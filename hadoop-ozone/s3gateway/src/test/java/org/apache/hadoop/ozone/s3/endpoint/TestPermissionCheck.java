@@ -32,24 +32,15 @@ import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
 
-import javax.ws.rs.core.Cookie;
 import javax.ws.rs.core.HttpHeaders;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.MultivaluedMap;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
-import java.util.Map;
 
 import static java.net.HttpURLConnection.HTTP_FORBIDDEN;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 
 /**
@@ -81,7 +72,7 @@ public class TestPermissionCheck {
   }
 
   /**
-   *  Root Endpoint
+   *  Root Endpoint.
    */
   @Test
   public void testListS3Buckets() throws IOException {
@@ -99,7 +90,7 @@ public class TestPermissionCheck {
   }
 
   /**
-   *  Bucket Endpoint
+   *  Bucket Endpoint.
    */
   @Test
   public void testGetBucket() throws IOException {
@@ -201,7 +192,7 @@ public class TestPermissionCheck {
   }
 
   /**
-   *  Object Endpoint
+   *  Object Endpoint.
    */
   @Test
   public void testGetKey() throws IOException {
@@ -212,10 +203,11 @@ public class TestPermissionCheck {
     objectEndpoint.setHeaders(headers);
 
     try {
-      objectEndpoint.get("bucketName", "keyPath", "uploadId", 1000, "marker",
+      objectEndpoint.get("bucketName", "keyPath", null, 1000, "marker",
           null);
       Assert.fail("Should fail");
     } catch (Exception e) {
+      e.printStackTrace();
       Assert.assertTrue(e instanceof OS3Exception);
       Assert.assertTrue(((OS3Exception) e).getHttpCode() == HTTP_FORBIDDEN);
     }
@@ -232,6 +224,41 @@ public class TestPermissionCheck {
 
     try {
       objectEndpoint.put("bucketName", "keyPath", 1024, 0, null, null);
+      Assert.fail("Should fail");
+    } catch (Exception e) {
+      Assert.assertTrue(e instanceof OS3Exception);
+      Assert.assertTrue(((OS3Exception) e).getHttpCode() == HTTP_FORBIDDEN);
+    }
+  }
+
+  @Test
+  public void testDeleteKey() throws IOException {
+    Mockito.when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
+    doThrow(exception).when(bucket).deleteKey(anyString());
+    ObjectEndpoint objectEndpoint = new ObjectEndpoint();
+    objectEndpoint.setClient(client);
+    objectEndpoint.setHeaders(headers);
+
+    try {
+      objectEndpoint.delete("bucketName", "keyPath", null);
+      Assert.fail("Should fail");
+    } catch (Exception e) {
+      Assert.assertTrue(e instanceof OS3Exception);
+      Assert.assertTrue(((OS3Exception) e).getHttpCode() == HTTP_FORBIDDEN);
+    }
+  }
+
+  @Test
+  public void testMultiUploadKey() throws IOException {
+    Mockito.when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
+    doThrow(exception).when(bucket)
+        .initiateMultipartUpload(anyString(), any(), any());
+    ObjectEndpoint objectEndpoint = new ObjectEndpoint();
+    objectEndpoint.setClient(client);
+    objectEndpoint.setHeaders(headers);
+
+    try {
+      objectEndpoint.initializeMultipartUpload("bucketName", "keyPath");
       Assert.fail("Should fail");
     } catch (Exception e) {
       Assert.assertTrue(e instanceof OS3Exception);

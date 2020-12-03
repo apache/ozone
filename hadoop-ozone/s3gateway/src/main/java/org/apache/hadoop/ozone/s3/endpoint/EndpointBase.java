@@ -119,7 +119,8 @@ public class EndpointBase {
       client.getObjectStore().deleteS3Bucket(s3BucketName);
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
-        throw S3ErrorTable.newError(S3ErrorTable.PERMISSION_DENIED, s3BucketName);
+        throw S3ErrorTable.newError(S3ErrorTable.PERMISSION_DENIED,
+            s3BucketName);
       }
       throw ex;
     }
@@ -162,7 +163,8 @@ public class EndpointBase {
       if (e.getResult() == ResultCodes.VOLUME_NOT_FOUND) {
         return Collections.emptyIterator();
       } else  if (e.getResult() == ResultCodes.PERMISSION_DENIED) {
-        throw S3ErrorTable.newError(S3ErrorTable.PERMISSION_DENIED, "listBuckets");
+        throw S3ErrorTable.newError(S3ErrorTable.PERMISSION_DENIED,
+            "listBuckets");
       } else {
         throw e;
       }

@@ -324,8 +324,7 @@ public class ObjectEndpoint extends EndpointBase {
         throw S3ErrorTable.newError(S3ErrorTable
             .NO_SUCH_KEY, keyPath);
       } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
-        throw S3ErrorTable.newError(S3ErrorTable
-            .PERMISSION_DENIED, keyPath);
+        throw S3ErrorTable.newError(S3ErrorTable.PERMISSION_DENIED, keyPath);
       } else {
         throw ex;
       }
@@ -363,6 +362,8 @@ public class ObjectEndpoint extends EndpointBase {
       if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
         // Just return 404 with no content
         return Response.status(Status.NOT_FOUND).build();
+      } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
+        throw S3ErrorTable.newError(S3ErrorTable.PERMISSION_DENIED, keyPath);
       } else {
         throw ex;
       }
@@ -432,6 +433,8 @@ public class ObjectEndpoint extends EndpointBase {
       } else if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
         //NOT_FOUND is not a problem, AWS doesn't throw exception for missing
         // keys. Just return 204
+      } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
+        throw S3ErrorTable.newError(S3ErrorTable.PERMISSION_DENIED, keyPath);
       } else {
         throw ex;
       }
@@ -480,9 +483,12 @@ public class ObjectEndpoint extends EndpointBase {
 
       return Response.status(Status.OK).entity(
           multipartUploadInitiateResponse).build();
-    } catch (IOException ex) {
+    } catch (OMException ex) {
       LOG.error("Error in Initiate Multipart Upload Request for bucket: {}, " +
           "key: {}", bucket, key, ex);
+      if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
+        throw S3ErrorTable.newError(S3ErrorTable.PERMISSION_DENIED, key);
+      }
       throw ex;
     }
   }

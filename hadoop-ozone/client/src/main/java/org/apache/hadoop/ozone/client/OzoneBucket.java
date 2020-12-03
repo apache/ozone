@@ -781,7 +781,8 @@ public class OzoneBucket extends WithMetadata {
     public boolean hasNext() {
       if(!currentIterator.hasNext() && currentValue != null) {
         try {
-          currentIterator = getNextListOfKeys(currentValue.getName()).iterator();
+          currentIterator =
+              getNextListOfKeys(currentValue.getName()).iterator();
         } catch (IOException e) {
           throw new RuntimeException(e);
         }
