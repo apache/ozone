@@ -79,7 +79,7 @@ public abstract class TestOzoneManagerHA {
   private static final int OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS = 5;
   private static final int IPC_CLIENT_CONNECT_MAX_RETRIES = 4;
   private static final long SNAPSHOT_THRESHOLD = 50;
-  private static final Duration retryCacheDuration = Duration.ofSeconds(30);
+  private static final Duration RETRY_CACHE_DURATION = Duration.ofSeconds(30);
 
   @Rule
   public ExpectedException exception = ExpectedException.none();
@@ -150,7 +150,7 @@ public abstract class TestOzoneManagerHA {
     OzoneManagerRatisServerConfig omHAConfig =
         conf.getObject(OzoneManagerRatisServerConfig.class);
 
-    omHAConfig.setRetryCacheTimeout(retryCacheDuration);
+    omHAConfig.setRetryCacheTimeout(RETRY_CACHE_DURATION);
 
     conf.setFromObject(omHAConfig);
 

@@ -550,7 +550,7 @@ public final class OzoneManagerRatisServer {
     Map<String, String> ratisServerConf =
         getOMHAConfigs(ozoneConf);
     ratisServerConf.forEach((key, val) -> {
-        raftProperties.set(key, val);
+      raftProperties.set(key, val);
     });
   }
 
