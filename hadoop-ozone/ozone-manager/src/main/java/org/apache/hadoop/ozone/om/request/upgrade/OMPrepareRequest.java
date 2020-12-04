@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.request.upgrade;
 
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
@@ -93,39 +94,45 @@ public class OMPrepareRequest extends OMClientRequest {
       // the snapshot index in the prepared state.
       ozoneManagerDoubleBufferHelper.add(response, transactionLogIndex);
 
+      OzoneManagerRatisServer omRatisServer = ozoneManager.getOmRatisServer();
+      RaftServerProxy server = (RaftServerProxy) omRatisServer.getServer();
+      RaftServerImpl serverImpl =
+          server.getImpl(omRatisServer.getRaftGroup().getGroupId());
+
       // Wait for outstanding double buffer entries to flush to disk,
       // so they will not be purged from the log before being persisted to
       // the DB.
       // Since the response for this request was added to the double buffer
       // already, once this index reaches the state machine, we know all
       // transactions have been flushed.
-      waitForDoubleBufferFlush(ozoneManager, transactionLogIndex);
-
-      OzoneManagerRatisServer omRatisServer = ozoneManager.getOmRatisServer();
-      RaftServerProxy server = (RaftServerProxy) omRatisServer.getServer();
-      RaftServerImpl serverImpl =
-          server.getImpl(omRatisServer.getRaftGroup().getGroupId());
-
+      waitForLogIndex(transactionLogIndex,
+          ozoneManager.getMetadataManager(), serverImpl);
       takeSnapshotAndPurgeLogs(serverImpl);
 
       // TODO: Create marker file with txn index.
 
       LOG.info("OM prepared at log index {}. Returning response {}",
           ozoneManager.getRatisSnapshotIndex(), omResponse);
-    } catch (IOException e) {
+    } catch (OMException e) {
       response = new OMPrepareResponse(
           createErrorOMResponse(responseBuilder, e));
-    } catch (InterruptedException e) {
+    } catch (InterruptedException | IOException e) {
+      // Set error code so that prepare failure does not cause the OM to
+      // terminate.
       response = new OMPrepareResponse(
           createErrorOMResponse(responseBuilder, new OMException(e,
-              OMException.ResultCodes.INTERNAL_ERROR)));
+              OMException.ResultCodes.PREPARE_FAILED)));
     }
 
     return response;
   }
 
-  private static void waitForDoubleBufferFlush(
-      OzoneManager ozoneManager, long indexToWaitFor)
+  /**
+   * Waits for the specified index to be flushed to the state machine on
+   * disk, and to be updated in memory in Ratis.
+   */
+  private static void waitForLogIndex(long indexToWaitFor,
+      OMMetadataManager metadataManager, RaftServerImpl server)
       throws InterruptedException, IOException {
 
     long endTime = System.currentTimeMillis() +
@@ -138,14 +145,21 @@ public class OMPrepareRequest extends OMClientRequest {
       // ozoneManager#getRatisSnaphotIndex.
       // Get the transaction directly instead to handle the case when it is
       // null.
-      OMTransactionInfo dbTxnInfo = ozoneManager.getMetadataManager()
+      OMTransactionInfo dbTxnInfo = metadataManager
           .getTransactionInfoTable().get(TRANSACTION_INFO_KEY);
+      long ratisTxnIndex =
+          server.getStateMachine().getLastAppliedTermIndex().getIndex();
+
+      // Ratis may apply meta transactions after the prepare request, causing
+      // its in memory index to always be greater than the DB index.
       if (dbTxnInfo == null) {
         // If there are no transactions in the DB, we are prepared to log
         // index 0 only.
-        success = (indexToWaitFor == 0);
+        success = (indexToWaitFor == 0)
+            && (ratisTxnIndex >= indexToWaitFor);
       } else {
-        success = (dbTxnInfo.getTransactionIndex() == indexToWaitFor);
+        success = (dbTxnInfo.getTransactionIndex() == indexToWaitFor)
+            && (ratisTxnIndex >= indexToWaitFor);
       }
 
       if (!success) {
@@ -170,11 +184,14 @@ public class OMPrepareRequest extends OMClientRequest {
    */
   public static long takeSnapshotAndPurgeLogs(RaftServerImpl impl)
       throws IOException {
+
     StateMachine stateMachine = impl.getStateMachine();
     long snapshotIndex = stateMachine.takeSnapshot();
     RaftLog raftLog = impl.getState().getLog();
     long raftLogIndex = raftLog.getLastEntryTermIndex().getIndex();
 
+    // Ensure that Ratis's in memory snapshot index is the same as the index
+    // of its last log entry.
     if (snapshotIndex != raftLogIndex) {
       throw new IOException("Snapshot index " + snapshotIndex + " does not " +
           "match last log index " + raftLogIndex);
