@@ -475,6 +475,8 @@ public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
 
     testSeekOnFileLength();
     tableCleanup();
+    testAllocateMoreThanOneBlock();
+    tableCleanup();
   }
 
   /**

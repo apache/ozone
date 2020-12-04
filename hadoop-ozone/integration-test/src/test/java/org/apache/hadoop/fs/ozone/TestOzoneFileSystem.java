@@ -38,6 +38,7 @@ import org.apache.hadoop.fs.InvalidPathException;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.Trash;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
+import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -278,6 +279,7 @@ public class TestOzoneFileSystem {
     testRenameDestinationParentDoesntExist();
     testRenameToParentDir();
     testSeekOnFileLength();
+    testAllocateMoreThanOneBlock();
     testDeleteRoot();
 
     testRecursiveDelete();
@@ -455,6 +457,18 @@ public class TestOzoneFileSystem {
     Path grandparent = new Path("/testBatchDelete");
     Path parent = new Path(grandparent, "parent");
     Path childFolder = new Path(parent, "childFolder");
+
+    Path childFile1 = new Path(parent, "childFileInfo.tmp");
+    ContractTestUtils.touch(fs, childFile1);
+    assertTrue("File doesn't exist!", fs.exists(childFile1));
+    assertTrue("Failed to delete file!", fs.delete(childFile1, true));
+    assertFalse("File delete failed!", fs.exists(childFile1));
+
+    Path srcFile = new Path(childFolder, "childFileInfo.txt");
+    ContractTestUtils.touch(fs, srcFile);
+    assertTrue("File doesn't exist!", fs.exists(srcFile));
+    fs.rename(srcFile, childFile1);
+
     // BatchSize is 5, so we're going to set a number that's not a
     // multiple of 5. In order to test the final number of keys less than
     // batchSize can also be deleted.
@@ -640,6 +654,38 @@ public class TestOzoneFileSystem {
     } catch (FileNotFoundException fnfe) {
       Assert.assertTrue("Expected FILE_NOT_FOUND error",
               fnfe.getMessage().contains("FILE_NOT_FOUND"));
+    }
+  }
+
+  public void testAllocateMoreThanOneBlock() throws IOException {
+    Path file = new Path("/file");
+    String str = "TestOzoneFileSystemV1.testSeekOnFileLength";
+    byte[] strBytes = str.getBytes();
+    long numBlockAllocationsOrg =
+            cluster.getOzoneManager().getMetrics().getNumBlockAllocates();
+
+    try (FSDataOutputStream out1 = fs.create(file, FsPermission.getDefault(),
+            true, 8, (short) 3, 1, null)) {
+      for (int i = 0; i < 100000; i++) {
+        out1.write(strBytes);
+      }
+    }
+
+    try (FSDataInputStream stream = fs.open(file)) {
+      FileStatus fileStatus = fs.getFileStatus(file);
+      long blkSize = fileStatus.getBlockSize();
+      long fileLength = fileStatus.getLen();
+      Assert.assertTrue("Block allocation should happen",
+              fileLength > blkSize);
+
+      long newNumBlockAllocations =
+              cluster.getOzoneManager().getMetrics().getNumBlockAllocates();
+
+      Assert.assertTrue("Block allocation should happen",
+              (newNumBlockAllocations > numBlockAllocationsOrg));
+
+      stream.seek(fileLength);
+      assertEquals(-1, stream.read());
     }
   }
 
@@ -834,14 +880,18 @@ public class TestOzoneFileSystem {
    * Rename file to a non-existent destin file.
    */
   protected void testRenameFile() throws Exception {
-    final String root = "/root";
+    final String root = "/root/dir1/";
     Path rootPath = new Path(fs.getUri().toString() + root);
     fs.mkdirs(rootPath);
+
+    final String destin = "/root/destin/dirdestin/";
+    Path destinRoot = new Path(fs.getUri().toString() + destin);
+    fs.mkdirs(destinRoot);
 
     Path file1Source = new Path(fs.getUri().toString() + root
             + "/file1_Copy");
     ContractTestUtils.touch(fs, file1Source);
-    Path file1Destin = new Path(fs.getUri().toString() + root + "/file1");
+    Path file1Destin = new Path(fs.getUri().toString() + destin + "/file1");
     assertTrue("Renamed failed", fs.rename(file1Source, file1Destin));
     assertTrue("Renamed failed: /root/file1", fs.exists(file1Destin));
 
@@ -851,7 +901,7 @@ public class TestOzoneFileSystem {
      * prepared and assigned to fullkeyPath name.
      */
     for (int i = 0; i < 10; i++) {
-      FileStatus[] fStatus = fs.listStatus(rootPath);
+      FileStatus[] fStatus = fs.listStatus(destinRoot);
       assertEquals("Renamed failed", 1, fStatus.length);
       assertEquals("Wrong path name!", file1Destin, fStatus[0].getPath());
     }
