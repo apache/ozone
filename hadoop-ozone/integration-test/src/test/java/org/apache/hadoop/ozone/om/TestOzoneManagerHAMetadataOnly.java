@@ -423,7 +423,7 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
         + volumeName));
 
     //Sleep for little above seconds to get cache clear.
-    Thread.sleep(35000);
+    Thread.sleep(65000);
 
     raftClientReply =
         raftServer.submitClientRequest(new RaftClientRequest(clientId,
