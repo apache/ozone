@@ -923,7 +923,7 @@ public class KeyManagerImpl implements KeyManager {
 
     List<OmKeyInfo> keyList = metadataManager.listKeys(volumeName, bucketName,
         startKey, keyPrefix, maxKeys);
-    refreshPipeline(keyList);
+
     return keyList;
   }
 
