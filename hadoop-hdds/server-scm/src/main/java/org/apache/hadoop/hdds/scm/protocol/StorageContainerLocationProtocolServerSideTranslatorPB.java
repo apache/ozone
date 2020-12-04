@@ -133,9 +133,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   public ScmContainerLocationResponse submitRequest(RpcController controller,
       ScmContainerLocationRequest request) throws ServiceException {
     if (!isLeader()) {
-      return ScmContainerLocationResponse.newBuilder()
-              .setCmdType(request.getCmdType()).setTraceID(request.getTraceID())
-              .setSuccess(false).setStatus(Status.SCM_NOT_LEADER).build();
+      throw new ServiceException(new IOException("SCM IS NOT LEADER"));
     }
     return dispatcher
         .processRequest(request, this::processRequest, request.getCmdType(),
