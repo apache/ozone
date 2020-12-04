@@ -28,6 +28,10 @@ import java.util.concurrent.atomic.AtomicLong;
 import com.google.protobuf.ServiceException;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
+import org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBuffer;
+import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKey;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKeyBucket;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -45,6 +49,8 @@ import com.google.common.annotations.VisibleForTesting;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
 import org.apache.ratis.protocol.ClientId;
+import org.apache.ratis.protocol.Message;
+import org.apache.ratis.protocol.RaftClientRequest;
 import org.apache.ratis.util.Preconditions;
 import org.apache.ratis.util.TimeDuration;
 import org.slf4j.Logger;
@@ -136,6 +142,13 @@ public class OpenKeyCleanupService extends BackgroundService {
     return ozoneManager.isLeaderReady();
   }
 
+  private boolean isRatisEnabled() {
+    if (ozoneManager == null) {
+      return false;
+    }
+    return ozoneManager.isRatisEnabled();
+  }
+
   private class OpenKeyCleanupTask implements BackgroundTask {
     @Override
     public int getPriority() {
@@ -155,7 +168,13 @@ public class OpenKeyCleanupService extends BackgroundService {
               expireThreshold, cleanupLimitPerTask);
 
           if (expiredOpenKeys != null && !expiredOpenKeys.isEmpty()) {
-            submitOpenKeysDeleteRequest(expiredOpenKeys);
+            OMRequest omRequest = buildOpenKeyDeleteRequest(expiredOpenKeys);
+            if (isRatisEnabled()) {
+              submitRatisRequest(ozoneManager, omRequest);
+            } else {
+              ozoneManager.getOmServerProtocol().submitRequest(null, omRequest);
+            }
+
             LOG.debug("Number of expired keys submitted for deletion: {}, " +
                     "elapsed time: {}ms",
                  expiredOpenKeys.size(), Time.monotonicNow() - startTime);
@@ -171,10 +190,11 @@ public class OpenKeyCleanupService extends BackgroundService {
     }
 
     /**
-     * Submits a Ratis request to move the keys in {@code expiredOpenKeys}
+     * Builds a Ratis request to move the keys in {@code expiredOpenKeys}
      * out of the open key table and into the delete table.
      */
-    public void submitOpenKeysDeleteRequest(List<String> expiredOpenKeys) {
+    private OMRequest buildOpenKeyDeleteRequest(
+        List<String> expiredOpenKeys) {
       Map<Pair<String, String>, List<OpenKey>> openKeysPerBucket =
           new HashMap<>();
 
@@ -202,57 +222,68 @@ public class OpenKeyCleanupService extends BackgroundService {
         requestBuilder.addOpenKeysPerBucket(openKeyBucket);
       }
 
-      OMRequest omRequest = OMRequest.newBuilder()
+      return OMRequest.newBuilder()
           .setCmdType(Type.DeleteOpenKeys)
           .setDeleteOpenKeysRequest(requestBuilder)
           .setClientId(clientId.toString())
           .build();
+    }
 
+    private void submitRatisRequest(OzoneManager om, OMRequest omRequest) {
       try {
-        ozoneManager.getOmServerProtocol().submitRequest(null, omRequest);
+        OzoneManagerRatisServer server = om.getOmRatisServer();
+        RaftClientRequest raftClientRequest = new RaftClientRequest(
+            ClientId.randomId(),
+            server.getRaftPeerId(),
+            server.getRaftGroupId(),
+            0,
+            Message.valueOf(OMRatisHelper.convertRequestToByteString(omRequest)),
+            RaftClientRequest.writeRequestType(), null);
+
+        server.submitRequest(omRequest, raftClientRequest);
       } catch (ServiceException ex) {
         LOG.error("Open key delete request failed. Will retry at next run.",
             ex);
       }
     }
-  }
 
-  /**
-   * Separates {@code openKeyName} into its volume, bucket, key, and client ID.
-   * Creates an {@link OpenKey} object from {@code openKeyName}'s key and
-   * client ID, and maps {@code openKeyName}'s volume and bucket to this
-   * {@link OpenKey}.
-   */
-  private void addToMap(Map<Pair<String, String>, List<OpenKey>>
-      openKeysPerBucket, String openKeyName) {
-    // First element of the split is an empty string since the key begins
-    // with the separator.
-    // Key may contain multiple instances of the separator as well, for example:
-    // /volume/bucket/dir1//dir2/dir3/file1////10000
-    String[] split = openKeyName.split(OM_KEY_PREFIX);
-    Preconditions.assertTrue(split.length >= 5, "Unable to separate volume, " +
-        "bucket, key, and client ID from open key {}.", openKeyName);
+    /**
+     * Separates {@code openKeyName} into its volume, bucket, key, and client ID.
+     * Creates an {@link OpenKey} object from {@code openKeyName}'s key and
+     * client ID, and maps {@code openKeyName}'s volume and bucket to this
+     * {@link OpenKey}.
+     */
+    private void addToMap(Map<Pair<String, String>, List<OpenKey>>
+        openKeysPerBucket, String openKeyName) {
+      // First element of the split is an empty string since the key begins
+      // with the separator.
+      // Key may contain multiple instances of the separator as well, for example:
+      // /volume/bucket/dir1//dir2/dir3/file1////10000
+      String[] split = openKeyName.split(OM_KEY_PREFIX);
+      Preconditions.assertTrue(split.length >= 5, "Unable to separate volume, " +
+          "bucket, key, and client ID from open key {}.", openKeyName);
 
-    Pair<String, String> volumeBucketPair = Pair.of(split[1], split[2]);
-    String key = String.join(OM_KEY_PREFIX,
-        Arrays.copyOfRange(split, 3, split.length - 1));
-    String clientID = split[split.length - 1];
+      Pair<String, String> volumeBucketPair = Pair.of(split[1], split[2]);
+      String key = String.join(OM_KEY_PREFIX,
+          Arrays.copyOfRange(split, 3, split.length - 1));
+      String clientID = split[split.length - 1];
 
-    if (!openKeysPerBucket.containsKey(volumeBucketPair)) {
-      openKeysPerBucket.put(volumeBucketPair, new ArrayList<>());
-    }
+      if (!openKeysPerBucket.containsKey(volumeBucketPair)) {
+        openKeysPerBucket.put(volumeBucketPair, new ArrayList<>());
+      }
 
-    try {
-      OpenKey openKey = OpenKey.newBuilder()
-          .setName(key)
-          .setClientID(Long.parseLong(clientID))
-          .build();
-      openKeysPerBucket.get(volumeBucketPair).add(openKey);
-    } catch (NumberFormatException ex) {
-      // If the client ID cannot be parsed correctly, do not add the key to
-      // the map.
-      LOG.error("Failed to parse client ID {} as a long from open key {}.",
-          clientID, openKeyName, ex);
+      try {
+        OpenKey openKey = OpenKey.newBuilder()
+            .setName(key)
+            .setClientID(Long.parseLong(clientID))
+            .build();
+        openKeysPerBucket.get(volumeBucketPair).add(openKey);
+      } catch (NumberFormatException ex) {
+        // If the client ID cannot be parsed correctly, do not add the key to
+        // the map.
+        LOG.error("Failed to parse client ID {} as a long from open key {}.",
+            clientID, openKeyName, ex);
+      }
     }
   }
 }
