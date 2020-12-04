@@ -20,35 +20,52 @@
 package org.apache.hadoop.ozone.om;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Random;
 
+import org.apache.avro.generic.GenericData;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.MiniOzoneClusterImpl;
+import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.common.BlockGroup;
+import org.apache.hadoop.ozone.container.keyvalue.ChunkLayoutTestInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.hadoop.tools.util.ProducerConsumer;
 import org.apache.ratis.util.TimeDuration;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
+import java.util.function.Function;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
 /**
  * Integration tests for the open key cleanup service on OM.
  */
+@RunWith(Parameterized.class)
 public class TestOpenKeyCleanupService {
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();
@@ -71,10 +88,21 @@ public class TestOpenKeyCleanupService {
   private static final String DEFAULT_VOLUME = "volume";
   private static final String DEFAULT_BUCKET = "bucket";
 
-  private KeyManager keyManager;
-  private OpenKeyCleanupService service;
-  private  OMMetadataManager metadataManager;
   private MiniOzoneCluster cluster;
+  private boolean isOMHA;
+  private List<OzoneManager> ozoneManagers;
+
+  @Parameterized.Parameters
+  public static Iterable<Object[]> parameters() {
+    List<Object[]> params = new ArrayList<>();
+    params.add(new Boolean[]{true});
+    params.add(new Boolean[]{false});
+    return params;
+  }
+
+  public TestOpenKeyCleanupService(boolean isOMHA) {
+    this.isOMHA = isOMHA;
+  }
 
   private void setupCluster() throws Exception {
     setupCluster(TESTING_SERVICE_INTERVAL, TESTING_EXPIRE_THRESHOLD);
@@ -99,17 +127,20 @@ public class TestOpenKeyCleanupService {
     conf.setInt(OMConfigKeys.OZONE_OPEN_KEY_CLEANUP_LIMIT_PER_TASK,
         TESTING_TASK_LIMIT);
 
-    cluster = MiniOzoneCluster.newBuilder(conf).build();
+    if (isOMHA) {
+      cluster = MiniOzoneCluster.newHABuilder(conf).build();
+      ozoneManagers = ((MiniOzoneHAClusterImpl) cluster).getOzoneManagersList();
+    } else {
+      cluster = MiniOzoneCluster.newBuilder(conf).build();
+      ozoneManagers = Collections.singletonList(cluster.getOzoneManager());
+    }
+
     cluster.waitForClusterToBeReady();
 
-    OzoneManager omLeader = cluster.getOzoneManager();
-    keyManager = omLeader.getKeyManager();
-    service = (OpenKeyCleanupService) keyManager.getOpenKeyCleanupService();
-    metadataManager = omLeader.getMetadataManager();
-
-    TestOMRequestUtils.addVolumeToDB(DEFAULT_VOLUME, metadataManager);
-    TestOMRequestUtils.addBucketToDB(DEFAULT_VOLUME, DEFAULT_BUCKET,
-        metadataManager);
+    ObjectStore store = OzoneClientFactory.getRpcClient("om-service-id", conf)
+            .getObjectStore();
+    store.createVolume(DEFAULT_VOLUME);
+    store.getVolume(DEFAULT_VOLUME).createBucket(DEFAULT_BUCKET);
   }
 
   @After
@@ -146,23 +177,28 @@ public class TestOpenKeyCleanupService {
 
     // Setup test and verify the setup.
     Set<String> originalOpenKeys = createExpiredOpenKeys(numKeys, numBlocks);
-    Assert.assertEquals(originalOpenKeys, getAllOpenKeys());
     Assert.assertEquals(numKeys, originalOpenKeys.size());
-
-    Assert.assertEquals(0, getAllPendingDeleteKeys().size());
+    for (OzoneManager om: ozoneManagers) {
+      Assert.assertEquals(originalOpenKeys, getAllOpenKeys(om));
+      Assert.assertEquals(0, getAllPendingDeleteKeys(om).size());
+    }
 
     int serviceIntervalMillis =
         serviceInterval.toIntExact(TimeUnit.MILLISECONDS);
 
     // Wait for all open keys to become expired and be deleted.
+
+    OpenKeyCleanupService service = getService();
     GenericTestUtils.waitFor(
         () -> service.getSubmittedOpenKeyCount().get() >= numKeys,
         serviceIntervalMillis,
         serviceIntervalMillis * 10);
 
     Assert.assertTrue(service.getRunCount().get() >= numRuns);
-    Assert.assertEquals(originalOpenKeys, getAllPendingDeleteKeys());
-    Assert.assertEquals(0, getAllOpenKeys().size());
+    for (OzoneManager om: ozoneManagers) {
+      Assert.assertEquals(originalOpenKeys, getAllPendingDeleteKeys(om));
+      Assert.assertEquals(0, getAllOpenKeys(om).size());
+    }
   }
 
   /**
@@ -176,23 +212,26 @@ public class TestOpenKeyCleanupService {
 
     // Setup test and verify the setup.
     Set<String> originalOpenKeys = createOpenKeys(TESTING_TASK_LIMIT);
-    Assert.assertEquals(originalOpenKeys, getAllOpenKeys());
     Assert.assertEquals(TESTING_TASK_LIMIT, originalOpenKeys.size());
 
     Set<String> originalExpiredKeys = createExpiredOpenKeys(TESTING_TASK_LIMIT);
-    Assert.assertEquals(originalExpiredKeys, getAllExpiredOpenKeys());
     Assert.assertEquals(TESTING_TASK_LIMIT, originalExpiredKeys.size());
 
-    Assert.assertEquals(0, getAllPendingDeleteKeys().size());
+    for (OzoneManager om: ozoneManagers) {
+      Assert.assertEquals(originalOpenKeys, getAllOpenKeys(om));
+      Assert.assertEquals(originalExpiredKeys, getAllExpiredOpenKeys(om));
+      Assert.assertEquals(0, getAllPendingDeleteKeys(om).size());
+    }
 
     runService();
 
     // Keys with no block data should be removed from open key table without
     // being put in the delete table.
-    Assert.assertEquals(0, getAllPendingDeleteKeys().size());
-
-    Assert.assertEquals(TESTING_TASK_LIMIT, getAllOpenKeys().size());
-    Assert.assertEquals(originalOpenKeys, getAllOpenKeys());
+    for (OzoneManager om: ozoneManagers) {
+      Assert.assertEquals(0, getAllPendingDeleteKeys(om).size());
+      Assert.assertEquals(TESTING_TASK_LIMIT, getAllOpenKeys(om).size());
+      Assert.assertEquals(originalOpenKeys, getAllOpenKeys(om));
+    }
   }
 
   /**
@@ -208,20 +247,28 @@ public class TestOpenKeyCleanupService {
 
     // Setup test and verify the setup.
     Set<String> originalOpenKeys = createOpenKeys(TESTING_TASK_LIMIT);
-    Assert.assertEquals(originalOpenKeys, getAllOpenKeys());
     Assert.assertEquals(TESTING_TASK_LIMIT, originalOpenKeys.size());
+    for (OzoneManager om: ozoneManagers) {
+      Assert.assertEquals(originalOpenKeys, getAllOpenKeys(om));
+    }
 
     Set<String> originalExpiredKeys = createExpiredOpenKeys(TESTING_TASK_LIMIT,
         numBlocks);
-    Assert.assertEquals(originalExpiredKeys, getAllExpiredOpenKeys());
     Assert.assertEquals(TESTING_TASK_LIMIT, originalExpiredKeys.size());
+    for (OzoneManager om: ozoneManagers) {
+      Assert.assertEquals(originalExpiredKeys, getAllExpiredOpenKeys(om));
+    }
 
-    Assert.assertEquals(0, getAllPendingDeleteKeys().size());
+    for (OzoneManager om: ozoneManagers) {
+      Assert.assertEquals(0, getAllPendingDeleteKeys(om).size());
+    }
 
     runService();
 
-    Assert.assertEquals(originalOpenKeys, getAllOpenKeys());
-    Assert.assertEquals(originalExpiredKeys, getAllPendingDeleteKeys());
+    for (OzoneManager om: ozoneManagers) {
+      Assert.assertEquals(originalOpenKeys, getAllOpenKeys(om));
+      Assert.assertEquals(originalExpiredKeys, getAllPendingDeleteKeys(om));
+    }
   }
 
   @Test
@@ -232,14 +279,19 @@ public class TestOpenKeyCleanupService {
 
     // Verify test setup.
     Assert.assertEquals(TESTING_TASK_LIMIT, originalOpenKeys.size());
-    Assert.assertEquals(getAllOpenKeys(), originalOpenKeys);
-    Assert.assertEquals(0, getAllPendingDeleteKeys().size());
+
+    for (OzoneManager om: ozoneManagers) {
+      Assert.assertEquals(getAllOpenKeys(om), originalOpenKeys);
+      Assert.assertEquals(0, getAllPendingDeleteKeys(om).size());
+    }
 
     runService();
 
     // Tables should be unchanged since no keys are expired.
-    Assert.assertEquals(originalOpenKeys, getAllOpenKeys());
-    Assert.assertEquals(0, getAllPendingDeleteKeys().size());
+    for (OzoneManager om: ozoneManagers) {
+      Assert.assertEquals(originalOpenKeys, getAllOpenKeys(om));
+      Assert.assertEquals(0, getAllPendingDeleteKeys(om).size());
+    }
   }
 
   @Test
@@ -247,15 +299,19 @@ public class TestOpenKeyCleanupService {
     setupCluster();
 
     // Verify test setup.
-    Assert.assertEquals(0, getAllOpenKeys().size());
-    Assert.assertEquals(0, getAllPendingDeleteKeys().size());
+    for (OzoneManager om: ozoneManagers) {
+      Assert.assertEquals(0, getAllOpenKeys(om).size());
+      Assert.assertEquals(0, getAllPendingDeleteKeys(om).size());
+    }
 
     // Make sure service runs without errors.
     runService();
 
     // Tables should be unchanged since no keys are expired.
-    Assert.assertEquals(0, getAllOpenKeys().size());
-    Assert.assertEquals(0, getAllPendingDeleteKeys().size());
+    for (OzoneManager om: ozoneManagers) {
+      Assert.assertEquals(0, getAllOpenKeys(om).size());
+      Assert.assertEquals(0, getAllPendingDeleteKeys(om).size());
+    }
   }
 
   /**
@@ -277,8 +333,10 @@ public class TestOpenKeyCleanupService {
 
     // Verify test setup.
     Assert.assertEquals(numKeys, originalExpiredKeys.size());
-    Assert.assertEquals(getAllExpiredOpenKeys(), originalExpiredKeys);
-    Assert.assertEquals(0, getAllPendingDeleteKeys().size());
+    for (OzoneManager om: ozoneManagers) {
+      Assert.assertEquals(getAllExpiredOpenKeys(om), originalExpiredKeys);
+      Assert.assertEquals(0, getAllPendingDeleteKeys(om).size());
+    }
 
     runService(numServiceRuns);
 
@@ -286,17 +344,19 @@ public class TestOpenKeyCleanupService {
     // So for multiple runs that will not delete all keys, we can only
     // check that the correct key counts were deleted, and that the deleted
     // keys are a subset of the originally created keys.
-    Set<String> pendingDeleteKeys = getAllPendingDeleteKeys();
-    Set<String> expiredKeys = getAllExpiredOpenKeys();
+    for (OzoneManager om: ozoneManagers) {
+      Set<String> pendingDeleteKeys = getAllPendingDeleteKeys(om);
+      Set<String> expiredKeys = getAllExpiredOpenKeys(om);
 
-    Assert.assertTrue(originalExpiredKeys.containsAll(pendingDeleteKeys));
-    Assert.assertTrue(originalExpiredKeys.containsAll(expiredKeys));
+      Assert.assertTrue(originalExpiredKeys.containsAll(pendingDeleteKeys));
+      Assert.assertTrue(originalExpiredKeys.containsAll(expiredKeys));
 
-    // Service runs should have reached but not exceeded their task limit.
-    Assert.assertEquals(TESTING_TASK_LIMIT * numServiceRuns,
-        pendingDeleteKeys.size());
-    // All remaining keys should still be present in the open key table.
-    Assert.assertEquals(TESTING_TASK_LIMIT, expiredKeys.size());
+      // Service runs should have reached but not exceeded their task limit.
+      Assert.assertEquals(TESTING_TASK_LIMIT * numServiceRuns,
+          pendingDeleteKeys.size());
+      // All remaining keys should still be present in the open key table.
+      Assert.assertEquals(TESTING_TASK_LIMIT, expiredKeys.size());
+    }
   }
 
   /**
@@ -316,14 +376,18 @@ public class TestOpenKeyCleanupService {
 
     // Verify test setup.
     Assert.assertEquals(TESTING_TASK_LIMIT, originalExpiredKeys.size());
-    Assert.assertEquals(getAllExpiredOpenKeys(), originalExpiredKeys);
-    Assert.assertEquals(0, getAllPendingDeleteKeys().size());
+    for (OzoneManager om: ozoneManagers) {
+      Assert.assertEquals(getAllExpiredOpenKeys(om), originalExpiredKeys);
+      Assert.assertEquals(0, getAllPendingDeleteKeys(om).size());
+    }
 
     runService();
 
     // All keys should have been cleaned up.
-    Assert.assertEquals(originalExpiredKeys, getAllPendingDeleteKeys());
-    Assert.assertEquals(0, getAllExpiredOpenKeys().size());
+    for (OzoneManager om: ozoneManagers) {
+      Assert.assertEquals(originalExpiredKeys, getAllPendingDeleteKeys(om));
+      Assert.assertEquals(0, getAllExpiredOpenKeys(om).size());
+    }
   }
 
   /**
@@ -356,25 +420,29 @@ public class TestOpenKeyCleanupService {
 
     // Verify test setup.
     Assert.assertEquals(numKeysPerBucket * 3, allCreatedKeys.size());
-    Assert.assertEquals(getAllOpenKeys(), allCreatedKeys);
+    for (OzoneManager om: ozoneManagers) {
+      Assert.assertEquals(getAllOpenKeys(om), allCreatedKeys);
+    }
 
     runService(numServiceRuns);
 
     // All keys should have been cleaned up.
-    Assert.assertEquals(allCreatedKeys, getAllPendingDeleteKeys());
-    Assert.assertEquals(0, getAllExpiredOpenKeys().size());
+    for (OzoneManager om: ozoneManagers) {
+      Assert.assertEquals(allCreatedKeys, getAllPendingDeleteKeys(om));
+      Assert.assertEquals(0, getAllExpiredOpenKeys(om).size());
+    }
   }
 
-  private Set<String> getAllExpiredOpenKeys() throws Exception {
-    return new HashSet<>(keyManager.getExpiredOpenKeys(TESTING_EXPIRE_THRESHOLD,
-        Integer.MAX_VALUE));
+  private Set<String> getAllExpiredOpenKeys(OzoneManager om) throws Exception {
+    return new HashSet<>(om.getKeyManager()
+        .getExpiredOpenKeys(TESTING_EXPIRE_THRESHOLD, Integer.MAX_VALUE));
   }
 
-  private Set<String> getAllOpenKeys() throws Exception {
+  private Set<String> getAllOpenKeys(OzoneManager om) throws Exception {
     Set<String> keys = new HashSet<>();
     List<? extends Table.KeyValue<String, OmKeyInfo>> keyPairs =
-        metadataManager.getOpenKeyTable().getRangeKVs(null,
-        Integer.MAX_VALUE);
+        om.getMetadataManager().getOpenKeyTable()
+            .getRangeKVs(null, Integer.MAX_VALUE);
 
     for (Table.KeyValue<String, OmKeyInfo> keyPair: keyPairs) {
       keys.add(keyPair.getKey());
@@ -383,9 +451,9 @@ public class TestOpenKeyCleanupService {
     return keys;
   }
 
-  private Set<String> getAllPendingDeleteKeys() throws Exception {
+  private Set<String> getAllPendingDeleteKeys(OzoneManager om) throws Exception {
     List<BlockGroup> blocks =
-        keyManager.getPendingDeletionKeys(Integer.MAX_VALUE);
+        om.getKeyManager().getPendingDeletionKeys(Integer.MAX_VALUE);
 
     Set<String> keyNames = new HashSet<>();
     for (BlockGroup block: blocks) {
@@ -400,8 +468,24 @@ public class TestOpenKeyCleanupService {
   }
 
   private void runService(int numRuns) throws Exception {
+    OpenKeyCleanupService service = getService();
     for (int i = 0; i < numRuns; i++) {
       service.getTasks().poll().call();
+    }
+
+    // TODO: Wait until all ozone managers have applied changes to disk.
+  }
+
+  private OpenKeyCleanupService getService() {
+    return (OpenKeyCleanupService) getLeader().getKeyManager()
+        .getOpenKeyCleanupService();
+  }
+
+  private OzoneManager getLeader() {
+    if (cluster instanceof MiniOzoneHAClusterImpl) {
+      return ((MiniOzoneHAClusterImpl) cluster).getOMLeader();
+    } else {
+      return cluster.getOzoneManager();
     }
   }
 
@@ -426,7 +510,6 @@ public class TestOpenKeyCleanupService {
 
   private Set<String> createOpenKeys(String volume, String bucket, int numKeys,
       int numBlocks, boolean expired) throws Exception {
-
     Set<String> openKeys = new HashSet<>();
     long creationTime = Instant.now().toEpochMilli();
 
@@ -464,12 +547,15 @@ public class TestOpenKeyCleanupService {
         TestOMRequestUtils.addKeyLocationInfo(keyInfo, 0, numBlocks);
       }
 
-      TestOMRequestUtils.addKeyToTable(true, false,
-          keyInfo, clientID, 0L, metadataManager);
+      // Insert keys into every ozone manager's DB.
+      for (OzoneManager om: ozoneManagers) {
+        TestOMRequestUtils.addKeyToTable(true, false,
+            keyInfo, clientID, 0L, om.getMetadataManager());
 
-      String fullKeyName = metadataManager.getOpenKey(volume, bucket,
-          keyInfo.getKeyName(), clientID);
-      openKeys.add(fullKeyName);
+        String fullKeyName = om.getMetadataManager().getOpenKey(volume, bucket,
+            keyInfo.getKeyName(), clientID);
+        openKeys.add(fullKeyName);
+      }
     }
 
     return openKeys;
