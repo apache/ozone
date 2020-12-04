@@ -17,21 +17,25 @@
  */
 package org.apache.hadoop.hdds.scm.cli;
 
+import org.apache.hadoop.hdds.scm.cli.upgrade.FinalizeUpgradeBaseCommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import picocli.CommandLine;
 
 import java.io.IOException;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 
 /**
  * Base class for admin commands that connect via SCM client.
  */
-public abstract class ScmSubcommand implements Callable<Void> {
+public abstract class ScmSubcommand extends FinalizeUpgradeBaseCommand
+    implements Callable<Void> {
 
   @CommandLine.Mixin
   private ScmOption scmOption;
 
-  protected abstract void execute(ScmClient client) throws IOException;
+  protected abstract void execute(ScmClient client)
+      throws IOException, ExecutionException;
 
   @Override
   public final Void call() throws Exception {

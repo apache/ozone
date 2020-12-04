@@ -18,8 +18,9 @@
 package org.apache.hadoop.ozone.admin.om;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.hdds.scm.cli.upgrade.FinalizeUpgradeBaseCommand;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.ozone.upgrade.UpgradeException;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import picocli.CommandLine;
 
@@ -31,8 +32,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 
 /**
  * Handler of ozone admin om finalizeUpgrade command.
@@ -47,7 +46,8 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVA
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class
 )
-public class FinalizeUpgradeSubCommand implements Callable<Void> {
+public class FinalizeUpgradeSubCommand extends FinalizeUpgradeBaseCommand
+    implements Callable<Void> {
 
   @CommandLine.ParentCommand
   private OMAdmin parent;
@@ -91,8 +91,8 @@ public class FinalizeUpgradeSubCommand implements Callable<Void> {
         );
         throw new IOException("Exiting...");
       }
-    } catch (OMException e) {
-      handleInvalidRequestAfterInitiatingFinalization(e);
+    } catch (UpgradeException e) {
+      handleInvalidRequestAfterInitiatingFinalization(force, e);
     }
     monitorAndWaitFinalization(client, upgradeClientID);
     return null;
@@ -105,34 +105,14 @@ public class FinalizeUpgradeSubCommand implements Callable<Void> {
         exec.submit(new UpgradeMonitor(client, upgradeClientID, force));
     try {
       monitor.get();
-      emitFinishedMsg();
+      emitFinishedMsg("Ozone Manager");
     } catch (CancellationException|InterruptedException e) {
-      emitCancellationMsg();
+      emitCancellationMsg("Ozone Manager");
     } catch (ExecutionException e) {
       emitGeneralErrorMsg();
       throw e;
     } finally {
       exec.shutdown();
-    }
-  }
-
-  private void handleInvalidRequestAfterInitiatingFinalization(
-      OMException e) throws IOException {
-    if (e.getResult().equals(INVALID_REQUEST)) {
-      if (force) {
-        return;
-      }
-      System.err.println("Finalization is already in progress, it is not"
-          + "possible to initiate it again.");
-      e.printStackTrace(System.err);
-      System.err.println("If you want to track progress from a new client"
-          + "for any reason, use --takeover, and the status update will be"
-          + "received by the new client. Note that with forcing to monitor"
-          + "progress from a new client, the old one initiated the upgrade"
-          + "will not be able to monitor the progress further and exit.");
-      throw new IOException("Exiting...");
-    } else {
-      throw e;
     }
   }
 
@@ -178,40 +158,5 @@ public class FinalizeUpgradeSubCommand implements Callable<Void> {
       }
       return null;
     }
-
-  }
-  private static void emitExitMsg() {
-    System.out.println("Exiting...");
-  }
-
-  private static boolean isFinalized(UpgradeFinalizer.Status status) {
-    return status.equals(UpgradeFinalizer.Status.ALREADY_FINALIZED);
-  }
-
-  private static boolean isDone(UpgradeFinalizer.Status status) {
-    return status.equals(UpgradeFinalizer.Status.FINALIZATION_DONE);
-  }
-
-  private static boolean isInprogress(UpgradeFinalizer.Status status) {
-    return status.equals(UpgradeFinalizer.Status.FINALIZATION_IN_PROGRESS);
-  }
-
-  private static boolean isStarting(UpgradeFinalizer.Status status) {
-    return status.equals(UpgradeFinalizer.Status.STARTING_FINALIZATION);
-  }
-
-  private static void emitGeneralErrorMsg() {
-    System.err.println("Finalization was not successful.");
-  }
-
-  private static void emitFinishedMsg() {
-    System.out.println("Finalization of Ozone Manager's metadata upgrade "
-        + "finished.");
-  }
-
-  private static void emitCancellationMsg() {
-    System.err.println("Finalization command was cancelled. Note that, this"
-        + "will not cancel finalization in Ozone Manager. Progress can be"
-        + "monitored in the Ozone Manager's log.");
   }
 }
