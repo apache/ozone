@@ -457,18 +457,6 @@ public class TestOzoneFileSystem {
     Path grandparent = new Path("/testBatchDelete");
     Path parent = new Path(grandparent, "parent");
     Path childFolder = new Path(parent, "childFolder");
-
-    Path childFile1 = new Path(parent, "childFileInfo.tmp");
-    ContractTestUtils.touch(fs, childFile1);
-    assertTrue("File doesn't exist!", fs.exists(childFile1));
-    assertTrue("Failed to delete file!", fs.delete(childFile1, true));
-    assertFalse("File delete failed!", fs.exists(childFile1));
-
-    Path srcFile = new Path(childFolder, "childFileInfo.txt");
-    ContractTestUtils.touch(fs, srcFile);
-    assertTrue("File doesn't exist!", fs.exists(srcFile));
-    fs.rename(srcFile, childFile1);
-
     // BatchSize is 5, so we're going to set a number that's not a
     // multiple of 5. In order to test the final number of keys less than
     // batchSize can also be deleted.
@@ -724,8 +712,8 @@ public class TestOzoneFileSystem {
    */
   protected void testRenameWithNonExistentSource() throws Exception {
     final String root = "/root";
-    final String dir1 = root + "/dir1";
-    final String dir2 = root + "/dir2";
+    final String dir1 = root + "/sourcedir1";
+    final String dir2 = root + "/destindir1";
     final Path source = new Path(fs.getUri().toString() + dir1);
     final Path destin = new Path(fs.getUri().toString() + dir2);
 
@@ -826,15 +814,12 @@ public class TestOzoneFileSystem {
 
     // Add a sub-directory '/b/a' to '/b'. This is to verify that rename
     // throws exception as new destin /b/a already exists.
-    final Path baPath = new Path(fs.getUri().toString() + "/b/a");
+    final Path baPath = new Path(fs.getUri().toString() + "/b/a/c");
     fs.mkdirs(baPath);
 
-    try {
-      fs.rename(aSourcePath, bDestinPath);
-      Assert.fail("Should fail as new destination dir exists!");
-    } catch (FileAlreadyExistsException faee) {
-      // expected as new sub-path /b/a already exists.
-    }
+    // expected as new sub-path /b/a already exists.
+    Assert.assertFalse("Should fail as new destination dir exists!",
+            fs.rename(aSourcePath, bDestinPath));
 
     // Case-5.b) Rename file from /a/b/c/file1 to /a.
     // Should be failed since /a/file1 exists.
@@ -848,12 +833,8 @@ public class TestOzoneFileSystem {
 
     final Path aDestinPath = new Path(fs.getUri().toString() + "/a");
 
-    try {
-      fs.rename(abcFile1, aDestinPath);
-      Assert.fail("Should fail as new destination file exists!");
-    } catch (FileAlreadyExistsException faee) {
-      // expected as new sub-path /a/file1 already exists.
-    }
+    Assert.assertFalse("Should fail as new destination file exists!",
+            fs.rename(abcFile1, aDestinPath));
   }
 
   /**
@@ -868,12 +849,8 @@ public class TestOzoneFileSystem {
     ContractTestUtils.touch(fs, file1Destin);
     Path abcRootPath = new Path(fs.getUri().toString() + "/a/b/c");
     fs.mkdirs(abcRootPath);
-    try {
-      fs.rename(abcRootPath, file1Destin);
-      Assert.fail("key already exists /root_dir/file1");
-    } catch (FileAlreadyExistsException faee) {
-      // expected
-    }
+    Assert.assertFalse("key already exists /root_dir/file1",
+            fs.rename(abcRootPath, file1Destin));
   }
 
   /**
