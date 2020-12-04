@@ -422,6 +422,24 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
     Assert.assertFalse(logCapturer.getOutput().contains("created volume:"
         + volumeName));
 
+    //Sleep for little above seconds to get cache clear.
+    Thread.sleep(35000);
+
+    raftClientReply =
+        raftServer.submitClientRequest(new RaftClientRequest(clientId,
+            raftServer.getId(), ozoneManagerRatisServer.getRaftGroup()
+            .getGroupId(), callId, Message.valueOf(
+            OMRatisHelper.convertRequestToByteString(omRequest)),
+            RaftClientRequest.writeRequestType(), null));
+
+    Assert.assertTrue(raftClientReply.isSuccess());
+
+    // As second time with same client id and call id, this request should
+    // be executed ratis server as we are sending this request after cache
+    // expiry duration.
+    Assert.assertTrue(logCapturer.getOutput().contains(
+        "Volume creation failed"));
+
   }
 
   private void validateVolumesList(String userName,
