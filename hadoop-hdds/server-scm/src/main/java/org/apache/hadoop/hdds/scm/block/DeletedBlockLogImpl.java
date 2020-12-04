@@ -386,13 +386,14 @@ public class DeletedBlockLogImpl
 
   public void purgeTransactions(List<DeletedBlocksTransaction> txnsToBePurged)
       throws IOException {
-    BatchOperation batch =
-        scmMetadataStore.getBatchHandler().initBatchOperation();
-    for (int i = 0; i < txnsToBePurged.size(); i++) {
-      scmMetadataStore.getDeletedBlocksTXTable()
-          .deleteWithBatch(batch, txnsToBePurged.get(i).getTxID());
+    try (BatchOperation batch = scmMetadataStore.getBatchHandler()
+        .initBatchOperation()) {
+      for (int i = 0; i < txnsToBePurged.size(); i++) {
+        scmMetadataStore.getDeletedBlocksTXTable()
+            .deleteWithBatch(batch, txnsToBePurged.get(i).getTxID());
+      }
+      scmMetadataStore.getBatchHandler().commitBatchOperation(batch);
     }
-    scmMetadataStore.getBatchHandler().commitBatchOperation(batch);
   }
 
   @Override
