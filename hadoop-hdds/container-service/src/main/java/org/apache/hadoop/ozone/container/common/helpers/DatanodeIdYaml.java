@@ -30,6 +30,7 @@ import java.util.UUID;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.Yaml;
 
@@ -83,6 +84,12 @@ public final class DatanodeIdYaml {
           .setIpAddress(datanodeDetailsYaml.getIpAddress())
           .setHostName(datanodeDetailsYaml.getHostName())
           .setCertSerialId(datanodeDetailsYaml.getCertSerialId());
+      if (datanodeDetailsYaml.getPersistedOpState() != null) {
+        builder.setPersistedOpState(HddsProtos.NodeOperationalState.valueOf(
+            datanodeDetailsYaml.getPersistedOpState()));
+      }
+      builder.setPersistedOpStateExpiry(
+          datanodeDetailsYaml.getPersistedOpStateExpiryEpochSec());
 
       if (!MapUtils.isEmpty(datanodeDetailsYaml.getPortDetails())) {
         for (Map.Entry<String, Integer> portEntry :
@@ -106,6 +113,8 @@ public final class DatanodeIdYaml {
     private String ipAddress;
     private String hostName;
     private String certSerialId;
+    private String persistedOpState;
+    private long persistedOpStateExpiryEpochSec = 0;
     private Map<String, Integer> portDetails;
 
     public DatanodeDetailsYaml() {
@@ -114,11 +123,15 @@ public final class DatanodeIdYaml {
 
     private DatanodeDetailsYaml(String uuid, String ipAddress,
                                 String hostName, String certSerialId,
+                                String persistedOpState,
+                                long persistedOpStateExpiryEpochSec,
                                 Map<String, Integer> portDetails) {
       this.uuid = uuid;
       this.ipAddress = ipAddress;
       this.hostName = hostName;
       this.certSerialId = certSerialId;
+      this.persistedOpState = persistedOpState;
+      this.persistedOpStateExpiryEpochSec = persistedOpStateExpiryEpochSec;
       this.portDetails = portDetails;
     }
 
@@ -136,6 +149,14 @@ public final class DatanodeIdYaml {
 
     public String getCertSerialId() {
       return certSerialId;
+    }
+
+    public String getPersistedOpState() {
+      return persistedOpState;
+    }
+
+    public long getPersistedOpStateExpiryEpochSec() {
+      return persistedOpStateExpiryEpochSec;
     }
 
     public Map<String, Integer> getPortDetails() {
@@ -158,6 +179,14 @@ public final class DatanodeIdYaml {
       this.certSerialId = certSerialId;
     }
 
+    public void setPersistedOpState(String persistedOpState) {
+      this.persistedOpState = persistedOpState;
+    }
+
+    public void setPersistedOpStateExpiryEpochSec(long opStateExpiryEpochSec) {
+      this.persistedOpStateExpiryEpochSec = opStateExpiryEpochSec;
+    }
+
     public void setPortDetails(Map<String, Integer> portDetails) {
       this.portDetails = portDetails;
     }
@@ -173,11 +202,17 @@ public final class DatanodeIdYaml {
       }
     }
 
+    String persistedOpString = null;
+    if (datanodeDetails.getPersistedOpState() != null) {
+      persistedOpString = datanodeDetails.getPersistedOpState().name();
+    }
     return new DatanodeDetailsYaml(
         datanodeDetails.getUuid().toString(),
         datanodeDetails.getIpAddress(),
         datanodeDetails.getHostName(),
         datanodeDetails.getCertSerialId(),
+        persistedOpString,
+        datanodeDetails.getPersistedOpStateExpiryEpochSec(),
         portDetails);
   }
 }

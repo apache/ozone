@@ -24,6 +24,7 @@ import java.security.PrivilegedExceptionAction;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -54,6 +55,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.utils.BackgroundService;
@@ -109,6 +111,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.StringUtils;
+
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT;
@@ -699,7 +702,7 @@ public class KeyManagerImpl implements KeyManager {
     refreshPipeline(value);
 
     if (args.getSortDatanodes()) {
-      sortDatanodeInPipeline(value, clientAddress);
+      sortDatanodes(clientAddress, value);
     }
     return value;
   }
@@ -1827,7 +1830,7 @@ public class KeyManagerImpl implements KeyManager {
         // Please refer this jira for more details.
         refreshPipeline(fileKeyInfo);
         if (sortDatanodes) {
-          sortDatanodeInPipeline(fileKeyInfo, clientAddress);
+          sortDatanodes(clientAddress, fileKeyInfo);
         }
         return new OzoneFileStatus(fileKeyInfo, scmBlockSize, false);
       }
@@ -2212,9 +2215,7 @@ public class KeyManagerImpl implements KeyManager {
     refreshPipeline(keyInfoList);
 
     if (args.getSortDatanodes()) {
-      for (OzoneFileStatus fileStatus : fileStatusList) {
-        sortDatanodeInPipeline(fileStatus.getKeyInfo(), clientAddress);
-      }
+      sortDatanodes(clientAddress, keyInfoList.toArray(new OmKeyInfo[0]));
     }
 
     return fileStatusList;
@@ -2309,38 +2310,67 @@ public class KeyManagerImpl implements KeyManager {
     return encInfo;
   }
 
-  private void sortDatanodeInPipeline(OmKeyInfo keyInfo, String clientMachine) {
-    if (keyInfo != null && clientMachine != null && !clientMachine.isEmpty()) {
-      for (OmKeyLocationInfoGroup key : keyInfo.getKeyLocationVersions()) {
-        key.getLocationList().forEach(k -> {
-          List<DatanodeDetails> nodes = k.getPipeline().getNodes();
-          if (nodes == null || nodes.isEmpty()) {
-            LOG.warn("Datanodes for pipeline {} is empty",
-                k.getPipeline().getId().toString());
-            return;
-          }
-          List<String> nodeList = new ArrayList<>();
-          nodes.stream().forEach(node ->
-              nodeList.add(node.getUuidString()));
-          try {
-            List<DatanodeDetails> sortedNodes = scmClient.getBlockClient()
-                .sortDatanodes(nodeList, clientMachine);
-            k.getPipeline().setNodesInOrder(sortedNodes);
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("Sort datanodes {} for client {}, return {}", nodes,
-                  clientMachine, sortedNodes);
+  @VisibleForTesting
+  void sortDatanodes(String clientMachine, OmKeyInfo... keyInfos) {
+    if (keyInfos != null && clientMachine != null && !clientMachine.isEmpty()) {
+      Map<Set<String>, List<DatanodeDetails>> sortedPipelines = new HashMap<>();
+      for (OmKeyInfo keyInfo : keyInfos) {
+        OmKeyLocationInfoGroup key = keyInfo.getLatestVersionLocations();
+        if (key == null) {
+          LOG.warn("No location for key {}", keyInfo);
+          continue;
+        }
+        for (OmKeyLocationInfo k : key.getLocationList()) {
+          Pipeline pipeline = k.getPipeline();
+          List<DatanodeDetails> nodes = pipeline.getNodes();
+          List<String> uuidList = toNodeUuid(nodes);
+          Set<String> uuidSet = new HashSet<>(uuidList);
+          List<DatanodeDetails> sortedNodes = sortedPipelines.get(uuidSet);
+          if (sortedNodes == null) {
+            if (nodes.isEmpty()) {
+              LOG.warn("No datanodes in pipeline {}", pipeline.getId());
+              continue;
             }
-          } catch (IOException e) {
-            LOG.warn("Unable to sort datanodes based on distance to " +
-                "client, volume=" + keyInfo.getVolumeName() +
-                ", bucket=" + keyInfo.getBucketName() +
-                ", key=" + keyInfo.getKeyName() +
-                ", client=" + clientMachine +
-                ", datanodes=" + nodes.toString() +
-                ", exception=" + e.getMessage());
+            sortedNodes = sortDatanodes(clientMachine, nodes, keyInfo,
+                uuidList);
+            if (sortedNodes != null) {
+              sortedPipelines.put(uuidSet, sortedNodes);
+            }
+          } else if (LOG.isDebugEnabled()) {
+            LOG.debug("Found sorted datanodes for pipeline {} and client {} "
+                + "in cache", pipeline.getId(), clientMachine);
           }
-        });
+          pipeline.setNodesInOrder(sortedNodes);
+        }
       }
     }
+  }
+
+  private List<DatanodeDetails> sortDatanodes(String clientMachine,
+      List<DatanodeDetails> nodes, OmKeyInfo keyInfo, List<String> nodeList) {
+    List<DatanodeDetails> sortedNodes = null;
+    try {
+      sortedNodes = scmClient.getBlockClient()
+          .sortDatanodes(nodeList, clientMachine);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Sorted datanodes {} for client {}, result: {}", nodes,
+            clientMachine, sortedNodes);
+      }
+    } catch (IOException e) {
+      LOG.warn("Unable to sort datanodes based on distance to client, "
+          + " volume={}, bucket={}, key={}, client={}, datanodes={}, "
+          + " exception={}",
+          keyInfo.getVolumeName(), keyInfo.getBucketName(),
+          keyInfo.getKeyName(), clientMachine, nodeList, e.getMessage());
+    }
+    return sortedNodes;
+  }
+
+  private static List<String> toNodeUuid(Collection<DatanodeDetails> nodes) {
+    List<String> nodeSet = new ArrayList<>(nodes.size());
+    for (DatanodeDetails node : nodes) {
+      nodeSet.add(node.getUuidString());
+    }
+    return nodeSet;
   }
 }

@@ -1292,14 +1292,6 @@
               {
                 "name": "DEAD",
                 "integer": 3
-              },
-              {
-                "name": "DECOMMISSIONING",
-                "integer": 4
-              },
-              {
-                "name": "DECOMMISSIONED",
-                "integer": 5
               }
             ]
           },
