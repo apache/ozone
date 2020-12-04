@@ -77,8 +77,6 @@ services:
     env_file:
       - ./docker-config
       - ../common-config
-    environment:
-      HADOOP_CLASSPATH: /opt/ozone/share/ozone/lib/hadoop-ozone-filesystem-hadoop2-@project.version@.jar
     command: ["yarn", "resourcemanager"]
   nm:
     image: ${HADOOP_IMAGE}:${HADOOP_VERSION}
@@ -89,7 +87,6 @@ services:
       - ./docker-config
       - ../common-config
     environment:
-      HADOOP_CLASSPATH: /opt/ozone/share/ozone/lib/hadoop-ozone-filesystem-hadoop2-@project.version@.jar
       WAITFOR: rm:8088
     command: ["yarn","nodemanager"]
 # Optional section: comment out this part to get DNS resolution for all the containers.

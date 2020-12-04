@@ -14,37 +14,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#
-# Can be executed with bats (https://github.com/bats-core/bats-core)
-# bats gc_opts.bats
-#
+setup() {
+  RELTMP="${BATS_TEST_DIRNAME}/../../../target/test-dir/bats.$$.${RANDOM}"
+  mkdir -p "${RELTMP}"
 
-load ozone-functions_test_helper
+  TMP=$(cd -P -- "${RELTMP}" >/dev/null && pwd -P)
+  export TMP
 
-@test "Setting GC parameters: add GC params for server" {
-  export OZONE_SUBCMD_SUPPORTDAEMONIZATION=true
-  export OZONE_OPTS="Test"
+  # shellcheck disable=SC2034
+  OZONE_SHELL_SCRIPT_DEBUG=true
 
-  ozone_add_default_gc_opts
+  # shellcheck disable=SC2034
+  QATESTMODE=true
 
-  echo $OZONE_OPTS
-  [[ "$OZONE_OPTS" =~ "UseConcMarkSweepGC" ]]
+  . "${BATS_TEST_DIRNAME}/../../shell/ozone/ozone-functions.sh"
+  pushd "${TMP}" >/dev/null
 }
 
-@test "Setting GC parameters: disabled for client" {
-  export OZONE_SUBCMD_SUPPORTDAEMONIZATION=false
-  export OZONE_OPTS="Test"
-
-  ozone_add_default_gc_opts
-
-  [[ ! "$OZONE_OPTS" =~ "UseConcMarkSweepGC" ]]
-}
-
-@test "Setting GC parameters: disabled if GC params are customized" {
-  export OZONE_SUBCMD_SUPPORTDAEMONIZATION=true
-  export OZONE_OPTS="-XX:++UseG1GC -Xmx512"
-
-  ozone_add_default_gc_opts
-
-  [[ ! "$OZONE_OPTS" =~ "UseConcMarkSweepGC" ]]
+teardown() {
+  popd >/dev/null
+  rm -rf "${TMP}"
 }
