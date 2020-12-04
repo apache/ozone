@@ -112,7 +112,7 @@ public class TestBlockManager {
     // Override the default Node Manager and SCMHAManager
     // in SCM with the Mock one.
     nodeManager = new MockNodeManager(true, 10);
-    scmHAManager = MockSCMHAManager.getInstance();
+    scmHAManager = MockSCMHAManager.getInstance(true);
 
     eventQueue = new EventQueue();
 

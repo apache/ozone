@@ -49,7 +49,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
-import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -144,7 +143,6 @@ public final class PipelineManagerV2Impl implements PipelineManager {
   @Override
   public Pipeline createPipeline(ReplicationType type,
                                  ReplicationFactor factor) throws IOException {
-    checkLeader();
     if (!isPipelineCreationAllowed() && factor != ReplicationFactor.ONE) {
       LOG.debug("Pipeline creation is not allowed until safe mode prechecks " +
           "complete");
@@ -275,7 +273,6 @@ public final class PipelineManagerV2Impl implements PipelineManager {
   @Override
   public void addContainerToPipeline(
       PipelineID pipelineID, ContainerID containerID) throws IOException {
-    checkLeader();
     lock.writeLock().lock();
     try {
       stateManager.addContainerToPipeline(pipelineID, containerID);
@@ -287,7 +284,6 @@ public final class PipelineManagerV2Impl implements PipelineManager {
   @Override
   public void removeContainerFromPipeline(
       PipelineID pipelineID, ContainerID containerID) throws IOException {
-    checkLeader();
     lock.writeLock().lock();
     try {
       stateManager.removeContainerFromPipeline(pipelineID, containerID);
@@ -299,7 +295,6 @@ public final class PipelineManagerV2Impl implements PipelineManager {
   @Override
   public NavigableSet<ContainerID> getContainersInPipeline(
       PipelineID pipelineID) throws IOException {
-    checkLeader();
     lock.readLock().lock();
     try {
       return stateManager.getContainers(pipelineID);
@@ -310,13 +305,11 @@ public final class PipelineManagerV2Impl implements PipelineManager {
 
   @Override
   public int getNumberOfContainers(PipelineID pipelineID) throws IOException {
-    checkLeader();
     return stateManager.getNumberOfContainers(pipelineID);
   }
 
   @Override
   public void openPipeline(PipelineID pipelineId) throws IOException {
-    checkLeader();
     lock.writeLock().lock();
     try {
       Pipeline pipeline = stateManager.getPipeline(pipelineId);
@@ -342,7 +335,6 @@ public final class PipelineManagerV2Impl implements PipelineManager {
    * @throws IOException
    */
   protected void removePipeline(Pipeline pipeline) throws IOException {
-    checkLeader();
     pipelineFactory.close(pipeline.getType(), pipeline);
     PipelineID pipelineID = pipeline.getId();
     lock.writeLock().lock();
@@ -364,7 +356,6 @@ public final class PipelineManagerV2Impl implements PipelineManager {
    */
   protected void closeContainersForPipeline(final PipelineID pipelineId)
       throws IOException {
-    checkLeader();
     Set<ContainerID> containerIDs = stateManager.getContainers(pipelineId);
     for (ContainerID containerID : containerIDs) {
       eventPublisher.fireEvent(SCMEvents.CLOSE_CONTAINER, containerID);
@@ -380,7 +371,6 @@ public final class PipelineManagerV2Impl implements PipelineManager {
   @Override
   public void closePipeline(Pipeline pipeline, boolean onTimeout)
       throws IOException {
-    checkLeader();
     PipelineID pipelineID = pipeline.getId();
     lock.writeLock().lock();
     try {
@@ -410,8 +400,6 @@ public final class PipelineManagerV2Impl implements PipelineManager {
   @Override
   public void scrubPipeline(ReplicationType type, ReplicationFactor factor)
       throws IOException {
-    checkLeader();
-
     Instant currentTime = Instant.now();
     Long pipelineScrubTimeoutInMills = conf.getTimeDuration(
         ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT,
@@ -484,7 +472,6 @@ public final class PipelineManagerV2Impl implements PipelineManager {
   @Override
   public void activatePipeline(PipelineID pipelineID)
       throws IOException {
-    checkLeader();
     stateManager.updatePipelineState(pipelineID.getProtobuf(),
         HddsProtos.PipelineState.PIPELINE_OPEN);
   }
@@ -498,7 +485,6 @@ public final class PipelineManagerV2Impl implements PipelineManager {
   @Override
   public void deactivatePipeline(PipelineID pipelineID)
       throws IOException {
-    checkLeader();
     stateManager.updatePipelineState(pipelineID.getProtobuf(),
         HddsProtos.PipelineState.PIPELINE_DORMANT);
   }
@@ -513,7 +499,6 @@ public final class PipelineManagerV2Impl implements PipelineManager {
   @Override
   public void waitPipelineReady(PipelineID pipelineID, long timeout)
       throws IOException {
-    checkLeader();
     long st = Time.monotonicNow();
     if (timeout == 0) {
       timeout = pipelineWaitDefaultTimeout;
@@ -546,7 +531,6 @@ public final class PipelineManagerV2Impl implements PipelineManager {
 
   @Override
   public Map<String, Integer> getPipelineInfo() throws NotLeaderException {
-    checkLeader();
     final Map<String, Integer> pipelineInfo = new HashMap<>();
     for (Pipeline.PipelineState state : Pipeline.PipelineState.values()) {
       pipelineInfo.put(state.toString(), 0);
@@ -632,21 +616,10 @@ public final class PipelineManagerV2Impl implements PipelineManager {
   public StateManager getStateManager() {
     return stateManager;
   }
-  
-  public void setScmhaManager(SCMHAManager scmhaManager) {
-    this.scmhaManager = scmhaManager;
-  }
 
-  /**
-   * return term of underlying RaftServer if role of SCM is leader.
-   * @throws NotLeaderException when it's not leader.
-   */
-  private long checkLeader() throws NotLeaderException {
-    Optional<Long> termOpt = scmhaManager.isLeader();
-    if (!termOpt.isPresent()) {
-      throw scmhaManager.triggerNotLeaderException();
-    }
-    return termOpt.get();
+  @VisibleForTesting
+  public SCMHAManager getScmhaManager() {
+    return scmhaManager;
   }
 
   private void setBackgroundPipelineCreator(

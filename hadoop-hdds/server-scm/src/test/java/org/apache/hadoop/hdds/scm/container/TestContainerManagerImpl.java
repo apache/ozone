@@ -60,7 +60,7 @@ public class TestContainerManagerImpl {
     pipelineManager.createPipeline(HddsProtos.ReplicationType.RATIS,
         HddsProtos.ReplicationFactor.THREE);
     containerManager = new ContainerManagerImpl(conf,
-        MockSCMHAManager.getInstance(), pipelineManager,
+        MockSCMHAManager.getInstance(true), pipelineManager,
         SCMDBDefinition.CONTAINERS.getTable(dbStore));
   }
 

@@ -80,7 +80,7 @@ public class TestCloseContainerEventHandler {
     pipelineManager =
         PipelineManagerV2Impl.newPipelineManager(
             configuration,
-            MockSCMHAManager.getInstance(),
+            MockSCMHAManager.getInstance(true),
             nodeManager,
             scmMetadataStore.getPipelineTable(),
             eventQueue);

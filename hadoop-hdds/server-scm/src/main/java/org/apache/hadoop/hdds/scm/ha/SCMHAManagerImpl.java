@@ -48,7 +48,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMHAManagerImpl.class);
 
-  private final SCMRatisServerImpl ratisServer;
+  private final SCMRatisServer ratisServer;
   private final ConfigurationSource conf;
 
   /**

@@ -84,7 +84,7 @@ public class TestOneReplicaPipelineSafeModeRule {
 
     pipelineManager = PipelineManagerV2Impl.newPipelineManager(
         ozoneConfiguration,
-        MockSCMHAManager.getInstance(),
+        MockSCMHAManager.getInstance(true),
         mockNodeManager,
         scmMetadataStore.getPipelineTable(),
         eventQueue);

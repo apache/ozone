@@ -118,7 +118,7 @@ public class TestContainerPlacement {
     PipelineManager pipelineManager =
         PipelineManagerV2Impl.newPipelineManager(
             config,
-            MockSCMHAManager.getInstance(),
+            MockSCMHAManager.getInstance(true),
             scmNodeManager,
             scmMetadataStore.getPipelineTable(),
             eventQueue);
