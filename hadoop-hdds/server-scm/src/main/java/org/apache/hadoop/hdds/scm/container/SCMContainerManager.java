@@ -423,6 +423,10 @@ public class SCMContainerManager implements ContainerManager {
         } catch (ContainerNotFoundException ex) {
           // Container is not present therefore we don't need to update
           // transaction id for this container.
+          LOG.warn(
+              "Failed to update the transaction Id as container: " + containerID
+                  + " for transaction: " + entry.getValue()
+                  + " does not exists");
         }
       }
       batchHandler.commitBatchOperation(batchOperation);
