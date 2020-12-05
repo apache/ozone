@@ -19,9 +19,12 @@
 
 package org.apache.hadoop.hdds.security.x509.certificate.authority;
 
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+
 import java.io.IOException;
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
+import java.util.List;
 
 /**
  *
@@ -48,6 +51,13 @@ public class MockCAStore implements CertificateStore {
   @Override
   public X509Certificate getCertificateByID(BigInteger serialID,
                                             CertType certType)
+      throws IOException {
+    return null;
+  }
+
+  @Override
+  public List<X509Certificate> listCertificate(HddsProtos.NodeType role,
+      BigInteger startSerialID, int count, CertType certType)
       throws IOException {
     return null;
   }
