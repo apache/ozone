@@ -804,7 +804,7 @@ public final class OMFileRequest {
 
     iterator.seek(seekDirInDB);
 
-    while (iterator.hasNext()) {
+    if (iterator.hasNext()) {
       OmDirectoryInfo dirInfo = iterator.value().getValue();
       return isImmediateChild(dirInfo.getParentObjectID(),
               omKeyInfo.getObjectID());
@@ -840,7 +840,7 @@ public final class OMFileRequest {
 
     iterator.seek(seekFileInDB);
 
-    while (iterator.hasNext()) {
+    if (iterator.hasNext()) {
       OmKeyInfo fileInfo = iterator.value().getValue();
       return isImmediateChild(fileInfo.getParentObjectID(),
               omKeyInfo.getObjectID()); // found a sub path file
