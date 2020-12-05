@@ -66,10 +66,10 @@ public class ListSubcommand extends ScmCertSubcommand {
       defaultValue = "valid", showDefaultValue = Visibility.ALWAYS)
   private String type;
 
-  private HddsProtos.NodeType parseCertRole(String role) {
-    if (role.equalsIgnoreCase("om")) {
+  private HddsProtos.NodeType parseCertRole(String r) {
+    if (r.equalsIgnoreCase("om")) {
       return HddsProtos.NodeType.OM;
-    } else if (role.equalsIgnoreCase("scm")) {
+    } else if (r.equalsIgnoreCase("scm")) {
       return HddsProtos.NodeType.SCM;
     } else {
       return HddsProtos.NodeType.DATANODE;

@@ -105,8 +105,8 @@ public class SCMSecurityProtocolServerSideTranslatorPB
             .setGetCertResponseProto(
                 getDataNodeCertificate(request.getGetDataNodeCertRequest()))
             .build();
-        case ListCertificate:
-          return SCMSecurityResponse.newBuilder()
+      case ListCertificate:
+        return SCMSecurityResponse.newBuilder()
             .setCmdType(request.getCmdType())
             .setStatus(Status.OK)
             .setListCertificateResponseProto(
