@@ -107,12 +107,11 @@ public class SCMSecurityProtocolServerSideTranslatorPB
             .build();
         case ListCertificate:
           return SCMSecurityResponse.newBuilder()
-              .setCmdType(request.getCmdType())
-              .setStatus(Status.OK)
-              .setListCertificateResponseProto(
-                  listCertificate(request.getListCertificateRequest())
-              )
-              .build();
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setListCertificateResponseProto(
+                listCertificate(request.getListCertificateRequest()))
+            .build();
       default:
         throw new IllegalArgumentException(
             "Unknown request type: " + request.getCmdType());
