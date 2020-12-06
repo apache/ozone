@@ -22,7 +22,6 @@ load ozone-functions_test_helper
 
   run ozone_set_var_for_compatibility target_var source_var "message not printed"
 
-  [[ -z "$output" ]]
   [[ "$target_var" == "old value" ]]
   [[ "$source_var" == "new value" ]]
 }
@@ -33,7 +32,6 @@ load ozone-functions_test_helper
 
   run ozone_set_var_for_compatibility target_var source_var "message not printed"
 
-  [[ -z "$output" ]]
   [[ "$target_var" == "" ]]
   [[ "$source_var" == "new value" ]]
 }
@@ -44,7 +42,6 @@ load ozone-functions_test_helper
 
   run ozone_set_var_for_compatibility target_var source_var "message not printed"
 
-  [[ -z "$output" ]]
   [[ "$target_var" == "old value" ]]
   [[ -z "${!source_var*}" ]]
 }
@@ -55,7 +52,6 @@ load ozone-functions_test_helper
 
   run ozone_set_var_for_compatibility target_var source_var "expected message"
 
-  [[ "$output" == "expected message" ]]
   [[ "$target_var" == "new value" ]]
   [[ "$source_var" == "new value" ]]
 }
@@ -66,7 +62,6 @@ load ozone-functions_test_helper
 
   run ozone_set_var_for_compatibility target_var source_var "expected message"
 
-  [[ "$output" == "expected message" ]]
   [[ -n "${!target_var*}" ]] # exists
   [[ "$target_var" == "" ]]
   [[ -n "${!source_var*}" ]]
@@ -78,7 +73,6 @@ load ozone-functions_test_helper
 
   run ozone_set_var_for_compatibility target_var source_var "message not printed"
 
-  [[ -z "$output" ]]
   [[ -z "${!target_var*}" ]]
   [[ -z "${!source_var*}" ]]
 }
