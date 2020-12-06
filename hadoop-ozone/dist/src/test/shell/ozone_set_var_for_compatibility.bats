@@ -20,8 +20,10 @@ load ozone-functions_test_helper
   export target_var="old value"
   export source_var="new value"
 
-  run ozone_set_var_for_compatibility target_var source_var "message not printed"
+  set +e
+  ozone_set_var_for_compatibility target_var source_var
 
+  [[ "$?" != 0 ]] # no change
   [[ "$target_var" == "old value" ]]
   [[ "$source_var" == "new value" ]]
 }
@@ -30,8 +32,10 @@ load ozone-functions_test_helper
   export target_var=""
   export source_var="new value"
 
-  run ozone_set_var_for_compatibility target_var source_var "message not printed"
+  set +e
+  ozone_set_var_for_compatibility target_var source_var
 
+  [[ "$?" != 0 ]] # no change
   [[ "$target_var" == "" ]]
   [[ "$source_var" == "new value" ]]
 }
@@ -40,8 +44,10 @@ load ozone-functions_test_helper
   export target_var="old value"
   unset source_var
 
-  run ozone_set_var_for_compatibility target_var source_var "message not printed"
+  set +e
+  ozone_set_var_for_compatibility target_var source_var
 
+  [[ "$?" != 0 ]] # no change
   [[ "$target_var" == "old value" ]]
   [[ -z "${!source_var*}" ]]
 }
@@ -50,7 +56,7 @@ load ozone-functions_test_helper
   unset target_var
   export source_var="new value"
 
-  run ozone_set_var_for_compatibility target_var source_var "expected message"
+  ozone_set_var_for_compatibility target_var source_var
 
   [[ "$target_var" == "new value" ]]
   [[ "$source_var" == "new value" ]]
@@ -60,7 +66,7 @@ load ozone-functions_test_helper
   unset target_var
   export source_var=""
 
-  run ozone_set_var_for_compatibility target_var source_var "expected message"
+  ozone_set_var_for_compatibility target_var source_var
 
   [[ -n "${!target_var*}" ]] # exists
   [[ "$target_var" == "" ]]
@@ -71,8 +77,10 @@ load ozone-functions_test_helper
 @test "ozone_set_var_for_compatibility: allow both to be unset" {
   unset target_var source_var
 
-  run ozone_set_var_for_compatibility target_var source_var "message not printed"
+  set +e
+  ozone_set_var_for_compatibility target_var source_var
 
+  [[ "$?" != 0 ]] # no change
   [[ -z "${!target_var*}" ]]
   [[ -z "${!source_var*}" ]]
 }
