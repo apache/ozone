@@ -74,6 +74,7 @@ enum Type {
   DBUpdates = 53;
   FinalizeUpgrade = 54;
   FinalizeUpgradeProgress = 55;
+  Prepare = 56;
 
   GetDelegationToken = 61;
   RenewDelegationToken = 62;
@@ -145,6 +146,7 @@ message OMRequest {
   optional DBUpdatesRequest                  dbUpdatesRequest              = 53;
   optional FinalizeUpgradeRequest           finalizeUpgradeRequest         = 54;
   optional FinalizeUpgradeProgressRequest   finalizeUpgradeProgressRequest = 55;
+  optional PrepareRequest                   prepareRequest                 = 56;
 
   optional hadoop.common.GetDelegationTokenRequestProto getDelegationTokenRequest = 61;
   optional hadoop.common.RenewDelegationTokenRequestProto renewDelegationTokenRequest= 62;
@@ -220,6 +222,7 @@ message OMResponse {
   optional DBUpdatesResponse                 dbUpdatesResponse             = 52;
   optional FinalizeUpgradeResponse           finalizeUpgradeResponse       = 54;
   optional FinalizeUpgradeProgressResponse finalizeUpgradeProgressResponse = 55;
+  optional PrepareResponse                 prepareResponse                 = 56;
 
   optional GetDelegationTokenResponseProto getDelegationTokenResponse = 61;
   optional RenewDelegationTokenResponseProto renewDelegationTokenResponse = 62;
@@ -329,6 +332,7 @@ enum Status {
     REMOVE_UPGRADE_TO_LAYOUT_VERSION_FAILED = 68;
     UPDATE_LAYOUT_VERSION_FAILED = 69;
     LAYOUT_FEATURE_FINALIZATION_FAILED = 70;
+    PREPARE_FAILED = 71;
 }
 
 /**
@@ -1072,6 +1076,14 @@ message FinalizeUpgradeProgressRequest {
 
 message FinalizeUpgradeProgressResponse {
     required UpgradeFinalizationStatus status = 1;
+}
+
+message PrepareRequest {
+
+}
+
+message PrepareResponse {
+    required uint64 txnID = 1;
 }
 
 message ServicePort {

@@ -69,15 +69,6 @@ public class OMDBDefinition implements DBDefinition {
                     OmVolumeArgs.class,
                     new OmVolumeArgsCodec());
 
-  public static final DBColumnFamilyDefinition<String, String>
-            S3_TABLE=
-            new DBColumnFamilyDefinition<>(
-                    "s3Table",
-                    String.class,
-                    new StringCodec(),
-                    String.class,
-                    new StringCodec());
-
   public static final DBColumnFamilyDefinition<String, OmKeyInfo>
             OPEN_KEY_TABLE =
             new DBColumnFamilyDefinition<>(
@@ -164,7 +155,7 @@ public class OMDBDefinition implements DBDefinition {
   @Override
   public DBColumnFamilyDefinition[] getColumnFamilies() {
     return new DBColumnFamilyDefinition[] {DELETED_TABLE, USER_TABLE,
-        VOLUME_TABLE, S3_TABLE, OPEN_KEY_TABLE, KEY_TABLE,
+        VOLUME_TABLE, OPEN_KEY_TABLE, KEY_TABLE,
         BUCKET_TABLE, MULTIPART_INFO_TABLE, PREFIX_TABLE, DTOKEN_TABLE,
         S3_SECRET_TABLE, TRANSACTION_INFO_TABLE};
   }
