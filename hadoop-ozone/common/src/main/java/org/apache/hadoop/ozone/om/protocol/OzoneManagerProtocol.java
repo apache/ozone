@@ -587,4 +587,14 @@ public interface OzoneManagerProtocol
     return false;
   }
 
+  /**
+   *
+   * @param flushWaitTimeout
+   * @param flushCheckInterval
+   * @return
+   */
+  default long prepareOzoneManager(long flushWaitTimeout,
+                                   long flushCheckInterval) throws IOException {
+    return -1;
+  }
 }

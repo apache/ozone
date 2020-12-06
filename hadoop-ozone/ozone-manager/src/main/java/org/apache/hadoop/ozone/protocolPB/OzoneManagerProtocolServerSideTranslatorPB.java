@@ -151,6 +151,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
     }
   }
 
+  // Client --> Rpc Handler --> OMSST -> Ratis Leader
   /**
    * Create OMResponse from the specified OMRequest and exception.
    *

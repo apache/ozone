@@ -1547,6 +1547,32 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     return recoverResponse.getResponse();
   }
 
+  @Override
+  public long prepareOzoneManager(long flushWaitTimeout,
+                                  long flushCheckInterval) throws IOException {
+    Preconditions.checkArgument(flushWaitTimeout > 0,
+        "flushWaitTimeout has to be > zero");
+
+    Preconditions.checkArgument(flushCheckInterval > 0 &&
+            flushCheckInterval < flushWaitTimeout / 2,
+        "flushCheckInterval has to be > zero and < half of " +
+            "flushWaitTimeout to make sense.");
+
+    PrepareRequest prepareRequest =
+        PrepareRequest.newBuilder().setArgs(
+            PrepareRequestArgs.newBuilder()
+                .setFlushWaitCheckInterval(flushCheckInterval)
+                .setFlushWaitTimeOut(flushWaitTimeout)
+                .build()).build();
+
+    OMRequest omRequest = createOMRequest(Type.Prepare)
+        .setPrepareRequest(prepareRequest).build();
+
+    PrepareResponse prepareResponse =
+        handleError(submitRequest(omRequest)).getPrepareResponse();
+    return prepareResponse.getTxnID();
+  }
+
   @VisibleForTesting
   public OmTransport getTransport() {
     return transport;

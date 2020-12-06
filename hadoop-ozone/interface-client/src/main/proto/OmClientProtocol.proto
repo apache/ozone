@@ -1079,7 +1079,12 @@ message FinalizeUpgradeProgressResponse {
 }
 
 message PrepareRequest {
+    required PrepareRequestArgs args = 1;
+}
 
+message PrepareRequestArgs {
+    optional uint64 flushWaitTimeOut = 1 [default = 300];
+    optional uint64 flushWaitCheckInterval = 2 [default = 5];
 }
 
 message PrepareResponse {
