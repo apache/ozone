@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.om.request.file.OMFileCreateRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyCreateRequest;
 import org.apache.hadoop.ozone.om.response.file.OMFileCreateResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyCreateResponse;
+import org.apache.hadoop.ozone.om.response.upgrade.OMPrepareResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateFileRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
@@ -155,7 +156,9 @@ public class TestCleanupTableInfo {
         Assert.assertTrue(
             Arrays.stream(cleanupTables).allMatch(tables::contains)
         );
-      } else {
+      } else if (aClass != OMPrepareResponse.class) {
+        // Prepare response is allowed to have no cleanup tables, since it
+        // does not modify the DB.
         Assert.assertTrue(cleanupAll);
       }
     });

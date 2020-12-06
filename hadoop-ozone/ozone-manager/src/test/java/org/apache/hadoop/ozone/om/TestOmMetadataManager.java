@@ -33,6 +33,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -44,8 +45,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRE
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
-import static org.hamcrest.Matchers.containsInAnyOrder;
-import static org.junit.Assert.assertThat;
 
 /**
  * Tests OzoneManager MetadataManager.
@@ -616,10 +615,10 @@ public class TestOmMetadataManager {
 
   @Test
   public void testAllTablesAreProperInOMMetadataManagerImpl() {
-    String[] tablesByDefinition = OmMetadataManagerImpl.ALL_TABLES;
-
+    Set<String> tablesByDefinition =
+        new HashSet<>(Arrays.asList(OmMetadataManagerImpl.ALL_TABLES));
     Set<String> tablesInManager = omMetadataManager.listTableNames();
 
-    assertThat(tablesInManager, containsInAnyOrder(tablesByDefinition));
+    Assert.assertEquals(tablesByDefinition, tablesInManager);
   }
 }

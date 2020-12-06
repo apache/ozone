@@ -27,7 +27,6 @@ import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
@@ -100,28 +99,29 @@ public class OzoneManagerStarter extends GenericCli {
     }
   }
 
-
-  /**
-   * This function implements a sub-command to allow the OM to be
-   * "prepared for upgrade".
-   */
-  @CommandLine.Command(name = "--prepareForUpgrade",
-      aliases = {"--prepareForDowngrade", "--flushTransactions"},
-      customSynopsis = "ozone om [global options] --prepareForUpgrade",
-      hidden = false,
-      description = "Prepare the OM for upgrade/downgrade. (Flush Raft log " +
-          "transactions.)",
-      mixinStandardHelpOptions = true,
-      versionProvider = HddsVersionProvider.class)
-  @SuppressFBWarnings("DM_EXIT")
-  public void prepareOmForUpgrade() throws Exception {
-    commonInit();
-    boolean result = receiver.prepareForUpgrade(conf);
-    if (!result) {
-      throw new Exception("Prepare OM For Upgrade failed.");
-    }
-    System.exit(0);
-  }
+  // TODO: Convert this flag to bring the OM out of prepare mode with the new
+  //  bits when prepare marker files have been implemented.
+//  /**
+//   * This function implements a sub-command to allow the OM to be
+//   * "prepared for upgrade".
+//   */
+//  @CommandLine.Command(name = "--prepareForUpgrade",
+//      aliases = {"--prepareForDowngrade", "--flushTransactions"},
+//      customSynopsis = "ozone om [global options] --prepareForUpgrade",
+//      hidden = false,
+//      description = "Prepare the OM for upgrade/downgrade. (Flush Raft log " +
+//          "transactions.)",
+//      mixinStandardHelpOptions = true,
+//      versionProvider = HddsVersionProvider.class)
+//  @SuppressFBWarnings("DM_EXIT")
+//  public void prepareOmForUpgrade() throws Exception {
+//    commonInit();
+//    boolean result = receiver.prepareForUpgrade(conf);
+//    if (!result) {
+//      throw new Exception("Prepare OM For Upgrade failed.");
+//    }
+//    System.exit(0);
+//  }
 
   /**
    * This function should be called by each command to ensure the configuration
@@ -143,7 +143,7 @@ public class OzoneManagerStarter extends GenericCli {
    * testing.
    */
   static class OMStarterHelper implements OMStarterInterface{
-
+    @Override
     public void start(OzoneConfiguration conf) throws IOException,
         AuthenticationException {
       OzoneManager om = OzoneManager.createOm(conf);
@@ -151,25 +151,10 @@ public class OzoneManagerStarter extends GenericCli {
       om.join();
     }
 
+    @Override
     public boolean init(OzoneConfiguration conf) throws IOException,
         AuthenticationException {
       return OzoneManager.omInit(conf);
-    }
-
-    public boolean prepareForUpgrade(OzoneConfiguration conf)
-        throws IOException, AuthenticationException {
-      try (OzoneManager om = OzoneManager.createOmUpgradeMode(conf)) {
-        om.start();
-        boolean success = false;
-        try {
-          LOG.info("Preparing OM for upgrade.");
-          success = om.applyAllPendingTransactions();
-        } catch (InterruptedException e) {
-          LOG.error("Error preparing OM for upgrade.", e);
-          Thread.currentThread().interrupt();
-        }
-        return success;
-      }
     }
   }
 

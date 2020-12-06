@@ -123,8 +123,8 @@ public class TestOzoneManagerStateMachine {
   public void testApplyTransactionsUpdateLastAppliedIndexCalledLate() {
     // Now try a scenario where 1,2,3 transactions are in applyTransactionMap
     // and updateLastAppliedIndex is not called for them, and before that
-    // notifyIndexUpdate is called with transaction 4. And see now at the end
-    // when updateLastAppliedIndex is called with epochs we have
+    // notifyTermIndexUpdated is called with transaction 4. And see now at the
+    // end when updateLastAppliedIndex is called with epochs we have
     // lastAppliedIndex as 4 or not.
 
     // Conf/metadata transaction.
