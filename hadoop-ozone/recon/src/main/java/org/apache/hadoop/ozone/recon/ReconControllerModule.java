@@ -132,8 +132,9 @@ public class ReconControllerModule extends AbstractModule {
             ReconTaskStatusDao.class,
             UnhealthyContainersDao.class,
             GlobalStatsDao.class,
-            ClusterGrowthDailyDao.class,
-            ContainerHistoryDao.class);
+            ClusterGrowthDailyDao.class
+//            ContainerHistoryDao.class
+        );
 
     @Override
     protected void configure() {

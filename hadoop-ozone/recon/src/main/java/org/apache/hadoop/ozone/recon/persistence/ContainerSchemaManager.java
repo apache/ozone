@@ -23,11 +23,16 @@ import static org.jooq.impl.DSL.count;
 
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersSummary;
 import org.apache.hadoop.ozone.recon.scm.ContainerReplicaWithTimestamp;
+import org.apache.hadoop.ozone.recon.scm.ReconSCMDBDefinition;
+import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
+import org.apache.hadoop.ozone.recon.spi.impl.ContainerDBServiceProviderImpl;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
-import org.hadoop.ozone.recon.schema.tables.daos.ContainerHistoryDao;
 import org.hadoop.ozone.recon.schema.tables.daos.UnhealthyContainersDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ContainerHistory;
 import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
@@ -35,8 +40,13 @@ import org.hadoop.ozone.recon.schema.tables.records.UnhealthyContainersRecord;
 import org.jooq.Cursor;
 import org.jooq.DSLContext;
 import org.jooq.Record;
-import org.jooq.Record2;
 import org.jooq.SelectQuery;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -46,20 +56,37 @@ import java.util.UUID;
  */
 @Singleton
 public class ContainerSchemaManager {
-  private ContainerHistoryDao containerHistoryDao;
-  private UnhealthyContainersDao unhealthyContainersDao;
-  private ContainerSchemaDefinition containerSchemaDefinition;
+  private static final Logger LOG = LoggerFactory.getLogger(
+      ContainerSchemaManager.class);
+
+  private final UnhealthyContainersDao unhealthyContainersDao;
+  private final ContainerSchemaDefinition containerSchemaDefinition;
 
   private Map<Long, Map<UUID, ContainerReplicaWithTimestamp>> lastSeenMap;
 
+  // TODO: Declare all extra impl methods in interface later.
+//  @Inject
+  private final ContainerDBServiceProviderImpl dbServiceProvider;
+
+  private DBStore scmDBStore;
+  private Table<UUID, DatanodeDetails> nodeDB;
+
+  public Table<UUID, DatanodeDetails> getNodeDB() {
+    return nodeDB;
+  }
+
   @Inject
-  public ContainerSchemaManager(ContainerHistoryDao containerHistoryDao,
+  public ContainerSchemaManager(
       ContainerSchemaDefinition containerSchemaDefinition,
-      UnhealthyContainersDao unhealthyContainersDao) {
-    this.containerHistoryDao = containerHistoryDao;
+      UnhealthyContainersDao unhealthyContainersDao,
+      ContainerDBServiceProvider containerDBServiceProvider) {
     this.unhealthyContainersDao = unhealthyContainersDao;
     this.containerSchemaDefinition = containerSchemaDefinition;
     this.lastSeenMap = null;
+    this.scmDBStore = null;
+    this.nodeDB = null;
+    this.dbServiceProvider =
+        (ContainerDBServiceProviderImpl) containerDBServiceProvider;
   }
 
   /**
@@ -119,56 +146,70 @@ public class ContainerSchemaManager {
     unhealthyContainersDao.insert(recs);
   }
 
-  // TODO: Improve
-  public void upsertContainerHistory(long containerID, String datanode,
+  public void upsertContainerHistory(long containerID, UUID uuid,
                                      long time) {
-    DSLContext dslContext = containerSchemaDefinition.getDSLContext();
-    Record2<Long, String> recordToFind =
-        dslContext.newRecord(
-        CONTAINER_HISTORY.CONTAINER_ID,
-        CONTAINER_HISTORY.DATANODE_HOST).value1(containerID).value2(datanode);
-    ContainerHistory newRecord = new ContainerHistory();
-    newRecord.setContainerId(containerID);
-    newRecord.setDatanodeHost(datanode);
-    newRecord.setLastReportTimestamp(time);
-    ContainerHistory record = containerHistoryDao.findById(recordToFind);
-    if (record != null) {
-      newRecord.setFirstReportTimestamp(record.getFirstReportTimestamp());
-      containerHistoryDao.update(newRecord);
-    } else {
-      newRecord.setFirstReportTimestamp(time);
-      containerHistoryDao.insert(newRecord);
+
+    Map<UUID, ContainerReplicaWithTimestamp> tsMap;
+    try {
+      tsMap = dbServiceProvider.getContainerReplicaHistoryMap(containerID);
+      ContainerReplicaWithTimestamp ts = tsMap.get(uuid);
+      if (ts == null) {
+        tsMap.put(uuid, new ContainerReplicaWithTimestamp(uuid, time));
+      } else {
+        // Entry exists, update last seen time and put it back to DB.
+        ts.setLastSeenTime(time);
+      }
+      dbServiceProvider.storeContainerReplicaHistoryMap(containerID, tsMap);
+    } catch (IOException e) {
+      // TODO: Better error handling
+      LOG.debug("Error on DB operations.");
     }
   }
 
   public List<ContainerHistory> getAllContainerHistory(long containerID) {
-    List<ContainerHistory> resList =
-        containerHistoryDao.fetchByContainerId(containerID);
+    Map<UUID, ContainerReplicaWithTimestamp> resMap;
+    try {
+      resMap = dbServiceProvider.getContainerReplicaHistoryMap(containerID);
+    } catch (IOException ex) {
+      resMap = new HashMap<>();
+      LOG.debug("Unable to retrieve container replica history from RDB.");
+    }
 
     if (lastSeenMap != null) {
-      // Update result with in-memory map
       Map<UUID, ContainerReplicaWithTimestamp> replicaLastSeenMap =
           lastSeenMap.get(containerID);
       if (replicaLastSeenMap != null) {
-        for (ContainerHistory res : resList) {
-          final String dnHost = res.getDatanodeHost();
-          // TODO: For testing only. Eliminate nested loop once switched to RDB
-          for (ContainerReplicaWithTimestamp ts : replicaLastSeenMap.values()) {
-            if (dnHost.equals(
-                ts.getContainerReplica().getDatanodeDetails().getHostName())) {
-              res.setLastReportTimestamp(ts.getLastSeenTime());
-              break;
-            }
-          }
-
-        }
+        Map<UUID, ContainerReplicaWithTimestamp> finalResMap = resMap;
+        replicaLastSeenMap.forEach((k, v) ->
+            finalResMap.merge(k, v, (prev, curr) -> curr));
+        resMap = finalResMap;
       }
     }
 
+    List<ContainerHistory> resList = new ArrayList<>();
+    for (Map.Entry<UUID, ContainerReplicaWithTimestamp> entry :
+        resMap.entrySet()) {
+      final UUID uuid = entry.getKey();
+      final long firstSeenTime = entry.getValue().getFirstSeenTime();
+      final long lastSeenTime = entry.getValue().getLastSeenTime();
+      // Retrieve hostname in NODES table
+      String hostname = "N/A";
+      if (nodeDB != null) {
+        try {
+          DatanodeDetails dnDetails = nodeDB.get(uuid);
+          if (dnDetails != null) {
+            hostname = dnDetails.getHostName();
+          }
+        } catch (IOException ex) {
+          LOG.debug("Unable to get DatanodeDetails from NODES table.");
+        }
+      }
+      resList.add(new ContainerHistory(
+          containerID, uuid.toString(), hostname, firstSeenTime, lastSeenTime));
+    }
     return resList;
   }
 
-  // TODO: Check
   public List<ContainerHistory> getLatestContainerHistory(long containerID,
                                                           int limit) {
     DSLContext dslContext = containerSchemaDefinition.getDSLContext();
@@ -184,5 +225,39 @@ public class ContainerSchemaManager {
   public void setLastSeenMap(
       Map<Long, Map<UUID, ContainerReplicaWithTimestamp>> lastSeenMap) {
     this.lastSeenMap = lastSeenMap;
+  }
+
+  public DBStore getScmDBStore() {
+    return scmDBStore;
+  }
+
+  public void setScmDBStore(DBStore scmDBStore) {
+    this.scmDBStore = scmDBStore;
+    try {
+      this.nodeDB = ReconSCMDBDefinition.NODES.getTable(scmDBStore);
+    } catch (IOException ex) {
+      LOG.debug("Failed to get NODES table.");
+    }
+  }
+
+  public void flushLastSeenMapToDB(boolean clearMap) {
+    if (lastSeenMap == null) {
+      return;
+    }
+    synchronized (lastSeenMap) {
+      try {
+        for (Map.Entry<Long, Map<UUID, ContainerReplicaWithTimestamp>> entry :
+            lastSeenMap.entrySet()) {
+          final long containerId = entry.getKey();
+          final Map<UUID, ContainerReplicaWithTimestamp> map = entry.getValue();
+          dbServiceProvider.storeContainerReplicaHistoryMap(containerId, map);
+        }
+      } catch (IOException e) {
+        LOG.debug("Error flushing container replica history to DB. {}",
+            e.getMessage());
+      } if (clearMap) {
+        lastSeenMap.clear();
+      }
+    }
   }
 }

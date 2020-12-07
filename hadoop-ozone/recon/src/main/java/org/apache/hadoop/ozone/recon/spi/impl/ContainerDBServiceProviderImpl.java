@@ -22,11 +22,17 @@ import static org.apache.hadoop.ozone.recon.ReconConstants.CONTAINER_COUNT_KEY;
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconContainerDBProvider.getNewDBStore;
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.CONTAINER_KEY;
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.CONTAINER_KEY_COUNT;
+import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.REPLICA_HISTORY;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -37,6 +43,8 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
+import org.apache.hadoop.ozone.recon.scm.ContainerReplicaWithTimestamp;
+import org.apache.hadoop.ozone.recon.scm.ContainerReplicaWithTimestampList;
 import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -60,6 +68,8 @@ public class ContainerDBServiceProviderImpl
 
   private Table<ContainerKeyPrefix, Integer> containerKeyTable;
   private Table<Long, Long> containerKeyCountTable;
+  private Table<Long, ContainerReplicaWithTimestampList>
+      containerReplicaHistoryTable;
   private GlobalStatsDao globalStatsDao;
 
   @Inject
@@ -119,6 +129,7 @@ public class ContainerDBServiceProviderImpl
       FileUtils.deleteDirectory(oldDBLocation);
     }
 
+    // TODO: btw what's this doing? Flushing old entries to DB?
     if (containerKeyPrefixCounts != null) {
       for (Map.Entry<ContainerKeyPrefix, Integer> entry :
           containerKeyPrefixCounts.entrySet()) {
@@ -138,6 +149,8 @@ public class ContainerDBServiceProviderImpl
       this.containerKeyTable = CONTAINER_KEY.getTable(containerDbStore);
       this.containerKeyCountTable =
           CONTAINER_KEY_COUNT.getTable(containerDbStore);
+      this.containerReplicaHistoryTable =
+          REPLICA_HISTORY.getTable(containerDbStore);
     } catch (IOException e) {
       LOG.error("Unable to create Container Key tables.", e);
     }
@@ -171,6 +184,30 @@ public class ContainerDBServiceProviderImpl
     containerKeyCountTable.put(containerID, count);
   }
 
+  // TODO: REMOVE?
+  @Override
+  public void storeContainerReplicaHistory(Long containerID,
+      ContainerReplicaWithTimestamp ts) throws IOException {
+    containerReplicaHistoryTable.put(containerID,
+        new ContainerReplicaWithTimestampList(new ArrayList<>(
+            Collections.singletonList(ts))));
+  }
+
+  void storeContainerReplicaHistoryList(long containerID,
+      List<ContainerReplicaWithTimestamp> tsList) throws IOException {
+    containerReplicaHistoryTable.put(containerID,
+        new ContainerReplicaWithTimestampList(tsList));
+  }
+
+  public void storeContainerReplicaHistoryMap(long containerID,
+      Map<UUID, ContainerReplicaWithTimestamp> tsMap) throws IOException {
+    List<ContainerReplicaWithTimestamp> tsList = new ArrayList<>();
+    for (Map.Entry<UUID, ContainerReplicaWithTimestamp> e : tsMap.entrySet()) {
+      tsList.add(e.getValue());
+    }
+    storeContainerReplicaHistoryList(containerID, tsList);
+  }
+
   /**
    * Get the total count of keys within the given containerID.
    *
@@ -182,6 +219,38 @@ public class ContainerDBServiceProviderImpl
   public long getKeyCountForContainer(Long containerID) throws IOException {
     Long keyCount = containerKeyCountTable.get(containerID);
     return keyCount == null ? 0L : keyCount;
+  }
+
+  // TODO: REMOVE?
+  @Override
+  public List<ContainerReplicaWithTimestamp> getContainerReplicaHistory(
+      Long containerID) throws IOException {
+    // TODO: Double check usage
+    ContainerReplicaWithTimestampList lst =
+        containerReplicaHistoryTable.get(containerID);
+    return lst == null ? null : lst.getList();
+  }
+
+  /**
+   * Get the map of container replica history from RDB.
+   */
+  public Map<UUID, ContainerReplicaWithTimestamp> getContainerReplicaHistoryMap(
+      Long containerID) throws IOException {
+
+    ContainerReplicaWithTimestampList lst =
+        containerReplicaHistoryTable.get(containerID);
+    if (lst == null) {
+      return new HashMap<>();
+    }
+
+    Map<UUID, ContainerReplicaWithTimestamp> res = new HashMap<>();
+    for (ContainerReplicaWithTimestamp ts : lst.getList()) {
+      final UUID dnUuid = ts.getId();
+      res.put(dnUuid,
+          new ContainerReplicaWithTimestamp(
+              dnUuid, ts.getFirstSeenTime(), ts.getLastSeenTime(), null));
+    }
+    return res;
   }
 
   /**

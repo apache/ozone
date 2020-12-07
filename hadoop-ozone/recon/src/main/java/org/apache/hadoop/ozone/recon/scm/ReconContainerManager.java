@@ -38,7 +38,7 @@ import org.apache.hadoop.hdds.scm.container.SCMContainerManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
-import org.apache.hadoop.hdds.utils.db.BatchOperationHandler;
+import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.recon.persistence.ContainerSchemaManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
@@ -56,8 +56,9 @@ public class ReconContainerManager extends SCMContainerManager {
   private StorageContainerServiceProvider scmClient;
   private ContainerSchemaManager containerSchemaManager;
 
+  // Container ID -> Datanode UUID -> Timestamp
   private final Map<Long, Map<UUID, ContainerReplicaWithTimestamp>>
-      containerIDtoReplicaLastSeenMap;
+      containerReplicaLastSeenMap;
 
   /**
    * Constructs a mapping class that creates mapping between container names
@@ -72,15 +73,16 @@ public class ReconContainerManager extends SCMContainerManager {
   public ReconContainerManager(
       ConfigurationSource conf,
       Table<ContainerID, ContainerInfo> containerStore,
-      BatchOperationHandler batchHandler,
+      DBStore batchHandler,
       PipelineManager pipelineManager,
       StorageContainerServiceProvider scm,
       ContainerSchemaManager containerSchemaManager) throws IOException {
     super(conf, containerStore, batchHandler, pipelineManager);
     this.scmClient = scm;
     this.containerSchemaManager = containerSchemaManager;
-    this.containerIDtoReplicaLastSeenMap = new ConcurrentHashMap<>();
-    containerSchemaManager.setLastSeenMap(containerIDtoReplicaLastSeenMap);
+    this.containerReplicaLastSeenMap = new ConcurrentHashMap<>();
+    containerSchemaManager.setLastSeenMap(containerReplicaLastSeenMap);
+    containerSchemaManager.setScmDBStore(batchHandler);
   }
 
   /**
@@ -190,31 +192,33 @@ public class ReconContainerManager extends SCMContainerManager {
     final long currTime = System.currentTimeMillis();
     final long id = containerID.getId();
     final DatanodeDetails dnInfo = replica.getDatanodeDetails();
-    final UUID dnUUID = dnInfo.getUuid();
+    final UUID dnUuid = dnInfo.getUuid();
 
-    // Map from DataNode (UUID) to container replica last seen time
+    // Map from DataNode UUID to replica last seen time
     final Map<UUID, ContainerReplicaWithTimestamp> replicaLastSeenMap =
-        containerIDtoReplicaLastSeenMap.get(id);
+        containerReplicaLastSeenMap.get(id);
 
     boolean flushToDB = false;
 
     // If replica doesn't exist in in-memory map, add to DB and add to map
     if (replicaLastSeenMap == null) {
       // putIfAbsent to avoid TOCTOU
-      containerIDtoReplicaLastSeenMap.putIfAbsent(id,
+      containerReplicaLastSeenMap.putIfAbsent(id,
           new ConcurrentHashMap<UUID, ContainerReplicaWithTimestamp>() {{
-            put(dnUUID, new ContainerReplicaWithTimestamp(replica, currTime));
+            put(dnUuid,
+                new ContainerReplicaWithTimestamp(dnUuid, currTime, replica));
           }});
       flushToDB = true;
     } else {
       // ContainerID exists, update timestamp in memory
-      final ContainerReplicaWithTimestamp ts = replicaLastSeenMap.get(dnUUID);
+      final ContainerReplicaWithTimestamp ts = replicaLastSeenMap.get(dnUuid);
       if (ts == null) {
-        replicaLastSeenMap.put(dnUUID,
-            new ContainerReplicaWithTimestamp(replica, currTime));
+        // New Datanode
+        replicaLastSeenMap.put(dnUuid,
+            new ContainerReplicaWithTimestamp(dnUuid, currTime, replica));
         flushToDB = true;
       } else {
-        // Only update the last seen time field if the object exists
+        // if the object exists, only update the last seen time field
         ts.setLastSeenTime(currTime);
       }
     }
@@ -222,8 +226,9 @@ public class ReconContainerManager extends SCMContainerManager {
     if (flushToDB) {
       // TODO: Use RDB. SCMContainerManager Table<ContainerID, ContainerInfo>
       // TODO: Use UUID instead of host name as identifier in DB.
-      containerSchemaManager.upsertContainerHistory(
-          id, replica.getDatanodeDetails().getHostName(), currTime);
+//      containerSchemaManager.upsertContainerHistory(
+//          id, replica.getDatanodeDetails().getHostName(), currTime);
+      containerSchemaManager.upsertContainerHistory(id, dnUuid, currTime);
     }
   }
 
@@ -238,23 +243,33 @@ public class ReconContainerManager extends SCMContainerManager {
 
     final long id = containerID.getId();
     final DatanodeDetails dnInfo = replica.getDatanodeDetails();
-    final UUID dnUUID = dnInfo.getUuid();
+    final UUID dnUuid = dnInfo.getUuid();
 
     final Map<UUID, ContainerReplicaWithTimestamp> replicaLastSeenMap =
-        containerIDtoReplicaLastSeenMap.get(id);
+        containerReplicaLastSeenMap.get(id);
 
     if (replicaLastSeenMap != null) {
-      final ContainerReplicaWithTimestamp ts = replicaLastSeenMap.get(dnUUID);
+      final ContainerReplicaWithTimestamp ts = replicaLastSeenMap.get(dnUuid);
       if (ts != null) {
         // Flush to DB and remove from map. TODO: Use RocksDB.
-        containerSchemaManager.upsertContainerHistory(id,
-            replica.getDatanodeDetails().getHostName(), ts.getLastSeenTime());
-        replicaLastSeenMap.remove(dnUUID);
+//        containerSchemaManager.upsertContainerHistory(id,
+//            replica.getDatanodeDetails().getHostName(), ts.getLastSeenTime());
+        containerSchemaManager.upsertContainerHistory(
+            id, dnUuid, ts.getLastSeenTime());
+        replicaLastSeenMap.remove(dnUuid);
       }
     }
   }
 
   public ContainerSchemaManager getContainerSchemaManager() {
     return containerSchemaManager;
+  }
+
+  /**
+   * Flush entire map to DB.
+   * Expected to be called on Recon graceful shutdown.
+   */
+  public void flushLastSeenMapToDB(boolean clearMap) {
+    containerSchemaManager.flushLastSeenMapToDB(clearMap);
   }
 }

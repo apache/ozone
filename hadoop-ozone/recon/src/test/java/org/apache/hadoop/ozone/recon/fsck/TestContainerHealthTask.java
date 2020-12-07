@@ -45,6 +45,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
 import org.apache.hadoop.ozone.recon.persistence.ContainerSchemaManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
+import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
 import org.apache.hadoop.test.LambdaTestUtils;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
@@ -68,9 +69,9 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
 
     ContainerSchemaManager containerSchemaManager =
         new ContainerSchemaManager(
-            mock(ContainerHistoryDao.class),
             getSchemaDefinition(ContainerSchemaDefinition.class),
-            unHealthyContainersTableHandle);
+            unHealthyContainersTableHandle,
+            mock(ContainerDBServiceProvider.class));
     ReconStorageContainerManagerFacade scmMock =
         mock(ReconStorageContainerManagerFacade.class);
     MockPlacementPolicy placementMock = new MockPlacementPolicy();

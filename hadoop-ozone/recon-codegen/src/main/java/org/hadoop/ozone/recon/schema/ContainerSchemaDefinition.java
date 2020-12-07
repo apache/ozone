@@ -68,6 +68,7 @@ public class ContainerSchemaDefinition implements ReconSchemaDefinition {
   public void initializeSchema() throws SQLException {
     Connection conn = dataSource.getConnection();
     dslContext = DSL.using(conn);
+    // TODO: REMOVE THIS
     if (!TABLE_EXISTS_CHECK.test(conn, CONTAINER_HISTORY_TABLE_NAME)) {
       createContainerHistoryTable();
     }
@@ -80,8 +81,11 @@ public class ContainerSchemaDefinition implements ReconSchemaDefinition {
    * Create the Container History table.
    */
   private void createContainerHistoryTable() {
+    // TODO: DROP IF EXISTS
+//    dslContext.dropTableIfExists(CONTAINER_HISTORY_TABLE_NAME);
     dslContext.createTableIfNotExists(CONTAINER_HISTORY_TABLE_NAME)
         .column(CONTAINER_ID, SQLDataType.BIGINT.nullable(false))
+        .column("datanode_uuid", SQLDataType.VARCHAR(766).nullable(false))
         .column("datanode_host", SQLDataType.VARCHAR(766).nullable(false))
         .column("first_report_timestamp", SQLDataType.BIGINT)
         .column("last_report_timestamp", SQLDataType.BIGINT)

@@ -81,7 +81,7 @@ public class ReconStorageContainerManagerFacade
 
   private ReconNodeManager nodeManager;
   private ReconPipelineManager pipelineManager;
-  private ContainerManager containerManager;
+  private ReconContainerManager containerManager;
   private NetworkTopology clusterMap;
   private StorageContainerServiceProvider scmServiceProvider;
   private Set<ReconScmTask> reconScmTasks = new HashSet<>();
@@ -240,6 +240,8 @@ public class ReconStorageContainerManagerFacade
     IOUtils.cleanupWithLogger(LOG, nodeManager);
     IOUtils.cleanupWithLogger(LOG, containerManager);
     IOUtils.cleanupWithLogger(LOG, pipelineManager);
+    LOG.info("Flushing container replicas last seen map to DB.");
+    containerManager.flushLastSeenMapToDB(true);
     try {
       dbStore.close();
     } catch (Exception e) {

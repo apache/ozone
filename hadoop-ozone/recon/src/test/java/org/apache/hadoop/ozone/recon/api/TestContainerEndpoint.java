@@ -30,6 +30,7 @@ import static org.junit.Assert.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -39,12 +40,14 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -111,8 +114,6 @@ public class TestContainerEndpoint {
     pipelineID = pipeline.getId();
 
     // Mock ReconStorageContainerManagerFacade and other SCM related methods
-    OzoneStorageContainerManager mockReconSCM =
-        mock(ReconStorageContainerManagerFacade.class);
     ContainerManager mockContainerManager =
         mock(ReconContainerManager.class);
 
@@ -124,15 +125,16 @@ public class TestContainerEndpoint {
             .setReplicationFactor(ReplicationFactor.THREE)
             .setPipelineID(pipelineID)
             .build());
-    when(mockReconSCM.getContainerManager())
-        .thenReturn(mockContainerManager);
 
     ReconTestInjector reconTestInjector =
         new ReconTestInjector.Builder(temporaryFolder)
             .withReconSqlDb()
             .withReconOm(reconOMMetadataManager)
             .withOmServiceProvider(mock(OzoneManagerServiceProviderImpl.class))
-            .withReconScm(mockReconSCM)
+            // No longer using mock reconSCM as we need nodeDB in Facade
+            //  to establish datanode UUID to hostname mapping
+            .addBinding(OzoneStorageContainerManager.class,
+                ReconStorageContainerManagerFacade.class)
             .withContainerDB()
             .addBinding(StorageContainerServiceProvider.class,
                 mock(StorageContainerServiceProviderImpl.class))
@@ -428,10 +430,14 @@ public class TestContainerEndpoint {
     missingList.add(missing);
     containerSchemaManager.insertUnhealthyContainerRecords(missingList);
     // Add container history for id 1
-    containerSchemaManager.upsertContainerHistory(1L, "host1", 1L);
-    containerSchemaManager.upsertContainerHistory(1L, "host2", 2L);
-    containerSchemaManager.upsertContainerHistory(1L, "host3", 3L);
-    containerSchemaManager.upsertContainerHistory(1L, "host4", 4L);
+    final UUID uuid1 = UUID.randomUUID();
+    final UUID uuid2 = UUID.randomUUID();
+    final UUID uuid3 = UUID.randomUUID();
+    final UUID uuid4 = UUID.randomUUID();
+    containerSchemaManager.upsertContainerHistory(1L, uuid1, 1L);
+    containerSchemaManager.upsertContainerHistory(1L, uuid2, 2L);
+    containerSchemaManager.upsertContainerHistory(1L, uuid3, 3L);
+    containerSchemaManager.upsertContainerHistory(1L, uuid4, 4L);
 
     response = containerEndpoint.getMissingContainers();
     responseObject = (MissingContainersResponse) response.getEntity();
@@ -618,23 +624,38 @@ public class TestContainerEndpoint {
   }
 
   @Test
-  public void testGetReplicaHistoryForContainer() {
-    // Add container history for id 1
-    containerSchemaManager.upsertContainerHistory(1L, "host1", 1L);
-    containerSchemaManager.upsertContainerHistory(1L, "host2", 2L);
-    containerSchemaManager.upsertContainerHistory(1L, "host3", 3L);
-    containerSchemaManager.upsertContainerHistory(1L, "host4", 4L);
-    containerSchemaManager.upsertContainerHistory(1L, "host1", 5L);
+  public void testGetReplicaHistoryForContainer() throws IOException {
+    // Add container history for container id 1
+    final UUID uuid1 = UUID.randomUUID();
+    final UUID uuid2 = UUID.randomUUID();
+    final UUID uuid3 = UUID.randomUUID();
+    final UUID uuid4 = UUID.randomUUID();
+    containerSchemaManager.getNodeDB().put(uuid1, DatanodeDetails.newBuilder()
+        .setUuid(uuid1).setHostName("host1").build());
+    containerSchemaManager.getNodeDB().put(uuid2, DatanodeDetails.newBuilder()
+        .setUuid(uuid2).setHostName("host2").build());
+    containerSchemaManager.getNodeDB().put(uuid3, DatanodeDetails.newBuilder()
+        .setUuid(uuid3).setHostName("host3").build());
+    containerSchemaManager.getNodeDB().put(uuid4, DatanodeDetails.newBuilder()
+        .setUuid(uuid4).setHostName("host4").build());
+    containerSchemaManager.upsertContainerHistory(1L, uuid1, 1L);
+    containerSchemaManager.upsertContainerHistory(1L, uuid2, 2L);
+    containerSchemaManager.upsertContainerHistory(1L, uuid3, 3L);
+    containerSchemaManager.upsertContainerHistory(1L, uuid4, 4L);
+    containerSchemaManager.upsertContainerHistory(1L, uuid1, 5L);
 
     Response response = containerEndpoint.getReplicaHistoryForContainer(1L);
     List<ContainerHistory> histories =
         (List<ContainerHistory>) response.getEntity();
     Set<String> datanodes = Collections.unmodifiableSet(
-        new HashSet<>(Arrays.asList("host1", "host2", "host3", "host4")));
+        new HashSet<>(Arrays.asList(
+            uuid1.toString(), uuid2.toString(),
+            uuid3.toString(), uuid4.toString())));
     Assert.assertEquals(4, histories.size());
     histories.forEach(history -> {
-      Assert.assertTrue(datanodes.contains(history.getDatanodeHost()));
-      if (history.getDatanodeHost().equals("host1")) {
+      Assert.assertTrue(datanodes.contains(history.getDatanodeUuid()));
+      if (history.getDatanodeUuid().equals(uuid1.toString())) {
+        Assert.assertEquals("host1", history.getDatanodeHost());
         Assert.assertEquals(1L, (long) history.getFirstReportTimestamp());
         Assert.assertEquals(5L, (long) history.getLastReportTimestamp());
       }
@@ -682,9 +703,13 @@ public class TestContainerEndpoint {
     missingList.add(missing);
     containerSchemaManager.insertUnhealthyContainerRecords(missingList);
 
-    containerSchemaManager.upsertContainerHistory(cID, "host1", 1L);
-    containerSchemaManager.upsertContainerHistory(cID, "host2", 2L);
-    containerSchemaManager.upsertContainerHistory(cID, "host3", 3L);
-    containerSchemaManager.upsertContainerHistory(cID, "host4", 4L);
+    final UUID uuid1 = UUID.randomUUID();
+    final UUID uuid2 = UUID.randomUUID();
+    final UUID uuid3 = UUID.randomUUID();
+    final UUID uuid4 = UUID.randomUUID();
+    containerSchemaManager.upsertContainerHistory(cID, uuid1, 1L);
+    containerSchemaManager.upsertContainerHistory(cID, uuid2, 2L);
+    containerSchemaManager.upsertContainerHistory(cID, uuid3, 3L);
+    containerSchemaManager.upsertContainerHistory(cID, uuid4, 4L);
   }
 }

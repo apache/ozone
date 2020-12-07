@@ -19,12 +19,14 @@
 package org.apache.hadoop.ozone.recon.spi;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.recon.scm.ContainerReplicaWithTimestamp;
 
 /**
  * The Recon Container DB Service interface.
@@ -66,6 +68,16 @@ public interface ContainerDBServiceProvider {
   void storeContainerKeyCount(Long containerID, Long count) throws IOException;
 
   /**
+   * Store the containerID -> ContainerReplicaWithTimestamp mapping to the
+   * container DB store.
+   * @param containerID the containerID.
+   * @param ts ContainerReplicaWithTimestamp.
+   * @throws IOException
+   */
+  void storeContainerReplicaHistory(Long containerID,
+      ContainerReplicaWithTimestamp ts) throws IOException;
+
+  /**
    * Store the total count of containers into the container DB store.
    *
    * @param count count of the containers present in the system.
@@ -89,6 +101,15 @@ public interface ContainerDBServiceProvider {
    * @throws IOException
    */
   long getKeyCountForContainer(Long containerID) throws IOException;
+
+  /**
+   * Get the container replica history of the given containerID.
+   * @param containerID the given containerId.
+   * @return A list of ContainerReplicaWithTimestamp of the given containerID.
+   * @throws IOException
+   */
+  List<ContainerReplicaWithTimestamp> getContainerReplicaHistory(
+      Long containerID) throws IOException;
 
   /**
    * Get if a containerID exists or not.
