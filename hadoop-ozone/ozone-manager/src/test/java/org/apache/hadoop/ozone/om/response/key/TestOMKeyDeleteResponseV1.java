@@ -34,10 +34,10 @@ public class TestOMKeyDeleteResponseV1 extends TestOMKeyDeleteResponse {
 
   @Override
   protected OMKeyDeleteResponse getOmKeyDeleteResponse(OmKeyInfo omKeyInfo,
-      OmVolumeArgs omVolumeArgs, OmBucketInfo omBucketInfo,
+      OmVolumeArgs omVolumeArgs,
       OzoneManagerProtocolProtos.OMResponse omResponse) {
     return new OMKeyDeleteResponseV1(omResponse, omKeyInfo,
-            true, omVolumeArgs, omBucketInfo, false);
+            true, omVolumeArgs, getOmBucketInfo(), false);
   }
 
   @Override

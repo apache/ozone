@@ -61,7 +61,7 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
             .build();
 
     OMKeyDeleteResponse omKeyDeleteResponse = getOmKeyDeleteResponse(omKeyInfo,
-            omVolumeArgs, omBucketInfo, omResponse);
+            omVolumeArgs, omResponse);
 
     String ozoneKey = addKeyToTable();
 
@@ -121,7 +121,7 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
             .build();
 
     OMKeyDeleteResponse omKeyDeleteResponse = getOmKeyDeleteResponse(omKeyInfo,
-            omVolumeArgs, omBucketInfo, omResponse);
+            omVolumeArgs, omResponse);
 
     Assert.assertTrue(omMetadataManager.getKeyTable().isExist(ozoneKey));
     omKeyDeleteResponse.addToDBBatch(omMetadataManager, batchOperation);
@@ -155,7 +155,7 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
             .build();
 
     OMKeyDeleteResponse omKeyDeleteResponse = getOmKeyDeleteResponse(omKeyInfo,
-            omVolumeArgs, omBucketInfo, omResponse);
+            omVolumeArgs, omResponse);
 
     String ozoneKey = addKeyToTable();
 
@@ -182,9 +182,9 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
   }
 
   protected OMKeyDeleteResponse getOmKeyDeleteResponse(OmKeyInfo omKeyInfo,
-      OmVolumeArgs omVolumeArgs, OmBucketInfo omBucketInfo,
+      OmVolumeArgs omVolumeArgs,
       OzoneManagerProtocolProtos.OMResponse omResponse) {
-    return new OMKeyDeleteResponse( omResponse, omKeyInfo,
+    return new OMKeyDeleteResponse(omResponse, omKeyInfo,
             true, omVolumeArgs, omBucketInfo);
   }
 
