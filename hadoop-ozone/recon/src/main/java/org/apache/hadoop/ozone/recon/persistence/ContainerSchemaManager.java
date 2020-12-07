@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.ozone.recon.persistence;
 
-import static org.hadoop.ozone.recon.schema.tables.ContainerHistoryTable.CONTAINER_HISTORY;
+import static java.util.Comparator.comparingLong;
 import static org.hadoop.ozone.recon.schema.tables.UnhealthyContainersTable.UNHEALTHY_CONTAINERS;
 import static org.jooq.impl.DSL.count;
 
@@ -33,7 +33,6 @@ import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
 import org.hadoop.ozone.recon.schema.tables.daos.UnhealthyContainersDao;
-import org.hadoop.ozone.recon.schema.tables.pojos.ContainerHistory;
 import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
 import org.hadoop.ozone.recon.schema.tables.records.UnhealthyContainersRecord;
 import org.jooq.Cursor;
@@ -49,6 +48,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Provide a high level API to access the Container Schema.
@@ -210,14 +210,9 @@ public class ContainerSchemaManager {
 
   public List<ContainerHistory> getLatestContainerHistory(long containerID,
                                                           int limit) {
-    DSLContext dslContext = containerSchemaDefinition.getDSLContext();
-    // Get container history sorted in descending order of last report timestamp
-    return dslContext.select()
-        .from(CONTAINER_HISTORY)
-        .where(CONTAINER_HISTORY.CONTAINER_ID.eq(containerID))
-        .orderBy(CONTAINER_HISTORY.LAST_REPORT_TIMESTAMP.desc())
-        .limit(limit)
-        .fetchInto(ContainerHistory.class);
+    List<ContainerHistory> res = getAllContainerHistory(containerID);
+    res.sort(comparingLong(ContainerHistory::getLastReportTimestamp).reversed());
+    return res.stream().limit(limit).collect(Collectors.toList());
   }
 
   /**

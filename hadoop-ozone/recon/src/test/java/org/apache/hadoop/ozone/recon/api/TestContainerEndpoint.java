@@ -67,6 +67,7 @@ import org.apache.hadoop.ozone.recon.api.types.MissingContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.MissingContainersResponse;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersResponse;
+import org.apache.hadoop.ozone.recon.persistence.ContainerHistory;
 import org.apache.hadoop.ozone.recon.persistence.ContainerSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
@@ -79,7 +80,6 @@ import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTask;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
-import org.hadoop.ozone.recon.schema.tables.pojos.ContainerHistory;
 import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
 import org.junit.Assert;
 import org.junit.Before;
@@ -631,13 +631,13 @@ public class TestContainerEndpoint {
     final UUID uuid3 = UUID.randomUUID();
     final UUID uuid4 = UUID.randomUUID();
     containerSchemaManager.getNodeDB().put(uuid1, DatanodeDetails.newBuilder()
-        .setUuid(uuid1).setHostName("host1").build());
+        .setUuid(uuid1).setHostName("host1").setIpAddress("127.0.0.1").build());
     containerSchemaManager.getNodeDB().put(uuid2, DatanodeDetails.newBuilder()
-        .setUuid(uuid2).setHostName("host2").build());
+        .setUuid(uuid2).setHostName("host2").setIpAddress("127.0.0.2").build());
     containerSchemaManager.getNodeDB().put(uuid3, DatanodeDetails.newBuilder()
-        .setUuid(uuid3).setHostName("host3").build());
+        .setUuid(uuid3).setHostName("host3").setIpAddress("127.0.0.3").build());
     containerSchemaManager.getNodeDB().put(uuid4, DatanodeDetails.newBuilder()
-        .setUuid(uuid4).setHostName("host4").build());
+        .setUuid(uuid4).setHostName("host4").setIpAddress("127.0.0.4").build());
     containerSchemaManager.upsertContainerHistory(1L, uuid1, 1L);
     containerSchemaManager.upsertContainerHistory(1L, uuid2, 2L);
     containerSchemaManager.upsertContainerHistory(1L, uuid3, 3L);
