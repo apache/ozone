@@ -63,11 +63,11 @@ public class TestOMKeyDeleteResponseV1 extends TestOMKeyDeleteResponse {
 
   @Override
   protected OmKeyInfo getOmKeyInfo() {
-    Assert.assertNotNull(omBucketInfo);
+    Assert.assertNotNull(getOmBucketInfo());
     return TestOMRequestUtils.createOmKeyInfo(volumeName,
-            omBucketInfo.getBucketName(), keyName, replicationType,
+            getOmBucketInfo().getBucketName(), keyName, replicationType,
             replicationFactor,
-            omBucketInfo.getObjectID() + 1,
-            omBucketInfo.getObjectID(), 100, Time.now());
+            getOmBucketInfo().getObjectID() + 1,
+            getOmBucketInfo().getObjectID(), 100, Time.now());
   }
 }

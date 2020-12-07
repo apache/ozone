@@ -40,7 +40,7 @@ import java.util.List;
  */
 public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
 
-  protected OmBucketInfo omBucketInfo;
+  private OmBucketInfo omBucketInfo;
 
   @Test
   public void testAddToDBBatch() throws Exception {
@@ -186,5 +186,9 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
       OzoneManagerProtocolProtos.OMResponse omResponse) {
     return new OMKeyDeleteResponse( omResponse, omKeyInfo,
             true, omVolumeArgs, omBucketInfo);
+  }
+
+  protected OmBucketInfo getOmBucketInfo() {
+    return omBucketInfo;
   }
 }
