@@ -48,7 +48,6 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
@@ -378,7 +377,8 @@ public class KeyManagerImpl implements KeyManager {
       if (grpcBlockTokenEnabled) {
         builder.setToken(secretManager
             .generateToken(remoteUser, allocatedBlock.getBlockID().toString(),
-                getAclForUser(remoteUser), scmBlockSize));
+                EnumSet.of(HddsProtos.BlockTokenSecretProto.
+                    AccessModeProto.WRITE), scmBlockSize));
       }
       locationInfos.add(builder.build());
     }
@@ -391,16 +391,6 @@ public class KeyManagerImpl implements KeyManager {
   public static UserGroupInformation getRemoteUser() throws IOException {
     UserGroupInformation ugi = Server.getRemoteUser();
     return (ugi != null) ? ugi : UserGroupInformation.getCurrentUser();
-  }
-
-  /**
-   * Return acl for user.
-   * @param user
-   *
-   * */
-  private EnumSet<AccessModeProto> getAclForUser(String user) {
-    // TODO: Return correct acl for user.
-    return EnumSet.allOf(AccessModeProto.class);
   }
 
   private EncryptedKeyVersion generateEDEK(
@@ -691,7 +681,8 @@ public class KeyManagerImpl implements KeyManager {
         key.getLocationList().forEach(k -> {
           k.setToken(secretManager.generateToken(remoteUser,
                   k.getBlockID().getContainerBlockID().toString(),
-                  getAclForUser(remoteUser), k.getLength()));
+              EnumSet.of(HddsProtos.BlockTokenSecretProto.
+                  AccessModeProto.READ), k.getLength()));
         });
       }
     }
