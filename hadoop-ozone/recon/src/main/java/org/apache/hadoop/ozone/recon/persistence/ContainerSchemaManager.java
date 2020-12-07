@@ -161,6 +161,7 @@ public class ContainerSchemaManager {
   }
 
   public List<ContainerHistory> getAllContainerHistory(long containerID) {
+    // First, get the existing entries from DB
     Map<UUID, ContainerReplicaTimestamp> resMap;
     try {
       resMap = dbServiceProvider.getContainerReplicaHistoryMap(containerID);
@@ -169,23 +170,22 @@ public class ContainerSchemaManager {
       LOG.debug("Unable to retrieve container replica history from RDB.");
     }
 
+    // Then, update the entries with the latest in-memory info, if available
     if (lastSeenMap != null) {
       Map<UUID, ContainerReplicaTimestamp> replicaLastSeenMap =
           lastSeenMap.get(containerID);
       if (replicaLastSeenMap != null) {
         Map<UUID, ContainerReplicaTimestamp> finalResMap = resMap;
         replicaLastSeenMap.forEach((k, v) ->
-            finalResMap.merge(k, v, (prev, curr) -> curr));
+            finalResMap.merge(k, v, (old, latest) -> latest));
         resMap = finalResMap;
       }
     }
 
+    // Finally, convert map to list for output
     List<ContainerHistory> resList = new ArrayList<>();
-    for (Map.Entry<UUID, ContainerReplicaTimestamp> entry :
-        resMap.entrySet()) {
+    for (Map.Entry<UUID, ContainerReplicaTimestamp> entry : resMap.entrySet()) {
       final UUID uuid = entry.getKey();
-      final long firstSeenTime = entry.getValue().getFirstSeenTime();
-      final long lastSeenTime = entry.getValue().getLastSeenTime();
       String hostname = "N/A";
       // Attempt to retrieve hostname from NODES table
       if (nodeDB != null) {
@@ -195,12 +195,15 @@ public class ContainerSchemaManager {
             hostname = dnDetails.getHostName();
           }
         } catch (IOException ex) {
-          LOG.debug("Unable to get DatanodeDetails from NODES table.");
+          LOG.debug("Unable to retrieve from NODES table of node {}. {}",
+              uuid, ex.getMessage());
         }
       }
+      final long firstSeenTime = entry.getValue().getFirstSeenTime();
+      final long lastSeenTime = entry.getValue().getLastSeenTime();
       // TODO: Refrain from using jOOQ class since we use RDB now?
-      resList.add(new ContainerHistory(
-          containerID, uuid.toString(), hostname, firstSeenTime, lastSeenTime));
+      resList.add(new ContainerHistory(containerID, uuid.toString(), hostname,
+          firstSeenTime, lastSeenTime));
     }
     return resList;
   }
@@ -217,15 +220,17 @@ public class ContainerSchemaManager {
         .fetchInto(ContainerHistory.class);
   }
 
+  /**
+   * Should only be called once during ReconContainerManager init.
+   */
   public void setLastSeenMap(
       Map<Long, Map<UUID, ContainerReplicaTimestamp>> lastSeenMap) {
     this.lastSeenMap = lastSeenMap;
   }
 
-  public DBStore getScmDBStore() {
-    return scmDBStore;
-  }
-
+  /**
+   * Should only be called once during ReconContainerManager init.
+   */
   public void setScmDBStore(DBStore scmDBStore) {
     this.scmDBStore = scmDBStore;
     try {
