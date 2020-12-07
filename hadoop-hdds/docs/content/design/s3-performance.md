@@ -184,7 +184,7 @@ public interface OmTransport {
   ...
 ```
 
- The proposal is to create a new **additional** transport, based on GRPC, which can do the per-request authentication. **Existing Hadoop clients will use the well-known Hadoop RPC client**, but S3g can start to use this specific transport to achieve better performance.
+The proposal is to create a new **additional** transport, based on GRPC, which can do the per-request authentication. **Existing Hadoop clients will use the well-known Hadoop RPC client**, but S3g can start to use this specific transport to achieve better performance.
 
 As this is nothing more, just a transport: exactly the same messages (`OmRequest`) will be used, it's not a new RPC interface.
 
@@ -195,6 +195,37 @@ A new GRPC service should be started in Ozone Manager, which receives `OMRequest
 `OzoneToken` identifier can be simplified (after deprecation period) with removing the S3 specific part, as it won't be required any more.
 
 With this approach the `OzoneClient` instances can be cached on S3g side (with persistent GRPC connections) as the authentication information is not part of the OzoneClient any more (added by the `OmTransport` implementation per request (in case of GRPC) or per connection (in case of HadoopRPC)).
+
+To make it easier to understand the implementation of this approach, let's compare the old (existing) and new (proposed) approach.
+
+### Old approach
+
+1. OzoneClientProvider creates a new OzoneClient for each of the HTTP requests (@RequestScope)
+
+2. OzoneToken is created based on the authentication header (signature, string to sign)
+
+3. OzoneClient creates new OM connection (Hadoop RPC) with the new OzoneToken
+
+4. OM extracts the information from OzoneToken and validates the signature
+
+5. OzoneClient is injected to the REST endpoints
+
+6. OzoneClient is used for any client calls
+
+7. When HTTP request is handled, the OzoneClient is closed
+
+   ![old approach](s3-performance-old.png)
+
+### New approach
+
+1. OzoneClientProvider creates client with @ApplicationScope. Connection is always open to the OM (clients can be pooled)
+2. OM doesn't authentication the connection, each of the requests should be authenticated one-by-one
+3. OzoneClients are always injected to the REST endpoints
+4. For each new HTTP request the authorization header is extracted and added to the outgoing GRPC request as a token
+5. OM authenticate each of the request and calls the same request handler as before
+6. OzoneClient can be open long-term
+
+![new approach](s3-performance-new.png)
 
 # Possible alternatives
 
