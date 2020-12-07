@@ -553,7 +553,21 @@ public class OzoneBucket extends WithMetadata {
    * @throws IOException
    */
   public void deleteKey(String key) throws IOException {
-    proxy.deleteKey(volumeName, name, key);
+    proxy.deleteKey(volumeName, name, key, false);
+  }
+
+  /**
+   * Ozone FS api to delete a directory. Sub directories will be deleted if
+   * recursive flag is true, otherwise it will be non-recursive.
+   *
+   * @param key       Name of the key to be deleted.
+   * @param recursive recursive deletion of all sub path keys if true,
+   *                  otherwise non-recursive
+   * @throws IOException
+   */
+  public void deleteDirectory(String key, boolean recursive)
+      throws IOException {
+    proxy.deleteKey(volumeName, name, key, recursive);
   }
 
   /**

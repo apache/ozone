@@ -321,6 +321,7 @@ enum Status {
 
     QUOTA_ERROR = 67;
 
+    DIRECTORY_NOT_EMPTY = 68;
 }
 
 /**
@@ -731,6 +732,9 @@ message KeyArgs {
 
     // This will be set by leader OM in HA and update the original request.
     optional FileEncryptionInfoProto fileEncryptionInfo = 15;
+
+    // This will be set when user performs delete directory recursively.
+    optional bool recursive = 16;
 }
 
 message KeyLocation {
