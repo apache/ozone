@@ -291,9 +291,12 @@ public interface ClientProtocol {
    * @param volumeName Name of the Volume
    * @param bucketName Name of the Bucket
    * @param keyName Name of the Key
+   * @param recursive recursive deletion of all sub path keys if true,
+   *                  otherwise non-recursive
    * @throws IOException
    */
-  void deleteKey(String volumeName, String bucketName, String keyName)
+  void deleteKey(String volumeName, String bucketName, String keyName,
+                 boolean recursive)
       throws IOException;
 
   /**

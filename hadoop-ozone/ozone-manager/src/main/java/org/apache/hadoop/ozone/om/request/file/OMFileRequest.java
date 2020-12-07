@@ -25,11 +25,14 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Strings;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -758,5 +761,94 @@ public final class OMFileRequest {
               toKeyParentDir), OMException.ResultCodes.KEY_RENAME_ERROR);
     }
     return toKeyParentDirStatus.getKeyInfo().getObjectID();
+  }
+
+  /**
+   * Check if there are any sub path exist for the given user key path.
+   *
+   * @param omKeyInfo om key path
+   * @param metaMgr   OMMetadataManager
+   * @return true if there are any sub path, false otherwise
+   * @throws IOException DB exception
+   */
+  public static boolean hasChildren(OmKeyInfo omKeyInfo,
+      OMMetadataManager metaMgr) throws IOException {
+    return checkSubDirectoryExists(omKeyInfo, metaMgr) ||
+            checkSubFileExists(omKeyInfo, metaMgr);
+  }
+
+  private static boolean checkSubDirectoryExists(OmKeyInfo omKeyInfo,
+      OMMetadataManager metaMgr) throws IOException {
+    // Check all dirTable cache for any sub paths.
+    Table dirTable = metaMgr.getDirectoryTable();
+    Iterator<Map.Entry<CacheKey<String>, CacheValue<OmDirectoryInfo>>>
+            cacheIter = dirTable.cacheIterator();
+
+    while (cacheIter.hasNext()) {
+      Map.Entry<CacheKey<String>, CacheValue<OmDirectoryInfo>> entry =
+              cacheIter.next();
+      OmDirectoryInfo cacheOmDirInfo = entry.getValue().getCacheValue();
+      if (cacheOmDirInfo == null) {
+        continue;
+      }
+      if (isImmediateChild(cacheOmDirInfo.getParentObjectID(),
+              omKeyInfo.getObjectID())) {
+        return true; // found a sub path directory
+      }
+    }
+
+    // Check dirTable entries for any sub paths.
+    String seekDirInDB = metaMgr.getOzonePathKey(omKeyInfo.getObjectID(), "");
+    TableIterator<String, ? extends Table.KeyValue<String, OmDirectoryInfo>>
+            iterator = dirTable.iterator();
+
+    iterator.seek(seekDirInDB);
+
+    if (iterator.hasNext()) {
+      OmDirectoryInfo dirInfo = iterator.value().getValue();
+      return isImmediateChild(dirInfo.getParentObjectID(),
+              omKeyInfo.getObjectID());
+    }
+    return false; // no sub paths found
+  }
+
+  private static boolean checkSubFileExists(OmKeyInfo omKeyInfo,
+      OMMetadataManager metaMgr) throws IOException {
+    // Check all fileTable cache for any sub paths.
+    Table fileTable = metaMgr.getKeyTable();
+    Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>>
+            cacheIter = fileTable.cacheIterator();
+
+    while (cacheIter.hasNext()) {
+      Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>> entry =
+              cacheIter.next();
+      OmKeyInfo cacheOmFileInfo = entry.getValue().getCacheValue();
+      if (cacheOmFileInfo == null) {
+        continue;
+      }
+      if (isImmediateChild(cacheOmFileInfo.getParentObjectID(),
+              omKeyInfo.getObjectID())) {
+        return true; // found a sub path file
+      }
+    }
+
+    // Check fileTable entries for any sub paths.
+    String seekFileInDB = metaMgr.getOzonePathKey(
+            omKeyInfo.getObjectID(), "");
+    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+            iterator = fileTable.iterator();
+
+    iterator.seek(seekFileInDB);
+
+    if (iterator.hasNext()) {
+      OmKeyInfo fileInfo = iterator.value().getValue();
+      return isImmediateChild(fileInfo.getParentObjectID(),
+              omKeyInfo.getObjectID()); // found a sub path file
+    }
+    return false; // no sub paths found
+  }
+
+  public static boolean isImmediateChild(long parentId, long ancestorId) {
+    return parentId == ancestorId;
   }
 }
