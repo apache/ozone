@@ -22,6 +22,7 @@ import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 
 import java.io.IOException;
+import java.util.Optional;
 
 /**
  * SCMHAManager provides HA service for SCM.
@@ -34,9 +35,13 @@ public interface SCMHAManager {
   void start() throws IOException;
 
   /**
-   * Returns true if the current SCM is the leader.
+   * For HA mode, return an Optional that holds term of the
+   * underlying RaftServer iff current SCM is in leader role.
+   * Otherwise, return an empty optional.
+   *
+   * For non-HA mode, return an Optional that holds term 0.
    */
-  boolean isLeader();
+  Optional<Long> isLeader();
 
   /**
    * Returns RatisServer instance associated with the SCM instance.

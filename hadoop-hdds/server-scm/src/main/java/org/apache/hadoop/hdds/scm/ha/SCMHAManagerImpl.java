@@ -21,6 +21,7 @@ import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.protocol.RaftGroupMemberId;
 import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.RaftPeerId;
@@ -32,6 +33,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.Optional;
 
 /**
  * SCMHAManagerImpl uses Apache Ratis for HA implementation. We will have 2N+1
@@ -70,29 +72,28 @@ public class SCMHAManagerImpl implements SCMHAManager {
    * {@inheritDoc}
    */
   @Override
-  public boolean isLeader() {
+  public Optional<Long> isLeader() {
     if (!SCMHAUtils.isSCMHAEnabled(conf)) {
       // When SCM HA is not enabled, the current SCM is always the leader.
-      return true;
+      return Optional.of((long)0);
     }
     RaftServer server = ratisServer.getServer();
     Preconditions.checkState(server instanceof RaftServerProxy);
-    RaftServerImpl serverImpl = null;
     try {
       // SCM only has one raft group.
-      serverImpl = ((RaftServerProxy) server)
+      RaftServerImpl serverImpl = ((RaftServerProxy) server)
           .getImpl(ratisServer.getRaftGroupId());
       if (serverImpl != null) {
-        // Only when it's sure the current SCM is the leader, otherwise
-        // it should all return false.
-        return serverImpl.isLeader();
+        RaftProtos.RoleInfoProto roleInfoProto = serverImpl.getRoleInfoProto();
+        return roleInfoProto.hasLeaderInfo()
+            ? Optional.of(roleInfoProto.getLeaderInfo().getTerm())
+            : Optional.empty();
       }
     } catch (IOException ioe) {
       LOG.error("Fail to get RaftServer impl and therefore it's not clear " +
           "whether it's leader. ", ioe);
     }
-
-    return false;
+    return Optional.empty();
   }
 
   /**
@@ -104,11 +105,6 @@ public class SCMHAManagerImpl implements SCMHAManager {
   }
 
   private RaftPeerId getPeerIdFromRoleInfo(RaftServerImpl serverImpl) {
-    /*
-      TODO: Fix Me
-              Ratis API has changed.
-              RaftServerImpl#getRoleInfoProto is no more public.
-
     if (serverImpl.isLeader()) {
       return RaftPeerId.getRaftPeerId(
           serverImpl.getRoleInfoProto().getLeaderInfo().toString());
@@ -119,8 +115,6 @@ public class SCMHAManagerImpl implements SCMHAManager {
     } else {
       return null;
     }
-     */
-    return null;
   }
 
   @Override
