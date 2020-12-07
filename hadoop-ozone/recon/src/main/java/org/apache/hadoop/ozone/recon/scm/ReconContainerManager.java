@@ -239,18 +239,17 @@ public class ReconContainerManager extends SCMContainerManager {
 
     final long id = containerID.getId();
     final DatanodeDetails dnInfo = replica.getDatanodeDetails();
-    final UUID dnUuid = dnInfo.getUuid();
+    final UUID uuid = dnInfo.getUuid();
 
     final Map<UUID, ContainerReplicaWithTimestamp> replicaLastSeenMap =
         containerReplicaLastSeenMap.get(id);
-
     if (replicaLastSeenMap != null) {
-      final ContainerReplicaWithTimestamp ts = replicaLastSeenMap.get(dnUuid);
+      final ContainerReplicaWithTimestamp ts = replicaLastSeenMap.get(uuid);
       if (ts != null) {
-        // Flush to DB and remove from in-memory map
-        containerSchemaManager.upsertContainerHistory(
-            id, dnUuid, ts.getLastSeenTime());
-        replicaLastSeenMap.remove(dnUuid);
+        // Flush to DB, then remove from in-memory map
+        containerSchemaManager.upsertContainerHistory(id, uuid,
+            ts.getLastSeenTime());
+        replicaLastSeenMap.remove(uuid);
       }
     }
   }
@@ -260,8 +259,9 @@ public class ReconContainerManager extends SCMContainerManager {
   }
 
   /**
-   * Flush entire map to DB.
+   * Flush the container replica history in-memory map to DB.
    * Expected to be called on Recon graceful shutdown.
+   * @param clearMap true to clear the in-memory map after flushing completes.
    */
   public void flushLastSeenMapToDB(boolean clearMap) {
     containerSchemaManager.flushLastSeenMapToDB(clearMap);

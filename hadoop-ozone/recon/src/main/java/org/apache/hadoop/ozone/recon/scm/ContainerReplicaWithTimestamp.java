@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.recon.scm;
 
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-
 import java.util.UUID;
 
 /**
@@ -27,29 +26,44 @@ import java.util.UUID;
  */
 public class ContainerReplicaWithTimestamp {
 
-  private UUID id;
+  // Datanode UUID
+  private UUID uuid;
+  // First reported time of the replica on this datanode,
+  //  should only be updated once when the object is created.
   private Long firstSeenTime;
+  // Last reported time of the replica
   private Long lastSeenTime;
+  // TODO: Remove this if unused.
   private final ContainerReplica containerReplica;
 
+  /**
+   * Constructor used when new timestamp entry is being created but has no
+   *  ContainerReplica info.
+   */
   public ContainerReplicaWithTimestamp(UUID id, Long lastSeenTime) {
-    this.id = id;
+    this.uuid = id;
     this.firstSeenTime = lastSeenTime;
     this.lastSeenTime = lastSeenTime;
     this.containerReplica = null;
   }
 
+  /**
+   * Constructor used when new timestamp entry is being created.
+   */
   public ContainerReplicaWithTimestamp(UUID id, Long lastSeenTime,
       ContainerReplica containerReplica) {
-    this.id = id;
+    this.uuid = id;
     this.firstSeenTime = lastSeenTime;
     this.lastSeenTime = lastSeenTime;
     this.containerReplica = containerReplica;
   }
 
+  /**
+   * Constructor used when an entry is being read from the DB.
+   */
   public ContainerReplicaWithTimestamp(UUID id, Long firstSeenTime,
       Long lastSeenTime, ContainerReplica containerReplica) {
-    this.id = id;
+    this.uuid = id;
     this.firstSeenTime = firstSeenTime;
     this.lastSeenTime = lastSeenTime;
     this.containerReplica = containerReplica;
@@ -62,12 +76,12 @@ public class ContainerReplicaWithTimestamp {
     return containerReplica;
   }
 
-  public UUID getId() {
-    return id;
+  public UUID getUuid() {
+    return uuid;
   }
 
-  public void setId(UUID id) {
-    this.id = id;
+  public void setUuid(UUID uuid) {
+    this.uuid = uuid;
   }
 
   public Long getFirstSeenTime() {

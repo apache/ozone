@@ -71,6 +71,7 @@ public interface ContainerDBServiceProvider {
   /**
    * Store the containerID -> ContainerReplicaWithTimestamp mapping to the
    * container DB store.
+   *
    * @param containerID the containerID.
    * @param tsMap A map from datanode UUID to ContainerReplicaWithTimestamp.
    * @throws IOException
@@ -105,6 +106,7 @@ public interface ContainerDBServiceProvider {
 
   /**
    * Get the container replica history of the given containerID.
+   *
    * @param containerID the given containerId.
    * @return A map of ContainerReplicaWithTimestamp of the given containerID.
    * @throws IOException

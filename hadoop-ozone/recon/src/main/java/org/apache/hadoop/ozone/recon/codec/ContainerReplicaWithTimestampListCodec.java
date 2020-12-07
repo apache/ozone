@@ -51,8 +51,8 @@ public class ContainerReplicaWithTimestampListCodec
     // ByteArrayOutputStream constructor has a sanity check on size.
     ByteArrayOutputStream out = new ByteArrayOutputStream(sizeOfRes);
     for (ContainerReplicaWithTimestamp ts : lst) {
-      out.write(lc.toPersistedFormat(ts.getId().getMostSignificantBits()));
-      out.write(lc.toPersistedFormat(ts.getId().getLeastSignificantBits()));
+      out.write(lc.toPersistedFormat(ts.getUuid().getMostSignificantBits()));
+      out.write(lc.toPersistedFormat(ts.getUuid().getLeastSignificantBits()));
       out.write(lc.toPersistedFormat(ts.getFirstSeenTime()));
       out.write(lc.toPersistedFormat(ts.getLastSeenTime()));
     }

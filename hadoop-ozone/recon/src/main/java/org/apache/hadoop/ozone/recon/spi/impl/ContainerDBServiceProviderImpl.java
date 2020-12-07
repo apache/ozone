@@ -182,6 +182,14 @@ public class ContainerDBServiceProviderImpl
     containerKeyCountTable.put(containerID, count);
   }
 
+  /**
+   * Store the containerID -> ContainerReplicaWithTimestamp mapping to the
+   * container DB store.
+   *
+   * @param containerID the containerID.
+   * @param tsMap A map from datanode UUID to ContainerReplicaWithTimestamp.
+   * @throws IOException
+   */
   @Override
   public void storeContainerReplicaHistoryMap(Long containerID,
       Map<UUID, ContainerReplicaWithTimestamp> tsMap) throws IOException {
@@ -207,24 +215,29 @@ public class ContainerDBServiceProviderImpl
   }
 
   /**
-   * Get the map of container replica history from RDB.
+   * Get the container replica history of the given containerID.
+   *
+   * @param containerID the given containerId.
+   * @return A map of ContainerReplicaWithTimestamp of the given containerID.
+   * @throws IOException
    */
   @Override
   public Map<UUID, ContainerReplicaWithTimestamp> getContainerReplicaHistoryMap(
       Long containerID) throws IOException {
 
-    ContainerReplicaWithTimestampList lst =
+    final ContainerReplicaWithTimestampList tsList =
         containerReplicaHistoryTable.get(containerID);
-    if (lst == null) {
+    if (tsList == null) {
+      // DB doesn't have an existing entry for the containerID, return empty map
       return new HashMap<>();
     }
 
     Map<UUID, ContainerReplicaWithTimestamp> res = new HashMap<>();
-    for (ContainerReplicaWithTimestamp ts : lst.getList()) {
-      final UUID dnUuid = ts.getId();
-      res.put(dnUuid,
-          new ContainerReplicaWithTimestamp(
-              dnUuid, ts.getFirstSeenTime(), ts.getLastSeenTime(), null));
+    // Populate result map with entries from the DB.
+    // The list should be fairly short (< 10 entries).
+    for (ContainerReplicaWithTimestamp ts : tsList.getList()) {
+      final UUID uuid = ts.getUuid();
+      res.put(uuid, ts);
     }
     return res;
   }

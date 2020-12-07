@@ -142,9 +142,7 @@ public class ContainerSchemaManager {
     unhealthyContainersDao.insert(recs);
   }
 
-  public void upsertContainerHistory(long containerID, UUID uuid,
-                                     long time) {
-
+  public void upsertContainerHistory(long containerID, UUID uuid, long time) {
     Map<UUID, ContainerReplicaWithTimestamp> tsMap;
     try {
       tsMap = dbServiceProvider.getContainerReplicaHistoryMap(containerID);
@@ -157,8 +155,7 @@ public class ContainerSchemaManager {
       }
       dbServiceProvider.storeContainerReplicaHistoryMap(containerID, tsMap);
     } catch (IOException e) {
-      // TODO: Better error handling
-      LOG.debug("Error on DB operations.");
+      LOG.debug("Error on DB operations. {}", e.getMessage());
     }
   }
 
@@ -188,8 +185,8 @@ public class ContainerSchemaManager {
       final UUID uuid = entry.getKey();
       final long firstSeenTime = entry.getValue().getFirstSeenTime();
       final long lastSeenTime = entry.getValue().getLastSeenTime();
-      // Retrieve hostname in NODES table
       String hostname = "N/A";
+      // Attempt to retrieve hostname from NODES table
       if (nodeDB != null) {
         try {
           DatanodeDetails dnDetails = nodeDB.get(uuid);
@@ -237,6 +234,10 @@ public class ContainerSchemaManager {
     }
   }
 
+  /**
+   * Flush the container replica history in-memory map to DB.
+   * @param clearMap true to clear the in-memory map after flushing completes.
+   */
   public void flushLastSeenMapToDB(boolean clearMap) {
     if (lastSeenMap == null) {
       return;
