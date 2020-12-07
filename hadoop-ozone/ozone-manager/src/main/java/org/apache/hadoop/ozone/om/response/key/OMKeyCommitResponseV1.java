@@ -69,10 +69,6 @@ public class OMKeyCommitResponseV1 extends OMKeyCommitResponse {
     OMFileRequest.addToFileTable(omMetadataManager, batchOperation,
             getOmKeyInfo());
 
-    // update volume usedBytes.
-    omMetadataManager.getVolumeTable().putWithBatch(batchOperation,
-            omMetadataManager.getVolumeKey(getOmVolumeArgs().getVolume()),
-            getOmVolumeArgs());
     // update bucket usedBytes.
     omMetadataManager.getBucketTable().putWithBatch(batchOperation,
             omMetadataManager.getBucketKey(getOmVolumeArgs().getVolume(),

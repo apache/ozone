@@ -76,10 +76,6 @@ public class OMKeyDeleteResponseV1 extends OMKeyDeleteResponse {
               ozoneDbKey, getOmKeyInfo());
     }
 
-    // update volume usedBytes.
-    omMetadataManager.getVolumeTable().putWithBatch(batchOperation,
-        omMetadataManager.getVolumeKey(getOmVolumeArgs().getVolume()),
-        getOmVolumeArgs());
     // update bucket usedBytes.
     omMetadataManager.getBucketTable().putWithBatch(batchOperation,
         omMetadataManager.getBucketKey(getOmVolumeArgs().getVolume(),
