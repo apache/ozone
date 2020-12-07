@@ -102,8 +102,10 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
 
     // Make sure all OMs have logs from writing data, so we can check that
     // they are purged after prepare.
-    cluster.getOzoneManagersList().forEach(om ->
-        Assert.assertTrue(logFilesPresentInRatisPeer(om)));
+    for (OzoneManager om: cluster.getOzoneManagersList()) {
+      LambdaTestUtils.await(timeoutMillis, 1000,
+          () -> logFilesPresentInRatisPeer(om));
+    }
 
     OzoneManagerProtocol ozoneManagerClient =
         ozClient.getObjectStore().getClientProxy().getOzoneManagerClient();
