@@ -92,7 +92,7 @@ As a result we can have three main options:
 |-|-|-|-|-|-|
 | default | DISABLED | DISABLED | 100 % compatibility | FULLY UNSUPPORTED |  implemented, default |
 | ozone.om.enable.filesystem.paths=true | ENABLED | ENABLED | limited compatibility | FULLY SUPPORTED | implemented |
-| ozone.om.enable.intermediate.dirs=true | ENABLED | DISABLED | 100% compatibility | SUPPORTED but partial view. | NOT implemented |
+| ozone.om.enable.intermediate.dirs=true | ENABLED | DISABLED | 100% compatibility | SUPPORTED but partial view | NOT implemented |
 
 Let's talk all of these option in more details
 
@@ -142,7 +142,7 @@ This approach makes the normalization and prefix creation independent from each 
 | `ozone.om.enable.filesystem.paths=true`  | Enable intermediate dir generation **AND** key name normalization |
 | `ozone.om.enable.intermediate.dirs=true` | Enable only the intermediate dir generation |
 
-This mode can be 100% S3 compatibility (no forced normalization). But some of the path which are saved via S3 (like `a/b//////v`) couldn't be displayed via `ofs/o3fs`. This is the same behavior what S3A provides when incompatible path is found in S3.
+This mode can be 100% S3 compatibility (no forced normalization). But some of the path which are saved via S3 (like `a/b//////v`, `2019:12:23.txt` or `../../a.txt`) couldn't be displayed via `ofs/o3fs`. This is the same behavior what S3A provides when incompatible path is found in S3.
 
 With this approach `ofs/o3fs` can show only a partial view 
 
