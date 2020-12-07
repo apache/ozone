@@ -16,25 +16,31 @@
 *** Settings ***
 Documentation       Test ozone classpath command
 Library             BuiltIn
-Resource            ../commonlib.robot
+Resource            ../lib/os.robot
+Resource            ../ozone-lib/shell.robot
 Test Timeout        5 minutes
+Suite Setup         Find Jars Dir
 
 *** Test Cases ***
 Ignores HADOOP_CLASSPATH if OZONE_CLASSPATH is set
-    Create File         %{OZONE_HOME=/opt/hadoop}/share/ozone/lib/hadoop-classpath.jar
-    Set Environment Variable   HADOOP_CLASSPATH  %{OZONE_HOME=/opt/hadoop}/share/ozone/lib/hadoop-classpath.jar
+    [setup]    Create File         %{HDDS_LIB_JARS_DIR}/hadoop-classpath.jar
+    Set Environment Variable   HADOOP_CLASSPATH  %{HDDS_LIB_JARS_DIR}/hadoop-classpath.jar
     Set Environment Variable   OZONE_CLASSPATH   ${EMPTY}
     ${output} =         Execute          ozone classpath hadoop-ozone-insight
                         Should Contain   ${output}   hadoop-hdds-interface
-                        Should Not Contain   ${output}   hadoop-classpath.jar
+                        Should Not Contain   ${output}   %{HDDS_LIB_JARS_DIR}/hadoop-classpath.jar
+    [teardown]    Remove File         %{HDDS_LIB_JARS_DIR}/hadoop-classpath.jar
 
 Picks up items from OZONE_CLASSPATH
-    Create File         %{OZONE_HOME=/opt/hadoop}/share/ozone/lib/ozone-classpath.jar
-    Set Environment Variable   OZONE_CLASSPATH  %{OZONE_HOME=/opt/hadoop}/share/ozone/lib/ozone-classpath.jar
+    [setup]    Create File         %{HDDS_LIB_JARS_DIR}/ozone-classpath.jar
+    Set Environment Variable   OZONE_CLASSPATH  %{HDDS_LIB_JARS_DIR}/ozone-classpath.jar
     ${output} =         Execute          ozone classpath hadoop-ozone-insight
-                        Should Contain   ${output}   ozone-classpath.jar
+                        Should Contain   ${output}   %{HDDS_LIB_JARS_DIR}/ozone-classpath.jar
+    [teardown]    Remove File         %{HDDS_LIB_JARS_DIR}/ozone-classpath.jar
 
 Adds optional dir entries
-    Create File         %{OZONE_HOME=/opt/hadoop}/share/ozone/lib/hadoop-ozone-insight/optional.jar
+    [setup]    Create File         %{HDDS_LIB_JARS_DIR}/hadoop-ozone-insight/optional.jar
+    Set Environment Variable   OZONE_CLASSPATH  ${EMPTY}
     ${output} =         Execute          ozone classpath hadoop-ozone-insight
-                        Should Contain   ${output}   optional.jar
+                        Should Contain   ${output}   %{HDDS_LIB_JARS_DIR}/hadoop-ozone-insight/optional.jar
+    [teardown]    Remove File    %{HDDS_LIB_JARS_DIR}/hadoop-ozone-insight/optional.jar
