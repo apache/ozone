@@ -746,7 +746,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     KeyArgs keyArgs = KeyArgs.newBuilder()
         .setVolumeName(args.getVolumeName())
         .setBucketName(args.getBucketName())
-        .setKeyName(args.getKeyName()).build();
+        .setKeyName(args.getKeyName())
+        .setRecursive(args.isRecursive()).build();
     req.setKeyArgs(keyArgs);
 
     OMRequest omRequest = createOMRequest(Type.DeleteKey)

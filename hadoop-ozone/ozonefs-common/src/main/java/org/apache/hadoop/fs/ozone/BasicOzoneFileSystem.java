@@ -414,7 +414,17 @@ public class BasicOzoneFileSystem extends FileSystem {
   }
 
   private boolean renameV1(String srcPath, String dstPath) throws IOException {
-    adapter.renameKey(srcPath, dstPath);
+    try {
+      adapter.renameKey(srcPath, dstPath);
+    } catch (OMException ome) {
+      LOG.error("rename key failed: {}. source:{}, destin:{}",
+              ome.getMessage(), srcPath, dstPath);
+      if (OMException.ResultCodes.KEY_ALREADY_EXISTS == ome.getResult()) {
+        return false;
+      } else {
+        throw ome;
+      }
+    }
     return true;
   }
 
@@ -498,6 +508,20 @@ public class BasicOzoneFileSystem extends FileSystem {
     incrementCounter(Statistic.INVOCATION_DELETE, 1);
     statistics.incrementWriteOps(1);
     LOG.debug("Delete path {} - recursive {}", f, recursive);
+
+    String layOutVersion = adapter.getBucketLayoutVersion();
+    if (layOutVersion != null &&
+            OMConfigKeys.OZONE_OM_LAYOUT_VERSION_V1.equals(layOutVersion)) {
+
+      if (f.isRoot()) {
+        LOG.warn("Cannot delete root directory.");
+        return false;
+      }
+
+      String key = pathToKey(f);
+      return adapter.deleteObject(key, recursive);
+    }
+
     FileStatus status;
     try {
       status = getFileStatus(f);

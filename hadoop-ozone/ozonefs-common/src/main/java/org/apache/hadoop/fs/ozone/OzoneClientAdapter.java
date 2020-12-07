@@ -51,7 +51,9 @@ public interface OzoneClientAdapter {
 
   boolean createDirectory(String keyName) throws IOException;
 
-  boolean deleteObject(String keyName);
+  boolean deleteObject(String keyName) throws IOException;
+
+  boolean deleteObject(String keyName, boolean recursive) throws IOException;
 
   boolean deleteObjects(List<String> keyName);
 
