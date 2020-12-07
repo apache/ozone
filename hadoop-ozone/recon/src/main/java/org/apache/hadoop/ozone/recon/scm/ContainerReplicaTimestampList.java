@@ -22,26 +22,26 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * A list of ContainerReplicaWithTimestamp.
+ * A list of ContainerReplicaTimestamp.
  */
-public class ContainerReplicaWithTimestampList {
+public class ContainerReplicaTimestampList {
 
-  private List<ContainerReplicaWithTimestamp> tsList;
+  private List<ContainerReplicaTimestamp> tsList;
 
-  public ContainerReplicaWithTimestampList(
-      List<ContainerReplicaWithTimestamp> tsList) {
+  public ContainerReplicaTimestampList(
+      List<ContainerReplicaTimestamp> tsList) {
     this.tsList = tsList;
   }
 
-  public List<ContainerReplicaWithTimestamp> asList() {
+  public List<ContainerReplicaTimestamp> asList() {
     return Collections.unmodifiableList(tsList);
   }
 
-  public List<ContainerReplicaWithTimestamp> getList() {
+  public List<ContainerReplicaTimestamp> getList() {
     return tsList;
   }
 
-  public void setList(List<ContainerReplicaWithTimestamp> list) {
+  public void setList(List<ContainerReplicaTimestamp> list) {
     this.tsList = list;
   }
 

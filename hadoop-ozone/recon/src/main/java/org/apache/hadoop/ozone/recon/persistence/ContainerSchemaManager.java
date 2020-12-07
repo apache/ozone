@@ -27,7 +27,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersSummary;
-import org.apache.hadoop.ozone.recon.scm.ContainerReplicaWithTimestamp;
+import org.apache.hadoop.ozone.recon.scm.ContainerReplicaTimestamp;
 import org.apache.hadoop.ozone.recon.scm.ReconSCMDBDefinition;
 import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
@@ -61,7 +61,7 @@ public class ContainerSchemaManager {
   private final UnhealthyContainersDao unhealthyContainersDao;
   private final ContainerSchemaDefinition containerSchemaDefinition;
 
-  private Map<Long, Map<UUID, ContainerReplicaWithTimestamp>> lastSeenMap;
+  private Map<Long, Map<UUID, ContainerReplicaTimestamp>> lastSeenMap;
 
   private final ContainerDBServiceProvider dbServiceProvider;
 
@@ -143,12 +143,13 @@ public class ContainerSchemaManager {
   }
 
   public void upsertContainerHistory(long containerID, UUID uuid, long time) {
-    Map<UUID, ContainerReplicaWithTimestamp> tsMap;
+    Map<UUID, ContainerReplicaTimestamp> tsMap;
     try {
       tsMap = dbServiceProvider.getContainerReplicaHistoryMap(containerID);
-      ContainerReplicaWithTimestamp ts = tsMap.get(uuid);
+      ContainerReplicaTimestamp ts = tsMap.get(uuid);
       if (ts == null) {
-        tsMap.put(uuid, new ContainerReplicaWithTimestamp(uuid, time));
+        // New entry
+        tsMap.put(uuid, new ContainerReplicaTimestamp(uuid, time, time));
       } else {
         // Entry exists, update last seen time and put it back to DB.
         ts.setLastSeenTime(time);
@@ -160,7 +161,7 @@ public class ContainerSchemaManager {
   }
 
   public List<ContainerHistory> getAllContainerHistory(long containerID) {
-    Map<UUID, ContainerReplicaWithTimestamp> resMap;
+    Map<UUID, ContainerReplicaTimestamp> resMap;
     try {
       resMap = dbServiceProvider.getContainerReplicaHistoryMap(containerID);
     } catch (IOException ex) {
@@ -169,10 +170,10 @@ public class ContainerSchemaManager {
     }
 
     if (lastSeenMap != null) {
-      Map<UUID, ContainerReplicaWithTimestamp> replicaLastSeenMap =
+      Map<UUID, ContainerReplicaTimestamp> replicaLastSeenMap =
           lastSeenMap.get(containerID);
       if (replicaLastSeenMap != null) {
-        Map<UUID, ContainerReplicaWithTimestamp> finalResMap = resMap;
+        Map<UUID, ContainerReplicaTimestamp> finalResMap = resMap;
         replicaLastSeenMap.forEach((k, v) ->
             finalResMap.merge(k, v, (prev, curr) -> curr));
         resMap = finalResMap;
@@ -180,7 +181,7 @@ public class ContainerSchemaManager {
     }
 
     List<ContainerHistory> resList = new ArrayList<>();
-    for (Map.Entry<UUID, ContainerReplicaWithTimestamp> entry :
+    for (Map.Entry<UUID, ContainerReplicaTimestamp> entry :
         resMap.entrySet()) {
       final UUID uuid = entry.getKey();
       final long firstSeenTime = entry.getValue().getFirstSeenTime();
@@ -217,7 +218,7 @@ public class ContainerSchemaManager {
   }
 
   public void setLastSeenMap(
-      Map<Long, Map<UUID, ContainerReplicaWithTimestamp>> lastSeenMap) {
+      Map<Long, Map<UUID, ContainerReplicaTimestamp>> lastSeenMap) {
     this.lastSeenMap = lastSeenMap;
   }
 
@@ -244,10 +245,10 @@ public class ContainerSchemaManager {
     }
     synchronized (lastSeenMap) {
       try {
-        for (Map.Entry<Long, Map<UUID, ContainerReplicaWithTimestamp>> entry :
+        for (Map.Entry<Long, Map<UUID, ContainerReplicaTimestamp>> entry :
             lastSeenMap.entrySet()) {
           final long containerId = entry.getKey();
-          final Map<UUID, ContainerReplicaWithTimestamp> map = entry.getValue();
+          final Map<UUID, ContainerReplicaTimestamp> map = entry.getValue();
           dbServiceProvider.storeContainerReplicaHistoryMap(containerId, map);
         }
       } catch (IOException e) {

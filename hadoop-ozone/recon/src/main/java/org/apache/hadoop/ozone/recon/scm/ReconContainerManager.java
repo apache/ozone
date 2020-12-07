@@ -57,7 +57,7 @@ public class ReconContainerManager extends SCMContainerManager {
   private ContainerSchemaManager containerSchemaManager;
 
   // Container ID -> Datanode UUID -> Timestamp
-  private final Map<Long, Map<UUID, ContainerReplicaWithTimestamp>>
+  private final Map<Long, Map<UUID, ContainerReplicaTimestamp>>
       containerReplicaLastSeenMap;
 
   /**
@@ -192,10 +192,10 @@ public class ReconContainerManager extends SCMContainerManager {
     final long currTime = System.currentTimeMillis();
     final long id = containerID.getId();
     final DatanodeDetails dnInfo = replica.getDatanodeDetails();
-    final UUID dnUuid = dnInfo.getUuid();
+    final UUID uuid = dnInfo.getUuid();
 
     // Map from DataNode UUID to replica last seen time
-    final Map<UUID, ContainerReplicaWithTimestamp> replicaLastSeenMap =
+    final Map<UUID, ContainerReplicaTimestamp> replicaLastSeenMap =
         containerReplicaLastSeenMap.get(id);
 
     boolean flushToDB = false;
@@ -204,18 +204,17 @@ public class ReconContainerManager extends SCMContainerManager {
     if (replicaLastSeenMap == null) {
       // putIfAbsent to avoid TOCTOU
       containerReplicaLastSeenMap.putIfAbsent(id,
-          new ConcurrentHashMap<UUID, ContainerReplicaWithTimestamp>() {{
-            put(dnUuid,
-                new ContainerReplicaWithTimestamp(dnUuid, currTime, replica));
+          new ConcurrentHashMap<UUID, ContainerReplicaTimestamp>() {{
+            put(uuid, new ContainerReplicaTimestamp(uuid, currTime, currTime));
           }});
       flushToDB = true;
     } else {
       // ContainerID exists, update timestamp in memory
-      final ContainerReplicaWithTimestamp ts = replicaLastSeenMap.get(dnUuid);
+      final ContainerReplicaTimestamp ts = replicaLastSeenMap.get(uuid);
       if (ts == null) {
         // New Datanode
-        replicaLastSeenMap.put(dnUuid,
-            new ContainerReplicaWithTimestamp(dnUuid, currTime, replica));
+        replicaLastSeenMap.put(uuid,
+            new ContainerReplicaTimestamp(uuid, currTime, currTime));
         flushToDB = true;
       } else {
         // if the object exists, only update the last seen time field
@@ -224,7 +223,7 @@ public class ReconContainerManager extends SCMContainerManager {
     }
 
     if (flushToDB) {
-      containerSchemaManager.upsertContainerHistory(id, dnUuid, currTime);
+      containerSchemaManager.upsertContainerHistory(id, uuid, currTime);
     }
   }
 
@@ -241,10 +240,10 @@ public class ReconContainerManager extends SCMContainerManager {
     final DatanodeDetails dnInfo = replica.getDatanodeDetails();
     final UUID uuid = dnInfo.getUuid();
 
-    final Map<UUID, ContainerReplicaWithTimestamp> replicaLastSeenMap =
+    final Map<UUID, ContainerReplicaTimestamp> replicaLastSeenMap =
         containerReplicaLastSeenMap.get(id);
     if (replicaLastSeenMap != null) {
-      final ContainerReplicaWithTimestamp ts = replicaLastSeenMap.get(uuid);
+      final ContainerReplicaTimestamp ts = replicaLastSeenMap.get(uuid);
       if (ts != null) {
         // Flush to DB, then remove from in-memory map
         containerSchemaManager.upsertContainerHistory(id, uuid,
