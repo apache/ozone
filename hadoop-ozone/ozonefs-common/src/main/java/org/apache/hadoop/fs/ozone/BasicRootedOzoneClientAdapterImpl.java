@@ -38,6 +38,7 @@ import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -439,10 +440,13 @@ public class BasicRootedOzoneClientAdapterImpl
    * Helper method to delete an object specified by key name in bucket.
    *
    * @param path path to a key to be deleted
+   * @param recursive recursive deletion of all sub path keys if true,
+   *                  otherwise non-recursive
    * @return true if the key is deleted, false otherwise
    */
   @Override
-  public boolean deleteObject(String path) {
+  public boolean deleteObject(String path, boolean recursive)
+      throws IOException {
     LOG.trace("issuing delete for path to key: {}", path);
     incrementCounter(Statistic.OBJECTS_DELETED, 1);
     OFSPath ofsPath = new OFSPath(path);
@@ -452,12 +456,23 @@ public class BasicRootedOzoneClientAdapterImpl
     }
     try {
       OzoneBucket bucket = getBucket(ofsPath, false);
-      bucket.deleteKey(keyName);
+      bucket.deleteDirectory(keyName, recursive);
       return true;
+    } catch (OMException ome) {
+      LOG.error("delete key failed {}", ome.getMessage());
+      if (OMException.ResultCodes.DIRECTORY_NOT_EMPTY == ome.getResult()) {
+        throw new PathIsNotEmptyDirectoryException(ome.getMessage());
+      }
+      return false;
     } catch (IOException ioe) {
       LOG.error("delete key failed " + ioe.getMessage());
       return false;
     }
+  }
+
+  @Override
+  public boolean deleteObject(String path) throws IOException {
+    return deleteObject(path, false);
   }
 
   /**
