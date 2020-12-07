@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ipc.ProtobufRpcEngine.Server;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
@@ -131,7 +132,7 @@ public final class OzoneManagerRatisServer {
   public OMResponse submitRequest(OMRequest omRequest) throws ServiceException {
     // In prepare mode, only prepare and cancel requests are allowed to go
     // through.
-    if (ozoneManager.requestAllowed(omRequest.getCmdType())) {
+    if (OzoneManagerPrepareState.requestAllowed(omRequest.getCmdType())) {
       RaftClientRequest raftClientRequest =
           createWriteRaftClientRequest(omRequest);
       RaftClientReply raftClientReply = submitRequestToRatis(raftClientRequest);

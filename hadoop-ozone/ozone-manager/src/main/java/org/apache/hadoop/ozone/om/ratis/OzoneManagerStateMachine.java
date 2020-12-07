@@ -33,6 +33,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -202,9 +203,9 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
 
     // In prepare mode, only prepare and cancel requests are allowed to go
     // through.
-    if (ozoneManager.requestAllowed(cmdType)) {
+    if (OzoneManagerPrepareState.requestAllowed(cmdType)) {
       if (cmdType == OzoneManagerProtocolProtos.Type.Prepare) {
-        ozoneManager.setPrepared(true);
+        OzoneManagerPrepareState.setPrepared(true);
       }
       // TODO: Add cancel prepare here after it is implemented.
       return trx;

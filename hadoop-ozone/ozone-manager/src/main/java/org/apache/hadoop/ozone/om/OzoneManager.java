@@ -339,14 +339,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final boolean useRatisForReplication;
 
   private boolean isNativeAuthorizerEnabled;
-  private boolean isPrepared;
 
   private ExitManager exitManager;
 
   private enum State {
     INITIALIZED,
     RUNNING,
-    PREPARED,
     STOPPED
   }
 
@@ -509,7 +507,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     // TODO: When marker file is added, check for that on startup to
     //  determine prepare mode.
-    this.isPrepared = false;
   }
 
   private void logVersionMismatch(OzoneConfiguration conf, ScmInfo scmInfo) {
@@ -1222,12 +1219,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     startJVMPauseMonitor();
     setStartTime();
 
-    if (!isPrepared) {
-      omState = State.RUNNING;
-    } else {
-      omState = State.PREPARED;
-      LOG.info("Started OM services in prepare mode.");
-    }
+  omState = State.RUNNING;
   }
 
   /**
@@ -3826,43 +3818,5 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   public OmLayoutVersionManager getVersionManager() {
     return versionManager;
-  }
-
-  /**
-   * Mark this Ozone Manager as being in or out of prepare mode.
-   * In prepare mode, an Ozone Manager has applied all transactions from
-   * its Ratis log and cleared out the log. It will not allow any write requests
-   * through until it is taken out of prepare mode.
-   *
-   * Blocking write requests while the OM is in prepare mode is enforced by
-   * {@link OzoneManagerStateMachine#preAppendTransaction}
-   * and {@link OzoneManagerRatisServer#submitRequest}
-   *
-   * @param prepare true if this Ozone Manager should be put in prepare mode,
-   * false if this Ozone Manager should be taken out of prepare mode.
-   */
-  public void setPrepared(boolean prepare) {
-    isPrepared = prepare;
-  }
-
-  public boolean isPrepared() {
-    return isPrepared;
-  }
-
-  /**
-   * If this Ozone Manager is not in prepare mode, returns true.
-   * If this Ozone Manager is in prepare mode, returns true only if {@code
-   * requestType} is{@code Prepare} or {@code CancelPrepare}. Returns false
-   * otherwise.
-   */
-  public boolean requestAllowed(OzoneManagerProtocolProtos.Type requestType) {
-    boolean requestAllowed = true;
-
-    if (isPrepared) {
-      // TODO: Also return true for cancel prepare when it is implemented.
-      requestAllowed = (requestType == OzoneManagerProtocolProtos.Type.Prepare);
-    }
-
-    return requestAllowed;
   }
 }
