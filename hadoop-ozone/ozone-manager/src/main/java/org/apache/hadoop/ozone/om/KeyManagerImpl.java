@@ -2454,7 +2454,8 @@ public class KeyManagerImpl implements KeyManager {
 
     while (iterator.hasNext() && numEntries - countEntries > 0) {
       OmDirectoryInfo dirInfo = iterator.value().getValue();
-      if (!isImmediateChild(dirInfo.getParentObjectID(), prefixKeyInDB)) {
+      if (!OMFileRequest.isImmediateChild(dirInfo.getParentObjectID(),
+              prefixKeyInDB)) {
         break;
       }
 
@@ -2489,7 +2490,8 @@ public class KeyManagerImpl implements KeyManager {
     while (iterator.hasNext() && numEntries - countEntries > 0) {
       OmKeyInfo keyInfo = iterator.value().getValue();
 
-      if (!isImmediateChild(keyInfo.getParentObjectID(), prefixKeyInDB)) {
+      if (!OMFileRequest.isImmediateChild(keyInfo.getParentObjectID(),
+              prefixKeyInDB)) {
         break;
       }
 
@@ -2502,10 +2504,6 @@ public class KeyManagerImpl implements KeyManager {
       iterator.next(); // move to next entry in the table
     }
     return countEntries;
-  }
-
-  private boolean isImmediateChild(long parentId, long ancestorId) {
-    return parentId == ancestorId;
   }
 
   /**
