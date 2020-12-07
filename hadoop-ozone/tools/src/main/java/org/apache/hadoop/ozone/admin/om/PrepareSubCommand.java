@@ -30,10 +30,10 @@ import picocli.CommandLine;
 @CommandLine.Command(
     name = "prepare",
     description = "Prepares Ozone Manager for upgrade/downgrade, by applying " +
-        "all pending transactions, taking a Ratis snapshot at the last txn " +
-        "and purging all logs on each OM instance. The returned txn id " +
-        "corresponds to the last txn in the quorum in which the snapshot is " +
-        "taken.",
+        "all pending transactions, taking a Ratis snapshot at the last " +
+        "transaction and purging all logs on each OM instance. The returned " +
+        "transaction #ID corresponds to the last transaction in the quorum in" +
+        " which the snapshot is taken.",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class
 )
@@ -50,16 +50,28 @@ public class PrepareSubCommand implements Callable<Void> {
   private String omServiceId;
 
   @CommandLine.Option(
-      names = {"-ft", "--flush-wait-timeout"},
-      description = "Max time to wait for OM Double Buffer flush in seconds.",
-      defaultValue = "300"
+      names = {"-tawt", "--transaction-apply-wait-timeout"},
+      description = "Max time in SECONDS to wait for all transactions before" +
+          "the prepare request to be applied to the OM DB.",
+      defaultValue = "300",
+      hidden = true
   )
-  private long flushWaitTime;
+  private long txnApplyWaitTimeSeconds;
+
+  @CommandLine.Option(
+      names = {"-tact", "--transaction-apply-check-interval"},
+      description = "Time in SECONDS to wait between successive checks for " +
+          "all transactions to be applied to the OM DB.",
+      defaultValue = "5",
+      hidden = true
+  )
+  private long txnApplyCheckIntervalSeconds;
 
   @Override
   public Void call() throws Exception {
     OzoneManagerProtocol client = parent.createOmClient(omServiceId);
-    long prepareTxnId = client.prepareOzoneManager(flushWaitTime, 5);
+    long prepareTxnId = client.prepareOzoneManager(txnApplyWaitTimeSeconds,
+        txnApplyCheckIntervalSeconds);
     System.out.println("Ozone Manager Prepare Request successfully returned " +
         "with Txn Id " + prepareTxnId);
     return null;

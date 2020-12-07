@@ -80,10 +80,10 @@ public class OMPrepareRequest extends OMClientRequest {
     // Allow double buffer this many seconds to flush all transactions before
     // returning an error to the caller.
     Duration flushTimeout =
-        Duration.of(args.getFlushWaitTimeOut(), ChronoUnit.SECONDS);
+        Duration.of(args.getTxnApplyWaitTimeoutSeconds(), ChronoUnit.SECONDS);
     // Time between checks to see if double buffer finished flushing.
     Duration flushCheckInterval =
-        Duration.of(args.getFlushWaitCheckInterval(), ChronoUnit.SECONDS);
+        Duration.of(args.getTxnApplyCheckIntervalSeconds(), ChronoUnit.SECONDS);
 
     try {
       // Create response.
@@ -167,7 +167,9 @@ public class OMPrepareRequest extends OMClientRequest {
             && (ratisTxnIndex >= indexToWaitFor);
       }
 
-      Thread.sleep(flushCheckInterval.toMillis());
+      if (!success) {
+        Thread.sleep(flushCheckInterval.toMillis());
+      }
     }
 
     // If the timeout waiting for all transactions to reach the state machine

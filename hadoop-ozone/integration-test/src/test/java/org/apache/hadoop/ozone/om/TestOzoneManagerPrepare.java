@@ -24,7 +24,6 @@ import java.io.File;
 import java.nio.file.Paths;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 
@@ -53,6 +52,8 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
 
   private final String keyPrefix = "key";
   private final int timeoutMillis = 30000;
+  private final static Long PREPARE_FLUSH_WAIT_TIMEOUT_SECONDS = 300L;
+  private final static Long PREPARE_FLUSH_INTERVAL_SECONDS = 5L;
 
   /**
    * Calls prepare on all OMs when they have no transaction information.
@@ -64,7 +65,8 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     ClientProtocol ozClient = OzoneClientFactory.getRpcClient(getConf())
         .getObjectStore().getClientProxy();
     long prepareRequestLogIndex =
-        ozClient.getOzoneManagerClient().prepareOzoneManager(300, 5);
+        ozClient.getOzoneManagerClient().prepareOzoneManager(
+            PREPARE_FLUSH_WAIT_TIMEOUT_SECONDS, PREPARE_FLUSH_INTERVAL_SECONDS);
 
     // Prepare response processing is included in the snapshot,
     // giving index of 1.
@@ -106,7 +108,8 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     OzoneManagerProtocol ozoneManagerClient =
         ozClient.getObjectStore().getClientProxy().getOzoneManagerClient();
     long prepareRequestLogIndex =
-        ozoneManagerClient.prepareOzoneManager(300, 5);
+        ozoneManagerClient.prepareOzoneManager(
+            PREPARE_FLUSH_WAIT_TIMEOUT_SECONDS, PREPARE_FLUSH_INTERVAL_SECONDS);
 
     // Make sure all OMs are prepared and all OMs still have their data.
     for (OzoneManager om: cluster.getOzoneManagersList()) {
@@ -134,7 +137,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
 //  @Test
   public void testPrepareDownedOM() throws Exception {
     // Index of the OM that will be shut down during this test.
-    final int shutdownOMIndex = new Random().nextInt(3);
+    final int shutdownOMIndex = 2;
 
     MiniOzoneHAClusterImpl cluster = getCluster();
     OzoneClient ozClient = OzoneClientFactory.getRpcClient(getConf());
@@ -157,8 +160,10 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
 
     // Make sure all OMs have logs from writing data, so we can check that
     // they are purged after prepare.
-    cluster.getOzoneManagersList().forEach(om ->
-        Assert.assertTrue(logFilesPresentInRatisPeer(om)));
+    for (OzoneManager om: cluster.getOzoneManagersList()) {
+      LambdaTestUtils.await(timeoutMillis, 1000,
+          () -> logFilesPresentInRatisPeer(om));
+    }
 
     // Shut down one OM.
     cluster.stopOzoneManager(shutdownOMIndex);
@@ -174,7 +179,8 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
 
     OzoneManagerProtocol ozoneManagerClient =
         ozClient.getObjectStore().getClientProxy().getOzoneManagerClient();
-    long prepareIndex = ozoneManagerClient.prepareOzoneManager(300, 5);
+    long prepareIndex = ozoneManagerClient.prepareOzoneManager(
+        PREPARE_FLUSH_WAIT_TIMEOUT_SECONDS, PREPARE_FLUSH_INTERVAL_SECONDS);
 
     // Check that the two live OMs are prepared.
     for (OzoneManager om: cluster.getOzoneManagersList()) {
