@@ -78,10 +78,6 @@ public class OMFileCreateResponseV1 extends OMFileCreateResponse {
     OMFileRequest.addToOpenFileTable(omMetadataMgr, batchOp, getOmKeyInfo(),
             getOpenKeySessionID());
 
-    // update volume usedBytes.
-    omMetadataMgr.getVolumeTable().putWithBatch(batchOp,
-            omMetadataMgr.getVolumeKey(getOmVolumeArgs().getVolume()),
-            getOmVolumeArgs());
     // update bucket usedBytes.
     omMetadataMgr.getBucketTable().putWithBatch(batchOp,
             omMetadataMgr.getBucketKey(getOmVolumeArgs().getVolume(),
