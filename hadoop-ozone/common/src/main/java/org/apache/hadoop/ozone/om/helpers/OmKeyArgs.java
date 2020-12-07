@@ -48,6 +48,7 @@ public final class OmKeyArgs implements Auditable {
   private boolean refreshPipeline;
   private boolean sortDatanodesInPipeline;
   private List<OzoneAcl> acls;
+  private boolean recursive;
 
   @SuppressWarnings("parameternumber")
   private OmKeyArgs(String volumeName, String bucketName, String keyName,
@@ -55,7 +56,7 @@ public final class OmKeyArgs implements Auditable {
       List<OmKeyLocationInfo> locationInfoList, boolean isMultipart,
       String uploadID, int partNumber,
       Map<String, String> metadataMap, boolean refreshPipeline,
-      List<OzoneAcl> acls, boolean sortDatanode) {
+      List<OzoneAcl> acls, boolean sortDatanode, boolean recursive) {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.keyName = keyName;
@@ -70,6 +71,7 @@ public final class OmKeyArgs implements Auditable {
     this.refreshPipeline = refreshPipeline;
     this.acls = acls;
     this.sortDatanodesInPipeline = sortDatanode;
+    this.recursive = recursive;
   }
 
   public boolean getIsMultipartKey() {
@@ -140,6 +142,10 @@ public final class OmKeyArgs implements Auditable {
     return sortDatanodesInPipeline;
   }
 
+  public boolean isRecursive() {
+    return recursive;
+  }
+
   @Override
   public Map<String, String> toAuditMap() {
     Map<String, String> auditMap = new LinkedHashMap<>();
@@ -198,6 +204,7 @@ public final class OmKeyArgs implements Auditable {
     private boolean refreshPipeline;
     private boolean sortDatanodesInPipeline;
     private List<OzoneAcl> acls;
+    private boolean recursive;
 
     public Builder setVolumeName(String volume) {
       this.volumeName = volume;
@@ -274,11 +281,16 @@ public final class OmKeyArgs implements Auditable {
       return this;
     }
 
+    public Builder setRecursive(boolean isRecursive) {
+      this.recursive = isRecursive;
+      return this;
+    }
+
     public OmKeyArgs build() {
       return new OmKeyArgs(volumeName, bucketName, keyName, dataSize, type,
           factor, locationInfoList, isMultipartKey, multipartUploadID,
           multipartUploadPartNumber, metadata, refreshPipeline, acls,
-          sortDatanodesInPipeline);
+          sortDatanodesInPipeline, recursive);
     }
 
   }

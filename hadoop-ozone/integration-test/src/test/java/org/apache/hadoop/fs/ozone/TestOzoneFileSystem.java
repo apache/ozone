@@ -35,6 +35,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.InvalidPathException;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.Trash;
 import org.apache.hadoop.fs.TrashPolicy;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
@@ -376,6 +377,24 @@ public class TestOzoneFileSystem {
       Path parent = new Path(grandparent, "pdir" +i);
       Path child = new Path(parent, "child");
       ContractTestUtils.touch(fs, child);
+    }
+
+    // delete a dir with sub-file
+    try {
+      FileStatus[] parents = fs.listStatus(grandparent);
+      Assert.assertTrue(parents.length > 0);
+      fs.delete(parents[0].getPath(), false);
+      Assert.fail("Must throw exception as dir is not empty!");
+    } catch (PathIsNotEmptyDirectoryException pde) {
+      // expected
+    }
+
+    // delete a dir with sub-file
+    try {
+      fs.delete(grandparent, false);
+      Assert.fail("Must throw exception as dir is not empty!");
+    } catch (PathIsNotEmptyDirectoryException pde) {
+      // expected
     }
 
     // Delete the grandparent, which should delete all keys.
@@ -786,7 +805,7 @@ public class TestOzoneFileSystem {
 
     // Add a sub-directory '/b/a' to '/b'. This is to verify that rename
     // throws exception as new destin /b/a already exists.
-    final Path baPath = new Path(fs.getUri().toString() + "/b/a");
+    final Path baPath = new Path(fs.getUri().toString() + "/b/a/c");
     fs.mkdirs(baPath);
 
     Assert.assertFalse("New destin sub-path /b/a already exists",
