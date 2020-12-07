@@ -27,6 +27,14 @@ export OZONE_VOLUME
 
 mkdir -p "${OZONE_VOLUME}"/{dn1,dn2,dn3,om,recon,s3g,scm}
 
+if [[ -n "${OZONE_VOLUME_OWNER}" ]]; then
+  current_user=$(whoami)
+  if [[ "${OZONE_VOLUME_OWNER}" != "${current_user}" ]]; then
+    chown -R "${OZONE_VOLUME_OWNER}" "${OZONE_VOLUME}" \
+      || sudo chown -R "${OZONE_VOLUME_OWNER}" "${OZONE_VOLUME}"
+  fi
+fi
+
 # define version-specifics
 export OZONE_DIR=/opt/ozone
 export OZONE_IMAGE="apache/ozone:${OZONE_UPGRADE_FROM}"

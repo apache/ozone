@@ -210,6 +210,7 @@ jobs:
           KEEP_IMAGE: false
           OZONE_ACCEPTANCE_SUITE: ${{ matrix.suite }}
           OZONE_WITH_COVERAGE: true
+          OZONE_VOLUME_OWNER: 1000
       - name: Archive build results
         uses: actions/upload-artifact@v2
         if: always()
