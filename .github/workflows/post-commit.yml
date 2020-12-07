@@ -199,6 +199,7 @@ jobs:
         run: |
           mkdir -p /mnt/ozone/hadoop-ozone/dist/target
           tar xzvf hadoop-ozone*.tar.gz -C /mnt/ozone/hadoop-ozone/dist/target
+          sudo chown -R 1000 /mnt/ozone/hadoop-ozone/dist/target
       - name: Install robotframework
         run: sudo pip install robotframework
       - name: Execute tests
@@ -209,7 +210,6 @@ jobs:
           KEEP_IMAGE: false
           OZONE_ACCEPTANCE_SUITE: ${{ matrix.suite }}
           OZONE_WITH_COVERAGE: true
-          OZONE_VOLUME_OWNER: 1000
       - name: Archive build results
         uses: actions/upload-artifact@v2
         if: always()
