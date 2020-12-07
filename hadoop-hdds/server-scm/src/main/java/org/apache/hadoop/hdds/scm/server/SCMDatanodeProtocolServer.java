@@ -292,6 +292,11 @@ public class SCMDatanodeProtocolServer implements
       throws IOException {
     SCMCommandProto.Builder builder =
         SCMCommandProto.newBuilder();
+
+    // In HA mode, it is the term of current leader SCM.
+    // In non-HA mode, it is the default value 0.
+    builder.setTerm(cmd.getTerm());
+
     switch (cmd.getType()) {
     case reregisterCommand:
       return builder

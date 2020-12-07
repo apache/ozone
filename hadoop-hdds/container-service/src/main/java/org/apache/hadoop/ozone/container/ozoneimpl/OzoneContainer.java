@@ -25,6 +25,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -85,6 +86,7 @@ public class OzoneContainer {
   private List<ContainerDataScanner> dataScanners;
   private final BlockDeletingService blockDeletingService;
   private final GrpcTlsConfig tlsClientConfig;
+  private final AtomicBoolean isStarted;
 
   /**
    * Construct OzoneContainer object.
@@ -152,6 +154,8 @@ public class OzoneContainer {
             TimeUnit.MILLISECONDS, config);
     tlsClientConfig = RatisHelper.createTlsClientConfig(
         secConf, certClient != null ? certClient.getCACertificate() : null);
+
+    isStarted = new AtomicBoolean(false);
   }
 
   public GrpcTlsConfig getTlsClientConfig() {
@@ -240,6 +244,10 @@ public class OzoneContainer {
    * @throws IOException
    */
   public void start(String scmId) throws IOException {
+    if (!isStarted.compareAndSet(false, true)) {
+      LOG.info("Ignore. OzoneContainer already started.");
+      return;
+    }
     LOG.info("Attempting to start container services.");
     startContainerScrub();
     writeChannel.start();
