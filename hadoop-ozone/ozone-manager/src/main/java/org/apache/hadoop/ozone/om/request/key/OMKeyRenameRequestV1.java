@@ -90,7 +90,6 @@ public class OMKeyRenameRequestV1 extends OMKeyRenameRequest {
     OMClientResponse omClientResponse = null;
     IOException exception = null;
     OmKeyInfo fromKeyValue;
-    String fromKey = null;
     Result result;
     try {
       if (toKeyName.length() == 0 || fromKeyName.length() == 0) {
@@ -122,7 +121,7 @@ public class OMKeyRenameRequestV1 extends OMKeyRenameRequest {
       // case-1) fromKeyName should exist, otw throws exception
       if (fromKeyFileStatus == null) {
         // TODO: Add support for renaming open key
-        throw new OMException("Key not found " + fromKey, KEY_NOT_FOUND);
+        throw new OMException("Key not found " + fromKeyName, KEY_NOT_FOUND);
       }
 
       // source existed

@@ -36,6 +36,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.InvalidPathException;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.Trash;
 import org.apache.hadoop.fs.TrashPolicy;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
@@ -392,13 +393,31 @@ public class TestOzoneFileSystem {
   }
 
 
-  private void testRecursiveDelete() throws Exception {
+  protected void testRecursiveDelete() throws Exception {
     Path grandparent = new Path("/gdir1");
 
     for (int i = 1; i <= 10; i++) {
       Path parent = new Path(grandparent, "pdir" +i);
       Path child = new Path(parent, "child");
       ContractTestUtils.touch(fs, child);
+    }
+
+    // delete a dir with sub-file
+    try {
+      FileStatus[] parents = fs.listStatus(grandparent);
+      Assert.assertTrue(parents.length > 0);
+      fs.delete(parents[0].getPath(), false);
+      Assert.fail("Must throw exception as dir is not empty!");
+    } catch (PathIsNotEmptyDirectoryException pde) {
+      // expected
+    }
+
+    // delete a dir with sub-file
+    try {
+      fs.delete(grandparent, false);
+      Assert.fail("Must throw exception as dir is not empty!");
+    } catch (PathIsNotEmptyDirectoryException pde) {
+      // expected
     }
 
     // Delete the grandparent, which should delete all keys.
@@ -463,7 +482,7 @@ public class TestOzoneFileSystem {
     }
   }
 
-  private void testFileDelete() throws Exception {
+  protected void testFileDelete() throws Exception {
     Path grandparent = new Path("/testBatchDelete");
     Path parent = new Path(grandparent, "parent");
     Path childFolder = new Path(parent, "childFolder");
@@ -795,12 +814,8 @@ public class TestOzoneFileSystem {
     final Path baPath = new Path(fs.getUri().toString() + "/b/a");
     fs.mkdirs(baPath);
 
-    try {
-      fs.rename(aSourcePath, bDestinPath);
-      Assert.fail("Should fail as new destination dir exists!");
-    } catch (FileAlreadyExistsException faee) {
-      // expected as new sub-path /b/a already exists.
-    }
+    Assert.assertFalse("New destin sub-path /b/a already exists",
+            fs.rename(aSourcePath, bDestinPath));
 
     // Case-5.b) Rename file from /a/b/c/file1 to /a.
     // Should be failed since /a/file1 exists.
@@ -814,12 +829,8 @@ public class TestOzoneFileSystem {
 
     final Path aDestinPath = new Path(fs.getUri().toString() + "/a");
 
-    try {
-      fs.rename(abcFile1, aDestinPath);
-      Assert.fail("Should fail as new destination file exists!");
-    } catch (FileAlreadyExistsException faee) {
-      // expected as new sub-path /a/file1 already exists.
-    }
+    Assert.assertFalse("New destin sub-path /b/a already exists",
+            fs.rename(abcFile1, aDestinPath));
   }
 
   /**
@@ -834,12 +845,8 @@ public class TestOzoneFileSystem {
     ContractTestUtils.touch(fs, file1Destin);
     Path abcRootPath = new Path(fs.getUri().toString() + "/a/b/c");
     fs.mkdirs(abcRootPath);
-    try {
-      fs.rename(abcRootPath, file1Destin);
-      Assert.fail("key already exists /root_dir/file1");
-    } catch (FileAlreadyExistsException faee) {
-      // expected
-    }
+    Assert.assertFalse("key already exists /root_dir/file1",
+            fs.rename(abcRootPath, file1Destin));
   }
 
   /**
