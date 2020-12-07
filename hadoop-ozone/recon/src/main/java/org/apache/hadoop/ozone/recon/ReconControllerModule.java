@@ -62,7 +62,6 @@ import static org.apache.hadoop.ozone.OmUtils.getOzoneManagerServiceId;
 import org.apache.ratis.protocol.ClientId;
 import org.hadoop.ozone.recon.codegen.ReconSqlDbConfig;
 import org.hadoop.ozone.recon.schema.tables.daos.ClusterGrowthDailyDao;
-import org.hadoop.ozone.recon.schema.tables.daos.ContainerHistoryDao;
 import org.hadoop.ozone.recon.schema.tables.daos.FileCountBySizeDao;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;

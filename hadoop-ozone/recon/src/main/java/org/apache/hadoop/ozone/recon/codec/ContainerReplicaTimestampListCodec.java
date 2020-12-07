@@ -67,11 +67,11 @@ public class ContainerReplicaTimestampListCodec
     DataInputStream in = new DataInputStream(new ByteArrayInputStream(rawData));
     List<ContainerReplicaTimestamp> lst = new ArrayList<>();
     while (in.available() > 0) {
-      final long uuid_msb = in.readLong();
-      final long uuid_lsb = in.readLong();
+      final long uuidMsb = in.readLong();
+      final long uuidLsb = in.readLong();
       final long firstSeenTime = in.readLong();
       final long lastSeenTime = in.readLong();
-      final UUID id = new UUID(uuid_msb, uuid_lsb);
+      final UUID id = new UUID(uuidMsb, uuidLsb);
       lst.add(new ContainerReplicaTimestamp(id, firstSeenTime, lastSeenTime));
     }
     in.close();

@@ -254,7 +254,8 @@ public class ContainerSchemaManager {
       } catch (IOException e) {
         LOG.debug("Error flushing container replica history to DB. {}",
             e.getMessage());
-      } if (clearMap) {
+      }
+      if (clearMap) {
         lastSeenMap.clear();
       }
     }

@@ -49,7 +49,6 @@ import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
 import org.apache.hadoop.test.LambdaTestUtils;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
-import org.hadoop.ozone.recon.schema.tables.daos.ContainerHistoryDao;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.daos.UnhealthyContainersDao;
