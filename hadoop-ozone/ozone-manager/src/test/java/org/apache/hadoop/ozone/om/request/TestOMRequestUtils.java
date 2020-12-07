@@ -910,6 +910,9 @@ public final class TestOMRequestUtils {
           throws Exception {
     long bucketId = TestOMRequestUtils.getBucketId(volumeName, bucketName,
             omMetaMgr);
+    if (org.apache.commons.lang3.StringUtils.isBlank(key)) {
+      return bucketId;
+    }
     String[] pathComponents = StringUtils.split(key, '/');
     long objectId = bucketId + 10;
     long parentId = bucketId;
