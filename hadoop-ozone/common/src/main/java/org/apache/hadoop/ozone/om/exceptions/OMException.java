@@ -233,7 +233,9 @@ public class OMException extends IOException {
 
     QUOTA_EXCEEDED,
 
-    QUOTA_ERROR
+    QUOTA_ERROR,
+
+    DIRECTORY_NOT_EMPTY
 
   }
 }
