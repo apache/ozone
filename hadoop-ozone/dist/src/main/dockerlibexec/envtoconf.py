@@ -36,7 +36,7 @@ class Simple(object):
 
     self.known_formats = ['xml', 'properties', 'yaml', 'yml', 'env', "sh", "cfg", 'conf']
     self.output_dir = self.args.destination
-    self.excluded_envs = ['HADOOP_CONF_DIR']
+    self.excluded_envs = ['HADOOP_CONF_DIR', 'OZONE_CONF_DIR']
     self.configurables = {}
 
   def destination_file_path(self, name, extension):
