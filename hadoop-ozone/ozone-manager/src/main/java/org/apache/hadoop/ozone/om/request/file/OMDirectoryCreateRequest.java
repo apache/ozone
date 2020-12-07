@@ -144,6 +144,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
     OMClientResponse omClientResponse = null;
     Result result = Result.FAILURE;
     List<OmKeyInfo> missingParentInfos;
+    int numMissingParents = 0;
 
     try {
       keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
@@ -195,6 +196,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
         missingParentInfos = getAllParentInfo(ozoneManager, keyArgs,
             missingParents, inheritAcls, trxnLogIndex);
 
+        numMissingParents = missingParentInfos.size();
         OMFileRequest.addKeyTableCacheEntries(omMetadataManager, volumeName,
             bucketName, Optional.of(dirKeyInfo),
             Optional.of(missingParentInfos), trxnLogIndex);
@@ -224,8 +226,8 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
     auditLog(auditLogger, buildAuditMessage(OMAction.CREATE_DIRECTORY,
         auditMap, exception, userInfo));
 
-    logResult(createDirectoryRequest, keyArgs, omMetrics, result, trxnLogIndex,
-        exception);
+    logResult(createDirectoryRequest, keyArgs, omMetrics, result,
+        exception, numMissingParents);
 
     return omClientResponse;
   }
@@ -284,8 +286,8 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
   }
 
   private void logResult(CreateDirectoryRequest createDirectoryRequest,
-      KeyArgs keyArgs, OMMetrics omMetrics, Result result, long trxnLogIndex,
-      IOException exception) {
+      KeyArgs keyArgs, OMMetrics omMetrics, Result result,
+      IOException exception, int numMissingParents) {
 
     String volumeName = keyArgs.getVolumeName();
     String bucketName = keyArgs.getBucketName();
@@ -293,7 +295,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
 
     switch (result) {
     case SUCCESS:
-      omMetrics.incNumKeys();
+      omMetrics.incNumKeys(numMissingParents + 1);
       if (LOG.isDebugEnabled()) {
         LOG.debug("Directory created. Volume:{}, Bucket:{}, Key:{}",
             volumeName, bucketName, keyName);
