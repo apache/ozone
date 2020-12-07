@@ -110,17 +110,20 @@ public class TestOzoneFileSystemMetrics {
   }
 
   private void testOzoneFileCommit(TestOps op) throws Exception {
-    long numKeysBeforeCreate = cluster.getOzoneManager().getMetrics().getNumKeys();
+    long numKeysBeforeCreate = cluster
+        .getOzoneManager().getMetrics().getNumKeys();
 
     int fileLen = 30 * 1024 * 1024;
     byte[] data = string2Bytes(RandomStringUtils.randomAlphanumeric(fileLen));
 
     Path parentDir = new Path("/" + RandomStringUtils.randomAlphanumeric(5));
-    Path filePath = new Path(parentDir, RandomStringUtils.randomAlphanumeric(5));
+    Path filePath = new Path(parentDir,
+        RandomStringUtils.randomAlphanumeric(5));
 
     switch (op) {
     case Key:
-      try (OzoneOutputStream stream = bucket.createKey(filePath.toString(), fileLen)) {
+      try (OzoneOutputStream stream =
+               bucket.createKey(filePath.toString(), fileLen)) {
         stream.write(data);
       }
       break;
@@ -132,14 +135,18 @@ public class TestOzoneFileSystemMetrics {
     case Directory:
       fs.mkdirs(filePath);
       break;
+    default:
+      throw new IOException("Execution should never reach here." + op);
     }
 
-    long numKeysAfterCommit = cluster.getOzoneManager().getMetrics().getNumKeys();
+    long numKeysAfterCommit = cluster
+        .getOzoneManager().getMetrics().getNumKeys();
     Assert.assertTrue(numKeysAfterCommit > 0);
     Assert.assertEquals(numKeysBeforeCreate + 2, numKeysAfterCommit);
     fs.delete(parentDir, true);
 
-    long numKeysAfterDelete = cluster.getOzoneManager().getMetrics().getNumKeys();
+    long numKeysAfterDelete = cluster
+        .getOzoneManager().getMetrics().getNumKeys();
     Assert.assertTrue(numKeysAfterDelete >= 0);
     Assert.assertEquals(numKeysBeforeCreate, numKeysAfterDelete);
   }
