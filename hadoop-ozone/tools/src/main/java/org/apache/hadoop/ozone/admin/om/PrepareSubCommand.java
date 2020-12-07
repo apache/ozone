@@ -29,7 +29,11 @@ import picocli.CommandLine;
  */
 @CommandLine.Command(
     name = "prepare",
-    description = "Prepares OM",
+    description = "Prepares Ozone Manager for upgrade/downgrade, by applying " +
+        "all pending transactions, taking a Ratis snapshot at the last txn " +
+        "and purging all logs on each OM instance. The returned txn id " +
+        "corresponds to the last txn in the quorum in which the snapshot is " +
+        "taken.",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class
 )
@@ -40,7 +44,8 @@ public class PrepareSubCommand implements Callable<Void> {
 
   @CommandLine.Option(
       names = {"-id", "--service-id"},
-      description = "Ozone Manager Service ID"
+      description = "Ozone Manager Service ID",
+      required = true
   )
   private String omServiceId;
 
