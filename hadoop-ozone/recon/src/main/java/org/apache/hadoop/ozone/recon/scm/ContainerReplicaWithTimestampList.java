@@ -28,10 +28,6 @@ public class ContainerReplicaWithTimestampList {
 
   private List<ContainerReplicaWithTimestamp> replicaList;
 
-//  ContainerReplicaWithTimestampList() {
-//    replicaList = new ArrayList<>();
-//  }
-
   public ContainerReplicaWithTimestampList(
       List<ContainerReplicaWithTimestamp> replicaList) {
     this.replicaList = replicaList;

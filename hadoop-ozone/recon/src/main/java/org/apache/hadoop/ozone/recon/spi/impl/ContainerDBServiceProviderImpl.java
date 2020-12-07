@@ -27,7 +27,6 @@ import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.REPLICA_H
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -129,7 +128,6 @@ public class ContainerDBServiceProviderImpl
       FileUtils.deleteDirectory(oldDBLocation);
     }
 
-    // TODO: btw what's this doing? Flushing old entries to DB?
     if (containerKeyPrefixCounts != null) {
       for (Map.Entry<ContainerKeyPrefix, Integer> entry :
           containerKeyPrefixCounts.entrySet()) {
@@ -184,28 +182,15 @@ public class ContainerDBServiceProviderImpl
     containerKeyCountTable.put(containerID, count);
   }
 
-  // TODO: REMOVE?
   @Override
-  public void storeContainerReplicaHistory(Long containerID,
-      ContainerReplicaWithTimestamp ts) throws IOException {
-    containerReplicaHistoryTable.put(containerID,
-        new ContainerReplicaWithTimestampList(new ArrayList<>(
-            Collections.singletonList(ts))));
-  }
-
-  void storeContainerReplicaHistoryList(long containerID,
-      List<ContainerReplicaWithTimestamp> tsList) throws IOException {
-    containerReplicaHistoryTable.put(containerID,
-        new ContainerReplicaWithTimestampList(tsList));
-  }
-
-  public void storeContainerReplicaHistoryMap(long containerID,
+  public void storeContainerReplicaHistoryMap(Long containerID,
       Map<UUID, ContainerReplicaWithTimestamp> tsMap) throws IOException {
     List<ContainerReplicaWithTimestamp> tsList = new ArrayList<>();
     for (Map.Entry<UUID, ContainerReplicaWithTimestamp> e : tsMap.entrySet()) {
       tsList.add(e.getValue());
     }
-    storeContainerReplicaHistoryList(containerID, tsList);
+    containerReplicaHistoryTable.put(containerID,
+        new ContainerReplicaWithTimestampList(tsList));
   }
 
   /**
@@ -221,19 +206,10 @@ public class ContainerDBServiceProviderImpl
     return keyCount == null ? 0L : keyCount;
   }
 
-  // TODO: REMOVE?
-  @Override
-  public List<ContainerReplicaWithTimestamp> getContainerReplicaHistory(
-      Long containerID) throws IOException {
-    // TODO: Double check usage
-    ContainerReplicaWithTimestampList lst =
-        containerReplicaHistoryTable.get(containerID);
-    return lst == null ? null : lst.getList();
-  }
-
   /**
    * Get the map of container replica history from RDB.
    */
+  @Override
   public Map<UUID, ContainerReplicaWithTimestamp> getContainerReplicaHistoryMap(
       Long containerID) throws IOException {
 

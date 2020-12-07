@@ -42,6 +42,7 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
   final private long keyCount;
   final private long bytesUsed;
 
+
   private ContainerReplica(final ContainerID containerID,
       final ContainerReplicaProto.State state, final DatanodeDetails datanode,
       final UUID originNodeId, long keyNum, long dataSize) {

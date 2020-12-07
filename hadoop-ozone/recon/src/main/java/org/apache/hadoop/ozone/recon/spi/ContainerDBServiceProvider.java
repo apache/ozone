@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.recon.spi;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
@@ -71,11 +72,11 @@ public interface ContainerDBServiceProvider {
    * Store the containerID -> ContainerReplicaWithTimestamp mapping to the
    * container DB store.
    * @param containerID the containerID.
-   * @param ts ContainerReplicaWithTimestamp.
+   * @param tsMap A map from datanode UUID to ContainerReplicaWithTimestamp.
    * @throws IOException
    */
-  void storeContainerReplicaHistory(Long containerID,
-      ContainerReplicaWithTimestamp ts) throws IOException;
+  void storeContainerReplicaHistoryMap(Long containerID,
+      Map<UUID, ContainerReplicaWithTimestamp> tsMap) throws IOException;
 
   /**
    * Store the total count of containers into the container DB store.
@@ -105,10 +106,10 @@ public interface ContainerDBServiceProvider {
   /**
    * Get the container replica history of the given containerID.
    * @param containerID the given containerId.
-   * @return A list of ContainerReplicaWithTimestamp of the given containerID.
+   * @return A map of ContainerReplicaWithTimestamp of the given containerID.
    * @throws IOException
    */
-  List<ContainerReplicaWithTimestamp> getContainerReplicaHistory(
+  Map<UUID, ContainerReplicaWithTimestamp> getContainerReplicaHistoryMap(
       Long containerID) throws IOException;
 
   /**

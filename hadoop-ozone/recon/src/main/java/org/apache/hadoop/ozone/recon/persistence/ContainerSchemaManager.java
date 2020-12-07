@@ -30,7 +30,6 @@ import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersSummary;
 import org.apache.hadoop.ozone.recon.scm.ContainerReplicaWithTimestamp;
 import org.apache.hadoop.ozone.recon.scm.ReconSCMDBDefinition;
 import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
-import org.apache.hadoop.ozone.recon.spi.impl.ContainerDBServiceProviderImpl;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
 import org.hadoop.ozone.recon.schema.tables.daos.UnhealthyContainersDao;
@@ -64,9 +63,7 @@ public class ContainerSchemaManager {
 
   private Map<Long, Map<UUID, ContainerReplicaWithTimestamp>> lastSeenMap;
 
-  // TODO: Declare all extra impl methods in interface later.
-//  @Inject
-  private final ContainerDBServiceProviderImpl dbServiceProvider;
+  private final ContainerDBServiceProvider dbServiceProvider;
 
   private DBStore scmDBStore;
   private Table<UUID, DatanodeDetails> nodeDB;
@@ -82,11 +79,10 @@ public class ContainerSchemaManager {
       ContainerDBServiceProvider containerDBServiceProvider) {
     this.unhealthyContainersDao = unhealthyContainersDao;
     this.containerSchemaDefinition = containerSchemaDefinition;
+    this.dbServiceProvider = containerDBServiceProvider;
     this.lastSeenMap = null;
     this.scmDBStore = null;
     this.nodeDB = null;
-    this.dbServiceProvider =
-        (ContainerDBServiceProviderImpl) containerDBServiceProvider;
   }
 
   /**
@@ -204,6 +200,7 @@ public class ContainerSchemaManager {
           LOG.debug("Unable to get DatanodeDetails from NODES table.");
         }
       }
+      // TODO: Refrain from using jOOQ class since we use RDB now?
       resList.add(new ContainerHistory(
           containerID, uuid.toString(), hostname, firstSeenTime, lastSeenTime));
     }

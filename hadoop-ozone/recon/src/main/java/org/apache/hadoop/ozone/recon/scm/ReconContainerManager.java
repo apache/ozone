@@ -224,10 +224,6 @@ public class ReconContainerManager extends SCMContainerManager {
     }
 
     if (flushToDB) {
-      // TODO: Use RDB. SCMContainerManager Table<ContainerID, ContainerInfo>
-      // TODO: Use UUID instead of host name as identifier in DB.
-//      containerSchemaManager.upsertContainerHistory(
-//          id, replica.getDatanodeDetails().getHostName(), currTime);
       containerSchemaManager.upsertContainerHistory(id, dnUuid, currTime);
     }
   }
@@ -251,9 +247,7 @@ public class ReconContainerManager extends SCMContainerManager {
     if (replicaLastSeenMap != null) {
       final ContainerReplicaWithTimestamp ts = replicaLastSeenMap.get(dnUuid);
       if (ts != null) {
-        // Flush to DB and remove from map. TODO: Use RocksDB.
-//        containerSchemaManager.upsertContainerHistory(id,
-//            replica.getDatanodeDetails().getHostName(), ts.getLastSeenTime());
+        // Flush to DB and remove from in-memory map
         containerSchemaManager.upsertContainerHistory(
             id, dnUuid, ts.getLastSeenTime());
         replicaLastSeenMap.remove(dnUuid);
