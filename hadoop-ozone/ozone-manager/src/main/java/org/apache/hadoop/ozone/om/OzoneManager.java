@@ -306,6 +306,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private OzoneManagerProtocolServerSideTranslatorPB omServerProtocol;
 
   private boolean isRatisEnabled;
+  private boolean isSuggestedLeaderEnabled;
   private OzoneManagerRatisServer omRatisServer;
   private OzoneManagerSnapshotProvider omSnapshotProvider;
   private OMNodeDetails omNodeDetails;
@@ -404,6 +405,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     isRatisEnabled = configuration.getBoolean(
         OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY,
         OMConfigKeys.OZONE_OM_RATIS_ENABLE_DEFAULT);
+    // If we need to forward to the suggested Ratis Leader
+    isSuggestedLeaderEnabled = configuration.getBoolean(
+        OMConfigKeys.OZONE_OM_RATIS_SUGGESTED_LEADER_ENABLE_KEY,
+        OMConfigKeys.OZONE_OM_RATIS_SUGGESTED_LEADER_ENABLE_KEY_DEFAULT);
 
     InetSocketAddress omNodeRpcAddr = omNodeDetails.getRpcAddress();
     omRpcAddressTxt = new Text(omNodeDetails.getRpcAddressString());
@@ -1312,7 +1317,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     RPC.setProtocolEngine(configuration, OzoneManagerProtocolPB.class,
         ProtobufRpcEngine.class);
     this.omServerProtocol = new OzoneManagerProtocolServerSideTranslatorPB(
-        this, omRatisServer, omClientProtocolMetrics, isRatisEnabled,
+        this, omRatisServer, omClientProtocolMetrics, isRatisEnabled, isSuggestedLeaderEnabled,
         getLastTrxnIndexForNonRatis());
 
     BlockingService omService = newReflectiveBlockingService(omServerProtocol);

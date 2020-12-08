@@ -27,6 +27,7 @@ import org.apache.hadoop.ipc.ProtobufHelper;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -56,6 +57,8 @@ public class Hadoop3OmTransport implements OmTransport {
 
   private final OzoneManagerProtocolPB rpcProxy;
 
+  private final boolean isSuggestedLeaderEnabled;
+
   public Hadoop3OmTransport(ConfigurationSource conf,
       UserGroupInformation ugi, String omServiceId) throws IOException {
 
@@ -69,6 +72,11 @@ public class Hadoop3OmTransport implements OmTransport {
     int maxFailovers = conf.getInt(
         OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY,
         OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_DEFAULT);
+    this.isSuggestedLeaderEnabled =
+        conf.getBoolean(
+            OMConfigKeys.OZONE_OM_RATIS_SUGGESTED_LEADER_ENABLE_KEY,
+            OMConfigKeys.OZONE_OM_RATIS_SUGGESTED_LEADER_ENABLE_KEY_DEFAULT
+        );
 
     this.rpcProxy = createRetryProxy(omFailoverProxyProvider, maxFailovers);
   }
@@ -90,6 +98,16 @@ public class Hadoop3OmTransport implements OmTransport {
     } catch (ServiceException e) {
       OMNotLeaderException notLeaderException =
           OMFailoverProxyProvider.getNotLeaderException(e);
+      if (isSuggestedLeaderEnabled) {
+        if (notLeaderException != null &&
+            notLeaderException.getSuggestedLeaderNodeId() != null) {
+          // Failover to the OM node returned by OMResponse leaderOMNodeId if
+          // current proxy is not pointing to that node.
+          omFailoverProxyProvider.
+              performFailoverIfRequired(notLeaderException
+                  .getSuggestedLeaderNodeId());
+        }
+      }
       if (notLeaderException == null) {
         throw ProtobufHelper.getRemoteException(e);
       }

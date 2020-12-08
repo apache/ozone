@@ -98,6 +98,10 @@ public final class OMConfigKeys {
       = "ozone.om.ratis.enable";
   public static final boolean OZONE_OM_RATIS_ENABLE_DEFAULT
       = false;
+  public static final String OZONE_OM_RATIS_SUGGESTED_LEADER_ENABLE_KEY
+      = "ozone.om.ratis.suggested.leader.enable";
+  public static final boolean OZONE_OM_RATIS_SUGGESTED_LEADER_ENABLE_KEY_DEFAULT
+      = false;
   public static final String OZONE_OM_RATIS_PORT_KEY
       = "ozone.om.ratis.port";
   public static final int OZONE_OM_RATIS_PORT_DEFAULT

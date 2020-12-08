@@ -46,6 +46,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.LEADER_AND_READY;
+import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.LEADER_AND_NOT_READY;
 import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.NOT_LEADER;
 
 /**
@@ -60,6 +61,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
   private final OzoneManagerRatisServer omRatisServer;
   private final RequestHandler handler;
   private final boolean isRatisEnabled;
+  private final boolean isSuggestedLeaderEnabled;
   private final OzoneManager ozoneManager;
   private final OzoneManagerDoubleBuffer ozoneManagerDoubleBuffer;
   private final AtomicLong transactionIndex;
@@ -76,6 +78,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
       OzoneManagerRatisServer ratisServer,
       ProtocolMessageMetrics<ProtocolMessageEnum> metrics,
       boolean enableRatis,
+      boolean isSuggestedLeaderEnabled,
       long lastTransactionIndexForNonRatis) {
     this.ozoneManager = impl;
     this.isRatisEnabled = enableRatis;
@@ -107,7 +110,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
     this.omRatisServer = ratisServer;
     dispatcher = new OzoneProtocolMessageDispatcher<>("OzoneProtocol",
         metrics, LOG);
-
+    this.isSuggestedLeaderEnabled = isSuggestedLeaderEnabled;
   }
 
   /**
@@ -126,10 +129,11 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
   private OMResponse processRequest(OMRequest request) throws
       ServiceException {
     RaftServerStatus raftServerStatus;
+    OMResponse response = null;
     if (isRatisEnabled) {
       // Check if the request is a read only request
       if (OmUtils.isReadOnly(request)) {
-        return submitReadRequestToOM(request);
+        response = submitReadRequestToOM(request);
       } else {
         raftServerStatus = omRatisServer.checkLeaderStatus();
         if (raftServerStatus == LEADER_AND_READY) {
@@ -141,11 +145,23 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
             // As some of the preExecute returns error. So handle here.
             return createErrorResponse(request, ex);
           }
-          return submitRequestToRatis(request);
+          response = submitRequestToRatis(request);
         } else {
-          throw createLeaderErrorException(raftServerStatus);
+          // Since we will complete read from followers,
+          // so we just change write related.
+          if (isSuggestedLeaderEnabled &&
+              raftServerStatus == LEADER_AND_NOT_READY) {
+            try {
+              response = submitRequestToRatis(request);
+            } catch (ServiceException exception) {
+              throw exception;
+            }
+          } else {
+            throw createLeaderErrorException(raftServerStatus);
+          }
         }
       }
+      return response;
     } else {
       return submitRequestDirectlyToOM(request);
     }

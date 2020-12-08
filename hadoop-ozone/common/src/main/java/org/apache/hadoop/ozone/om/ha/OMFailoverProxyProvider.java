@@ -253,10 +253,16 @@ public class OMFailoverProxyProvider implements
             // TODO: NotLeaderException should include the host
             //  address of the suggested leader along with the nodeID.
             //  Failing over just based on nodeID is not very robust.
-
-            // OMFailoverProxyProvider#performFailover() is a dummy call and
-            // does not perform any failover. Failover manually to the next OM.
-            performFailoverToNextProxy();
+            // If enable suggested it will be not null.
+            String suggestedLeader =
+                notLeaderException.getSuggestedLeaderNodeId();
+            if (suggestedLeader != null) {
+              performFailoverIfRequired(suggestedLeader);
+            } else {
+              // OMFailoverProxyProvider#performFailover() is a dummy call and
+              // does not perform any failover. Failover manually to the next OM.
+              performFailoverToNextProxy();
+            }
             return getRetryAction(RetryDecision.FAILOVER_AND_RETRY, failovers);
           }
 
