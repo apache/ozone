@@ -47,28 +47,16 @@ public final class MockSCMHAManager implements SCMHAManager {
   private final SCMRatisServer ratisServer;
   private boolean isLeader;
 
-  public static SCMHAManager getInstance() {
-    return new MockSCMHAManager();
-  }
-
-  public static SCMHAManager getLeaderInstance() {
-    MockSCMHAManager mockSCMHAManager = new MockSCMHAManager();
-    mockSCMHAManager.setIsLeader(true);
-    return mockSCMHAManager;
-  }
-
-  public static SCMHAManager getFollowerInstance() {
-    MockSCMHAManager mockSCMHAManager = new MockSCMHAManager();
-    mockSCMHAManager.setIsLeader(false);
-    return mockSCMHAManager;
+  public static SCMHAManager getInstance(boolean isLeader) {
+    return new MockSCMHAManager(isLeader);
   }
 
   /**
    * Creates MockSCMHAManager instance.
    */
-  private MockSCMHAManager() {
+  private MockSCMHAManager(boolean isLeader) {
     this.ratisServer = new MockRatisServer();
-    this.isLeader = true;
+    this.isLeader = isLeader;
   }
 
   @Override
@@ -127,7 +115,7 @@ public final class MockSCMHAManager implements SCMHAManager {
         null, new ArrayList<>());
   }
 
-  private static class MockRatisServer implements SCMRatisServer {
+  private class MockRatisServer implements SCMRatisServer {
 
     private Map<RequestType, Object> handlers =
         new EnumMap<>(RequestType.class);
@@ -148,19 +136,32 @@ public final class MockSCMHAManager implements SCMHAManager {
       final RaftGroupMemberId raftId = RaftGroupMemberId.valueOf(
           RaftPeerId.valueOf("peer"), RaftGroupId.randomId());
       RaftClientReply reply;
-      try {
-        final Message result = process(request);
-        reply = RaftClientReply.newBuilder()
-            .setClientId(ClientId.randomId())
-            .setServerId(raftId)
-            .setGroupId(RaftGroupId.emptyGroupId())
-            .setCallId(1L)
-            .setSuccess(true)
-            .setMessage(result)
-            .setException(null)
-            .setLogIndex(1L)
-            .build();
-      } catch (Exception ex) {
+      if (isLeader().isPresent()) {
+        try {
+          final Message result = process(request);
+          reply = RaftClientReply.newBuilder()
+              .setClientId(ClientId.randomId())
+              .setServerId(raftId)
+              .setGroupId(RaftGroupId.emptyGroupId())
+              .setCallId(1L)
+              .setSuccess(true)
+              .setMessage(result)
+              .setException(null)
+              .setLogIndex(1L)
+              .build();
+        } catch (Exception ex) {
+          reply = RaftClientReply.newBuilder()
+              .setClientId(ClientId.randomId())
+              .setServerId(raftId)
+              .setGroupId(RaftGroupId.emptyGroupId())
+              .setCallId(1L)
+              .setSuccess(false)
+              .setMessage(Message.EMPTY)
+              .setException(new StateMachineException(raftId, ex))
+              .setLogIndex(1L)
+              .build();
+        }
+      } else {
         reply = RaftClientReply.newBuilder()
             .setClientId(ClientId.randomId())
             .setServerId(raftId)
@@ -168,7 +169,7 @@ public final class MockSCMHAManager implements SCMHAManager {
             .setCallId(1L)
             .setSuccess(false)
             .setMessage(Message.EMPTY)
-            .setException(new StateMachineException(raftId, ex))
+            .setException(triggerNotLeaderException())
             .setLogIndex(1L)
             .build();
       }

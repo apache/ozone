@@ -171,7 +171,7 @@ public class TestKeyManagerImpl {
     SCMConfigurator configurator = new SCMConfigurator();
     configurator.setScmNodeManager(nodeManager);
     configurator.setNetworkTopology(clusterMap);
-    configurator.setSCMHAManager(MockSCMHAManager.getInstance());
+    configurator.setSCMHAManager(MockSCMHAManager.getInstance(true));
     scm = TestUtils.getScm(conf, configurator);
     scm.start();
     scm.exitSafeMode();

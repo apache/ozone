@@ -74,7 +74,7 @@ public class TestHealthyPipelineSafeModeRule {
       PipelineManagerV2Impl pipelineManager =
           PipelineManagerV2Impl.newPipelineManager(
               config,
-              MockSCMHAManager.getInstance(),
+              MockSCMHAManager.getInstance(true),
               nodeManager,
               scmMetadataStore.getPipelineTable(),
               eventQueue);
@@ -123,7 +123,7 @@ public class TestHealthyPipelineSafeModeRule {
       PipelineManagerV2Impl pipelineManager =
           PipelineManagerV2Impl.newPipelineManager(
               config,
-              MockSCMHAManager.getInstance(),
+              MockSCMHAManager.getInstance(true),
               nodeManager,
               scmMetadataStore.getPipelineTable(),
               eventQueue);
@@ -217,7 +217,7 @@ public class TestHealthyPipelineSafeModeRule {
       PipelineManagerV2Impl pipelineManager =
           PipelineManagerV2Impl.newPipelineManager(
               config,
-              MockSCMHAManager.getInstance(),
+              MockSCMHAManager.getInstance(true),
               nodeManager,
               scmMetadataStore.getPipelineTable(),
               eventQueue);

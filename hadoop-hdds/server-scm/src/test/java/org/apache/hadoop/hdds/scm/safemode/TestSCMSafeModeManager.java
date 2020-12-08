@@ -303,7 +303,7 @@ public class TestSCMSafeModeManager {
       PipelineManager pipelineManager =
           PipelineManagerV2Impl.newPipelineManager(
               conf,
-              MockSCMHAManager.getInstance(),
+              MockSCMHAManager.getInstance(true),
               mockNodeManager,
               scmMetadataStore.getPipelineTable(),
               queue);
@@ -326,7 +326,7 @@ public class TestSCMSafeModeManager {
       PipelineManager pipelineManager =
           PipelineManagerV2Impl.newPipelineManager(
               conf,
-              MockSCMHAManager.getInstance(),
+              MockSCMHAManager.getInstance(true),
               mockNodeManager,
               scmMetadataStore.getPipelineTable(),
               queue);
@@ -348,7 +348,7 @@ public class TestSCMSafeModeManager {
       PipelineManager pipelineManager =
           PipelineManagerV2Impl.newPipelineManager(
               conf,
-              MockSCMHAManager.getInstance(),
+              MockSCMHAManager.getInstance(true),
               mockNodeManager,
               scmMetadataStore.getPipelineTable(),
               queue);
@@ -377,7 +377,7 @@ public class TestSCMSafeModeManager {
     PipelineManagerV2Impl pipelineManager =
         PipelineManagerV2Impl.newPipelineManager(
             conf,
-            MockSCMHAManager.getInstance(),
+            MockSCMHAManager.getInstance(true),
             mockNodeManager,
             scmMetadataStore.getPipelineTable(),
             queue);
@@ -627,7 +627,7 @@ public class TestSCMSafeModeManager {
       PipelineManagerV2Impl pipelineManager =
           PipelineManagerV2Impl.newPipelineManager(
               config,
-              MockSCMHAManager.getInstance(),
+              MockSCMHAManager.getInstance(true),
               nodeManager,
               scmMetadataStore.getPipelineTable(),
               queue);
@@ -690,7 +690,7 @@ public class TestSCMSafeModeManager {
     PipelineManagerV2Impl pipelineManager =
         PipelineManagerV2Impl.newPipelineManager(
             config,
-            MockSCMHAManager.getInstance(),
+            MockSCMHAManager.getInstance(true),
             nodeManager,
             scmMetadataStore.getPipelineTable(),
             queue);
