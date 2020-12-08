@@ -23,6 +23,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.thirdparty.io.grpc.Context;
 import org.apache.ratis.thirdparty.io.grpc.Metadata;
 
+import java.nio.charset.StandardCharsets;
 import java.util.regex.Pattern;
 
 import static org.apache.ratis.thirdparty.io.grpc.Metadata.ASCII_STRING_MARSHALLER;
@@ -351,7 +352,7 @@ public final class OzoneConsts {
   public static final String GDPR_FLAG = "gdprEnabled";
   public static final String GDPR_ALGORITHM_NAME = "AES";
   public static final int GDPR_DEFAULT_RANDOM_SECRET_LENGTH = 16;
-  public static final String GDPR_CHARSET = "UTF-8";
+  public static final String GDPR_CHARSET = StandardCharsets.UTF_8.name();
   public static final String GDPR_LENGTH = "length";
   public static final String GDPR_SECRET = "secret";
   public static final String GDPR_ALGORITHM = "algorithm";

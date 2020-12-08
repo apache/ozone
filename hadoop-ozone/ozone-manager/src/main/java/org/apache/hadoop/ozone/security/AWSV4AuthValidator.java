@@ -42,7 +42,7 @@ final class AWSV4AuthValidator {
   private final static Logger LOG =
       LoggerFactory.getLogger(AWSV4AuthValidator.class);
   private static final String HMAC_SHA256_ALGORITHM = "HmacSHA256";
-  private static final Charset UTF_8 = Charset.forName("utf-8");
+  private static final Charset UTF_8 = StandardCharsets.UTF_8;
 
   private AWSV4AuthValidator() {
   }

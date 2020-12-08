@@ -28,6 +28,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -75,7 +76,7 @@ public class TestDefaultCertificateClient {
   private Path dnMetaDirPath;
   private SecurityConfig omSecurityConfig;
   private SecurityConfig dnSecurityConfig;
-  private final static String UTF = "UTF-8";
+  private final static String UTF = StandardCharsets.UTF_8.name();
   private final static String DN_COMPONENT = DNCertificateClient.COMPONENT_NAME;
   private final static String OM_COMPONENT = OMCertificateClient.COMPONENT_NAME;
   private KeyCodec omKeyCodec;
