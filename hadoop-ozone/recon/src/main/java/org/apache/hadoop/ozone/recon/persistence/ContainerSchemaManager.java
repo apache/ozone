@@ -27,7 +27,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersSummary;
-import org.apache.hadoop.ozone.recon.scm.ContainerReplicaTimestamp;
+import org.apache.hadoop.ozone.recon.scm.ContainerReplicaHistory;
 import org.apache.hadoop.ozone.recon.scm.ReconSCMDBDefinition;
 import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
@@ -61,7 +61,7 @@ public class ContainerSchemaManager {
   private final UnhealthyContainersDao unhealthyContainersDao;
   private final ContainerSchemaDefinition containerSchemaDefinition;
 
-  private Map<Long, Map<UUID, ContainerReplicaTimestamp>> lastSeenMap;
+  private Map<Long, Map<UUID, ContainerReplicaHistory>> replicaHistoryMap;
 
   private final ContainerDBServiceProvider dbServiceProvider;
 
@@ -80,7 +80,7 @@ public class ContainerSchemaManager {
     this.unhealthyContainersDao = unhealthyContainersDao;
     this.containerSchemaDefinition = containerSchemaDefinition;
     this.dbServiceProvider = containerDBServiceProvider;
-    this.lastSeenMap = null;
+    this.replicaHistoryMap = null;
     this.scmDBStore = null;
     this.nodeDB = null;
   }
@@ -143,13 +143,13 @@ public class ContainerSchemaManager {
   }
 
   public void upsertContainerHistory(long containerID, UUID uuid, long time) {
-    Map<UUID, ContainerReplicaTimestamp> tsMap;
+    Map<UUID, ContainerReplicaHistory> tsMap;
     try {
       tsMap = dbServiceProvider.getContainerReplicaHistoryMap(containerID);
-      ContainerReplicaTimestamp ts = tsMap.get(uuid);
+      ContainerReplicaHistory ts = tsMap.get(uuid);
       if (ts == null) {
         // New entry
-        tsMap.put(uuid, new ContainerReplicaTimestamp(uuid, time, time));
+        tsMap.put(uuid, new ContainerReplicaHistory(uuid, time, time));
       } else {
         // Entry exists, update last seen time and put it back to DB.
         ts.setLastSeenTime(time);
@@ -162,7 +162,7 @@ public class ContainerSchemaManager {
 
   public List<ContainerHistory> getAllContainerHistory(long containerID) {
     // First, get the existing entries from DB
-    Map<UUID, ContainerReplicaTimestamp> resMap;
+    Map<UUID, ContainerReplicaHistory> resMap;
     try {
       resMap = dbServiceProvider.getContainerReplicaHistoryMap(containerID);
     } catch (IOException ex) {
@@ -171,11 +171,11 @@ public class ContainerSchemaManager {
     }
 
     // Then, update the entries with the latest in-memory info, if available
-    if (lastSeenMap != null) {
-      Map<UUID, ContainerReplicaTimestamp> replicaLastSeenMap =
-          lastSeenMap.get(containerID);
+    if (replicaHistoryMap != null) {
+      Map<UUID, ContainerReplicaHistory> replicaLastSeenMap =
+          replicaHistoryMap.get(containerID);
       if (replicaLastSeenMap != null) {
-        Map<UUID, ContainerReplicaTimestamp> finalResMap = resMap;
+        Map<UUID, ContainerReplicaHistory> finalResMap = resMap;
         replicaLastSeenMap.forEach((k, v) ->
             finalResMap.merge(k, v, (old, latest) -> latest));
         resMap = finalResMap;
@@ -184,7 +184,7 @@ public class ContainerSchemaManager {
 
     // Finally, convert map to list for output
     List<ContainerHistory> resList = new ArrayList<>();
-    for (Map.Entry<UUID, ContainerReplicaTimestamp> entry : resMap.entrySet()) {
+    for (Map.Entry<UUID, ContainerReplicaHistory> entry : resMap.entrySet()) {
       final UUID uuid = entry.getKey();
       String hostname = "N/A";
       // Attempt to retrieve hostname from NODES table
@@ -201,7 +201,6 @@ public class ContainerSchemaManager {
       }
       final long firstSeenTime = entry.getValue().getFirstSeenTime();
       final long lastSeenTime = entry.getValue().getLastSeenTime();
-      // TODO: Refrain from using jOOQ class since we use RDB now?
       resList.add(new ContainerHistory(containerID, uuid.toString(), hostname,
           firstSeenTime, lastSeenTime));
     }
@@ -218,9 +217,9 @@ public class ContainerSchemaManager {
   /**
    * Should only be called once during ReconContainerManager init.
    */
-  public void setLastSeenMap(
-      Map<Long, Map<UUID, ContainerReplicaTimestamp>> lastSeenMap) {
-    this.lastSeenMap = lastSeenMap;
+  public void setReplicaHistoryMap(
+      Map<Long, Map<UUID, ContainerReplicaHistory>> replicaHistoryMap) {
+    this.replicaHistoryMap = replicaHistoryMap;
   }
 
   /**
@@ -231,7 +230,7 @@ public class ContainerSchemaManager {
     try {
       this.nodeDB = ReconSCMDBDefinition.NODES.getTable(scmDBStore);
     } catch (IOException ex) {
-      LOG.debug("Failed to get NODES table.");
+      LOG.debug("Failed to get NODES table. {}", ex.getMessage());
     }
   }
 
@@ -239,24 +238,24 @@ public class ContainerSchemaManager {
    * Flush the container replica history in-memory map to DB.
    * @param clearMap true to clear the in-memory map after flushing completes.
    */
-  public void flushLastSeenMapToDB(boolean clearMap) {
-    if (lastSeenMap == null) {
+  public void flushReplicaHistoryMapToDB(boolean clearMap) {
+    if (replicaHistoryMap == null) {
       return;
     }
-    synchronized (lastSeenMap) {
+    synchronized (replicaHistoryMap) {
       try {
-        for (Map.Entry<Long, Map<UUID, ContainerReplicaTimestamp>> entry :
-            lastSeenMap.entrySet()) {
+        for (Map.Entry<Long, Map<UUID, ContainerReplicaHistory>> entry :
+            replicaHistoryMap.entrySet()) {
           final long containerId = entry.getKey();
-          final Map<UUID, ContainerReplicaTimestamp> map = entry.getValue();
+          final Map<UUID, ContainerReplicaHistory> map = entry.getValue();
           dbServiceProvider.storeContainerReplicaHistoryMap(containerId, map);
         }
       } catch (IOException e) {
-        LOG.debug("Error flushing container replica history to DB. {}",
+        LOG.debug("Error flushing container replica history map to DB. {}",
             e.getMessage());
       }
       if (clearMap) {
-        lastSeenMap.clear();
+        replicaHistoryMap.clear();
       }
     }
   }

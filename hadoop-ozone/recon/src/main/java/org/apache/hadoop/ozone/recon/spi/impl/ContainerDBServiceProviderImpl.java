@@ -42,8 +42,8 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
-import org.apache.hadoop.ozone.recon.scm.ContainerReplicaTimestamp;
-import org.apache.hadoop.ozone.recon.scm.ContainerReplicaTimestampList;
+import org.apache.hadoop.ozone.recon.scm.ContainerReplicaHistory;
+import org.apache.hadoop.ozone.recon.scm.ContainerReplicaHistoryList;
 import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -67,7 +67,7 @@ public class ContainerDBServiceProviderImpl
 
   private Table<ContainerKeyPrefix, Integer> containerKeyTable;
   private Table<Long, Long> containerKeyCountTable;
-  private Table<Long, ContainerReplicaTimestampList>
+  private Table<Long, ContainerReplicaHistoryList>
       containerReplicaHistoryTable;
   private GlobalStatsDao globalStatsDao;
 
@@ -192,13 +192,13 @@ public class ContainerDBServiceProviderImpl
    */
   @Override
   public void storeContainerReplicaHistoryMap(Long containerID,
-      Map<UUID, ContainerReplicaTimestamp> tsMap) throws IOException {
-    List<ContainerReplicaTimestamp> tsList = new ArrayList<>();
-    for (Map.Entry<UUID, ContainerReplicaTimestamp> e : tsMap.entrySet()) {
+      Map<UUID, ContainerReplicaHistory> tsMap) throws IOException {
+    List<ContainerReplicaHistory> tsList = new ArrayList<>();
+    for (Map.Entry<UUID, ContainerReplicaHistory> e : tsMap.entrySet()) {
       tsList.add(e.getValue());
     }
     containerReplicaHistoryTable.put(containerID,
-        new ContainerReplicaTimestampList(tsList));
+        new ContainerReplicaHistoryList(tsList));
   }
 
   /**
@@ -222,20 +222,20 @@ public class ContainerDBServiceProviderImpl
    * @throws IOException
    */
   @Override
-  public Map<UUID, ContainerReplicaTimestamp> getContainerReplicaHistoryMap(
+  public Map<UUID, ContainerReplicaHistory> getContainerReplicaHistoryMap(
       Long containerID) throws IOException {
 
-    final ContainerReplicaTimestampList tsList =
+    final ContainerReplicaHistoryList tsList =
         containerReplicaHistoryTable.get(containerID);
     if (tsList == null) {
       // DB doesn't have an existing entry for the containerID, return empty map
       return new HashMap<>();
     }
 
-    Map<UUID, ContainerReplicaTimestamp> res = new HashMap<>();
+    Map<UUID, ContainerReplicaHistory> res = new HashMap<>();
     // Populate result map with entries from the DB.
     // The list should be fairly short (< 10 entries).
-    for (ContainerReplicaTimestamp ts : tsList.getList()) {
+    for (ContainerReplicaHistory ts : tsList.getList()) {
       final UUID uuid = ts.getUuid();
       res.put(uuid, ts);
     }

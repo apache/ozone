@@ -23,7 +23,7 @@ import java.util.UUID;
 /**
  * A ContainerReplica timestamp class that tracks first and last seen time.
  */
-public class ContainerReplicaTimestamp {
+public class ContainerReplicaHistory {
   // Datanode UUID
   private final UUID uuid;
   // First reported time of the replica on this datanode
@@ -31,7 +31,7 @@ public class ContainerReplicaTimestamp {
   // Last reported time of the replica
   private Long lastSeenTime;
 
-  public ContainerReplicaTimestamp(UUID id, Long firstSeenTime,
+  public ContainerReplicaHistory(UUID id, Long firstSeenTime,
       Long lastSeenTime) {
     this.uuid = id;
     this.firstSeenTime = firstSeenTime;

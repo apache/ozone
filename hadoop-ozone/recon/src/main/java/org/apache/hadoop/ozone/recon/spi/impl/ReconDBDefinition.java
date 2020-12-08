@@ -24,8 +24,8 @@ import org.apache.hadoop.hdds.utils.db.IntegerCodec;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
-import org.apache.hadoop.ozone.recon.codec.ContainerReplicaTimestampListCodec;
-import org.apache.hadoop.ozone.recon.scm.ContainerReplicaTimestampList;
+import org.apache.hadoop.ozone.recon.codec.ContainerReplicaHistoryListCodec;
+import org.apache.hadoop.ozone.recon.scm.ContainerReplicaHistoryList;
 
 /**
  * RocksDB definition for the DB internal to Recon.
@@ -57,13 +57,13 @@ public class ReconDBDefinition implements DBDefinition {
           new LongCodec());
 
   public static final DBColumnFamilyDefinition
-      <Long, ContainerReplicaTimestampList> REPLICA_HISTORY =
-      new DBColumnFamilyDefinition<Long, ContainerReplicaTimestampList>(
+      <Long, ContainerReplicaHistoryList> REPLICA_HISTORY =
+      new DBColumnFamilyDefinition<Long, ContainerReplicaHistoryList>(
           "replica_history",
           Long.class,
           new LongCodec(),
-          ContainerReplicaTimestampList.class,
-          new ContainerReplicaTimestampListCodec());
+          ContainerReplicaHistoryList.class,
+          new ContainerReplicaHistoryListCodec());
 
   @Override
   public String getName() {

@@ -24,24 +24,24 @@ import java.util.List;
 /**
  * A list of ContainerReplicaTimestamp.
  */
-public class ContainerReplicaTimestampList {
+public class ContainerReplicaHistoryList {
 
-  private List<ContainerReplicaTimestamp> tsList;
+  private List<ContainerReplicaHistory> tsList;
 
-  public ContainerReplicaTimestampList(
-      List<ContainerReplicaTimestamp> tsList) {
+  public ContainerReplicaHistoryList(
+      List<ContainerReplicaHistory> tsList) {
     this.tsList = tsList;
   }
 
-  public List<ContainerReplicaTimestamp> asList() {
+  public List<ContainerReplicaHistory> asList() {
     return Collections.unmodifiableList(tsList);
   }
 
-  public List<ContainerReplicaTimestamp> getList() {
+  public List<ContainerReplicaHistory> getList() {
     return tsList;
   }
 
-  public void setList(List<ContainerReplicaTimestamp> list) {
+  public void setList(List<ContainerReplicaHistory> list) {
     this.tsList = list;
   }
 

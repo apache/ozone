@@ -21,8 +21,8 @@ package org.apache.hadoop.ozone.recon.codec;
 
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
-import org.apache.hadoop.ozone.recon.scm.ContainerReplicaTimestamp;
-import org.apache.hadoop.ozone.recon.scm.ContainerReplicaTimestampList;
+import org.apache.hadoop.ozone.recon.scm.ContainerReplicaHistory;
+import org.apache.hadoop.ozone.recon.scm.ContainerReplicaHistoryList;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -33,24 +33,24 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Codec for ContainerReplicaTimestampList.
+ * Codec for ContainerReplicaHistoryList.
  */
-public class ContainerReplicaTimestampListCodec
-    implements Codec<ContainerReplicaTimestampList> {
+public class ContainerReplicaHistoryListCodec
+    implements Codec<ContainerReplicaHistoryList> {
 
   // UUID takes 2 long to store. Each timestamp takes 1 long to store.
   static final int SIZE_PER_ENTRY = 4 * Long.BYTES;
   private final Codec<Long> lc = new LongCodec();
 
   @Override
-  public byte[] toPersistedFormat(ContainerReplicaTimestampList obj)
+  public byte[] toPersistedFormat(ContainerReplicaHistoryList obj)
       throws IOException {
 
-    List<ContainerReplicaTimestamp> lst = obj.getList();
+    List<ContainerReplicaHistory> lst = obj.getList();
     final int sizeOfRes = SIZE_PER_ENTRY * lst.size();
     // ByteArrayOutputStream constructor has a sanity check on size.
     ByteArrayOutputStream out = new ByteArrayOutputStream(sizeOfRes);
-    for (ContainerReplicaTimestamp ts : lst) {
+    for (ContainerReplicaHistory ts : lst) {
       out.write(lc.toPersistedFormat(ts.getUuid().getMostSignificantBits()));
       out.write(lc.toPersistedFormat(ts.getUuid().getLeastSignificantBits()));
       out.write(lc.toPersistedFormat(ts.getFirstSeenTime()));
@@ -60,27 +60,27 @@ public class ContainerReplicaTimestampListCodec
   }
 
   @Override
-  public ContainerReplicaTimestampList fromPersistedFormat(byte[] rawData)
+  public ContainerReplicaHistoryList fromPersistedFormat(byte[] rawData)
       throws IOException {
 
     assert(rawData.length % SIZE_PER_ENTRY == 0);
     DataInputStream in = new DataInputStream(new ByteArrayInputStream(rawData));
-    List<ContainerReplicaTimestamp> lst = new ArrayList<>();
+    List<ContainerReplicaHistory> lst = new ArrayList<>();
     while (in.available() > 0) {
       final long uuidMsb = in.readLong();
       final long uuidLsb = in.readLong();
       final long firstSeenTime = in.readLong();
       final long lastSeenTime = in.readLong();
       final UUID id = new UUID(uuidMsb, uuidLsb);
-      lst.add(new ContainerReplicaTimestamp(id, firstSeenTime, lastSeenTime));
+      lst.add(new ContainerReplicaHistory(id, firstSeenTime, lastSeenTime));
     }
     in.close();
-    return new ContainerReplicaTimestampList(lst);
+    return new ContainerReplicaHistoryList(lst);
   }
 
   @Override
-  public ContainerReplicaTimestampList copyObject(
-      ContainerReplicaTimestampList obj) {
+  public ContainerReplicaHistoryList copyObject(
+      ContainerReplicaHistoryList obj) {
     return obj;
   }
 }

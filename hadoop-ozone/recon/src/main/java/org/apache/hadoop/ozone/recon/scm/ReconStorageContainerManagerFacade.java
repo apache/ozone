@@ -241,7 +241,7 @@ public class ReconStorageContainerManagerFacade
     IOUtils.cleanupWithLogger(LOG, containerManager);
     IOUtils.cleanupWithLogger(LOG, pipelineManager);
     LOG.info("Flushing container replicas last seen map to DB.");
-    containerManager.flushLastSeenMapToDB(true);
+    containerManager.flushReplicaHistoryMapToDB(true);
     try {
       dbStore.close();
     } catch (Exception e) {

@@ -58,8 +58,7 @@ public class ReconContainerManager extends SCMContainerManager {
   private ContainerSchemaManager containerSchemaManager;
 
   // Container ID -> Datanode UUID -> Timestamp
-  private final Map<Long, Map<UUID, ContainerReplicaTimestamp>>
-      containerReplicaLastSeenMap;
+  private final Map<Long, Map<UUID, ContainerReplicaHistory>> replicaHistoryMap;
 
   /**
    * Constructs a mapping class that creates mapping between container names
@@ -81,8 +80,8 @@ public class ReconContainerManager extends SCMContainerManager {
     super(conf, containerStore, batchHandler, pipelineManager);
     this.scmClient = scm;
     this.containerSchemaManager = containerSchemaManager;
-    this.containerReplicaLastSeenMap = new ConcurrentHashMap<>();
-    containerSchemaManager.setLastSeenMap(containerReplicaLastSeenMap);
+    this.replicaHistoryMap = new ConcurrentHashMap<>();
+    containerSchemaManager.setReplicaHistoryMap(replicaHistoryMap);
     containerSchemaManager.setScmDBStore(batchHandler);
   }
 
@@ -196,26 +195,26 @@ public class ReconContainerManager extends SCMContainerManager {
     final UUID uuid = dnInfo.getUuid();
 
     // Map from DataNode UUID to replica last seen time
-    final Map<UUID, ContainerReplicaTimestamp> replicaLastSeenMap =
-        containerReplicaLastSeenMap.get(id);
+    final Map<UUID, ContainerReplicaHistory> replicaLastSeenMap =
+        replicaHistoryMap.get(id);
 
     boolean flushToDB = false;
 
     // If replica doesn't exist in in-memory map, add to DB and add to map
     if (replicaLastSeenMap == null) {
       // putIfAbsent to avoid TOCTOU
-      containerReplicaLastSeenMap.putIfAbsent(id,
-          new ConcurrentHashMap<UUID, ContainerReplicaTimestamp>() {{
-            put(uuid, new ContainerReplicaTimestamp(uuid, currTime, currTime));
+      replicaHistoryMap.putIfAbsent(id,
+          new ConcurrentHashMap<UUID, ContainerReplicaHistory>() {{
+            put(uuid, new ContainerReplicaHistory(uuid, currTime, currTime));
           }});
       flushToDB = true;
     } else {
       // ContainerID exists, update timestamp in memory
-      final ContainerReplicaTimestamp ts = replicaLastSeenMap.get(uuid);
+      final ContainerReplicaHistory ts = replicaLastSeenMap.get(uuid);
       if (ts == null) {
         // New Datanode
         replicaLastSeenMap.put(uuid,
-            new ContainerReplicaTimestamp(uuid, currTime, currTime));
+            new ContainerReplicaHistory(uuid, currTime, currTime));
         flushToDB = true;
       } else {
         // if the object exists, only update the last seen time field
@@ -241,10 +240,10 @@ public class ReconContainerManager extends SCMContainerManager {
     final DatanodeDetails dnInfo = replica.getDatanodeDetails();
     final UUID uuid = dnInfo.getUuid();
 
-    final Map<UUID, ContainerReplicaTimestamp> replicaLastSeenMap =
-        containerReplicaLastSeenMap.get(id);
+    final Map<UUID, ContainerReplicaHistory> replicaLastSeenMap =
+        replicaHistoryMap.get(id);
     if (replicaLastSeenMap != null) {
-      final ContainerReplicaTimestamp ts = replicaLastSeenMap.get(uuid);
+      final ContainerReplicaHistory ts = replicaLastSeenMap.get(uuid);
       if (ts != null) {
         // Flush to DB, then remove from in-memory map
         containerSchemaManager.upsertContainerHistory(id, uuid,
@@ -259,12 +258,17 @@ public class ReconContainerManager extends SCMContainerManager {
     return containerSchemaManager;
   }
 
+  @VisibleForTesting
+  public Map<Long, Map<UUID, ContainerReplicaHistory>> getReplicaHistoryMap() {
+    return replicaHistoryMap;
+  }
+
   /**
    * Flush the container replica history in-memory map to DB.
    * Expected to be called on Recon graceful shutdown.
    * @param clearMap true to clear the in-memory map after flushing completes.
    */
-  public void flushLastSeenMapToDB(boolean clearMap) {
-    containerSchemaManager.flushLastSeenMapToDB(clearMap);
+  public void flushReplicaHistoryMapToDB(boolean clearMap) {
+    containerSchemaManager.flushReplicaHistoryMapToDB(clearMap);
   }
 }
