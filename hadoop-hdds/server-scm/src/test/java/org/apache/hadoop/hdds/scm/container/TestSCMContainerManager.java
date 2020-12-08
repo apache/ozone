@@ -95,7 +95,7 @@ public class TestSCMContainerManager {
     SCMMetadataStore scmMetadataStore = new SCMMetadataStoreImpl(conf);
     pipelineManager = PipelineManagerV2Impl.newPipelineManager(
         conf,
-        MockSCMHAManager.getInstance(),
+        MockSCMHAManager.getInstance(true),
         nodeManager,
         scmMetadataStore.getPipelineTable(),
         new EventQueue());

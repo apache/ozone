@@ -28,7 +28,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
-import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
@@ -91,15 +90,10 @@ public class TestPipelineManagerImpl {
     FileUtil.fullyDelete(testDir);
   }
 
-  private PipelineManagerV2Impl createPipelineManager(boolean leader)
+  private PipelineManagerV2Impl createPipelineManager(boolean isLeader)
       throws IOException {
-    SCMHAManager scmhaManager;
-    if (leader) {
-      scmhaManager = MockSCMHAManager.getLeaderInstance();
-    } else {
-      scmhaManager = MockSCMHAManager.getFollowerInstance();
-    }
-    return PipelineManagerV2Impl.newPipelineManager(conf, scmhaManager,
+    return PipelineManagerV2Impl.newPipelineManager(conf,
+        MockSCMHAManager.getInstance(isLeader),
         new MockNodeManager(true, 20),
         SCMDBDefinition.PIPELINES.getTable(dbStore),
         new EventQueue());
@@ -195,7 +189,8 @@ public class TestPipelineManagerImpl {
     Assert.assertTrue(pipelineManager.containsPipeline(pipeline.getId()));
     Assert.assertEquals(ALLOCATED, pipeline.getPipelineState());
     // Change to follower
-    pipelineManager.setScmhaManager(MockSCMHAManager.getFollowerInstance());
+    assert pipelineManager.getScmhaManager() instanceof MockSCMHAManager;
+    ((MockSCMHAManager) pipelineManager.getScmhaManager()).setIsLeader(false);
     try {
       pipelineManager.openPipeline(pipeline.getId());
     } catch (NotLeaderException ex) {
@@ -216,7 +211,8 @@ public class TestPipelineManagerImpl {
     Assert.assertTrue(pipelineManager.containsPipeline(pipeline.getId()));
     Assert.assertEquals(ALLOCATED, pipeline.getPipelineState());
     // Change to follower
-    pipelineManager.setScmhaManager(MockSCMHAManager.getFollowerInstance());
+    assert pipelineManager.getScmhaManager() instanceof MockSCMHAManager;
+    ((MockSCMHAManager) pipelineManager.getScmhaManager()).setIsLeader(false);
     try {
       pipelineManager.activatePipeline(pipeline.getId());
     } catch (NotLeaderException ex) {
@@ -237,7 +233,8 @@ public class TestPipelineManagerImpl {
     Assert.assertTrue(pipelineManager.containsPipeline(pipeline.getId()));
     Assert.assertEquals(ALLOCATED, pipeline.getPipelineState());
     // Change to follower
-    pipelineManager.setScmhaManager(MockSCMHAManager.getFollowerInstance());
+    assert pipelineManager.getScmhaManager() instanceof MockSCMHAManager;
+    ((MockSCMHAManager) pipelineManager.getScmhaManager()).setIsLeader(false);
     try {
       pipelineManager.deactivatePipeline(pipeline.getId());
     } catch (NotLeaderException ex) {
@@ -301,7 +298,8 @@ public class TestPipelineManagerImpl {
     Assert.assertTrue(pipelineManager.containsPipeline(pipeline.getId()));
     Assert.assertEquals(ALLOCATED, pipeline.getPipelineState());
     // Change to follower
-    pipelineManager.setScmhaManager(MockSCMHAManager.getFollowerInstance());
+    assert pipelineManager.getScmhaManager() instanceof MockSCMHAManager;
+    ((MockSCMHAManager) pipelineManager.getScmhaManager()).setIsLeader(false);
     try {
       pipelineManager.closePipeline(pipeline, false);
     } catch (NotLeaderException ex) {
@@ -494,12 +492,41 @@ public class TestPipelineManagerImpl {
     pipelineManager.close();
   }
 
-  @Test (expected = NotLeaderException.class)
+  @Test
   public void testScrubPipelineShouldFailOnFollower() throws Exception {
-    PipelineManagerV2Impl pipelineManager = createPipelineManager(false);
+    // No timeout for pipeline scrubber.
+    conf.setTimeDuration(
+        OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT, -1,
+        TimeUnit.MILLISECONDS);
+
+    PipelineManagerV2Impl pipelineManager = createPipelineManager(true);
     pipelineManager.allowPipelineCreation();
-    pipelineManager.scrubPipeline(HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.THREE);
+    Pipeline pipeline = pipelineManager
+        .createPipeline(HddsProtos.ReplicationType.RATIS,
+            HddsProtos.ReplicationFactor.THREE);
+    // At this point, pipeline is not at OPEN stage.
+    Assert.assertEquals(Pipeline.PipelineState.ALLOCATED,
+        pipeline.getPipelineState());
+
+    // pipeline should be seen in pipelineManager as ALLOCATED.
+    Assert.assertTrue(pipelineManager
+        .getPipelines(HddsProtos.ReplicationType.RATIS,
+            HddsProtos.ReplicationFactor.THREE,
+            Pipeline.PipelineState.ALLOCATED).contains(pipeline));
+
+    // Change to follower
+    assert pipelineManager.getScmhaManager() instanceof MockSCMHAManager;
+    ((MockSCMHAManager) pipelineManager.getScmhaManager()).setIsLeader(false);
+
+    try {
+      pipelineManager.scrubPipeline(HddsProtos.ReplicationType.RATIS,
+          HddsProtos.ReplicationFactor.THREE);
+    } catch (NotLeaderException ex) {
+      pipelineManager.close();
+      return;
+    }
+    // Should not reach here.
+    Assert.fail();
   }
 
   @Test

@@ -59,7 +59,7 @@ public class TestSCMBlockProtocolServer {
     File dir = GenericTestUtils.getRandomizedTestDir();
     config.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.toString());
     SCMConfigurator configurator = new SCMConfigurator();
-    configurator.setSCMHAManager(MockSCMHAManager.getInstance());
+    configurator.setSCMHAManager(MockSCMHAManager.getInstance(true));
     scm = TestUtils.getScm(config, configurator);
     scm.start();
     scm.exitSafeMode();
