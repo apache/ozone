@@ -26,6 +26,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -81,6 +82,7 @@ import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ipc.RpcConstants.DUMMY_CLIENT_ID;
 import static org.apache.hadoop.ipc.RpcConstants.INVALID_CALL_ID;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HA_PREFIX;
 
 /**
  * Creates a Ratis server endpoint for OM.
@@ -538,7 +540,23 @@ public final class OzoneManagerRatisServer {
 
     RaftServerConfigKeys.Snapshot.setAutoTriggerThreshold(properties,
         snapshotAutoTriggerThreshold);
+
+    createRaftServerProperties(conf, properties);
     return properties;
+  }
+
+  private void createRaftServerProperties(ConfigurationSource ozoneConf,
+      RaftProperties raftProperties) {
+    Map<String, String> ratisServerConf =
+        getOMHAConfigs(ozoneConf);
+    ratisServerConf.forEach((key, val) -> {
+      raftProperties.set(key, val);
+    });
+  }
+
+  private static Map<String, String> getOMHAConfigs(
+      ConfigurationSource configuration) {
+    return configuration.getPropsWithPrefix(OZONE_OM_HA_PREFIX + ".");
   }
 
   /**
