@@ -686,6 +686,16 @@ public class TestContainerEndpoint {
         Assert.assertEquals(5L, history.getLastSeenTime());
       }
     });
+
+    // Check getLatestContainerHistory
+    List<ContainerHistory> hist1 = containerSchemaManager
+        .getLatestContainerHistory(1L, 10);
+    Assert.assertTrue(hist1.size() <= 10);
+    // Descending order by last report timestamp
+    for (int i = 0; i < hist1.size() - 1; i++) {
+      Assert.assertTrue(hist1.get(i).getLastSeenTime()
+          >= hist1.get(i + 1).getLastSeenTime());
+    }
   }
 
   UUID newDatanode(String hostName, String ipAddress) throws IOException {
