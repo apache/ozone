@@ -492,7 +492,7 @@ public class TestPipelineManagerImpl {
     pipelineManager.close();
   }
 
-  @Test (expected = NotLeaderException.class)
+  @Test
   public void testScrubPipelineShouldFailOnFollower() throws Exception {
     // No timeout for pipeline scrubber.
     conf.setTimeDuration(
@@ -518,8 +518,15 @@ public class TestPipelineManagerImpl {
     assert pipelineManager.getScmhaManager() instanceof MockSCMHAManager;
     ((MockSCMHAManager) pipelineManager.getScmhaManager()).setIsLeader(false);
 
-    pipelineManager.scrubPipeline(HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.THREE);
+    try {
+      pipelineManager.scrubPipeline(HddsProtos.ReplicationType.RATIS,
+          HddsProtos.ReplicationFactor.THREE);
+    } catch (NotLeaderException ex) {
+      pipelineManager.close();
+      return;
+    }
+    // Should not reach here.
+    Assert.fail();
   }
 
   @Test
