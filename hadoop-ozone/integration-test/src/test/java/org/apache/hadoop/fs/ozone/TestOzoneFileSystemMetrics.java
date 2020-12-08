@@ -34,6 +34,7 @@ import org.junit.Rule;
 import org.junit.BeforeClass;
 import org.junit.AfterClass;
 import org.junit.Test;
+import org.junit.Assert;
 import org.junit.rules.Timeout;
 
 import java.io.IOException;
