@@ -30,7 +30,10 @@ import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.junit.*;
+import org.junit.Rule;
+import org.junit.BeforeClass;
+import org.junit.AfterClass;
+import org.junit.Test;
 import org.junit.rules.Timeout;
 
 import java.io.IOException;
