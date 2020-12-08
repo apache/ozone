@@ -30,10 +30,16 @@ menu:
 1. Storage space级别配额
 
  管理员应该能够定义一个Volume或Bucket可以使用多少存储空间。目前支持以下storage space quota的设置:
+ 
  a. 默认情况下volume和bucket的quota不启用。
+ 
  b. 当volume quota启用时，bucket quota的总大小不能超过volume。
+ 
  c. 可以在不启用volume quota的情况下单独给bucket设置quota。此时bucket quota的大小是不受限制的。
+ 
  d. 目前不支持单独设置volume quota，只有在设置了bucket quota的情况下volume quota才会生效。因为ozone在写入key时只检查bucket的usedBytes。
+ 
+ e. 如果集群从小于1.1.0的旧版本升级而来，则不建议在旧volume和bucket上使用配额。由于旧的key没有计算到bucket的usedBytes中，所以此时配额设置是不准确的。
 
 ## 客户端用法
 ### Storage space级别配额

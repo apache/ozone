@@ -32,11 +32,16 @@ So far, we know that Ozone allows users to create volumes, buckets, and keys. A 
 1. Storage Space level quota
 
 Administrators should be able to define how much storage space a Volume or Bucket can use. The following Settings for Storage space quota are currently supported：
+
 a. By default, the quota for volume and bucket is not enabled.
+
 b. When volume quota is enabled, the total size of bucket quota cannot exceed volume.
+
 c. Bucket quota can be set separately without enabling Volume quota. The size of bucket quota is unrestricted at this point.
+
 d. Volume quota is not currently supported separately, and volume quota takes effect only if bucket quota is set. Because ozone only check the usedBytes of the bucket when we write the key.
 
+e. If the cluster is upgraded from old version less than 1.1.0, use of quota on older volumes and buckets is not recommended. Since the old key is not counted to the bucket's usedBytes, the quota setting is inaccurate at this point.
 
 ## Client usage
 ### Storage Space level quota
