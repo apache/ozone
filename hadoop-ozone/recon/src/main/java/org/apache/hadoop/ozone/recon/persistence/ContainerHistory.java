@@ -25,16 +25,16 @@ public class ContainerHistory implements Serializable {
   private long containerID;
   private String datanodeUuid;
   private String datanodeHost;
-  private long firstReportTimestamp;
-  private long lastReportTimestamp;
+  private long firstSeenTime;
+  private long lastSeenTime;
 
   public ContainerHistory(long containerId, String datanodeUuid,
       String datanodeHost, long firstSeenTime, long lastSeenTime) {
     this.containerID = containerId;
     this.datanodeUuid = datanodeUuid;
     this.datanodeHost = datanodeHost;
-    this.firstReportTimestamp = firstSeenTime;
-    this.lastReportTimestamp = lastSeenTime;
+    this.firstSeenTime = firstSeenTime;
+    this.lastSeenTime = lastSeenTime;
   }
 
   public long getContainerID() {
@@ -61,19 +61,19 @@ public class ContainerHistory implements Serializable {
     this.datanodeHost = datanodeHost;
   }
 
-  public long getFirstReportTimestamp() {
-    return firstReportTimestamp;
+  public long getFirstSeenTime() {
+    return firstSeenTime;
   }
 
-  public void setFirstReportTimestamp(long firstReportTimestamp) {
-    this.firstReportTimestamp = firstReportTimestamp;
+  public void setFirstSeenTime(long firstSeenTime) {
+    this.firstSeenTime = firstSeenTime;
   }
 
-  public long getLastReportTimestamp() {
-    return lastReportTimestamp;
+  public long getLastSeenTime() {
+    return lastSeenTime;
   }
 
-  public void setLastReportTimestamp(long lastReportTimestamp) {
-    this.lastReportTimestamp = lastReportTimestamp;
+  public void setLastSeenTime(long lastSeenTime) {
+    this.lastSeenTime = lastSeenTime;
   }
 }

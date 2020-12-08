@@ -682,8 +682,8 @@ public class TestContainerEndpoint {
       Assert.assertTrue(datanodes.contains(history.getDatanodeUuid()));
       if (history.getDatanodeUuid().equals(uuid1.toString())) {
         Assert.assertEquals("host1", history.getDatanodeHost());
-        Assert.assertEquals(1L, history.getFirstReportTimestamp());
-        Assert.assertEquals(5L, history.getLastReportTimestamp());
+        Assert.assertEquals(1L, history.getFirstSeenTime());
+        Assert.assertEquals(5L, history.getLastSeenTime());
       }
     });
   }

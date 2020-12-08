@@ -210,7 +210,7 @@ public class ContainerSchemaManager {
   public List<ContainerHistory> getLatestContainerHistory(long containerID,
                                                           int limit) {
     List<ContainerHistory> res = getAllContainerHistory(containerID);
-    res.sort(comparingLong(ContainerHistory::getLastReportTimestamp).reversed());
+    res.sort(comparingLong(ContainerHistory::getLastSeenTime).reversed());
     return res.stream().limit(limit).collect(Collectors.toList());
   }
 
