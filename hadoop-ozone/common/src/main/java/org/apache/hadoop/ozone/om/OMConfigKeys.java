@@ -239,4 +239,6 @@ public final class OMConfigKeys {
       "ozone.om.enable.filesystem.paths";
   public static final boolean OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT =
       false;
+
+  public static final String OZONE_OM_HA_PREFIX = "ozone.om.ha";
 }
