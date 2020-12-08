@@ -79,7 +79,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <declared.ozone.version>${ozone.version}</declared.ozone.version>
 
     <!-- Apache Ratis version -->
-    <ratis.version>1.1.0-11689cd-SNAPSHOT</ratis.version>
+    <ratis.version>1.1.0-913f5a4-SNAPSHOT</ratis.version>
 
     <!-- Apache Ratis thirdparty version -->
     <ratis.thirdparty.version>0.6.0-SNAPSHOT</ratis.thirdparty.version>
@@ -138,7 +138,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <httpcore.version>4.4.13</httpcore.version>
 
     <!-- SLF4J/LOG4J version -->
-    <slf4j.version>1.7.25</slf4j.version>
+    <slf4j.version>1.7.30</slf4j.version>
     <log4j.version>1.2.17</log4j.version>
     <log4j2.version>2.13.3</log4j2.version>
     <disruptor.version>3.4.2</disruptor.version>
@@ -224,7 +224,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <maven-checkstyle-plugin.version>3.1.0</maven-checkstyle-plugin.version>
     <checkstyle.version>8.29</checkstyle.version>
     <surefire.fork.timeout>1200</surefire.fork.timeout>
-    <aws-java-sdk.version>1.11.615</aws-java-sdk.version>
+    <aws-java-sdk.version>1.11.901</aws-java-sdk.version>
     <hsqldb.version>2.3.4</hsqldb.version>
     <frontend-maven-plugin.version>1.10.0</frontend-maven-plugin.version>
     <!-- the version of Hadoop declared in the version resources; can be overridden
@@ -233,7 +233,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <proto-backwards-compatibility.version>1.0.5</proto-backwards-compatibility.version>
 
     <swagger-annotations-version>1.5.4</swagger-annotations-version>
-    <snakeyaml.version>1.16</snakeyaml.version>
+    <snakeyaml.version>1.26</snakeyaml.version>
     <sonar.java.binaries>${basedir}/target/classes</sonar.java.binaries>
   </properties>
 
@@ -1017,12 +1017,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <artifactId>ratis-tools</artifactId>
         <groupId>org.apache.ratis</groupId>
         <version>${ratis.version}</version>
-      </dependency>
-
-      <dependency>
-        <groupId>io.netty</groupId>
-        <artifactId>netty</artifactId>
-        <version>3.10.5.Final</version>
       </dependency>
 
       <dependency>

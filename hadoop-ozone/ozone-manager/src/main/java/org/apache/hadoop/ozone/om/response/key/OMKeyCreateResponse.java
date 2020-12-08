@@ -34,12 +34,13 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
 
 /**
  * Response for CreateKey request.
  */
-@CleanupTableInfo(cleanupTables = OPEN_KEY_TABLE)
+@CleanupTableInfo(cleanupTables = {OPEN_KEY_TABLE, KEY_TABLE})
 public class OMKeyCreateResponse extends OMClientResponse {
 
   public static final Logger LOG =
@@ -99,10 +100,6 @@ public class OMKeyCreateResponse extends OMClientResponse {
     omMetadataManager.getOpenKeyTable().putWithBatch(batchOperation,
         openKey, omKeyInfo);
 
-    // update volume usedBytes.
-    omMetadataManager.getVolumeTable().putWithBatch(batchOperation,
-        omMetadataManager.getVolumeKey(omVolumeArgs.getVolume()),
-        omVolumeArgs);
     // update bucket usedBytes.
     omMetadataManager.getBucketTable().putWithBatch(batchOperation,
         omMetadataManager.getBucketKey(omVolumeArgs.getVolume(),

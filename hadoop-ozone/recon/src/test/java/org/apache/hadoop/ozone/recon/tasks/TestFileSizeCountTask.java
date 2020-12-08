@@ -27,6 +27,7 @@ import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMUpdateEventBuilder;
 import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.daos.FileCountBySizeDao;
+import org.hadoop.ozone.recon.schema.tables.pojos.FileCountBySize;
 import org.jooq.DSLContext;
 import org.jooq.Record3;
 import org.junit.Before;
@@ -110,6 +111,11 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
         .thenReturn(omKeyInfo1)
         .thenReturn(omKeyInfo2)
         .thenReturn(omKeyInfo3);
+
+    // Reprocess could be called from table having existing entries. Adding
+    // an entry to simulate that.
+    fileCountBySizeDao.insert(
+        new FileCountBySize("vol1", "bucket1", 1024L, 10L));
 
     Pair<String, Boolean> result =
         fileSizeCountTask.reprocess(omMetadataManager);

@@ -700,7 +700,7 @@ public class ContainerStateMachine extends BaseStateMachine {
    * @param index index of the log entry
    */
   @Override
-  public void notifyIndexUpdate(long term, long index) {
+  public void notifyTermIndexUpdated(long term, long index) {
     applyTransactionCompletionMap.put(index, term);
     // We need to call updateLastApplied here because now in ratis when a
     // node becomes leader, it is checking stateMachineIndex >=
@@ -844,7 +844,7 @@ public class ContainerStateMachine extends BaseStateMachine {
   }
 
   @Override
-  public void notifySlowness(RoleInfoProto roleInfoProto) {
+  public void notifyFollowerSlowness(RoleInfoProto roleInfoProto) {
     ratisServer.handleNodeSlowness(gid, roleInfoProto);
   }
 

@@ -25,12 +25,12 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
@@ -116,11 +116,14 @@ public class SCMBlockDeletingService extends BackgroundService {
       long startTime = Time.monotonicNow();
       // Scan SCM DB in HB interval and collect a throttled list of
       // to delete blocks.
+
       if (LOG.isDebugEnabled()) {
         LOG.debug("Running DeletedBlockTransactionScanner");
       }
-
-      List<DatanodeDetails> datanodes = nodeManager.getNodes(NodeState.HEALTHY);
+      // TODO - DECOMM - should we be deleting blocks from decom nodes
+      //        and what about entering maintenance.
+      List<DatanodeDetails> datanodes =
+          nodeManager.getNodes(NodeStatus.inServiceHealthy());
       if (datanodes != null) {
         try {
           DatanodeDeletedBlockTransactions transactions =
@@ -141,7 +144,7 @@ public class SCMBlockDeletingService extends BackgroundService {
               // We should stop caching new commands if num of un-processed
               // command is bigger than a limit, e.g 50. In case datanode goes
               // offline for sometime, the cached commands be flooded.
-              eventPublisher.fireEvent(SCMEvents.RETRIABLE_DATANODE_COMMAND,
+              eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
                   new CommandForDatanode<>(dnId,
                       new DeleteBlocksCommand(dnTXs)));
               if (LOG.isDebugEnabled()) {

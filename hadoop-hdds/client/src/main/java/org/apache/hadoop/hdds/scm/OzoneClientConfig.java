@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
+import org.apache.hadoop.hdds.conf.PostConstruct;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 
@@ -111,9 +112,7 @@ public class OzoneClientConfig {
       tags = ConfigTag.CLIENT)
   private boolean checksumVerify = true;
 
-  public OzoneClientConfig() {
-  }
-
+  @PostConstruct
   private void validate() {
     Preconditions.checkState(streamBufferSize > 0);
     Preconditions.checkState(streamBufferFlushSize > 0);
