@@ -48,10 +48,10 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
@@ -86,7 +86,6 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
-import org.mockito.Mockito;
 
 /**
  * Test for container endpoint.
@@ -96,6 +95,8 @@ public class TestContainerEndpoint {
   @Rule
   public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
+  private OzoneStorageContainerManager ozoneStorageContainerManager;
+  private ReconContainerManager reconContainerManager;
   private ContainerDBServiceProvider containerDbServiceProvider;
   private ContainerEndpoint containerEndpoint;
   private boolean isSetupDone = false;
@@ -105,6 +106,11 @@ public class TestContainerEndpoint {
   private PipelineID pipelineID;
   private long keyCount = 5L;
 
+  UUID uuid1;
+  UUID uuid2;
+  UUID uuid3;
+  UUID uuid4;
+
   private void initializeInjector() throws Exception {
     reconOMMetadataManager = getTestReconOmMetadataManager(
         initializeNewOmMetadataManager(temporaryFolder.newFolder()),
@@ -112,19 +118,6 @@ public class TestContainerEndpoint {
 
     Pipeline pipeline = getRandomPipeline();
     pipelineID = pipeline.getId();
-
-    // Mock ReconStorageContainerManagerFacade and other SCM related methods
-    ContainerManager mockContainerManager =
-        mock(ReconContainerManager.class);
-
-    when(mockContainerManager.getContainer(Mockito.any(ContainerID.class)))
-        .thenReturn(
-        new ContainerInfo.Builder()
-            .setContainerID(containerID.getId())
-            .setNumberOfKeys(keyCount)
-            .setReplicationFactor(ReplicationFactor.THREE)
-            .setPipelineID(pipelineID)
-            .build());
 
     ReconTestInjector reconTestInjector =
         new ReconTestInjector.Builder(temporaryFolder)
@@ -142,6 +135,10 @@ public class TestContainerEndpoint {
             .addBinding(ContainerSchemaManager.class)
             .build();
 
+    ozoneStorageContainerManager =
+        reconTestInjector.getInstance(OzoneStorageContainerManager.class);
+    reconContainerManager = (ReconContainerManager)
+        ozoneStorageContainerManager.getContainerManager();
     containerDbServiceProvider =
         reconTestInjector.getInstance(ContainerDBServiceProvider.class);
     containerEndpoint = reconTestInjector.getInstance(ContainerEndpoint.class);
@@ -232,7 +229,6 @@ public class TestContainerEndpoint {
 
   @Test
   public void testGetKeysForContainer() {
-
     Response response = containerEndpoint.getKeysForContainer(1L, -1, "");
 
     KeysResponse data = (KeysResponse) response.getEntity();
@@ -325,7 +321,6 @@ public class TestContainerEndpoint {
 
   @Test
   public void testGetContainers() {
-
     Response response = containerEndpoint.getContainers(-1, 0L);
 
     ContainersResponse responseObject =
@@ -406,7 +401,7 @@ public class TestContainerEndpoint {
   }
 
   @Test
-  public void testGetMissingContainers() {
+  public void testGetMissingContainers() throws IOException {
     Response response = containerEndpoint.getMissingContainers();
 
     MissingContainersResponse responseObject =
@@ -429,11 +424,13 @@ public class TestContainerEndpoint {
         new ArrayList<UnhealthyContainers>();
     missingList.add(missing);
     containerSchemaManager.insertUnhealthyContainerRecords(missingList);
+
+    putContainerInfos(1);
     // Add container history for id 1
-    final UUID uuid1 = UUID.randomUUID();
-    final UUID uuid2 = UUID.randomUUID();
-    final UUID uuid3 = UUID.randomUUID();
-    final UUID uuid4 = UUID.randomUUID();
+    final UUID uuid1 = newDatanode("host1", "127.0.0.1");
+    final UUID uuid2 = newDatanode("host2", "127.0.0.2");
+    final UUID uuid3 = newDatanode("host3", "127.0.0.3");
+    final UUID uuid4 = newDatanode("host4", "127.0.0.4");
     containerSchemaManager.upsertContainerHistory(1L, uuid1, 1L);
     containerSchemaManager.upsertContainerHistory(1L, uuid2, 2L);
     containerSchemaManager.upsertContainerHistory(1L, uuid3, 3L);
@@ -460,8 +457,29 @@ public class TestContainerEndpoint {
     });
   }
 
+  ContainerInfo newContainerInfo(long containerId) {
+    return new ContainerInfo.Builder()
+        .setContainerID(containerId)
+        .setReplicationType(HddsProtos.ReplicationType.RATIS)
+        .setState(HddsProtos.LifeCycleState.OPEN)
+        .setOwner("owner1")
+        .setNumberOfKeys(keyCount)
+        .setReplicationFactor(ReplicationFactor.THREE)
+        .setPipelineID(pipelineID)
+        .build();
+  }
+
+  void putContainerInfos(int num) throws IOException {
+    for (int i = 1; i <= num; i++) {
+      final ContainerInfo info = newContainerInfo(i);
+      reconContainerManager.getContainerStore().put(new ContainerID(i), info);
+      reconContainerManager.getContainerStateManager().addContainerInfo(
+          i, info, null, null);
+    }
+  }
+
   @Test
-  public void testUnhealthyContainers() {
+  public void testUnhealthyContainers() throws IOException {
     Response response = containerEndpoint.getUnhealthyContainers(1000, 1);
 
     UnhealthyContainersResponse responseObject =
@@ -474,6 +492,11 @@ public class TestContainerEndpoint {
 
     assertEquals(Collections.EMPTY_LIST, responseObject.getContainers());
 
+    putContainerInfos(14);
+    uuid1 = newDatanode("host1", "127.0.0.1");
+    uuid2 = newDatanode("host2", "127.0.0.2");
+    uuid3 = newDatanode("host3", "127.0.0.3");
+    uuid4 = newDatanode("host4", "127.0.0.4");
     createUnhealthyRecords(5, 4, 3, 2);
 
     response = containerEndpoint.getUnhealthyContainers(1000, 1);
@@ -550,7 +573,7 @@ public class TestContainerEndpoint {
   }
 
   @Test
-  public void testUnhealthyContainersFilteredResponse() {
+  public void testUnhealthyContainersFilteredResponse() throws IOException {
     String missing =  UnHealthyContainerStates.MISSING.toString();
 
     Response response = containerEndpoint
@@ -565,9 +588,14 @@ public class TestContainerEndpoint {
     assertEquals(0, responseObject.getMisReplicatedCount());
     assertEquals(Collections.EMPTY_LIST, responseObject.getContainers());
 
+    putContainerInfos(5);
+    uuid1 = newDatanode("host1", "127.0.0.1");
+    uuid2 = newDatanode("host2", "127.0.0.2");
+    uuid3 = newDatanode("host3", "127.0.0.3");
+    uuid4 = newDatanode("host4", "127.0.0.4");
     createUnhealthyRecords(5, 4, 3, 2);
 
-    response =  containerEndpoint.getUnhealthyContainers(missing, 1000, 1);
+    response = containerEndpoint.getUnhealthyContainers(missing, 1000, 1);
 
     responseObject = (UnhealthyContainersResponse) response.getEntity();
     // Summary should have the count for all unhealthy:
@@ -598,7 +626,12 @@ public class TestContainerEndpoint {
   }
 
   @Test
-  public void testUnhealthyContainersPaging() {
+  public void testUnhealthyContainersPaging() throws IOException {
+    putContainerInfos(6);
+    uuid1 = newDatanode("host1", "127.0.0.1");
+    uuid2 = newDatanode("host2", "127.0.0.2");
+    uuid3 = newDatanode("host3", "127.0.0.3");
+    uuid4 = newDatanode("host4", "127.0.0.4");
     createUnhealthyRecords(5, 4, 3, 2);
     UnhealthyContainersResponse firstBatch =
         (UnhealthyContainersResponse) containerEndpoint.getUnhealthyContainers(
@@ -626,22 +659,15 @@ public class TestContainerEndpoint {
   @Test
   public void testGetReplicaHistoryForContainer() throws IOException {
     // Add container history for container id 1
-    final UUID uuid1 = UUID.randomUUID();
-    final UUID uuid2 = UUID.randomUUID();
-    final UUID uuid3 = UUID.randomUUID();
-    final UUID uuid4 = UUID.randomUUID();
-    containerSchemaManager.getNodeDB().put(uuid1, DatanodeDetails.newBuilder()
-        .setUuid(uuid1).setHostName("host1").setIpAddress("127.0.0.1").build());
-    containerSchemaManager.getNodeDB().put(uuid2, DatanodeDetails.newBuilder()
-        .setUuid(uuid2).setHostName("host2").setIpAddress("127.0.0.2").build());
-    containerSchemaManager.getNodeDB().put(uuid3, DatanodeDetails.newBuilder()
-        .setUuid(uuid3).setHostName("host3").setIpAddress("127.0.0.3").build());
-    containerSchemaManager.getNodeDB().put(uuid4, DatanodeDetails.newBuilder()
-        .setUuid(uuid4).setHostName("host4").setIpAddress("127.0.0.4").build());
+    final UUID uuid1 = newDatanode("host1", "127.0.0.1");
+    final UUID uuid2 = newDatanode("host2", "127.0.0.2");
+    final UUID uuid3 = newDatanode("host3", "127.0.0.3");
+    final UUID uuid4 = newDatanode("host4", "127.0.0.4");
     containerSchemaManager.upsertContainerHistory(1L, uuid1, 1L);
     containerSchemaManager.upsertContainerHistory(1L, uuid2, 2L);
     containerSchemaManager.upsertContainerHistory(1L, uuid3, 3L);
     containerSchemaManager.upsertContainerHistory(1L, uuid4, 4L);
+
     containerSchemaManager.upsertContainerHistory(1L, uuid1, 5L);
 
     Response response = containerEndpoint.getReplicaHistoryForContainer(1L);
@@ -656,30 +682,41 @@ public class TestContainerEndpoint {
       Assert.assertTrue(datanodes.contains(history.getDatanodeUuid()));
       if (history.getDatanodeUuid().equals(uuid1.toString())) {
         Assert.assertEquals("host1", history.getDatanodeHost());
-        Assert.assertEquals(1L, (long) history.getFirstReportTimestamp());
-        Assert.assertEquals(5L, (long) history.getLastReportTimestamp());
+        Assert.assertEquals(1L, history.getFirstReportTimestamp());
+        Assert.assertEquals(5L, history.getLastReportTimestamp());
       }
     });
+  }
+
+  UUID newDatanode(String hostName, String ipAddress) throws IOException {
+    final UUID uuid = UUID.randomUUID();
+    containerSchemaManager.getNodeDB().put(uuid,
+        DatanodeDetails.newBuilder()
+            .setUuid(uuid)
+            .setHostName(hostName)
+            .setIpAddress(ipAddress)
+            .build());
+    return uuid;
   }
 
   private void createUnhealthyRecords(int missing, int overRep, int underRep,
       int misRep) {
     int cid = 0;
-    for (int i=0; i<missing; i++) {
-      createUnhealthyRecord(++cid,
-          UnHealthyContainerStates.MISSING.toString(), 3, 0, 3, null);
+    for (int i = 0; i < missing; i++) {
+      createUnhealthyRecord(++cid, UnHealthyContainerStates.MISSING.toString(),
+          3, 0, 3, null);
     }
-    for (int i=0; i<overRep; i++) {
+    for (int i = 0; i < overRep; i++) {
       createUnhealthyRecord(++cid,
           UnHealthyContainerStates.OVER_REPLICATED.toString(),
           3, 5, -2, null);
     }
-    for (int i=0; i<underRep; i++) {
+    for (int i = 0; i < underRep; i++) {
       createUnhealthyRecord(++cid,
           UnHealthyContainerStates.UNDER_REPLICATED.toString(),
           3, 1, 2, null);
     }
-    for (int i=0; i<misRep; i++) {
+    for (int i = 0; i < misRep; i++) {
       createUnhealthyRecord(++cid,
           UnHealthyContainerStates.MIS_REPLICATED.toString(),
           2, 1, 1, "some reason");
@@ -698,15 +735,10 @@ public class TestContainerEndpoint {
     missing.setReplicaDelta(delta);
     missing.setReason(reason);
 
-    ArrayList<UnhealthyContainers> missingList =
-        new ArrayList<UnhealthyContainers>();
+    ArrayList<UnhealthyContainers> missingList = new ArrayList<>();
     missingList.add(missing);
     containerSchemaManager.insertUnhealthyContainerRecords(missingList);
 
-    final UUID uuid1 = UUID.randomUUID();
-    final UUID uuid2 = UUID.randomUUID();
-    final UUID uuid3 = UUID.randomUUID();
-    final UUID uuid4 = UUID.randomUUID();
     containerSchemaManager.upsertContainerHistory(cID, uuid1, 1L);
     containerSchemaManager.upsertContainerHistory(cID, uuid2, 2L);
     containerSchemaManager.upsertContainerHistory(cID, uuid3, 3L);

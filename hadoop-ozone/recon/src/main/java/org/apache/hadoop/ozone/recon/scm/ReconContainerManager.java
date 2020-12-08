@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -253,6 +254,7 @@ public class ReconContainerManager extends SCMContainerManager {
     }
   }
 
+  @VisibleForTesting
   public ContainerSchemaManager getContainerSchemaManager() {
     return containerSchemaManager;
   }
