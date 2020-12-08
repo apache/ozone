@@ -675,17 +675,9 @@ public class KeyManagerImpl implements KeyManager {
       }
       throw new OMException("Key not found", KEY_NOT_FOUND);
     }
-    if (grpcBlockTokenEnabled) {
-      String remoteUser = getRemoteUser().getShortUserName();
-      for (OmKeyLocationInfoGroup key : value.getKeyLocationVersions()) {
-        key.getLocationList().forEach(k -> {
-          k.setToken(secretManager.generateToken(remoteUser,
-                  k.getBlockID().getContainerBlockID().toString(),
-              EnumSet.of(HddsProtos.BlockTokenSecretProto.
-                  AccessModeProto.READ), k.getLength()));
-        });
-      }
-    }
+
+    // add block token for read.
+    addBlockToken4Read(value);
 
     // Refresh container pipeline info from SCM
     // based on OmKeyArgs.refreshPipeline flag
@@ -698,6 +690,20 @@ public class KeyManagerImpl implements KeyManager {
     return value;
   }
 
+  private void addBlockToken4Read(OmKeyInfo value) throws IOException {
+    Preconditions.checkNotNull(value, "OMKeyInfo cannot be null");
+    if (grpcBlockTokenEnabled) {
+      String remoteUser = getRemoteUser().getShortUserName();
+      for (OmKeyLocationInfoGroup key : value.getKeyLocationVersions()) {
+        key.getLocationList().forEach(k -> {
+          k.setToken(secretManager.generateToken(remoteUser,
+              k.getBlockID().getContainerBlockID().toString(),
+              EnumSet.of(HddsProtos.BlockTokenSecretProto.
+                  AccessModeProto.READ), k.getLength()));
+        });
+      }
+    }
+  }
   /**
    * Refresh pipeline info in OM by asking SCM.
    * @param keyList a list of OmKeyInfo
@@ -1974,6 +1980,8 @@ public class KeyManagerImpl implements KeyManager {
             clientAddress);
       //if key is not of type file or if key is not found we throw an exception
     if (fileStatus.isFile()) {
+      // add block token for read.
+      addBlockToken4Read(fileStatus.getKeyInfo());
       return fileStatus.getKeyInfo();
     }
     throw new OMException("Can not write to directory: " + keyName,
