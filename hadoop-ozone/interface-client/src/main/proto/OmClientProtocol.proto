@@ -1079,7 +1079,12 @@ message FinalizeUpgradeProgressResponse {
 }
 
 message PrepareRequest {
+    required PrepareRequestArgs args = 1;
+}
 
+message PrepareRequestArgs {
+    optional uint64 txnApplyWaitTimeoutSeconds = 1 [default = 300];
+    optional uint64 txnApplyCheckIntervalSeconds = 2 [default = 5];
 }
 
 message PrepareResponse {

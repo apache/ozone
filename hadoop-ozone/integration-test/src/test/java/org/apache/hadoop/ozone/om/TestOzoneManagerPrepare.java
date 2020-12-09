@@ -35,20 +35,13 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
-import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
-import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareRequest;
 import org.apache.hadoop.test.LambdaTestUtils;
-import org.apache.ratis.protocol.ClientId;
-import org.apache.ratis.protocol.Message;
-import org.apache.ratis.protocol.RaftClientRequest;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -59,6 +52,8 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
 
   private final String keyPrefix = "key";
   private final int timeoutMillis = 30000;
+  private final static Long PREPARE_FLUSH_WAIT_TIMEOUT_SECONDS = 300L;
+  private final static Long PREPARE_FLUSH_INTERVAL_SECONDS = 5L;
 
   /**
    * Calls prepare on all OMs when they have no transaction information.
@@ -67,22 +62,17 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
   @Test
   public void testPrepareWithoutTransactions() throws Exception {
     MiniOzoneHAClusterImpl cluster = getCluster();
-    OzoneManager leader = cluster.getOMLeader();
-    OMResponse omResponse = submitPrepareRequest(leader.getOmRatisServer());
-    // Get the log index of the prepare request.
+    ClientProtocol ozClient = OzoneClientFactory.getRpcClient(getConf())
+        .getObjectStore().getClientProxy();
     long prepareRequestLogIndex =
-        omResponse.getPrepareResponse().getTxnID();
+        ozClient.getOzoneManagerClient().prepareOzoneManager(
+            PREPARE_FLUSH_WAIT_TIMEOUT_SECONDS, PREPARE_FLUSH_INTERVAL_SECONDS);
 
     // Prepare response processing is included in the snapshot,
     // giving index of 1.
     Assert.assertEquals(1, prepareRequestLogIndex);
     for (OzoneManager om: cluster.getOzoneManagersList()) {
-      // Leader should be prepared as soon as it returns response.
-      if (om == leader) {
-        checkPrepared(om, prepareRequestLogIndex);
-      } else {
-        waitAndCheckPrepared(om, prepareRequestLogIndex);
-      }
+      waitAndCheckPrepared(om, prepareRequestLogIndex);
     }
   }
 
@@ -117,21 +107,15 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
           () -> logFilesPresentInRatisPeer(om));
     }
 
-    OzoneManager leader = cluster.getOMLeader();
-    OMResponse omResponse = submitPrepareRequest(leader.getOmRatisServer());
-    // Get the log index of the prepare request.
+    OzoneManagerProtocol ozoneManagerClient =
+        ozClient.getObjectStore().getClientProxy().getOzoneManagerClient();
     long prepareRequestLogIndex =
-        omResponse.getPrepareResponse().getTxnID();
+        ozoneManagerClient.prepareOzoneManager(
+            PREPARE_FLUSH_WAIT_TIMEOUT_SECONDS, PREPARE_FLUSH_INTERVAL_SECONDS);
 
     // Make sure all OMs are prepared and all OMs still have their data.
     for (OzoneManager om: cluster.getOzoneManagersList()) {
-      // Leader should be prepared as soon as it returns response.
-      if (om == leader) {
-        checkPrepared(om, prepareRequestLogIndex);
-      } else {
-        waitAndCheckPrepared(om, prepareRequestLogIndex);
-      }
-
+      waitAndCheckPrepared(om, prepareRequestLogIndex);
       List<OmKeyInfo> keys = om.getMetadataManager().listKeys(volumeName,
           bucketName, null, keyPrefix, 100);
 
@@ -152,8 +136,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
    * Checks that third OM received all transactions and is prepared.
    * @throws Exception
    */
-  // TODO: Fix this test so it passes.
-  //   @Test
+//  @Test
   public void testPrepareDownedOM() throws Exception {
     // Index of the OM that will be shut down during this test.
     final int shutdownOMIndex = 2;
@@ -196,18 +179,14 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
       writtenKeys.add(keyName);
     }
 
-    // Submit prepare request via Ratis.
-    OzoneManager leaderOM = cluster.getOMLeader();
-    long prepareIndex = submitPrepareRequest(leaderOM.getOmRatisServer())
-            .getPrepareResponse()
-            .getTxnID();
+    OzoneManagerProtocol ozoneManagerClient =
+        ozClient.getObjectStore().getClientProxy().getOzoneManagerClient();
+    long prepareIndex = ozoneManagerClient.prepareOzoneManager(
+        PREPARE_FLUSH_WAIT_TIMEOUT_SECONDS, PREPARE_FLUSH_INTERVAL_SECONDS);
 
     // Check that the two live OMs are prepared.
     for (OzoneManager om: cluster.getOzoneManagersList()) {
-      if (om == leaderOM) {
-        // Leader should have been prepared after we got the response.
-        checkPrepared(om, prepareIndex);
-      } else if (om != downedOM) {
+      if (om != downedOM) {
         // Follower may still be applying transactions.
         waitAndCheckPrepared(om, prepareIndex);
       }
@@ -217,15 +196,11 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     // Since prepare was the last Ratis transaction, it should have all data
     // it missed once it receives the prepare transaction.
     cluster.restartOzoneManager(downedOM, true);
-    // Wait for other OMs to catch this one up on transactions.
-    LambdaTestUtils.await(timeoutMillis, 1000,
-        () -> downedOM.getRatisSnapshotIndex() == prepareIndex);
-    checkPrepared(downedOM, prepareIndex);
+    LambdaTestUtils.await(timeoutMillis, 2000,
+        () -> checkPrepared(downedOM, prepareIndex));
 
     // Make sure all OMs are prepared and still have data.
     for (OzoneManager om: cluster.getOzoneManagersList()) {
-      waitAndCheckPrepared(om, prepareIndex);
-
       List<OmKeyInfo> readKeys = om.getMetadataManager().listKeys(volumeName,
           bucketName, null, keyPrefix, 100);
 
@@ -266,61 +241,23 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     keyStream.close();
   }
 
-  private OMRequest buildPrepareRequest() {
-    PrepareRequest requestProto = PrepareRequest.newBuilder().build();
-
-    return OMRequest.newBuilder()
-        .setPrepareRequest(requestProto)
-        .setCmdType(Type.Prepare)
-        .setClientId(UUID.randomUUID().toString())
-        .build();
-  }
-
   private void waitAndCheckPrepared(OzoneManager om,
       long prepareRequestLogIndex) throws Exception {
     // Log files are deleted after the snapshot is taken,
     // So once log files have been deleted, OM should be prepared.
     LambdaTestUtils.await(timeoutMillis, 1000,
         () -> !logFilesPresentInRatisPeer(om));
-    checkPrepared(om, prepareRequestLogIndex);
+    Assert.assertTrue(checkPrepared(om, prepareRequestLogIndex));
   }
 
-  private void checkPrepared(OzoneManager om, long prepareRequestLogIndex)
+  private boolean checkPrepared(OzoneManager om, long prepareRequestLogIndex)
       throws Exception {
-    Assert.assertFalse(logFilesPresentInRatisPeer(om));
-
     // If no transactions have been persisted to the DB, transaction info
     // will be null, not zero.
     // This will cause a null pointer exception if we use
     // OzoneManager#getRatisSnapshotIndex to get the index from the DB.
     OMTransactionInfo txnInfo = om.getMetadataManager()
         .getTransactionInfoTable().get(TRANSACTION_INFO_KEY);
-    if (prepareRequestLogIndex == 0) {
-      Assert.assertNull(txnInfo);
-    } else {
-      Assert.assertEquals(txnInfo.getTransactionIndex(),
-          prepareRequestLogIndex);
-    }
-  }
-
-  private OMResponse submitPrepareRequest(OzoneManagerRatisServer server)
-      throws Exception {
-    PrepareRequest requestProto = PrepareRequest.newBuilder().build();
-
-    OMRequest omRequest = OMRequest.newBuilder()
-        .setPrepareRequest(requestProto)
-        .setCmdType(Type.Prepare)
-        .setClientId(UUID.randomUUID().toString())
-        .build();
-
-    RaftClientRequest raftClientRequest = new RaftClientRequest(
-        ClientId.randomId(),
-        server.getRaftPeerId(),
-        server.getRaftGroupId(),
-        0,
-        Message.valueOf(OMRatisHelper.convertRequestToByteString(omRequest)),
-        RaftClientRequest.writeRequestType(), null);
-
-    return server.submitRequest(omRequest, raftClientRequest);
+    return (txnInfo.getTransactionIndex() == prepareRequestLogIndex);
   }
 }

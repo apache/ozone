@@ -587,4 +587,19 @@ public interface OzoneManagerProtocol
     return false;
   }
 
+  /**
+   *
+   * @param txnApplyWaitTimeoutSeconds Max time in SECONDS to wait for all
+   *                                   transactions before the prepare request
+   *                                   to be applied to the OM DB.
+   * @param txnApplyCheckIntervalSeconds Time in SECONDS to wait between
+   *                                     successive checks for all transactions
+   *                                     to be applied to the OM DB.
+   * @return
+   */
+  default long prepareOzoneManager(
+      long txnApplyWaitTimeoutSeconds, long txnApplyCheckIntervalSeconds)
+      throws IOException {
+    return -1;
+  }
 }
