@@ -214,7 +214,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private PipelineChoosePolicy pipelineChoosePolicy;
 
   private HDDSLayoutVersionManager scmLayoutVersionManager;
-  private UpgradeFinalizer upgradeFinalizer;
+  private UpgradeFinalizer<StorageContainerManager> upgradeFinalizer;
 
   /**
    * Creates a new StorageContainerManager. Configuration will be

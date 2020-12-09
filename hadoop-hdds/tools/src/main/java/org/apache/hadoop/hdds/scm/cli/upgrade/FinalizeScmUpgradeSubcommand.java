@@ -18,6 +18,16 @@
 
 package org.apache.hadoop.hdds.scm.cli.upgrade;
 
+import static org.apache.hadoop.hdds.scm.cli.upgrade.FinalizeUpgradeCommandUtil.emitCancellationMsg;
+import static org.apache.hadoop.hdds.scm.cli.upgrade.FinalizeUpgradeCommandUtil.emitExitMsg;
+import static org.apache.hadoop.hdds.scm.cli.upgrade.FinalizeUpgradeCommandUtil.emitFinishedMsg;
+import static org.apache.hadoop.hdds.scm.cli.upgrade.FinalizeUpgradeCommandUtil.emitGeneralErrorMsg;
+import static org.apache.hadoop.hdds.scm.cli.upgrade.FinalizeUpgradeCommandUtil.handleInvalidRequestAfterInitiatingFinalization;
+import static org.apache.hadoop.hdds.scm.cli.upgrade.FinalizeUpgradeCommandUtil.isDone;
+import static org.apache.hadoop.hdds.scm.cli.upgrade.FinalizeUpgradeCommandUtil.isFinalized;
+import static org.apache.hadoop.hdds.scm.cli.upgrade.FinalizeUpgradeCommandUtil.isInprogress;
+import static org.apache.hadoop.hdds.scm.cli.upgrade.FinalizeUpgradeCommandUtil.isStarting;
+
 import java.io.IOException;
 import java.util.UUID;
 import java.util.concurrent.Callable;
@@ -40,7 +50,7 @@ import picocli.CommandLine;
  * Handler of Finalize SCM command.
  */
 @CommandLine.Command(
-    name = "FinalizeScm",
+    name = "finalizeupgrade",
     description = "Finalize SCM Upgrade",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)

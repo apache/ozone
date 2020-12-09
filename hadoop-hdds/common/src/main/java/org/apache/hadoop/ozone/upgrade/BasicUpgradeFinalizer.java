@@ -218,14 +218,15 @@ public class BasicUpgradeFinalizer<T, V extends AbstractLayoutVersionManager>
 
   protected void emitNOOPMsg(String feature) {
     String msg = "No finalization work defined for feature: " + feature + ".";
-    String msg2 = "Skipping.";
 
     logAndEmit(msg);
-    logAndEmit(msg2);
   }
 
   protected void emitStartingMsg() {
-    String msg = "Finalization started.";
+    String msg = "Finalization started.\n";
+    msg += "Existing pipelines and containers will be closed during Upgrade.\n";
+    msg += "New pipelines creation will remain frozen until Upgrade is " +
+        "finalized";
     logAndEmit(msg);
   }
 

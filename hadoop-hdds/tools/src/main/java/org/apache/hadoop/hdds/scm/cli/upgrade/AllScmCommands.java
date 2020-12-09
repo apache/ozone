@@ -33,15 +33,15 @@ import picocli.CommandLine.Spec;
  * Subcommand to group Upgrade related operations.
  */
 @Command(
-    name = "upgrade",
-    description = "Upgrade specific operations",
+    name = "scm",
+    description = "Storage Container Manager specific operations",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class,
     subcommands = {
         FinalizeScmUpgradeSubcommand.class,
     })
 @MetaInfServices(SubcommandWithParent.class)
-public class UpgradeCommands implements Callable<Void>, SubcommandWithParent {
+public class AllScmCommands implements Callable<Void>, SubcommandWithParent {
 
   @Spec
   private CommandSpec spec;

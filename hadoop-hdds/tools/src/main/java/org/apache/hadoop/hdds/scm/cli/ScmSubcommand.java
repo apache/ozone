@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdds.scm.cli;
 
-import org.apache.hadoop.hdds.scm.cli.upgrade.FinalizeUpgradeBaseCommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import picocli.CommandLine;
 
@@ -28,8 +27,7 @@ import java.util.concurrent.ExecutionException;
 /**
  * Base class for admin commands that connect via SCM client.
  */
-public abstract class ScmSubcommand extends FinalizeUpgradeBaseCommand
-    implements Callable<Void> {
+public abstract class ScmSubcommand implements Callable<Void> {
 
   @CommandLine.Mixin
   private ScmOption scmOption;
