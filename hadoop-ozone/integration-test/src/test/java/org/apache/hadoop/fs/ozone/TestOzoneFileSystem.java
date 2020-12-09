@@ -587,6 +587,9 @@ public class TestOzoneFileSystem {
    */
   protected void testListStatusOnLargeDirectory() throws Exception {
     Path root = new Path("/");
+    FileStatus[] fileStatuses = o3fs.listStatus(root);
+    assertEquals("Root shouldn't have any child!", 0,
+            fileStatuses.length);
     Set<String> paths = new TreeSet<>();
     int numDirs = 5111;
     for(int i = 0; i < numDirs; i++) {
@@ -596,7 +599,22 @@ public class TestOzoneFileSystem {
       rootItemCount++;
     }
 
-    FileStatus[] fileStatuses = o3fs.listStatus(root);
+    fileStatuses = o3fs.listStatus(root);
+    // Added logs for debugging failures, to check any sub-path mismatches.
+    Set<String> actualPaths = new TreeSet<>();
+    ArrayList<String> actualPathList = new ArrayList<>();
+    if (rootItemCount != fileStatuses.length) {
+      for (int i = 0; i < fileStatuses.length; i++) {
+        actualPaths.add(fileStatuses[i].getPath().getName());
+        actualPathList.add(fileStatuses[i].getPath().getName());
+      }
+      if (rootItemCount != actualPathList.size()) {
+        actualPaths.removeAll(paths);
+        actualPathList.removeAll(paths);
+        LOG.info("actualPaths:{}" + actualPaths);
+        LOG.info("actualPathList:{}" + actualPathList);
+      }
+    }
     assertEquals(
         "Total directories listed do not match the existing directories",
         rootItemCount, fileStatuses.length);

@@ -51,10 +51,6 @@ public class OMAllocateBlockResponseV1 extends OMAllocateBlockResponse {
     OMFileRequest.addToOpenFileTable(omMetadataManager, batchOperation,
             getOmKeyInfo(), getClientID());
 
-    // update volume usedBytes.
-    omMetadataManager.getVolumeTable().putWithBatch(batchOperation,
-            omMetadataManager.getVolumeKey(getOmVolumeArgs().getVolume()),
-            getOmVolumeArgs());
     // update bucket usedBytes.
     omMetadataManager.getBucketTable().putWithBatch(batchOperation,
             omMetadataManager.getBucketKey(getOmVolumeArgs().getVolume(),
