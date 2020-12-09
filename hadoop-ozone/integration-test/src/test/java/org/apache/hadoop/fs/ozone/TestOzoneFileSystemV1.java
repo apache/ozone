@@ -396,6 +396,9 @@ public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
     testSeekOnFileLength();
     deleteRootDir();
 
+    testAllocateMoreThanOneBlock();
+    deleteRootDir();
+
     testFileDelete();
     deleteRootDir();
 

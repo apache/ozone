@@ -4,7 +4,7 @@
  * distributed with this work for additional information
  * regarding copyright ownership.  The ASF licenses this file
  * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
+ * "License"); you may not use this file exgetOzoneConfigurationcept in compliance
  * with the License.  You may obtain a copy of the License at
  * <p>
  * http://www.apache.org/licenses/LICENSE-2.0
@@ -20,58 +20,56 @@ package org.apache.hadoop.ozone.om.response.key;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.util.Time;
 import org.jetbrains.annotations.NotNull;
-import org.junit.Assert;
+
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_LAYOUT_VERSION;
 
 /**
- * Tests OMKeyDeleteResponse layout version V1.
+ * Tests OMAllocateBlockResponse layout version V1.
  */
-public class TestOMKeyDeleteResponseV1 extends TestOMKeyDeleteResponse {
+public class TestOMAllocateBlockResponseV1
+        extends TestOMAllocateBlockResponse {
 
-  @Override
-  protected OMKeyDeleteResponse getOmKeyDeleteResponse(OmKeyInfo omKeyInfo,
-      OmVolumeArgs omVolumeArgs,
-      OzoneManagerProtocolProtos.OMResponse omResponse) {
-    return new OMKeyDeleteResponseV1(omResponse, omKeyInfo,
-            true, omVolumeArgs, getOmBucketInfo(), false);
-  }
+  // logical ID, which really doesn't exist in dirTable
+  private long parentID = 10;
+  private String fileName = "file1";
 
-  @Override
-  protected String addKeyToTable() throws Exception {
-    // Add volume, bucket and key entries to OM DB.
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-            omMetadataManager);
+  protected OmKeyInfo createOmKeyInfo() throws Exception {
+    // need to initialize parentID
+    String parentDir = keyName;
+    keyName = parentDir + OzoneConsts.OM_KEY_PREFIX + fileName;
 
-    // Create parent dirs for the path
-    long parentId = TestOMRequestUtils.addParentsToDirTable(volumeName,
-            bucketName, "", omMetadataManager);
+    long txnId = 50;
+    long objectId = parentID + 1;
 
-    OmKeyInfo omKeyInfo =
+    OmKeyInfo omKeyInfoV1 =
             TestOMRequestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
                     HddsProtos.ReplicationType.RATIS,
-                    HddsProtos.ReplicationFactor.ONE,
-                    parentId + 1,
-                    parentId, 100, Time.now());
-    TestOMRequestUtils.addFileToKeyTable(false, false,
-            keyName, omKeyInfo, -1, 50, omMetadataManager);
-    return omKeyInfo.getPath();
+                    HddsProtos.ReplicationFactor.ONE, objectId, parentID, txnId,
+                    Time.now());
+    return omKeyInfoV1;
   }
 
-  @Override
-  protected OmKeyInfo getOmKeyInfo() {
-    Assert.assertNotNull(getOmBucketInfo());
-    return TestOMRequestUtils.createOmKeyInfo(volumeName,
-            getOmBucketInfo().getBucketName(), keyName, replicationType,
-            replicationFactor,
-            getOmBucketInfo().getObjectID() + 1,
-            getOmBucketInfo().getObjectID(), 100, Time.now());
+  protected String getOpenKey() throws Exception {
+    return omMetadataManager.getOpenFileName(
+            parentID, fileName, clientID);
+  }
+
+  @NotNull
+  protected OMAllocateBlockResponse getOmAllocateBlockResponse(
+          OmKeyInfo omKeyInfo, OmVolumeArgs omVolumeArgs,
+          OmBucketInfo omBucketInfo, OMResponse omResponse) {
+    return new OMAllocateBlockResponseV1(omResponse, omKeyInfo, clientID,
+            omVolumeArgs, omBucketInfo);
   }
 
   @NotNull
@@ -84,4 +82,5 @@ public class TestOMKeyDeleteResponseV1 extends TestOMKeyDeleteResponse {
     OzoneManagerRatisUtils.setOmLayoutVersionV1(true);
     return config;
   }
+
 }

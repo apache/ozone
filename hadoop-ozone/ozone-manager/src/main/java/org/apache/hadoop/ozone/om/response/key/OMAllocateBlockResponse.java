@@ -77,4 +77,20 @@ public class OMAllocateBlockResponse extends OMClientResponse {
         omMetadataManager.getBucketKey(omVolumeArgs.getVolume(),
             omBucketInfo.getBucketName()), omBucketInfo);
   }
+
+  protected OmKeyInfo getOmKeyInfo() {
+    return omKeyInfo;
+  }
+
+  protected OmVolumeArgs getOmVolumeArgs() {
+    return omVolumeArgs;
+  }
+
+  protected OmBucketInfo getOmBucketInfo() {
+    return omBucketInfo;
+  }
+
+  protected long getClientID() {
+    return clientID;
+  }
 }
