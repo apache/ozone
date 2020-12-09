@@ -128,9 +128,10 @@ public final class StringToSignProducer {
     strToSign.append(hash(canonicalRequest));
     if (LOG.isDebugEnabled()) {
       LOG.debug("canonicalRequest:[{}]", canonicalRequest);
+      LOG.debug("StringToSign:[{}]", strToSign);
     }
 
-    LOG.debug("StringToSign:[{}]", strToSign);
+
     return strToSign.toString();
   }
 
