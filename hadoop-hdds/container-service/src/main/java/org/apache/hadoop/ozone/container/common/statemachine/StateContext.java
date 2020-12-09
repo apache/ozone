@@ -235,7 +235,9 @@ public class StateContext {
    * @param report report to be added
    */
   public void addReport(GeneratedMessage report) {
-    Preconditions.checkState(report != null);
+    if (report == null) {
+      return;
+    }
     final Descriptor descriptor = report.getDescriptorForType();
     Preconditions.checkState(descriptor != null);
     final String reportType = descriptor.getFullName();
