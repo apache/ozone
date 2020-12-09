@@ -137,6 +137,8 @@ public class BlockTokenVerifier implements TokenVerifier {
         throw new BlockTokenException("Block token with " + id
             + " doesn't have WRITE permission");
       }
+    } else {
+      throw new BlockTokenException("Block token does not support " + cmd);
     }
   }
 
