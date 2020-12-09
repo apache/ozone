@@ -81,14 +81,13 @@ public class BlockTokenVerifier implements TokenVerifier {
     OzoneBlockTokenIdentifier tokenId = new OzoneBlockTokenIdentifier();
     try {
       token.decodeFromUrlString(tokenStr);
-      if (LOGGER.isDebugEnabled()) {
-        LOGGER.debug("Verifying token:{} for user:{} ", token, user);
-      }
       ByteArrayInputStream buf = new ByteArrayInputStream(
           token.getIdentifier());
       DataInputStream in = new DataInputStream(buf);
       tokenId.readFields(in);
-
+      if (LOGGER.isDebugEnabled()) {
+        LOGGER.debug("Verifying token:{} for user:{} ", tokenId, user);
+      }
     } catch (IOException ex) {
       throw new BlockTokenException("Failed to decode token : " + tokenStr);
     }
