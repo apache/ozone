@@ -1,8 +1,18 @@
 package org.apache.hadoop.ozone.om;
 
+import org.apache.hadoop.hdds.server.ServerUtils;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerStateMachine;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+
+import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 
 public final class OzoneManagerPrepareState {
   private static boolean isPrepared;
@@ -43,5 +53,46 @@ public final class OzoneManagerPrepareState {
     }
 
     return requestAllowed;
+  }
+
+  /**
+   * Creates a prepare marker file inside {@code metadataDir} which contains
+   * the log index {@code index}. If a marker file already exists, it will be
+   * overwritten.
+   */
+  public static void writePrepareMarkerFile(File metadataDir, long index)
+      throws IOException {
+    File markerFile = new File(metadataDir, OzoneConsts.PREPARE_MARKER);
+    try(FileOutputStream stream =
+            new FileOutputStream(markerFile)) {
+      stream.write(Long.toString(index).getBytes());
+    }
+  }
+
+  /**
+   * If a prepare marker file exists in {@code metadataDir} and contains a
+   * log index matching {@code index}, the prepare state flag will be be
+   * turned on. Otherwise, the prepare state flag will be turned off.
+   */
+  public static void checkPrepareMarkerFile(File metadataDir, long index) {
+    File prepareMarkerFile = new File(metadataDir, OzoneConsts.PREPARE_MARKER);
+    if (prepareMarkerFile.exists()) {
+      byte[] data = new byte[(int) prepareMarkerFile.length()];
+      try(FileInputStream stream = new FileInputStream(prepareMarkerFile)) {
+        stream.read(data);
+      } catch (IOException e) {
+        setPrepared(false);
+      }
+
+      try {
+        long prepareMarkerIndex = Long.parseLong(new String(data));
+        setPrepared(index == prepareMarkerIndex);
+      } catch (NumberFormatException e) {
+        setPrepared(false);
+      }
+    } else {
+      // No marker file found.
+      OzoneManagerPrepareState.setPrepared(false);
+    }
   }
 }

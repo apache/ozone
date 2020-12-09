@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om;
 import javax.management.ObjectName;
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
@@ -79,6 +80,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient
 import org.apache.hadoop.hdds.security.x509.certificate.client.OMCertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
+import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.server.ServiceRuntimeInfoImpl;
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
@@ -221,6 +223,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_FILE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_TEMP_FILE;
 import static org.apache.hadoop.ozone.OzoneConsts.RPC_PORT;
+import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT;
@@ -400,7 +403,22 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           ResultCodes.OM_NOT_INITIALIZED);
     }
     omMetaDir = OMStorage.getOmDbDir(configuration);
-    this.isAclEnabled = conf.getBoolean(OZONE_ACL_ENABLED,
+
+    // If the prepare marker file is present and its index matches the last
+    // transaction index in the OM DB, turn on the in memory flag to
+    // put the ozone manager in prepare mode, disallowing write requests.
+    OMTransactionInfo txnInfo = metadataManager.getTransactionInfoTable()
+        .get(TRANSACTION_INFO_KEY);
+    if (txnInfo != null) {
+      OzoneManagerPrepareState.checkPrepareMarkerFile(omMetaDir,
+          txnInfo.getTransactionIndex());
+    } else {
+      // If we have no transaction info in the DB, then no prepare request
+      // could have been received.
+      OzoneManagerPrepareState.setPrepared(false);
+    }
+
+      this.isAclEnabled = conf.getBoolean(OZONE_ACL_ENABLED,
         OZONE_ACL_ENABLED_DEFAULT);
     this.scmBlockSize = (long) conf.getStorageSize(OZONE_SCM_BLOCK_SIZE,
         OZONE_SCM_BLOCK_SIZE_DEFAULT, StorageUnit.BYTES);
@@ -504,9 +522,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     ShutdownHookManager.get().addShutdownHook(shutdownHook,
         SHUTDOWN_HOOK_PRIORITY);
     omState = State.INITIALIZED;
-
-    // TODO: When marker file is added, check for that on startup to
-    //  determine prepare mode.
   }
 
   private void logVersionMismatch(OzoneConfiguration conf, ScmInfo scmInfo) {
