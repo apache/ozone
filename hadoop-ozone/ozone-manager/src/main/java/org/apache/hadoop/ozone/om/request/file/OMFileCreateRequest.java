@@ -166,6 +166,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
     String volumeName = keyArgs.getVolumeName();
     String bucketName = keyArgs.getBucketName();
     String keyName = keyArgs.getKeyName();
+    int numMissingParents = 0;
 
     // if isRecursive is true, file would be created even if parent
     // directories does not exist.
@@ -301,6 +302,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
 
       omBucketInfo.incrUsedBytes(preAllocatedSpace);
 
+      numMissingParents = missingParentInfos.size();
       // Prepare response
       omResponse.setCreateFileResponse(CreateFileResponse.newBuilder()
           .setKeyInfo(omKeyInfo.getProtobuf())
@@ -335,6 +337,9 @@ public class OMFileCreateRequest extends OMKeyRequest {
 
     switch (result) {
     case SUCCESS:
+      // Missing directories are created immediately, counting that here.
+      // The metric for the file is incremented as part of the file commit.
+      omMetrics.incNumKeys(numMissingParents);
       LOG.debug("File created. Volume:{}, Bucket:{}, Key:{}", volumeName,
           bucketName, keyName);
       break;
