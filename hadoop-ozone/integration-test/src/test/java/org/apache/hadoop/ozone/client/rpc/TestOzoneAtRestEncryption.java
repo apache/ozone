@@ -179,7 +179,7 @@ public class TestOzoneAtRestEncryption extends TestOzoneRpcClient {
 
       try (OzoneOutputStream out = bucket.createKey(keyName,
           value.getBytes(StandardCharsets.UTF_8).length,
-              ReplicationType.STAND_ALONE,
+          ReplicationType.STAND_ALONE,
           ReplicationFactor.ONE, new HashMap<>())) {
         out.write(value.getBytes(StandardCharsets.UTF_8));
       }
@@ -199,7 +199,7 @@ public class TestOzoneAtRestEncryption extends TestOzoneRpcClient {
           keyName, ReplicationType.STAND_ALONE,
           ReplicationFactor.ONE));
       Assert.assertEquals(value, new String(fileContent,
-              StandardCharsets.UTF_8));
+          StandardCharsets.UTF_8));
       Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
       Assert.assertFalse(key.getModificationTime().isBefore(testStartTime));
     }
@@ -239,7 +239,7 @@ public class TestOzoneAtRestEncryption extends TestOzoneRpcClient {
     keyMetadata.put(OzoneConsts.GDPR_FLAG, "true");
     try (OzoneOutputStream out = bucket.createKey(keyName,
         value.getBytes(StandardCharsets.UTF_8).length,
-            ReplicationType.STAND_ALONE,
+        ReplicationType.STAND_ALONE,
         ReplicationFactor.ONE, keyMetadata)) {
       out.write(value.getBytes(StandardCharsets.UTF_8));
     }

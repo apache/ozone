@@ -34,7 +34,8 @@ public class X509CertificateCodec implements Codec<X509Certificate> {
   @Override
   public byte[] toPersistedFormat(X509Certificate object) throws IOException {
     try {
-      return CertificateCodec.getPEMEncodedString(object).getBytes(StandardCharsets.UTF_8);
+      return CertificateCodec.getPEMEncodedString(object)
+          .getBytes(StandardCharsets.UTF_8);
     } catch (SCMSecurityException exp) {
       throw new IOException(exp);
     }

@@ -357,8 +357,8 @@ public class TestTarContainerPacker {
         Files.exists(dbFile));
 
     try (FileInputStream testFile = new FileInputStream(dbFile.toFile())) {
-      List<String> strings = IOUtils.readLines(testFile,
-          StandardCharsets.UTF_8);
+      List<String> strings = IOUtils
+          .readLines(testFile, StandardCharsets.UTF_8);
       Assert.assertEquals(1, strings.size());
       Assert.assertEquals(TEST_DB_FILE_CONTENT, strings.get(0));
     }
@@ -375,8 +375,8 @@ public class TestTarContainerPacker {
         Files.exists(chunkFile));
 
     try (FileInputStream testFile = new FileInputStream(chunkFile.toFile())) {
-      List<String> strings = IOUtils.readLines(testFile,
-         StandardCharsets.UTF_8);
+      List<String> strings = IOUtils
+          .readLines(testFile, StandardCharsets.UTF_8);
       Assert.assertEquals(1, strings.size());
       Assert.assertEquals(TEST_CHUNK_FILE_CONTENT, strings.get(0));
     }
