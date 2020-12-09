@@ -214,7 +214,7 @@ public class OMFileCreateRequestV1 extends OMFileCreateRequest {
           .setOpenVersion(openVersion).build())
           .setCmdType(Type.CreateFile);
       omClientResponse = new OMFileCreateResponseV1(omResponse.build(),
-              omFileInfo, missingParentInfos, clientID, omBucketInfo);
+              omFileInfo, missingParentInfos, clientID, omBucketInfo.copyObject());
 
       result = Result.SUCCESS;
     } catch (IOException ex) {

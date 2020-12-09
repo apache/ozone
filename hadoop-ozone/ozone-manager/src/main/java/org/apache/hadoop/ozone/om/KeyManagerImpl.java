@@ -2427,19 +2427,18 @@ public class KeyManagerImpl implements KeyManager {
       metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
               bucketName);
     }
+    List<OmKeyInfo> keyInfoList = new ArrayList<>(fileStatusList.size());
     for (OzoneFileStatus fileStatus : fileStatusList) {
       if (fileStatus.isFile()) {
-        // refreshPipeline flag check has been removed as part of
-        // https://issues.apache.org/jira/browse/HDDS-3658.
-        // Please refer this jira for more details.
-        refresh(fileStatus.getKeyInfo());
-
-        // No need to check if a key is deleted or not here, this is handled
-        // when adding entries to cacheKeyMap from DB.
-        if (args.getSortDatanodes()) {
-          sortDatanodes(clientAddress, fileStatus.getKeyInfo());
-        }
+        keyInfoList.add(fileStatus.getKeyInfo());
       }
+    }
+    // refreshPipeline flag check has been removed as part of
+    // https://issues.apache.org/jira/browse/HDDS-3658.
+    // Please refer this jira for more details.
+    refreshPipeline(keyInfoList);
+    if (args.getSortDatanodes()) {
+      sortDatanodes(clientAddress, keyInfoList.toArray(new OmKeyInfo[0]));
     }
     fileStatusFinalList.addAll(fileStatusList);
     return fileStatusFinalList;
