@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
@@ -29,10 +28,10 @@ import java.util.stream.Collectors;
  */
 public class OMUpdateEventBatch {
 
-  private List<OMDBUpdateEvent> events;
+  private final List<OMDBUpdateEvent> events;
 
-  public OMUpdateEventBatch(Collection<OMDBUpdateEvent> e) {
-    events = new ArrayList<>(e);
+  public OMUpdateEventBatch(List<OMDBUpdateEvent> e) {
+    events = e;
   }
 
   /**
