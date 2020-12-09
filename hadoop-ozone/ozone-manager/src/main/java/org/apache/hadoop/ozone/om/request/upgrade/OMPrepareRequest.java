@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.om.request.upgrade;
 
+import org.apache.hadoop.hdds.server.ServerUtils;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -42,6 +44,8 @@ import org.apache.ratis.statemachine.StateMachine;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
@@ -114,7 +118,13 @@ public class OMPrepareRequest extends OMClientRequest {
           flushTimeout, flushCheckInterval);
       takeSnapshotAndPurgeLogs(serverImpl);
 
-      // TODO: Create marker file with txn index.
+      // Save transaction log index to a marker file, so if the OM restarts,
+      // it will remain in prepare mode on that index as long as the file
+      // exists.
+      try(FileOutputStream stream =
+              new FileOutputStream(getPrepareFile(ozoneManager))){
+         stream.write(Long.toString(transactionLogIndex).getBytes());
+      }
 
       LOG.info("OM prepared at log index {}. Returning response {}",
           ozoneManager.getRatisSnapshotIndex(), omResponse);
@@ -130,6 +140,12 @@ public class OMPrepareRequest extends OMClientRequest {
     }
 
     return response;
+  }
+
+  private File getPrepareFile(OzoneManager ozoneManager) {
+    File metadataDir =
+        ServerUtils.getOzoneMetaDirPath(ozoneManager.getConfiguration());
+    return new File(metadataDir, OzoneConsts.PREPARE_MARKER);
   }
 
   /**
