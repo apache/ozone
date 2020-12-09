@@ -54,7 +54,8 @@ import java.util.Collection;
     versionProvider = HddsVersionProvider.class,
     subcommands = {
         FinalizeUpgradeSubCommand.class,
-        GetServiceRolesSubcommand.class
+        GetServiceRolesSubcommand.class,
+        PrepareSubCommand.class
     })
 @MetaInfServices(SubcommandWithParent.class)
 public class OMAdmin extends GenericCli implements SubcommandWithParent {

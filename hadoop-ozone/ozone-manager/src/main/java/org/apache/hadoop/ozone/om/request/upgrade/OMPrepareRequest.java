@@ -27,6 +27,7 @@ import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.upgrade.OMPrepareResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -57,14 +58,6 @@ public class OMPrepareRequest extends OMClientRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMPrepareRequest.class);
 
-  // Allow double buffer this many seconds to flush all transactions before
-  // returning an error to the caller.
-  private static final Duration DOUBLE_BUFFER_FLUSH_TIMEOUT =
-      Duration.of(5, ChronoUnit.MINUTES);
-  // Time between checks to see if double buffer finished flushing.
-  private static final Duration DOUBLE_BUFFER_FLUSH_CHECK_INTERVAL =
-      Duration.of(1, ChronoUnit.SECONDS);
-
   public OMPrepareRequest(OMRequest omRequest) {
     super(omRequest);
   }
@@ -76,10 +69,21 @@ public class OMPrepareRequest extends OMClientRequest {
 
     LOG.info("Received prepare request with log index {}", transactionLogIndex);
 
+    OMRequest omRequest = getOmRequest();
+    OzoneManagerProtocolProtos.PrepareRequestArgs args =
+        omRequest.getPrepareRequest().getArgs();
     OMResponse.Builder responseBuilder =
-        OmResponseUtil.getOMResponseBuilder(getOmRequest());
+        OmResponseUtil.getOMResponseBuilder(omRequest);
     responseBuilder.setCmdType(Type.Prepare);
     OMClientResponse response = null;
+
+    // Allow double buffer this many seconds to flush all transactions before
+    // returning an error to the caller.
+    Duration flushTimeout =
+        Duration.of(args.getTxnApplyWaitTimeoutSeconds(), ChronoUnit.SECONDS);
+    // Time between checks to see if double buffer finished flushing.
+    Duration flushCheckInterval =
+        Duration.of(args.getTxnApplyCheckIntervalSeconds(), ChronoUnit.SECONDS);
 
     try {
       // Create response.
@@ -106,7 +110,8 @@ public class OMPrepareRequest extends OMClientRequest {
       // already, once this index reaches the state machine, we know all
       // transactions have been flushed.
       waitForLogIndex(transactionLogIndex,
-          ozoneManager.getMetadataManager(), serverImpl);
+          ozoneManager.getMetadataManager(), serverImpl,
+          flushTimeout, flushCheckInterval);
       takeSnapshotAndPurgeLogs(serverImpl);
 
       // TODO: Create marker file with txn index.
@@ -132,11 +137,11 @@ public class OMPrepareRequest extends OMClientRequest {
    * disk, and to be updated in memory in Ratis.
    */
   private static void waitForLogIndex(long indexToWaitFor,
-      OMMetadataManager metadataManager, RaftServerImpl server)
+      OMMetadataManager metadataManager, RaftServerImpl server,
+      Duration flushTimeout, Duration flushCheckInterval)
       throws InterruptedException, IOException {
 
-    long endTime = System.currentTimeMillis() +
-        DOUBLE_BUFFER_FLUSH_TIMEOUT.toMillis();
+    long endTime = System.currentTimeMillis() + flushTimeout.toMillis();
     boolean success = false;
 
     while (!success && System.currentTimeMillis() < endTime) {
@@ -163,7 +168,7 @@ public class OMPrepareRequest extends OMClientRequest {
       }
 
       if (!success) {
-        Thread.sleep(DOUBLE_BUFFER_FLUSH_CHECK_INTERVAL.toMillis());
+        Thread.sleep(flushCheckInterval.toMillis());
       }
     }
 
@@ -173,7 +178,7 @@ public class OMPrepareRequest extends OMClientRequest {
     if (!success) {
       throw new IOException(String.format("After waiting for %d seconds, " +
               "State Machine has not applied  all the transactions.",
-          DOUBLE_BUFFER_FLUSH_TIMEOUT.toMillis() * 1000));
+          flushTimeout.getSeconds()));
     }
   }
 

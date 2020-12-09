@@ -1547,6 +1547,33 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     return recoverResponse.getResponse();
   }
 
+  @Override
+  public long prepareOzoneManager(
+      long txnApplyWaitTimeoutSeconds, long txnApplyCheckIntervalSeconds)
+      throws IOException {
+    Preconditions.checkArgument(txnApplyWaitTimeoutSeconds > 0,
+        "txnApplyWaitTimeoutSeconds has to be > zero");
+
+    Preconditions.checkArgument(txnApplyCheckIntervalSeconds > 0 &&
+            txnApplyCheckIntervalSeconds < txnApplyWaitTimeoutSeconds / 2,
+        "txnApplyCheckIntervalSeconds has to be > zero and < half "
+            + "of txnApplyWaitTimeoutSeconds to make sense.");
+
+    PrepareRequest prepareRequest =
+        PrepareRequest.newBuilder().setArgs(
+            PrepareRequestArgs.newBuilder()
+                .setTxnApplyWaitTimeoutSeconds(txnApplyWaitTimeoutSeconds)
+                .setTxnApplyCheckIntervalSeconds(txnApplyCheckIntervalSeconds)
+                .build()).build();
+
+    OMRequest omRequest = createOMRequest(Type.Prepare)
+        .setPrepareRequest(prepareRequest).build();
+
+    PrepareResponse prepareResponse =
+        handleError(submitRequest(omRequest)).getPrepareResponse();
+    return prepareResponse.getTxnID();
+  }
+
   @VisibleForTesting
   public OmTransport getTransport() {
     return transport;
