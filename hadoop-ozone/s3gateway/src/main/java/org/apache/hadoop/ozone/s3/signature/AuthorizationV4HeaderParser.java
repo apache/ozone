@@ -69,7 +69,7 @@ public class AuthorizationV4HeaderParser implements SignatureParser {
   @SuppressWarnings("StringSplitter")
   @Override
   public SignatureInfo parseSignature() throws OS3Exception {
-    if (authHeader == null || !authHeader.startsWith("AWS4 ")) {
+    if (authHeader == null || !authHeader.startsWith("AWS4")) {
       return null;
     }
     int firstSep = authHeader.indexOf(' ');

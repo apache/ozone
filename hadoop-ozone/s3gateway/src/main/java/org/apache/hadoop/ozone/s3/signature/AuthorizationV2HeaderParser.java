@@ -44,7 +44,7 @@ public class AuthorizationV2HeaderParser implements SignatureParser {
    */
   @Override
   public SignatureInfo parseSignature() throws OS3Exception {
-    if (authHeader == null || !authHeader.startsWith(IDENTIFIER)) {
+    if (authHeader == null || !authHeader.startsWith(IDENTIFIER + " ")) {
       return null;
     }
     String[] split = authHeader.split(" ");
