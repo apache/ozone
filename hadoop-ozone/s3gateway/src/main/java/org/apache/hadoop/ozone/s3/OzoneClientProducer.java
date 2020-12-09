@@ -140,7 +140,7 @@ public class OzoneClientProducer {
       // For any other critical errors during object creation throw Internal
       // error.
       if (LOG.isDebugEnabled()) {
-        LOG.error("Error during Client Creation: ", t);
+        LOG.debug("Error during Client Creation: ", t);
       }
       throw INTERNAL_ERROR;
     }
