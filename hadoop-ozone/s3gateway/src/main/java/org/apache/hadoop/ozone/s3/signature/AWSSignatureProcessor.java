@@ -89,12 +89,10 @@ public class AWSSignatureProcessor implements SignatureProcessor {
    */
   public static class LowerCaseKeyStringMap implements Map<String, String> {
 
-    private HashMap<String, String> delegate;
+    private Map<String, String> delegate;
 
-    public LowerCaseKeyStringMap(
-        HashMap<String, String> delegate
-    ) {
-      this.delegate = delegate;
+    public LowerCaseKeyStringMap() {
+      this.delegate = new HashMap<>();
     }
 
     public static LowerCaseKeyStringMap fromHeaderMap(
@@ -105,7 +103,7 @@ public class AWSSignatureProcessor implements SignatureProcessor {
       //header map is MUTABLE. It's better to save it here. (with lower case
       // keys!!!)
       final LowerCaseKeyStringMap headers =
-          new LowerCaseKeyStringMap(new HashMap<>());
+          new LowerCaseKeyStringMap();
 
       for (Entry<String, List<String>> headerEntry : rawHeaders.entrySet()) {
         if (0 < headerEntry.getValue().size()) {
@@ -120,18 +118,23 @@ public class AWSSignatureProcessor implements SignatureProcessor {
         }
       }
 
-      //in case of the HeaderPreprocessor executed before us, let's restore the
-      // original content type.
-      if (headers.containsKey(HeaderPreprocessor.ORIGINAL_CONTENT_TYPE)) {
-        headers.put(HeaderPreprocessor.CONTENT_TYPE,
-            headers.get(HeaderPreprocessor.ORIGINAL_CONTENT_TYPE));
-      }
+      headers.fixContentType();
 
       if (LOG.isTraceEnabled()) {
         headers.keySet().forEach(k -> LOG.trace("Header:{},value:{}", k,
             headers.get(k)));
       }
       return headers;
+    }
+
+    @VisibleForTesting
+    protected void fixContentType() {
+      //in case of the HeaderPreprocessor executed before us, let's restore the
+      // original content type.
+      if (containsKey(HeaderPreprocessor.ORIGINAL_CONTENT_TYPE)) {
+        put(HeaderPreprocessor.CONTENT_TYPE,
+            get(HeaderPreprocessor.ORIGINAL_CONTENT_TYPE));
+      }
     }
 
     @Override

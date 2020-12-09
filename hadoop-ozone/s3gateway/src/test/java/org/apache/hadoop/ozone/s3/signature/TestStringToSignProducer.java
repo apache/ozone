@@ -17,31 +17,31 @@
  */
 package org.apache.hadoop.ozone.s3.signature;
 
-import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
-import javax.ws.rs.core.UriInfo;
-import java.net.URI;
 
 import org.apache.hadoop.ozone.s3.HeaderPreprocessor;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.signature.AWSSignatureProcessor.LowerCaseKeyStringMap;
 
 import org.junit.Assert;
 import org.junit.Test;
-import org.mockito.Mockito;
 
+/**
+ * Test string2sign creation.
+ */
 public class TestStringToSignProducer {
 
   @Test
   public void test() throws Exception {
 
-    MultivaluedMap<String, String> headers = new MultivaluedHashMap<>();
-    headers.putSingle("Content-Length", "123");
-    headers.putSingle("Host", "0.0.0.0:9878");
-    headers.putSingle("X-AMZ-Content-Sha256", "Content-SHA");
-    headers.putSingle("X-AMZ-Date", "123");
-    headers.putSingle("Content-Type", "ozone/mpu");
-    headers.putSingle(HeaderPreprocessor.ORIGINAL_CONTENT_TYPE, "streaming");
+    LowerCaseKeyStringMap headers = new LowerCaseKeyStringMap();
+    headers.put("Content-Length", "123");
+    headers.put("Host", "0.0.0.0:9878");
+    headers.put("X-AMZ-Content-Sha256", "Content-SHA");
+    headers.put("X-AMZ-Date", "123");
+    headers.put("Content-Type", "ozone/mpu");
+    headers.put(HeaderPreprocessor.ORIGINAL_CONTENT_TYPE, "streaming");
 
     String authHeader =
         "AWS4-HMAC-SHA256 Credential=AKIAJWFJK62WUTKNFJJA/20181009/us-east-1"
@@ -52,21 +52,10 @@ public class TestStringToSignProducer {
             +
             "=db81b057718d7c1b3b8dffa29933099551c51d787b3b13b9e0f9ebed45982bf2";
 
-    headers.putSingle("Authorization",
+    headers.put("Authorization",
         authHeader);
 
     MultivaluedMap<String, String> queryParameters = new MultivaluedHashMap<>();
-
-    UriInfo uriInfo = Mockito.mock(UriInfo.class);
-    Mockito.when(uriInfo.getQueryParameters()).thenReturn(queryParameters);
-    Mockito.when(uriInfo.getRequestUri())
-        .thenReturn(new URI("http://localhost/buckets"));
-
-    ContainerRequestContext context =
-        Mockito.mock(ContainerRequestContext.class);
-    Mockito.when(context.getHeaders()).thenReturn(headers);
-    Mockito.when(context.getMethod()).thenReturn("GET");
-    Mockito.when(context.getUriInfo()).thenReturn(uriInfo);
 
     final SignatureInfo signatureInfo =
         new AuthorizationV4HeaderParser(authHeader) {
@@ -77,8 +66,16 @@ public class TestStringToSignProducer {
           }
         }.parseSignature();
 
+    headers.fixContentType();
+
     final String signatureBase =
-        StringToSignProducer.createSignatureBase(signatureInfo, context);
+        StringToSignProducer.createSignatureBase(
+            signatureInfo,
+            "http",
+            "GET",
+            "/buckets",
+            headers,
+            queryParameters);
 
     Assert.assertEquals(
         "String to sign is invalid",

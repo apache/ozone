@@ -87,12 +87,13 @@ public final class StringToSignProducer {
         context.getUriInfo().getQueryParameters());
   }
 
+  @VisibleForTesting
   public static String createSignatureBase(
       SignatureInfo signatureInfo,
       String scheme,
       String method,
       String uri,
-      Map<String, String> headers,
+      LowerCaseKeyStringMap headers,
       MultivaluedMap<String, String> queryParams
   ) throws Exception {
     StringBuilder strToSign = new StringBuilder();
