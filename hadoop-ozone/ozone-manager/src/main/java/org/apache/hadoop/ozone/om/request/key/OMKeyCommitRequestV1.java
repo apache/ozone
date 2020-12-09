@@ -170,7 +170,8 @@ public class OMKeyCommitRequestV1 extends OMKeyCommitRequest {
       omBucketInfo.incrUsedBytes(correctedSpace);
 
       omClientResponse = new OMKeyCommitResponseV1(omResponse.build(),
-              omKeyInfo, dbFileKey, dbOpenFileKey, omVolumeArgs, omBucketInfo);
+              omKeyInfo, dbFileKey, dbOpenFileKey, omVolumeArgs,
+              omBucketInfo.copyObject());
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
