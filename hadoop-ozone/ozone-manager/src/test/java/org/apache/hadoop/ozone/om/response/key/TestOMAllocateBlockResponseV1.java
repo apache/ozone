@@ -4,7 +4,7 @@
  * distributed with this work for additional information
  * regarding copyright ownership.  The ASF licenses this file
  * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file exgetOzoneConfigurationcept in compliance
+ * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  * <p>
  * http://www.apache.org/licenses/LICENSE-2.0
@@ -30,8 +30,6 @@ import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.util.Time;
 import org.jetbrains.annotations.NotNull;
-
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_LAYOUT_VERSION;
 
 /**
  * Tests OMAllocateBlockResponse layout version V1.

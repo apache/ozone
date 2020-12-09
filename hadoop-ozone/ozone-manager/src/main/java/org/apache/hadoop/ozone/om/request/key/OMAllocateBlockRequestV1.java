@@ -58,7 +58,7 @@ public class OMAllocateBlockRequestV1 extends OMAllocateBlockRequest {
   }
 
   protected String getOpenKeyName(String volumeName, String bucketName,
-                                  String keyName, long clientID, OzoneManager ozoneManager)
+      String keyName, long clientID, OzoneManager ozoneManager)
           throws IOException {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
