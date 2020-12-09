@@ -147,7 +147,9 @@ public class SCMCertStore implements CertificateStore {
         // CN=FQDN/user=root/role=datanode/...
         results.add(cert);
       } catch (IOException e) {
-        LOG.error("Fail to get certificate from SCM metadata store", e);
+        LOG.error("Fail to list certificate from SCM metadata store", e);
+        throw new SCMSecurityException(
+            "Fail to list certificate from SCM metadata store.");
       }
     }
     return results;

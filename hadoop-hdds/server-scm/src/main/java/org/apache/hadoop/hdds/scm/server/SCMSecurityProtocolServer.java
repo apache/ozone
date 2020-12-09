@@ -216,7 +216,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
         String certStr = CertificateCodec.getPEMEncodedString(cert);
         results.add(certStr);
       } catch (SCMSecurityException e) {
-        LOGGER.error("listCertificate fail to encode certificate.", e);
+        throw new IOException("listCertificate operation failed. ", e);
       }
     }
     return results;
