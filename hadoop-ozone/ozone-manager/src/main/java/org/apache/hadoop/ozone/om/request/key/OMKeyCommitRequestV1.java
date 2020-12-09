@@ -169,11 +169,11 @@ public class OMKeyCommitRequestV1 extends OMKeyCommitRequest {
       // be subtracted.
       long correctedSpace = omKeyInfo.getDataSize() * factor -
               locationInfoList.size() * scmBlockSize * factor;
-      omVolumeArgs.getUsedBytes().add(correctedSpace);
-      omBucketInfo.getUsedBytes().add(correctedSpace);
+      omBucketInfo.incrUsedBytes(correctedSpace);
 
       omClientResponse = new OMKeyCommitResponseV1(omResponse.build(),
-              omKeyInfo, dbFileKey, dbOpenFileKey, omVolumeArgs, omBucketInfo);
+              omKeyInfo, dbFileKey, dbOpenFileKey, omVolumeArgs,
+              omBucketInfo.copyObject());
 
       result = Result.SUCCESS;
     } catch (IOException ex) {

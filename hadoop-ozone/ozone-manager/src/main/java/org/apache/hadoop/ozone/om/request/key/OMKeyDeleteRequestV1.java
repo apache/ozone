@@ -148,10 +148,9 @@ public class OMKeyDeleteRequestV1 extends OMKeyDeleteRequest {
       omVolumeArgs = getVolumeInfo(omMetadataManager, volumeName);
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
 
+      // TODO: HDDS-4565: consider all the sub-paths if the path is a dir.
       long quotaReleased = sumBlockLengths(omKeyInfo);
-      // update usedBytes atomically.
-      omVolumeArgs.getUsedBytes().add(-quotaReleased);
-      omBucketInfo.getUsedBytes().add(-quotaReleased);
+      omBucketInfo.incrUsedBytes(-quotaReleased);
 
       // No need to add cache entries to delete table. As delete table will
       // be used by DeleteKeyService only, not used for any client response
@@ -161,7 +160,7 @@ public class OMKeyDeleteRequestV1 extends OMKeyDeleteRequest {
       omClientResponse = new OMKeyDeleteResponseV1(omResponse
           .setDeleteKeyResponse(DeleteKeyResponse.newBuilder()).build(),
           omKeyInfo, ozoneManager.isRatisEnabled(), omVolumeArgs,
-          omBucketInfo, keyStatus.isDirectory());
+          omBucketInfo.copyObject(), keyStatus.isDirectory());
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
