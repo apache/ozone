@@ -295,6 +295,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
 
     switch (result) {
     case SUCCESS:
+      // Count for the missing parents plus the directory being created.
       omMetrics.incNumKeys(numMissingParents + 1);
       if (LOG.isDebugEnabled()) {
         LOG.debug("Directory created. Volume:{}, Bucket:{}, Key:{}",

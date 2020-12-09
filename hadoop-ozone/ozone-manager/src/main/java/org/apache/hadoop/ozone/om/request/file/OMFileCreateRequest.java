@@ -338,6 +338,8 @@ public class OMFileCreateRequest extends OMKeyRequest {
 
     switch (result) {
     case SUCCESS:
+      // Missing directories are created immediately, counting that here.
+      // The metric for the file is incremented as part of the file commit.
       omMetrics.incNumKeys(numMissingParents);
       LOG.debug("File created. Volume:{}, Bucket:{}, Key:{}", volumeName,
           bucketName, keyName);

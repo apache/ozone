@@ -346,6 +346,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
     switch (result) {
     case SUCCESS:
+      // Missing directories are created immediately, counting that here.
+      // The metric for the key is incremented as part of the key commit.
       omMetrics.incNumKeys(numMissingParents);
       LOG.debug("Key created. Volume:{}, Bucket:{}, Key:{}", volumeName,
           bucketName, keyName);
