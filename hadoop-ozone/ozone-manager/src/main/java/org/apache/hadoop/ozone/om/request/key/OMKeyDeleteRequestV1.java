@@ -147,6 +147,7 @@ public class OMKeyDeleteRequestV1 extends OMKeyDeleteRequest {
 
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
 
+      // TODO: HDDS-4565: consider all the sub-paths if the path is a dir.
       long quotaReleased = sumBlockLengths(omKeyInfo);
       omBucketInfo.incrUsedBytes(-quotaReleased);
       omBucketInfo.incrUsedNamespace(-1L);
@@ -157,9 +158,9 @@ public class OMKeyDeleteRequestV1 extends OMKeyDeleteRequest {
       // TODO: Revisit if we need it later.
 
       omClientResponse = new OMKeyDeleteResponseV1(omResponse
-          .setDeleteKeyResponse(DeleteKeyResponse.newBuilder()).build(),
-          omKeyInfo, ozoneManager.isRatisEnabled(),
-          omBucketInfo, keyStatus.isDirectory());
+              .setDeleteKeyResponse(DeleteKeyResponse.newBuilder()).build(),
+              omKeyInfo, ozoneManager.isRatisEnabled(),
+              omBucketInfo.copyObject(), keyStatus.isDirectory());
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
