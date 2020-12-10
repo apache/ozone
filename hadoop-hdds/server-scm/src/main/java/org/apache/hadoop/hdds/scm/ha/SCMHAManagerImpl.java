@@ -48,16 +48,17 @@ public class SCMHAManagerImpl implements SCMHAManager {
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMHAManagerImpl.class);
 
-  private final SCMRatisServer ratisServer;
+  private SCMRatisServer ratisServer;
   private final ConfigurationSource conf;
 
   /**
    * Creates SCMHAManager instance.
    */
-  public SCMHAManagerImpl(final ConfigurationSource conf) throws IOException {
+  public SCMHAManagerImpl(final ConfigurationSource conf,
+      final SCMNodeDetails scmNodeDetails) throws IOException {
     this.conf = conf;
     this.ratisServer = new SCMRatisServerImpl(
-        conf.getObject(SCMHAConfiguration.class), conf);
+        conf.getObject(SCMHAConfiguration.class), conf, scmNodeDetails);
   }
 
   /**

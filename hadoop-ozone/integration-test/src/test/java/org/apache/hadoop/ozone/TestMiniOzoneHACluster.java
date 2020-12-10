@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -50,8 +51,10 @@ public class TestMiniOzoneHACluster {
   private OzoneConfiguration conf;
   private String clusterId;
   private String scmId;
+  private String scmServiceId;
   private String omServiceId;
   private int numOfOMs = 3;
+  private int numOfSCMs = 3;
 
   @Rule
   public ExpectedException exception = ExpectedException.none();
@@ -70,6 +73,7 @@ public class TestMiniOzoneHACluster {
     clusterId = UUID.randomUUID().toString();
     scmId = UUID.randomUUID().toString();
     omServiceId = "omServiceId1";
+    scmServiceId = "scmServiceId2";
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     conf.set(OzoneConfigKeys.OZONE_ADMINISTRATORS,
         OZONE_ADMINISTRATORS_WILDCARD);
@@ -77,8 +81,10 @@ public class TestMiniOzoneHACluster {
     cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
         .setClusterId(clusterId)
         .setScmId(scmId)
+        .setSCMServiceId(scmServiceId)
         .setOMServiceId(omServiceId)
         .setNumOfOzoneManagers(numOfOMs)
+        .setNumOfStorageContainerManagers(numOfSCMs)
         .build();
     cluster.waitForClusterToBeReady();
     objectStore = OzoneClientFactory.getRpcClient(omServiceId, conf)
@@ -108,5 +114,20 @@ public class TestMiniOzoneHACluster {
             + "no leader or more than one leader.", ozoneManager);
     Assert.assertTrue("Should have gotten the leader!",
         ozoneManager.get().isLeader());
+  }
+
+  @Test
+  public void testGetSCMLeader() throws InterruptedException, TimeoutException {
+    AtomicReference<StorageContainerManager> scm = new AtomicReference<>();
+    // Wait for OM leader election to finish
+    GenericTestUtils.waitFor(() -> {
+      StorageContainerManager s = cluster.getSCMLeader();
+      scm.set(s);
+      return s != null;
+    }, 100, 120000);
+    Assert.assertNotNull("Timed out waiting SCM leader election to finish: "
+            + "no leader or more than one leader.", scm);
+    Assert.assertTrue("Should have gotten the leader!",
+            scm.get().checkLeader());
   }
 }

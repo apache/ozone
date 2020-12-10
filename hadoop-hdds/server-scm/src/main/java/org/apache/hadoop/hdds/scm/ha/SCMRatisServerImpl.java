@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.ratis.conf.RaftProperties;
+import org.apache.ratis.grpc.GrpcConfigKeys;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.RaftClientReply;
 import org.apache.ratis.protocol.RaftClientRequest;
@@ -65,17 +66,27 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   // TODO: Refactor and remove ConfigurationSource and use only
   //  SCMHAConfiguration.
   SCMRatisServerImpl(final SCMHAConfiguration haConf,
-                     final ConfigurationSource conf)
+                     final ConfigurationSource conf,
+                     final SCMNodeDetails scmNodeDetails)
       throws IOException {
     this.address = haConf.getRatisBindAddress();
 
-    SCMHAGroupBuilder scmHAGroupBuilder = new SCMHAGroupBuilder(haConf, conf);
-    this.raftPeerId = scmHAGroupBuilder.getPeerId();
-    this.raftGroupId = scmHAGroupBuilder.getRaftGroupId();
-    this.raftGroup = scmHAGroupBuilder.getRaftGroup();
+    RaftProperties serverProperties = RatisUtil.newRaftProperties(haConf, conf);
+    if (scmNodeDetails != null) {
+      this.raftPeerId = scmNodeDetails.getSelfPeerId();
+      this.raftGroupId = scmNodeDetails.getRaftGroupId();
+      this.raftGroup = scmNodeDetails.getRaftGroup();
+      GrpcConfigKeys.Server.setPort(serverProperties,
+              scmNodeDetails.getRatisPort());
+    } else {
+      SCMHAGroupBuilder scmHAGroupBuilder = new SCMHAGroupBuilder(haConf, conf);
+      this.raftPeerId = scmHAGroupBuilder.getPeerId();
+      this.raftGroupId = scmHAGroupBuilder.getRaftGroupId();
+      this.raftGroup = scmHAGroupBuilder.getRaftGroup();
+      GrpcConfigKeys.Server.setPort(serverProperties,
+              scmHAGroupBuilder.getAddress().getPort());
+    }
 
-    final RaftProperties serverProperties = RatisUtil
-        .newRaftProperties(haConf, conf);
     this.scmStateMachine = new SCMStateMachine();
     this.server = RaftServer.newBuilder()
         .setServerId(raftPeerId)
@@ -151,11 +162,13 @@ public class SCMRatisServerImpl implements SCMRatisServer {
    * ozone.scm.ha.ratis.bind.port.
    */
   private static class SCMHAGroupBuilder {
-    private final static String SCM_SERVICE_ID = "SCM-HA-Service";
+    private String SCM_SERVICE_ID = "SCM-HA-Service";
 
     private final RaftGroupId raftGroupId;
     private final RaftGroup raftGroup;
     private RaftPeerId selfPeerId;
+    private final InetSocketAddress address;
+    private final RaftProperties raftProperties;
 
     /**
      * @return raft group
@@ -176,6 +189,14 @@ public class SCMRatisServerImpl implements SCMRatisServer {
      */
     public RaftPeerId getPeerId() {
       return selfPeerId;
+    }
+
+    public InetSocketAddress getAddress() {
+      return address;
+    }
+
+    public RaftProperties getRaftProperties() {
+      return raftProperties;
     }
 
     SCMHAGroupBuilder(final SCMHAConfiguration haConf,
@@ -223,6 +244,9 @@ public class SCMRatisServerImpl implements SCMRatisServer {
           SCM_SERVICE_ID.getBytes(StandardCharsets.UTF_8)));
 
       raftGroup = RaftGroup.valueOf(raftGroupId, raftPeers);
+
+      this.address = haConf.getRatisBindAddress();
+      this.raftProperties = RatisUtil.newRaftProperties(haConf, conf);
     }
   }
 }

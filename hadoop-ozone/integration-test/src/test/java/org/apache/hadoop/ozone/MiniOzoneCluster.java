@@ -281,8 +281,10 @@ public interface MiniOzoneCluster {
 
     protected String clusterId;
     protected String omServiceId;
+    protected String scmServiceId;
     protected int numOfOMs;
     protected int numOfActiveOMs = ACTIVE_OMS_NOT_SET;
+    protected int numOfSCMs;
 
     protected Optional<Boolean> enableTrace = Optional.of(false);
     protected Optional<Integer> hbInterval = Optional.empty();
@@ -520,6 +522,16 @@ public interface MiniOzoneCluster {
 
     public Builder includeRecon(boolean include) {
       this.includeRecon = include;
+      return this;
+    }
+
+    public Builder setSCMServiceId(String scmServiceId) {
+      this.scmServiceId = scmServiceId;
+      return this;
+    }
+
+    public Builder setNumOfStorageContainerManagers(int numSCMs) {
+      this.numOfSCMs = numSCMs;
       return this;
     }
 

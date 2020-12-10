@@ -101,7 +101,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   private ReconServer reconServer;
 
   // Timeout for the cluster to be ready
-  private int waitForClusterToBeReadyTimeout = 120000; // 2 min
+  protected int waitForClusterToBeReadyTimeout = 120000; // 2 min
   private CertificateClient caClient;
 
   /**
@@ -136,7 +136,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     this.reconServer = reconServer;
   }
 
-  /**
+  /**`
    * Creates a new MiniOzoneCluster without the OzoneManager. This is used by
    * {@link MiniOzoneHAClusterImpl} for starting multiple OzoneManagers.
    *
@@ -151,6 +151,14 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     this.hddsDatanodes = hddsDatanodes;
     this.reconServer = reconServer;
   }
+
+  MiniOzoneClusterImpl(OzoneConfiguration conf, List<HddsDatanodeService> hddsDatanodes,
+                       ReconServer reconServer) {
+    this.conf = conf;
+    this.hddsDatanodes = hddsDatanodes;
+    this.reconServer = reconServer;
+  }
+
 
   public OzoneConfiguration getConf() {
     return conf;

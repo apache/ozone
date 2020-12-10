@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionResponseProto;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.PipelineReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ReportFromDatanode;
@@ -135,8 +136,12 @@ public class SCMDatanodeProtocolServer implements
     heartbeatDispatcher = new SCMDatanodeHeartbeatDispatcher(
         scm.getScmNodeManager(), eventPublisher);
 
-    InetSocketAddress datanodeRpcAddr = getDataNodeBindAddress(conf);
-
+    InetSocketAddress datanodeRpcAddr;
+    if (conf.getBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, ScmConfigKeys.OZONE_SCM_HA_ENABLE_DEFAULT)) {
+      datanodeRpcAddr = scm.getSCMNodeDetails().getDatanodeProtocolServerAddress();
+    } else {
+      datanodeRpcAddr = getDataNodeBindAddress(conf);
+    }
     protocolMessageMetrics = getProtocolMessageMetrics();
 
     final int handlerCount = conf.getInt(OZONE_SCM_HANDLER_COUNT_KEY,

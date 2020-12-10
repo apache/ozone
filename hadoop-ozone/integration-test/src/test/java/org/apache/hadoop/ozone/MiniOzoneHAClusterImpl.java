@@ -23,11 +23,16 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.ScmUtils;
+import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
+import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
+import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -39,14 +44,12 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.BindException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
+import java.util.*;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 
 /**
  * MiniOzoneHAClusterImpl creates a complete in-process Ozone cluster
@@ -65,6 +68,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
   // Active OMs denote OMs which are up and running
   private List<OzoneManager> activeOMs;
   private List<OzoneManager> inactiveOMs;
+  private List<StorageContainerManager> storageContainerManagers;
 
   private int waitForOMToBeReadyTimeout = 120000; // 2 min
 
@@ -82,11 +86,11 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       OzoneConfiguration conf,
       List<OzoneManager> activeOMList,
       List<OzoneManager> inactiveOMList,
-      StorageContainerManager scm,
+      List<StorageContainerManager> scms,
       List<HddsDatanodeService> hddsDatanodes,
       String omServiceId,
       ReconServer reconServer) {
-    super(conf, scm, hddsDatanodes, reconServer);
+    super(conf, hddsDatanodes, reconServer);
 
     this.ozoneManagerMap = Maps.newHashMap();
     if (activeOMList != null) {
@@ -102,6 +106,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     this.ozoneManagers = new ArrayList<>(ozoneManagerMap.values());
     this.activeOMs = activeOMList;
     this.inactiveOMs = inactiveOMList;
+    this.storageContainerManagers = scms;
     this.omServiceId = omServiceId;
 
     // If the serviceID is null, then this should be a non-HA cluster.
@@ -120,7 +125,27 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       StorageContainerManager scm,
       List<HddsDatanodeService> hddsDatanodes,
       String omServiceId) {
-    this(conf, omList, null, scm, hddsDatanodes, omServiceId, null);
+    this(conf, omList, null, Arrays.asList(scm), hddsDatanodes, omServiceId, null);
+  }
+
+  public StorageContainerManager getSCMLeader() {
+    return getSCMLeader(this.storageContainerManagers);
+  }
+
+  private static StorageContainerManager getSCMLeader(List<StorageContainerManager> scms) {
+    StorageContainerManager res = null;
+    for (StorageContainerManager scm : scms) {
+      if (scm.checkLeader()) {
+        if (res != null) {
+          // Found more than one leader
+          // Return null, expect the caller to retry in a while
+          return null;
+        }
+        // Found a leader
+        res = scm;
+      }
+    }
+    return res;
   }
 
   @Override
@@ -251,8 +276,11 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
   public static class Builder extends MiniOzoneClusterImpl.Builder {
 
     private final String nodeIdBaseStr = "omNode-";
+    private final String scmNodeIdBaseStr = "scmNode-";
     private List<OzoneManager> activeOMs = new ArrayList<>();
     private List<OzoneManager> inactiveOMs = new ArrayList<>();
+    private List<StorageContainerManager> scms = new ArrayList<>();
+    private OzoneConfiguration conf = new OzoneConfiguration();
 
     /**
      * Creates a new Builder.
@@ -278,11 +306,10 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       DefaultMetricsSystem.setMiniClusterMode(true);
       initializeConfiguration();
       initOMRatisConf();
-      StorageContainerManager scm;
+      initSCMRatisConf();
       ReconServer reconServer = null;
       try {
-        scm = createSCM();
-        scm.start();
+        createSCMService();
         createOMService();
         if (includeRecon) {
           configureRecon();
@@ -293,15 +320,17 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
         throw new IOException("Unable to build MiniOzoneCluster. ", ex);
       }
 
-      final List<HddsDatanodeService> hddsDatanodes = createHddsDatanodes(
-          scm, reconServer);
+//      final List<HddsDatanodeService> hddsDatanodes = createHddsDatanodes(
+//          scm, reconServer);
+
+      final List<HddsDatanodeService> hddsDatanodes = Collections.emptyList();
 
       MiniOzoneHAClusterImpl cluster = new MiniOzoneHAClusterImpl(conf,
-          activeOMs, inactiveOMs, scm, hddsDatanodes, omServiceId, reconServer);
+          activeOMs, inactiveOMs, scms, hddsDatanodes, omServiceId, reconServer);
 
-      if (startDataNodes) {
-        cluster.startHddsDatanodes();
-      }
+//      if (startDataNodes) {
+//        cluster.startHddsDatanodes();
+//      }
       return cluster;
     }
 
@@ -444,5 +473,134 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
       conf.set(omNodesKey, omNodesKeyValue.substring(1));
     }
+
+    protected void initSCMRatisConf() {
+      conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
+    }
+
+    private void initializeScmStorage(SCMStorageConfig scmStore)
+            throws IOException {
+      if (scmStore.getState() == Storage.StorageState.INITIALIZED) {
+        return;
+      }
+      scmStore.setClusterId(clusterId);
+      scmStore.setScmId(scmServiceId);
+      scmStore.initialize();
+    }
+
+    private StorageContainerManager createSCM(OzoneConfiguration conf)
+            throws IOException, AuthenticationException {
+
+      SCMStorageConfig scmStore = new SCMStorageConfig(conf);
+      initializeScmStorage(scmStore);
+      SCMConfigurator configurator = new SCMConfigurator();
+      StorageContainerManager scm = StorageContainerManager.createSCM(conf, configurator);
+      return scm;
+    }
+    protected List<StorageContainerManager> createSCMService()
+            throws IOException, AuthenticationException {
+      List<StorageContainerManager> scmList = Lists.newArrayList();
+
+      int retryCount = 0;
+      int basePort;
+
+      while (true) {
+        try {
+          basePort = 20000 + RANDOM.nextInt(1000) * 4;
+          initSCMHAConfig(basePort);
+          // int port = basePort;
+          for (int i = 1; i <= numOfSCMs; i++) {
+            String scmNodeId = scmNodeIdBaseStr + i;
+            OzoneConfiguration config = new OzoneConfiguration(conf);
+            config.set(ScmConfigKeys.OZONE_SCM_NODE_ID_KEY, scmNodeId);
+            String metaDirPath = path + "/" + scmNodeId;
+            config.set(OZONE_METADATA_DIRS, metaDirPath);
+
+            scmList.add(createSCM(config));
+          }
+          for (StorageContainerManager scm : scmList) {
+            scm.start();
+          }
+          break;
+        } catch (BindException e) {
+          for (StorageContainerManager scm : scmList) {
+            scm.stop();
+            scm.join();
+            LOG.info("Stopping SCM server: {}", scm.getSCMNodeDetails());
+          }
+          scmList.clear();
+          ++retryCount;
+          LOG.info("MiniOzoneHACluster port conflicts, retried {} times",
+                  retryCount);
+        }
+      }
+
+      scms.clear();
+      scms.addAll(scmList);
+      return scmList;
+    }
+
+    private void initSCMHAConfig(int basePort) throws IOException {
+      // Set configurations required for starting SCM HA service.
+      conf.set(ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY, scmServiceId);
+      conf.set(ScmConfigKeys.OZONE_SCM_INTERNAL_SERVICE_ID, scmServiceId);
+      String scmNodesKey = ScmUtils.addKeySuffixes(
+              ScmConfigKeys.OZONE_SCM_NODES_KEY, scmServiceId);
+      StringBuilder scmNodesKeyValue = new StringBuilder();
+      int port = basePort;
+      for (int i = 1; i <= numOfSCMs; i++, port+=6) {
+        String scmNodeId = scmNodeIdBaseStr + i;
+        scmNodesKeyValue.append(",").append(scmNodeId);
+        String scmClientAddrKey = ScmUtils.addKeySuffixes(
+                ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, scmServiceId, scmNodeId);
+        String scmBlockClientAddrKey = ScmUtils.addKeySuffixes(
+                ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY, scmServiceId, scmNodeId);
+        String scmDatanodeAddrKey = ScmUtils.addKeySuffixes(
+                ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY, scmServiceId, scmNodeId);
+        String scmHttpAddrKey = ScmUtils.addKeySuffixes(
+                ScmConfigKeys.OZONE_SCM_HTTP_ADDRESS_KEY, scmServiceId, scmNodeId);
+        String scmHttpsAddrKey = ScmUtils.addKeySuffixes(
+                ScmConfigKeys.OZONE_SCM_HTTPS_ADDRESS_KEY, scmServiceId, scmNodeId);
+        String scmRatisProtKey = ScmUtils.addKeySuffixes(
+                ScmConfigKeys.OZONE_SCM_RATIS_PORT_KEY, scmServiceId, scmNodeId);
+        String scmRatisAddressKey = ScmUtils.addKeySuffixes(
+                ScmConfigKeys.OZONE_SCM_RATIS_BIND_ADDRESS_KEY, scmServiceId, scmNodeId);
+
+        conf.set(scmClientAddrKey, "127.0.0.1:" + port);
+        conf.set(scmBlockClientAddrKey, "127.0.0.1:" + (port + 1));
+        conf.set(scmDatanodeAddrKey, "127.0.0.1:" + (port + 2));
+        conf.set(scmHttpAddrKey, "127.0.0.1:" + (port + 3));
+        conf.set(scmHttpsAddrKey, "127.0.0.1:" + (port + 4));
+        conf.setInt(scmRatisProtKey, port + 5);
+        conf.set(scmRatisAddressKey, "127.0.0.1");
+      }
+
+      conf.set(scmNodesKey, scmNodesKeyValue.substring(1));
+    }
+  }
+
+  @Override
+  public void waitForClusterToBeReady()
+          throws TimeoutException, InterruptedException {
+    GenericTestUtils.waitFor(() -> {
+      boolean status = false;
+      boolean foundLead = false;
+      for (StorageContainerManager scm : storageContainerManagers) {
+        final int healthy = scm.getNodeCount(HEALTHY);
+        foundLead = scm.checkLeader();
+        final boolean exitSafeMode = !scm.isInSafeMode();
+        LOG.info(exitSafeMode ? "Cluster exits safe mode" :
+                        "Waiting for cluster to exit safe mode",
+                healthy);
+
+        status |= foundLead;
+        status &= exitSafeMode;
+      }
+      LOG.info(foundLead ? "Cluster has elected a SCM leader" :
+              "Waiting for SCM to elect a leader");
+
+      return status;
+    }, 1000, waitForClusterToBeReadyTimeout);
+    System.out.println();
   }
 }
