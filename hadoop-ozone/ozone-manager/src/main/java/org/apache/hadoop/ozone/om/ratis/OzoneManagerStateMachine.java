@@ -50,6 +50,7 @@ import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftClientRequest;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftPeerId;
+import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.server.storage.RaftStorage;
@@ -209,13 +210,15 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       }
       // TODO: Add cancel prepare here after it is implemented.
       return trx;
-    }
-    else {
-      // TODO: This will cause the node to step down as leader in ratis. This
-      //  may be a problem.
-      throw new OMException("Cannot apply write request " +
-          request.getCmdType().name() + " when OM is in prepare mode.",
-          OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
+    } else {
+      // TODO: This will cause leader in ratis to step down without
+      //  RATIS-1216 applied.
+      String message = "Cannot apply write request " +
+          request.getCmdType().name() + " when OM is in prepare mode.";
+      OMException cause = new OMException(message,
+          OMException.ResultCodes.OPERATION_DISALLOWED_WHILE_PREPARED);
+      // Indicate that the leader should not step down because of this failure.
+      throw new StateMachineException(message, cause, false);
     }
   }
 
