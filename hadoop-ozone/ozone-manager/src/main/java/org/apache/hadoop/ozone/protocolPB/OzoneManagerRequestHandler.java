@@ -73,6 +73,9 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Multipa
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartUploadListPartsResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
@@ -95,6 +98,8 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartUploadInfo;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartInfo;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus.PREPARE_DONE;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus.PREPARE_NOT_DONE;
 
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.slf4j.Logger;
@@ -214,6 +219,11 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         responseBuilder
             .setFinalizeUpgradeProgressResponse(upgradeProgressResponse);
         break;
+        case PrepareStatus:
+          PrepareStatusResponse prepareStatusResponse =
+              getPrepareStatus(request.getPrepareStatusRequest());
+          responseBuilder.setPrepareStatusResponse(prepareStatusResponse);
+          break;
       default:
         responseBuilder.setSuccess(false);
         responseBuilder.setMessage("Unrecognized Command Type: " + cmdType);
@@ -621,6 +631,21 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return FinalizeUpgradeProgressResponse.newBuilder()
         .setStatus(response)
         .build();
+  }
+
+  private PrepareStatusResponse getPrepareStatus(PrepareStatusRequest request)
+      throws IOException {
+    PrepareStatus prepareStatus = null;
+    long txnID = request.getTxnID();
+    long ratisSnapshotIndex = impl.getRatisSnapshotIndex();
+    if (ratisSnapshotIndex != txnID) {
+      LOG.info("Last Txn Index = {}", ratisSnapshotIndex);
+      prepareStatus =  PREPARE_NOT_DONE;
+    } else {
+      prepareStatus = PREPARE_DONE;
+    }
+    return PrepareStatusResponse.newBuilder().setStatus(prepareStatus)
+        .setCurrentTxnIndex(ratisSnapshotIndex).build();
   }
 
   protected OzoneManager getOzoneManager() {

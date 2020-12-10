@@ -49,6 +49,8 @@ import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
 import org.apache.hadoop.ozone.security.OzoneDelegationTokenSelector;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
@@ -601,5 +603,13 @@ public interface OzoneManagerProtocol
       long txnApplyWaitTimeoutSeconds, long txnApplyCheckIntervalSeconds)
       throws IOException {
     return -1;
+  }
+
+  default PrepareStatusResponse getOzoneManagerPrepareStatus(long txnId)
+      throws IOException {
+    return PrepareStatusResponse.newBuilder()
+        .setCurrentTxnIndex(-1)
+        .setStatus(PrepareStatus.NOT_IN_PREPARE_STATE)
+        .build();
   }
 }

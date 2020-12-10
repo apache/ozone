@@ -52,7 +52,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
 
   private final String keyPrefix = "key";
   private final int timeoutMillis = 30000;
-  private final static Long PREPARE_FLUSH_WAIT_TIMEOUT_SECONDS = 300L;
+  private final static Long PREPARE_FLUSH_WAIT_TIMEOUT_SECONDS = 120L;
   private final static Long PREPARE_FLUSH_INTERVAL_SECONDS = 5L;
 
   /**

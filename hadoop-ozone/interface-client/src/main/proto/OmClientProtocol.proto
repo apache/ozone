@@ -75,6 +75,7 @@ enum Type {
   FinalizeUpgrade = 54;
   FinalizeUpgradeProgress = 55;
   Prepare = 56;
+  PrepareStatus = 57;
 
   GetDelegationToken = 61;
   RenewDelegationToken = 62;
@@ -147,6 +148,7 @@ message OMRequest {
   optional FinalizeUpgradeRequest           finalizeUpgradeRequest         = 54;
   optional FinalizeUpgradeProgressRequest   finalizeUpgradeProgressRequest = 55;
   optional PrepareRequest                   prepareRequest                 = 56;
+  optional PrepareStatusRequest             prepareStatusRequest           = 57;
 
   optional hadoop.common.GetDelegationTokenRequestProto getDelegationTokenRequest = 61;
   optional hadoop.common.RenewDelegationTokenRequestProto renewDelegationTokenRequest= 62;
@@ -223,6 +225,7 @@ message OMResponse {
   optional FinalizeUpgradeResponse           finalizeUpgradeResponse       = 54;
   optional FinalizeUpgradeProgressResponse finalizeUpgradeProgressResponse = 55;
   optional PrepareResponse                 prepareResponse                 = 56;
+  optional PrepareStatusResponse           prepareStatusResponse           = 57;
 
   optional GetDelegationTokenResponseProto getDelegationTokenResponse = 61;
   optional RenewDelegationTokenResponseProto renewDelegationTokenResponse = 62;
@@ -1089,6 +1092,21 @@ message PrepareRequestArgs {
 
 message PrepareResponse {
     required uint64 txnID = 1;
+}
+
+message PrepareStatusRequest {
+    required uint64 txnID = 1;
+}
+
+message PrepareStatusResponse {
+    enum PrepareStatus {
+        NOT_IN_PREPARE_STATE = 1;
+        PREPARE_NOT_DONE = 2;
+        PREPARE_TXN_MISMATCH = 3;
+        PREPARE_DONE = 4;
+    }
+    required PrepareStatus status = 1;
+    optional uint64 currentTxnIndex = 2;
 }
 
 message ServicePort {

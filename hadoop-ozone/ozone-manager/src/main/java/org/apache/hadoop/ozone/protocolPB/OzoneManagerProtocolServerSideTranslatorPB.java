@@ -17,6 +17,7 @@
 package org.apache.hadoop.ozone.protocolPB;
 
 import static org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils.getRequest;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.PrepareStatus;
 
 import java.io.IOException;
 import java.util.Optional;
@@ -185,7 +186,8 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
   private OMResponse submitReadRequestToOM(OMRequest request)
       throws ServiceException {
     // Check if this OM is the leader.
-    if (omRatisServer.isLeader()) {
+    if (omRatisServer.isLeader() ||
+        request.getCmdType().equals(PrepareStatus)) {
       return handler.handleReadRequest(request);
     } else {
       throw createNotLeaderException();

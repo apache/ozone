@@ -1574,6 +1574,17 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     return prepareResponse.getTxnID();
   }
 
+  public PrepareStatusResponse getOzoneManagerPrepareStatus(long txnId)
+      throws IOException {
+    PrepareStatusRequest prepareStatusRequest =
+        PrepareStatusRequest.newBuilder().setTxnID(txnId).build();
+    OMRequest omRequest = createOMRequest(Type.PrepareStatus)
+        .setPrepareStatusRequest(prepareStatusRequest).build();
+    PrepareStatusResponse prepareStatusResponse =
+        handleError(submitRequest(omRequest)).getPrepareStatusResponse();
+    return prepareStatusResponse;
+  }
+
   @VisibleForTesting
   public OmTransport getTransport() {
     return transport;

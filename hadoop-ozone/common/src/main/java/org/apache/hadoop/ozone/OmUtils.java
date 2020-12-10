@@ -260,6 +260,7 @@ public final class OmUtils {
     case DBUpdates:
     case ListMultipartUploads:
     case FinalizeUpgradeProgress:
+    case PrepareStatus:
       return true;
     case CreateVolume:
     case SetVolumeProperty:
