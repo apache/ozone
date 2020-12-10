@@ -74,6 +74,8 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     for (OzoneManager om: cluster.getOzoneManagersList()) {
       waitAndCheckPrepared(om, prepareRequestLogIndex);
     }
+
+    ozClient.createVolume("foo");
   }
 
   /**

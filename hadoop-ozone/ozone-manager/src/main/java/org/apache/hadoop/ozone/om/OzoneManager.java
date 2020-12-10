@@ -404,20 +404,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
     omMetaDir = OMStorage.getOmDbDir(configuration);
 
-    // If the prepare marker file is present and its index matches the last
-    // transaction index in the OM DB, turn on the in memory flag to
-    // put the ozone manager in prepare mode, disallowing write requests.
-    OMTransactionInfo txnInfo = metadataManager.getTransactionInfoTable()
-        .get(TRANSACTION_INFO_KEY);
-    if (txnInfo != null) {
-      OzoneManagerPrepareState.checkPrepareMarkerFile(omMetaDir,
-          txnInfo.getTransactionIndex());
-    } else {
-      // If we have no transaction info in the DB, then no prepare request
-      // could have been received.
-      OzoneManagerPrepareState.setPrepared(false);
-    }
-
       this.isAclEnabled = conf.getBoolean(OZONE_ACL_ENABLED,
         OZONE_ACL_ENABLED_DEFAULT);
     this.scmBlockSize = (long) conf.getStorageSize(OZONE_SCM_BLOCK_SIZE,
@@ -481,6 +467,22 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     instantiateServices();
+
+    // If the prepare marker file is present and its index matches the last
+    // transaction index in the OM DB, turn on the in memory flag to
+    // put the ozone manager in prepare mode, disallowing write requests.
+    // This must be done after metadataManager is instantiated by
+    // instantiateServices and before the RPC server is started.
+    OMTransactionInfo txnInfo = metadataManager.getTransactionInfoTable()
+        .get(TRANSACTION_INFO_KEY);
+    if (txnInfo != null) {
+      OzoneManagerPrepareState.checkPrepareMarkerFile(omMetaDir,
+          txnInfo.getTransactionIndex());
+    } else {
+      // If we have no transaction info in the DB, then no prepare request
+      // could have been received.
+      OzoneManagerPrepareState.setPrepared(false);
+    }
 
     // Create special volume s3v which is required for S3G.
     addS3GVolumeToDB();
