@@ -23,6 +23,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
+import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -58,7 +59,7 @@ public final class DatanodeIdYaml {
     Yaml yaml = new Yaml(options);
 
     try (Writer writer = new OutputStreamWriter(
-        new FileOutputStream(path), "UTF-8")) {
+        new FileOutputStream(path), StandardCharsets.UTF_8)) {
       yaml.dump(getDatanodeDetailsYaml(datanodeDetails), writer);
     }
   }

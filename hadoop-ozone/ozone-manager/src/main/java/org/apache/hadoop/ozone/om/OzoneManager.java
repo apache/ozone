@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -640,7 +641,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           getTempMetricsStorageFile().getParentFile().toPath());
       try (BufferedWriter writer = new BufferedWriter(
           new OutputStreamWriter(new FileOutputStream(
-              getTempMetricsStorageFile()), "UTF-8"))) {
+              getTempMetricsStorageFile()), StandardCharsets.UTF_8))) {
         OmMetricsInfo metricsInfo = new OmMetricsInfo();
         metricsInfo.setNumKeys(metrics.getNumKeys());
         WRITER.writeValue(writer, metricsInfo);
