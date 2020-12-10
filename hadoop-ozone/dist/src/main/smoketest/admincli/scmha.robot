@@ -25,4 +25,4 @@ Test Timeout        5 minutes
 *** Test Cases ***
 Run scm roles
     ${output} =         Execute          ozone admin scm roles
-                        Should contain   ${output}  []
+                        Should contain   ${output}  [scm:9865]
