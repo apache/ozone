@@ -219,11 +219,11 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         responseBuilder
             .setFinalizeUpgradeProgressResponse(upgradeProgressResponse);
         break;
-        case PrepareStatus:
-          PrepareStatusResponse prepareStatusResponse =
-              getPrepareStatus(request.getPrepareStatusRequest());
-          responseBuilder.setPrepareStatusResponse(prepareStatusResponse);
-          break;
+      case PrepareStatus:
+        PrepareStatusResponse prepareStatusResponse =
+            getPrepareStatus(request.getPrepareStatusRequest());
+        responseBuilder.setPrepareStatusResponse(prepareStatusResponse);
+        break;
       default:
         responseBuilder.setSuccess(false);
         responseBuilder.setMessage("Unrecognized Command Type: " + cmdType);

@@ -103,7 +103,7 @@ public class PrepareSubCommand implements Callable<Void> {
     long prepareTxnId = client.prepareOzoneManager(txnApplyWaitTimeSeconds,
         txnApplyCheckIntervalSeconds);
     System.out.println("Ozone Manager Prepare Request successfully returned " +
-        "with Txn Id : [" + prepareTxnId + "].");
+        "with Transaction Id : [" + prepareTxnId + "].");
 
     Map<String, Boolean> omPreparedStatusMap = new HashMap<>();
     Set<String> omHosts  = getOmHostsFromConfig();
@@ -126,7 +126,7 @@ public class PrepareSubCommand implements Callable<Void> {
               singleOmClient.getOzoneManagerPrepareStatus(prepareTxnId);
           PrepareStatus status = response.getStatus();
           System.out.println("OM : [" + omHost + "], Prepare " +
-              "Status : [" + status.name() + "], Current Txn Id : [" +
+              "Status : [" + status.name() + "], Current Transaction Id : [" +
               response.getCurrentTxnIndex() + "]");
           if (status.equals(PrepareStatus.PREPARE_DONE)) {
             e.setValue(true);
@@ -146,8 +146,8 @@ public class PrepareSubCommand implements Callable<Void> {
     } else {
       System.out.println();
       System.out.println("OM Preparation successful! ");
-      System.out.println("No new write requests will be " +
-      "allowed until preparation is cancelled or upgrade/downgrade is done.");
+      System.out.println("No new write requests will be allowed until " +
+          "preparation is cancelled or upgrade/downgrade is done.");
     }
 
     return null;
