@@ -51,7 +51,7 @@ import org.apache.hadoop.security.token.Token;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import org.apache.ratis.protocol.RaftGroupId;
-import org.apache.ratis.server.impl.RaftServerImpl;
+import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.impl.RaftServerProxy;
 import org.apache.ratis.statemachine.StateMachine;
 import org.junit.Assert;
@@ -583,7 +583,7 @@ public final class ContainerTestHelper {
     return String.format("%1$" + length + "s", string);
   }
 
-  private static RaftServerImpl getRaftServerImpl(HddsDatanodeService dn,
+  private static RaftServer.Division getRaftServerDivision(HddsDatanodeService dn,
       Pipeline pipeline) throws Exception {
     if (!pipeline.getNodes().contains(dn.getDatanodeDetails())) {
       throw new IllegalArgumentException("Pipeline:" + pipeline.getId() +
@@ -597,21 +597,22 @@ public final class ContainerTestHelper {
     RaftGroupId groupId =
         pipeline == null ? proxy.getGroupIds().iterator().next() :
             RatisHelper.newRaftGroup(pipeline).getGroupId();
-    return proxy.getImpl(groupId);
+
+    return proxy.getDivision(groupId);
   }
 
   public static StateMachine getStateMachine(HddsDatanodeService dn,
       Pipeline pipeline) throws Exception {
-    return getRaftServerImpl(dn, pipeline).getStateMachine();
+    return getRaftServerDivision(dn, pipeline).getStateMachine();
   }
 
   public static boolean isRatisLeader(HddsDatanodeService dn, Pipeline pipeline)
       throws Exception {
-    return getRaftServerImpl(dn, pipeline).isLeader();
+    return getRaftServerDivision(dn, pipeline).getInfo().isLeader();
   }
 
   public static boolean isRatisFollower(HddsDatanodeService dn,
       Pipeline pipeline) throws Exception {
-    return getRaftServerImpl(dn, pipeline).isFollower();
+    return getRaftServerDivision(dn, pipeline).getInfo().isFollower();
   }
 }

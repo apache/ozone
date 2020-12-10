@@ -423,7 +423,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     RaftServer server = ratisServer.getServer();
     Preconditions.checkState(server instanceof RaftServerProxy);
     try {
-      if (((RaftServerProxy) server).getImpl(gid).isLeader()) {
+      if (server.getDivision(gid).getInfo().isLeader()) {
         stateMachineDataCache.put(entryIndex, write.getData());
       }
     } catch (InterruptedException ioe) {

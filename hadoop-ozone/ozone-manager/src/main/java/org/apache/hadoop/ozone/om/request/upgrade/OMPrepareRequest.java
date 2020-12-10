@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.om.request.upgrade;
 
 import org.apache.hadoop.hdds.server.ServerUtils;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
@@ -38,15 +37,13 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 
-import org.apache.ratis.server.impl.RaftServerImpl;
-import org.apache.ratis.server.impl.RaftServerProxy;
+import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.raftlog.RaftLog;
 import org.apache.ratis.statemachine.StateMachine;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
@@ -104,9 +101,9 @@ public class OMPrepareRequest extends OMClientRequest {
       ozoneManagerDoubleBufferHelper.add(response, transactionLogIndex);
 
       OzoneManagerRatisServer omRatisServer = ozoneManager.getOmRatisServer();
-      RaftServerProxy server = (RaftServerProxy) omRatisServer.getServer();
-      RaftServerImpl serverImpl =
-          server.getImpl(omRatisServer.getRaftGroup().getGroupId());
+      RaftServer.Division division =
+          omRatisServer.getServer()
+              .getDivision(omRatisServer.getRaftGroup().getGroupId());
 
       // Wait for outstanding double buffer entries to flush to disk,
       // so they will not be purged from the log before being persisted to
@@ -115,9 +112,9 @@ public class OMPrepareRequest extends OMClientRequest {
       // already, once this index reaches the state machine, we know all
       // transactions have been flushed.
       waitForLogIndex(transactionLogIndex,
-          ozoneManager.getMetadataManager(), serverImpl,
+          ozoneManager.getMetadataManager(), division,
           flushTimeout, flushCheckInterval);
-      takeSnapshotAndPurgeLogs(serverImpl);
+      takeSnapshotAndPurgeLogs(division);
 
       // Save transaction log index to a marker file, so if the OM restarts,
       // it will remain in prepare mode on that index as long as the file
@@ -148,7 +145,7 @@ public class OMPrepareRequest extends OMClientRequest {
    * disk, and to be updated in memory in Ratis.
    */
   private static void waitForLogIndex(long indexToWaitFor,
-      OMMetadataManager metadataManager, RaftServerImpl server,
+      OMMetadataManager metadataManager, RaftServer.Division division,
       Duration flushTimeout, Duration flushCheckInterval)
       throws InterruptedException, IOException {
 
@@ -164,7 +161,7 @@ public class OMPrepareRequest extends OMClientRequest {
       OMTransactionInfo dbTxnInfo = metadataManager
           .getTransactionInfoTable().get(TRANSACTION_INFO_KEY);
       long ratisTxnIndex =
-          server.getStateMachine().getLastAppliedTermIndex().getIndex();
+          division.getStateMachine().getLastAppliedTermIndex().getIndex();
 
       // Ratis may apply meta transactions after the prepare request, causing
       // its in memory index to always be greater than the DB index.
@@ -195,15 +192,15 @@ public class OMPrepareRequest extends OMClientRequest {
 
   /**
    * Take a snapshot of the state machine at the last index, and purge ALL logs.
-   * @param impl RaftServerImpl instance
+   * @param division Raft server division.
    * @throws IOException on Error.
    */
-  public static long takeSnapshotAndPurgeLogs(RaftServerImpl impl)
+  public static long takeSnapshotAndPurgeLogs(RaftServer.Division division)
       throws IOException {
 
-    StateMachine stateMachine = impl.getStateMachine();
+    StateMachine stateMachine = division.getStateMachine();
     long snapshotIndex = stateMachine.takeSnapshot();
-    RaftLog raftLog = impl.getState().getLog();
+    RaftLog raftLog = division.getRaftLog();
     long raftLogIndex = raftLog.getLastEntryTermIndex().getIndex();
 
     // Ensure that Ratis's in memory snapshot index is the same as the index
