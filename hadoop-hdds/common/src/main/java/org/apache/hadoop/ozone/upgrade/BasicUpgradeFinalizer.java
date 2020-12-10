@@ -223,10 +223,7 @@ public class BasicUpgradeFinalizer<T, V extends AbstractLayoutVersionManager>
   }
 
   protected void emitStartingMsg() {
-    String msg = "Finalization started.\n";
-    msg += "Existing pipelines and containers will be closed during Upgrade.\n";
-    msg += "New pipelines creation will remain frozen until Upgrade is " +
-        "finalized";
+    String msg = "Finalization started.";
     logAndEmit(msg);
   }
 
@@ -266,7 +263,7 @@ public class BasicUpgradeFinalizer<T, V extends AbstractLayoutVersionManager>
     logAndEmit(msg);
   }
 
-  private void logAndEmit(String msg) {
+  protected void logAndEmit(String msg) {
     LOG.info(msg);
     msgs.offer(msg);
   }

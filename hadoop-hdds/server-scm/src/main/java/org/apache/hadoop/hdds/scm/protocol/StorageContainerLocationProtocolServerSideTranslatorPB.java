@@ -136,6 +136,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             request.getTraceID());
   }
 
+  @SuppressWarnings("methodlength")
   public ScmContainerLocationResponse processRequest(
       ScmContainerLocationRequest request) throws ServiceException {
     try {
