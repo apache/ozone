@@ -130,7 +130,7 @@ public class BucketEndpoint extends EndpointBase {
       }
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
-        throw S3ErrorTable.newError(S3ErrorTable.PERMISSION_DENIED, bucketName);
+        throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, bucketName);
       } else {
         throw ex;
       }
@@ -241,7 +241,7 @@ public class BucketEndpoint extends EndpointBase {
       ozoneMultipartUploadList = bucket.listMultipartUploads(prefix);
     } catch (OMException exception) {
       if (exception.getResult() == ResultCodes.PERMISSION_DENIED) {
-        throw S3ErrorTable.newError(S3ErrorTable.PERMISSION_DENIED,
+        throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED,
             prefix);
       }
       throw exception;
@@ -298,7 +298,7 @@ public class BucketEndpoint extends EndpointBase {
         throw S3ErrorTable.newError(S3ErrorTable
             .NO_SUCH_BUCKET, bucketName);
       } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
-        throw S3ErrorTable.newError(S3ErrorTable.PERMISSION_DENIED, bucketName);
+        throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, bucketName);
       } else {
         throw ex;
       }

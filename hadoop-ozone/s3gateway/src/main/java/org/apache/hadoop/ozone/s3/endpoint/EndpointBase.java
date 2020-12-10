@@ -71,7 +71,7 @@ public class EndpointBase {
           || ex.getResult() == ResultCodes.VOLUME_NOT_FOUND) {
         throw S3ErrorTable.newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName);
       } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
-        throw S3ErrorTable.newError(S3ErrorTable.PERMISSION_DENIED, bucketName);
+        throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, bucketName);
       } else {
         throw ex;
       }
@@ -98,7 +98,7 @@ public class EndpointBase {
       client.getObjectStore().createS3Bucket(bucketName);
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
-        throw S3ErrorTable.newError(S3ErrorTable.PERMISSION_DENIED, bucketName);
+        throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, bucketName);
       } else if (ex.getResult() != ResultCodes.BUCKET_ALREADY_EXISTS) {
         // S3 does not return error for bucket already exists, it just
         // returns the location.
@@ -119,7 +119,7 @@ public class EndpointBase {
       client.getObjectStore().deleteS3Bucket(s3BucketName);
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
-        throw S3ErrorTable.newError(S3ErrorTable.PERMISSION_DENIED,
+        throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED,
             s3BucketName);
       }
       throw ex;
@@ -163,7 +163,7 @@ public class EndpointBase {
       if (e.getResult() == ResultCodes.VOLUME_NOT_FOUND) {
         return Collections.emptyIterator();
       } else  if (e.getResult() == ResultCodes.PERMISSION_DENIED) {
-        throw S3ErrorTable.newError(S3ErrorTable.PERMISSION_DENIED,
+        throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED,
             "listBuckets");
       } else {
         throw e;

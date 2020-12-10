@@ -106,8 +106,8 @@ public final class S3ErrorTable {
       "InternalError", "We encountered an internal error. Please try again.",
       HTTP_SERVER_ERROR);
 
-  public static final OS3Exception PERMISSION_DENIED = new OS3Exception(
-      "PermissionDenied", "User doesn't have the permission to access this " +
+  public static final OS3Exception ACCESS_DENIED = new OS3Exception(
+      "AccessDenied", "User doesn't have the right to access this " +
       "resource.", HTTP_FORBIDDEN);
 
   /**

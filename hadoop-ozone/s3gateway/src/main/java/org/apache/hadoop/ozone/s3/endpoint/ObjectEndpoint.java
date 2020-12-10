@@ -211,7 +211,7 @@ public class ObjectEndpoint extends EndpointBase {
           throw os3Exception;
         } else if ((((OMException) ex).getResult() ==
             ResultCodes.PERMISSION_DENIED)) {
-          throw S3ErrorTable.newError(S3ErrorTable.PERMISSION_DENIED, keyPath);
+          throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, keyPath);
         }
       }
       throw ex;
@@ -324,7 +324,7 @@ public class ObjectEndpoint extends EndpointBase {
         throw S3ErrorTable.newError(S3ErrorTable
             .NO_SUCH_KEY, keyPath);
       } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
-        throw S3ErrorTable.newError(S3ErrorTable.PERMISSION_DENIED, keyPath);
+        throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, keyPath);
       } else {
         throw ex;
       }
@@ -363,7 +363,7 @@ public class ObjectEndpoint extends EndpointBase {
         // Just return 404 with no content
         return Response.status(Status.NOT_FOUND).build();
       } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
-        throw S3ErrorTable.newError(S3ErrorTable.PERMISSION_DENIED, keyPath);
+        throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, keyPath);
       } else {
         throw ex;
       }
@@ -434,7 +434,7 @@ public class ObjectEndpoint extends EndpointBase {
         //NOT_FOUND is not a problem, AWS doesn't throw exception for missing
         // keys. Just return 204
       } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
-        throw S3ErrorTable.newError(S3ErrorTable.PERMISSION_DENIED, keyPath);
+        throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, keyPath);
       } else {
         throw ex;
       }
@@ -487,7 +487,7 @@ public class ObjectEndpoint extends EndpointBase {
       LOG.error("Error in Initiate Multipart Upload Request for bucket: {}, " +
           "key: {}", bucket, key, ex);
       if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
-        throw S3ErrorTable.newError(S3ErrorTable.PERMISSION_DENIED, key);
+        throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, key);
       }
       throw ex;
     }
@@ -632,7 +632,7 @@ public class ObjectEndpoint extends EndpointBase {
         throw S3ErrorTable.newError(NO_SUCH_UPLOAD,
             uploadID);
       } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
-        throw S3ErrorTable.newError(S3ErrorTable.PERMISSION_DENIED,
+        throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED,
             bucket + "/" + key);
       }
       throw ex;
@@ -691,7 +691,7 @@ public class ObjectEndpoint extends EndpointBase {
         throw S3ErrorTable.newError(NO_SUCH_UPLOAD,
             uploadID);
       } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
-        throw S3ErrorTable.newError(S3ErrorTable.PERMISSION_DENIED,
+        throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED,
             bucket + "/" + key + "/" + uploadID);
       }
       throw ex;
@@ -779,7 +779,7 @@ public class ObjectEndpoint extends EndpointBase {
       } else if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
         throw S3ErrorTable.newError(S3ErrorTable.NO_SUCH_BUCKET, sourceBucket);
       } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
-        throw S3ErrorTable.newError(S3ErrorTable.PERMISSION_DENIED,
+        throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED,
             destBucket + "/" + destkey);
       }
       throw ex;
