@@ -587,9 +587,7 @@ public class TestOzoneFileSystem {
    */
   protected void testListStatusOnLargeDirectory() throws Exception {
     Path root = new Path("/");
-    FileStatus[] fileStatuses = o3fs.listStatus(root);
-    assertEquals("Root shouldn't have any child!", 0,
-            fileStatuses.length);
+    deleteRootDir(); // cleanup
     Set<String> paths = new TreeSet<>();
     int numDirs = 5111;
     for(int i = 0; i < numDirs; i++) {
@@ -599,7 +597,7 @@ public class TestOzoneFileSystem {
       rootItemCount++;
     }
 
-    fileStatuses = o3fs.listStatus(root);
+    FileStatus[] fileStatuses = o3fs.listStatus(root);
     // Added logs for debugging failures, to check any sub-path mismatches.
     Set<String> actualPaths = new TreeSet<>();
     ArrayList<String> actualPathList = new ArrayList<>();
@@ -621,6 +619,31 @@ public class TestOzoneFileSystem {
 
     for (int i=0; i < numDirs; i++) {
       assertTrue(paths.contains(fileStatuses[i].getPath().getName()));
+    }
+  }
+
+  /**
+   * Cleanup files and directories.
+   *
+   * @throws IOException DB failure
+   */
+  protected void deleteRootDir() throws IOException {
+    Path root = new Path("/");
+    FileStatus[] fileStatuses = fs.listStatus(root);
+
+    rootItemCount = 0; // reset to zero
+
+    if (fileStatuses == null) {
+      return;
+    }
+
+    for (FileStatus fStatus : fileStatuses) {
+      fs.delete(fStatus.getPath(), true);
+    }
+
+    fileStatuses = fs.listStatus(root);
+    if (fileStatuses != null) {
+      Assert.assertEquals("Delete root failed!", 0, fileStatuses.length);
     }
   }
 
