@@ -54,7 +54,7 @@ public final class OzoneQuota {
   private static QuotaList quotaList;
 
   /** Setting QuotaList parameters from large to small. */
-  private static void setQuotaList(){
+  static {
     quotaList = new QuotaList();
     quotaList.addQuotaList(OZONE_QUOTA_TB, Units.TB, TB);
     quotaList.addQuotaList(OZONE_QUOTA_GB, Units.GB, GB);
@@ -87,15 +87,14 @@ public final class OzoneQuota {
      * Returns size in Bytes or negative num if there is no Quota.
      */
     public long sizeInBytes() {
-      long sQuote = -1L;
-      setQuotaList();
-      for(Units quota:quotaList.getUnitQuotaArray()){
+      long sQuota = -1L;
+      for(Units quota : quotaList.getUnitQuotaArray()){
         if(quota == this.unit){
-          sQuote = quotaList.getQuotaSize(quota);
+          sQuota = quotaList.getQuotaSize(quota);
           break;
         }
       }
-      return this.getSize() * sQuote;
+      return this.getSize() * sQuota;
     }
 
     @Override
@@ -157,7 +156,6 @@ public final class OzoneQuota {
   public static OzoneQuota parseQuota(String quotaInBytes,
       long quotaInCounts) {
 
-    setQuotaList();
     if (Strings.isNullOrEmpty(quotaInBytes)) {
       throw new IllegalArgumentException(
           "Quota string cannot be null or empty.");
@@ -171,21 +169,21 @@ public final class OzoneQuota {
     long quotaMultiplyExact = 0;
 
     try {
-      for(String quota:quotaList.getOzoneQuotaArray()){
+      for(String quota : quotaList.getOzoneQuotaArray()){
         if (uppercase.endsWith((quota))){
           size = uppercase
-                  .substring(0, uppercase.length() - quota.length());
+              .substring(0, uppercase.length() - quota.length());
           currUnit = quotaList.getUnits(quota);
           quotaMultiplyExact = Math.multiplyExact(Long.parseLong(size),
-                  quotaList.getQuotaSize(currUnit));
+              quotaList.getQuotaSize(currUnit));
           break;
         }
       }
       nSize = Long.parseLong(size);
     } catch (NumberFormatException e) {
       throw new IllegalArgumentException("Invalid values for quota, to ensure" +
-              " that the Quota format is legal(supported values are BYTES, " +
-              " KB, MB, GB and TB).");
+          " that the Quota format is legal(supported values are BYTES, " +
+          " KB, MB, GB and TB).");
     } catch  (ArithmeticException e) {
       LOG.debug("long overflow:\n{}", quotaMultiplyExact);
       throw new IllegalArgumentException("Invalid values for quota, the quota" +
@@ -210,10 +208,9 @@ public final class OzoneQuota {
    * @return OzoneQuota object
    */
   public static OzoneQuota getOzoneQuota(long quotaInBytes,
-                                         long quotaInCounts) {
+      long quotaInCounts) {
     long size = 1L;
     Units unit = Units.BYTES;
-    setQuotaList();
     for (Long quota:quotaList.getSizeQuotaArray()){
       if(quotaInBytes % quota == 0){
         size = quotaInBytes / quota;
