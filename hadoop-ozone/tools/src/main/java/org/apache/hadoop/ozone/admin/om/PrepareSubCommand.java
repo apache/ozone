@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.admin.om;
 import static org.apache.hadoop.ozone.OmUtils.getOmHostsFromConfig;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus.PREPARE_COMPLETED;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
@@ -120,17 +121,22 @@ public class PrepareSubCommand implements Callable<Void> {
       for (Map.Entry<String, Boolean> e : omPreparedStatusMap.entrySet()) {
         if (!e.getValue()) {
           String omHost = e.getKey();
-          OzoneManagerProtocol singleOmClient =
-              parent.createOmClient(omServiceId, omHost, false);
-          PrepareStatusResponse response =
-              singleOmClient.getOzoneManagerPrepareStatus(prepareTxnId);
-          PrepareStatus status = response.getStatus();
-          System.out.println("OM : [" + omHost + "], Prepare " +
-              "Status : [" + status.name() + "], Current Transaction Id : [" +
-              response.getCurrentTxnIndex() + "]");
-          if (status.equals(PREPARE_COMPLETED)) {
-            e.setValue(true);
-            currentNumPreparedOms++;
+          try (OzoneManagerProtocol singleOmClient =
+                    parent.createOmClient(omServiceId, omHost, false)) {
+            PrepareStatusResponse response =
+                singleOmClient.getOzoneManagerPrepareStatus(prepareTxnId);
+            PrepareStatus status = response.getStatus();
+            System.out.println("OM : [" + omHost + "], Prepare " +
+                "Status : [" + status.name() + "], Current Transaction Id : [" +
+                response.getCurrentTxnIndex() + "]");
+            if (status.equals(PREPARE_COMPLETED)) {
+              e.setValue(true);
+              currentNumPreparedOms++;
+            }
+          } catch (IOException ioEx) {
+            System.out.println("Exception while checking preparation " +
+                "completeness for [" + omHost +
+                "], Error : [" + ioEx.getMessage() + "]");
           }
         }
       }
