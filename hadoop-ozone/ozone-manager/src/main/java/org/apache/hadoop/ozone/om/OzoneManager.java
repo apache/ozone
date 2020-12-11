@@ -57,8 +57,6 @@ import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Trash;
-import org.apache.hadoop.fs.TrashPolicy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -1187,8 +1185,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
     omRpcServer.start();
     isOmRpcServerRunning = true;
-    // TODO: Start this thread only on the leader node.
-    //  Should be fixed after HDDS-4451.
     startTrashEmptier(configuration);
 
     registerMXBean();
@@ -1247,8 +1243,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     omRpcServer.start();
     isOmRpcServerRunning = true;
 
-    // TODO: Start this thread only on the leader node.
-    //  Should be fixed after HDDS-4451.
     startTrashEmptier(configuration);
     registerMXBean();
 
@@ -1289,9 +1283,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             return FileSystem.get(fsconf);
           }
         });
-    conf.setClass("fs.trash.classname", TrashPolicyOzone.class,
-        TrashPolicy.class);
-    this.emptier = new Thread(new Trash(fs, conf).
+    this.emptier = new Thread(new OzoneTrash(fs, conf, this).
       getEmptier(), "Trash Emptier");
     this.emptier.setDaemon(true);
     this.emptier.start();
@@ -1400,12 +1392,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (httpServer != null) {
         httpServer.stop();
       }
-      // TODO:Also stop this thread if an OM switches from leader to follower.
-      //  Should be fixed after HDDS-4451.
-      if (this.emptier != null) {
-        emptier.interrupt();
-        emptier = null;
-      }
+      stopTrashEmptier();
       metadataManager.stop();
       metrics.unRegister();
       omClientProtocolMetrics.unregister();
@@ -3285,6 +3272,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       // During stopServices, if KeyManager was stopped successfully and
       // OMMetadataManager stop failed, we should restart the KeyManager.
       keyManager.start(configuration);
+      startTrashEmptier(configuration);
       throw e;
     }
 
@@ -3375,6 +3363,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     keyManager.stop();
     stopSecretManager();
     metadataManager.stop();
+    stopTrashEmptier();
+  }
+
+  private void stopTrashEmptier() {
+    if (this.emptier != null) {
+      emptier.interrupt();
+      emptier = null;
+    }
   }
 
   /**
@@ -3443,6 +3439,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // Restart required services
     metadataManager.start(configuration);
     keyManager.start(configuration);
+    startTrashEmptier(configuration);
 
     // Set metrics and start metrics back ground thread
     metrics.setNumVolumes(metadataManager.countRowsInTable(metadataManager
