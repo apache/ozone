@@ -48,6 +48,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.ha.OMNodeDetails;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -140,10 +141,14 @@ public final class OzoneManagerRatisServer {
       return processReply(omRequest, raftClientReply);
     }
     else {
-      throw new ServiceException(
-          new OMException("Cannot submit write request " +
-          omRequest.getCmdType().name() + " when OM is in prepare mode.",
-          OMException.ResultCodes.NOT_SUPPORTED_OPERATION));
+      // TODO: Put this in a factory somewhere, it was taken from a
+      //  createErrorResponse helper method.
+      OMResponse.Builder omResponse = OMResponse.newBuilder()
+          .setStatus(OzoneManagerProtocolProtos.Status.NOT_SUPPORTED_OPERATION)
+          .setCmdType(omRequest.getCmdType())
+          .setTraceID(omRequest.getTraceID())
+          .setSuccess(false);
+      return omResponse.build();
     }
   }
 

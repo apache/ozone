@@ -214,7 +214,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       // TODO: This will cause leader in ratis to step down without
       //  RATIS-1216 applied.
       String message = "Cannot apply write request " +
-          request.getCmdType().name() + " when OM is in prepare mode.";
+          request.getCmdType().name() + " when OM is in prepare ---mode.";
       OMException cause = new OMException(message,
           OMException.ResultCodes.OPERATION_DISALLOWED_WHILE_PREPARED);
       // Indicate that the leader should not step down because of this failure.

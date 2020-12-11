@@ -12,8 +12,6 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 
-import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
-
 public final class OzoneManagerPrepareState {
   private static boolean isPrepared;
 
