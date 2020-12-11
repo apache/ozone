@@ -474,10 +474,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       // snapshot directory.
       File[] dirs = new File(omRatisDirectory).listFiles();
 
-      for (File dir : dirs) {
-        if (dir.isDirectory() && dir.getName().equals("snapshot")) {
-          FileUtils.moveDirectory(dir.toPath(), omRatisSnapshotDir.toPath());
-          break;
+      if (dirs != null) {
+        for (File dir : dirs) {
+          if (dir.isDirectory() && dir.getName().equals("snapshot")) {
+            FileUtils.moveDirectory(dir.toPath(), omRatisSnapshotDir.toPath());
+            break;
+          }
         }
       }
 
