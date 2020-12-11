@@ -464,6 +464,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         throw new IllegalArgumentException(HddsConfigKeys.OZONE_METADATA_DIRS +
             " must be defined.");
       }
+      OmUtils.createOMDir(omRatisDirectory);
 
       // Create Ratis snapshot dir
       omRatisSnapshotDir = OmUtils.createOMDir(
