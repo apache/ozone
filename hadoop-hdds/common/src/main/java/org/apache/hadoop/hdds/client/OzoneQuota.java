@@ -88,8 +88,8 @@ public final class OzoneQuota {
      */
     public long sizeInBytes() {
       long sQuota = -1L;
-      for(Units quota : quotaList.getUnitQuotaArray()){
-        if(quota == this.unit){
+      for (Units quota : quotaList.getUnitQuotaArray()) {
+        if (quota == this.unit) {
           sQuota = quotaList.getQuotaSize(quota);
           break;
         }
@@ -169,8 +169,8 @@ public final class OzoneQuota {
     long quotaMultiplyExact = 0;
 
     try {
-      for(String quota : quotaList.getOzoneQuotaArray()){
-        if (uppercase.endsWith((quota))){
+      for (String quota : quotaList.getOzoneQuotaArray()) {
+        if (uppercase.endsWith((quota))) {
           size = uppercase
               .substring(0, uppercase.length() - quota.length());
           currUnit = quotaList.getUnits(quota);
@@ -184,7 +184,7 @@ public final class OzoneQuota {
       throw new IllegalArgumentException("Invalid values for quota, to ensure" +
           " that the Quota format is legal(supported values are BYTES, " +
           " KB, MB, GB and TB).");
-    } catch  (ArithmeticException e) {
+    } catch (ArithmeticException e) {
       LOG.debug("long overflow:\n{}", quotaMultiplyExact);
       throw new IllegalArgumentException("Invalid values for quota, the quota" +
           " value cannot be greater than Long.MAX_VALUE BYTES");
@@ -211,8 +211,8 @@ public final class OzoneQuota {
       long quotaInCounts) {
     long size = 1L;
     Units unit = Units.BYTES;
-    for (Long quota:quotaList.getSizeQuotaArray()){
-      if(quotaInBytes % quota == 0){
+    for (Long quota : quotaList.getSizeQuotaArray()) {
+      if (quotaInBytes % quota == 0) {
         size = quotaInBytes / quota;
         unit = quotaList.getQuotaUnit(quota);
       }
