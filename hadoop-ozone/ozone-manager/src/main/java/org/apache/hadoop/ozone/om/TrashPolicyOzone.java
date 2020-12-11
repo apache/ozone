@@ -137,7 +137,7 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
         try {                                     // sleep for interval
           Thread.sleep(end - now);
           if (!om.isLeader()){
-            return;
+            continue;
           }
         } catch (InterruptedException e) {
           break;                                  // exit on interrupt
