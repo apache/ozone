@@ -100,7 +100,7 @@ public class FinalizeScmUpgradeSubcommand extends ScmSubcommand {
       emitCancellationMsg("Storage Container Manager");
     } catch (ExecutionException e) {
       emitGeneralErrorMsg();
-      throw new IOException(e.getMessage());
+      throw new IOException(e.getCause());
     } finally {
       exec.shutdown();
     }
