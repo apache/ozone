@@ -136,7 +136,7 @@ public class SCMNodeManager implements NodeManager {
     this.numPipelinesPerMetadataVolume =
         conf.getInt(ScmConfigKeys.OZONE_SCM_PIPELINE_PER_METADATA_VOLUME,
             ScmConfigKeys.OZONE_SCM_PIPELINE_PER_METADATA_VOLUME_DEFAULT);
-    String dnLimit = conf.get(ScmConfigKeys.OZONE_SCM_DATANODE_PIPELINE_LIMIT);
+    String dnLimit = conf.get(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT);
     this.heavyNodeCriteria = dnLimit == null ? 0 : Integer.parseInt(dnLimit);
   }
 

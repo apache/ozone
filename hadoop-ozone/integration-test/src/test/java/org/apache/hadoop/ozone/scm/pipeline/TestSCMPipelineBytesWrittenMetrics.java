@@ -48,7 +48,7 @@ import java.util.concurrent.TimeUnit;
 import org.junit.Rule;
 import org.junit.rules.Timeout;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PIPELINE_LIMIT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE;
 import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
@@ -73,7 +73,7 @@ public class TestSCMPipelineBytesWrittenMetrics {
     conf.set(HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK,
         Boolean.TRUE.toString());
     conf.setBoolean(OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE, false);
-    conf.setInt(OZONE_SCM_DATANODE_PIPELINE_LIMIT, 1);
+    conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 1);
     conf.setTimeDuration(HDDS_PIPELINE_REPORT_INTERVAL, 10, TimeUnit.SECONDS);
 
     cluster = MiniOzoneCluster.newBuilder(conf)

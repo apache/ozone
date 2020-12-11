@@ -36,7 +36,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PIPELINE_LIMIT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE;
 
 /**
@@ -78,7 +78,7 @@ public class TestPipelineDatanodesIntersection {
   @Test
   public void testPipelineDatanodesIntersection() {
     NodeManager nodeManager= new MockNodeManager(true, nodeCount);
-    conf.setInt(OZONE_SCM_DATANODE_PIPELINE_LIMIT, nodeHeaviness);
+    conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, nodeHeaviness);
     conf.setBoolean(OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE, false);
     PipelineStateManager stateManager = new PipelineStateManager();
     PipelineProvider provider = new MockRatisPipelineProvider(nodeManager,

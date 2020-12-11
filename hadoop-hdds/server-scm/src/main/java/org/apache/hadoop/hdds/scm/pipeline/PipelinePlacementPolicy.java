@@ -75,7 +75,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     this.nodeManager = nodeManager;
     this.conf = conf;
     this.stateManager = stateManager;
-    String dnLimit = conf.get(ScmConfigKeys.OZONE_SCM_DATANODE_PIPELINE_LIMIT);
+    String dnLimit = conf.get(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT);
     this.heavyNodeCriteria = dnLimit == null ? 0 : Integer.parseInt(dnLimit);
   }
 

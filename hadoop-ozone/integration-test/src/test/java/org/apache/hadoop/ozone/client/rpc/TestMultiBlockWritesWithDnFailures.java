@@ -111,7 +111,7 @@ public class TestMultiBlockWritesWithDnFailures {
     conf.setTimeDuration(
         OzoneConfigKeys.DFS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY,
         1, TimeUnit.SECONDS);
-    conf.setInt(OZONE_SCM_DATANODE_PIPELINE_LIMIT, 2);
+    conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 2);
 
     conf.setQuietMode(false);
     cluster = MiniOzoneCluster.newBuilder(conf)

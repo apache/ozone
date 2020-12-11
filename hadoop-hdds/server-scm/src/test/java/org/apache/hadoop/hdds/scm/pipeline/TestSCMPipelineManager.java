@@ -55,7 +55,7 @@ import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.test.GenericTestUtils;
 
 import com.google.common.base.Supplier;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PIPELINE_LIMIT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT;
 import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
@@ -91,7 +91,7 @@ public class TestSCMPipelineManager {
   @Before
   public void setUp() throws Exception {
     conf = new OzoneConfiguration();
-    conf.setInt(OZONE_SCM_DATANODE_PIPELINE_LIMIT, 1);
+    conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 1);
     testDir = GenericTestUtils
         .getTestDir(TestSCMPipelineManager.class.getSimpleName());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
@@ -348,7 +348,7 @@ public class TestSCMPipelineManager {
         false);
     // turning off this config will ensure, pipeline creation is determined by
     // metadata volume count.
-    config.setInt(OZONE_SCM_DATANODE_PIPELINE_LIMIT, 0);
+    config.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 0);
     MockNodeManager nodeManagerMock = new MockNodeManager(true,
         3);
     nodeManagerMock.setNumMetaDataVolumes(numMetaDataVolumes);

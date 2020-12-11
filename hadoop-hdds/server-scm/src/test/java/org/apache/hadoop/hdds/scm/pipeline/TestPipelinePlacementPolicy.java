@@ -54,7 +54,7 @@ import java.io.IOException;
 
 import static junit.framework.TestCase.assertEquals;
 import static junit.framework.TestCase.assertTrue;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PIPELINE_LIMIT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
@@ -85,7 +85,7 @@ public class TestPipelinePlacementPolicy {
     nodeManager = new MockNodeManager(cluster, getNodesWithRackAwareness(),
         false, PIPELINE_PLACEMENT_MAX_NODES_COUNT);
     conf = new OzoneConfiguration();
-    conf.setInt(OZONE_SCM_DATANODE_PIPELINE_LIMIT, PIPELINE_LOAD_LIMIT);
+    conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, PIPELINE_LOAD_LIMIT);
     nodeManager.setNumPipelinePerDatanode(PIPELINE_LOAD_LIMIT);
     stateManager = new PipelineStateManager();
     placementPolicy = new PipelinePlacementPolicy(
@@ -546,7 +546,7 @@ public class TestPipelinePlacementPolicy {
 
     int considerHeavyCount =
         conf.getInt(
-            ScmConfigKeys.OZONE_SCM_DATANODE_PIPELINE_LIMIT,
+            ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT,
             ScmConfigKeys.OZONE_SCM_DATANODE_PIPELINE_LIMIT_DEFAULT) + 1;
 
     Node2PipelineMap mockMap = new Node2PipelineMap();
