@@ -609,7 +609,7 @@ public interface OzoneManagerProtocol
       throws IOException {
     return PrepareStatusResponse.newBuilder()
         .setCurrentTxnIndex(-1)
-        .setStatus(PrepareStatus.NOT_IN_PREPARE_STATE)
+        .setStatus(PrepareStatus.PREPARE_NOT_STARTED)
         .build();
   }
 }

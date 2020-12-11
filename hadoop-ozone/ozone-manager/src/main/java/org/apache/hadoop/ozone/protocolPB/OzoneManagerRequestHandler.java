@@ -98,8 +98,8 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartUploadInfo;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartInfo;
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus.PREPARE_DONE;
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus.PREPARE_NOT_DONE;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus.PREPARE_COMPLETED;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus.PREPARE_IN_PROGRESS;
 
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.slf4j.Logger;
@@ -635,14 +635,17 @@ public class OzoneManagerRequestHandler implements RequestHandler {
 
   private PrepareStatusResponse getPrepareStatus(PrepareStatusRequest request)
       throws IOException {
+    // TODO After HDDS-4569,
+    // When there is a global "prepared" state in OM, we can return
+    // PREPARE_NOT_STARTED instead of PREPARE_IN_PROGRESS appropriately.
     PrepareStatus prepareStatus = null;
     long txnID = request.getTxnID();
     long ratisSnapshotIndex = impl.getRatisSnapshotIndex();
     if (ratisSnapshotIndex != txnID) {
       LOG.info("Last Txn Index = {}", ratisSnapshotIndex);
-      prepareStatus =  PREPARE_NOT_DONE;
+      prepareStatus =  PREPARE_IN_PROGRESS;
     } else {
-      prepareStatus = PREPARE_DONE;
+      prepareStatus = PREPARE_COMPLETED;
     }
     return PrepareStatusResponse.newBuilder().setStatus(prepareStatus)
         .setCurrentTxnIndex(ratisSnapshotIndex).build();

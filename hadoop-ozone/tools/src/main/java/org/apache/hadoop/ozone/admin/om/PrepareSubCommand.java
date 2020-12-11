@@ -19,7 +19,10 @@ package org.apache.hadoop.ozone.admin.om;
 
 import static org.apache.hadoop.hdds.HddsUtils.getHostName;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus.PREPARE_COMPLETED;
 
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -108,11 +111,13 @@ public class PrepareSubCommand implements Callable<Void> {
     Map<String, Boolean> omPreparedStatusMap = new HashMap<>();
     Set<String> omHosts  = getOmHostsFromConfig();
     omHosts.forEach(h -> omPreparedStatusMap.put(h, false));
+    Duration pTimeout = Duration.of(prepareTimeOut, ChronoUnit.SECONDS);
+    Duration pInterval = Duration.of(prepareCheckInterval, ChronoUnit.SECONDS);
 
     System.out.println();
     System.out.println("Checking individual OM instances for prepare request " +
         "completion...");
-    long endTime = System.currentTimeMillis() + (prepareTimeOut * 1000);
+    long endTime = System.currentTimeMillis() + pTimeout.toMillis();
     int expectedNumPreparedOms = omPreparedStatusMap.size();
     int currentNumPreparedOms = 0;
     while (System.currentTimeMillis() < endTime &&
@@ -128,7 +133,7 @@ public class PrepareSubCommand implements Callable<Void> {
           System.out.println("OM : [" + omHost + "], Prepare " +
               "Status : [" + status.name() + "], Current Transaction Id : [" +
               response.getCurrentTxnIndex() + "]");
-          if (status.equals(PrepareStatus.PREPARE_DONE)) {
+          if (status.equals(PREPARE_COMPLETED)) {
             e.setValue(true);
             currentNumPreparedOms++;
           }
@@ -137,7 +142,7 @@ public class PrepareSubCommand implements Callable<Void> {
       if (currentNumPreparedOms < expectedNumPreparedOms) {
         System.out.println("Waiting for " + prepareCheckInterval +
             " seconds before retrying...");
-        Thread.sleep(prepareCheckInterval * 1000);
+        Thread.sleep(pInterval.toMillis());
       }
     }
     if (currentNumPreparedOms < expectedNumPreparedOms) {

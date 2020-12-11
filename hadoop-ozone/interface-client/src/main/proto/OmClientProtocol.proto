@@ -1100,10 +1100,12 @@ message PrepareStatusRequest {
 
 message PrepareStatusResponse {
     enum PrepareStatus {
-        NOT_IN_PREPARE_STATE = 1;
-        PREPARE_NOT_DONE = 2;
-        PREPARE_TXN_MISMATCH = 3;
-        PREPARE_DONE = 4;
+        // TODO
+        // HDDS-4569 may introduce new states here, like marker file found
+        // but with different txn id. We can add them as make sense.
+        PREPARE_NOT_STARTED = 1;
+        PREPARE_IN_PROGRESS = 2;
+        PREPARE_COMPLETED = 3;
     }
     required PrepareStatus status = 1;
     optional uint64 currentTxnIndex = 2;
