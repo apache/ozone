@@ -22,7 +22,6 @@ import picocli.CommandLine;
 
 import java.io.IOException;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
 
 /**
  * Base class for admin commands that connect via SCM client.
@@ -32,8 +31,7 @@ public abstract class ScmSubcommand implements Callable<Void> {
   @CommandLine.Mixin
   private ScmOption scmOption;
 
-  protected abstract void execute(ScmClient client)
-      throws IOException, ExecutionException;
+  protected abstract void execute(ScmClient client) throws IOException;
 
   @Override
   public final Void call() throws Exception {

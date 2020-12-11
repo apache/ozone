@@ -64,8 +64,7 @@ public class FinalizeScmUpgradeSubcommand extends ScmSubcommand {
   private boolean force;
 
   @Override
-  public void execute(ScmClient scmClient)
-      throws IOException, ExecutionException {
+  public void execute(ScmClient scmClient) throws IOException {
     String upgradeClientID = "Upgrade-Client-" + UUID.randomUUID().toString();
     try {
       StatusAndMessages finalizationResponse =
@@ -89,8 +88,8 @@ public class FinalizeScmUpgradeSubcommand extends ScmSubcommand {
   }
 
   private void monitorAndWaitFinalization(ScmClient client,
-                                          String upgradeClientID) throws
-      ExecutionException {
+                                          String upgradeClientID)
+      throws IOException {
     ExecutorService exec = Executors.newSingleThreadExecutor();
     Future<?> monitor =
         exec.submit(new UpgradeMonitor(client, upgradeClientID, force));
@@ -101,7 +100,7 @@ public class FinalizeScmUpgradeSubcommand extends ScmSubcommand {
       emitCancellationMsg("Storage Container Manager");
     } catch (ExecutionException e) {
       emitGeneralErrorMsg();
-      throw e;
+      throw new IOException(e.getMessage());
     } finally {
       exec.shutdown();
     }
