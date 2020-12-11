@@ -138,8 +138,16 @@ public class OMBucketDeleteRequest extends OMClientRequest {
       // update used namespace for volume
       String volumeKey = omMetadataManager.getVolumeKey(volumeName);
       OmVolumeArgs omVolumeArgs =
-              omMetadataManager.getVolumeTable().getReadCopy(volumeKey);
+          omMetadataManager.getVolumeTable().getReadCopy(volumeKey);
+      if (omVolumeArgs == null) {
+        throw new OMException("Volume " + volumeName + " is not found",
+            OMException.ResultCodes.VOLUME_NOT_FOUND);
+      }
       omVolumeArgs.incrUsedNamespace(-1L);
+      // Update table cache.
+      omMetadataManager.getVolumeTable().addCacheEntry(
+          new CacheKey<>(omMetadataManager.getVolumeKey(volumeName)),
+          new CacheValue<>(Optional.of(omVolumeArgs), transactionLogIndex));
 
       // Add to double buffer.
       omClientResponse = new OMBucketDeleteResponse(omResponse.build(),
