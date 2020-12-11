@@ -279,7 +279,6 @@ public class OMFileCreateRequest extends OMKeyRequest {
           .collect(Collectors.toList());
       omKeyInfo.appendNewBlocks(newLocationList, false);
 
-      omVolumeArgs = getVolumeInfo(omMetadataManager, volumeName);
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
       // check bucket and volume quota
       long preAllocatedSpace = newLocationList.size()
@@ -310,8 +309,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
           .setOpenVersion(openVersion).build())
           .setCmdType(Type.CreateFile);
       omClientResponse = new OMFileCreateResponse(omResponse.build(),
-          omKeyInfo, missingParentInfos, clientID, omVolumeArgs,
-          omBucketInfo.copyObject());
+          omKeyInfo, missingParentInfos, clientID, omBucketInfo.copyObject());
 
       result = Result.SUCCESS;
     } catch (IOException ex) {

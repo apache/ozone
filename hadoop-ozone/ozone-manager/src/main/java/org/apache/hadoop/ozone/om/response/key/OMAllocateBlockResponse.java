@@ -41,16 +41,14 @@ public class OMAllocateBlockResponse extends OMClientResponse {
 
   private OmKeyInfo omKeyInfo;
   private long clientID;
-  private OmVolumeArgs omVolumeArgs;
   private OmBucketInfo omBucketInfo;
 
   public OMAllocateBlockResponse(@Nonnull OMResponse omResponse,
       @Nonnull OmKeyInfo omKeyInfo, long clientID,
-      @Nonnull OmVolumeArgs omVolumeArgs, @Nonnull OmBucketInfo omBucketInfo) {
+      @Nonnull OmBucketInfo omBucketInfo) {
     super(omResponse);
     this.omKeyInfo = omKeyInfo;
     this.clientID = clientID;
-    this.omVolumeArgs = omVolumeArgs;
     this.omBucketInfo = omBucketInfo;
   }
 
@@ -74,7 +72,7 @@ public class OMAllocateBlockResponse extends OMClientResponse {
 
     // update bucket usedBytes.
     omMetadataManager.getBucketTable().putWithBatch(batchOperation,
-        omMetadataManager.getBucketKey(omVolumeArgs.getVolume(),
-            omBucketInfo.getBucketName()), omBucketInfo);
+        omMetadataManager.getBucketKey(omKeyInfo.getVolumeName(),
+            omKeyInfo.getBucketName()), omBucketInfo);
   }
 }

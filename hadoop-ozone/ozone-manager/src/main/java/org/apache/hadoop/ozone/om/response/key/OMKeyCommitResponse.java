@@ -42,17 +42,15 @@ public class OMKeyCommitResponse extends OMClientResponse {
   private OmKeyInfo omKeyInfo;
   private String ozoneKeyName;
   private String openKeyName;
-  private OmVolumeArgs omVolumeArgs;
   private OmBucketInfo omBucketInfo;
 
   public OMKeyCommitResponse(@Nonnull OMResponse omResponse,
       @Nonnull OmKeyInfo omKeyInfo, String ozoneKeyName, String openKeyName,
-      @Nonnull OmVolumeArgs omVolumeArgs, @Nonnull OmBucketInfo omBucketInfo) {
+      @Nonnull OmBucketInfo omBucketInfo) {
     super(omResponse);
     this.omKeyInfo = omKeyInfo;
     this.ozoneKeyName = ozoneKeyName;
     this.openKeyName = openKeyName;
-    this.omVolumeArgs = omVolumeArgs;
     this.omBucketInfo = omBucketInfo;
   }
 
@@ -78,7 +76,7 @@ public class OMKeyCommitResponse extends OMClientResponse {
 
     // update bucket usedBytes.
     omMetadataManager.getBucketTable().putWithBatch(batchOperation,
-        omMetadataManager.getBucketKey(omVolumeArgs.getVolume(),
+        omMetadataManager.getBucketKey(omBucketInfo.getVolumeName(),
             omBucketInfo.getBucketName()), omBucketInfo);
   }
 

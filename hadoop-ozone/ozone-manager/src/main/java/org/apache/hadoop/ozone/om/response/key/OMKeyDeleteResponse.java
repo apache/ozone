@@ -41,15 +41,13 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 public class OMKeyDeleteResponse extends AbstractOMKeyDeleteResponse {
 
   private OmKeyInfo omKeyInfo;
-  private OmVolumeArgs omVolumeArgs;
   private OmBucketInfo omBucketInfo;
 
   public OMKeyDeleteResponse(@Nonnull OMResponse omResponse,
       @Nonnull OmKeyInfo omKeyInfo, boolean isRatisEnabled,
-      @Nonnull OmVolumeArgs omVolumeArgs, @Nonnull OmBucketInfo omBucketInfo) {
+      @Nonnull OmBucketInfo omBucketInfo) {
     super(omResponse, isRatisEnabled);
     this.omKeyInfo = omKeyInfo;
-    this.omVolumeArgs = omVolumeArgs;
     this.omBucketInfo = omBucketInfo;
   }
 
@@ -75,7 +73,7 @@ public class OMKeyDeleteResponse extends AbstractOMKeyDeleteResponse {
 
     // update bucket usedBytes.
     omMetadataManager.getBucketTable().putWithBatch(batchOperation,
-        omMetadataManager.getBucketKey(omVolumeArgs.getVolume(),
+        omMetadataManager.getBucketKey(omBucketInfo.getVolumeName(),
             omBucketInfo.getBucketName()), omBucketInfo);
   }
 }

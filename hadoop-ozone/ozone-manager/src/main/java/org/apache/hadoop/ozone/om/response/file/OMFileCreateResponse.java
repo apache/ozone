@@ -41,10 +41,9 @@ public class OMFileCreateResponse extends OMKeyCreateResponse {
 
   public OMFileCreateResponse(@Nonnull OMResponse omResponse,
       @Nonnull OmKeyInfo omKeyInfo, @Nonnull List<OmKeyInfo> parentKeyInfos,
-      long openKeySessionID, @Nonnull OmVolumeArgs omVolumeArgs,
+      long openKeySessionID,
       @Nonnull OmBucketInfo omBucketInfo) {
-    super(omResponse, omKeyInfo, parentKeyInfos, openKeySessionID,
-        omVolumeArgs, omBucketInfo);
+    super(omResponse, omKeyInfo, parentKeyInfos, openKeySessionID, omBucketInfo);
   }
 
   /**
