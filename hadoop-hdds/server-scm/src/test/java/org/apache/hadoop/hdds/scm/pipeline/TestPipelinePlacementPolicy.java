@@ -547,7 +547,7 @@ public class TestPipelinePlacementPolicy {
     int considerHeavyCount =
         conf.getInt(
             ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT,
-            ScmConfigKeys.OZONE_SCM_DATANODE_PIPELINE_LIMIT_DEFAULT) + 1;
+            ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT_DEFAULT) + 1;
 
     Node2PipelineMap mockMap = new Node2PipelineMap();
     for (DatanodeDetails node : nodes) {
