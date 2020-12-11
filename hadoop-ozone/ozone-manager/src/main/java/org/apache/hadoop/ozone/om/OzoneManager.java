@@ -1392,8 +1392,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (httpServer != null) {
         httpServer.stop();
       }
-      // TODO:Also stop this thread if an OM switches from leader to follower.
-      //  Should be fixed after HDDS-4451.
       stopTrashEmptier();
       metadataManager.stop();
       metrics.unRegister();
