@@ -294,9 +294,11 @@ public class OzoneConfiguration extends Configuration
   }
 
   private static void addDeprecatedKeys(){
-    Configuration.addDeprecation(HDDS_DATANODE_RATIS_PREFIX_KEY + "."
-        + RaftServerConfigKeys.PREFIX + "." + "rpcslowness.timeout",
-        HDDS_DATANODE_RATIS_PREFIX_KEY + "."
-        + RaftServerConfigKeys.PREFIX + "." + "rpc.slowness.timeout");
+    Configuration.addDeprecations(new DeprecationDelta[]{
+        new DeprecationDelta(HDDS_DATANODE_RATIS_PREFIX_KEY + "."
+           + RaftServerConfigKeys.PREFIX + "." + "rpcslowness.timeout",
+           HDDS_DATANODE_RATIS_PREFIX_KEY + "."
+           + RaftServerConfigKeys.PREFIX + "." + "rpc.slowness.timeout")
+    });
   }
 }
