@@ -127,7 +127,7 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
     @Override
     public void run() {
       // if this is not the leader node,don't run the emptier
-      if (emptierInterval == 0 || !om.isLeader()) {
+      if (emptierInterval == 0 || !om.isLeaderReady()) {
         return;                                   // trash disabled
       }
       long now, end;
@@ -136,7 +136,7 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
         end = ceiling(now, emptierInterval);
         try {                                     // sleep for interval
           Thread.sleep(end - now);
-          if (!om.isLeader()){
+          if (!om.isLeaderReady()){
             continue;
           }
         } catch (InterruptedException e) {
