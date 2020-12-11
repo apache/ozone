@@ -454,7 +454,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     addS3GVolumeToDB();
 
     this.omRatisSnapshotInfo = new OMRatisSnapshotInfo();
-    initializeRatisServer();
+
     if (isRatisEnabled) {
       // Create Ratis storage dir
       String omRatisDirectory =
@@ -463,16 +463,37 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         throw new IllegalArgumentException(HddsConfigKeys.OZONE_METADATA_DIRS +
             " must be defined.");
       }
+
+
       OmUtils.createOMDir(omRatisDirectory);
+
       // Create Ratis snapshot dir
       omRatisSnapshotDir = OmUtils.createOMDir(
           OzoneManagerRatisServer.getOMRatisSnapshotDirectory(configuration));
+
+      // In old setups there is a chance that snapshot directory exists in
+      // Ratis Storage directory, if exists move it to Ratis SnapshotDir.
+      if (!omRatisDirectory.isEmpty()) {
+        File[] dirs = new File(omRatisDirectory).listFiles();
+        // Before starting ratis server check, if previous installation has
+        // snapshot directory in Ratis storage directory if so, move it to
+        // snapshot
+        // directory.
+        for (File dir : dirs) {
+          if (dir.isDirectory() && dir.getName().equals("snapshot")) {
+            FileUtils.moveDirectory(dir.toPath(), omRatisSnapshotDir.toPath());
+            break;
+          }
+        }
+      }
 
       if (peerNodes != null && !peerNodes.isEmpty()) {
         this.omSnapshotProvider = new OzoneManagerSnapshotProvider(
             configuration, omRatisSnapshotDir, peerNodes);
       }
     }
+
+    initializeRatisServer();
 
     metrics = OMMetrics.create();
     omClientProtocolMetrics = ProtocolMessageMetrics
