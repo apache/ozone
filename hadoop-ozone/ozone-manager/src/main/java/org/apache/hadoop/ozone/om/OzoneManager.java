@@ -344,6 +344,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   private Thread emptier;
 
+  @SuppressWarnings("methodlength")
   private OzoneManager(OzoneConfiguration conf) throws IOException,
       AuthenticationException {
     super(OzoneVersionInfo.OZONE_VERSION_INFO);
@@ -464,26 +465,19 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             " must be defined.");
       }
 
-
-      OmUtils.createOMDir(omRatisDirectory);
-
       // Create Ratis snapshot dir
       omRatisSnapshotDir = OmUtils.createOMDir(
           OzoneManagerRatisServer.getOMRatisSnapshotDirectory(configuration));
 
-      // In old setups there is a chance that snapshot directory exists in
-      // Ratis Storage directory, if exists move it to Ratis SnapshotDir.
-      if (!omRatisDirectory.isEmpty()) {
-        File[] dirs = new File(omRatisDirectory).listFiles();
-        // Before starting ratis server check, if previous installation has
-        // snapshot directory in Ratis storage directory if so, move it to
-        // snapshot
-        // directory.
-        for (File dir : dirs) {
-          if (dir.isDirectory() && dir.getName().equals("snapshot")) {
-            FileUtils.moveDirectory(dir.toPath(), omRatisSnapshotDir.toPath());
-            break;
-          }
+      // Before starting ratis server check, if previous installation has
+      // snapshot directory in Ratis storage directory if so, move it to
+      // snapshot directory.
+      File[] dirs = new File(omRatisDirectory).listFiles();
+
+      for (File dir : dirs) {
+        if (dir.isDirectory() && dir.getName().equals("snapshot")) {
+          FileUtils.moveDirectory(dir.toPath(), omRatisSnapshotDir.toPath());
+          break;
         }
       }
 
