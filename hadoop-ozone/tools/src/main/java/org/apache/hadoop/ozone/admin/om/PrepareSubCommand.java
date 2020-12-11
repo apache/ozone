@@ -17,23 +17,17 @@
 
 package org.apache.hadoop.ozone.admin.om;
 
-import static org.apache.hadoop.hdds.HddsUtils.getHostName;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.OmUtils.getOmHostsFromConfig;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus.PREPARE_COMPLETED;
 
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
-import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Callable;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
@@ -109,7 +103,8 @@ public class PrepareSubCommand implements Callable<Void> {
         "with Transaction Id : [" + prepareTxnId + "].");
 
     Map<String, Boolean> omPreparedStatusMap = new HashMap<>();
-    Set<String> omHosts  = getOmHostsFromConfig();
+    Set<String> omHosts = getOmHostsFromConfig(
+        parent.getParent().getOzoneConf(), omServiceId);
     omHosts.forEach(h -> omPreparedStatusMap.put(h, false));
     Duration pTimeout = Duration.of(prepareTimeOut, ChronoUnit.SECONDS);
     Duration pInterval = Duration.of(prepareCheckInterval, ChronoUnit.SECONDS);
@@ -156,21 +151,6 @@ public class PrepareSubCommand implements Callable<Void> {
     }
 
     return null;
-  }
-
-  private Set<String> getOmHostsFromConfig() {
-    OzoneConfiguration configuration = parent.getParent().getOzoneConf();
-    Collection<String> omNodeIds = OmUtils.getOMNodeIds(configuration,
-        omServiceId);
-    Set<String> omHosts = new HashSet<>();
-    for (String nodeId : OmUtils.emptyAsSingletonNull(omNodeIds)) {
-      String rpcAddrKey = OmUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY,
-          omServiceId, nodeId);
-      String rpcAddrStr = OmUtils.getOmRpcAddress(configuration, rpcAddrKey);
-      Optional<String> hostName = getHostName(rpcAddrStr);
-      hostName.ifPresent(omHosts::add);
-    }
-    return omHosts;
   }
 
 }
