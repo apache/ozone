@@ -27,7 +27,7 @@ fi
 export OZONE_VERSION=$(grep "<ozone.version>" "${DOCDIR}/../../pom.xml" | sed 's/<[^>]*>//g'|  sed 's/^[ \t]*//')
 
 ENABLE_GIT_INFO=
-if git status >& /dev/null; then
+if git -C $(pwd) status >& /dev/null; then
   ENABLE_GIT_INFO="--enableGitInfo"
 fi
 
