@@ -146,7 +146,7 @@ public class OMBucketDeleteRequest extends OMClientRequest {
       omVolumeArgs.incrUsedNamespace(-1L);
       // Update table cache.
       omMetadataManager.getVolumeTable().addCacheEntry(
-          new CacheKey<>(omMetadataManager.getVolumeKey(volumeName)),
+          new CacheKey<>(volumeKey),
           new CacheValue<>(Optional.of(omVolumeArgs), transactionLogIndex));
 
       // Add to double buffer.

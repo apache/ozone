@@ -314,7 +314,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
    */
   private void checkQuotaInNamespace(OmVolumeArgs omVolumeArgs,
       long allocatedNamespace) throws IOException {
-    if (omVolumeArgs.getQuotaInCounts() > OzoneConsts.QUOTA_RESET) {
+    if (omVolumeArgs.getQuotaInCounts() != OzoneConsts.QUOTA_RESET) {
       long usedNamespace = omVolumeArgs.getUsedNamespace();
       long quotaInNamespace = omVolumeArgs.getQuotaInCounts();
       long toUseNamespaceInTotal = usedNamespace + allocatedNamespace;
