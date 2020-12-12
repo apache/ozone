@@ -162,11 +162,20 @@ public class BaseFreonGenerator {
 
       //in case of an other failed test, we shouldn't execute more tasks.
       if (counter >= testNo || (!failAtEnd && failureCounter.get() > 0)) {
-        return;
+        break;
       }
 
       tryNextTask(provider, counter);
     }
+
+    taskLoopCompleted();
+  }
+
+  /**
+   * Provides a way to clean up per-thread resources.
+   */
+  protected void taskLoopCompleted() {
+    // no-op
   }
 
   /**
