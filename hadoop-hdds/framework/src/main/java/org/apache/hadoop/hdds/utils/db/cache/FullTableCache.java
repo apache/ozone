@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.hdds.utils.db.cache;
 
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -31,6 +32,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -40,64 +43,74 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Cache implementation for the table. Depending on the cache clean up policy
- * this cache will be full cache or partial cache.
- *
- * If cache cleanup policy is set as {@link CacheCleanupPolicy#MANUAL},
- * this will be a partial cache.
- *
- * If cache cleanup policy is set as {@link CacheCleanupPolicy#NEVER},
- * this will be a full cache.
+ * Cache implementation for the table. Full Table cache, where the DB state
+ * and cache state will be same for these tables.
  */
 @Private
 @Evolving
-public class TableCacheImpl<CACHEKEY extends CacheKey,
+public class FullTableCache<CACHEKEY extends CacheKey,
     CACHEVALUE extends CacheValue> implements TableCache<CACHEKEY, CACHEVALUE> {
 
   public static final Logger LOG =
-      LoggerFactory.getLogger(TableCacheImpl.class);
+      LoggerFactory.getLogger(FullTableCache.class);
 
   private final Map<CACHEKEY, CACHEVALUE> cache;
   private final NavigableSet<EpochEntry<CACHEKEY>> epochEntries;
   private ExecutorService executorService;
-  private CacheCleanupPolicy cleanupPolicy;
+
+  private final ReadWriteLock lock;
 
 
-
-  public TableCacheImpl(CacheCleanupPolicy cleanupPolicy) {
-
+  public FullTableCache() {
     // As for full table cache only we need elements to be inserted in sorted
-    // manner, so that list will be easy. For other we can go with Hash map.
-    if (cleanupPolicy == CacheCleanupPolicy.NEVER) {
-      cache = new ConcurrentSkipListMap<>();
-    } else {
-      cache = new ConcurrentHashMap<>();
-    }
+    // manner, so that list will be easy. But looks up have log(N) time
+    // complexity.
+
+    // Here lock is required to protect cache because cleanup is not done
+    // under any ozone level locks like bucket/volume, there is a chance of
+    // cleanup which are not flushed to disks when request processing thread
+    // updates entries.
+    cache = new ConcurrentSkipListMap<>();
+
+    lock = new ReentrantReadWriteLock();
+
     epochEntries = new ConcurrentSkipListSet<>();
+
     // Created a singleThreadExecutor, so one cleanup will be running at a
     // time.
     ThreadFactory build = new ThreadFactoryBuilder().setDaemon(true)
-        .setNameFormat("PartialTableCache Cleanup Thread - %d").build();
+        .setNameFormat("FullTableCache Cleanup Thread - %d").build();
     executorService = Executors.newSingleThreadExecutor(build);
-    this.cleanupPolicy = cleanupPolicy;
   }
 
   @Override
   public CACHEVALUE get(CACHEKEY cachekey) {
-    return cache.get(cachekey);
+    try {
+      lock.readLock().lock();
+      return cache.get(cachekey);
+    } finally {
+      lock.readLock().unlock();
+    }
   }
 
   @Override
   public void loadInitial(CACHEKEY cacheKey, CACHEVALUE cacheValue) {
     // No need to add entry to epochEntries. Adding to cache is required during
     // normal put operation.
+    // No need of acquiring lock, this is performed only during startup. No
+    // operations happening at that time.
     cache.put(cacheKey, cacheValue);
   }
 
   @Override
   public void put(CACHEKEY cacheKey, CACHEVALUE value) {
-    cache.put(cacheKey, value);
-    epochEntries.add(new EpochEntry<>(value.getEpoch(), cacheKey));
+    try {
+      lock.writeLock().lock();
+      cache.put(cacheKey, value);
+      epochEntries.add(new EpochEntry<>(value.getEpoch(), cacheKey));
+    } finally {
+      lock.writeLock().unlock();
+    }
   }
 
   public void cleanup(List<Long> epochs) {
@@ -115,7 +128,7 @@ public class TableCacheImpl<CACHEKEY extends CacheKey,
   }
 
   @VisibleForTesting
-  protected void evictCache(List<Long> epochs) {
+  public void evictCache(List<Long> epochs) {
     EpochEntry<CACHEKEY> currentEntry;
     final AtomicBoolean removed = new AtomicBoolean();
     CACHEKEY cachekey;
@@ -125,43 +138,44 @@ public class TableCacheImpl<CACHEKEY extends CacheKey,
       currentEntry = iterator.next();
       cachekey = currentEntry.getCachekey();
       long currentEpoch = currentEntry.getEpoch();
-      CacheValue cacheValue = cache.computeIfPresent(cachekey, ((k, v) -> {
-        if (cleanupPolicy == CacheCleanupPolicy.MANUAL) {
-          if (v.getEpoch() == currentEpoch && epochs.contains(v.getEpoch())) {
-            LOG.debug("CacheKey {} with epoch {} is removed from cache",
-                k.getCacheKey(), currentEpoch);
-            iterator.remove();
-            removed.set(true);
-            return null;
-          }
-        } else if (cleanupPolicy == CacheCleanupPolicy.NEVER) {
-          // Remove only entries which are marked for delete.
+
+      // Acquire lock to avoid race between cleanup and add to cache entry by
+      // client requests.
+      try {
+        lock.writeLock().lock();
+        cache.computeIfPresent(cachekey, ((k, v) -> {
           if (v.getEpoch() == currentEpoch && epochs.contains(v.getEpoch())
               && v.getCacheValue() == null) {
-            LOG.debug("CacheKey {} with epoch {} is removed from cache",
-                k.getCacheKey(), currentEpoch);
-            removed.set(true);
+            if (LOG.isDebugEnabled()) {
+              LOG.debug("CacheKey {} with epoch {} is removed from cache",
+                  k.getCacheKey(), currentEpoch);
+            }
             iterator.remove();
+            removed.set(true);
             return null;
           }
-        }
-        return v;
-      }));
+          return v;
+        }));
+      } finally {
+        lock.writeLock().unlock();
+      }
 
-      // If override entries, then for those epoch entries, there will be no
-      // entry in cache. This can occur in the case we have cleaned up the
-      // override cache entry, but in epoch entry it is still lying around.
-      // This is done to cleanup epoch entries.
-      if (!removed.get() && cacheValue == null) {
-        LOG.debug("CacheKey {} with epoch {} is removed from epochEntry for " +
-                "a key not existing in cache", cachekey.getCacheKey(),
-            currentEpoch);
-        iterator.remove();
-      } else if (currentEpoch >= lastEpoch) {
-        // If currentEntry epoch is greater than last epoch provided, we have
-        // deleted all entries less than specified epoch. So, we can break.
+      // If currentEntry epoch is greater than last epoch provided, we have
+      // deleted all entries less than specified epoch. So, we can break.
+      if (currentEpoch > lastEpoch) {
         break;
       }
+
+      // When epoch entry is not removed, this might be a override entry in
+      // cache. Clean that epoch entry.
+      if (!removed.get()) {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("CacheKey {} with epoch {} is an override entry",
+              cachekey.getCacheKey(), currentEpoch);
+        }
+        iterator.remove();
+      }
+
       removed.set(false);
     }
   }
@@ -170,12 +184,7 @@ public class TableCacheImpl<CACHEKEY extends CacheKey,
 
     CACHEVALUE cachevalue = cache.get(cachekey);
     if (cachevalue == null) {
-      if (cleanupPolicy == CacheCleanupPolicy.NEVER) {
-        return new CacheResult<>(CacheResult.CacheStatus.NOT_EXIST, null);
-      } else {
-        return new CacheResult<>(CacheResult.CacheStatus.MAY_EXIST,
-            null);
-      }
+      return new CacheResult<>(CacheResult.CacheStatus.NOT_EXIST, null);
     } else {
       if (cachevalue.getCacheValue() != null) {
         return new CacheResult<>(CacheResult.CacheStatus.EXISTS, cachevalue);
@@ -193,13 +202,4 @@ public class TableCacheImpl<CACHEKEY extends CacheKey,
     return epochEntries;
   }
 
-  /**
-   * Cleanup policies for table cache.
-   */
-  public enum CacheCleanupPolicy {
-    NEVER, // Cache will not be cleaned up. This mean's the table maintains
-    // full cache.
-    MANUAL // Cache will be cleaned up, once after flushing to DB. It is
-    // caller's responsibility to flush to DB, before calling cleanup cache.
-  }
 }

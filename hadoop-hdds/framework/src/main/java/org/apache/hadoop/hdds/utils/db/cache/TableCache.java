@@ -22,6 +22,7 @@ package org.apache.hadoop.hdds.utils.db.cache;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience.Private;
 import org.apache.hadoop.hdds.annotation.InterfaceStability.Evolving;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 
 import java.util.Iterator;
 import java.util.List;
@@ -47,9 +48,9 @@ public interface TableCache<CACHEKEY extends CacheKey,
   CACHEVALUE get(CACHEKEY cacheKey);
 
   /**
-   * This method should be called for tables with cache cleanup policy
-   * {@link TableCacheImpl.CacheCleanupPolicy#NEVER} after system restart to
-   * fill up the cache.
+   * This method should be called for tables with cache type full cache.
+   * {@link TableCache.CacheType#FullCache} after system
+   * restart to fill up the cache.
    * @param cacheKey
    * @param cacheValue
    */
@@ -73,6 +74,9 @@ public interface TableCache<CACHEKEY extends CacheKey,
    */
   void cleanup(List<Long> epochs);
 
+  @VisibleForTesting
+  void evictCache(List<Long> epochs);
+
   /**
    * Return the size of the cache.
    * @return size
@@ -92,15 +96,13 @@ public interface TableCache<CACHEKEY extends CacheKey,
    * {@link CacheResult.CacheStatus#EXISTS}
    *
    * If it does not exist:
-   *  If cache clean up policy is
-   *  {@link TableCacheImpl.CacheCleanupPolicy#NEVER} it means table cache is
-   *  full cache. It return's {@link CacheResult} with null
-   *  and status as {@link CacheResult.CacheStatus#NOT_EXIST}.
+   *  If cache type is
+   *  {@link TableCache.CacheType#FullCache}. It return's {@link CacheResult}
+   *  with null and status as {@link CacheResult.CacheStatus#NOT_EXIST}.
    *
-   *  If cache clean up policy is
-   *  {@link TableCacheImpl.CacheCleanupPolicy#MANUAL} it means
-   *  table cache is partial cache. It return's {@link CacheResult} with
-   *  null and status as MAY_EXIST.
+   *  If cache type is
+   *  {@link TableCache.CacheType#PartialCache}.
+   *  It return's {@link CacheResult} with null and status as MAY_EXIST.
    *
    * @param cachekey
    */
@@ -109,4 +111,11 @@ public interface TableCache<CACHEKEY extends CacheKey,
 
   @VisibleForTesting
   Set<EpochEntry<CACHEKEY>> getEpochEntrySet();
+
+  public enum CacheType {
+    FullCache, //  This mean's the table maintains full cache. Cache and DB
+    // state are same.
+    PartialCache // This is partial table cache, cache state is partial state
+    // compared to DB state.
+  }
 }
