@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -115,6 +116,9 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   private static final Logger LOG = LoggerFactory
       .getLogger(XceiverServerRatis.class);
   private static final AtomicLong CALL_ID_COUNTER = new AtomicLong();
+  private static final List<Integer> DEFAULT_PRIORITY_LIST =
+      new ArrayList<>(
+          Collections.nCopies(HddsProtos.ReplicationFactor.THREE_VALUE, 0));
 
   private static long nextCallId() {
     return CALL_ID_COUNTER.getAndIncrement() & Long.MAX_VALUE;
@@ -139,6 +143,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   private Map<RaftGroupId, Boolean> groupLeaderMap = new ConcurrentHashMap<>();
   // Timeout used while calling submitRequest directly.
   private long requestTimeout;
+  private boolean shouldDeleteRatisLogDirectory;
 
   /**
    * Maintains a list of active volumes per StorageType.
@@ -159,6 +164,12 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     this.containerController = containerController;
     this.raftPeerId = RatisHelper.toRaftPeerId(dd);
     chunkExecutors = createChunkExecutors(conf);
+    nodeFailureTimeoutMs =
+            conf.getObject(DatanodeRatisServerConfig.class)
+                    .getFollowerSlownessTimeout();
+    shouldDeleteRatisLogDirectory =
+            conf.getObject(DatanodeRatisServerConfig.class)
+                    .shouldDeleteRatisLogDirectory();
 
     RaftServer.Builder builder =
         RaftServer.newBuilder().setServerId(raftPeerId)
@@ -209,6 +220,21 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         TimeDuration.valueOf(duration, timeUnit);
     RaftServerConfigKeys.Log.StateMachineData
         .setSyncTimeout(properties, dataSyncTimeout);
+    // typically a pipeline close will be initiated after a node failure
+    // timeout from Ratis in case a follower does not respond.
+    // By this time, all the writeStateMachine calls should be stopped
+    // and IOs should fail.
+    // Even if the leader is not able to complete write calls within
+    // the timeout seconds, it should just fail the operation and trigger
+    // pipeline close. failing the writeStateMachine call with limited retries
+    // will ensure even the leader initiates a pipeline close if its not
+    // able to complete write in the timeout configured.
+
+    // NOTE : the default value for the retry count in ratis is -1,
+    // which means retry indefinitely.
+    RaftServerConfigKeys.Log.StateMachineData
+            .setSyncTimeoutRetry(properties, (int) nodeFailureTimeoutMs /
+                    dataSyncTimeout.toIntExact(TimeUnit.MILLISECONDS));
 
     // set timeout for a retry cache entry
     setTimeoutForRetryCache(properties);
@@ -218,9 +244,6 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
     // Set the maximum cache segments
     RaftServerConfigKeys.Log.setSegmentCacheNumMax(properties, 2);
-
-    // set the node failure timeout
-    setNodeFailureTimeout(properties);
 
     // Set the ratis storage directory
     Collection<String> storageDirPaths =
@@ -295,13 +318,6 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     RatisHelper.createRaftServerProperties(conf, properties);
 
     return properties;
-  }
-
-  private void setNodeFailureTimeout(RaftProperties properties) {
-    nodeFailureTimeoutMs =
-        conf.getObject(DatanodeRatisServerConfig.class)
-            .getFollowerSlownessTimeout();
-
   }
 
   private void setRatisLeaderElectionTimeout(RaftProperties properties) {
@@ -711,10 +727,23 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
   @Override
   public void addGroup(HddsProtos.PipelineID pipelineId,
-      Collection<DatanodeDetails> peers) throws IOException {
+      List<DatanodeDetails> peers) throws IOException {
+    if (peers.size() == getDefaultPriorityList().size()) {
+      addGroup(pipelineId, peers, getDefaultPriorityList());
+    } else {
+      addGroup(pipelineId, peers,
+          new ArrayList<>(Collections.nCopies(peers.size(), 0)));
+    }
+  }
+
+  @Override
+  public void addGroup(HddsProtos.PipelineID pipelineId,
+      List<DatanodeDetails> peers,
+      List<Integer> priorityList) throws IOException {
     final PipelineID pipelineID = PipelineID.getFromProtobuf(pipelineId);
     final RaftGroupId groupId = RaftGroupId.valueOf(pipelineID.getId());
-    final RaftGroup group = RatisHelper.newRaftGroup(groupId, peers);
+    final RaftGroup group =
+        RatisHelper.newRaftGroup(groupId, peers, priorityList);
     GroupManagementRequest request = GroupManagementRequest.newAdd(
         clientId, server.getId(), nextCallId(), group);
 
@@ -730,10 +759,13 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   @Override
   public void removeGroup(HddsProtos.PipelineID pipelineId)
       throws IOException {
+    // if shouldDeleteRatisLogDirectory is set to false, the raft log
+    // directory will be renamed and kept aside for debugging.
+    // In case, its set to true, the raft log directory will be removed
     GroupManagementRequest request = GroupManagementRequest.newRemove(
         clientId, server.getId(), nextCallId(),
         RaftGroupId.valueOf(PipelineID.getFromProtobuf(pipelineId).getId()),
-        true, false);
+        shouldDeleteRatisLogDirectory, !shouldDeleteRatisLogDirectory);
 
     RaftClientReply reply;
     try {
@@ -864,4 +896,10 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     return ImmutableList.copyOf(executors);
   }
 
+  /**
+   * @return list of default priority
+   */
+  public static List<Integer> getDefaultPriorityList() {
+    return DEFAULT_PRIORITY_LIST;
+  }
 }

@@ -27,6 +27,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.rules.TemporaryFolder;
+import org.rocksdb.ColumnFamilyOptions;
 
 import java.io.File;
 import java.io.IOException;
@@ -99,15 +100,27 @@ public class TestDBStoreBuilder {
     if(!newFolder.exists()) {
       Assert.assertTrue(newFolder.mkdirs());
     }
-    thrown.expect(IOException.class);
-    DBStoreBuilder.newBuilder(conf)
+    // Registering a new table with the same name should replace the previous
+    // one.
+    DBStore dbStore = DBStoreBuilder.newBuilder(conf)
         .setName("Test.db")
         .setPath(newFolder.toPath())
         .addTable("FIRST")
-        .addTable("FIRST")
+        .addTable("FIRST", new ColumnFamilyOptions())
         .build();
-    // Nothing to do , This will throw so we do not have to close.
+    // Building should succeed without error.
 
+    try (Table<byte[], byte[]> firstTable = dbStore.getTable("FIRST")) {
+      byte[] key =
+          RandomStringUtils.random(9).getBytes(StandardCharsets.UTF_8);
+      byte[] value =
+          RandomStringUtils.random(9).getBytes(StandardCharsets.UTF_8);
+      firstTable.put(key, value);
+      byte[] temp = firstTable.get(key);
+      Assert.assertArrayEquals(value, temp);
+    }
+
+    dbStore.close();
   }
 
   @Test

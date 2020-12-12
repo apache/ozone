@@ -45,6 +45,7 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.metadata.PipelineIDCodec;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.PipelineReportFromDatanode;
 import org.apache.hadoop.hdds.server.events.EventQueue;
@@ -131,6 +132,7 @@ public class TestSCMPipelineManager {
       Pipeline pipeline = pipelineManager
           .createPipeline(HddsProtos.ReplicationType.RATIS,
               HddsProtos.ReplicationFactor.THREE);
+      pipelineManager.openPipeline(pipeline.getId());
       pipelines.add(pipeline);
     }
     pipelineManager.close();
@@ -146,7 +148,8 @@ public class TestSCMPipelineManager {
     pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
         mockRatisProvider);
     for (Pipeline p : pipelines) {
-      pipelineManager.openPipeline(p.getId());
+      // After reload, pipelines should be in open state
+      Assert.assertTrue(pipelineManager.getPipeline(p.getId()).isOpen());
     }
     List<Pipeline> pipelineList =
         pipelineManager.getPipelines(HddsProtos.ReplicationType.RATIS);
@@ -786,7 +789,7 @@ public class TestSCMPipelineManager {
         .setState(Pipeline.PipelineState.OPEN)
         .setNodes(
             Arrays.asList(
-                nodeManager.getNodes(HddsProtos.NodeState.HEALTHY).get(0)
+                nodeManager.getNodes(NodeStatus.inServiceHealthy()).get(0)
             )
         )
         .setNodesInOrder(Arrays.asList(0))

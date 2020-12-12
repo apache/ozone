@@ -95,6 +95,21 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
       operationResult = apply(omKeyInfo, trxnLogIndex);
       omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
+      // Update the modification time when updating ACLs of Key.
+      long modificationTime = omKeyInfo.getModificationTime();
+      if (getOmRequest().getAddAclRequest().hasObj() && operationResult) {
+        modificationTime = getOmRequest().getAddAclRequest()
+            .getModificationTime();
+      } else if (getOmRequest().getSetAclRequest().hasObj()){
+        modificationTime = getOmRequest().getSetAclRequest()
+            .getModificationTime();
+      } else if (getOmRequest().getRemoveAclRequest().hasObj()
+          && operationResult) {
+        modificationTime = getOmRequest().getRemoveAclRequest()
+            .getModificationTime();
+      }
+      omKeyInfo.setModificationTime(modificationTime);
+
       // update cache.
       omMetadataManager.getKeyTable().addCacheEntry(
           new CacheKey<>(dbKey),

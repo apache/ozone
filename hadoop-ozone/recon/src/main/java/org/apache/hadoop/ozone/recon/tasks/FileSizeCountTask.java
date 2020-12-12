@@ -96,7 +96,9 @@ public class FileSizeCountTask implements ReconOmTask {
       return new ImmutablePair<>(getTaskName(), false);
     }
     // Truncate table before inserting new rows
-    dslContext.truncate(FILE_COUNT_BY_SIZE);
+    int execute = dslContext.delete(FILE_COUNT_BY_SIZE).execute();
+    LOG.info("Deleted {} records from {}", execute, FILE_COUNT_BY_SIZE);
+
     writeCountsToDB(true, fileSizeCountMap);
 
     LOG.info("Completed a 'reprocess' run of FileSizeCountTask.");

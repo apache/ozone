@@ -17,11 +17,9 @@
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.
-    StorageContainerDatanodeProtocolProtos.ClosePipelineCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.
     StorageContainerDatanodeProtocolProtos.SCMCommandProto;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.ozone.container.common.statemachine
     .SCMConnectionManager;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
@@ -68,17 +66,16 @@ public class ClosePipelineCommandHandler implements CommandHandler {
     invocationCount.incrementAndGet();
     final long startTime = Time.monotonicNow();
     final DatanodeDetails dn = context.getParent().getDatanodeDetails();
-    final ClosePipelineCommandProto closeCommand =
-        ((ClosePipelineCommand)command).getProto();
-    final HddsProtos.PipelineID pipelineID = closeCommand.getPipelineID();
+    ClosePipelineCommand closePipelineCommand = (ClosePipelineCommand) command;
+    final PipelineID pipelineID = closePipelineCommand.getPipelineID();
 
     try {
       XceiverServerSpi server = ozoneContainer.getWriteChannel();
-      server.removeGroup(pipelineID);
-      LOG.info("Close Pipeline #{} command on datanode #{}.", pipelineID,
+      server.removeGroup(pipelineID.getProtobuf());
+      LOG.info("Close Pipeline {} command on datanode {}.", pipelineID,
           dn.getUuidString());
     } catch (IOException e) {
-      LOG.error("Can't close pipeline #{}", pipelineID, e);
+      LOG.error("Can't close pipeline {}", pipelineID, e);
     } finally {
       long endTime = Time.monotonicNow();
       totalTime += endTime - startTime;

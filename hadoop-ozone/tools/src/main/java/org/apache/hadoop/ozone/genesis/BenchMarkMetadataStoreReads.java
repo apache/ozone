@@ -27,7 +27,7 @@ import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.infra.Blackhole;
 
 import java.io.IOException;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 
 import static org.apache.hadoop.ozone.genesis.GenesisUtil.CACHE_10MB_TYPE;
 import static org.apache.hadoop.ozone.genesis.GenesisUtil.CACHE_1GB_TYPE;
@@ -52,9 +52,9 @@ public class BenchMarkMetadataStoreReads {
   public void initialize() throws IOException {
     store = GenesisUtil.getMetadataStore(this.type);
     byte[] data = RandomStringUtils.randomAlphanumeric(DATA_LEN)
-        .getBytes(Charset.forName("UTF-8"));
+        .getBytes(StandardCharsets.UTF_8);
     for (int x = 0; x < MAX_KEYS; x++) {
-      store.put(Long.toHexString(x).getBytes(Charset.forName("UTF-8")), data);
+      store.put(Long.toHexString(x).getBytes(StandardCharsets.UTF_8), data);
     }
     if (type.compareTo(CLOSED_TYPE) == 0) {
       store.compactDB();
@@ -65,6 +65,6 @@ public class BenchMarkMetadataStoreReads {
   public void test(Blackhole bh) throws IOException {
     long x = org.apache.commons.lang3.RandomUtils.nextLong(0L, MAX_KEYS);
     bh.consume(
-        store.get(Long.toHexString(x).getBytes(Charset.forName("UTF-8"))));
+        store.get(Long.toHexString(x).getBytes(StandardCharsets.UTF_8)));
   }
 }

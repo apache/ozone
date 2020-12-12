@@ -156,7 +156,7 @@ public class TestXceiverClientGrpc {
             .setContainerID(1)
             .setLocalID(1)
             .setBlockCommitSequenceId(1)
-            .build());
+            .build(), null);
   }
 
   private void invokeXceiverClientReadChunk(XceiverClientSpi client)
@@ -174,14 +174,14 @@ public class TestXceiverClientGrpc {
             .setOffset(100)
             .build(),
         bid,
-        null);
+        null, null);
   }
 
   private void invokeXceiverClientReadSmallFile(XceiverClientSpi client)
       throws IOException {
     BlockID bid = new BlockID(1, 1);
     bid.setBlockCommitSequenceId(1);
-    ContainerProtocolCalls.readSmallFile(client, bid);
+    ContainerProtocolCalls.readSmallFile(client, bid, null);
   }
 
   private XceiverClientReply buildValidResponse() {

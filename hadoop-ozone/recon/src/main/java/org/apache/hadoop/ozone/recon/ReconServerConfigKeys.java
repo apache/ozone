@@ -25,7 +25,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceStability;
  */
 @InterfaceAudience.Public
 @InterfaceStability.Unstable
-public final class ReconServerConfigKeys {
+public final class  ReconServerConfigKeys {
 
   public static final String OZONE_RECON_HTTP_ENABLED_KEY =
       "ozone.recon.http.enabled";
@@ -60,29 +60,47 @@ public final class ReconServerConfigKeys {
 
   public static final String RECON_STORAGE_DIR = "recon";
 
+  public static final String OZONE_RECON_OM_SOCKET_TIMEOUT =
+      "ozone.recon.om.socket.timeout";
+  public static final String OZONE_RECON_OM_SOCKET_TIMEOUT_DEFAULT = "5s";
+  @Deprecated
   public static final String RECON_OM_SOCKET_TIMEOUT =
       "recon.om.socket.timeout";
-  public static final String RECON_OM_SOCKET_TIMEOUT_DEFAULT = "5s";
 
+  public static final String OZONE_RECON_OM_CONNECTION_TIMEOUT =
+      "ozone.recon.om.connection.timeout";
+  public static final String OZONE_RECON_OM_CONNECTION_TIMEOUT_DEFAULT = "5s";
+  @Deprecated
   public static final String RECON_OM_CONNECTION_TIMEOUT =
       "recon.om.connection.timeout";
-  public static final String RECON_OM_CONNECTION_TIMEOUT_DEFAULT = "5s";
 
+  public static final String OZONE_RECON_OM_CONNECTION_REQUEST_TIMEOUT =
+      "ozone.recon.om.connection.request.timeout";
+  public static final String OZONE_RECON_OM_CONNECTION_REQUEST_TIMEOUT_DEFAULT =
+      "5s";
+  @Deprecated
   public static final String RECON_OM_CONNECTION_REQUEST_TIMEOUT =
       "recon.om.connection.request.timeout";
 
-  public static final String RECON_OM_CONNECTION_REQUEST_TIMEOUT_DEFAULT = "5s";
-
+  public static final String OZONE_RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY =
+      "ozone.recon.om.snapshot.task.initial.delay";
+  public static final String
+      OZONE_RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT = "1m";
+  @Deprecated
   public static final String RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY =
       "recon.om.snapshot.task.initial.delay";
-  public static final String
-      RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT = "1m";
 
-  public static final String RECON_OM_SNAPSHOT_TASK_INTERVAL =
-      "recon.om.snapshot.task.interval.delay";
-  public static final String RECON_OM_SNAPSHOT_TASK_INTERVAL_DEFAULT
+  public static final String OZONE_RECON_OM_SNAPSHOT_TASK_INTERVAL_DELAY =
+      "ozone.recon.om.snapshot.task.interval.delay";
+  public static final String OZONE_RECON_OM_SNAPSHOT_TASK_INTERVAL_DEFAULT
       = "10m";
+  @Deprecated
+  public static final String RECON_OM_SNAPSHOT_TASK_INTERVAL_DELAY =
+      "recon.om.snapshot.task.interval.delay";
 
+  public static final String OZONE_RECON_OM_SNAPSHOT_TASK_FLUSH_PARAM =
+      "ozone.recon.om.snapshot.task.flush.param";
+  @Deprecated
   public static final String RECON_OM_SNAPSHOT_TASK_FLUSH_PARAM =
       "recon.om.snapshot.task.flush.param";
 
@@ -96,17 +114,19 @@ public final class ReconServerConfigKeys {
   public static final String OZONE_RECON_HTTP_AUTH_TYPE =
       OZONE_RECON_HTTP_AUTH_CONFIG_PREFIX + "type";
 
-  public static final String RECON_METRICS_HTTP_CONNECTION_TIMEOUT =
+  public static final String OZONE_RECON_METRICS_HTTP_CONNECTION_TIMEOUT =
       "ozone.recon.metrics.http.connection.timeout";
 
-  public static final String RECON_METRICS_HTTP_CONNECTION_TIMEOUT_DEFAULT =
+  public static final String
+      OZONE_RECON_METRICS_HTTP_CONNECTION_TIMEOUT_DEFAULT =
       "10s";
 
-  public static final String RECON_METRICS_HTTP_CONNECTION_REQUEST_TIMEOUT =
+  public static final String
+      OZONE_RECON_METRICS_HTTP_CONNECTION_REQUEST_TIMEOUT =
       "ozone.recon.metrics.http.connection.request.timeout";
 
   public static final String
-      RECON_METRICS_HTTP_CONNECTION_REQUEST_TIMEOUT_DEFAULT = "10s";
+      OZONE_RECON_METRICS_HTTP_CONNECTION_REQUEST_TIMEOUT_DEFAULT = "10s";
 
   /**
    * Private constructor for utility class.

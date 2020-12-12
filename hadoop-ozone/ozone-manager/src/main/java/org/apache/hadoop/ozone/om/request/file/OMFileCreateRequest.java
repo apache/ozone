@@ -166,6 +166,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
     String volumeName = keyArgs.getVolumeName();
     String bucketName = keyArgs.getBucketName();
     String keyName = keyArgs.getKeyName();
+    int numMissingParents = 0;
 
     // if isRecursive is true, file would be created even if parent
     // directories does not exist.
@@ -260,6 +261,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
       omKeyInfo = prepareKeyInfo(omMetadataManager, keyArgs, dbKeyInfo,
           keyArgs.getDataSize(), locations, getFileEncryptionInfo(keyArgs),
           ozoneManager.getPrefixManager(), bucketInfo, trxnLogIndex,
+          ozoneManager.getObjectIdFromTxId(trxnLogIndex),
           ozoneManager.isRatisEnabled());
 
       long openVersion = omKeyInfo.getLatestVersionLocations().getVersion();
@@ -279,11 +281,11 @@ public class OMFileCreateRequest extends OMKeyRequest {
 
       omVolumeArgs = getVolumeInfo(omMetadataManager, volumeName);
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
-      // check volume quota
+      // check bucket and volume quota
       long preAllocatedSpace = newLocationList.size()
           * ozoneManager.getScmBlockSize()
           * omKeyInfo.getFactor().getNumber();
-      checkVolumeQuotaInBytes(omVolumeArgs, preAllocatedSpace);
+      checkBucketQuotaInBytes(omBucketInfo, preAllocatedSpace);
 
       // Add to cache entry can be done outside of lock for this openKey.
       // Even if bucket gets deleted, when commitKey we shall identify if
@@ -298,10 +300,9 @@ public class OMFileCreateRequest extends OMKeyRequest {
           bucketName, Optional.absent(), Optional.of(missingParentInfos),
           trxnLogIndex);
 
-      // update usedBytes atomically.
-      omVolumeArgs.getUsedBytes().add(preAllocatedSpace);
-      omBucketInfo.getUsedBytes().add(preAllocatedSpace);
+      omBucketInfo.incrUsedBytes(preAllocatedSpace);
 
+      numMissingParents = missingParentInfos.size();
       // Prepare response
       omResponse.setCreateFileResponse(CreateFileResponse.newBuilder()
           .setKeyInfo(omKeyInfo.getProtobuf())
@@ -309,7 +310,8 @@ public class OMFileCreateRequest extends OMKeyRequest {
           .setOpenVersion(openVersion).build())
           .setCmdType(Type.CreateFile);
       omClientResponse = new OMFileCreateResponse(omResponse.build(),
-          omKeyInfo, missingParentInfos, clientID, omVolumeArgs, omBucketInfo);
+          omKeyInfo, missingParentInfos, clientID, omVolumeArgs,
+          omBucketInfo.copyObject());
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
@@ -335,6 +337,9 @@ public class OMFileCreateRequest extends OMKeyRequest {
 
     switch (result) {
     case SUCCESS:
+      // Missing directories are created immediately, counting that here.
+      // The metric for the file is incremented as part of the file commit.
+      omMetrics.incNumKeys(numMissingParents);
       LOG.debug("File created. Volume:{}, Bucket:{}, Key:{}", volumeName,
           bucketName, keyName);
       break;

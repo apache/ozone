@@ -23,8 +23,6 @@ import java.util.Map;
 
 import com.google.common.base.Optional;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -145,18 +143,11 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
               keyName)),
           new CacheValue<>(Optional.absent(), trxnLogIndex));
 
-      long quotaReleased = 0;
-      int keyFactor = omKeyInfo.getFactor().getNumber();
       omVolumeArgs = getVolumeInfo(omMetadataManager, volumeName);
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
-      OmKeyLocationInfoGroup keyLocationGroup =
-          omKeyInfo.getLatestVersionLocations();
-      for(OmKeyLocationInfo locationInfo: keyLocationGroup.getLocationList()){
-        quotaReleased += locationInfo.getLength() * keyFactor;
-      }
-      // update usedBytes atomically.
-      omVolumeArgs.getUsedBytes().add(-quotaReleased);
-      omBucketInfo.getUsedBytes().add(-quotaReleased);
+
+      long quotaReleased = sumBlockLengths(omKeyInfo);
+      omBucketInfo.incrUsedBytes(-quotaReleased);
 
       // No need to add cache entries to delete table. As delete table will
       // be used by DeleteKeyService only, not used for any client response
@@ -165,7 +156,8 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
 
       omClientResponse = new OMKeyDeleteResponse(omResponse
           .setDeleteKeyResponse(DeleteKeyResponse.newBuilder()).build(),
-          omKeyInfo, ozoneManager.isRatisEnabled(), omVolumeArgs, omBucketInfo);
+          omKeyInfo, ozoneManager.isRatisEnabled(), omVolumeArgs,
+          omBucketInfo.copyObject());
 
       result = Result.SUCCESS;
     } catch (IOException ex) {

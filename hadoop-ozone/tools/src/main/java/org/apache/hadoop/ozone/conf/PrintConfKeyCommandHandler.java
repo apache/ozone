@@ -26,6 +26,7 @@ import picocli.CommandLine.ParentCommand;
  * Handler for ozone getconf confKey [key].
  */
 @Command(name = "confKey",
+    aliases = {"-confKey"},
     description = "gets a specific key from the configuration",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
@@ -42,8 +43,10 @@ public class PrintConfKeyCommandHandler implements Callable<Void> {
     String value = tool.getConf().getTrimmed(confKey);
     if (value != null) {
       tool.printOut(value);
+    } else {
+      throw new IllegalArgumentException(
+          "Configuration " + confKey + " is missing.");
     }
-    tool.printError("Configuration " + confKey + " is missing.");
     return null;
   }
 }

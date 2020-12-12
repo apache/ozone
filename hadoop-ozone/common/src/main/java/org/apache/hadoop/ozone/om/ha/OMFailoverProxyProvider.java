@@ -214,7 +214,7 @@ public class OMFailoverProxyProvider implements
     try {
       OzoneManagerProtocolPB proxy = createOMProxy(address);
       // Create proxyInfo here, to make it work with all Hadoop versions.
-      proxyInfo = new ProxyInfo<>(proxy, omProxyInfos.toString());
+      proxyInfo = new ProxyInfo<>(proxy, omProxyInfo.toString());
       omProxies.put(nodeId, proxyInfo);
     } catch (IOException ioe) {
       LOG.error("{} Failed to create RPC proxy to OM at {}",

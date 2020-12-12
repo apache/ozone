@@ -52,6 +52,11 @@
     </property>
 
     <property>
+        <name>fs.contract.rename-returns-false-if-dest-exists</name>
+        <value>true</value>
+    </property>
+
+    <property>
         <name>fs.contract.rename-remove-dest-if-empty-dir</name>
         <value>false</value>
     </property>
@@ -103,6 +108,11 @@
 
     <property>
         <name>fs.contract.supports-strict-exceptions</name>
+        <value>true</value>
+    </property>
+
+    <property>
+        <name>fs.contract.supports-unbuffer</name>
         <value>true</value>
     </property>
 

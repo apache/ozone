@@ -208,6 +208,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
     IOException exception = null;
     Result result = null;
     List<OmKeyInfo> missingParentInfos = null;
+    int numMissingParents = 0;
     try {
       keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
       volumeName = keyArgs.getVolumeName();
@@ -267,12 +268,13 @@ public class OMKeyCreateRequest extends OMKeyRequest {
         OMFileRequest.addKeyTableCacheEntries(omMetadataManager, volumeName,
             bucketName, Optional.absent(), Optional.of(missingParentInfos),
             trxnLogIndex);
-
+        numMissingParents = missingParentInfos.size();
       }
 
       omKeyInfo = prepareKeyInfo(omMetadataManager, keyArgs, dbKeyInfo,
           keyArgs.getDataSize(), locations, getFileEncryptionInfo(keyArgs),
           ozoneManager.getPrefixManager(), bucketInfo, trxnLogIndex,
+          ozoneManager.getObjectIdFromTxId(trxnLogIndex),
           ozoneManager.isRatisEnabled());
 
       long openVersion = omKeyInfo.getLatestVersionLocations().getVersion();
@@ -298,8 +300,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       long preAllocatedSpace = newLocationList.size()
           * ozoneManager.getScmBlockSize()
           * omKeyInfo.getFactor().getNumber();
-      // check volume quota
-      checkVolumeQuotaInBytes(omVolumeArgs, preAllocatedSpace);
+      // check bucket and volume quota
+      checkBucketQuotaInBytes(omBucketInfo, preAllocatedSpace);
 
       // Add to cache entry can be done outside of lock for this openKey.
       // Even if bucket gets deleted, when commitKey we shall identify if
@@ -308,8 +310,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           new CacheKey<>(dbOpenKeyName),
           new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
 
-      omVolumeArgs.getUsedBytes().add(preAllocatedSpace);
-      omBucketInfo.getUsedBytes().add(preAllocatedSpace);
+      omBucketInfo.incrUsedBytes(preAllocatedSpace);
 
       // Prepare response
       omResponse.setCreateKeyResponse(CreateKeyResponse.newBuilder()
@@ -318,7 +319,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           .setOpenVersion(openVersion).build())
           .setCmdType(Type.CreateKey);
       omClientResponse = new OMKeyCreateResponse(omResponse.build(),
-          omKeyInfo, missingParentInfos, clientID, omVolumeArgs, omBucketInfo);
+          omKeyInfo, missingParentInfos, clientID, omVolumeArgs,
+          omBucketInfo.copyObject());
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
@@ -344,6 +346,9 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
     switch (result) {
     case SUCCESS:
+      // Missing directories are created immediately, counting that here.
+      // The metric for the key is incremented as part of the key commit.
+      omMetrics.incNumKeys(numMissingParents);
       LOG.debug("Key created. Volume:{}, Bucket:{}, Key:{}", volumeName,
           bucketName, keyName);
       break;

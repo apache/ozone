@@ -71,6 +71,9 @@
     <!--<module name="FileLength">-->
     <module name="FileTabCharacter"/>
 
+    <module name="LineLength">
+        <property name="fileExtensions" value="java"/>
+    </module>
     <module name="TreeWalker">
 
         <module name="SuppressWarningsHolder"/>
@@ -129,7 +132,6 @@
 
         <!-- Checks for Size Violations.                    -->
         <!-- See http://checkstyle.sf.net/config_sizes.html -->
-        <module name="LineLength"/>
         <module name="MethodLength"/>
         <module name="ParameterNumber">
           <property name="ignoreOverriddenMethods" value="true"/>

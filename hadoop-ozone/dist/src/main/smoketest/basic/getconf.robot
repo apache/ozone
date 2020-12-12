@@ -14,20 +14,33 @@
 # limitations under the License.
 
 *** Settings ***
-Documentation       Smoketest ozone cluster startup
-Library             OperatingSystem
-Resource            ../commonlib.robot
+Documentation       Test 'ozone getconf' command
+Resource            ../lib/os.robot
 Test Timeout        5 minutes
 
 *** Test Cases ***
-Ozone getconf OM
-    ${result} =        Execute              ozone getconf ozonemanagers
-                       Should contain   ${result}   om
+Get OM
+    ${result} =      Execute                ozone getconf ozonemanagers
+                     Should contain   ${result}   om
+    ${result} =      Execute                ozone getconf -ozonemanagers
+                     Should contain   ${result}   om
 
-Ozone getconf SCM
-    ${result} =        Execute              ozone getconf storagecontainermanagers
-                       Should contain   ${result}   scm
+Get SCM
+    ${result} =      Execute                ozone getconf storagecontainermanagers
+                     Should contain   ${result}   scm
+    ${result} =      Execute                ozone getconf -storagecontainermanagers
+                     Should contain   ${result}   scm
 
-Ozone getconf configration keys
-    ${result} =        Execute              ozone getconf confKey endpoint.token
-                       Should contain   ${result}   Configuration endpoint.token is missing
+Get existing config key
+    ${result} =      Execute                ozone getconf confKey ozone.om.address
+                     Should contain    ${result}   om
+                     Should not contain   ${result}   is missing
+    ${result} =      Execute                ozone getconf -confKey ozone.om.address
+                     Should contain    ${result}   om
+                     Should not contain   ${result}   is missing
+
+Get undefined config key
+    ${result} =      Execute and checkrc    ozone getconf confKey no-such-config-key    255
+                     Should contain   ${result}   Configuration no-such-config-key is missing
+    ${result} =      Execute and checkrc    ozone getconf -confKey no-such-config-key    255
+                     Should contain   ${result}   Configuration no-such-config-key is missing

@@ -24,7 +24,8 @@ import picocli.CommandLine;
  */
 public class SetSpaceQuotaOptions {
 
-  @CommandLine.Option(names = {"--space-quota"},
+  // Added --quota for backward compatibility.
+  @CommandLine.Option(names = {"--space-quota", "--quota"},
       description = "The maximum space quota can be used (eg. 1GB)")
   private String quotaInBytes;
 

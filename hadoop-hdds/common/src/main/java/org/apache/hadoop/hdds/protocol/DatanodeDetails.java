@@ -47,6 +47,7 @@ public class DatanodeDetails extends NodeImpl implements
    * DataNode's unique identifier in the cluster.
    */
   private final UUID uuid;
+  private final String uuidString;
 
   private String ipAddress;
   private String hostName;
@@ -56,6 +57,8 @@ public class DatanodeDetails extends NodeImpl implements
   private long setupTime;
   private String revision;
   private String buildDate;
+  private HddsProtos.NodeOperationalState persistedOpState;
+  private long persistedOpStateExpiryEpochSec = 0;
 
   /**
    * Constructs DatanodeDetails instance. DatanodeDetails.Builder is used
@@ -70,13 +73,19 @@ public class DatanodeDetails extends NodeImpl implements
    * @param setupTime the setup time of DataNode
    * @param revision DataNodes's revision
    * @param buildDate DataNodes's build timestamp
+   * @param persistedOpState Operational State stored on DN.
+   * @param persistedOpStateExpiryEpochSec Seconds after the epoch the stored
+   *                                       state should expire.
    */
   @SuppressWarnings("parameternumber")
   private DatanodeDetails(UUID uuid, String ipAddress, String hostName,
       String networkLocation, List<Port> ports, String certSerialId,
-      String version, long setupTime, String revision, String buildDate) {
+      String version, long setupTime, String revision, String buildDate,
+      HddsProtos.NodeOperationalState persistedOpState,
+      long persistedOpStateExpiryEpochSec) {
     super(hostName, networkLocation, NetConstants.NODE_COST_DEFAULT);
     this.uuid = uuid;
+    this.uuidString = uuid.toString();
     this.ipAddress = ipAddress;
     this.hostName = hostName;
     this.ports = ports;
@@ -85,12 +94,15 @@ public class DatanodeDetails extends NodeImpl implements
     this.setupTime = setupTime;
     this.revision = revision;
     this.buildDate = buildDate;
+    this.persistedOpState = persistedOpState;
+    this.persistedOpStateExpiryEpochSec = persistedOpStateExpiryEpochSec;
   }
 
   public DatanodeDetails(DatanodeDetails datanodeDetails) {
     super(datanodeDetails.getHostName(), datanodeDetails.getNetworkLocation(),
         datanodeDetails.getCost());
     this.uuid = datanodeDetails.uuid;
+    this.uuidString = uuid.toString();
     this.ipAddress = datanodeDetails.ipAddress;
     this.hostName = datanodeDetails.hostName;
     this.ports = datanodeDetails.ports;
@@ -100,6 +112,9 @@ public class DatanodeDetails extends NodeImpl implements
     this.setupTime = datanodeDetails.setupTime;
     this.revision = datanodeDetails.revision;
     this.buildDate = datanodeDetails.buildDate;
+    this.persistedOpState = datanodeDetails.getPersistedOpState();
+    this.persistedOpStateExpiryEpochSec =
+        datanodeDetails.getPersistedOpStateExpiryEpochSec();
   }
 
   /**
@@ -117,7 +132,7 @@ public class DatanodeDetails extends NodeImpl implements
    * @return UUID of DataNode
    */
   public String getUuidString() {
-    return uuid.toString();
+    return uuidString;
   }
 
   /**
@@ -178,6 +193,46 @@ public class DatanodeDetails extends NodeImpl implements
   }
 
   /**
+   * Return the persistedOpState. If the stored value is null, return the
+   * default value of IN_SERVICE.
+   *
+   * @return The OperationalState persisted on the datanode.
+   */
+  public HddsProtos.NodeOperationalState getPersistedOpState() {
+    if (persistedOpState == null) {
+      return HddsProtos.NodeOperationalState.IN_SERVICE;
+    } else {
+      return persistedOpState;
+    }
+  }
+
+  /**
+   * Set the persistedOpState for this instance.
+   *
+   * @param state The new operational state.
+   */
+  public void setPersistedOpState(HddsProtos.NodeOperationalState state) {
+    this.persistedOpState = state;
+  }
+
+  /**
+   * Get the persistedOpStateExpiryEpochSec for the instance.
+   * @return Seconds from the epoch when the operational state should expire.
+   */
+  public long getPersistedOpStateExpiryEpochSec() {
+    return persistedOpStateExpiryEpochSec;
+  }
+
+  /**
+   * Set persistedOpStateExpiryEpochSec.
+   * @param expiry The number of second after the epoch the operational state
+   *               should expire.
+   */
+  public void setPersistedOpStateExpiryEpochSec(long expiry) {
+    this.persistedOpStateExpiryEpochSec = expiry;
+  }
+
+  /**
    * Given the name returns port number, null if the asked port is not found.
    *
    * @param name Name of the port
@@ -227,6 +282,13 @@ public class DatanodeDetails extends NodeImpl implements
     }
     if (datanodeDetailsProto.hasNetworkLocation()) {
       builder.setNetworkLocation(datanodeDetailsProto.getNetworkLocation());
+    }
+    if (datanodeDetailsProto.hasPersistedOpState()) {
+      builder.setPersistedOpState(datanodeDetailsProto.getPersistedOpState());
+    }
+    if (datanodeDetailsProto.hasPersistedOpStateExpiry()) {
+      builder.setPersistedOpStateExpiry(
+          datanodeDetailsProto.getPersistedOpStateExpiry());
     }
     return builder.build();
   }
@@ -291,6 +353,10 @@ public class DatanodeDetails extends NodeImpl implements
     if (!Strings.isNullOrEmpty(getNetworkLocation())) {
       builder.setNetworkLocation(getNetworkLocation());
     }
+    if (persistedOpState != null) {
+      builder.setPersistedOpState(persistedOpState);
+    }
+    builder.setPersistedOpStateExpiry(persistedOpStateExpiryEpochSec);
 
     for (Port port : ports) {
       builder.addPorts(HddsProtos.Port.newBuilder()
@@ -339,6 +405,8 @@ public class DatanodeDetails extends NodeImpl implements
         ", networkLocation: " +
         getNetworkLocation() +
         ", certSerialId: " + certSerialId +
+        ", persistedOpState: " + persistedOpState +
+        ", persistedOpStateExpiryEpochSec: " + persistedOpStateExpiryEpochSec +
         "}";
   }
 
@@ -382,6 +450,8 @@ public class DatanodeDetails extends NodeImpl implements
     private long setupTime;
     private String revision;
     private String buildDate;
+    private HddsProtos.NodeOperationalState persistedOpState;
+    private long persistedOpStateExpiryEpochSec = 0;
 
     /**
      * Default private constructor. To create Builder instance use
@@ -409,6 +479,9 @@ public class DatanodeDetails extends NodeImpl implements
       this.setupTime = details.getSetupTime();
       this.revision = details.getRevision();
       this.buildDate = details.getBuildDate();
+      this.persistedOpState = details.getPersistedOpState();
+      this.persistedOpStateExpiryEpochSec =
+          details.getPersistedOpStateExpiryEpochSec();
       return this;
     }
 
@@ -539,6 +612,31 @@ public class DatanodeDetails extends NodeImpl implements
       return this;
     }
 
+    /*
+     * Adds persistedOpState.
+     *
+     * @param state The operational state persisted on the datanode
+     *
+     * @return DatanodeDetails.Builder
+     */
+    public Builder setPersistedOpState(HddsProtos.NodeOperationalState state){
+      this.persistedOpState = state;
+      return this;
+    }
+
+    /*
+     * Adds persistedOpStateExpiryEpochSec.
+     *
+     * @param expiry The seconds after the epoch the operational state should
+     *              expire.
+     *
+     * @return DatanodeDetails.Builder
+     */
+    public Builder setPersistedOpStateExpiry(long expiry){
+      this.persistedOpStateExpiryEpochSec = expiry;
+      return this;
+    }
+
     /**
      * Builds and returns DatanodeDetails instance.
      *
@@ -550,8 +648,8 @@ public class DatanodeDetails extends NodeImpl implements
         networkLocation = NetConstants.DEFAULT_RACK;
       }
       DatanodeDetails dn = new DatanodeDetails(id, ipAddress, hostName,
-          networkLocation, ports, certSerialId,
-          version, setupTime, revision, buildDate);
+          networkLocation, ports, certSerialId, version, setupTime, revision,
+          buildDate, persistedOpState, persistedOpStateExpiryEpochSec);
       if (networkName != null) {
         dn.setNetworkName(networkName);
       }
