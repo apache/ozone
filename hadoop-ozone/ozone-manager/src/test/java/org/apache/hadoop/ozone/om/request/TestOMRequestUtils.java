@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -702,7 +703,8 @@ public final class TestOMRequestUtils {
       String adminName, String ownerName) {
     OzoneManagerProtocolProtos.VolumeInfo volumeInfo =
         OzoneManagerProtocolProtos.VolumeInfo.newBuilder().setVolume(volumeName)
-        .setAdminName(adminName).setOwnerName(ownerName).build();
+        .setAdminName(adminName).setOwnerName(ownerName)
+        .setQuotaInCounts(OzoneConsts.QUOTA_RESET).build();
     OzoneManagerProtocolProtos.CreateVolumeRequest createVolumeRequest =
         OzoneManagerProtocolProtos.CreateVolumeRequest.newBuilder()
             .setVolumeInfo(volumeInfo).build();

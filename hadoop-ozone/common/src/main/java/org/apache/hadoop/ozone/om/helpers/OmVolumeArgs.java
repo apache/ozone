@@ -33,8 +33,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeI
 
 import com.google.common.base.Preconditions;
 
-import static org.apache.hadoop.ozone.OzoneConsts.QUOTA_RESET;
-
 
 /**
  * A class that encapsulates the OmVolumeArgs Args.
@@ -248,7 +246,7 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
     private long creationTime;
     private long modificationTime;
     private long quotaInBytes;
-    private long quotaInCounts = QUOTA_RESET;
+    private long quotaInCounts;
     private long usedNamespace;
     private Map<String, String> metadata;
     private OmOzoneAclMap aclMap;
@@ -282,6 +280,8 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
     public Builder() {
       metadata = new HashMap<>();
       aclMap = new OmOzoneAclMap();
+      quotaInBytes = OzoneConsts.QUOTA_RESET;
+      quotaInCounts = OzoneConsts.QUOTA_RESET;
     }
 
     public Builder setAdminName(String admin) {
