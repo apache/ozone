@@ -148,7 +148,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
             .setIsVersionEnabled(dbBucketInfo.getIsVersionEnabled());
       }
 
-      //Check quotaInBytes and quotaInCounts to update
+      //Check quotaInBytes and quotaInNamespace to update
       String volumeKey = omMetadataManager.getVolumeKey(volumeName);
       OmVolumeArgs omVolumeArgs = omMetadataManager.getVolumeTable()
           .get(volumeKey);
@@ -159,9 +159,9 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
         bucketInfoBuilder.setQuotaInBytes(dbBucketInfo.getQuotaInBytes());
       }
       if (checkQuotaCountsValid(omVolumeArgs, omBucketArgs)) {
-        bucketInfoBuilder.setQuotaInCounts(omBucketArgs.getQuotaInCounts());
+        bucketInfoBuilder.setQuotaInNamespace(omBucketArgs.getQuotaInNamespace());
       } else {
-        bucketInfoBuilder.setQuotaInCounts(dbBucketInfo.getQuotaInCounts());
+        bucketInfoBuilder.setQuotaInNamespace(dbBucketInfo.getQuotaInNamespace());
       }
 
       bucketInfoBuilder.setCreationTime(dbBucketInfo.getCreationTime());
@@ -258,9 +258,9 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
 
   public boolean checkQuotaCountsValid(OmVolumeArgs omVolumeArgs,
       OmBucketArgs omBucketArgs) {
-    long quotaInCounts = omBucketArgs.getQuotaInCounts();
+    long quotaInNamespace = omBucketArgs.getQuotaInNamespace();
 
-    if ((quotaInCounts <= 0 && quotaInCounts != OzoneConsts.QUOTA_RESET)) {
+    if ((quotaInNamespace <= 0 && quotaInNamespace != OzoneConsts.QUOTA_RESET)) {
       return false;
     }
     return true;
