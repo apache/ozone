@@ -79,8 +79,10 @@ public final class ContainerUtils {
     String logInfo = "Operation: {} , Trace ID: {} , Message: {} , " +
         "Result: {} , StorageContainerException Occurred.";
     if (ex.getResult() == CLOSED_CONTAINER_IO) {
-      log.debug(logInfo, request.getCmdType(), request.getTraceID(),
-          ex.getMessage(), ex.getResult().getValueDescriptor().getName(), ex);
+      if (log.isDebugEnabled()) {
+        log.debug(logInfo, request.getCmdType(), request.getTraceID(),
+            ex.getMessage(), ex.getResult().getValueDescriptor().getName(), ex);
+      }
     } else {
       log.info(logInfo, request.getCmdType(), request.getTraceID(),
           ex.getMessage(), ex.getResult().getValueDescriptor().getName(), ex);
