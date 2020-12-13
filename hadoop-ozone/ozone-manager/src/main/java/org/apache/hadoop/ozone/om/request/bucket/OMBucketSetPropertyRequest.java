@@ -159,9 +159,11 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
         bucketInfoBuilder.setQuotaInBytes(dbBucketInfo.getQuotaInBytes());
       }
       if (checkQuotaCountsValid(omVolumeArgs, omBucketArgs)) {
-        bucketInfoBuilder.setQuotaInNamespace(omBucketArgs.getQuotaInNamespace());
+        bucketInfoBuilder.setQuotaInNamespace(
+            omBucketArgs.getQuotaInNamespace());
       } else {
-        bucketInfoBuilder.setQuotaInNamespace(dbBucketInfo.getQuotaInNamespace());
+        bucketInfoBuilder.setQuotaInNamespace(
+            dbBucketInfo.getQuotaInNamespace());
       }
 
       bucketInfoBuilder.setCreationTime(dbBucketInfo.getCreationTime());
@@ -260,7 +262,8 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       OmBucketArgs omBucketArgs) {
     long quotaInNamespace = omBucketArgs.getQuotaInNamespace();
 
-    if ((quotaInNamespace <= 0 && quotaInNamespace != OzoneConsts.QUOTA_RESET)) {
+    if ((quotaInNamespace <= 0
+         && quotaInNamespace != OzoneConsts.QUOTA_RESET)) {
       return false;
     }
     return true;

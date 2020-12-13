@@ -41,7 +41,8 @@ public class OzoneVolumeStub extends OzoneVolume {
   public OzoneVolumeStub(String name, String admin, String owner,
       long quotaInBytes, long quotaInNamespace, long creationTime,
       List<OzoneAcl> acls) {
-    super(name, admin, owner, quotaInBytes, quotaInNamespace, creationTime, acls);
+    super(name, admin, owner, quotaInBytes, quotaInNamespace, creationTime,
+        acls);
   }
 
   @Override

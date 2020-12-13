@@ -188,7 +188,8 @@ public class OzoneVolume extends WithMetadata {
   protected OzoneVolume(String name, String admin, String owner,
       long quotaInBytes, long quotaInNamespace, long creationTime,
       long modificationTime, List<OzoneAcl> acls) {
-    this(name, admin, owner, quotaInBytes, quotaInNamespace, creationTime, acls);
+    this(name, admin, owner, quotaInBytes, quotaInNamespace, creationTime,
+        acls);
     this.modificationTime = Instant.ofEpochMilli(modificationTime);
   }
 
