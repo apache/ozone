@@ -239,7 +239,7 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_HEARTBEAT_RPC_TIMEOUT =
       "ozone.scm.heartbeat.rpc-timeout";
   public static final String OZONE_SCM_HEARTBEAT_RPC_TIMEOUT_DEFAULT =
-      "1s";
+      "5s";
 
   public static final String OZONE_SCM_HEARTBEAT_RPC_RETRY_COUNT =
       "ozone.scm.heartbeat.rpc-retry-count";

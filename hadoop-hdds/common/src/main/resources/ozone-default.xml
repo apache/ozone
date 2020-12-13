@@ -943,7 +943,7 @@
   </property>
   <property>
     <name>ozone.scm.heartbeat.rpc-timeout</name>
-    <value>1s</value>
+    <value>5s</value>
     <tag>OZONE, MANAGEMENT</tag>
     <description>
       Timeout value for the RPC from Datanode to SCM.
