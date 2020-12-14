@@ -83,6 +83,8 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_K
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.startRpcServer;
 import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
+
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -558,6 +560,18 @@ public class SCMClientProtocolServer implements
     AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
         SCMAction.GET_REPLICATION_MANAGER_STATUS, null));
     return scm.getReplicationManager().isRunning();
+  }
+
+  @Override
+  public StatusAndMessages finalizeScmUpgrade(String upgradeClientID) throws
+      IOException {
+    return scm.finalizeUpgrade(upgradeClientID);
+  }
+
+  @Override
+  public StatusAndMessages queryUpgradeFinalizationProgress(
+      String upgradeClientID, boolean force) throws  IOException {
+    return scm.queryUpgradeFinalizationProgress(upgradeClientID, force);
   }
 
   /**

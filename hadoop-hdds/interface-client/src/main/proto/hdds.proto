@@ -277,3 +277,16 @@ message BlockID {
     required ContainerBlockID containerBlockID = 1;
     optional uint64 blockCommitSequenceId = 2 [default = 0];
 }
+
+message UpgradeFinalizationStatus {
+    enum Status {
+        ALREADY_FINALIZED = 1;
+        STARTING_FINALIZATION = 2;
+        FINALIZATION_IN_PROGRESS = 3;
+        FINALIZATION_DONE = 4;
+        FINALIZATION_REQUIRED = 5;
+    }
+    required Status status = 1;
+    repeated string messages = 2;
+}
+

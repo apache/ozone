@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.utils.db.SequenceNumberNotFoundException;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -77,7 +78,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Service
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 
 import com.google.common.collect.Lists;

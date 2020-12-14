@@ -1,21 +1,22 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  * <p>
  * http://www.apache.org/licenses/LICENSE-2.0
  * <p>
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.admin.om;
+package org.apache.hadoop.hdds.scm.cli.upgrade;
 
 import static org.apache.hadoop.hdds.scm.cli.upgrade.FinalizeUpgradeCommandUtil.emitCancellationMsg;
 import static org.apache.hadoop.hdds.scm.cli.upgrade.FinalizeUpgradeCommandUtil.emitExitMsg;
@@ -27,12 +28,6 @@ import static org.apache.hadoop.hdds.scm.cli.upgrade.FinalizeUpgradeCommandUtil.
 import static org.apache.hadoop.hdds.scm.cli.upgrade.FinalizeUpgradeCommandUtil.isInprogress;
 import static org.apache.hadoop.hdds.scm.cli.upgrade.FinalizeUpgradeCommandUtil.isStarting;
 
-import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.apache.hadoop.ozone.upgrade.UpgradeException;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
-import picocli.CommandLine;
-
 import java.io.IOException;
 import java.util.UUID;
 import java.util.concurrent.Callable;
@@ -42,58 +37,44 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
+import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
+import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.ozone.upgrade.UpgradeException;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
+
+import picocli.CommandLine;
+
 /**
- * Handler of ozone admin om finalizeUpgrade command.
+ * Handler of Finalize SCM command.
  */
 @CommandLine.Command(
     name = "finalizeupgrade",
-    description = "Finalizes Ozone Manager's metadata changes and enables new "
-        + "features after a software upgrade.\n"
-        + "It is possible to specify the service ID for an HA environment, "
-        + "or the Ozone manager host in a non-HA environment, if none provided "
-        + "the default from configuration is being used if not ambiguous.",
+    description = "Finalize SCM Upgrade",
     mixinStandardHelpOptions = true,
-    versionProvider = HddsVersionProvider.class
-)
-public class FinalizeUpgradeSubCommand implements Callable<Void> {
+    versionProvider = HddsVersionProvider.class)
 
-  @CommandLine.ParentCommand
-  private OMAdmin parent;
-
-  @CommandLine.Option(
-      names = {"-id", "--service-id"},
-      description = "Ozone Manager Service ID"
-  )
-  private String omServiceId;
-
-  @CommandLine.Option(
-      names = {"-host", "--service-host"},
-      description = "Ozone Manager Host"
-  )
-  private String omHost;
-
+public class FinalizeScmUpgradeSubcommand extends ScmSubcommand {
   @CommandLine.Option(
       names = {"--takeover"},
-      description = "Forces takeover of monitoring from an other client, if "
-          + "finalization has already been started and did not finished yet."
+      description = "Forces takeover of monitoring from another client, if "
+          + "finalization has already been started and did not finish yet."
   )
   private boolean force;
 
   @Override
-  public Void call() throws Exception {
-    boolean forceHA = false;
-    OzoneManagerProtocol client =
-        parent.createOmClient(omServiceId, omHost, forceHA);
+  public void execute(ScmClient scmClient) throws IOException {
     String upgradeClientID = "Upgrade-Client-" + UUID.randomUUID().toString();
     try {
-      UpgradeFinalizer.StatusAndMessages finalizationResponse =
-          client.finalizeUpgrade(upgradeClientID);
+      StatusAndMessages finalizationResponse =
+          scmClient.finalizeScmUpgrade(upgradeClientID);
       if (isFinalized(finalizationResponse.status())){
         System.out.println("Upgrade has already been finalized.");
         emitExitMsg();
-        return null;
+        return;
       } else if (!isStarting(finalizationResponse.status())){
-        System.err.println("Invalid response from Ozone Manager.");
+        System.err.println("Invalid response from Storage Container Manager.");
         System.err.println(
             "Current finalization status is: " + finalizationResponse.status()
         );
@@ -102,23 +83,24 @@ public class FinalizeUpgradeSubCommand implements Callable<Void> {
     } catch (UpgradeException e) {
       handleInvalidRequestAfterInitiatingFinalization(force, e);
     }
-    monitorAndWaitFinalization(client, upgradeClientID);
-    return null;
+    monitorAndWaitFinalization(scmClient, upgradeClientID);
+    return;
   }
 
-  private void monitorAndWaitFinalization(OzoneManagerProtocol client,
-      String upgradeClientID) throws ExecutionException {
+  private void monitorAndWaitFinalization(ScmClient client,
+                                          String upgradeClientID)
+      throws IOException {
     ExecutorService exec = Executors.newSingleThreadExecutor();
     Future<?> monitor =
         exec.submit(new UpgradeMonitor(client, upgradeClientID, force));
     try {
       monitor.get();
-      emitFinishedMsg("Ozone Manager");
-    } catch (CancellationException|InterruptedException e) {
-      emitCancellationMsg("Ozone Manager");
+      emitFinishedMsg("Storage Container Manager");
+    } catch (CancellationException |InterruptedException e) {
+      emitCancellationMsg("Storage Container Manager");
     } catch (ExecutionException e) {
       emitGeneralErrorMsg();
-      throw e;
+      throw new IOException(e.getCause());
     } finally {
       exec.shutdown();
     }
@@ -126,12 +108,12 @@ public class FinalizeUpgradeSubCommand implements Callable<Void> {
 
   private static class UpgradeMonitor implements Callable<Void> {
 
-    private OzoneManagerProtocol client;
+    private ScmClient client;
     private String upgradeClientID;
     private boolean force;
 
     UpgradeMonitor(
-        OzoneManagerProtocol client,
+        ScmClient client,
         String upgradeClientID,
         boolean force
     ) {

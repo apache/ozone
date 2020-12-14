@@ -62,6 +62,9 @@ message ScmContainerLocationRequest {
   optional GetPipelineRequestProto getPipelineRequest = 24;
   optional GetContainerWithPipelineBatchRequestProto getContainerWithPipelineBatchRequest = 25;
   optional GetSafeModeRuleStatusesRequestProto getSafeModeRuleStatusesRequest = 26;
+  optional FinalizeScmUpgradeRequestProto finalizeScmUpgradeRequest = 27;
+  optional QueryUpgradeFinalizationProgressRequestProto
+  queryUpgradeFinalizationProgressRequest = 28;
 }
 
 message ScmContainerLocationResponse {
@@ -96,6 +99,9 @@ message ScmContainerLocationResponse {
   optional GetPipelineResponseProto getPipelineResponse = 24;
   optional GetContainerWithPipelineBatchResponseProto getContainerWithPipelineBatchResponse = 25;
   optional GetSafeModeRuleStatusesResponseProto getSafeModeRuleStatusesResponse = 26;
+  optional FinalizeScmUpgradeResponseProto finalizeScmUpgradeResponse = 27;
+  optional QueryUpgradeFinalizationProgressResponseProto
+  queryUpgradeFinalizationProgressResponse = 28;
   enum Status {
     OK = 1;
     CONTAINER_ALREADY_EXISTS = 2;
@@ -126,6 +132,8 @@ enum Type {
   GetPipeline = 19;
   GetContainerWithPipelineBatch = 20;
   GetSafeModeRuleStatuses = 21;
+  FinalizeScmUpgrade = 22;
+  QueryUpgradeFinalizationProgress = 23;
 }
 
 /**
@@ -341,6 +349,20 @@ message ReplicationManagerStatusRequestProto {
 
 message ReplicationManagerStatusResponseProto {
   required bool isRunning = 1;
+}
+
+message FinalizeScmUpgradeRequestProto {
+  required string upgradeClientId = 1;
+}
+message FinalizeScmUpgradeResponseProto {
+  required hadoop.hdds.UpgradeFinalizationStatus status = 1;
+}
+message QueryUpgradeFinalizationProgressRequestProto {
+  required string upgradeClientId = 1;
+  optional bool takeover = 2;
+}
+message QueryUpgradeFinalizationProgressResponseProto {
+  required hadoop.hdds.UpgradeFinalizationStatus status = 1;
 }
 
 /**

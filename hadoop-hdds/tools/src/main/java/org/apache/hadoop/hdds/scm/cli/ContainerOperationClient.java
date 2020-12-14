@@ -51,6 +51,7 @@ import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.security.UserGroupInformation;
 
 import com.google.common.base.Preconditions;
@@ -508,4 +509,16 @@ public class ContainerOperationClient implements ScmClient {
     return storageContainerLocationClient.getReplicationManagerStatus();
   }
 
+  @Override
+  public StatusAndMessages finalizeScmUpgrade(String upgradeClientID)
+      throws IOException {
+    return storageContainerLocationClient.finalizeScmUpgrade(upgradeClientID);
+  }
+
+  @Override
+  public StatusAndMessages queryUpgradeFinalizationProgress(
+      String upgradeClientID, boolean force) throws IOException {
+    return storageContainerLocationClient.queryUpgradeFinalizationProgress(
+        upgradeClientID, force);
+  }
 }
