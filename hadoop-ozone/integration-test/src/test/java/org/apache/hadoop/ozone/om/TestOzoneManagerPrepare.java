@@ -22,7 +22,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 
 import java.io.File;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -41,38 +40,36 @@ import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
+import org.apache.hadoop.ozone.om.request.upgrade.OMPrepareRequest;
 import org.apache.hadoop.test.LambdaTestUtils;
+import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Test OM prepare against actual mini cluster.
  */
 public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
-
   private static final String BUCKET = "bucket";
   private static final String VOLUME = "volume";
   private static final String KEY_PREFIX = "key";
 
-  private static final int TIMEOUT_MILLIS = 30000;
-  private final static Long PREPARE_FLUSH_WAIT_TIMEOUT_SECONDS = 300L;
-  private final static Long PREPARE_FLUSH_INTERVAL_SECONDS = 5L;
+  private static final int TIMEOUT_MILLIS = 120000;
+  private final static long PREPARE_FLUSH_WAIT_TIMEOUT_SECONDS = 300L;
+  private final static long PREPARE_FLUSH_INTERVAL_SECONDS = 5L;
 
   private MiniOzoneHAClusterImpl cluster;
   private ClientProtocol clientProtocol;
   private ObjectStore store;
-  private long expectedLogIndex;
 
-  @Before
   public void setup() throws Exception {
     cluster = getCluster();
-    OzoneClient client = OzoneClientFactory.getRpcClient(getConf());
-    store = client.getObjectStore();
+    store = getObjectStore();
     clientProtocol = store.getClientProxy();
-    expectedLogIndex = 0;
   }
 
   /**
@@ -81,8 +78,9 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
    */
   @Test
   public void testPrepareWithoutTransactions() throws Exception {
-    submitPrepareRequest();
-    assertClusterPrepared(cluster.getOzoneManagersList());
+    setup();
+    long prepareIndex = submitPrepareRequest();
+    assertClusterPrepared(prepareIndex);
   }
 
   /**
@@ -91,14 +89,13 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
    */
   @Test
   public void testPrepareWithTransactions() throws Exception {
-    Set<String> writtenKeys = writeKeysAndWaitForLogs(50,
-        cluster.getOzoneManagersList());
-
-    submitPrepareRequest();
+    setup();
+    Set<String> writtenKeys = writeKeysAndWaitForLogs(50);
+    long prepareIndex = submitPrepareRequest();
 
     // Make sure all OMs are prepared and all OMs still have their data.
-    assertClusterPrepared(cluster.getOzoneManagersList());
-    assertKeysWritten(writtenKeys, cluster.getOzoneManagersList());
+    assertClusterPrepared(prepareIndex);
+    assertKeysWritten(writtenKeys);
   }
 
   /**
@@ -113,6 +110,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
    */
 //  @Test
   public void testPrepareDownedOM() throws Exception {
+    setup();
     // Index of the OM that will be shut down during this test.
     final int shutdownOMIndex = 2;
     List<OzoneManager> runningOms = cluster.getOzoneManagersList();
@@ -130,38 +128,37 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     writtenKeys.addAll(
         writeKeysAndWaitForLogs(10, runningOms));
 
-    submitPrepareRequest();
+    long prepareIndex = submitPrepareRequest();
 
     // Check that the two live OMs are prepared.
-    assertClusterPrepared(runningOms);
+    assertClusterPrepared(prepareIndex, runningOms);
 
     // Restart the downed OM and wait for it to catch up.
     // Since prepare was the last Ratis transaction, it should have all data
     // it missed once it receives the prepare transaction.
     cluster.restartOzoneManager(downedOM, true);
     runningOms.add(shutdownOMIndex, downedOM);
-    LambdaTestUtils.await(TIMEOUT_MILLIS, 2000,
-        () -> checkPrepared(downedOM, expectedLogIndex));
 
     // Make sure all OMs are prepared and still have data.
-    assertClusterPrepared(runningOms);
+    assertClusterPrepared(prepareIndex, runningOms);
     assertKeysWritten(writtenKeys, runningOms);
   }
 
   @Test
   public void testPrepareWithRestart() throws Exception {
-    writeKeysAndWaitForLogs(10, cluster.getOzoneManagersList());
-    submitPrepareRequest();
-    assertClusterPrepared(cluster.getOzoneManagersList());
+    setup();
+    writeKeysAndWaitForLogs(10);
+    long prepareIndex = submitPrepareRequest();
+    assertClusterPrepared(prepareIndex);
 
     // Restart all ozone managers.
     for (OzoneManager om: cluster.getOzoneManagersList()) {
       cluster.shutdownOzoneManager(om);
       cluster.restartOzoneManager(om, true);
     }
-    cluster.waitForClusterToBeReady();
 
-    assertClusterPrepared(cluster.getOzoneManagersList());
+    cluster.waitForClusterToBeReady();
+    assertClusterPrepared(prepareIndex);
   }
 
   private boolean logFilesPresentInRatisPeer(OzoneManager om) {
@@ -181,13 +178,16 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     return false;
   }
 
+  private Set<String> writeKeysAndWaitForLogs(int numKeys) throws Exception {
+    return writeKeysAndWaitForLogs(numKeys, cluster.getOzoneManagersList());
+  }
+
   private Set<String> writeKeysAndWaitForLogs(int numKeys,
       List<OzoneManager> ozoneManagers) throws Exception {
 
     store.createVolume(VOLUME);
     OzoneVolume volume = store.getVolume(VOLUME);
     volume.createBucket(BUCKET);
-    expectedLogIndex += 2;
 
     Set<String> writtenKeys = new HashSet<>();
     for (int i = 1; i <= numKeys; i++) {
@@ -217,7 +217,10 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
         100, store, volumeName, bucketName);
     keyStream.write(data);
     keyStream.close();
-    expectedLogIndex++;
+  }
+
+  private void assertKeysWritten(Set<String> expectedKeys) throws Exception {
+    assertKeysWritten(expectedKeys, cluster.getOzoneManagersList());
   }
 
   private void assertKeysWritten(Set<String> expectedKeys,
@@ -233,32 +236,22 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     }
   }
 
-  private void waitAndCheckPrepared(OzoneManager om,
-      long prepareRequestLogIndex) throws Exception {
-    // Log files are deleted after the snapshot is taken,
-    // So once log files have been deleted, OM should be prepared.
-    LambdaTestUtils.await(TIMEOUT_MILLIS, 1000,
-        () -> !logFilesPresentInRatisPeer(om));
-    Assert.assertTrue(checkPrepared(om, prepareRequestLogIndex));
+  private long submitPrepareRequest() throws Exception {
+    return clientProtocol.getOzoneManagerClient()
+        .prepareOzoneManager(PREPARE_FLUSH_WAIT_TIMEOUT_SECONDS,
+            PREPARE_FLUSH_INTERVAL_SECONDS);
   }
 
-  private boolean checkPrepared(OzoneManager om, long prepareRequestLogIndex)
-      throws Exception {
-    // If no transactions have been persisted to the DB, transaction info
-    // will be null, not zero.
-    // This will cause a null pointer exception if we use
-    // OzoneManager#getRatisSnapshotIndex to get the index from the DB.
-    OMTransactionInfo txnInfo = om.getMetadataManager()
-        .getTransactionInfoTable().get(TRANSACTION_INFO_KEY);
-    return (txnInfo.getTransactionIndex() == prepareRequestLogIndex);
+  private void assertClusterPrepared(long preparedIndex) throws Exception {
+    assertClusterPrepared(preparedIndex, cluster.getOzoneManagersList());
   }
 
-  private void assertClusterPrepared(List<OzoneManager> ozoneManagers)
-      throws Exception {
+  private void assertClusterPrepared(long preparedIndex,
+      List<OzoneManager> ozoneManagers) throws Exception {
 
     // Make sure the specified OMs are prepared individually.
-    for (OzoneManager om: ozoneManagers) {
-      waitAndCheckPrepared(om, expectedLogIndex);
+    for (OzoneManager om : ozoneManagers) {
+      waitAndAssertPrepared(om, preparedIndex);
     }
 
     // Submitting a read request should pass.
@@ -274,13 +267,14 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     }
   }
 
-  private void submitPrepareRequest() throws Exception {
-    long actualIndex = clientProtocol.getOzoneManagerClient()
-        .prepareOzoneManager(PREPARE_FLUSH_WAIT_TIMEOUT_SECONDS,
-            PREPARE_FLUSH_INTERVAL_SECONDS);
-
-    // Prepare request should add 1 to expected log index.
-    expectedLogIndex++;
-    Assert.assertEquals(expectedLogIndex, actualIndex);
+  private void waitAndAssertPrepared(OzoneManager om,
+      long prepareRequestLogIndex) throws Exception {
+    // Log files are deleted after the snapshot is taken,
+    // So once log files have been deleted, OM should be prepared.
+    LambdaTestUtils.await(TIMEOUT_MILLIS, 1000,
+        () -> !logFilesPresentInRatisPeer(om));
+    OMTransactionInfo txnInfo = om.getMetadataManager()
+        .getTransactionInfoTable().get(TRANSACTION_INFO_KEY);
+    Assert.assertEquals(txnInfo.getTransactionIndex(), prepareRequestLogIndex);
   }
 }
