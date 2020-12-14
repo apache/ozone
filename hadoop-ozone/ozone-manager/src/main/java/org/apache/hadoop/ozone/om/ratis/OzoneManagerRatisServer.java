@@ -141,9 +141,10 @@ public final class OzoneManagerRatisServer {
       return processReply(omRequest, raftClientReply);
     }
     else {
-      // TODO: Put this in a factory somewhere, it was taken from a
-      //  createErrorResponse helper method.
+      String message = "Cannot apply write request " +
+          omRequest.getCmdType().name() + " when OM is in prepare mode.";
       OMResponse.Builder omResponse = OMResponse.newBuilder()
+          .setMessage(message)
           .setStatus(OzoneManagerProtocolProtos.Status.NOT_SUPPORTED_OPERATION)
           .setCmdType(omRequest.getCmdType())
           .setTraceID(omRequest.getTraceID())
