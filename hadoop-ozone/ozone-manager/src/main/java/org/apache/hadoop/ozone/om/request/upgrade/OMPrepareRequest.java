@@ -116,14 +116,19 @@ public class OMPrepareRequest extends OMClientRequest {
 
       // TODO: Create marker file with txn index.
 
-      LOG.info("OM prepared at log index {}. Returning response {}",
+      LOG.info("OM {} prepared at log index {}. Returning response {}",
+          ozoneManager.getOMNodeId(),
           ozoneManager.getRatisSnapshotIndex(), omResponse);
     } catch (OMException e) {
+      LOG.error("Prepare Request Apply failed in {}. ",
+          ozoneManager.getOMNodeId(), e);
       response = new OMPrepareResponse(
           createErrorOMResponse(responseBuilder, e));
     } catch (InterruptedException | IOException e) {
       // Set error code so that prepare failure does not cause the OM to
       // terminate.
+      LOG.error("Prepare Request Apply failed in {}. ",
+          ozoneManager.getOMNodeId(), e);
       response = new OMPrepareResponse(
           createErrorOMResponse(responseBuilder, new OMException(e,
               OMException.ResultCodes.PREPARE_FAILED)));

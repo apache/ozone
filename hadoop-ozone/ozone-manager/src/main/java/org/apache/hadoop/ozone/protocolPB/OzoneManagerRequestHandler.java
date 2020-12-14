@@ -642,7 +642,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     long txnID = request.getTxnID();
     long ratisSnapshotIndex = impl.getRatisSnapshotIndex();
     if (ratisSnapshotIndex != txnID) {
-      LOG.info("Last Txn Index = {}", ratisSnapshotIndex);
+      LOG.info("Last Txn Id = {}, PrepareStatusRequest Txn Id = {}",
+          ratisSnapshotIndex, request.getTxnID());
       prepareStatus =  PREPARE_IN_PROGRESS;
     } else {
       prepareStatus = PREPARE_COMPLETED;
