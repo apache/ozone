@@ -119,10 +119,8 @@ public class OMPrepareRequest extends OMClientRequest {
       // Save transaction log index to a marker file, so if the OM restarts,
       // it will remain in prepare mode on that index as long as the file
       // exists.
-      File metadataDir =
-          ServerUtils.getOzoneMetaDirPath(ozoneManager.getConfiguration());
       OzoneManagerPrepareState.writePrepareMarkerFile(
-          metadataDir, transactionLogIndex);
+          ozoneManager.getConfiguration(), transactionLogIndex);
 
       LOG.info("OM prepared at log index {}. Returning response {}",
           ozoneManager.getRatisSnapshotIndex(), omResponse);

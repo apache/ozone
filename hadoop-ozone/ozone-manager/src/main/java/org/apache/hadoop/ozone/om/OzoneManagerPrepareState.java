@@ -1,5 +1,7 @@
 package org.apache.hadoop.ozone.om;
 
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
@@ -58,11 +60,10 @@ public final class OzoneManagerPrepareState {
    * the log index {@code index}. If a marker file already exists, it will be
    * overwritten.
    */
-  public static void writePrepareMarkerFile(File metadataDir, long index)
-      throws IOException {
-    File markerFile = new File(metadataDir, OzoneConsts.PREPARE_MARKER);
+  public static void writePrepareMarkerFile(ConfigurationSource conf,
+      long index) throws IOException {
     try(FileOutputStream stream =
-            new FileOutputStream(markerFile)) {
+            new FileOutputStream(getPrepareMarkerFile(conf))) {
       stream.write(Long.toString(index).getBytes());
     }
   }
@@ -72,8 +73,9 @@ public final class OzoneManagerPrepareState {
    * log index matching {@code index}, the prepare state flag will be be
    * turned on. Otherwise, the prepare state flag will be turned off.
    */
-  public static void checkPrepareMarkerFile(File metadataDir, long index) {
-    File prepareMarkerFile = new File(metadataDir, OzoneConsts.PREPARE_MARKER);
+  public static void checkPrepareMarkerFile(ConfigurationSource conf,
+      long index) {
+    File prepareMarkerFile = getPrepareMarkerFile(conf);
     if (prepareMarkerFile.exists()) {
       byte[] data = new byte[(int) prepareMarkerFile.length()];
       try(FileInputStream stream = new FileInputStream(prepareMarkerFile)) {
@@ -92,5 +94,11 @@ public final class OzoneManagerPrepareState {
       // No marker file found.
       OzoneManagerPrepareState.setPrepared(false);
     }
+  }
+
+  private static File getPrepareMarkerFile(ConfigurationSource conf) {
+    File markerFileDir = new File(ServerUtils.getOzoneMetaDirPath(conf),
+        OMStorage.STORAGE_DIR_CURRENT);
+    return new File(markerFileDir, OzoneConsts.PREPARE_MARKER);
   }
 }
