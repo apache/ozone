@@ -142,15 +142,15 @@ public class HeartbeatEndpointTask
       if (LOG.isDebugEnabled()) {
         LOG.debug("Sending heartbeat message :: {}", request.toString());
       }
-      SCMHeartbeatResponseProto reponse = rpcEndpoint.getEndPoint()
+      SCMHeartbeatResponseProto response = rpcEndpoint.getEndPoint()
           .sendHeartbeat(request);
-      processResponse(reponse, datanodeDetailsProto);
+      processResponse(response, datanodeDetailsProto);
       rpcEndpoint.setLastSuccessfulHeartbeat(ZonedDateTime.now());
       rpcEndpoint.zeroMissedCount();
     } catch (IOException ex) {
+      Preconditions.checkState(requestBuilder != null);
       // put back the reports which failed to be sent
       putBackReports(requestBuilder);
-
       rpcEndpoint.logIfNeeded(ex);
     } finally {
       rpcEndpoint.unlock();
@@ -161,12 +161,9 @@ public class HeartbeatEndpointTask
   // TODO: Make it generic.
   private void putBackReports(SCMHeartbeatRequestProto.Builder requestBuilder) {
     List<GeneratedMessage> reports = new LinkedList<>();
-    if (requestBuilder.hasContainerReport()) {
-      reports.add(requestBuilder.getContainerReport());
-    }
-    if (requestBuilder.hasNodeReport()) {
-      reports.add(requestBuilder.getNodeReport());
-    }
+    // We only put back CommandStatusReports and IncrementalContainerReport
+    // because those are incremental. Container/Node/PipelineReport are
+    // accumulative so we can keep only the latest of each.
     if (requestBuilder.getCommandStatusReportsCount() != 0) {
       reports.addAll(requestBuilder.getCommandStatusReportsList());
     }
@@ -194,6 +191,7 @@ public class HeartbeatEndpointTask
           } else {
             requestBuilder.setField(descriptor, report);
           }
+          break;
         }
       }
     }
