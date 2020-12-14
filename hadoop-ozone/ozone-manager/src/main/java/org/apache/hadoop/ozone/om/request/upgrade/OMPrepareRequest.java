@@ -200,11 +200,15 @@ public class OMPrepareRequest extends OMClientRequest {
     RaftLog raftLog = impl.getState().getLog();
     long raftLogIndex = raftLog.getLastEntryTermIndex().getIndex();
 
-    // Ensure that Ratis's in memory snapshot index is the same as the index
-    // of its last log entry.
-    if (snapshotIndex != raftLogIndex) {
-      throw new IOException("Snapshot index " + snapshotIndex + " does not " +
-          "match last log index " + raftLogIndex);
+    // We can have a case where the log has a meta transaction after the
+    // prepare request or another prepare request. If there is another
+    // prepare request, this one will end up purging that request.
+    // This means that an OM cannot support 2 prepare requests in the
+    // transaction pipeline (un-applied) at the same time.
+    if (raftLogIndex > snapshotIndex ) {
+      LOG.warn("Snapshot index {} does not " +
+          "match last log index {}.", snapshotIndex, raftLogIndex);
+      snapshotIndex = raftLogIndex;
     }
 
     CompletableFuture<Long> purgeFuture =
