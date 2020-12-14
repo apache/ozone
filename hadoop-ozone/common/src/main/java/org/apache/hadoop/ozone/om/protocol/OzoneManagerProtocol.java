@@ -605,6 +605,12 @@ public interface OzoneManagerProtocol
     return -1;
   }
 
+  /**
+   * Check if Ozone Manager is 'prepared' at a specific Txn Id.
+   * @param txnId passed in Txn Id
+   * @return PrepareStatus response
+   * @throws IOException on exception.
+   */
   default PrepareStatusResponse getOzoneManagerPrepareStatus(long txnId)
       throws IOException {
     return PrepareStatusResponse.newBuilder()

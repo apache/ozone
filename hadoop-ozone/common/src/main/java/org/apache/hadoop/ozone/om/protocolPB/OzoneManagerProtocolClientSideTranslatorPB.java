@@ -1574,6 +1574,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     return prepareResponse.getTxnID();
   }
 
+  @Override
   public PrepareStatusResponse getOzoneManagerPrepareStatus(long txnId)
       throws IOException {
     PrepareStatusRequest prepareStatusRequest =
