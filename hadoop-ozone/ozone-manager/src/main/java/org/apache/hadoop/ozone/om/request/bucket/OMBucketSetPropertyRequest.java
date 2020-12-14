@@ -158,7 +158,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       } else {
         bucketInfoBuilder.setQuotaInBytes(dbBucketInfo.getQuotaInBytes());
       }
-      if (checkQuotaCountsValid(omVolumeArgs, omBucketArgs)) {
+      if (checkQuotaNamespaceValid(omVolumeArgs, omBucketArgs)) {
         bucketInfoBuilder.setQuotaInNamespace(
             omBucketArgs.getQuotaInNamespace());
       } else {
@@ -258,7 +258,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
     return true;
   }
 
-  public boolean checkQuotaCountsValid(OmVolumeArgs omVolumeArgs,
+  public boolean checkQuotaNamespaceValid(OmVolumeArgs omVolumeArgs,
       OmBucketArgs omBucketArgs) {
     long quotaInNamespace = omBucketArgs.getQuotaInNamespace();
 

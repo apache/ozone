@@ -81,7 +81,7 @@ public class TestOMVolumeSetQuotaRequest extends TestOMVolumeRequest {
     // As request is valid volume table should not have entry.
     Assert.assertNotNull(omVolumeArgs);
     long quotaBytesBeforeSet = omVolumeArgs.getQuotaInBytes();
-    long quotaCountBeforeSet = omVolumeArgs.getQuotaInNamespace();
+    long quotaNamespaceBeforeSet = omVolumeArgs.getQuotaInNamespace();
 
     OMClientResponse omClientResponse =
         omVolumeSetQuotaRequest.validateAndUpdateCache(ozoneManager, 1,
@@ -96,11 +96,11 @@ public class TestOMVolumeSetQuotaRequest extends TestOMVolumeRequest {
 
     OmVolumeArgs ova = omMetadataManager.getVolumeTable().get(volumeKey);
     long quotaBytesAfterSet = ova.getQuotaInBytes();
-    long quotaCountAfterSet = ova.getQuotaInNamespace();
+    long quotaNamespaceAfterSet = ova.getQuotaInNamespace();
     Assert.assertEquals(quotaInBytes, quotaBytesAfterSet);
-    Assert.assertEquals(quotaInNamespace, quotaCountAfterSet);
+    Assert.assertEquals(quotaInNamespace, quotaNamespaceAfterSet);
     Assert.assertNotEquals(quotaBytesBeforeSet, quotaBytesAfterSet);
-    Assert.assertNotEquals(quotaCountBeforeSet, quotaCountAfterSet);
+    Assert.assertNotEquals(quotaNamespaceBeforeSet, quotaNamespaceAfterSet);
 
     // modificationTime should be greater than creationTime.
     long creationTime = omMetadataManager

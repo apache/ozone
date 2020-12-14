@@ -135,7 +135,7 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
       } else {
         omVolumeArgs.setQuotaInBytes(omVolumeArgs.getQuotaInBytes());
       }
-      if (checkQuotaCountsValid(
+      if (checkQuotaNamespaceValid(
           setVolumePropertyRequest.getQuotaInNamespace())) {
         omVolumeArgs.setQuotaInNamespace(
             setVolumePropertyRequest.getQuotaInNamespace());
@@ -211,7 +211,7 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
     return true;
   }
 
-  public boolean checkQuotaCountsValid(long quotaInNamespace) {
+  public boolean checkQuotaNamespaceValid(long quotaInNamespace) {
 
     if ((quotaInNamespace <= 0
          && quotaInNamespace != OzoneConsts.QUOTA_RESET)) {
