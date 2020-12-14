@@ -22,7 +22,6 @@ import javax.annotation.Nonnull;
 
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.key.OMKeyCreateResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -41,10 +40,10 @@ public class OMFileCreateResponse extends OMKeyCreateResponse {
 
   public OMFileCreateResponse(@Nonnull OMResponse omResponse,
       @Nonnull OmKeyInfo omKeyInfo, @Nonnull List<OmKeyInfo> parentKeyInfos,
-      long openKeySessionID, @Nonnull OmVolumeArgs omVolumeArgs,
+      long openKeySessionID,
       @Nonnull OmBucketInfo omBucketInfo) {
     super(omResponse, omKeyInfo, parentKeyInfos, openKeySessionID,
-        omVolumeArgs, omBucketInfo);
+        omBucketInfo);
   }
 
   /**
