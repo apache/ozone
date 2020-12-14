@@ -18,12 +18,15 @@
 package org.apache.hadoop.hdds.scm.container;
 
 import java.io.IOException;
+import java.util.Map;
+import java.util.NavigableSet;
 import java.util.Set;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 
 /**
@@ -152,6 +155,20 @@ public interface ContainerStateManagerV2 {
   /**
    *
    */
+  // Make this as @Replicate
+  void updateDeleteTransactionId(Map<ContainerID, Long> deleteTransactionMap)
+      throws IOException;
+
+  /**
+   *
+   */
+  ContainerInfo getMatchingContainer(long size, String owner,
+                                     PipelineID pipelineID,
+                                     NavigableSet<ContainerID> containerIDs);
+
+  /**
+   *
+   */
   @Replicate
   void removeContainer(HddsProtos.ContainerID containerInfo)
       throws IOException;
@@ -159,5 +176,5 @@ public interface ContainerStateManagerV2 {
   /**
    *
    */
-  void close() throws Exception;
+  void close() throws IOException;
 }

@@ -36,8 +36,9 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.container.CloseContainerEventHandler;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
+import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
-import org.apache.hadoop.hdds.scm.container.SCMContainerManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
@@ -77,7 +78,7 @@ import org.junit.rules.TemporaryFolder;
  */
 public class TestBlockManager {
   private StorageContainerManager scm;
-  private SCMContainerManager mapping;
+  private ContainerManagerV2 mapping;
   private MockNodeManager nodeManager;
   private PipelineManagerV2Impl pipelineManager;
   private BlockManagerImpl blockManager;
@@ -132,13 +133,14 @@ public class TestBlockManager {
             pipelineManager.getStateManager(), conf, eventQueue);
     pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
         mockRatisProvider);
-    SCMContainerManager containerManager =
-        new SCMContainerManager(conf,
-            scmMetadataStore.getContainerTable(),
-            scmMetadataStore.getStore(),
-            pipelineManager);
+    ContainerManagerV2 containerManager =
+        new ContainerManagerImpl(conf,
+            MockSCMHAManager.getInstance(true),
+            pipelineManager,
+            scmMetadataStore.getContainerTable());
     SCMSafeModeManager safeModeManager = new SCMSafeModeManager(conf,
-        containerManager.getContainers(), pipelineManager, eventQueue) {
+        containerManager.getContainers(),
+        pipelineManager, eventQueue) {
       @Override
       public void emitSafeModeStatus() {
         // skip
@@ -154,7 +156,7 @@ public class TestBlockManager {
     scm = TestUtils.getScm(conf, configurator);
 
     // Initialize these fields so that the tests can pass.
-    mapping = (SCMContainerManager) scm.getContainerManager();
+    mapping = scm.getContainerManager();
     blockManager = (BlockManagerImpl) scm.getScmBlockManager();
     DatanodeCommandHandler handler = new DatanodeCommandHandler();
     eventQueue.addHandler(SCMEvents.DATANODE_COMMAND, handler);
@@ -356,20 +358,20 @@ public class TestBlockManager {
       CompletableFuture
               .allOf(futureList.toArray(
                       new CompletableFuture[futureList.size()])).get();
-      Assert.assertTrue(
-              pipelineManager.getPipelines(type).size() == 1);
+      Assert.assertEquals(1,
+              pipelineManager.getPipelines(type).size());
       Pipeline pipeline = pipelineManager.getPipelines(type).get(0);
       // total no of containers to be created will be number of healthy
       // volumes * number of numContainerPerOwnerInPipeline which is equal to
       // the thread count
-      Assert.assertTrue(threadCount == pipelineManager.
+      Assert.assertEquals(threadCount, pipelineManager.
               getNumberOfContainers(pipeline.getId()));
-      Assert.assertTrue(
-              allocatedBlockMap.size() == threadCount);
-      Assert.assertTrue(allocatedBlockMap.
-              values().size() == threadCount);
+      Assert.assertEquals(threadCount,
+              allocatedBlockMap.size());
+      Assert.assertEquals(threadCount, allocatedBlockMap.
+              values().size());
       allocatedBlockMap.values().stream().forEach(v -> {
-        Assert.assertTrue(v.size() == 1);
+        Assert.assertEquals(1, v.size());
       });
     } catch (Exception e) {
       Assert.fail("testAllocateBlockInParallel failed");

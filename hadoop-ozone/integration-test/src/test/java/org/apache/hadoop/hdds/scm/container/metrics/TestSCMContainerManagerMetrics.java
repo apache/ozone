@@ -24,7 +24,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -81,7 +81,7 @@ public class TestSCMContainerManagerMetrics {
   @Test
   public void testContainerOpsMetrics() throws IOException {
     MetricsRecordBuilder metrics;
-    ContainerManager containerManager = scm.getContainerManager();
+    ContainerManagerV2 containerManager = scm.getContainerManager();
     metrics = getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
     long numSuccessfulCreateContainers = getLongCounter(
         "NumSuccessfulCreateContainers", metrics);
@@ -120,25 +120,28 @@ public class TestSCMContainerManagerMetrics {
         metrics), numSuccessfulDeleteContainers + 1);
 
 
-    try {
-      // Give random container to delete.
-      containerManager.deleteContainer(
-          ContainerID.valueOf(RandomUtils.nextLong(10000, 20000)));
-      fail("testContainerOpsMetrics failed");
-    } catch (IOException ex) {
-      // Here it should fail, so it should have the old metric value.
-      metrics = getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
-      Assert.assertEquals(getLongCounter("NumSuccessfulDeleteContainers",
-          metrics), numSuccessfulCreateContainers);
-      Assert.assertEquals(getLongCounter("NumFailureDeleteContainers",
-          metrics), 1);
-    }
+    // Give random container to delete.
+    containerManager.deleteContainer(
+        ContainerID.valueOf(RandomUtils.nextLong(10000, 20000)));
+    // Here it should fail, so it should have the old metric value.
+    metrics = getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
+    Assert.assertEquals(getLongCounter("NumSuccessfulDeleteContainers",
+        metrics), numSuccessfulCreateContainers);
+    Assert.assertEquals(getLongCounter("NumFailureDeleteContainers",
+        metrics), 1);
+    /*
 
-    containerManager.listContainer(
+    // ReplicationManager is also calling "getContainers" making the below
+    // check flaky. Move the metrics to protocol server and then enable
+    // this check.
+
+    containerManager.getContainers(
         ContainerID.valueOf(containerInfo.getContainerID()), 1);
     metrics = getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
     Assert.assertEquals(getLongCounter("NumListContainerOps",
         metrics), 1);
+
+     */
 
   }
 

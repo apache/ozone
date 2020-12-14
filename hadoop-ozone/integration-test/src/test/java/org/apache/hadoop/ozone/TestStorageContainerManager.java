@@ -182,8 +182,7 @@ public class TestStorageContainerManager {
         } else {
           // If passes permission check, it should fail with
           // container not exist exception.
-          Assert.assertTrue(e.getMessage()
-              .contains("container doesn't exist"));
+          Assert.assertTrue(e instanceof ContainerNotFoundException);
         }
       }
 

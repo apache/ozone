@@ -50,6 +50,8 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
+import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
+import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerImpl;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
@@ -64,12 +66,10 @@ import org.apache.hadoop.hdds.scm.container.CloseContainerEventHandler;
 import org.apache.hadoop.hdds.scm.container.ContainerActionsHandler;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReportHandler;
 import org.apache.hadoop.hdds.scm.container.IncrementalContainerReportHandler;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager.ReplicationManagerConfiguration;
-import org.apache.hadoop.hdds.scm.container.SCMContainerManager;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementPolicyFactory;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementMetrics;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.ContainerStat;
@@ -161,7 +161,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    */
   private NodeManager scmNodeManager;
   private PipelineManager pipelineManager;
-  private ContainerManager containerManager;
+  private ContainerManagerV2 containerManager;
   private BlockManager scmBlockManager;
   private final SCMStorageConfig scmStorageConfig;
 
@@ -448,11 +448,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (configurator.getContainerManager() != null) {
       containerManager = configurator.getContainerManager();
     } else {
-      containerManager =
-          new SCMContainerManager(conf,
-              scmMetadataStore.getContainerTable(),
-              scmMetadataStore.getBatchHandler(),
-              pipelineManager);
+      containerManager = new ContainerManagerImpl(conf, scmHAManager,
+          pipelineManager, scmMetadataStore.getContainerTable());
     }
 
     pipelineChoosePolicy = PipelineChoosePolicyFactory.getPolicy(conf);
@@ -476,7 +473,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       scmSafeModeManager = configurator.getScmSafeModeManager();
     } else {
       scmSafeModeManager = new SCMSafeModeManager(conf,
-          containerManager.getContainers(), pipelineManager, eventQueue);
+          containerManager.getContainers(),
+          pipelineManager, eventQueue);
     }
   }
 
@@ -983,7 +981,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    * Returns SCM container manager.
    */
   @VisibleForTesting
-  public ContainerManager getContainerManager() {
+  public ContainerManagerV2 getContainerManager() {
     return containerManager;
   }
 
@@ -1143,7 +1141,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     Map<String, Integer> nodeStateCount = new HashMap<>();
     for (HddsProtos.LifeCycleState state : HddsProtos.LifeCycleState.values()) {
       nodeStateCount.put(state.toString(),
-          containerManager.getContainerCountByState(state));
+          containerManager.getContainers(state).size());
     }
     return nodeStateCount;
   }

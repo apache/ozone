@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
@@ -49,10 +50,10 @@ public class CloseContainerEventHandler implements EventHandler<ContainerID> {
       LoggerFactory.getLogger(CloseContainerEventHandler.class);
 
   private final PipelineManager pipelineManager;
-  private final ContainerManager containerManager;
+  private final ContainerManagerV2 containerManager;
 
   public CloseContainerEventHandler(final PipelineManager pipelineManager,
-      final ContainerManager containerManager) {
+      final ContainerManagerV2 containerManager) {
     this.pipelineManager = pipelineManager;
     this.containerManager = containerManager;
   }
@@ -86,7 +87,7 @@ public class CloseContainerEventHandler implements EventHandler<ContainerID> {
             containerID, container.getState());
       }
 
-    } catch (IOException ex) {
+    } catch (IOException | InvalidStateTransitionException ex) {
       LOG.error("Failed to close the container {}.", containerID, ex);
     }
   }

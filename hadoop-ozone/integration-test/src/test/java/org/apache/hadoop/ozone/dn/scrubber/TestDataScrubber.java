@@ -28,7 +28,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementCapacity;
@@ -179,7 +179,7 @@ public class TestDataScrubber {
     // wait for the incremental container report to propagate to SCM
     Thread.sleep(5000);
 
-    ContainerManager cm = cluster.getStorageContainerManager()
+    ContainerManagerV2 cm = cluster.getStorageContainerManager()
         .getContainerManager();
     Set<ContainerReplica> replicas = cm.getContainerReplicas(
         ContainerID.valueOf(c.getContainerData().getContainerID()));
