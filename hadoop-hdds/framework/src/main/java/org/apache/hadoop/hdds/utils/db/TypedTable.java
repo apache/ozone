@@ -76,6 +76,15 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
         CacheType.PartialCache);
   }
 
+  /**
+   * Create an TypedTable from the raw table with specified cache type.
+   * @param rawTable
+   * @param codecRegistry
+   * @param keyType
+   * @param valueType
+   * @param cacheType
+   * @throws IOException
+   */
   public TypedTable(
       Table<byte[], byte[]> rawTable,
       CodecRegistry codecRegistry, Class<KEY> keyType,

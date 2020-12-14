@@ -111,7 +111,7 @@ public interface TableCache<CACHEKEY extends CacheKey,
   @VisibleForTesting
   Set<EpochEntry<CACHEKEY>> getEpochEntrySet();
 
-  public enum CacheType {
+  enum CacheType {
     FullCache, //  This mean's the table maintains full cache. Cache and DB
     // state are same.
     PartialCache // This is partial table cache, cache state is partial state
