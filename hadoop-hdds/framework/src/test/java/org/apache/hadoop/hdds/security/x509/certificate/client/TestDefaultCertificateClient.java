@@ -28,7 +28,6 @@ import org.junit.Before;
 import org.junit.Test;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -51,6 +50,7 @@ import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.test.LambdaTestUtils;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.*;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_METADATA_DIR_NAME;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
@@ -201,7 +201,7 @@ public class TestDefaultCertificateClient {
 
   @Test
   public void testSignDataStream() throws Exception {
-    String data = RandomStringUtils.random(100, StandardCharsets.UTF_8.name());
+    String data = RandomStringUtils.random(100);
     FileUtils.deleteQuietly(Paths.get(
         omSecurityConfig.getKeyLocation(OM_COMPONENT).toString(),
         omSecurityConfig.getPrivateKeyFileName()).toFile());
@@ -212,13 +212,12 @@ public class TestDefaultCertificateClient {
     // Expect error when there is no private key to sign.
     LambdaTestUtils.intercept(IOException.class, "Error while " +
             "signing the stream",
-        () -> omCertClient.signDataStream(IOUtils.toInputStream(data,
-            StandardCharsets.UTF_8)));
+        () -> omCertClient.signDataStream(IOUtils.toInputStream(data, UTF_8)));
 
     generateKeyPairFiles();
     byte[] sign = omCertClient.signDataStream(IOUtils.toInputStream(data,
-        StandardCharsets.UTF_8));
-    validateHash(sign, data.getBytes());
+        UTF_8));
+    validateHash(sign, data.getBytes(UTF_8));
   }
 
   /**
@@ -239,22 +238,22 @@ public class TestDefaultCertificateClient {
    */
   @Test
   public void verifySignatureStream() throws Exception {
-    String data = RandomStringUtils.random(500, StandardCharsets.UTF_8.name());
+    String data = RandomStringUtils.random(500);
     byte[] sign = omCertClient.signDataStream(IOUtils.toInputStream(data,
-        StandardCharsets.UTF_8));
+        UTF_8));
 
     // Positive tests.
-    assertTrue(omCertClient.verifySignature(data.getBytes(), sign,
+    assertTrue(omCertClient.verifySignature(data.getBytes(UTF_8), sign,
         x509Certificate));
     assertTrue(omCertClient.verifySignature(
-        IOUtils.toInputStream(data, StandardCharsets.UTF_8),
+        IOUtils.toInputStream(data, UTF_8),
         sign, x509Certificate));
 
     // Negative tests.
-    assertFalse(omCertClient.verifySignature(data.getBytes(),
-        "abc".getBytes(), x509Certificate));
+    assertFalse(omCertClient.verifySignature(data.getBytes(UTF_8),
+        "abc".getBytes(UTF_8), x509Certificate));
     assertFalse(omCertClient.verifySignature(IOUtils.toInputStream(data,
-        StandardCharsets.UTF_8), "abc".getBytes(), x509Certificate));
+        UTF_8), "abc".getBytes(UTF_8), x509Certificate));
 
   }
 
@@ -263,21 +262,21 @@ public class TestDefaultCertificateClient {
    */
   @Test
   public void verifySignatureDataArray() throws Exception {
-    String data = RandomStringUtils.random(500, StandardCharsets.UTF_8.name());
-    byte[] sign = omCertClient.signData(data.getBytes());
+    String data = RandomStringUtils.random(500);
+    byte[] sign = omCertClient.signData(data.getBytes(UTF_8));
 
     // Positive tests.
-    assertTrue(omCertClient.verifySignature(data.getBytes(), sign,
+    assertTrue(omCertClient.verifySignature(data.getBytes(UTF_8), sign,
         x509Certificate));
     assertTrue(omCertClient.verifySignature(
-        IOUtils.toInputStream(data, StandardCharsets.UTF_8),
+        IOUtils.toInputStream(data, UTF_8),
         sign, x509Certificate));
 
     // Negative tests.
-    assertFalse(omCertClient.verifySignature(data.getBytes(),
-        "abc".getBytes(), x509Certificate));
+    assertFalse(omCertClient.verifySignature(data.getBytes(UTF_8),
+        "abc".getBytes(UTF_8), x509Certificate));
     assertFalse(omCertClient.verifySignature(IOUtils.toInputStream(data,
-        StandardCharsets.UTF_8), "abc".getBytes(), x509Certificate));
+        UTF_8), "abc".getBytes(UTF_8), x509Certificate));
 
   }
 
