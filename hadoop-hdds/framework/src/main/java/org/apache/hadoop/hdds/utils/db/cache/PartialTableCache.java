@@ -148,8 +148,8 @@ public class PartialTableCache<CACHEKEY extends CacheKey,
       // cache. Clean that epoch entry.
       if (!removed.get()) {
         if (LOG.isDebugEnabled()) {
-          LOG.debug("CacheKey {} with epoch {} is removed from epochEntry for " +
-                  "a key not existing in cache", cachekey.getCacheKey(),
+          LOG.debug("CacheKey {} with epoch {} is removed from epochEntry " +
+                  "for a key not existing in cache", cachekey.getCacheKey(),
               currentEpoch);
         }
         iterator.remove();
