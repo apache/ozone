@@ -218,10 +218,8 @@ public class BasicUpgradeFinalizer<T, V extends AbstractLayoutVersionManager>
 
   protected void emitNOOPMsg(String feature) {
     String msg = "No finalization work defined for feature: " + feature + ".";
-    String msg2 = "Skipping.";
 
     logAndEmit(msg);
-    logAndEmit(msg2);
   }
 
   protected void emitStartingMsg() {
@@ -265,7 +263,7 @@ public class BasicUpgradeFinalizer<T, V extends AbstractLayoutVersionManager>
     logAndEmit(msg);
   }
 
-  private void logAndEmit(String msg) {
+  protected void logAndEmit(String msg) {
     LOG.info(msg);
     msgs.offer(msg);
   }

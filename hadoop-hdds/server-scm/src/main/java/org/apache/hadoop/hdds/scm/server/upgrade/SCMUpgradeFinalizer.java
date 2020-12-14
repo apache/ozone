@@ -75,7 +75,12 @@ public class SCMUpgradeFinalizer extends
          * all existing pipelines are closed and pipeline Manger would freeze
          * all new pipeline creation.
          */
+        String msg = "  Existing pipelines and containers will be closed " +
+            "during Upgrade.";
+        msg += "\n  New pipelines creation will remain frozen until Upgrade " +
+            "is finalized.";
         storageContainerManager.preFinalizeUpgrade();
+        logAndEmit(msg);
 
         for (HDDSLayoutFeature f : versionManager.unfinalizedFeatures()) {
           finalizeFeature(f, storageContainerManager.getScmStorageConfig());

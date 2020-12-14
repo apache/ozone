@@ -90,6 +90,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineReportHandler;
 import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.PipelineChoosePolicyFactory;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
+import org.apache.hadoop.hdds.scm.server.upgrade.SCMUpgradeFinalizer;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateServer;
@@ -111,6 +112,8 @@ import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.common.Storage.StorageState;
 import org.apache.hadoop.ozone.lease.LeaseManager;
 import org.apache.hadoop.ozone.lock.LockManager;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
@@ -211,6 +214,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private PipelineChoosePolicy pipelineChoosePolicy;
 
   private HDDSLayoutVersionManager scmLayoutVersionManager;
+  private UpgradeFinalizer<StorageContainerManager> upgradeFinalizer;
 
   /**
    * Creates a new StorageContainerManager. Configuration will be
@@ -246,7 +250,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     configuration = conf;
     initMetrics();
     containerReportCache = buildContainerReportCache();
-
     /**
      * It is assumed the scm --init command creates the SCM Storage Config.
      */
@@ -261,6 +264,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     scmLayoutVersionManager =
         HDDSLayoutVersionManager.initialize(scmStorageConfig);
+
+    upgradeFinalizer = new SCMUpgradeFinalizer(scmLayoutVersionManager);
 
     /**
      * Important : This initialization sequence is assumed by some of our tests.
@@ -1264,5 +1269,16 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
      * find enough Healthy data nodes.
      */
     pipelineManager.resumePipelineCreation();
+  }
+
+  public StatusAndMessages finalizeUpgrade(String upgradeClientID)
+      throws IOException{
+    return upgradeFinalizer.finalize(upgradeClientID, this);
+  }
+
+  public StatusAndMessages queryUpgradeFinalizationProgress(
+      String upgradeClientID, boolean takeover
+  ) throws IOException {
+    return upgradeFinalizer.reportStatus(upgradeClientID, takeover);
   }
 }

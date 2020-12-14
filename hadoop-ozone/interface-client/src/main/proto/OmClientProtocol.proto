@@ -1048,25 +1048,12 @@ message DBUpdatesResponse {
     repeated bytes data = 2;
 }
 
-
-message UpgradeFinalizationStatus {
-  enum Status {
-    ALREADY_FINALIZED = 1;
-    STARTING_FINALIZATION = 2;
-    FINALIZATION_IN_PROGRESS = 3;
-    FINALIZATION_DONE = 4;
-    FINALIZATION_REQUIRED = 5;
-  }
-  required Status status = 1;
-  repeated string messages = 2;
-}
-
 message FinalizeUpgradeRequest {
   required string upgradeClientId = 1;
 }
 
 message FinalizeUpgradeResponse {
-    required UpgradeFinalizationStatus status = 1;
+    required hadoop.hdds.UpgradeFinalizationStatus status = 1;
 }
 
 message FinalizeUpgradeProgressRequest {
@@ -1075,7 +1062,7 @@ message FinalizeUpgradeProgressRequest {
 }
 
 message FinalizeUpgradeProgressResponse {
-    required UpgradeFinalizationStatus status = 1;
+    required hadoop.hdds.UpgradeFinalizationStatus status = 1;
 }
 
 message PrepareRequest {
