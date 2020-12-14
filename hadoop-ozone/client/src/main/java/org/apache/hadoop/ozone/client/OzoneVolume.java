@@ -71,6 +71,10 @@ public class OzoneVolume extends WithMetadata {
    */
   private long quotaInCounts;
   /**
+   * Bucket namespace quota usage.
+   */
+  private long usedNamespace;
+  /**
    * Creation time of the volume.
    */
   private Instant creationTime;
@@ -126,11 +130,13 @@ public class OzoneVolume extends WithMetadata {
   @SuppressWarnings("parameternumber")
   public OzoneVolume(ConfigurationSource conf, ClientProtocol proxy,
       String name, String admin, String owner, long quotaInBytes,
-      long quotaInCounts, long creationTime, long modificationTime,
-      List<OzoneAcl> acls, Map<String, String> metadata) {
+      long quotaInCounts, long usedNamespace, long creationTime,
+      long modificationTime, List<OzoneAcl> acls,
+      Map<String, String> metadata) {
     this(conf, proxy, name, admin, owner, quotaInBytes, quotaInCounts,
         creationTime, acls, metadata);
     this.modificationTime = Instant.ofEpochMilli(modificationTime);
+    this.usedNamespace = usedNamespace;
   }
 
   @SuppressWarnings("parameternumber")
@@ -149,11 +155,12 @@ public class OzoneVolume extends WithMetadata {
   @SuppressWarnings("parameternumber")
   public OzoneVolume(ConfigurationSource conf, ClientProtocol proxy,
       String name, String admin, String owner, long quotaInBytes,
-      long quotaInCounts, long creationTime, long modificationTime,
-      List<OzoneAcl> acls) {
+      long quotaInCounts, long usedNamespace, long creationTime,
+      long modificationTime, List<OzoneAcl> acls) {
     this(conf, proxy, name, admin, owner, quotaInBytes, quotaInCounts,
         creationTime, acls);
     this.modificationTime = Instant.ofEpochMilli(modificationTime);
+    this.usedNamespace = usedNamespace;
   }
 
   @VisibleForTesting
@@ -254,6 +261,14 @@ public class OzoneVolume extends WithMetadata {
    */
   public List<OzoneAcl> getAcls() {
     return acls;
+  }
+
+  /**
+   * Returns used bucket namespace.
+   * @return usedNamespace
+   */
+  public long getUsedNamespace() {
+    return usedNamespace;
   }
 
   /**
