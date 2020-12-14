@@ -28,15 +28,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.TimeoutException;
 
-import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
-import org.apache.hadoop.fs.FSDataInputStream;
-import org.apache.hadoop.fs.FSDataOutputStream;
-import org.apache.hadoop.fs.FileAlreadyExistsException;
-import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.InvalidPathException;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.Trash;
+import org.apache.hadoop.fs.*;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -45,6 +37,7 @@ import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.TrashPolicyOzone;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -53,6 +46,7 @@ import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.commons.io.IOUtils;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_CHECKPOINT_INTERVAL_KEY;
 import static org.apache.hadoop.fs.FileSystem.TRASH_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
@@ -239,6 +233,7 @@ public class TestOzoneFileSystem {
     testDeleteRoot();
 
     testRecursiveDelete();
+    testTrash();
   }
 
   @After
@@ -252,7 +247,6 @@ public class TestOzoneFileSystem {
   private void setupOzoneFileSystem()
       throws IOException, TimeoutException, InterruptedException {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setInt(FS_TRASH_INTERVAL_KEY, 1);
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
         enabledFileSystemPaths);
     cluster = MiniOzoneCluster.newBuilder(conf)
@@ -272,6 +266,8 @@ public class TestOzoneFileSystem {
     conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
     // Set the number of keys to be processed during batch operate.
     conf.setInt(OZONE_FS_ITERATE_BATCH_SIZE, 5);
+    conf.setInt(FS_TRASH_INTERVAL_KEY, 1);
+    conf.setInt(FS_TRASH_CHECKPOINT_INTERVAL_KEY, 1);
     fs = FileSystem.get(conf);
     trash = new Trash(conf);
   }
@@ -775,5 +771,61 @@ public class TestOzoneFileSystem {
     Assert.assertTrue(o3fs.exists(trashPath));
     // Cleanup
     o3fs.delete(trashRoot, true);
+  }
+
+  /**
+   * 1.Move a Key to Trash
+   * 2.Verify that the key gets deleted by the trash emptier.
+   * @throws Exception
+   */
+
+  public void testTrash() throws Exception {
+    String testKeyName = "testKey2";
+    Path path = new Path(OZONE_URI_DELIMITER, testKeyName);
+    ContractTestUtils.touch(fs, path);
+    Assert.assertTrue(trash.getConf().getClass(
+        "fs.trash.classname", TrashPolicy.class).
+        isAssignableFrom(TrashPolicyOzone.class));
+    Assert.assertEquals(trash.getConf().getInt(FS_TRASH_INTERVAL_KEY, 0), 1);
+    Assert.assertEquals(trash.getConf().getInt(FS_TRASH_CHECKPOINT_INTERVAL_KEY,
+        0), 1);
+    // Call moveToTrash. We can't call protected fs.rename() directly
+    trash.moveToTrash(path);
+
+    // Construct paths
+    String username = UserGroupInformation.getCurrentUser().getShortUserName();
+    Path trashRoot = new Path(OZONE_URI_DELIMITER, TRASH_PREFIX);
+    Path userTrash = new Path(trashRoot, username);
+    Path userTrashCurrent = new Path(userTrash, "Current");
+    Path trashPath = new Path(userTrashCurrent, testKeyName);
+
+    // Wait until the TrashEmptier purges the key
+    GenericTestUtils.waitFor(()-> {
+      try {
+        return !fs.exists(trashPath);
+      } catch (IOException e) {
+        LOG.error("Delete from Trash Failed");
+        Assert.fail("Delete from Trash Failed");
+        return false;
+      }
+    }, 1000, 120000);
+
+    // userTrash path will contain the checkpoint folder
+    Assert.assertEquals(1, fs.listStatus(userTrash).length);
+
+    // wait for deletion of checkpoint dir
+    GenericTestUtils.waitFor(()-> {
+      try {
+        return fs.listStatus(userTrash).length==0;
+      } catch (IOException e) {
+        LOG.error("Delete from Trash Failed");
+        Assert.fail("Delete from Trash Failed");
+        return false;
+      }
+    }, 1000, 120000);
+
+    // Cleanup
+    fs.delete(trashRoot, true);
+
   }
 }
