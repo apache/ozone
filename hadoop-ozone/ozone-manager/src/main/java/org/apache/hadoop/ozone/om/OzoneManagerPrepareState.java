@@ -62,8 +62,10 @@ public final class OzoneManagerPrepareState {
    */
   public static void writePrepareMarkerFile(ConfigurationSource conf,
       long index) throws IOException {
+    File markerFile = getPrepareMarkerFile(conf);
+    markerFile.getParentFile().mkdirs();
     try(FileOutputStream stream =
-            new FileOutputStream(getPrepareMarkerFile(conf))) {
+            new FileOutputStream(markerFile)) {
       stream.write(Long.toString(index).getBytes());
     }
   }
