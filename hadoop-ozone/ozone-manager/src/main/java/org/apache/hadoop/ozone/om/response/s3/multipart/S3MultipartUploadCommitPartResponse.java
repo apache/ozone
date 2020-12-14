@@ -23,7 +23,6 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -58,7 +57,6 @@ public class S3MultipartUploadCommitPartResponse extends OMClientResponse {
   private OzoneManagerProtocolProtos.PartKeyInfo oldPartKeyInfo;
   private OmKeyInfo openPartKeyInfoToBeDeleted;
   private boolean isRatisEnabled;
-  private OmVolumeArgs omVolumeArgs;
   private OmBucketInfo omBucketInfo;
 
   /**
@@ -78,8 +76,7 @@ public class S3MultipartUploadCommitPartResponse extends OMClientResponse {
       @Nullable OmMultipartKeyInfo omMultipartKeyInfo,
       @Nullable OzoneManagerProtocolProtos.PartKeyInfo oldPartKeyInfo,
       @Nullable OmKeyInfo openPartKeyInfoToBeDeleted,
-      boolean isRatisEnabled, @Nonnull OmVolumeArgs omVolumeArgs,
-      @Nonnull OmBucketInfo omBucketInfo) {
+      boolean isRatisEnabled, @Nonnull OmBucketInfo omBucketInfo) {
     super(omResponse);
     this.multipartKey = multipartKey;
     this.openKey = openKey;
@@ -87,7 +84,6 @@ public class S3MultipartUploadCommitPartResponse extends OMClientResponse {
     this.oldPartKeyInfo = oldPartKeyInfo;
     this.openPartKeyInfoToBeDeleted = openPartKeyInfoToBeDeleted;
     this.isRatisEnabled = isRatisEnabled;
-    this.omVolumeArgs = omVolumeArgs;
     this.omBucketInfo = omBucketInfo;
   }
 
@@ -154,7 +150,7 @@ public class S3MultipartUploadCommitPartResponse extends OMClientResponse {
 
     // update bucket usedBytes.
     omMetadataManager.getBucketTable().putWithBatch(batchOperation,
-        omMetadataManager.getBucketKey(omVolumeArgs.getVolume(),
+        omMetadataManager.getBucketKey(omBucketInfo.getVolumeName(),
             omBucketInfo.getBucketName()), omBucketInfo);
   }
 }
