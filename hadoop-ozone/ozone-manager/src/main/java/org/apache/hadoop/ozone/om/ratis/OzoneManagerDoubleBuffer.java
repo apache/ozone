@@ -52,10 +52,6 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.ratis.util.ExitUtils;
 
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
-import static org.apache.hadoop.ozone.OzoneConsts.BUCKET;
-import static org.apache.hadoop.ozone.OzoneConsts.VOLUME;
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.DeleteBucket;
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.DeleteVolume;
 
 /**
  * This class implements DoubleBuffer implementation of OMClientResponse's. In
