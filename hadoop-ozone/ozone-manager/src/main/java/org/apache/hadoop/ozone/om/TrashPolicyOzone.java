@@ -59,8 +59,6 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
 
   private static final Path CURRENT = new Path("Current");
 
-  private final static int TRASH_EMPTIER_CORE_POOL_SIZE = 5;
-
   private static final FsPermission PERMISSION =
       new FsPermission(FsAction.ALL, FsAction.NONE, FsAction.NONE);
 
@@ -78,21 +76,6 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
   private OzoneManager om;
 
   public TrashPolicyOzone(){
-  }
-
-  private TrashPolicyOzone(FileSystem fs, Configuration conf){
-    super.initialize(conf, fs);
-  }
-
-  @Override
-  public void initialize(Configuration conf, FileSystem fs, Path path) {
-    this.fs = fs;
-    this.deletionInterval = (long)(conf.getFloat(
-        FS_TRASH_INTERVAL_KEY, FS_TRASH_INTERVAL_DEFAULT)
-        * MSECS_PER_MINUTE);
-    this.emptierInterval = (long)(conf.getFloat(
-        FS_TRASH_CHECKPOINT_INTERVAL_KEY, FS_TRASH_CHECKPOINT_INTERVAL_DEFAULT)
-        * MSECS_PER_MINUTE);
   }
 
   @Override
@@ -151,8 +134,8 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
           + (deletionInterval / MSECS_PER_MINUTE)
           + " minutes, Emptier interval = "
           + (this.emptierInterval / MSECS_PER_MINUTE) + " minutes.");
-      executor = new ThreadPoolExecutor(TRASH_EMPTIER_CORE_POOL_SIZE,
-          TRASH_EMPTIER_CORE_POOL_SIZE, 1,
+      executor = new ThreadPoolExecutor(trashEmptierCorePoolSize,
+          trashEmptierCorePoolSize, 1,
           TimeUnit.SECONDS, new ArrayBlockingQueue<>(1024),
           new ThreadPoolExecutor.CallerRunsPolicy());
     }
@@ -310,4 +293,3 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
     return time;
   }
 }
-
