@@ -358,7 +358,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   // TODO: Utilize the forUpgrade parameter to remove the marker file and
   //  take the OM out of prepare mode on startup.
   @SuppressWarnings("methodlength")
-  private OzoneManager(OzoneConfiguration conf, boolean forUpgrade)
+  private OzoneManager(OzoneConfiguration conf)
       throws IOException, AuthenticationException {
     super(OzoneVersionInfo.OZONE_VERSION_INFO);
     Preconditions.checkNotNull(conf);
@@ -957,12 +957,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public static OzoneManager createOm(OzoneConfiguration conf)
       throws IOException, AuthenticationException {
-    return new OzoneManager(conf, false);
-  }
-
-  public static OzoneManager createOmUpgradeMode(OzoneConfiguration conf)
-      throws IOException, AuthenticationException {
-    return new OzoneManager(conf, true);
+    return new OzoneManager(conf);
   }
 
   /**
