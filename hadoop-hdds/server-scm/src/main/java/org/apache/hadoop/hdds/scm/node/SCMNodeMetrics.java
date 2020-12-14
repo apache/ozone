@@ -23,6 +23,7 @@ import java.util.Map;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
+import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
@@ -32,12 +33,7 @@ import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.ozone.OzoneConsts;
-
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DEAD;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DECOMMISSIONED;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DECOMMISSIONING;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
+import org.apache.hadoop.util.StringUtils;
 
 /**
  * This class maintains Node related metrics.
@@ -53,6 +49,7 @@ public final class SCMNodeMetrics implements MetricsSource {
   private @Metric MutableCounterLong numHBProcessingFailed;
   private @Metric MutableCounterLong numNodeReportProcessed;
   private @Metric MutableCounterLong numNodeReportProcessingFailed;
+  private @Metric String textMetric;
 
   private final MetricsRegistry registry;
   private final NodeManagerMXBean managerMXBean;
@@ -63,6 +60,7 @@ public final class SCMNodeMetrics implements MetricsSource {
   private SCMNodeMetrics(NodeManagerMXBean managerMXBean) {
     this.managerMXBean = managerMXBean;
     this.registry = new MetricsRegistry(recordInfo);
+    this.textMetric = "my_test_metric";
   }
 
   /**
@@ -118,44 +116,58 @@ public final class SCMNodeMetrics implements MetricsSource {
   @Override
   @SuppressWarnings("SuspiciousMethodCalls")
   public void getMetrics(MetricsCollector collector, boolean all) {
-    Map<String, Integer> nodeCount = managerMXBean.getNodeCount();
+    Map<String, Map<String, Integer>> nodeCount = managerMXBean.getNodeCount();
     Map<String, Long> nodeInfo = managerMXBean.getNodeInfo();
-    registry.snapshot(
-        collector.addRecord(registry.info()) // Add annotated ones first
-            .addGauge(Interns.info(
-                "HealthyNodes",
-                "Number of healthy datanodes"),
-                nodeCount.get(HEALTHY.toString()))
-            .addGauge(Interns.info("StaleNodes",
-                "Number of stale datanodes"),
-                nodeCount.get(STALE.toString()))
-            .addGauge(Interns.info("DeadNodes",
-                "Number of dead datanodes"),
-                nodeCount.get(DEAD.toString()))
-            .addGauge(Interns.info("DecommissioningNodes",
-                "Number of decommissioning datanodes"),
-                nodeCount.get(DECOMMISSIONING.toString()))
-            .addGauge(Interns.info("DecommissionedNodes",
-                "Number of decommissioned datanodes"),
-                nodeCount.get(DECOMMISSIONED.toString()))
-            .addGauge(Interns.info("DiskCapacity",
-                "Total disk capacity"),
-                nodeInfo.get("DISKCapacity"))
-            .addGauge(Interns.info("DiskUsed",
-                "Total disk capacity used"),
-                nodeInfo.get("DISKUsed"))
-            .addGauge(Interns.info("DiskRemaining",
-                "Total disk capacity remaining"),
-                nodeInfo.get("DISKRemaining"))
-            .addGauge(Interns.info("SSDCapacity",
-                "Total ssd capacity"),
-                nodeInfo.get("SSDCapacity"))
-            .addGauge(Interns.info("SSDUsed",
-                "Total ssd capacity used"),
-                nodeInfo.get("SSDUsed"))
-            .addGauge(Interns.info("SSDRemaining",
-                "Total disk capacity remaining"),
-                nodeInfo.get("SSDRemaining")),
-        all);
+
+    /**
+     * Loop over the Node map and create a metric for the cross product of all
+     * Operational and health states, ie:
+     *     InServiceHealthy
+     *     InServiceStale
+     *     ...
+     *     EnteringMaintenanceHealthy
+     *     ...
+     */
+    MetricsRecordBuilder metrics = collector.addRecord(registry.info());
+    for(Map.Entry<String, Map<String, Integer>> e : nodeCount.entrySet()) {
+      for(Map.Entry<String, Integer> h : e.getValue().entrySet()) {
+        metrics.addGauge(
+            Interns.info(
+                StringUtils.camelize(e.getKey()+"_"+h.getKey()+"_nodes"),
+                "Number of "+e.getKey()+" "+h.getKey()+" datanodes"),
+            h.getValue());
+      }
+    }
+
+    for (Map.Entry<String, Long> e : nodeInfo.entrySet()) {
+      metrics.addGauge(
+          Interns.info(e.getKey(), diskMetricDescription(e.getKey())),
+          e.getValue());
+    }
+    registry.snapshot(metrics, all);
+  }
+
+  private String diskMetricDescription(String metric) {
+    StringBuilder sb = new StringBuilder();
+    sb.append("Total");
+    if (metric.indexOf("Maintenance") >= 0) {
+      sb.append(" maintenance");
+    } else if (metric.indexOf("Decommissioned") >= 0) {
+      sb.append(" decommissioned");
+    }
+    if (metric.indexOf("DiskCapacity") >= 0) {
+      sb.append(" disk capacity");
+    } else if (metric.indexOf("DiskUsed") >= 0) {
+      sb.append(" disk capacity used");
+    } else if (metric.indexOf("DiskRemaining") >= 0) {
+      sb.append(" disk capacity remaining");
+    } else if (metric.indexOf("SSDCapacity") >= 0) {
+      sb.append(" SSD capacity");
+    } else if (metric.indexOf("SSDUsed") >= 0) {
+      sb.append(" SSD capacity used");
+    } else if (metric.indexOf("SSDRemaining") >= 0) {
+      sb.append(" SSD capacity remaining");
+    }
+    return sb.toString();
   }
 }

@@ -943,7 +943,7 @@
   </property>
   <property>
     <name>ozone.scm.heartbeat.rpc-timeout</name>
-    <value>1s</value>
+    <value>5s</value>
     <tag>OZONE, MANAGEMENT</tag>
     <description>
       Timeout value for the RPC from Datanode to SCM.
@@ -2322,6 +2322,17 @@
     <tag>OZONE, RECON</tag>
     <description>
       The number of Recon Tasks that are waiting on updates from OM.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.datanode.admin.monitor.interval</name>
+    <value>30s</value>
+    <tag>SCM</tag>
+    <description>
+      This sets how frequently the datanode admin monitor runs to check for
+      nodes added to the admin workflow or removed from it. The progress
+      of decommissioning and entering maintenance nodes is also checked to see
+      if they have completed.
     </description>
   </property>
   <property>

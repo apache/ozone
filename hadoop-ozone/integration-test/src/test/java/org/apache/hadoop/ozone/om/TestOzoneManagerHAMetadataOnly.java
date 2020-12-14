@@ -419,8 +419,28 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
 
     // As second time with same client id and call id, this request should
     // not be executed ratis server should return from cache.
-    Assert.assertFalse(logCapturer.getOutput().contains("created volume:"
-        + volumeName));
+    // If 2nd time executed, it will fail with Volume creation failed. check
+    // for that.
+    Assert.assertFalse(logCapturer.getOutput().contains(
+        "Volume creation failed"));
+
+    //Sleep for little above retry cache duration to get cache clear.
+    Thread.sleep(getRetryCacheDuration().toMillis() + 5000);
+
+    raftClientReply =
+        raftServer.submitClientRequest(new RaftClientRequest(clientId,
+            raftServer.getId(), ozoneManagerRatisServer.getRaftGroup()
+            .getGroupId(), callId, Message.valueOf(
+            OMRatisHelper.convertRequestToByteString(omRequest)),
+            RaftClientRequest.writeRequestType(), null));
+
+    Assert.assertTrue(raftClientReply.isSuccess());
+
+    // As second time with same client id and call id, this request should
+    // be executed by ratis server as we are sending this request after cache
+    // expiry duration.
+    Assert.assertTrue(logCapturer.getOutput().contains(
+        "Volume creation failed"));
 
   }
 

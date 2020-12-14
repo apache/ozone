@@ -47,7 +47,7 @@ This will build following binaries:
     - Injecting delays on various filesystem interfaces.
     - Injecting a specific failure on a specific path for a specific operation.
     - Simulate temporary or on-disk data corruption on IO path.
-    - Reseting specific or all the failures injected so far.
+    - Resetting specific or all the failures injected so far.
 
 - some unit test binaries
 

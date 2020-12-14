@@ -260,6 +260,7 @@ public class RpcClient implements ClientProtocol {
     builder.setOwnerName(owner);
     builder.setQuotaInBytes(quotaInBytes);
     builder.setQuotaInCounts(quotaInCounts);
+    builder.setUsedNamespace(0L);
     builder.addAllMetadata(volArgs.getMetadata());
 
     //Remove duplicates and add ACLs
@@ -308,6 +309,7 @@ public class RpcClient implements ClientProtocol {
         volume.getOwnerName(),
         volume.getQuotaInBytes(),
         volume.getQuotaInCounts(),
+        volume.getUsedNamespace(),
         volume.getCreationTime(),
         volume.getModificationTime(),
         volume.getAclMap().ozoneAclGetProtobuf().stream().
@@ -342,6 +344,7 @@ public class RpcClient implements ClientProtocol {
         volume.getOwnerName(),
         volume.getQuotaInBytes(),
         volume.getQuotaInCounts(),
+        volume.getUsedNamespace(),
         volume.getCreationTime(),
         volume.getModificationTime(),
         volume.getAclMap().ozoneAclGetProtobuf().stream().
@@ -364,6 +367,7 @@ public class RpcClient implements ClientProtocol {
         volume.getOwnerName(),
         volume.getQuotaInBytes(),
         volume.getQuotaInCounts(),
+        volume.getUsedNamespace(),
         volume.getCreationTime(),
         volume.getModificationTime(),
         volume.getAclMap().ozoneAclGetProtobuf().stream().

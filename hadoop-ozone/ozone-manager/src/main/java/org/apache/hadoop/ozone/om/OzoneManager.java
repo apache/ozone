@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -56,8 +57,6 @@ import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Trash;
-import org.apache.hadoop.fs.TrashPolicy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -179,6 +178,8 @@ import org.apache.hadoop.util.JvmPauseMonitor;
 import org.apache.hadoop.util.KMSUtil;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.ShutdownHookManager;
+import org.apache.hadoop.util.Time;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.databind.ObjectWriter;
@@ -236,8 +237,6 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKE
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.LEADER_AND_READY;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneManagerService.newReflectiveBlockingService;
-
-import org.apache.hadoop.util.Time;
 import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.util.ExitUtils;
@@ -640,7 +639,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           getTempMetricsStorageFile().getParentFile().toPath());
       try (BufferedWriter writer = new BufferedWriter(
           new OutputStreamWriter(new FileOutputStream(
-              getTempMetricsStorageFile()), "UTF-8"))) {
+              getTempMetricsStorageFile()), StandardCharsets.UTF_8))) {
         OmMetricsInfo metricsInfo = new OmMetricsInfo();
         metricsInfo.setNumKeys(metrics.getNumKeys());
         WRITER.writeValue(writer, metricsInfo);
@@ -1186,8 +1185,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
     omRpcServer.start();
     isOmRpcServerRunning = true;
-    // TODO: Start this thread only on the leader node.
-    //  Should be fixed after HDDS-4451.
     startTrashEmptier(configuration);
 
     registerMXBean();
@@ -1246,8 +1243,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     omRpcServer.start();
     isOmRpcServerRunning = true;
 
-    // TODO: Start this thread only on the leader node.
-    //  Should be fixed after HDDS-4451.
     startTrashEmptier(configuration);
     registerMXBean();
 
@@ -1288,9 +1283,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             return FileSystem.get(fsconf);
           }
         });
-    conf.setClass("fs.trash.classname", TrashPolicyOzone.class,
-        TrashPolicy.class);
-    this.emptier = new Thread(new Trash(fs, conf).
+    this.emptier = new Thread(new OzoneTrash(fs, conf, this).
       getEmptier(), "Trash Emptier");
     this.emptier.setDaemon(true);
     this.emptier.start();
@@ -1399,12 +1392,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (httpServer != null) {
         httpServer.stop();
       }
-      // TODO:Also stop this thread if an OM switches from leader to follower.
-      //  Should be fixed after HDDS-4451.
-      if (this.emptier != null) {
-        emptier.interrupt();
-        emptier = null;
-      }
+      stopTrashEmptier();
       metadataManager.stop();
       metrics.unRegister();
       omClientProtocolMetrics.unregister();
@@ -3284,6 +3272,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       // During stopServices, if KeyManager was stopped successfully and
       // OMMetadataManager stop failed, we should restart the KeyManager.
       keyManager.start(configuration);
+      startTrashEmptier(configuration);
       throw e;
     }
 
@@ -3374,6 +3363,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     keyManager.stop();
     stopSecretManager();
     metadataManager.stop();
+    stopTrashEmptier();
+  }
+
+  private void stopTrashEmptier() {
+    if (this.emptier != null) {
+      emptier.interrupt();
+      emptier = null;
+    }
   }
 
   /**
@@ -3442,6 +3439,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // Restart required services
     metadataManager.start(configuration);
     keyManager.start(configuration);
+    startTrashEmptier(configuration);
 
     // Set metrics and start metrics back ground thread
     metrics.setNumVolumes(metadataManager.countRowsInTable(metadataManager

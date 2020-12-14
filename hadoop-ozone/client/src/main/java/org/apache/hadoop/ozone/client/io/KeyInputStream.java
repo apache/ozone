@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import org.apache.hadoop.fs.CanUnbuffer;
 import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.fs.Seekable;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -43,7 +44,8 @@ import org.slf4j.LoggerFactory;
 /**
  * Maintaining a list of BlockInputStream. Read based on offset.
  */
-public class KeyInputStream extends InputStream implements Seekable {
+public class KeyInputStream extends InputStream
+    implements Seekable, CanUnbuffer {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(KeyInputStream.class);
@@ -332,5 +334,12 @@ public class KeyInputStream extends InputStream implements Seekable {
     long toSkip = Math.min(n, length - getPos());
     seek(getPos() + toSkip);
     return toSkip;
+  }
+
+  @Override
+  public void unbuffer() {
+    for (BlockInputStream is : blockStreams) {
+      is.unbuffer();
+    }
   }
 }

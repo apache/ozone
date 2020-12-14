@@ -208,6 +208,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
     IOException exception = null;
     Result result = null;
     List<OmKeyInfo> missingParentInfos = null;
+    int numMissingParents = 0;
     try {
       keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
       volumeName = keyArgs.getVolumeName();
@@ -267,7 +268,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
         OMFileRequest.addKeyTableCacheEntries(omMetadataManager, volumeName,
             bucketName, Optional.absent(), Optional.of(missingParentInfos),
             trxnLogIndex);
-
+        numMissingParents = missingParentInfos.size();
       }
 
       omKeyInfo = prepareKeyInfo(omMetadataManager, keyArgs, dbKeyInfo,
@@ -345,6 +346,9 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
     switch (result) {
     case SUCCESS:
+      // Missing directories are created immediately, counting that here.
+      // The metric for the key is incremented as part of the key commit.
+      omMetrics.incNumKeys(numMissingParents);
       LOG.debug("Key created. Volume:{}, Bucket:{}, Key:{}", volumeName,
           bucketName, keyName);
       break;
