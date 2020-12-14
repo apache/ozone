@@ -298,7 +298,7 @@ public class OzoneConfiguration extends Configuration
   private static void addDeprecatedKeys(){
     Configuration.addDeprecations(new DeprecationDelta[]{
         new DeprecationDelta("ozone.datanode.pipeline.limit",
-            ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT)
+            ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT),
         new DeprecationDelta(HDDS_DATANODE_RATIS_PREFIX_KEY + "."
            + RaftServerConfigKeys.PREFIX + "." + "rpcslowness.timeout",
            HDDS_DATANODE_RATIS_PREFIX_KEY + "."
