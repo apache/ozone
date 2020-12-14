@@ -41,8 +41,8 @@ Recon API v1 是一组 HTTP 端点，可以帮助您了解 Ozone 集群的当前
 
     * prevKey (可选)
     
-        只回传ID大于给定的prevKey的容器。
-        范例：prevKey=1
+        只回传ID大于给定的 prevKey 的容器。
+        示例：prevKey=1
 
     * limit (可选)
     
@@ -86,7 +86,7 @@ Recon API v1 是一组 HTTP 端点，可以帮助您了解 Ozone 集群的当前
     * prevKey (可选)
      
         只回传在给定的 prevKey 键前缀之后的键。
-        范例：prevKey=/vol1/bucket1/key1
+        示例：prevKey=/vol1/bucket1/key1
         
     * limit (可选)
     
@@ -195,7 +195,7 @@ Recon API v1 是一组 HTTP 端点，可以帮助您了解 Ozone 集群的当前
     * batchNum (可选)
 
         回传结果的批号(如“页码”)。
-        传递1，将回传记录1以限制。传递2，将回传limit + 1 to 2 * limit，等等。
+        传递1，将回传记录1到limit。传递2，将回传limit + 1到2 * limit，依此类推。
         
     * limit (可选)
     
@@ -247,7 +247,7 @@ Recon API v1 是一组 HTTP 端点，可以帮助您了解 Ozone 集群的当前
     * batchNum (可选)
     
         回传结果的批号(如“页码”)。
-        传递1，将回传记录1以限制。传递2，将回传limit + 1 to 2 * limit，等等。
+        传递1，将回传记录1到limit。传递2，将回传limit + 1到2 * limit，依此类推。
         
     * limit (可选)
     
@@ -256,8 +256,8 @@ Recon API v1 是一组 HTTP 端点，可以帮助您了解 Ozone 集群的当前
     **回传**
     
     回传处于给定状态的容器的 UnhealthyContainerMetadata 对象。
-    可能有不健康的容器状态为`MISSING`, `MIS_REPLICATED`, `UNDER_REPLICATED`, `OVER_REPLICATED`.
-    响应结构与`/containers/unhealthy`相同
+    不健康的容器状态可能为`MISSING`, `MIS_REPLICATED`, `UNDER_REPLICATED`, `OVER_REPLICATED`。
+    响应结构与`/containers/unhealthy`相同。
     
 #### 集群状态
 
@@ -356,7 +356,7 @@ Recon API v1 是一组 HTTP 端点，可以帮助您了解 Ozone 集群的当前
     
     **回传**
     
-    回传在集群中的所有管道
+    回传在集群中的所有管道。
     
     ```json
      {
@@ -467,9 +467,13 @@ Recon API v1 是一组 HTTP 端点，可以帮助您了解 Ozone 集群的当前
     ```
     
     **参数**
-    
+
+    请参阅 [Prometheus HTTP API 参考](https://prometheus.io/docs/prometheus/latest/querying/api/) 以获取完整的查询文档。
+
+    **回传**
+
     这是 Prometheus 的代理端点，并回传与 Prometheus 端点相同的响应。
-    范例：/api/v1/metrics/query?query=ratis_leader_election_electionCount
+    示例：/api/v1/metrics/query?query=ratis_leader_election_electionCount
     
      ```json
      {
