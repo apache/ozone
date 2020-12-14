@@ -128,15 +128,15 @@ public class PartialTableCache<CACHEKEY extends CacheKey,
       // condition between cache cleanup and requests updating same cache entry.
 
       cache.computeIfPresent(cachekey, ((k, v) -> {
-          if (v.getEpoch() == currentEpoch && epochs.contains(v.getEpoch())) {
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("CacheKey {} with epoch {} is removed from cache",
-                  k.getCacheKey(), currentEpoch);
-            }
-            iterator.remove();
-            removed.set(true);
-            return null;
+        if (v.getEpoch() == currentEpoch && epochs.contains(v.getEpoch())) {
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("CacheKey {} with epoch {} is removed from cache",
+                k.getCacheKey(), currentEpoch);
           }
+          iterator.remove();
+          removed.set(true);
+          return null;
+        }
         return v;
       }));
 

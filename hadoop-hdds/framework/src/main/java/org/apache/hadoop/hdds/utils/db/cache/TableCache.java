@@ -22,7 +22,6 @@ package org.apache.hadoop.hdds.utils.db.cache;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience.Private;
 import org.apache.hadoop.hdds.annotation.InterfaceStability.Evolving;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 
 import java.util.Iterator;
 import java.util.List;
