@@ -583,8 +583,8 @@ public final class ContainerTestHelper {
     return String.format("%1$" + length + "s", string);
   }
 
-  private static RaftServer.Division getRaftServerDivision(HddsDatanodeService dn,
-      Pipeline pipeline) throws Exception {
+  private static RaftServer.Division getRaftServerDivision(
+      HddsDatanodeService dn, Pipeline pipeline) throws Exception {
     if (!pipeline.getNodes().contains(dn.getDatanodeDetails())) {
       throw new IllegalArgumentException("Pipeline:" + pipeline.getId() +
           " not exist in datanode:" + dn.getDatanodeDetails().getUuid());

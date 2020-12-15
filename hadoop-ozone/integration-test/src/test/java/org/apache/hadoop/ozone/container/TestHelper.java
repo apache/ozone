@@ -299,8 +299,8 @@ public final class TestHelper {
     return getStateMachine(cluster.getHddsDatanodes().get(0), null);
   }
 
-  private static RaftServer.Division getRaftServerDivision(HddsDatanodeService dn,
-      Pipeline pipeline) throws Exception {
+  private static RaftServer.Division getRaftServerDivision(
+      HddsDatanodeService dn, Pipeline pipeline) throws Exception {
     XceiverServerSpi server = dn.getDatanodeStateMachine().
         getContainer().getWriteChannel();
     RaftServerProxy proxy =

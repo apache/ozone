@@ -48,7 +48,6 @@ import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.ha.OMNodeDetails;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -88,7 +87,6 @@ import org.apache.ratis.util.StringUtils;
 import org.apache.ratis.util.TimeDuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import sun.misc.Request;
 
 import static org.apache.hadoop.ipc.RpcConstants.DUMMY_CLIENT_ID;
 import static org.apache.hadoop.ipc.RpcConstants.INVALID_CALL_ID;
@@ -139,8 +137,7 @@ public final class OzoneManagerRatisServer {
       RaftClientReply raftClientReply = submitRequestToRatis(raftClientRequest);
 
       return processReply(omRequest, raftClientReply);
-    }
-    else {
+    } else {
       String message = "Cannot apply write request " +
           omRequest.getCmdType().name() + " when OM is in prepare mode.";
       OMResponse.Builder omResponse = OMResponse.newBuilder()

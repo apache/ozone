@@ -400,7 +400,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
     omMetaDir = OMStorage.getOmDbDir(configuration);
 
-      this.isAclEnabled = conf.getBoolean(OZONE_ACL_ENABLED,
+    this.isAclEnabled = conf.getBoolean(OZONE_ACL_ENABLED,
         OZONE_ACL_ENABLED_DEFAULT);
     this.scmBlockSize = (long) conf.getStorageSize(OZONE_SCM_BLOCK_SIZE,
         OZONE_SCM_BLOCK_SIZE_DEFAULT, StorageUnit.BYTES);
@@ -1227,7 +1227,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     startJVMPauseMonitor();
     setStartTime();
 
-  omState = State.RUNNING;
+    omState = State.RUNNING;
   }
 
   /**
