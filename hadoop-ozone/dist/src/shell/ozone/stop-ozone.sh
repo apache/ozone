@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Stop hdfs and ozone daemons.
+# Stop ozone daemons.
 # Run this on master node.
 ## @description  usage info
 ## @audience     private

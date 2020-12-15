@@ -24,7 +24,7 @@ ulimit -c unlimited
 # may want to provide OVERWRITING values on the command line.
 # For example:
 #
-#  JAVA_HOME=/usr/java/testing hdfs dfs -ls
+#  JAVA_HOME=/usr/java/testing ozone fs -ls
 #
 # Therefore, the vast majority (BUT NOT ALL!) of these defaults
 # are configured for substitution and not append.  If append
@@ -83,8 +83,8 @@ ulimit -c unlimited
 export OZONE_OS_TYPE=${OZONE_OS_TYPE:-$(uname -s)}
 
 # Extra Java runtime options for some Ozone commands
-# and clients (i.e., hdfs dfs -blah).  These get appended to OZONE_OPTS for
-# such commands.  In most cases, # this should be left empty and
+# and clients (e.g., ozone sh).  These get appended to OZONE_OPTS for
+# such commands.  In most cases, this should be left empty and
 # let users supply it on the command line.
 # export OZONE_CLIENT_OPTS=""
 
@@ -122,9 +122,9 @@ export OZONE_OS_TYPE=${OZONE_OS_TYPE:-$(uname -s)}
 # Options for remote shell connectivity
 ###
 
-# There are some optional components of hadoop that allow for
+# There are some optional components of ozone that allow for
 # command and control of remote hosts.  For example,
-# start-dfs.sh will attempt to bring up all NNs, DNS, etc.
+# start-ozone.sh will attempt to bring up all OMs, SCMs, DNs, etc.
 
 # Options to pass to SSH when one of the "log into a host and
 # start/stop daemons" scripts is executed
@@ -136,7 +136,7 @@ export OZONE_OS_TYPE=${OZONE_OS_TYPE:-$(uname -s)}
 # export OZONE_SSH_PARALLEL=10
 
 # Filename which contains all of the hosts for any remote execution
-# helper scripts # such as workers.sh, start-dfs.sh, etc.
+# helper scripts # such as workers.sh, start-ozone.sh, etc.
 # export OZONE_WORKERS="${OZONE_CONFIG_DIR}/workers"
 
 ###
@@ -158,7 +158,7 @@ export OZONE_OS_TYPE=${OZONE_OS_TYPE:-$(uname -s)}
 # Java property: hadoop.log.dir
 # export OZONE_LOG_DIR=${OZONE_HOME}/logs
 
-# A string representing this instance of hadoop. $USER by default.
+# A string representing this instance of Ozone. $USER by default.
 # This is used in writing log and pid files, so keep that in mind!
 # Java property: hadoop.id.str
 # export OZONE_IDENT_STRING=$USER
@@ -174,14 +174,13 @@ export OZONE_OS_TYPE=${OZONE_OS_TYPE:-$(uname -s)}
 # export OZONE_ROOT_LOGGER=INFO,console
 
 # Default log4j setting for daemons spawned explicitly by
-# --daemon option of hadoop, hdfs, mapred and yarn command.
+# --daemon option of ozone command.
 # Java property: hadoop.root.logger
 # export OZONE_DAEMON_ROOT_LOGGER=INFO,RFA
 
 # Default log level and output location for security-related messages.
 # You will almost certainly want to change this on a per-daemon basis via
-# the Java property (i.e., -Dhadoop.security.logger=foo). (Note that the
-# defaults for the NN and 2NN override this by default.)
+# the Java property (i.e., -Dhadoop.security.logger=foo).
 # Java property: hadoop.security.logger
 # export OZONE_SECURITY_LOGGER=INFO,NullAppender
 
@@ -201,7 +200,7 @@ export OZONE_OS_TYPE=${OZONE_OS_TYPE:-$(uname -s)}
 #
 # export OZONE_GC_SETTINGS="-verbose:gc -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -XX:+PrintGCDateStamps"
 #
-# .. and then use it as per the b option under the namenode.
+# .. and then use it when setting OZONE_OM_OPTS, etc. below
 
 ###
 # Secure/privileged execution
@@ -210,7 +209,7 @@ export OZONE_OS_TYPE=${OZONE_OS_TYPE:-$(uname -s)}
 #
 # Out of the box, Ozone uses jsvc from Apache Commons to launch daemons
 # on privileged ports.  This functionality can be replaced by providing
-# custom functions.  See hadoop-functions.sh for more information.
+# custom functions.  See ozone-functions.sh for more information.
 #
 
 # The jsvc implementation to use. Jsvc is required to run secure datanodes
@@ -276,5 +275,5 @@ export OZONE_OS_TYPE=${OZONE_OS_TYPE:-$(uname -s)}
 # to only allow certain users to execute certain subcommands.
 # It uses the format of (command)_(subcommand)_USER.
 #
-# For example, to limit who can execute the namenode command,
-# export HDFS_NAMENODE_USER=hdfs
+# For example, to limit who can execute the om command,
+# export OZONE_OM_USER=ozone

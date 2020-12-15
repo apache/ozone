@@ -21,7 +21,7 @@ MYNAME="${BASH_SOURCE-$0}"
 bin=$(cd -P -- "$(dirname -- "${MYNAME}")" >/dev/null && pwd -P)
 JVM_PID="$$"
 
-## @description  build up the hdfs command's usage text.
+## @description  build up the ozone command's usage text.
 ## @audience     public
 ## @stability    stable
 ## @replaceable  no
@@ -36,7 +36,7 @@ function ozone_usage
   ozone_add_option "--jvmargs arguments" "append JVM options to any existing options defined in the OZONE_OPTS environment variable. Any defined in OZONE_CLIENT_OPTS will be append after these jvmargs"
 
   ozone_add_subcommand "auditparser" client "runs audit parser tool"
-  ozone_add_subcommand "classpath" client "prints the class path needed to get the hadoop jar and the required libraries"
+  ozone_add_subcommand "classpath" client "prints the class path needed for running ozone commands"
   ozone_add_subcommand "datanode" daemon "run a HDDS datanode"
   ozone_add_subcommand "envvars" client "display computed Hadoop environment variables"
   ozone_add_subcommand "freon" client "runs an ozone data generator"
@@ -62,7 +62,7 @@ function ozone_usage
   ozone_generate_usage "${OZONE_SHELL_EXECNAME}" false
 }
 
-## @description  Default command handler for hadoop command
+## @description  Default command handler for ozone command
 ## @audience     public
 ## @stability    stable
 ## @replaceable  no

@@ -259,11 +259,11 @@ function ozone_uservar_su
   #
   # if $EUID != 0, then exec
   # if $EUID =0 then
-  #    if hdfs_subcmd_user is defined, call ozone_su to exec
-  #    if hdfs_subcmd_user is not defined, error
+  #    if ozone_subcmd_user is defined, call ozone_su to exec
+  #    if ozone_subcmd_user is not defined, error
   #
   # For secure daemons, this means both the secure and insecure env vars need to be
-  # defined.  e.g., HDFS_DATANODE_USER=root HDFS_DATANODE_SECURE_USER=hdfs
+  # defined.  e.g., OZONE_DATANODE_USER=root OZONE_DATANODE_SECURE_USER=ozone
   # This function will pick up the "normal" var, switch to that user, then
   # execute the command which will then pick up the "secure" version.
   #
@@ -816,7 +816,7 @@ function ozone_shellprofiles_finalize
   done
 }
 
-## @description  Initialize the Hadoop shell environment, now that
+## @description  Initialize the shell environment, now that
 ## @description  user settings have been imported
 ## @audience     private
 ## @stability    evolving
@@ -1321,7 +1321,7 @@ function ozone_os_tricks
       fi
 
       # NOTE! OZONE_ALLOW_IPV6 is a developer hook.  We leave it
-      # undocumented in hadoop-env.sh because we don't want users to
+      # undocumented in ozone-env.sh because we don't want users to
       # shoot themselves in the foot while devs make IPv6 work.
 
       bindv6only=$(/sbin/sysctl -n net.ipv6.bindv6only 2> /dev/null)
@@ -2371,7 +2371,6 @@ function ozone_subcommand_opts
 
   # Let's handle all of the deprecation cases early
   # TODO remove, as now this is no-op, since $program == 'ozone'
-  # OZONE_x_OPTS -> HDFS_NAMENODE_OPTS
 
   depvar="OZONE_${ucommand}_OPTS"
   if [[ "${depvar}" != "${uvar}" ]]; then
@@ -2407,8 +2406,8 @@ function ozone_subcommand_secure_opts
     return 1
   fi
 
-  # HDFS_DATANODE_SECURE_EXTRA_OPTS
-  # HDFS_NFS3_SECURE_EXTRA_OPTS
+  # OZONE_DATANODE_SECURE_EXTRA_OPTS
+  # OZONE_OM_SECURE_EXTRA_OPTS
   # ...
   uvar=$(ozone_build_custom_subcmd_var "${program}" "${command}" SECURE_EXTRA_OPTS)
 
