@@ -17,11 +17,14 @@
  */
 package org.apache.hadoop.ozone.container.metadata;
 
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
+import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 
 /**
  * This class defines the RocksDB structure for datanodes following schema
@@ -58,8 +61,24 @@ public class DatanodeSchemaTwoDBDefinition extends
                   ChunkInfoList.class,
                   new ChunkInfoListCodec());
 
+  public static final DBColumnFamilyDefinition<Long, DeletedBlocksTransaction>
+      TXN =
+      new DBColumnFamilyDefinition<>(
+          "txnTable",
+          Long.class,
+          new LongCodec(),
+          StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction.class,
+          new DeletedBlocksTransactionCodec());
+
   protected DatanodeSchemaTwoDBDefinition(String dbPath) {
     super(dbPath);
+  }
+
+  @Override
+  public DBColumnFamilyDefinition[] getColumnFamilies() {
+    return new DBColumnFamilyDefinition[] {getBlockDataColumnFamily(),
+        getMetadataColumnFamily(), getDeletedBlocksColumnFamily(),
+        getTxnBlocksColumnFamily()};
   }
 
   @Override
@@ -77,5 +96,10 @@ public class DatanodeSchemaTwoDBDefinition extends
   public DBColumnFamilyDefinition<String, ChunkInfoList>
       getDeletedBlocksColumnFamily() {
     return DELETED_BLOCKS;
+  }
+
+  public DBColumnFamilyDefinition<Long, DeletedBlocksTransaction>
+      getTxnBlocksColumnFamily() {
+    return TXN;
   }
 }

@@ -257,6 +257,9 @@ public final class OzoneConsts {
   // Most recent schema version that all new containers should be created with.
   public static final String SCHEMA_LATEST = SCHEMA_V2;
 
+  public static final String[] SCHEMA_VERSIONS =
+      new String[] {SCHEMA_V1, SCHEMA_V2};
+
   // Supported store types.
   public static final String OZONE = "ozone";
   public static final String S3 = "s3";

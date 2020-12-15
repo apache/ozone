@@ -18,6 +18,9 @@
 package org.apache.hadoop.ozone.container.metadata;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.proto.
+    StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
+import org.apache.hadoop.hdds.utils.db.TypedTable;
 
 import java.io.IOException;
 
@@ -30,6 +33,8 @@ import java.io.IOException;
  */
 public class DatanodeStoreSchemaTwoImpl extends AbstractDatanodeStore {
 
+  private TypedTable<Long, DeletedBlocksTransaction> txnTable;
+
   /**
    * Constructs the datanode store and starts the DB Services.
    *
@@ -41,5 +46,13 @@ public class DatanodeStoreSchemaTwoImpl extends AbstractDatanodeStore {
       throws IOException {
     super(config, containerID, new DatanodeSchemaTwoDBDefinition(dbPath),
         openReadOnly);
+    this.txnTable =
+        (TypedTable<Long, DeletedBlocksTransaction>) new
+            DatanodeSchemaTwoDBDefinition(
+            dbPath).getTxnBlocksColumnFamily().getTable(getStore());
+  }
+
+  public TypedTable<Long, DeletedBlocksTransaction> getTxnTable(){
+    return txnTable;
   }
 }
