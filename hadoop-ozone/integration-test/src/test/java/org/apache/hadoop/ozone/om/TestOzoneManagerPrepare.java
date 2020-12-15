@@ -57,7 +57,8 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
   private static final String VOLUME = "volume";
   private static final String KEY_PREFIX = "key";
 
-  private static final int TIMEOUT_MILLIS = 120000;
+  // Maximum time to wait for conditions involving Ratis logs.
+  private static final int LOG_WAIT_TIMEOUT_MILLIS = 120000;
   private final static long PREPARE_FLUSH_WAIT_TIMEOUT_SECONDS = 300L;
   private final static long PREPARE_FLUSH_INTERVAL_SECONDS = 5L;
 
@@ -80,6 +81,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     setup();
     long prepareIndex = submitPrepareRequest();
     assertClusterPrepared(prepareIndex);
+    assertRatisLogsCleared();
   }
 
   /**
@@ -94,6 +96,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
 
     // Make sure all OMs are prepared and all OMs still have their data.
     assertClusterPrepared(prepareIndex);
+    assertRatisLogsCleared();
     assertKeysWritten(writtenKeys);
   }
 
@@ -151,12 +154,10 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     assertClusterPrepared(prepareIndex);
 
     // Restart all ozone managers.
-    for (OzoneManager om: cluster.getOzoneManagersList()) {
-      cluster.shutdownOzoneManager(om);
-      cluster.restartOzoneManager(om, true);
-    }
+    cluster.restartOzoneManager();
 
-    cluster.waitForClusterToBeReady();
+    // No check for cleared logs, since Ratis meta transactions may slip in
+    // on restart.
     assertClusterPrepared(prepareIndex);
   }
 
@@ -199,6 +200,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
 
       if (i == prepareTaskIndex) {
         assertClusterPrepared(future.get());
+        assertRatisLogsCleared();
       } else {
         try {
           // If this throws an exception, it should be an OMException
@@ -257,7 +259,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     // Make sure all OMs have logs from writing data, so we can check that
     // they are purged after prepare.
     for (OzoneManager om: ozoneManagers) {
-      LambdaTestUtils.await(TIMEOUT_MILLIS, 1000,
+      LambdaTestUtils.await(LOG_WAIT_TIMEOUT_MILLIS, 1000,
           () -> logFilesPresentInRatisPeer(om));
     }
 
@@ -307,9 +309,12 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
   private void assertClusterPrepared(long preparedIndex,
       List<OzoneManager> ozoneManagers) throws Exception {
 
-    // Make sure the specified OMs are prepared individually.
+    // Make sure the specified OMs are prepared based on their state machine
+    // index.
     for (OzoneManager om : ozoneManagers) {
-      waitAndAssertPrepared(om, preparedIndex);
+      OMTransactionInfo txnInfo = om.getMetadataManager()
+          .getTransactionInfoTable().get(TRANSACTION_INFO_KEY);
+      Assert.assertEquals(txnInfo.getTransactionIndex(), preparedIndex);
     }
 
     // Submitting a read request should pass.
@@ -317,7 +322,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
 
     // Submitting write request should fail.
     try {
-      clientProtocol.createVolume("foo");
+      clientProtocol.createVolume("vol");
       Assert.fail("Write request should fail when OM is in prepare mode.");
     } catch (OMException ex) {
       Assert.assertEquals(OMException.ResultCodes.NOT_SUPPORTED_OPERATION,
@@ -325,14 +330,15 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     }
   }
 
-  private void waitAndAssertPrepared(OzoneManager om,
-      long prepareRequestLogIndex) throws Exception {
-    // Log files are deleted after the snapshot is taken,
-    // So once log files have been deleted, OM should be prepared.
-    LambdaTestUtils.await(TIMEOUT_MILLIS, 1000,
-        () -> !logFilesPresentInRatisPeer(om));
-    OMTransactionInfo txnInfo = om.getMetadataManager()
-        .getTransactionInfoTable().get(TRANSACTION_INFO_KEY);
-    Assert.assertEquals(txnInfo.getTransactionIndex(), prepareRequestLogIndex);
+  private void assertRatisLogsCleared() throws Exception {
+    assertRatisLogsCleared(cluster.getOzoneManagersList());
+  }
+
+  private void assertRatisLogsCleared(List<OzoneManager> ozoneManagers)
+      throws Exception {
+    for (OzoneManager om: ozoneManagers) {
+      LambdaTestUtils.await(LOG_WAIT_TIMEOUT_MILLIS, 1000,
+          () -> logFilesPresentInRatisPeer(om));
+    }
   }
 }
