@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.Time;
+import org.bouncycastle.x509.X509V1CertificateGenerator;
 import org.junit.After;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -34,14 +35,17 @@ import org.slf4j.LoggerFactory;
 import javax.crypto.KeyGenerator;
 import javax.crypto.Mac;
 import javax.crypto.SecretKey;
+import javax.security.auth.x500.X500Principal;
 import java.io.File;
 import java.io.IOException;
+import java.math.BigInteger;
 import java.security.GeneralSecurityException;
 import java.security.InvalidKeyException;
 import java.security.KeyPair;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
+import java.security.SecureRandom;
 import java.security.Signature;
 import java.security.SignatureException;
 import java.security.cert.Certificate;
@@ -49,6 +53,7 @@ import java.security.cert.CertificateEncodingException;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
@@ -127,6 +132,11 @@ public class TestOzoneManagerBlockToken {
     LOG.info("Unsigned token {} is {}", tokenId,
         verifyTokenAsymmetric(tokenId, RandomUtils.nextBytes(128), cert));
 
+
+    // verify with an expired certs
+    X509Certificate expiredCert = generateExpiredCert(
+        "CN=OzoneMaster", keyPair, "SHA256withRSA");
+    verifyTokenAsymmetric(tokenId, signedToken, expiredCert);
   }
 
   public byte[] signTokenAsymmetric(OzoneBlockTokenIdentifier tokenId,
@@ -247,5 +257,30 @@ public class TestOzoneManagerBlockToken {
     long duration = Time.monotonicNowNanos() - startTime;
     LOG.info("Average token sign time with {}({} symmetric key) is {} ns",
         hmacAlgorithm, keyLen, duration / testTokenCount);
+  }
+
+  private X509Certificate generateExpiredCert(String dn,
+      KeyPair pair, String algorithm)
+      throws CertificateEncodingException,
+        InvalidKeyException, IllegalStateException,
+      NoSuchAlgorithmException, SignatureException{
+
+      Date from = new Date();
+      Date to = new Date(from.getTime() + 100l);
+      BigInteger sn = new BigInteger(64, new SecureRandom());
+      KeyPair keyPair = pair;
+      X509V1CertificateGenerator certGen = new X509V1CertificateGenerator();
+      X500Principal dnName = new X500Principal(dn);
+
+      certGen.setSerialNumber(sn);
+      certGen.setIssuerDN(dnName);
+      certGen.setNotBefore(from);
+      certGen.setNotAfter(to);
+      certGen.setSubjectDN(dnName);
+      certGen.setPublicKey(keyPair.getPublic());
+      certGen.setSignatureAlgorithm(algorithm);
+
+      X509Certificate cert = certGen.generate(pair.getPrivate());
+      return cert;
   }
 }
