@@ -517,7 +517,8 @@ public class OzoneBucket extends WithMetadata {
    * @param keyPrefix Bucket prefix to match
    * @return {@code Iterator<OzoneKey>}
    */
-  public Iterator<? extends OzoneKey> listKeys(String keyPrefix) {
+  public Iterator<? extends OzoneKey> listKeys(String keyPrefix)
+      throws IOException{
     return listKeys(keyPrefix, null);
   }
 
@@ -532,7 +533,7 @@ public class OzoneBucket extends WithMetadata {
    * @return {@code Iterator<OzoneKey>}
    */
   public Iterator<? extends OzoneKey> listKeys(String keyPrefix,
-      String prevKey) {
+      String prevKey) throws IOException {
     return new KeyIterator(keyPrefix, prevKey);
   }
 
@@ -760,7 +761,6 @@ public class OzoneBucket extends WithMetadata {
   private class KeyIterator implements Iterator<OzoneKey> {
 
     private String keyPrefix = null;
-
     private Iterator<OzoneKey> currentIterator;
     private OzoneKey currentValue;
 
@@ -771,7 +771,7 @@ public class OzoneBucket extends WithMetadata {
      * The returned keys match key prefix.
      * @param keyPrefix
      */
-    KeyIterator(String keyPrefix, String prevKey) {
+    KeyIterator(String keyPrefix, String prevKey) throws IOException{
       this.keyPrefix = keyPrefix;
       this.currentValue = null;
       this.currentIterator = getNextListOfKeys(prevKey).iterator();
@@ -780,7 +780,12 @@ public class OzoneBucket extends WithMetadata {
     @Override
     public boolean hasNext() {
       if(!currentIterator.hasNext() && currentValue != null) {
-        currentIterator = getNextListOfKeys(currentValue.getName()).iterator();
+        try {
+          currentIterator =
+              getNextListOfKeys(currentValue.getName()).iterator();
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }
       }
       return currentIterator.hasNext();
     }
@@ -799,13 +804,10 @@ public class OzoneBucket extends WithMetadata {
      * @param prevKey
      * @return {@code List<OzoneKey>}
      */
-    private List<OzoneKey> getNextListOfKeys(String prevKey) {
-      try {
-        return proxy.listKeys(volumeName, name, keyPrefix, prevKey,
-            listCacheSize);
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
+    private List<OzoneKey> getNextListOfKeys(String prevKey) throws
+        IOException {
+      return proxy.listKeys(volumeName, name, keyPrefix, prevKey,
+          listCacheSize);
     }
   }
 }

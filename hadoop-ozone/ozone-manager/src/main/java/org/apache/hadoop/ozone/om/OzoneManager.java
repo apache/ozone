@@ -1794,7 +1794,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             obj.getKeyName());
         throw new OMException("User " + context.getClientUgi().getUserName() +
             " doesn't have " + context.getAclRights() +
-            " permission to access " + obj.getResourceType(),
+            " permission to access " + obj.getResourceType() + " " +
+            obj.getVolumeName() + " " + obj.getBucketName() + " " +
+            obj.getKeyName(),
             ResultCodes.PERMISSION_DENIED);
       }
       return false;
