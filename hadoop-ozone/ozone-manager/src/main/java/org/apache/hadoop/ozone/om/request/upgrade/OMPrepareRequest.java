@@ -199,17 +199,9 @@ public class OMPrepareRequest extends OMClientRequest {
     StateMachine stateMachine = division.getStateMachine();
     long snapshotIndex = stateMachine.takeSnapshot();
     RaftLog raftLog = division.getRaftLog();
-    long raftLogIndex = raftLog.getLastEntryTermIndex().getIndex();
-
-    // Ensure that Ratis's in memory snapshot index is the same as the index
-    // of its last log entry.
-    if (snapshotIndex != raftLogIndex) {
-      throw new IOException("Snapshot index " + snapshotIndex + " does not " +
-          "match last log index " + raftLogIndex);
-    }
-
     CompletableFuture<Long> purgeFuture =
         raftLog.syncWithSnapshot(snapshotIndex);
+
     try {
       Long purgeIndex = purgeFuture.get();
       if (purgeIndex != snapshotIndex) {
