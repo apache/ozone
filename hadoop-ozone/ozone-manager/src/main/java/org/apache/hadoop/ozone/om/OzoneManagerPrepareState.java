@@ -1,10 +1,9 @@
 package org.apache.hadoop.ozone.om;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerStateMachine;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
@@ -15,7 +14,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 
 public final class OzoneManagerPrepareState {
-  private static boolean isPrepared;
+  private static boolean isPrepared = false;
 
   public static synchronized boolean isPrepared() {
     return isPrepared;
@@ -94,11 +93,12 @@ public final class OzoneManagerPrepareState {
       }
     } else {
       // No marker file found.
-      OzoneManagerPrepareState.setPrepared(false);
+      setPrepared(false);
     }
   }
 
-  private static File getPrepareMarkerFile(ConfigurationSource conf) {
+  @VisibleForTesting
+  public static File getPrepareMarkerFile(ConfigurationSource conf) {
     File markerFileDir = new File(ServerUtils.getOzoneMetaDirPath(conf),
         OMStorage.STORAGE_DIR_CURRENT);
     return new File(markerFileDir, OzoneConsts.PREPARE_MARKER);
