@@ -1514,10 +1514,6 @@ function ozone_finalize
 
   ozone_translate_cygwin_path OZONE_HOME
   ozone_translate_cygwin_path OZONE_CONFIG_DIR
-  ozone_translate_cygwin_path OZONE_COMMON_HOME
-  ozone_translate_cygwin_path OZONE_HDFS_HOME
-  ozone_translate_cygwin_path OZONE_YARN_HOME
-  ozone_translate_cygwin_path OZONE_MAPRED_HOME
 }
 
 ## @description  Print usage information and exit with the passed
