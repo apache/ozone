@@ -66,12 +66,10 @@ public final class DBConfigFromFile {
     if (StringUtil.isBlank(path)) {
       LOG.debug("Unable to find the configuration directory. "
           + "Please make sure that " + CONFIG_DIR + " is setup correctly.");
-    }
-    if(StringUtil.isBlank(path)){
       return null;
     }
-    return new File(path);
 
+    return new File(path);
   }
 
   /**
