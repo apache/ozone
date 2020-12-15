@@ -22,13 +22,21 @@ import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 
 import java.io.File;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
+import jdk.nashorn.internal.ir.LiteralNode;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptCompletionEvent;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -159,6 +167,65 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
 
     cluster.waitForClusterToBeReady();
     assertClusterPrepared(prepareIndex);
+  }
+
+  /**
+   * Issues requests on ten different threads, for which one is a prepare and
+   * the rest are create volume. We cannot be sure of the exact order that
+   * the requests will execute, so this test checks that the cluster ends in
+   * a prepared state, and that create volume requests either succeed, or fail
+   * indicating the cluster was prepared before they were encountered.
+   * @throws Exception
+   */
+  @Test
+  public void testPrepareWithMultipleThreads() throws Exception {
+    setup();
+    final int numThreads = 10;
+    final int prepareTaskIndex = 5;
+
+    ExecutorService executorService = Executors.newFixedThreadPool(numThreads);
+    // For the prepare task, the future will return a log index.
+    // For the create volume tasks, 0 (dummy value) will be returned.
+    List<Future<Long>> tasks = new ArrayList<>();
+
+    for (int i = 0; i < numThreads; i++) {
+      Callable<Long> task;
+      if (i == prepareTaskIndex) {
+        task = this::submitPrepareRequest;
+      } else {
+        String volumeName = VOLUME + i;
+        task = () -> {
+          clientProtocol.createVolume(volumeName);
+          return 0L;
+        };
+      }
+      tasks.add(executorService.submit(task));
+    }
+
+    // For each task, wait for it to complete and check its result.
+    for (int i = 0; i < numThreads; i++) {
+      Future<Long> future = tasks.get(i);
+
+      if (i == prepareTaskIndex) {
+        assertClusterPrepared(future.get());
+      } else {
+        try {
+          // If this throws an exception, it should be an OMException
+          // indicating failure because the cluster was already prepared.
+          // If no exception is thrown, the volume should be created.
+          future.get();
+          String volumeName = VOLUME + i;
+          Assert.assertTrue(clientProtocol.listVolumes(volumeName, "", 1)
+              .stream()
+              .anyMatch((vol) -> vol.getName().equals(volumeName)));
+        } catch (ExecutionException ex) {
+          Throwable cause = ex.getCause();
+          Assert.assertTrue(cause instanceof OMException);
+          Assert.assertEquals(OMException.ResultCodes.NOT_SUPPORTED_OPERATION,
+              ((OMException) cause).getResult());
+        }
+      }
+    }
   }
 
   private boolean logFilesPresentInRatisPeer(OzoneManager om) {
