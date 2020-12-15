@@ -59,35 +59,35 @@ Property| Value
 -----------------------------------|-----------------------------------------
 ozone.om.http.auth.type | kerberos
 ozone.om.http.auth.kerberos.principal | HTTP/_HOST@REALM
-ozone.om.http.auth.kerberos.keytab| /path/to/HTTP.keytab
+ozone.om.http.auth.kerberos.keytab.file| /path/to/HTTP.keytab
 
 ### Enable SPNEGO authentication for S3G HTTP
 Property| Value
 -----------------------------------|-----------------------------------------
 ozone.s3g.http.auth.type | kerberos
 ozone.s3g.http.auth.kerberos.principal | HTTP/_HOST@REALM
-ozone.s3g.http.auth.kerberos.keytab| /path/to/HTTP.keytab
+ozone.s3g.http.auth.kerberos.keytab.file| /path/to/HTTP.keytab
 
 ### Enable SPNEGO authentication for RECON HTTP
 Property| Value
 -----------------------------------|-----------------------------------------
 ozone.recon.http.auth.type | kerberos
 ozone.recon.http.auth.kerberos.principal | HTTP/_HOST@REALM
-ozone.recon.http.auth.kerberos.keytab| /path/to/HTTP.keytab
+ozone.recon.http.auth.kerberos.keytab.file| /path/to/HTTP.keytab
 
 ### Enable SPNEGO authentication for SCM HTTP
 Property| Value
 -----------------------------------|-----------------------------------------
 hdds.scm.http.auth.type | kerberos
 hdds.scm.http.auth.kerberos.principal | HTTP/_HOST@REALM
-hdds.scm.http.auth.kerberos.keytab| /path/to/HTTP.keytab
+hdds.scm.http.auth.kerberos.keytab.file| /path/to/HTTP.keytab
 
 ### Enable SPNEGO authentication for DATANODE HTTP
 Property| Value
 -----------------------------------|-----------------------------------------
 hdds.datanode.http.auth.type | kerberos
 hdds.datanode.http.auth.kerberos.principal | HTTP/_HOST@REALM
-hdds.datanode.http.auth.kerberos.keytab| /path/to/HTTP.keytab
+hdds.datanode.http.auth.kerberos.keytab.file| /path/to/HTTP.keytab
 
 Note: Ozone datanode does not have a default webpage, which prevents you from 
 accessing "/" or "/index.html". But it does provide standard 

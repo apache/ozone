@@ -65,7 +65,7 @@ public final class OMConfigKeys {
       "ozone.om.http-address";
   public static final String OZONE_OM_HTTPS_ADDRESS_KEY =
       "ozone.om.https-address";
-  public static final String OZONE_OM_KEYTAB_FILE =
+  public static final String OZONE_OM_KEYTAB_FILE_KEY =
       "ozone.om.keytab.file";
   public static final String OZONE_OM_HTTP_BIND_HOST_DEFAULT = "0.0.0.0";
   public static final int OZONE_OM_HTTP_BIND_PORT_DEFAULT = 9874;
@@ -193,8 +193,8 @@ public final class OMConfigKeys {
       + "kerberos.keytab.file";
   public static final String OZONE_OM_KERBEROS_PRINCIPAL_KEY = "ozone.om"
       + ".kerberos.principal";
-  public static final String OZONE_OM_HTTP_KERBEROS_KEYTAB_FILE =
-      "ozone.om.http.auth.kerberos.keytab";
+  public static final String OZONE_OM_HTTP_KERBEROS_KEYTAB_FILE_KEY =
+      "ozone.om.http.auth.kerberos.keytab.file";
   public static final String OZONE_OM_HTTP_KERBEROS_PRINCIPAL_KEY
       = "ozone.om.http.auth.kerberos.principal";
   public static final String OZONE_OM_HTTP_AUTH_TYPE =

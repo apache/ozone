@@ -40,7 +40,7 @@ Property|Description
 dfs.datanode.kerberos.principal|The datanode service principal. <br/> e.g. dn/_HOST@REALM.COM
 dfs.datanode.keytab.file| The keytab file used by datanode daemon to login as its service principal.
 hdds.datanode.http.auth.kerberos.principal| Datanode http server service principal.
-hdds.datanode.http.auth.kerberos.keytab| The keytab file used by datanode http server to login as its service principal.
+hdds.datanode.http.auth.kerberos.keytab.file| The keytab file used by datanode http server to login as its service principal.
 
 
 ## How a datanode becomes secure.

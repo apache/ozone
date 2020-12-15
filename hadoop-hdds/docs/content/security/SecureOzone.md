@@ -107,7 +107,7 @@ All these settings should be made in ozone-site.xml.
             <td>SCM http server service principal if SPNEGO is enabled for SCM http server.</td>
           </tr>
           <tr>
-            <td>hdds.scm.http.auth.kerberos.keytab</th>
+            <td>hdds.scm.http.auth.kerberos.keytab.file</th>
             <td>The keytab file used by SCM http server to login as its service principal if SPNEGO is enabled for SCM http server</td>
           </tr>
         </tbody>
@@ -143,7 +143,7 @@ All these settings should be made in ozone-site.xml.
             <td>Ozone Manager http server service principal if SPNEGO is enabled for om http server.</td>
           </tr>
           <tr>
-            <td>ozone.om.http.auth.kerberos.keytab</th>
+            <td>ozone.om.http.auth.kerberos.keytab.file</th>
             <td>The keytab file used by OM http server to login as its service principal if SPNEGO is enabled for om http server.</td>
           </tr>
         </tbody>
@@ -171,7 +171,7 @@ All these settings should be made in ozone-site.xml.
             <td>S3 Gateway principal if SPNEGO is enabled for S3 Gateway http server. <br/> e.g. HTTP/_HOST@EXAMPLE.COM</td>
           </tr>
           <tr>
-            <td>ozone.s3g.http.auth.kerberos.keytab</th>
+            <td>ozone.s3g.http.auth.kerberos.keytab.file</th>
             <td>The keytab file used by S3 gateway if SPNEGO is enabled for S3 Gateway http server.</td>
           </tr>
         </tbody>

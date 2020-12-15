@@ -88,7 +88,7 @@ ozone-site.xml 中应进行如下配置：
             <td>SCM http 服务主体</td>
           </tr>
           <tr>
-            <td>hdds.scm.http.kerberos.keytab</th>
+            <td>hdds.scm.http.kerberos.keytab.file</th>
             <td>SCM http 服务使用的 keytab 文件</td>
           </tr>
         </tbody>
@@ -123,7 +123,7 @@ ozone-site.xml 中应进行如下配置：
             <td>OM http 服务主体</td>
           </tr>
           <tr>
-            <td>ozone.om.http.kerberos.keytab</th>
+            <td>ozone.om.http.kerberos.keytab.file</th>
             <td>OM http 服务使用的 keytab 文件</td>
           </tr>
         </tbody>
@@ -146,11 +146,11 @@ ozone-site.xml 中应进行如下配置：
         </thead>
         <tbody>
           <tr>
-            <td>ozone.s3g.authentication.kerberos.principal</th>
+            <td>ozone.s3g.http.auth.kerberos.principal</th>
             <td>S3 网关服务主体，例如：HTTP/_HOST@EXAMPLE.COM</td>
           </tr>
           <tr>
-            <td>ozone.s3g.keytab.file</th>
+            <td>ozone.s3g.http.auth.kerberos.keytab.file</th>
             <td>S3 网关使用的 keytab 文件</td>
           </tr>
         </tbody>

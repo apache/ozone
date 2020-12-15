@@ -42,9 +42,9 @@ public class ConfigurationProvider implements
   private static void addDeprecations() {
     Configuration.addDeprecations(new DeprecationDelta[]{
         new DeprecationDelta("ozone.recon.keytab.file",
-            ReconServerConfigKeys.OZONE_RECON_HTTP_KEYTAB_FILE),
+            ReconServerConfigKeys.OZONE_RECON_HTTP_KEYTAB_FILE_KEY),
         new DeprecationDelta(("ozone.recon.http.kerberos.keytab.file"),
-            ReconServerConfigKeys.OZONE_RECON_HTTP_KEYTAB_FILE),
+            ReconServerConfigKeys.OZONE_RECON_HTTP_KEYTAB_FILE_KEY),
         new DeprecationDelta("ozone.recon.authentication.kerberos.principal",
             ReconServerConfigKeys.
                 OZONE_RECON_WEB_AUTHENTICATION_KERBEROS_PRINCIPAL)

@@ -377,7 +377,7 @@ public final class OzoneConfigKeys {
       "ozone.freon.http.auth.kerberos.principal";
   public static final String
       OZONE_FREON_HTTP_KERBEROS_KEYTAB_FILE_KEY =
-      "ozone.freon.http.auth.kerberos.keytab";
+      "ozone.freon.http.auth.kerberos.keytab.file";
   public static final String OZONE_FREON_HTTP_AUTH_TYPE =
       "ozone.freon.http.auth.type";
   public static final String OZONE_FREON_HTTP_AUTH_CONFIG_PREFIX =

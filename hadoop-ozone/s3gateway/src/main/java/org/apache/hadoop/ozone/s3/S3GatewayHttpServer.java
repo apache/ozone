@@ -74,7 +74,7 @@ public class S3GatewayHttpServer extends BaseHttpServer {
 
   @Override
   protected String getKeytabFile() {
-    return S3GatewayConfigKeys.OZONE_S3G_KEYTAB_FILE;
+    return S3GatewayConfigKeys.OZONE_S3G_KEYTAB_FILE_KEY;
   }
 
   @Override

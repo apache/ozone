@@ -70,7 +70,7 @@ public class OzoneManagerHttpServer extends BaseHttpServer {
   }
 
   @Override protected String getKeytabFile() {
-    return OMConfigKeys.OZONE_OM_HTTP_KERBEROS_KEYTAB_FILE;
+    return OMConfigKeys.OZONE_OM_HTTP_KERBEROS_KEYTAB_FILE_KEY;
   }
 
   @Override protected String getSpnegoPrincipal() {

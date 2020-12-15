@@ -48,8 +48,8 @@ public final class S3GatewayConfigKeys {
       "ozone.s3g.http.auth.";
   public static final String OZONE_S3G_HTTP_AUTH_TYPE =
       OZONE_S3G_HTTP_AUTH_CONFIG_PREFIX + "type";
-  public static final String OZONE_S3G_KEYTAB_FILE =
-      OZONE_S3G_HTTP_AUTH_CONFIG_PREFIX + "kerberos.keytab";
+  public static final String OZONE_S3G_KEYTAB_FILE_KEY =
+      OZONE_S3G_HTTP_AUTH_CONFIG_PREFIX + "kerberos.keytab.file";
   public static final String OZONE_S3G_WEB_AUTHENTICATION_KERBEROS_PRINCIPAL =
       OZONE_S3G_HTTP_AUTH_CONFIG_PREFIX + "kerberos.principal";
 
