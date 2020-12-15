@@ -29,7 +29,7 @@ ${API_ENDPOINT_URL}   http://recon:9888/api/v1
 Check if Recon picks up container from OM
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit HTTP user
     ${result} =         Execute                             curl --negotiate -u : -LSs ${API_ENDPOINT_URL}/containers
-                        Should contain      ${result}       \"ContainerID\":1
+                        Should contain      ${result}       \"ContainerID\"
 
     ${result} =         Execute                             curl --negotiate -u : -LSs ${API_ENDPOINT_URL}/utilization/fileCount
                         Should contain      ${result}       \"fileSize\":2048,\"count\":10
@@ -61,9 +61,6 @@ Check if Recon picks up DN heartbeats
                         Should contain      ${result}       \"totalDatanodes\":3
                         Should contain      ${result}       \"healthyDatanodes\":3
                         Should contain      ${result}       \"pipelines\":4
-
-    ${result} =         Execute                             curl --negotiate -u : -LSs ${API_ENDPOINT_URL}/containers/1/replicaHistory
-                        Should contain      ${result}       \"containerId\":1
 
 Check if Recon Web UI is up
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit HTTP user

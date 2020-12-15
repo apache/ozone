@@ -77,6 +77,13 @@ public interface ContainerManagerV2 extends Closeable {
   List<ContainerInfo> getContainers(LifeCycleState state);
 
   /**
+   * Returns true if the container exist, false otherwise.
+   * @param id Container ID
+   * @return true if container exist, else false
+   */
+  boolean containerExist(ContainerID id);
+
+  /**
    * Allocates a new container for a given keyName and replication factor.
    *
    * @param replicationFactor - replication factor of the container.

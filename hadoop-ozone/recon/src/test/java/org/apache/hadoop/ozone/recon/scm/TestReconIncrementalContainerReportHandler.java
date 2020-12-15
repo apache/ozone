@@ -95,7 +95,7 @@ public class TestReconIncrementalContainerReportHandler
 
     reconIcr.onMessage(reportMock, eventPublisherMock);
     nodeManager.addContainer(datanodeDetails, containerID);
-    assertTrue(containerManager.exists(containerID));
+    assertTrue(containerManager.containerExist(containerID));
     assertEquals(1, containerManager.getContainerReplicas(containerID).size());
     assertEquals(OPEN, containerManager.getContainer(containerID).getState());
   }
@@ -136,7 +136,7 @@ public class TestReconIncrementalContainerReportHandler
               null);
 
       reconIcr.onMessage(reportMock, mock(EventPublisher.class));
-      assertTrue(containerManager.exists(containerID));
+      assertTrue(containerManager.containerExist(containerID));
       assertEquals(1,
           containerManager.getContainerReplicas(containerID).size());
       LifeCycleState expectedState = getContainerStateFromReplicaState(state);

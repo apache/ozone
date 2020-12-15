@@ -28,15 +28,18 @@ import java.util.Set;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.block.BlockManager;
+import org.apache.hadoop.hdds.scm.container.CloseContainerEventHandler;
 import org.apache.hadoop.hdds.scm.container.ContainerActionsHandler;
-import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
+import org.apache.hadoop.hdds.scm.container.ContainerReportHandler;
+import org.apache.hadoop.hdds.scm.container.IncrementalContainerReportHandler;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementPolicyFactory;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementMetrics;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
+import org.apache.hadoop.hdds.scm.node.DeadNodeHandler;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeReportHandler;
 import org.apache.hadoop.hdds.scm.node.StaleNodeHandler;
@@ -80,7 +83,7 @@ public class ReconStorageContainerManagerFacade
 
   private ReconNodeManager nodeManager;
   private ReconPipelineManager pipelineManager;
-  private ContainerManager containerManager;
+  private ContainerManagerV2 containerManager;
   private NetworkTopology clusterMap;
   private StorageContainerServiceProvider scmServiceProvider;
   private Set<ReconScmTask> reconScmTasks = new HashSet<>();
@@ -118,7 +121,6 @@ public class ReconStorageContainerManagerFacade
             eventQueue);
     this.containerManager = new ReconContainerManager(conf,
         ReconSCMDBDefinition.CONTAINERS.getTable(dbStore),
-        dbStore,
         pipelineManager,
         scmServiceProvider,
         containerSchemaManager);
@@ -137,17 +139,17 @@ public class ReconStorageContainerManagerFacade
 
     StaleNodeHandler staleNodeHandler =
         new StaleNodeHandler(nodeManager, pipelineManager, conf);
-    //DeadNodeHandler deadNodeHandler = new DeadNodeHandler(nodeManager,
-    //   pipelineManager, containerManager);
+    DeadNodeHandler deadNodeHandler = new DeadNodeHandler(nodeManager,
+        pipelineManager, containerManager);
 
-    //ContainerReportHandler containerReportHandler =
-    //    new ReconContainerReportHandler(nodeManager, containerManager);
+    ContainerReportHandler containerReportHandler =
+        new ReconContainerReportHandler(nodeManager, containerManager);
 
-    //IncrementalContainerReportHandler icrHandler =
-    //     new ReconIncrementalContainerReportHandler(nodeManager,
-    //        containerManager);
-    //CloseContainerEventHandler closeContainerHandler =
-    //    new CloseContainerEventHandler(pipelineManager, containerManager);
+    IncrementalContainerReportHandler icrHandler =
+         new ReconIncrementalContainerReportHandler(nodeManager,
+            containerManager);
+    CloseContainerEventHandler closeContainerHandler =
+        new CloseContainerEventHandler(pipelineManager, containerManager);
     ContainerActionsHandler actionsHandler = new ContainerActionsHandler();
     ReconNewNodeHandler newNodeHandler = new ReconNewNodeHandler(nodeManager);
 
@@ -156,11 +158,11 @@ public class ReconStorageContainerManagerFacade
     eventQueue.addHandler(SCMEvents.PIPELINE_REPORT, pipelineReportHandler);
     eventQueue.addHandler(SCMEvents.PIPELINE_ACTIONS, pipelineActionHandler);
     eventQueue.addHandler(SCMEvents.STALE_NODE, staleNodeHandler);
-    //eventQueue.addHandler(SCMEvents.DEAD_NODE, deadNodeHandler);
-    //eventQueue.addHandler(SCMEvents.CONTAINER_REPORT, containerReportHandler);
-    //eventQueue.addHandler(SCMEvents.INCREMENTAL_CONTAINER_REPORT, icrHandler);
+    eventQueue.addHandler(SCMEvents.DEAD_NODE, deadNodeHandler);
+    eventQueue.addHandler(SCMEvents.CONTAINER_REPORT, containerReportHandler);
+    eventQueue.addHandler(SCMEvents.INCREMENTAL_CONTAINER_REPORT, icrHandler);
     eventQueue.addHandler(SCMEvents.CONTAINER_ACTIONS, actionsHandler);
-    //eventQueue.addHandler(SCMEvents.CLOSE_CONTAINER, closeContainerHandler);
+    eventQueue.addHandler(SCMEvents.CLOSE_CONTAINER, closeContainerHandler);
     eventQueue.addHandler(SCMEvents.NEW_NODE, newNodeHandler);
 
     ReconTaskConfig reconTaskConfig = conf.getObject(ReconTaskConfig.class);
@@ -278,8 +280,7 @@ public class ReconStorageContainerManagerFacade
 
   @Override
   public ContainerManagerV2 getContainerManager() {
-    //return containerManager;
-    return null;
+    return containerManager;
   }
 
   @Override

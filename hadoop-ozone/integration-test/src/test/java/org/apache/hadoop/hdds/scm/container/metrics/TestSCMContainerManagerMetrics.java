@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -119,29 +120,26 @@ public class TestSCMContainerManagerMetrics {
     Assert.assertEquals(getLongCounter("NumSuccessfulDeleteContainers",
         metrics), numSuccessfulDeleteContainers + 1);
 
+    try {
+      // Give random container to delete.
+      containerManager.deleteContainer(
+          ContainerID.valueOf(RandomUtils.nextLong(10000, 20000)));
+      fail("testContainerOpsMetrics failed");
+    } catch (ContainerNotFoundException ex) {
+      // Here it should fail, so it should have the old metric value.
+      metrics = getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
+      Assert.assertEquals(getLongCounter("NumSuccessfulDeleteContainers",
+          metrics), numSuccessfulCreateContainers);
+      Assert.assertEquals(getLongCounter("NumFailureDeleteContainers",
+          metrics), 1);
+    }
 
-    // Give random container to delete.
-    containerManager.deleteContainer(
-        ContainerID.valueOf(RandomUtils.nextLong(10000, 20000)));
-    // Here it should fail, so it should have the old metric value.
-    metrics = getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
-    Assert.assertEquals(getLongCounter("NumSuccessfulDeleteContainers",
-        metrics), numSuccessfulCreateContainers);
-    Assert.assertEquals(getLongCounter("NumFailureDeleteContainers",
-        metrics), 1);
-    /*
-
-    // ReplicationManager is also calling "getContainers" making the below
-    // check flaky. Move the metrics to protocol server and then enable
-    // this check.
-
+    long currentValue = getLongCounter("NumListContainerOps", metrics);
     containerManager.getContainers(
         ContainerID.valueOf(containerInfo.getContainerID()), 1);
     metrics = getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
-    Assert.assertEquals(getLongCounter("NumListContainerOps",
-        metrics), 1);
-
-     */
+    Assert.assertEquals(currentValue + 1,
+        getLongCounter("NumListContainerOps", metrics));
 
   }
 

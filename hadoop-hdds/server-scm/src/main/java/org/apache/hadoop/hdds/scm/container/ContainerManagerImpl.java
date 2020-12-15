@@ -146,7 +146,6 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
       final List<ContainerID> containersIds =
           new ArrayList<>(containerStateManager.getContainerIDs());
       Collections.sort(containersIds);
-      scmContainerManagerMetrics.incNumListContainersOps();
       return containersIds.stream()
           .filter(id -> id.getId() > start).limit(count)
           .map(ContainerID::getProtobuf)
@@ -408,6 +407,11 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
     }
   }
 
+  @Override
+  public boolean containerExist(final ContainerID id) {
+    return containerExist(id.getProtobuf());
+  }
+
   private boolean containerExist(final HddsProtos.ContainerID id) {
     return containerStateManager.contains(id);
   }
@@ -423,4 +427,9 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
     containerStateManager.close();
   }
 
+  // Remove this after fixing Recon
+  @Deprecated
+  protected ContainerStateManagerV2 getContainerStateManager() {
+    return containerStateManager;
+  }
 }
