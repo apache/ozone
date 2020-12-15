@@ -71,7 +71,6 @@ import org.apache.ratis.protocol.RaftGroupMemberId;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.apache.ratis.server.RaftServer;
-import org.apache.ratis.server.impl.RaftServerProxy;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.server.raftlog.RaftLog;
 import org.apache.ratis.server.storage.RaftStorage;
@@ -221,7 +220,7 @@ public class ContainerStateMachine extends BaseStateMachine {
       throws IOException {
     if (snapshot == null) {
       TermIndex empty =
-          TermIndex.newTermIndex(0, RaftLog.INVALID_LOG_INDEX);
+          TermIndex.valueOf(0, RaftLog.INVALID_LOG_INDEX);
       LOG.info("{}: The snapshot info is null. Setting the last applied index" +
               "to:{}", gid, empty);
       setLastAppliedTermIndex(empty);
@@ -421,7 +420,6 @@ public class ContainerStateMachine extends BaseStateMachine {
       long startTime) {
     final WriteChunkRequestProto write = requestProto.getWriteChunk();
     RaftServer server = ratisServer.getServer();
-    Preconditions.checkState(server instanceof RaftServerProxy);
     try {
       if (server.getDivision(gid).getInfo().isLeader()) {
         stateMachineDataCache.put(entryIndex, write.getData());

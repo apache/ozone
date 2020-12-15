@@ -346,7 +346,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     getLifeCycle().startAndTransition(() -> {
       this.ozoneManagerDoubleBuffer = buildDoubleBufferForRatis();
       handler.updateDoubleBuffer(ozoneManagerDoubleBuffer);
-      this.setLastAppliedTermIndex(TermIndex.newTermIndex(
+      this.setLastAppliedTermIndex(TermIndex.valueOf(
           newLastAppliedSnapShotTermIndex, newLastAppliedSnaphsotIndex));
     });
   }
@@ -539,7 +539,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         OMTransactionInfo.readTransactionInfo(
             ozoneManager.getMetadataManager());
     if (omTransactionInfo != null) {
-      setLastAppliedTermIndex(TermIndex.newTermIndex(
+      setLastAppliedTermIndex(TermIndex.valueOf(
           omTransactionInfo.getTerm(),
           omTransactionInfo.getTransactionIndex()));
       snapshotInfo.updateTermIndex(omTransactionInfo.getTerm(),

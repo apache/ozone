@@ -52,7 +52,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.server.RaftServer;
-import org.apache.ratis.server.impl.RaftServerProxy;
 import org.apache.ratis.statemachine.StateMachine;
 import org.junit.Assert;
 import org.slf4j.Logger;
@@ -590,15 +589,14 @@ public final class ContainerTestHelper {
           " not exist in datanode:" + dn.getDatanodeDetails().getUuid());
     }
 
-    XceiverServerSpi server = dn.getDatanodeStateMachine().
+    XceiverServerSpi serverSpi = dn.getDatanodeStateMachine().
         getContainer().getWriteChannel();
-    RaftServerProxy proxy =
-        (RaftServerProxy) (((XceiverServerRatis) server).getServer());
+    RaftServer server = (((XceiverServerRatis) serverSpi).getServer());
     RaftGroupId groupId =
-        pipeline == null ? proxy.getGroupIds().iterator().next() :
+        pipeline == null ? server.getGroupIds().iterator().next() :
             RatisHelper.newRaftGroup(pipeline).getGroupId();
 
-    return proxy.getDivision(groupId);
+    return server.getDivision(groupId);
   }
 
   public static StateMachine getStateMachine(HddsDatanodeService dn,

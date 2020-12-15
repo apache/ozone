@@ -48,7 +48,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.server.RaftServer;
-import org.apache.ratis.server.impl.RaftServerProxy;
 import org.apache.ratis.statemachine.StateMachine;
 import org.junit.Assert;
 
@@ -301,14 +300,13 @@ public final class TestHelper {
 
   private static RaftServer.Division getRaftServerDivision(
       HddsDatanodeService dn, Pipeline pipeline) throws Exception {
-    XceiverServerSpi server = dn.getDatanodeStateMachine().
+    XceiverServerSpi serverSpi = dn.getDatanodeStateMachine().
         getContainer().getWriteChannel();
-    RaftServerProxy proxy =
-        (RaftServerProxy) (((XceiverServerRatis) server).getServer());
+    RaftServer server = (((XceiverServerRatis) serverSpi).getServer());
     RaftGroupId groupId =
-        pipeline == null ? proxy.getGroupIds().iterator().next() :
+        pipeline == null ? server.getGroupIds().iterator().next() :
             RatisHelper.newRaftGroup(pipeline).getGroupId();
-    return proxy.getDivision(groupId);
+    return server.getDivision(groupId);
   }
 
   public static StateMachine getStateMachine(HddsDatanodeService dn,
