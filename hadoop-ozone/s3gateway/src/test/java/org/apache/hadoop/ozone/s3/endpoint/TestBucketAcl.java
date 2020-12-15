@@ -38,7 +38,6 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Map;
 
-import static java.net.HttpURLConnection.HTTP_FORBIDDEN;
 import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
 import static java.net.HttpURLConnection.HTTP_NOT_IMPLEMENTED;
 import static java.net.HttpURLConnection.HTTP_OK;
@@ -94,7 +93,6 @@ public class TestBucketAcl {
   public void testSetAclWithNotSupportedGranteeType() throws Exception {
     when(headers.getHeaderString(S3Acl.grantRead))
         .thenReturn(S3Acl.ACLIdentityType.GROUP.getHeaderType() + "=root" );
-
     when(parameterMap.containsKey(aclMarker)).thenReturn(true);
     try {
       Response response =

@@ -393,7 +393,7 @@ public class BucketEndpoint extends EndpointBase {
         Set<Grant> grantSet = new HashSet<>();
         // Return ACL list
         for (OzoneAcl acl : bucket.getAcls()) {
-          List<Grant> grants = S3Acl.OzoneNativeACLToS3ACL(acl);
+          List<Grant> grants = S3Acl.ozoneNativeAclToS3Acl(acl);
           grantSet.addAll(grants);
         }
         ArrayList<Grant> grantList = new ArrayList<>();
@@ -445,9 +445,9 @@ public class BucketEndpoint extends EndpointBase {
             null, null, null, null, null, body);
         // Handle grants in body
         ozoneAclListOnBucket.addAll(
-            S3Acl.S3ACLToOzoneNativeACLOnBucket(putBucketAclRequest));
+            S3Acl.s3AclToOzoneNativeAclOnBucket(putBucketAclRequest));
         ozoneAclListOnVolume.addAll(
-            S3Acl.S3ACLToOzoneNativeACLOnVolume(putBucketAclRequest));
+            S3Acl.s3AclToOzoneNativeAclOnVolume(putBucketAclRequest));
       } else {
 
         // Handle grants in headers
@@ -518,7 +518,9 @@ public class BucketEndpoint extends EndpointBase {
   }
 
   /**
-   *  Example: x-amz-grant-write: uri="http://acs.amazonaws.com/groups/s3/LogDelivery", id="111122223333", id="555566667777".
+   *  Example: x-amz-grant-write: \
+   *  uri="http://acs.amazonaws.com/groups/s3/LogDelivery", id="111122223333", \
+   *  id="555566667777".
    */
   private List<OzoneAcl> getAndConvertAclOnBucket(String value,
       String permission) throws OS3Exception {

@@ -132,8 +132,12 @@ public class S3BucketAcl {
 
     @Override
     public boolean equals(Object o) {
-      if (this == o) return true;
-      if (o == null || getClass() != o.getClass()) return false;
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
       Grant grant = (Grant) o;
       return Objects.equals(grantee, grant.grantee) &&
           Objects.equals(permission, grant.permission);

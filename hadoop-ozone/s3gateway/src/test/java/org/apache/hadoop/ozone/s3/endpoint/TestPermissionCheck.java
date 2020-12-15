@@ -202,7 +202,6 @@ public class TestPermissionCheck {
 
     HttpServletRequest servletRequest = Mockito.mock(HttpServletRequest.class);
     Map<String, String[]> parameterMap = Mockito.mock(Map.class);
-    HttpHeaders headers = Mockito.mock(HttpHeaders.class);
     when(servletRequest.getParameterMap()).thenReturn(parameterMap);
 
     when(parameterMap.containsKey("acl")).thenReturn(true);
@@ -226,7 +225,6 @@ public class TestPermissionCheck {
 
     HttpServletRequest servletRequest = Mockito.mock(HttpServletRequest.class);
     Map<String, String[]> parameterMap = Mockito.mock(Map.class);
-    HttpHeaders headers = Mockito.mock(HttpHeaders.class);
     when(servletRequest.getParameterMap()).thenReturn(parameterMap);
 
     when(parameterMap.containsKey("acl")).thenReturn(true);

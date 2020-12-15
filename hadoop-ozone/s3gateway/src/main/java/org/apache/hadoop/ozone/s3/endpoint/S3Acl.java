@@ -1,3 +1,22 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ *
+ */
 package org.apache.hadoop.ozone.s3.endpoint;
 
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -16,7 +35,7 @@ import java.util.List;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NOT_IMPLEMENTED;
 
-public class S3Acl {
+public final class S3Acl {
   private static final Logger LOG = LoggerFactory.getLogger(S3Acl.class);
 
   // ACL put related headers
@@ -30,7 +49,7 @@ public class S3Acl {
   public static final String cannedAclHeader = "x-amz-acl";
 
   /**
-   * https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html
+   * https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html.
    */
   enum ACLType {
     // Allows grantee to list the objects in the bucket
@@ -132,7 +151,7 @@ public class S3Acl {
     return type == null ? false : type.isSupported();
   }
 
-  public static List<Grant> OzoneNativeACLToS3ACL(OzoneAcl ozoneAcl) {
+  public static List<Grant> ozoneNativeAclToS3Acl(OzoneAcl ozoneAcl) {
     // Since currently only "CanonicalUser" is supported, which maps to Ozone
     // "USER"
     List<Grant> grantList = new ArrayList<>();
@@ -181,7 +200,7 @@ public class S3Acl {
     return grantList;
   }
 
-  public static List<OzoneAcl> S3ACLToOzoneNativeACLOnBucket(
+  public static List<OzoneAcl> s3AclToOzoneNativeAclOnBucket(
       S3BucketAcl bucketAcl) throws OS3Exception {
     List<OzoneAcl> ozoneAclList = new ArrayList<>();
     List<Grant> grantList = bucketAcl.getAclList().getGrantList();
@@ -241,7 +260,7 @@ public class S3Acl {
     return acls;
   }
 
-  public static List<OzoneAcl> S3ACLToOzoneNativeACLOnVolume(
+  public static List<OzoneAcl> s3AclToOzoneNativeAclOnVolume(
       S3BucketAcl bucketAcl) throws OS3Exception {
     List<OzoneAcl> ozoneAclList = new ArrayList<>();
     List<Grant> grantList = bucketAcl.getAclList().getGrantList();
