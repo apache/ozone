@@ -199,7 +199,6 @@ function ozonecmd_case
     ;;
     insight)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.insight.Insight
-      OZONE_OPTS="${OZONE_OPTS} ${HDFS_SCM_CLI_OPTS}"
       OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-insight"
     ;;
     version)
