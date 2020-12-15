@@ -44,11 +44,7 @@ if ! declare -F ozone_bootstrap >& /dev/null; then
   exit 1
 fi
 
-if ! ozone_bootstrap; then
-  echo "ERROR: Cannot find ozone-config.sh." 2>&1
-  exit 1
-fi
-
+ozone_bootstrap
 . "${OZONE_LIBEXEC_DIR}/ozone-config.sh"
 
 # get arguments
