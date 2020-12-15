@@ -205,7 +205,7 @@ public class OMPrepareRequest extends OMClientRequest {
     // prepare request, this one will end up purging that request.
     // This means that an OM cannot support 2 prepare requests in the
     // transaction pipeline (un-applied) at the same time.
-    if (raftLogIndex > snapshotIndex ) {
+    if (raftLogIndex > snapshotIndex) {
       LOG.warn("Snapshot index {} does not " +
           "match last log index {}.", snapshotIndex, raftLogIndex);
       snapshotIndex = raftLogIndex;
