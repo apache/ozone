@@ -13,40 +13,43 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 
+/**
+ * Controls the prepare state of the {@link OzoneManager}.
+ * When prepared, an ozone manager should have no Ratis logs remaining,
+ * disallow all write requests except prepare and cancel prepare, and have a
+ * marker file present on disk that will cause it to remain prepared on restart.
+ */
 public final class OzoneManagerPrepareState {
-  private static boolean isPrepared = false;
+  private static boolean prepareGateEnabled = false;
 
-  public static synchronized boolean isPrepared() {
-    return isPrepared;
+  public static synchronized boolean isPrepareGateEnabled() {
+    return prepareGateEnabled;
   }
 
   /**
-   * Mark this Ozone Manager as being in or out of prepare mode.
-   * In prepare mode, an Ozone Manager has applied all transactions from
-   * its Ratis log and cleared out the log. It will not allow any write requests
-   * through until it is taken out of prepare mode.
-   *
-   * Blocking write requests while the OM is in prepare mode is enforced by
+   * Turning on this flag will enable a gate in the
    * {@link OzoneManagerStateMachine#preAppendTransaction}
-   * and {@link OzoneManagerRatisServer#submitRequest}
+   * and {@link OzoneManagerRatisServer#submitRequest} methods that block
+   * write requests from reaching the OM and fail them with error responses
+   * to the client.
    *
-   * @param value true if this Ozone Manager should be put in prepare mode,
-   * false if this Ozone Manager should be taken out of prepare mode.
+   * @param value true if the prepare gate for this Ozone Manager should be
+   * enabled, false if the gate should be disabled.
    */
-  public static synchronized void setPrepared(boolean value) {
-    isPrepared = value;
+  public static synchronized void setPrepareGateEnabled(boolean value) {
+    prepareGateEnabled = value;
   }
 
   /**
-   * If this Ozone Manager is not in prepare mode, returns true.
-   * If this Ozone Manager is in prepare mode, returns true only if {@code
-   * requestType} is{@code Prepare} or {@code CancelPrepare}. Returns false
+   * If the prepare gate is enabled, always returns true.
+   * If the prepare gate is disabled, returns true only if {@code
+   * requestType} is {@code Prepare} or {@code CancelPrepare}. Returns false
    * otherwise.
    */
   public static synchronized boolean requestAllowed(Type requestType) {
     boolean requestAllowed = true;
 
-    if (isPrepared) {
+    if (prepareGateEnabled) {
       // TODO: Also return true for cancel prepare when it is implemented.
       requestAllowed = (requestType == Type.Prepare);
     }
@@ -57,10 +60,10 @@ public final class OzoneManagerPrepareState {
   /**
    * Creates a prepare marker file inside {@code metadataDir} which contains
    * the log index {@code index}. If a marker file already exists, it will be
-   * overwritten.
+   * overwritten. This method does not change the state of the prepare gate.
    */
-  public static void writePrepareMarkerFile(ConfigurationSource conf,
-      long index) throws IOException {
+  public static synchronized void writePrepareMarkerFile(
+      ConfigurationSource conf, long index) throws IOException {
     File markerFile = getPrepareMarkerFile(conf);
     markerFile.getParentFile().mkdirs();
     try(FileOutputStream stream =
@@ -70,33 +73,41 @@ public final class OzoneManagerPrepareState {
   }
 
   /**
-   * If a prepare marker file exists in {@code metadataDir} and contains a
-   * log index matching {@code index}, the prepare state flag will be be
-   * turned on. Otherwise, the prepare state flag will be turned off.
+   * If a prepare marker file exists and contains a
+   * log index matching {@code index}, the prepare gate will be enabled.
+   * Otherwise, the prepare gate will be disabled.
    */
-  public static void checkPrepareMarkerFile(ConfigurationSource conf,
-      long index) {
+  public static synchronized void checkPrepareMarkerFile(
+      ConfigurationSource conf, long index) {
     File prepareMarkerFile = getPrepareMarkerFile(conf);
     if (prepareMarkerFile.exists()) {
       byte[] data = new byte[(int) prepareMarkerFile.length()];
       try(FileInputStream stream = new FileInputStream(prepareMarkerFile)) {
         stream.read(data);
       } catch (IOException e) {
-        setPrepared(false);
+        setPrepareGateEnabled(false);
       }
 
       try {
         long prepareMarkerIndex = Long.parseLong(new String(data));
-        setPrepared(index == prepareMarkerIndex);
+        setPrepareGateEnabled(index == prepareMarkerIndex);
       } catch (NumberFormatException e) {
-        setPrepared(false);
+        setPrepareGateEnabled(false);
       }
     } else {
       // No marker file found.
-      setPrepared(false);
+      setPrepareGateEnabled(false);
     }
   }
 
+  /**
+   * Returns a {@link File} object representing the prepare marker file,
+   * which may or may not correspond to an actual file on disk.
+   * This method should be used for testing only, and all other interactions
+   * with the prepare marker file should be done through
+   * {@link OzoneManagerPrepareState#writePrepareMarkerFile} and
+   * {@link OzoneManagerPrepareState#checkPrepareMarkerFile}
+   */
   @VisibleForTesting
   public static File getPrepareMarkerFile(ConfigurationSource conf) {
     File markerFileDir = new File(ServerUtils.getOzoneMetaDirPath(conf),

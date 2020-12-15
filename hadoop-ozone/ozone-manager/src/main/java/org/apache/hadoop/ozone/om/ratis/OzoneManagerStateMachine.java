@@ -206,7 +206,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     // through.
     if (OzoneManagerPrepareState.requestAllowed(cmdType)) {
       if (cmdType == OzoneManagerProtocolProtos.Type.Prepare) {
-        OzoneManagerPrepareState.setPrepared(true);
+        OzoneManagerPrepareState.setPrepareGateEnabled(true);
       }
       // TODO: Add cancel prepare here after it is implemented.
       return trx;

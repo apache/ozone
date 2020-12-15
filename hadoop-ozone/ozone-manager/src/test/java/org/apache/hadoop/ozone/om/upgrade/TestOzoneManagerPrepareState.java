@@ -29,7 +29,7 @@ public class TestOzoneManagerPrepareState {
         folder.getRoot().getAbsolutePath());
 
     // Clean up from previous runs.
-    OzoneManagerPrepareState.setPrepared(false);
+    OzoneManagerPrepareState.setPrepareGateEnabled(false);
 
     File markerFile = OzoneManagerPrepareState.getPrepareMarkerFile(conf);
     if (markerFile.exists()) {
@@ -40,9 +40,9 @@ public class TestOzoneManagerPrepareState {
   @Test
   public void testGetAndSetPrepare() {
     // Default value should be false.
-    Assert.assertFalse(OzoneManagerPrepareState.isPrepared());
-    OzoneManagerPrepareState.setPrepared(true);
-    Assert.assertTrue(OzoneManagerPrepareState.isPrepared());
+    Assert.assertFalse(OzoneManagerPrepareState.isPrepareGateEnabled());
+    OzoneManagerPrepareState.setPrepareGateEnabled(true);
+    Assert.assertTrue(OzoneManagerPrepareState.isPrepareGateEnabled());
   }
 
   @Test
@@ -52,7 +52,7 @@ public class TestOzoneManagerPrepareState {
       Assert.assertTrue(OzoneManagerPrepareState.requestAllowed(cmdType));
     }
 
-    OzoneManagerPrepareState.setPrepared(true);
+    OzoneManagerPrepareState.setPrepareGateEnabled(true);
 
     // Once prepared, only prepare and cancel prepare should be allowed.
     for (Type cmdType: Type.values()) {
@@ -69,18 +69,18 @@ public class TestOzoneManagerPrepareState {
   public void testCorrectMarkerFileIndex() throws Exception {
     OzoneManagerPrepareState.writePrepareMarkerFile(conf, testIndex);
     OzoneManagerPrepareState.checkPrepareMarkerFile(conf, testIndex);
-    Assert.assertTrue(OzoneManagerPrepareState.isPrepared());
+    Assert.assertTrue(OzoneManagerPrepareState.isPrepareGateEnabled());
   }
 
   @Test
   public void testIncorrectMarkerFileIndex() throws Exception {
-    OzoneManagerPrepareState.setPrepared(true);
+    OzoneManagerPrepareState.setPrepareGateEnabled(true);
     OzoneManagerPrepareState.writePrepareMarkerFile(conf, testIndex);
     Assert.assertTrue(
         OzoneManagerPrepareState.getPrepareMarkerFile(conf).exists());
 
     OzoneManagerPrepareState.checkPrepareMarkerFile(conf, testIndex + 1);
-    Assert.assertFalse(OzoneManagerPrepareState.isPrepared());
+    Assert.assertFalse(OzoneManagerPrepareState.isPrepareGateEnabled());
   }
 
   @Test
@@ -95,11 +95,11 @@ public class TestOzoneManagerPrepareState {
       stream.write(randomBytes);
     }
 
-    OzoneManagerPrepareState.setPrepared(true);
+    OzoneManagerPrepareState.setPrepareGateEnabled(true);
     Assert.assertTrue(prepareFile.exists());
 
     OzoneManagerPrepareState.checkPrepareMarkerFile(conf, testIndex);
-    Assert.assertFalse(OzoneManagerPrepareState.isPrepared());
+    Assert.assertFalse(OzoneManagerPrepareState.isPrepareGateEnabled());
   }
 
   @Test
@@ -109,23 +109,23 @@ public class TestOzoneManagerPrepareState {
     Assert.assertTrue(prepareFile.createNewFile());
     Assert.assertTrue(prepareFile.exists());
 
-    OzoneManagerPrepareState.setPrepared(true);
+    OzoneManagerPrepareState.setPrepareGateEnabled(true);
     OzoneManagerPrepareState.checkPrepareMarkerFile(conf, testIndex);
-    Assert.assertFalse(OzoneManagerPrepareState.isPrepared());
+    Assert.assertFalse(OzoneManagerPrepareState.isPrepareGateEnabled());
   }
 
   @Test
   public void testNoMarkerFile() {
-    OzoneManagerPrepareState.setPrepared(true);
+    OzoneManagerPrepareState.setPrepareGateEnabled(true);
     Assert.assertFalse(
         OzoneManagerPrepareState.getPrepareMarkerFile(conf).exists());
     OzoneManagerPrepareState.checkPrepareMarkerFile(conf, testIndex);
-    Assert.assertFalse(OzoneManagerPrepareState.isPrepared());
+    Assert.assertFalse(OzoneManagerPrepareState.isPrepareGateEnabled());
   }
 
   @Test
   public void testOverwritingMarkerFile() throws Exception {
-    OzoneManagerPrepareState.setPrepared(true);
+    OzoneManagerPrepareState.setPrepareGateEnabled(true);
 
     OzoneManagerPrepareState.writePrepareMarkerFile(conf, testIndex);
     Assert.assertTrue(
@@ -136,6 +136,6 @@ public class TestOzoneManagerPrepareState {
         OzoneManagerPrepareState.getPrepareMarkerFile(conf).exists());
 
     OzoneManagerPrepareState.checkPrepareMarkerFile(conf, testIndex + 1);
-    Assert.assertTrue(OzoneManagerPrepareState.isPrepared());
+    Assert.assertTrue(OzoneManagerPrepareState.isPrepareGateEnabled());
   }
 }
