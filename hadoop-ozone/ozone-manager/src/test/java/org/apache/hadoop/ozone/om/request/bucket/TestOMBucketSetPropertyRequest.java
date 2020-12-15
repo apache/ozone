@@ -119,7 +119,7 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
             BucketArgs.newBuilder().setBucketName(bucketName)
                 .setVolumeName(volumeName)
                 .setQuotaInBytes(quotaInBytes)
-                .setQuotaInCounts(1000L)
+                .setQuotaInNamespace(1000L)
                 .setIsVersionEnabled(isVersionEnabled).build()))
         .setCmdType(OzoneManagerProtocolProtos.Type.SetBucketProperty)
         .setClientId(UUID.randomUUID().toString()).build();

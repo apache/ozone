@@ -44,7 +44,7 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
   private long creationTime;
   private long modificationTime;
   private long quotaInBytes;
-  private long quotaInCounts;
+  private long quotaInNamespace;
   private long usedNamespace;
   private final OmOzoneAclMap aclMap;
 
@@ -54,7 +54,7 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
    * @param ownerName  - Volume owner's name
    * @param volume - volume name
    * @param quotaInBytes - Volume Quota in bytes.
-   * @param quotaInCounts - Volume Quota in counts.
+   * @param quotaInNamespace - Volume Quota in counts.
    * @param usedNamespace - Volume Namespace Quota Usage in counts.
    * @param metadata - metadata map for custom key/value data.
    * @param aclMap - User to access rights map.
@@ -66,14 +66,14 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
   @SuppressWarnings({"checkstyle:ParameterNumber", "This is invoked from a " +
       "builder."})
   private OmVolumeArgs(String adminName, String ownerName, String volume,
-      long quotaInBytes, long quotaInCounts, long usedNamespace,
+      long quotaInBytes, long quotaInNamespace, long usedNamespace,
       Map<String, String> metadata, OmOzoneAclMap aclMap, long creationTime,
       long modificationTime, long objectID, long updateID) {
     this.adminName = adminName;
     this.ownerName = ownerName;
     this.volume = volume;
     this.quotaInBytes = quotaInBytes;
-    this.quotaInCounts = quotaInCounts;
+    this.quotaInNamespace = quotaInNamespace;
     this.usedNamespace = usedNamespace;
     this.metadata = metadata;
     this.aclMap = aclMap;
@@ -92,8 +92,8 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
     this.quotaInBytes = quotaInBytes;
   }
 
-  public void setQuotaInCounts(long quotaInCounts) {
-    this.quotaInCounts= quotaInCounts;
+  public void setQuotaInNamespace(long quotaInNamespace) {
+    this.quotaInNamespace= quotaInNamespace;
   }
 
   public void setCreationTime(long time) {
@@ -168,8 +168,8 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
    * Returns Quota in counts.
    * @return long, Quota in counts.
    */
-  public long getQuotaInCounts() {
-    return quotaInCounts;
+  public long getQuotaInNamespace() {
+    return quotaInNamespace;
   }
 
   public OmOzoneAclMap getAclMap() {
@@ -210,8 +210,8 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
     auditMap.put(OzoneConsts.MODIFICATION_TIME,
         String.valueOf(this.modificationTime));
     auditMap.put(OzoneConsts.QUOTA_IN_BYTES, String.valueOf(this.quotaInBytes));
-    auditMap.put(OzoneConsts.QUOTA_IN_COUNTS,
-        String.valueOf(this.quotaInCounts));
+    auditMap.put(OzoneConsts.QUOTA_IN_NAMESPACE,
+        String.valueOf(this.quotaInNamespace));
     auditMap.put(OzoneConsts.USED_NAMESPACE,
         String.valueOf(this.usedNamespace));
     auditMap.put(OzoneConsts.OBJECT_ID, String.valueOf(this.getObjectID()));
@@ -246,7 +246,7 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
     private long creationTime;
     private long modificationTime;
     private long quotaInBytes;
-    private long quotaInCounts;
+    private long quotaInNamespace;
     private long usedNamespace;
     private Map<String, String> metadata;
     private OmOzoneAclMap aclMap;
@@ -281,7 +281,7 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
       metadata = new HashMap<>();
       aclMap = new OmOzoneAclMap();
       quotaInBytes = OzoneConsts.QUOTA_RESET;
-      quotaInCounts = OzoneConsts.QUOTA_RESET;
+      quotaInNamespace = OzoneConsts.QUOTA_RESET;
     }
 
     public Builder setAdminName(String admin) {
@@ -314,8 +314,8 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
       return this;
     }
 
-    public Builder setQuotaInCounts(long quotaCounts) {
-      this.quotaInCounts = quotaCounts;
+    public Builder setQuotaInNamespace(long quotaNamespace) {
+      this.quotaInNamespace = quotaNamespace;
       return this;
     }
 
@@ -350,7 +350,7 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
       Preconditions.checkNotNull(ownerName);
       Preconditions.checkNotNull(volume);
       return new OmVolumeArgs(adminName, ownerName, volume, quotaInBytes,
-          quotaInCounts, usedNamespace, metadata, aclMap, creationTime,
+          quotaInNamespace, usedNamespace, metadata, aclMap, creationTime,
           modificationTime, objectID, updateID);
     }
 
@@ -363,7 +363,7 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
         .setOwnerName(ownerName)
         .setVolume(volume)
         .setQuotaInBytes(quotaInBytes)
-        .setQuotaInCounts(quotaInCounts)
+        .setQuotaInNamespace(quotaInNamespace)
         .setUsedNamespace(usedNamespace)
         .addAllMetadata(KeyValueUtil.toProtobuf(metadata))
         .addAllVolumeAcls(aclList)
@@ -384,7 +384,7 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
         volInfo.getOwnerName(),
         volInfo.getVolume(),
         volInfo.getQuotaInBytes(),
-        volInfo.getQuotaInCounts(),
+        volInfo.getQuotaInNamespace(),
         volInfo.getUsedNamespace(),
         KeyValueUtil.getFromProtobuf(volInfo.getMetadataList()),
         aclMap,
@@ -418,7 +418,7 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
     OmOzoneAclMap cloneAclMap = aclMap.copyObject();
 
     return new OmVolumeArgs(adminName, ownerName, volume, quotaInBytes,
-        quotaInCounts, usedNamespace, cloneMetadata, cloneAclMap,
+        quotaInNamespace, usedNamespace, cloneMetadata, cloneAclMap,
         creationTime, modificationTime, objectID, updateID);
   }
 }
