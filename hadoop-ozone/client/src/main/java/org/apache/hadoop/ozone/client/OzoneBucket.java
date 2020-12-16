@@ -101,7 +101,7 @@ public class OzoneBucket extends WithMetadata {
   private long usedBytes;
 
   /**
-   * Used bytes of the bucket.
+   * Used namespace of the bucket.
    */
   private long usedNamespace;
 
