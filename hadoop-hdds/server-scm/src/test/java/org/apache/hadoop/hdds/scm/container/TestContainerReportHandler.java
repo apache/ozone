@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server
     .SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -55,15 +56,15 @@ import static org.apache.hadoop.hdds.scm.TestUtils.getContainer;
 public class TestContainerReportHandler {
 
   private NodeManager nodeManager;
-  private ContainerManager containerManager;
+  private ContainerManagerV2 containerManager;
   private ContainerStateManager containerStateManager;
   private EventPublisher publisher;
 
   @Before
-  public void setup() throws IOException {
+  public void setup() throws IOException, InvalidStateTransitionException {
     final ConfigurationSource conf = new OzoneConfiguration();
     this.nodeManager = new MockNodeManager(true, 10);
-    this.containerManager = Mockito.mock(ContainerManager.class);
+    this.containerManager = Mockito.mock(ContainerManagerV2.class);
     this.containerStateManager = new ContainerStateManager(conf);
     this.publisher = Mockito.mock(EventPublisher.class);
 

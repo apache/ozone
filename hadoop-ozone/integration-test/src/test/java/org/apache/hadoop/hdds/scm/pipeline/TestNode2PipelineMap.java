@@ -22,11 +22,12 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.container.common.helpers
     .ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -58,7 +59,7 @@ public class TestNode2PipelineMap {
   private static OzoneConfiguration conf;
   private static StorageContainerManager scm;
   private static ContainerWithPipeline ratisContainer;
-  private static ContainerManager containerManager;
+  private static ContainerManagerV2 containerManager;
   private static PipelineManager pipelineManager;
 
   /**
@@ -92,7 +93,8 @@ public class TestNode2PipelineMap {
   }
 
   @Test
-  public void testPipelineMap() throws IOException {
+  public void testPipelineMap() throws IOException,
+      InvalidStateTransitionException {
 
     Set<ContainerID> set = pipelineManager
         .getContainersInPipeline(ratisContainer.getPipeline().getId());

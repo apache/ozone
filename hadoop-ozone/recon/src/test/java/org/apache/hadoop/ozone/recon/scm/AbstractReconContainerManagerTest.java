@@ -83,7 +83,6 @@ public class AbstractReconContainerManagerTest {
     containerManager = new ReconContainerManager(
         conf,
         ReconSCMDBDefinition.CONTAINERS.getTable(store),
-        store,
         pipelineManager,
         getScmServiceProvider(),
         mock(ContainerSchemaManager.class));

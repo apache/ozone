@@ -39,6 +39,7 @@ import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
 
+// TODO: Move this class to test package after fixing Recon
 /**
  * Mock SCMHAManager implementation for testing.
  */

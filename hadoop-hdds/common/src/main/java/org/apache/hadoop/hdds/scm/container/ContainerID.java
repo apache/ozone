@@ -41,8 +41,8 @@ public final class ContainerID implements Comparable<ContainerID> {
    * @param id int
    */
   private ContainerID(long id) {
-    Preconditions.checkState(id > 0,
-        "Container ID should be a positive. %s.", id);
+    Preconditions.checkState(id >= 0,
+        "Container ID should be positive. %s.", id);
     this.id = id;
   }
 

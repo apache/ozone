@@ -80,16 +80,23 @@ public class TestReplicationManager {
   @Before
   public void setup() throws IOException, InterruptedException {
     final ConfigurationSource conf = new OzoneConfiguration();
-    final ContainerManager containerManager =
-        Mockito.mock(ContainerManager.class);
+    final ContainerManagerV2 containerManager =
+        Mockito.mock(ContainerManagerV2.class);
     eventQueue = new EventQueue();
     containerStateManager = new ContainerStateManager(conf);
 
     datanodeCommandHandler = new DatanodeCommandHandler();
     eventQueue.addHandler(SCMEvents.DATANODE_COMMAND, datanodeCommandHandler);
 
-    Mockito.when(containerManager.getContainerIDs())
-        .thenAnswer(invocation -> containerStateManager.getAllContainerIDs());
+    Mockito.when(containerManager.getContainers())
+        .thenAnswer(invocation -> {
+          Set<ContainerID> ids = containerStateManager.getAllContainerIDs();
+          List<ContainerInfo> containers = new ArrayList<>();
+          for (ContainerID id : ids) {
+            containers.add(containerStateManager.getContainer(id));
+          }
+          return containers;
+        });
 
     Mockito.when(containerManager.getContainer(Mockito.any(ContainerID.class)))
         .thenAnswer(invocation -> containerStateManager

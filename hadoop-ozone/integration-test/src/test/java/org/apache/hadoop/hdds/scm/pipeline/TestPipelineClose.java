@@ -27,7 +27,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.test.GenericTestUtils;
@@ -74,7 +75,7 @@ public class TestPipelineClose {
   private OzoneConfiguration conf;
   private StorageContainerManager scm;
   private ContainerWithPipeline ratisContainer;
-  private ContainerManager containerManager;
+  private ContainerManagerV2 containerManager;
   private PipelineManager pipelineManager;
 
   private long pipelineDestroyTimeoutInMillis;
@@ -117,7 +118,8 @@ public class TestPipelineClose {
   }
 
   @Test
-  public void testPipelineCloseWithClosedContainer() throws IOException {
+  public void testPipelineCloseWithClosedContainer() throws IOException,
+      InvalidStateTransitionException {
     Set<ContainerID> set = pipelineManager
         .getContainersInPipeline(ratisContainer.getPipeline().getId());
 

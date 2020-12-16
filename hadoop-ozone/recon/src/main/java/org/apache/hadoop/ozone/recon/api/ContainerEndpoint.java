@@ -40,6 +40,7 @@ import javax.inject.Inject;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -57,7 +58,6 @@ import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersResponse;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersSummary;
 import org.apache.hadoop.ozone.recon.persistence.ContainerSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
-import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
 import org.hadoop.ozone.recon.schema.tables.pojos.ContainerHistory;
@@ -84,14 +84,14 @@ public class ContainerEndpoint {
   @Inject
   private ReconOMMetadataManager omMetadataManager;
 
-  private ReconContainerManager containerManager;
+  // TODO: Fix ME, This has to be ReconContainerManager
+  private ContainerManagerV2 containerManager;
   private ContainerSchemaManager containerSchemaManager;
 
   @Inject
   public ContainerEndpoint(OzoneStorageContainerManager reconSCM,
                            ContainerSchemaManager containerSchemaManager) {
-    this.containerManager =
-        (ReconContainerManager) reconSCM.getContainerManager();
+    this.containerManager = reconSCM.getContainerManager();
     this.containerSchemaManager = containerSchemaManager;
   }
 

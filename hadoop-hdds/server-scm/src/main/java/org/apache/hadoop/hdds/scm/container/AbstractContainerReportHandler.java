@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
+import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.slf4j.Logger;
 
 import java.io.IOException;
@@ -44,7 +45,7 @@ import java.util.function.Supplier;
  */
 public class AbstractContainerReportHandler {
 
-  private final ContainerManager containerManager;
+  private final ContainerManagerV2 containerManager;
   private final Logger logger;
 
   /**
@@ -54,7 +55,7 @@ public class AbstractContainerReportHandler {
    * @param containerManager ContainerManager
    * @param logger Logger to be used for logging
    */
-  AbstractContainerReportHandler(final ContainerManager containerManager,
+  AbstractContainerReportHandler(final ContainerManagerV2 containerManager,
                                  final Logger logger) {
     Preconditions.checkNotNull(containerManager);
     Preconditions.checkNotNull(logger);
@@ -73,7 +74,7 @@ public class AbstractContainerReportHandler {
    */
   protected void processContainerReplica(final DatanodeDetails datanodeDetails,
       final ContainerReplicaProto replicaProto, final EventPublisher publisher)
-      throws IOException {
+      throws IOException, InvalidStateTransitionException {
     final ContainerID containerId = ContainerID
         .valueOf(replicaProto.getContainerID());
 
@@ -166,7 +167,7 @@ public class AbstractContainerReportHandler {
                                     final ContainerID containerId,
                                     final ContainerReplicaProto replica,
                                     final EventPublisher publisher)
-      throws IOException {
+      throws IOException, InvalidStateTransitionException {
 
     final ContainerInfo container = containerManager
         .getContainer(containerId);
@@ -310,7 +311,7 @@ public class AbstractContainerReportHandler {
    * Return ContainerManager.
    * @return {@link ContainerManager}
    */
-  protected ContainerManager getContainerManager() {
+  protected ContainerManagerV2 getContainerManager() {
     return containerManager;
   }
 

@@ -30,7 +30,7 @@ import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.block.BlockManager;
 import org.apache.hadoop.hdds.scm.container.CloseContainerEventHandler;
 import org.apache.hadoop.hdds.scm.container.ContainerActionsHandler;
-import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.container.ContainerReportHandler;
 import org.apache.hadoop.hdds.scm.container.IncrementalContainerReportHandler;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager;
@@ -70,6 +70,8 @@ import org.slf4j.LoggerFactory;
 public class ReconStorageContainerManagerFacade
     implements OzoneStorageContainerManager {
 
+  // TODO: Fix Recon.
+
   private static final Logger LOG = LoggerFactory
       .getLogger(ReconStorageContainerManagerFacade.class);
 
@@ -81,7 +83,7 @@ public class ReconStorageContainerManagerFacade
 
   private ReconNodeManager nodeManager;
   private ReconPipelineManager pipelineManager;
-  private ContainerManager containerManager;
+  private ContainerManagerV2 containerManager;
   private NetworkTopology clusterMap;
   private StorageContainerServiceProvider scmServiceProvider;
   private Set<ReconScmTask> reconScmTasks = new HashSet<>();
@@ -119,7 +121,6 @@ public class ReconStorageContainerManagerFacade
             eventQueue);
     this.containerManager = new ReconContainerManager(conf,
         ReconSCMDBDefinition.CONTAINERS.getTable(dbStore),
-        dbStore,
         pipelineManager,
         scmServiceProvider,
         containerSchemaManager);
@@ -145,7 +146,7 @@ public class ReconStorageContainerManagerFacade
         new ReconContainerReportHandler(nodeManager, containerManager);
 
     IncrementalContainerReportHandler icrHandler =
-        new ReconIncrementalContainerReportHandler(nodeManager,
+         new ReconIncrementalContainerReportHandler(nodeManager,
             containerManager);
     CloseContainerEventHandler closeContainerHandler =
         new CloseContainerEventHandler(pipelineManager, containerManager);
@@ -278,7 +279,7 @@ public class ReconStorageContainerManagerFacade
   }
 
   @Override
-  public ContainerManager getContainerManager() {
+  public ContainerManagerV2 getContainerManager() {
     return containerManager;
   }
 

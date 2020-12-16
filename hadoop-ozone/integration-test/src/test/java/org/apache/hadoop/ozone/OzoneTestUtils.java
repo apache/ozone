@@ -23,6 +23,7 @@ import java.util.List;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -87,9 +88,10 @@ public final class OzoneTestUtils {
    */
   public static void closeAllContainers(EventPublisher eventPublisher,
       StorageContainerManager scm) {
-    for (ContainerID containerID :
-        scm.getContainerManager().getContainerIDs()) {
-      eventPublisher.fireEvent(SCMEvents.CLOSE_CONTAINER, containerID);
+    for (ContainerInfo container :
+        scm.getContainerManager().getContainers()) {
+      eventPublisher.fireEvent(SCMEvents.CLOSE_CONTAINER,
+          container.containerID());
     }
   }
 

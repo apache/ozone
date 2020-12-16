@@ -48,7 +48,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
@@ -66,7 +66,6 @@ import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersResponse;
 import org.apache.hadoop.ozone.recon.persistence.ContainerSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
-import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
@@ -113,8 +112,8 @@ public class TestContainerEndpoint {
     // Mock ReconStorageContainerManagerFacade and other SCM related methods
     OzoneStorageContainerManager mockReconSCM =
         mock(ReconStorageContainerManagerFacade.class);
-    ContainerManager mockContainerManager =
-        mock(ReconContainerManager.class);
+    ContainerManagerV2 mockContainerManager =
+        mock(ContainerManagerV2.class);
 
     when(mockContainerManager.getContainer(Mockito.any(ContainerID.class)))
         .thenReturn(

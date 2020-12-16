@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.container;
 
 import java.io.IOException;
 import java.lang.reflect.Proxy;
+import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.NavigableSet;
@@ -33,12 +34,12 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.states.ContainerState;
 import org.apache.hadoop.hdds.scm.container.states.ContainerStateMap;
+import org.apache.hadoop.hdds.scm.ha.CheckedConsumer;
+import org.apache.hadoop.hdds.scm.ha.ExecutionUtil;
 import org.apache.hadoop.hdds.scm.ha.SCMHAInvocationHandler;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -114,6 +115,8 @@ public final class ContainerStateManagerImpl
    */
   private final ConcurrentHashMap<ContainerState, ContainerID> lastUsedMap;
 
+  private final Map<LifeCycleEvent, CheckedConsumer<ContainerInfo, IOException>>
+      containerStateChangeActions;
   /**
    * constructs ContainerStateManagerImpl instance and loads the containers
    * form the persistent storage.
@@ -133,6 +136,7 @@ public final class ContainerStateManagerImpl
     this.containerSize = getConfiguredContainerSize(conf);
     this.containers = new ContainerStateMap();
     this.lastUsedMap = new ConcurrentHashMap<>();
+    this.containerStateChangeActions = getContainerStateChangeActions();
 
     initialize();
   }
@@ -231,6 +235,15 @@ public final class ContainerStateManagerImpl
     }
   }
 
+  private Map<LifeCycleEvent, CheckedConsumer<ContainerInfo, IOException>>
+      getContainerStateChangeActions() {
+    final Map<LifeCycleEvent, CheckedConsumer<ContainerInfo, IOException>>
+        actions = new EnumMap<>(LifeCycleEvent.class);
+    actions.put(FINALIZE, info -> pipelineManager
+        .removeContainerFromPipeline(info.getPipelineID(), info.containerID()));
+    return actions;
+  }
+
   @Override
   public Set<ContainerID> getContainerIDs() {
     return containers.getAllContainerIDs();
@@ -261,15 +274,14 @@ public final class ContainerStateManagerImpl
     final PipelineID pipelineID = container.getPipelineID();
 
     if (!containers.contains(containerID)) {
-      containerStore.put(containerID, container);
-      try {
+      ExecutionUtil.create(() -> {
+        containerStore.put(containerID, container);
         containers.addContainer(container);
         pipelineManager.addContainerToPipeline(pipelineID, containerID);
-      } catch (Exception ex) {
+      }).onException(() -> {
         containers.removeContainer(containerID);
         containerStore.delete(containerID);
-        throw ex;
-      }
+      }).execute();
     }
   }
 
@@ -285,12 +297,20 @@ public final class ContainerStateManagerImpl
     // TODO: Remove the protobuf conversion after fixing ContainerStateMap.
     final ContainerID id = ContainerID.getFromProtobuf(containerID);
     if (containers.contains(id)) {
-      final ContainerInfo info = containers.getContainerInfo(id);
-      final LifeCycleState oldState = info.getState();
+      final ContainerInfo oldInfo = containers.getContainerInfo(id);
+      final LifeCycleState oldState = oldInfo.getState();
       final LifeCycleState newState = stateMachine.getNextState(
-          info.getState(), event);
+          oldInfo.getState(), event);
       if (newState.getNumber() > oldState.getNumber()) {
-        containers.updateState(id, info.getState(), newState);
+        ExecutionUtil.create(() -> {
+          containers.updateState(id, oldState, newState);
+          containerStore.put(id, containers.getContainerInfo(id));
+        }).onException(() -> {
+          containerStore.put(id, oldInfo);
+          containers.updateState(id, newState, oldState);
+        }).execute();
+        containerStateChangeActions.getOrDefault(event, info -> {})
+            .execute(oldInfo);
       }
     }
   }
@@ -318,29 +338,91 @@ public final class ContainerStateManagerImpl
 
   }
 
-  void updateDeleteTransactionId(
-      final Map<ContainerID, Long> deleteTransactionMap) {
-    throw new UnsupportedOperationException("Not yet implemented!");
+  @Override
+  public void updateDeleteTransactionId(
+      final Map<ContainerID, Long> deleteTransactionMap) throws IOException {
+    // TODO: Refactor this. Error handling is not done.
+    for (Map.Entry<ContainerID, Long> transaction :
+        deleteTransactionMap.entrySet()) {
+      final ContainerInfo info = containers.getContainerInfo(
+          transaction.getKey());
+      info.updateDeleteTransactionId(transaction.getValue());
+      containerStore.put(info.containerID(), info);
+    }
   }
 
-  ContainerInfo getMatchingContainer(final long size, String owner,
+  public ContainerInfo getMatchingContainer(final long size, String owner,
       PipelineID pipelineID, NavigableSet<ContainerID> containerIDs) {
-    throw new UnsupportedOperationException("Not yet implemented!");
+    if (containerIDs.isEmpty()) {
+      return null;
+    }
+
+    // Get the last used container and find container above the last used
+    // container ID.
+    final ContainerState key = new ContainerState(owner, pipelineID);
+    final ContainerID lastID =
+        lastUsedMap.getOrDefault(key, containerIDs.first());
+
+    // There is a small issue here. The first time, we will skip the first
+    // container. But in most cases it will not matter.
+    NavigableSet<ContainerID> resultSet = containerIDs.tailSet(lastID, false);
+    if (resultSet.isEmpty()) {
+      resultSet = containerIDs;
+    }
+
+    ContainerInfo selectedContainer = findContainerWithSpace(size, resultSet);
+    if (selectedContainer == null) {
+
+      // If we did not find any space in the tailSet, we need to look for
+      // space in the headset, we need to pass true to deal with the
+      // situation that we have a lone container that has space. That is we
+      // ignored the last used container under the assumption we can find
+      // other containers with space, but if have a single container that is
+      // not true. Hence we need to include the last used container as the
+      // last element in the sorted set.
+
+      resultSet = containerIDs.headSet(lastID, true);
+      selectedContainer = findContainerWithSpace(size, resultSet);
+    }
+
+    // TODO: cleanup entries in lastUsedMap
+    if (selectedContainer != null) {
+      lastUsedMap.put(key, selectedContainer.containerID());
+    }
+    return selectedContainer;
   }
 
-  NavigableSet<ContainerID> getMatchingContainerIDs(final String owner,
-      final ReplicationType type, final ReplicationFactor factor,
-      final LifeCycleState state) {
-    throw new UnsupportedOperationException("Not yet implemented!");
+  private ContainerInfo findContainerWithSpace(final long size,
+      final NavigableSet<ContainerID> searchSet) {
+    // Get the container with space to meet our request.
+    for (ContainerID id : searchSet) {
+      final ContainerInfo containerInfo = containers.getContainerInfo(id);
+      if (containerInfo.getUsedBytes() + size <= this.containerSize) {
+        containerInfo.updateLastUsedTime();
+        return containerInfo;
+      }
+    }
+    return null;
   }
 
-  public void removeContainer(final HddsProtos.ContainerID id) {
-    containers.removeContainer(ContainerID.getFromProtobuf(id));
+
+  public void removeContainer(final HddsProtos.ContainerID id)
+      throws IOException {
+    final ContainerID cid = ContainerID.getFromProtobuf(id);
+    final ContainerInfo containerInfo = containers.getContainerInfo(cid);
+    ExecutionUtil.create(() -> {
+      containerStore.delete(cid);
+      containers.removeContainer(cid);
+    }).onException(() -> containerStore.put(cid, containerInfo)).execute();
   }
 
   @Override
-  public void close() throws Exception {
-    containerStore.close();
+  public void close() throws IOException {
+    try {
+      containerStore.close();
+    } catch (Exception e) {
+      throw new IOException(e);
+    }
   }
 
   public static Builder newBuilder() {
