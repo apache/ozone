@@ -28,6 +28,10 @@ start_docker_env
 
 execute_robot_test scm basic/ozone-shell-single.robot
 
+# prepare test should be the last test to run, until a cancel prepare test is
+# added. (TODO)
+execute_robot_test scm omha/om-prepare.robot
+
 stop_docker_env
 
 generate_report
