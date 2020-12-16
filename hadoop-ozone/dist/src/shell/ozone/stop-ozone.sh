@@ -53,7 +53,7 @@ echo "Stopping datanodes"
 
 ozone_uservar_su ozone datanode "${OZONE_HOME}/bin/ozone" \
   --workers \
-  --config "${OZONE_CONFIG_DIR}" \
+  --config "${OZONE_CONF_DIR}" \
   --daemon stop \
   datanode
 
@@ -67,7 +67,7 @@ fi
 
 ozone_uservar_su hdfs om "${OZONE_HOME}/bin/ozone" \
   --workers \
-  --config "${OZONE_CONFIG_DIR}" \
+  --config "${OZONE_CONF_DIR}" \
   --hostnames "${OM_NODES}" \
   --daemon stop \
   om
@@ -78,7 +78,7 @@ SCM_NODES=$("${OZONE_HOME}/bin/ozone" getconf storagecontainermanagers 2>/dev/nu
 echo "Stopping storage container manager nodes [${SCM_NODES}]"
 ozone_uservar_su hdfs scm "${OZONE_HOME}/bin/ozone" \
   --workers \
-  --config "${OZONE_CONFIG_DIR}" \
+  --config "${OZONE_CONF_DIR}" \
   --hostnames "${SCM_NODES}" \
   --daemon stop \
   scm

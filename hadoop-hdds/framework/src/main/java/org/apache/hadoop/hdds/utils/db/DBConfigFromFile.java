@@ -49,7 +49,7 @@ public final class DBConfigFromFile {
   private static final Logger LOG =
       LoggerFactory.getLogger(DBConfigFromFile.class);
 
-  public static final String CONFIG_DIR = "OZONE_CONFIG_DIR";
+  public static final String CONFIG_DIR = "OZONE_CONF_DIR";
 
   private DBConfigFromFile() {
   }

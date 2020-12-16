@@ -72,8 +72,8 @@ function ozonecmd_case
   subcmd=$1
   shift
 
-  ozone_default_log4j="${OZONE_CONFIG_DIR}/log4j.properties"
-  ozone_shell_log4j="${OZONE_CONFIG_DIR}/ozone-shell-log4j.properties"
+  ozone_default_log4j="${OZONE_CONF_DIR}/log4j.properties"
+  ozone_shell_log4j="${OZONE_CONF_DIR}/ozone-shell-log4j.properties"
   if [ ! -f "${ozone_shell_log4j}" ]; then
     ozone_shell_log4j=${ozone_default_log4j}
   fi
@@ -108,7 +108,7 @@ function ozonecmd_case
       # TODO: Fix the problem related to netty resource leak detector throwing
       # exception as mentioned in HDDS-3812
       ozone_deprecate_envvar HDDS_DN_OPTS OZONE_DATANODE_OPTS
-      OZONE_DATANODE_OPTS="-Dorg.apache.ratis.thirdparty.io.netty.allocator.useCacheForAllThreads=false -Dorg.apache.ratis.thirdparty.io.netty.leakDetection.level=disabled -Dlog4j.configurationFile=${OZONE_CONFIG_DIR}/dn-audit-log4j2.properties ${OZONE_DATANODE_OPTS}"
+      OZONE_DATANODE_OPTS="-Dorg.apache.ratis.thirdparty.io.netty.allocator.useCacheForAllThreads=false -Dorg.apache.ratis.thirdparty.io.netty.leakDetection.level=disabled -Dlog4j.configurationFile=${OZONE_CONF_DIR}/dn-audit-log4j2.properties ${OZONE_DATANODE_OPTS}"
       OZONE_DATANODE_OPTS="-Dlog4j2.contextSelector=org.apache.logging.log4j.core.async.AsyncLoggerContextSelector ${OZONE_DATANODE_OPTS}"
       OZONE_CLASSNAME=org.apache.hadoop.ozone.HddsDatanodeService
       OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-datanode"
@@ -116,7 +116,7 @@ function ozonecmd_case
     envvars)
       echo "JAVA_HOME='${JAVA_HOME}'"
       echo "OZONE_HOME='${OZONE_HOME}'"
-      echo "OZONE_CONFIG_DIR='${OZONE_CONFIG_DIR}'"
+      echo "OZONE_CONF_DIR='${OZONE_CONF_DIR}'"
       echo "OZONE_LIBEXEC_DIR='${OZONE_LIBEXEC_DIR}'"
       echo "HDDS_LIB_JARS_DIR='${HDDS_LIB_JARS_DIR}'"
       if [[ -n "${QATESTMODE}" ]]; then
@@ -155,7 +155,7 @@ function ozonecmd_case
       OZONE_SUBCMD_SUPPORTDAEMONIZATION="true"
       OZONE_CLASSNAME=org.apache.hadoop.ozone.om.OzoneManagerStarter
       ozone_deprecate_envvar HDFS_OM_OPTS OZONE_OM_OPTS
-      OZONE_OM_OPTS="${OZONE_OM_OPTS} -Dlog4j.configurationFile=${OZONE_CONFIG_DIR}/om-audit-log4j2.properties"
+      OZONE_OM_OPTS="${OZONE_OM_OPTS} -Dlog4j.configurationFile=${OZONE_CONF_DIR}/om-audit-log4j2.properties"
       OZONE_OM_OPTS="-Dlog4j2.contextSelector=org.apache.logging.log4j.core.async.AsyncLoggerContextSelector ${OZONE_OM_OPTS}"
       OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-ozone-manager"
     ;;
@@ -174,7 +174,7 @@ function ozonecmd_case
       OZONE_SUBCMD_SUPPORTDAEMONIZATION="true"
       OZONE_CLASSNAME='org.apache.hadoop.hdds.scm.server.StorageContainerManagerStarter'
       ozone_deprecate_envvar HDFS_STORAGECONTAINERMANAGER_OPTS OZONE_SCM_OPTS
-      OZONE_SCM_OPTS="${OZONE_SCM_OPTS} -Dlog4j.configurationFile=${OZONE_CONFIG_DIR}/scm-audit-log4j2.properties"
+      OZONE_SCM_OPTS="${OZONE_SCM_OPTS} -Dlog4j.configurationFile=${OZONE_CONF_DIR}/scm-audit-log4j2.properties"
       OZONE_SCM_OPTS="-Dlog4j2.contextSelector=org.apache.logging.log4j.core.async.AsyncLoggerContextSelector ${OZONE_SCM_OPTS}"
       OZONE_RUN_ARTIFACT_NAME="hadoop-hdds-server-scm"
     ;;

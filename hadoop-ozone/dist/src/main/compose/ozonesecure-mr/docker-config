@@ -141,7 +141,7 @@ KERBEROS_ENABLED=true
 
 HADOOP_CLASSPATH=/opt/ozone/share/ozone/lib/hadoop-ozone-filesystem-hadoop3-@project.version@.jar
 OZONE_CLASSPATH=
-OZONE_CONFIG_DIR=/etc/hadoop
+OZONE_CONF_DIR=/etc/hadoop
 OZONE_LOG_DIR=/var/log/hadoop
 
 no_proxy=om,scm,s3g,recon,kdc,localhost,127.0.0.1

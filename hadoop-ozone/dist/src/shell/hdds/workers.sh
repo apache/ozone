@@ -21,8 +21,8 @@
 # Environment Variables
 #
 #   OZONE_WORKERS    File naming remote hosts.
-#     Default is ${OZONE_CONFIG_DIR}/workers.
-#   OZONE_CONFIG_DIR  Alternate conf dir. Default is ${OZONE_HOME}/conf.
+#     Default is ${OZONE_CONF_DIR}/workers.
+#   OZONE_CONF_DIR  Alternate conf dir. Default is ${OZONE_HOME}/conf.
 #   OZONE_WORKER_SLEEP Seconds to sleep between spawning remote commands.
 #   OZONE_SSH_OPTS Options passed to ssh when running remote commands.
 ##

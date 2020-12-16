@@ -624,27 +624,27 @@ function ozone_bootstrap
 ## @replaceable  no
 function ozone_find_confdir
 {
-  ozone_deprecate_envvar HADOOP_CONF_DIR OZONE_CONFIG_DIR
+  ozone_deprecate_envvar HADOOP_CONF_DIR OZONE_CONF_DIR
 
   local conf_dir=etc/hadoop
 
-  if [[ -n "${OZONE_CONFIG_DIR}" ]] && ozone_verify_confdir "${OZONE_CONFIG_DIR}"; then
+  if [[ -n "${OZONE_CONF_DIR}" ]] && ozone_verify_confdir "${OZONE_CONF_DIR}"; then
     : # OK
   elif [[ -n "${OZONE_HOME}" ]] && ozone_verify_confdir "${OZONE_HOME}/${conf_dir}"; then
-    OZONE_CONFIG_DIR="${OZONE_HOME}/${conf_dir}"
+    OZONE_CONF_DIR="${OZONE_HOME}/${conf_dir}"
   elif [[ -n "${OZONE_LIBEXEC_DIR}" ]] && ozone_verify_confdir "${OZONE_LIBEXEC_DIR}/../${conf_dir}"; then
-    OZONE_CONFIG_DIR=$(ozone_abs "${OZONE_LIBEXEC_DIR}/../${conf_dir}")
+    OZONE_CONF_DIR=$(ozone_abs "${OZONE_LIBEXEC_DIR}/../${conf_dir}")
   else
-    OZONE_CONFIG_DIR="${OZONE_HOME}/${conf_dir}" # not verified yet
-    ozone_error "WARNING: OZONE_CONFIG_DIR not defined and cannot be found, setting in OZONE_HOME: ${OZONE_CONFIG_DIR}."
+    OZONE_CONF_DIR="${OZONE_HOME}/${conf_dir}" # not verified yet
+    ozone_error "WARNING: OZONE_CONF_DIR not defined and cannot be found, setting in OZONE_HOME: ${OZONE_CONF_DIR}."
   fi
 
-  export OZONE_CONFIG_DIR
-  ozone_using_envvar OZONE_CONFIG_DIR
-  ozone_set_deprecated_var HADOOP_CONF_DIR OZONE_CONFIG_DIR
+  export OZONE_CONF_DIR
+  ozone_using_envvar OZONE_CONF_DIR
+  ozone_set_deprecated_var HADOOP_CONF_DIR OZONE_CONF_DIR
 }
 
-## @description  Validate ${OZONE_CONFIG_DIR}
+## @description  Validate ${OZONE_CONF_DIR}
 ## @audience     public
 ## @stability    stable
 ## @replaceable  yes
@@ -653,7 +653,7 @@ function ozone_verify_confdir
 {
   # Check only log4j.properties by default.
   # --loglevel does not work without logger settings in log4j.properties.
-  [[ -f "${OZONE_CONFIG_DIR}/log4j.properties" ]]
+  [[ -f "${OZONE_CONF_DIR}/log4j.properties" ]]
 }
 
 ## @description  Import the ozone-env.sh settings
@@ -663,10 +663,10 @@ function ozone_verify_confdir
 function ozone_exec_ozoneenv
 {
   if [[ -z "${OZONE_ENV_PROCESSED}" ]]; then
-    if [[ -f "${OZONE_CONFIG_DIR}/ozone-env.sh" ]]; then
+    if [[ -f "${OZONE_CONF_DIR}/ozone-env.sh" ]]; then
       export OZONE_ENV_PROCESSED=true
       # shellcheck source=./hadoop-hdds/common/src/main/conf/ozone-env.sh
-      . "${OZONE_CONFIG_DIR}/ozone-env.sh"
+      . "${OZONE_CONF_DIR}/ozone-env.sh"
     fi
   fi
 }
@@ -677,9 +677,9 @@ function ozone_exec_ozoneenv
 ## @replaceable  no
 function ozone_exec_userfuncs
 {
-  if [[ -e "${OZONE_CONFIG_DIR}/ozone-user-functions.sh" ]]; then
+  if [[ -e "${OZONE_CONF_DIR}/ozone-user-functions.sh" ]]; then
     # shellcheck disable=SC1090
-    . "${OZONE_CONFIG_DIR}/ozone-user-functions.sh"
+    . "${OZONE_CONF_DIR}/ozone-user-functions.sh"
   fi
 }
 
@@ -729,8 +729,8 @@ function ozone_import_shellprofiles
     ozone_error "WARNING: ${OZONE_LIBEXEC_DIR}/shellprofile.d doesn't exist. Functionality may not work."
   fi
 
-  if [[ -d "${OZONE_CONFIG_DIR}/shellprofile.d" ]]; then
-    files2=(${OZONE_CONFIG_DIR}/shellprofile.d/*.sh)
+  if [[ -d "${OZONE_CONF_DIR}/shellprofile.d" ]]; then
+    files2=(${OZONE_CONF_DIR}/shellprofile.d/*.sh)
   fi
 
   for i in "${files1[@]}" "${files2[@]}"
@@ -875,8 +875,8 @@ function ozone_populate_workers_file
   shift
   if [[ -f "${workersfile}" ]]; then
     OZONE_WORKERS="${workersfile}"
-  elif [[ -f "${OZONE_CONFIG_DIR}/${workersfile}" ]]; then
-    OZONE_WORKERS="${OZONE_CONFIG_DIR}/${workersfile}"
+  elif [[ -f "${OZONE_CONF_DIR}/${workersfile}" ]]; then
+    OZONE_WORKERS="${OZONE_CONF_DIR}/${workersfile}"
   else
     ozone_error "ERROR: Cannot find hosts file \"${workersfile}\""
     ozone_exit_with_usage 1
@@ -960,8 +960,8 @@ function ozone_connect_to_hosts
   elif [[ -z "${OZONE_WORKER_NAMES}" ]]; then
     if [[ -n "${OZONE_WORKERS}" ]]; then
       worker_file=${OZONE_WORKERS}
-    elif [[ -f "${OZONE_CONFIG_DIR}/workers" ]]; then
-      worker_file=${OZONE_CONFIG_DIR}/workers
+    elif [[ -f "${OZONE_CONF_DIR}/workers" ]]; then
+      worker_file=${OZONE_CONF_DIR}/workers
     fi
   fi
 
@@ -1489,7 +1489,7 @@ function ozone_finalize_opts
 ## @replaceable  yes
 function ozone_finalize_classpath
 {
-  ozone_add_classpath "${OZONE_CONFIG_DIR}" before
+  ozone_add_classpath "${OZONE_CONF_DIR}" before
 
   # user classpath gets added at the last minute. this allows
   # override of CONF dirs and more
@@ -1513,7 +1513,7 @@ function ozone_finalize
   ozone_finalize_opts
 
   ozone_translate_cygwin_path OZONE_HOME
-  ozone_translate_cygwin_path OZONE_CONFIG_DIR
+  ozone_translate_cygwin_path OZONE_CONF_DIR
 }
 
 ## @description  Print usage information and exit with the passed
@@ -2470,7 +2470,7 @@ function ozone_parse_args
         shift
         ((OZONE_PARSE_COUNTER=OZONE_PARSE_COUNTER+2))
         if [[ -d "${confdir}" ]]; then
-          OZONE_CONFIG_DIR="${confdir}"
+          OZONE_CONF_DIR="${confdir}"
         elif [[ -z "${confdir}" ]]; then
           ozone_error "ERROR: No parameter provided for --config "
           ozone_exit_with_usage 1

@@ -21,8 +21,8 @@
 function ozone_subproject_init
 {
   if [[ -z "${OZONE_ENV_PROCESSED}" ]]; then
-    if [[ -e "${OZONE_CONFIG_DIR}/ozone-env.sh" ]]; then
-      . "${OZONE_CONFIG_DIR}/ozone-env.sh"
+    if [[ -e "${OZONE_CONF_DIR}/ozone-env.sh" ]]; then
+      . "${OZONE_CONF_DIR}/ozone-env.sh"
       export OZONE_ENV_PROCESSED=true
     fi
   fi

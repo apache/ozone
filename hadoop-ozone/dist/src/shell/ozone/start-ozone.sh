@@ -75,7 +75,7 @@ SECURITY_AUTHORIZATION_ENABLED=$("${OZONE_HOME}/bin/ozone" getconf -confKey hado
 echo "Starting datanodes"
 ozone_uservar_su hdfs datanode "${OZONE_HOME}/bin/ozone" \
     --workers \
-    --config "${OZONE_CONFIG_DIR}" \
+    --config "${OZONE_CONF_DIR}" \
     --daemon start \
     datanode ${dataStartOpt}
 OZONE_JUMBO_RETCOUNTER=$?
@@ -90,7 +90,7 @@ fi
 
 ozone_uservar_su hdfs om "${OZONE_HOME}/bin/ozone" \
   --workers \
-  --config "${OZONE_CONFIG_DIR}" \
+  --config "${OZONE_CONF_DIR}" \
   --hostnames "${OM_NODES}" \
   --daemon start \
   om
@@ -102,7 +102,7 @@ SCM_NODES=$("${OZONE_HOME}/bin/ozone" getconf -storagecontainermanagers 2>/dev/n
 echo "Starting storage container manager nodes [${SCM_NODES}]"
 ozone_uservar_su hdfs scm "${OZONE_HOME}/bin/ozone" \
   --workers \
-  --config "${OZONE_CONFIG_DIR}" \
+  --config "${OZONE_CONF_DIR}" \
   --hostnames "${SCM_NODES}" \
   --daemon start \
   scm

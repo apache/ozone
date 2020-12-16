@@ -55,7 +55,7 @@ ulimit -c unlimited
 # /etc/profile.d or equivalent.  Some options (such as
 # --config) may react strangely otherwise.
 #
-# export OZONE_CONFIG_DIR=${OZONE_HOME}/etc/hadoop
+# export OZONE_CONF_DIR=${OZONE_HOME}/etc/hadoop
 
 # The maximum amount of heap to use (Java -Xmx).  If no unit
 # is provided, it will be converted to MB.  Daemons will
@@ -137,7 +137,7 @@ export OZONE_OS_TYPE=${OZONE_OS_TYPE:-$(uname -s)}
 
 # Filename which contains all of the hosts for any remote execution
 # helper scripts # such as workers.sh, start-ozone.sh, etc.
-# export OZONE_WORKERS="${OZONE_CONFIG_DIR}/workers"
+# export OZONE_WORKERS="${OZONE_CONF_DIR}/workers"
 
 ###
 # Options for all daemons
