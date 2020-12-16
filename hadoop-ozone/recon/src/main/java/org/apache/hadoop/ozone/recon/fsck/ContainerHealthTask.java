@@ -25,7 +25,7 @@ import java.util.Set;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.ozone.recon.persistence.ContainerSchemaManager;
@@ -49,14 +49,14 @@ public class ContainerHealthTask extends ReconScmTask {
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerHealthTask.class);
 
-  private ContainerManager containerManager;
+  private ContainerManagerV2 containerManager;
   private ContainerSchemaManager containerSchemaManager;
   private PlacementPolicy placementPolicy;
   private final long interval;
   private Set<ContainerInfo> processedContainers = new HashSet<>();
 
   public ContainerHealthTask(
-      ContainerManager containerManager,
+      ContainerManagerV2 containerManager,
       ReconTaskStatusDao reconTaskStatusDao,
       ContainerSchemaManager containerSchemaManager,
       PlacementPolicy placementPolicy,

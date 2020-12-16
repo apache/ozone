@@ -53,13 +53,13 @@ public class TestReconContainerManager
     ContainerInfo containerInfo = containerWithPipeline.getContainerInfo();
 
     ReconContainerManager containerManager = getContainerManager();
-    assertFalse(containerManager.exists(containerID));
+    assertFalse(containerManager.containerExist(containerID));
     assertFalse(getContainerTable().isExist(containerID));
 
     containerManager.addNewContainer(
         containerID.getId(), containerWithPipeline);
 
-    assertTrue(containerManager.exists(containerID));
+    assertTrue(containerManager.containerExist(containerID));
 
     List<ContainerInfo> containers =
         containerManager.getContainers(LifeCycleState.OPEN);
@@ -83,13 +83,13 @@ public class TestReconContainerManager
     ContainerInfo containerInfo = containerWithPipeline.getContainerInfo();
 
     ReconContainerManager containerManager = getContainerManager();
-    assertFalse(containerManager.exists(containerID));
+    assertFalse(containerManager.containerExist(containerID));
     assertFalse(getContainerTable().isExist(containerID));
 
     containerManager.addNewContainer(
         containerID.getId(), containerWithPipeline);
 
-    assertTrue(containerManager.exists(containerID));
+    assertTrue(containerManager.containerExist(containerID));
 
     List<ContainerInfo> containers = containerManager.getContainers(CLOSED);
     assertEquals(1, containers.size());
@@ -102,16 +102,16 @@ public class TestReconContainerManager
   public void testCheckAndAddNewContainer() throws IOException {
     ContainerID containerID = ContainerID.valueOf(100L);
     ReconContainerManager containerManager = getContainerManager();
-    assertFalse(containerManager.exists(containerID));
+    assertFalse(containerManager.containerExist(containerID));
     DatanodeDetails datanodeDetails = randomDatanodeDetails();
     containerManager.checkAndAddNewContainer(containerID,
         OPEN, datanodeDetails);
-    assertTrue(containerManager.exists(containerID));
+    assertTrue(containerManager.containerExist(containerID));
 
     // Doing it one more time should not change any state.
     containerManager.checkAndAddNewContainer(containerID, OPEN,
         datanodeDetails);
-    assertTrue(containerManager.exists(containerID));
+    assertTrue(containerManager.containerExist(containerID));
     assertEquals(LifeCycleState.OPEN,
         getContainerManager().getContainer(containerID).getState());
   }

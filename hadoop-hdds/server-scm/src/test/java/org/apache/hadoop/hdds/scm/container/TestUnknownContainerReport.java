@@ -51,7 +51,7 @@ import org.mockito.Mockito;
 public class TestUnknownContainerReport {
 
   private NodeManager nodeManager;
-  private ContainerManager containerManager;
+  private ContainerManagerV2 containerManager;
   private ContainerStateManager containerStateManager;
   private EventPublisher publisher;
 
@@ -59,7 +59,7 @@ public class TestUnknownContainerReport {
   public void setup() throws IOException {
     final ConfigurationSource conf = new OzoneConfiguration();
     this.nodeManager = new MockNodeManager(true, 10);
-    this.containerManager = Mockito.mock(ContainerManager.class);
+    this.containerManager = Mockito.mock(ContainerManagerV2.class);
     this.containerStateManager = new ContainerStateManager(conf);
     this.publisher = Mockito.mock(EventPublisher.class);
 

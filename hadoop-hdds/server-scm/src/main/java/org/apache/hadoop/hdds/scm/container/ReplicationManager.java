@@ -54,6 +54,7 @@ import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.lock.LockManager;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
@@ -88,7 +89,7 @@ public class ReplicationManager
   /**
    * Reference to the ContainerManager.
    */
-  private final ContainerManager containerManager;
+  private final ContainerManagerV2 containerManager;
 
   /**
    * PlacementPolicy which is used to identify where a container
@@ -149,7 +150,7 @@ public class ReplicationManager
    * @param eventPublisher EventPublisher
    */
   public ReplicationManager(final ReplicationManagerConfiguration conf,
-                            final ContainerManager containerManager,
+                            final ContainerManagerV2 containerManager,
                             final PlacementPolicy containerPlacement,
                             final EventPublisher eventPublisher,
                             final LockManager<ContainerID> lockManager,
@@ -235,13 +236,13 @@ public class ReplicationManager
     try {
       while (running) {
         final long start = Time.monotonicNow();
-        final Set<ContainerID> containerIds =
-            containerManager.getContainerIDs();
-        containerIds.forEach(this::processContainer);
+        final List<ContainerInfo> containers =
+            containerManager.getContainers();
+        containers.forEach(this::processContainer);
 
         LOG.info("Replication Monitor Thread took {} milliseconds for" +
                 " processing {} containers.", Time.monotonicNow() - start,
-            containerIds.size());
+            containers.size());
 
         wait(conf.getInterval());
       }
@@ -255,12 +256,12 @@ public class ReplicationManager
   /**
    * Process the given container.
    *
-   * @param id ContainerID
+   * @param container ContainerInfo
    */
-  private void processContainer(ContainerID id) {
+  private void processContainer(ContainerInfo container) {
+    final ContainerID id = container.containerID();
     lockManager.lock(id);
     try {
-      final ContainerInfo container = containerManager.getContainer(id);
       final Set<ContainerReplica> replicas = containerManager
           .getContainerReplicas(container.containerID());
       final LifeCycleState state = container.getState();
@@ -508,7 +509,8 @@ public class ReplicationManager
    * @param replicas Set of ContainerReplicas
    */
   private void deleteContainerReplicas(final ContainerInfo container,
-      final Set<ContainerReplica> replicas) throws IOException {
+      final Set<ContainerReplica> replicas) throws IOException,
+      InvalidStateTransitionException {
     Preconditions.assertTrue(container.getState() ==
         LifeCycleState.CLOSED);
     Preconditions.assertTrue(container.getNumberOfKeys() == 0);
@@ -532,7 +534,8 @@ public class ReplicationManager
    * @param replicas Set of ContainerReplicas
    */
   private void handleContainerUnderDelete(final ContainerInfo container,
-      final Set<ContainerReplica> replicas) throws IOException {
+      final Set<ContainerReplica> replicas) throws IOException,
+      InvalidStateTransitionException {
     if (replicas.size() == 0) {
       containerManager.updateContainerState(container.containerID(),
           HddsProtos.LifeCycleEvent.CLEANUP);

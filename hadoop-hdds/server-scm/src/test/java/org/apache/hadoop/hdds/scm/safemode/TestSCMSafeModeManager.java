@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
@@ -731,9 +732,21 @@ public class TestSCMSafeModeManager {
 
     // Create a pipeline and ensure safemode is exited.
     pipelineManager.allowPipelineCreation();
-    Pipeline pipeline = pipelineManager.createPipeline(
-        HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.THREE);
+
+    /* There is a race condition where the background pipeline creation
+     * task creates the pipeline before the following create call.
+     * So wrapping it with try..catch.
+     */
+    Pipeline pipeline;
+    try {
+      pipeline = pipelineManager.createPipeline(
+          HddsProtos.ReplicationType.RATIS,
+          HddsProtos.ReplicationFactor.THREE);
+    } catch (SCMException ex) {
+      pipeline = pipelineManager.getPipelines(
+          HddsProtos.ReplicationType.RATIS,
+          HddsProtos.ReplicationFactor.THREE).get(0);
+    }
 
     // Mark pipeline healthy
     pipeline = pipelineManager.getPipeline(pipeline.getId());

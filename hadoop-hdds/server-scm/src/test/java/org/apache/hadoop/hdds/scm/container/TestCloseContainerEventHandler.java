@@ -57,7 +57,7 @@ public class TestCloseContainerEventHandler {
   private static OzoneConfiguration configuration;
   private static MockNodeManager nodeManager;
   private static PipelineManagerV2Impl pipelineManager;
-  private static SCMContainerManager containerManager;
+  private static ContainerManagerV2 containerManager;
   private static long size;
   private static File testDir;
   private static EventQueue eventQueue;
@@ -91,11 +91,10 @@ public class TestCloseContainerEventHandler {
             pipelineManager.getStateManager(), configuration, eventQueue);
     pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
         mockRatisProvider);
-    containerManager = new SCMContainerManager(
-            configuration,
-            scmMetadataStore.getContainerTable(),
-            scmMetadataStore.getStore(),
-            pipelineManager);
+    containerManager = new ContainerManagerImpl(configuration,
+        MockSCMHAManager.getInstance(true),
+        pipelineManager,
+        scmMetadataStore.getContainerTable());
     pipelineManager.triggerPipelineCreation();
     eventQueue.addHandler(CLOSE_CONTAINER,
         new CloseContainerEventHandler(

@@ -23,7 +23,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -146,7 +146,7 @@ public class TestSCMMXBean {
     verifyEquals(data, containerStateCount);
 
     // Do some changes like allocate containers and change the container states
-    ContainerManager scmContainerManager = scm.getContainerManager();
+    ContainerManagerV2 scmContainerManager = scm.getContainerManager();
 
     List<ContainerInfo> containerInfoList = new ArrayList<>();
     for (int i=0; i < 10; i++) {

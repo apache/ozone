@@ -18,6 +18,7 @@ package org.apache.hadoop.hdds.scm.block;
 
 import java.io.IOException;
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -28,7 +29,8 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.ScmConfig;
-import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -59,14 +61,14 @@ public class SCMBlockDeletingService extends BackgroundService {
 
   private final static int BLOCK_DELETING_SERVICE_CORE_POOL_SIZE = 1;
   private final DeletedBlockLog deletedBlockLog;
-  private final ContainerManager containerManager;
+  private final ContainerManagerV2 containerManager;
   private final NodeManager nodeManager;
   private final EventPublisher eventPublisher;
 
   private int blockDeleteLimitSize;
 
   public SCMBlockDeletingService(DeletedBlockLog deletedBlockLog,
-      ContainerManager containerManager, NodeManager nodeManager,
+      ContainerManagerV2 containerManager, NodeManager nodeManager,
       EventPublisher eventPublisher, Duration interval, long serviceTimeout,
       ConfigurationSource conf) {
     super("SCMBlockDeletingService", interval.toMillis(), TimeUnit.MILLISECONDS,
@@ -154,8 +156,12 @@ public class SCMBlockDeletingService extends BackgroundService {
               }
             }
           }
-
-          containerManager.updateDeleteTransactionId(containerIdToMaxTxnId);
+          // TODO: Fix ME!!!
+          Map<ContainerID, Long> transactionMap = new HashMap<>();
+          for (Map.Entry<Long, Long> tx : containerIdToMaxTxnId.entrySet()) {
+            transactionMap.put(ContainerID.valueOf(tx.getKey()), tx.getValue());
+          }
+          containerManager.updateDeleteTransactionId(transactionMap);
           LOG.info("Totally added {} blocks to be deleted for"
                   + " {} datanodes, task elapsed time: {}ms",
               transactions.getBlocksDeleted(),

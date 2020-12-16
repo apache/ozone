@@ -333,13 +333,9 @@ public class SCMClientProtocolServer implements
     auditMap.put("startContainerID", String.valueOf(startContainerID));
     auditMap.put("count", String.valueOf(count));
     try {
-      // To allow startcontainerId to take the value "0",
-      // "null" is assigned, so that its handled in the
-      // scm.getContainerManager().listContainer method
-      final ContainerID containerId = startContainerID != 0 ? ContainerID
-          .valueOf(startContainerID) : null;
+      final ContainerID containerId = ContainerID.valueOf(startContainerID);
       return scm.getContainerManager().
-          listContainer(containerId, count);
+          getContainers(containerId, count);
     } catch (Exception ex) {
       auditSuccess = false;
       AUDIT.logReadFailure(
