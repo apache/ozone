@@ -59,3 +59,5 @@ In October 2019, the Ozone sources were moved out to the [apache/hadoop-ozone](h
 
 
 In March 2020, [Ozone 0.5.0 was released](https://hadoop.apache.org/ozone/release/0.5.0-beta/), the first release marked as _beta_tag (earlier releases were alpha).
+
+In September/October 2020, Hadoop community decided to move Ozone to a separated, top level Apache project. Apache Ozone is established by the board of the Apache Software Foundation during the October 2020 [board meeting](https://www.apache.org/foundation/records/minutes/2020/board_minutes_2020_10_21.txt).
