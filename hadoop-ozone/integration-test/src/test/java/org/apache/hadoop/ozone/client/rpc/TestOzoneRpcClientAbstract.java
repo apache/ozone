@@ -117,6 +117,7 @@ import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConsts.DEFAULT_OM_UPDATE_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR;
@@ -263,7 +264,7 @@ public abstract class TestOzoneRpcClientAbstract {
         cluster.getOzoneManager().getMetadataManager().getVolumeTable().get(
             omMetadataManager.getVolumeKey(s3VolumeName));
     Assert.assertEquals(objectID, omVolumeArgs.getObjectID());
-    Assert.assertEquals(-1, omVolumeArgs.getUpdateID());
+    Assert.assertEquals(DEFAULT_OM_UPDATE_ID, omVolumeArgs.getUpdateID());
   }
 
   @Test
