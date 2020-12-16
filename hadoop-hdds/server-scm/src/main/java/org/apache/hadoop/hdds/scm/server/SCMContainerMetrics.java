@@ -67,9 +67,9 @@ public class SCMContainerMetrics implements MetricsSource {
   public void getMetrics(MetricsCollector collector, boolean all) {
     Map<String, Integer> stateCount = scmmxBean.getContainerStateCount();
 
-    int TotalContainers = 0;
-    for(HddsProtos.LifeCycleState state : HddsProtos.LifeCycleState.values()){
-      TotalContainers = TotalContainers + stateCount.get(state.toString());
+    int totalContainers = 0;
+    for (HddsProtos.LifeCycleState state : HddsProtos.LifeCycleState.values()) {
+      totalContainers = totalContainers + stateCount.get(state.toString());
     }
 
     collector.addRecord(SOURCE)
@@ -93,6 +93,6 @@ public class SCMContainerMetrics implements MetricsSource {
             stateCount.get(DELETED.toString()))
         .addGauge(Interns.info("TotalContainers",
             "Number of all containers"),
-            TotalContainers);
+            totalContainers);
   }
 }
