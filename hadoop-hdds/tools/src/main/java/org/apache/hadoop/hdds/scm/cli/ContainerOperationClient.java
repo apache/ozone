@@ -528,5 +528,5 @@ public class ContainerOperationClient implements ScmClient {
   public boolean getReplicationManagerStatus() throws IOException {
     return storageContainerLocationClient.getReplicationManagerStatus();
   }
-  
+
 }
