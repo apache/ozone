@@ -39,7 +39,7 @@ import picocli.CommandLine.Spec;
  */
 @Command(
     name = "info",
-    description = "Show detail information of a specific certificate",
+    description = "Show detailed information for a specific certificate",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
 
@@ -69,7 +69,7 @@ class InfoSubcommand extends ScmCertSubcommand {
       X509Certificate cert = CertificateCodec.getX509Cert(certPemStr);
       LOG.info(cert.toString());
     } catch (CertificateException ex) {
-      LOG.error("Fail to get certificate id " + serialId);
+      LOG.error("Failed to get certificate id " + serialId);
       throw new IOException("Fail to get certificate id " + serialId, ex);
     }
   }

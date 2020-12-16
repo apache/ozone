@@ -87,13 +87,13 @@ public class ListSubcommand extends ScmCertSubcommand {
     List<String> certPemList = client.listCertificate(
         parseCertRole(role), startSerialId, count, isRevoked);
     LOG.info("Total {} {} certificates: ", certPemList.size(), type);
-    LOG.info("SerialNumber\t\tValid From\t\tValid To\t\tSubjectDN");
+    LOG.info("SerialNumber\t\tValid From\t\tExpiry\t\tSubject");
     for (String certPemStr : certPemList) {
       try {
         X509Certificate cert = CertificateCodec.getX509Certificate(certPemStr);
         printCert(cert);
       } catch (CertificateException ex) {
-        LOG.error("Fail to parse certificate.");
+        LOG.error("Failed to parse certificate.");
       }
     }
   }
