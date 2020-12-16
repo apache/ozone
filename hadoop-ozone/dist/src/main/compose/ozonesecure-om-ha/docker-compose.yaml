@@ -35,6 +35,8 @@ services:
       - ./docker-config
     environment:
       HADOOP_CONF_DIR: /opt/hadoop/etc/hadoop
+    volumes:
+      - ../../libexec/transformation.py:/opt/transformation.py
     command: ["hadoop", "kms"]
     networks:
       ozone_net:

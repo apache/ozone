@@ -34,6 +34,8 @@ services:
       - 9600:9600
     env_file:
       - ./docker-config
+    volumes:
+      - ../../libexec/transformation.py:/opt/transformation.py
     command: ["hadoop", "kms"]
   datanode:
     image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
@@ -106,6 +108,7 @@ services:
       - ozone
     volumes:
       - ../..:/opt/ozone
+      - ../../libexec/transformation.py:/opt/transformation.py
     ports:
       - 8088:8088
     env_file:
@@ -120,6 +123,7 @@ services:
       - ozone
     volumes:
       - ../..:/opt/ozone
+      - ../../libexec/transformation.py:/opt/transformation.py
     env_file:
       - ./docker-config
     environment:
@@ -134,6 +138,7 @@ services:
       - ozone
     volumes:
       - ../..:/opt/ozone
+      - ../../libexec/transformation.py:/opt/transformation.py
     ports:
       - 8188:8188
     env_file:

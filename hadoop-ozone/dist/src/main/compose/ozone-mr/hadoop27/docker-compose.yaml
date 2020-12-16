@@ -72,6 +72,7 @@ services:
     hostname: rm
     volumes:
       - ../../..:/opt/ozone
+      - ../../../libexec/transformation.py:/opt/transformation.py
     ports:
       - 8088:8088
     env_file:
@@ -83,6 +84,7 @@ services:
     hostname: nm
     volumes:
       - ../../..:/opt/ozone
+      - ../../../libexec/transformation.py:/opt/transformation.py
     env_file:
       - ./docker-config
       - ../common-config

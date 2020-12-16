@@ -25,14 +25,16 @@ services:
     volumes:
       - ../..:/opt/hadoop
   kms:
-      image: apache/hadoop:${HADOOP_VERSION}
-      ports:
-      - 9600:9600
-      env_file:
-      - ./docker-config
-      environment:
-        HADOOP_CONF_DIR: /opt/hadoop/etc/hadoop
-      command: ["hadoop", "kms"]
+    image: apache/hadoop:${HADOOP_VERSION}
+    ports:
+    - 9600:9600
+    env_file:
+    - ./docker-config
+    environment:
+      HADOOP_CONF_DIR: /opt/hadoop/etc/hadoop
+    volumes:
+      - ../../libexec/transformation.py:/opt/transformation.py
+    command: ["hadoop", "kms"]
 
   datanode:
     image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
