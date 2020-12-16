@@ -57,7 +57,6 @@ import com.google.common.base.Preconditions;
 import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForClients;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT;
-import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -529,4 +528,5 @@ public class ContainerOperationClient implements ScmClient {
   public boolean getReplicationManagerStatus() throws IOException {
     return storageContainerLocationClient.getReplicationManagerStatus();
   }
+  
 }
