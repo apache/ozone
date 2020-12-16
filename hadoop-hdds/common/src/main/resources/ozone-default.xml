@@ -1650,7 +1650,7 @@
     <description>This directory is used for storing OM's snapshot
       related files like the ratisSnapshotIndex and DB checkpoint from leader
       OM.
-      If undefined, OM snapshot dir will fallback to ozone.om.ratis.storage.dir.
+      If undefined, OM snapshot dir will fallback to ozone.metadata.dirs.
       This fallback approach is not recommended for production environments.
     </description>
   </property>
