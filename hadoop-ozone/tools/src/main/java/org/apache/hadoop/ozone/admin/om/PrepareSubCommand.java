@@ -17,10 +17,21 @@
 
 package org.apache.hadoop.ozone.admin.om;
 
+import static org.apache.hadoop.ozone.OmUtils.getOmHostsFromConfig;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus.PREPARE_COMPLETED;
+
+import java.io.IOException;
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Callable;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
 
 import picocli.CommandLine;
 
@@ -53,7 +64,7 @@ public class PrepareSubCommand implements Callable<Void> {
       names = {"-tawt", "--transaction-apply-wait-timeout"},
       description = "Max time in SECONDS to wait for all transactions before" +
           "the prepare request to be applied to the OM DB.",
-      defaultValue = "300",
+      defaultValue = "120",
       hidden = true
   )
   private long txnApplyWaitTimeSeconds;
@@ -67,13 +78,85 @@ public class PrepareSubCommand implements Callable<Void> {
   )
   private long txnApplyCheckIntervalSeconds;
 
+  @CommandLine.Option(
+      names = {"-pct", "--prepare-check-interval"},
+      description = "Time in SECONDS to wait between successive checks for OM" +
+          " preparation.",
+      defaultValue = "10",
+      hidden = true
+  )
+  private long prepareCheckInterval;
+
+  @CommandLine.Option(
+      names = {"-pt", "--prepare-timeout"},
+      description = "Max time in SECONDS to wait for all OMs to be prepared",
+      defaultValue = "300",
+      hidden = true
+  )
+  private long prepareTimeOut;
+
   @Override
   public Void call() throws Exception {
     OzoneManagerProtocol client = parent.createOmClient(omServiceId);
     long prepareTxnId = client.prepareOzoneManager(txnApplyWaitTimeSeconds,
         txnApplyCheckIntervalSeconds);
     System.out.println("Ozone Manager Prepare Request successfully returned " +
-        "with Txn Id " + prepareTxnId);
+        "with Transaction Id : [" + prepareTxnId + "].");
+
+    Map<String, Boolean> omPreparedStatusMap = new HashMap<>();
+    Set<String> omHosts = getOmHostsFromConfig(
+        parent.getParent().getOzoneConf(), omServiceId);
+    omHosts.forEach(h -> omPreparedStatusMap.put(h, false));
+    Duration pTimeout = Duration.of(prepareTimeOut, ChronoUnit.SECONDS);
+    Duration pInterval = Duration.of(prepareCheckInterval, ChronoUnit.SECONDS);
+
+    System.out.println();
+    System.out.println("Checking individual OM instances for prepare request " +
+        "completion...");
+    long endTime = System.currentTimeMillis() + pTimeout.toMillis();
+    int expectedNumPreparedOms = omPreparedStatusMap.size();
+    int currentNumPreparedOms = 0;
+    while (System.currentTimeMillis() < endTime &&
+        currentNumPreparedOms < expectedNumPreparedOms) {
+      for (Map.Entry<String, Boolean> e : omPreparedStatusMap.entrySet()) {
+        if (!e.getValue()) {
+          String omHost = e.getKey();
+          try (OzoneManagerProtocol singleOmClient =
+                    parent.createOmClient(omServiceId, omHost, false)) {
+            PrepareStatusResponse response =
+                singleOmClient.getOzoneManagerPrepareStatus(prepareTxnId);
+            PrepareStatus status = response.getStatus();
+            System.out.println("OM : [" + omHost + "], Prepare " +
+                "Status : [" + status.name() + "], Current Transaction Id : [" +
+                response.getCurrentTxnIndex() + "]");
+            if (status.equals(PREPARE_COMPLETED)) {
+              e.setValue(true);
+              currentNumPreparedOms++;
+            }
+          } catch (IOException ioEx) {
+            System.out.println("Exception while checking preparation " +
+                "completeness for [" + omHost +
+                "], Error : [" + ioEx.getMessage() + "]");
+          }
+        }
+      }
+      if (currentNumPreparedOms < expectedNumPreparedOms) {
+        System.out.println("Waiting for " + prepareCheckInterval +
+            " seconds before retrying...");
+        Thread.sleep(pInterval.toMillis());
+      }
+    }
+    if (currentNumPreparedOms < expectedNumPreparedOms) {
+      throw new Exception("OM Preparation failed since all OMs are not " +
+          "prepared yet.");
+    } else {
+      System.out.println();
+      System.out.println("OM Preparation successful! ");
+      System.out.println("No new write requests will be allowed until " +
+          "preparation is cancelled or upgrade/downgrade is done.");
+    }
+
     return null;
   }
+
 }
