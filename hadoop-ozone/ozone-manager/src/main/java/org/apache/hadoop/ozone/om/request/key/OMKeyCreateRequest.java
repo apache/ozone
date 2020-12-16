@@ -309,6 +309,10 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
       omBucketInfo.incrUsedBytes(preAllocatedSpace);
 
+      // Update namespace quota
+      checkBucketQuotaInNamespace(omBucketInfo, 1L);
+      omBucketInfo.incrUsedNamespace(1L);
+
       // Prepare response
       omResponse.setCreateKeyResponse(CreateKeyResponse.newBuilder()
           .setKeyInfo(omKeyInfo.getProtobuf())

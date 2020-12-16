@@ -628,6 +628,7 @@ public class RpcClient implements ClientProtocol {
         bucketInfo.getSourceVolume(),
         bucketInfo.getSourceBucket(),
         bucketInfo.getUsedBytes(),
+        bucketInfo.getUsedNamespace(),
         bucketInfo.getQuotaInBytes(),
         bucketInfo.getQuotaInNamespace()
     );
@@ -655,6 +656,7 @@ public class RpcClient implements ClientProtocol {
         bucket.getSourceVolume(),
         bucket.getSourceBucket(),
         bucket.getUsedBytes(),
+        bucket.getUsedNamespace(),
         bucket.getQuotaInBytes(),
         bucket.getQuotaInNamespace()))
         .collect(Collectors.toList());

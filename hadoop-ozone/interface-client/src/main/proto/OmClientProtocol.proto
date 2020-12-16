@@ -505,6 +505,7 @@ message BucketInfo {
     optional uint64 usedBytes = 14;
     optional int64 quotaInBytes = 15 [default = -2];
     optional int64 quotaInNamespace = 16 [default = -2];
+    optional uint64 usedNamespace = 17;
 }
 
 enum StorageTypeProto {
