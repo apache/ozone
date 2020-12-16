@@ -46,9 +46,9 @@ _Note_: for Docker compose based pseudo cluster put the \
 
 * Restart the Ozone Manager and Storage Container Manager and check the prometheus endpoints:
 
- * http://scm:9874/prom
+ * http://scm:9876/prom
 
- * http://ozoneManager:9876/prom
+ * http://ozoneManager:9874/prom
 
 * Create a prometheus.yaml configuration with the previous endpoints:
 

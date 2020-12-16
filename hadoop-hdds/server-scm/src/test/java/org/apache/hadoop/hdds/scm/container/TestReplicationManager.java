@@ -18,21 +18,24 @@
 
 package org.apache.hadoop.hdds.scm.container;
 
+import com.google.common.primitives.Longs;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMCommandProto;
-import org.apache.hadoop.hdds.scm.container.ReplicationManager.ReplicationManagerConfiguration;
+import org.apache.hadoop.hdds.scm.container.ReplicationManager
+    .ReplicationManagerConfiguration;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
@@ -61,6 +64,13 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.createDatanodeDetails;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
 import static org.apache.hadoop.hdds.scm.TestUtils.getContainer;
 import static org.apache.hadoop.hdds.scm.TestUtils.getReplicas;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
@@ -75,13 +85,17 @@ public class TestReplicationManager {
   private PlacementPolicy containerPlacementPolicy;
   private EventQueue eventQueue;
   private DatanodeCommandHandler datanodeCommandHandler;
+  private SimpleMockNodeManager nodeManager;
+  private ContainerManagerV2 containerManager;
+  private ConfigurationSource conf;
   private SCMNodeManager scmNodeManager;
 
   @Before
-  public void setup() throws IOException, InterruptedException {
-    final ConfigurationSource conf = new OzoneConfiguration();
-    final ContainerManagerV2 containerManager =
-        Mockito.mock(ContainerManagerV2.class);
+  public void setup()
+      throws IOException, InterruptedException, NodeNotFoundException {
+    conf = new OzoneConfiguration();
+    containerManager = Mockito.mock(ContainerManagerV2.class);
+    nodeManager = new SimpleMockNodeManager();
     eventQueue = new EventQueue();
     containerStateManager = new ContainerStateManager(conf);
 
@@ -128,9 +142,9 @@ public class TestReplicationManager {
         });
 
     scmNodeManager = Mockito.mock(SCMNodeManager.class);
-    Mockito.when(scmNodeManager.getNodeState(
+    Mockito.when(scmNodeManager.getNodeStatus(
         Mockito.any(DatanodeDetails.class)))
-        .thenReturn(NodeState.HEALTHY);
+        .thenReturn(NodeStatus.inServiceHealthy());
 
     replicationManager = new ReplicationManager(
         new ReplicationManagerConfiguration(),
@@ -138,7 +152,21 @@ public class TestReplicationManager {
         containerPlacementPolicy,
         eventQueue,
         new LockManager<>(conf),
-        scmNodeManager);
+        nodeManager);
+    replicationManager.start();
+    Thread.sleep(100L);
+  }
+
+  private void createReplicationManager(ReplicationManagerConfiguration rmConf)
+      throws InterruptedException {
+    replicationManager = new ReplicationManager(
+        rmConf,
+        containerManager,
+        containerPlacementPolicy,
+        eventQueue,
+        new LockManager<ContainerID>(conf),
+        nodeManager);
+
     replicationManager.start();
     Thread.sleep(100L);
   }
@@ -603,7 +631,7 @@ public class TestReplicationManager {
       throws SCMException, ContainerNotFoundException, InterruptedException {
     final ContainerInfo container = getContainer(LifeCycleState.CLOSED);
     final ContainerID id = container.containerID();
-    final Set<ContainerReplica> replicas = getReplicas(id, State.CLOSED,
+    final Set<ContainerReplica> replicas = getReplicas(id, CLOSED,
         randomDatanodeDetails(),
         randomDatanodeDetails(),
         randomDatanodeDetails());
@@ -850,6 +878,243 @@ public class TestReplicationManager {
     Thread.sleep(100L);
     Assert.assertEquals(currentDeleteCommandCount + 2, datanodeCommandHandler
         .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand));
+  }
+
+  /**
+   * ReplicationManager should replicate an additional replica if there are
+   * decommissioned replicas.
+   */
+  @Test
+  public void testUnderReplicatedDueToDecommission() throws
+      SCMException, ContainerNotFoundException, InterruptedException {
+    final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
+    addReplica(container, new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
+    addReplica(container, new NodeStatus(DECOMMISSIONING, HEALTHY), CLOSED);
+    addReplica(container, new NodeStatus(DECOMMISSIONING, HEALTHY), CLOSED);
+    assertReplicaScheduled(2);
+  }
+
+  /**
+   * ReplicationManager should replicate an additional replica when all copies
+   * are decommissioning.
+   */
+  @Test
+  public void testUnderReplicatedDueToAllDecommission() throws
+      SCMException, ContainerNotFoundException, InterruptedException {
+    final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
+    addReplica(container, new NodeStatus(DECOMMISSIONING, HEALTHY), CLOSED);
+    addReplica(container, new NodeStatus(DECOMMISSIONING, HEALTHY), CLOSED);
+    addReplica(container, new NodeStatus(DECOMMISSIONING, HEALTHY), CLOSED);
+    assertReplicaScheduled(3);
+  }
+
+  /**
+   * ReplicationManager should not take any action when the container is
+   * correctly replicated with decommissioned replicas still present.
+   */
+  @Test
+  public void testCorrectlyReplicatedWithDecommission() throws
+      SCMException, ContainerNotFoundException, InterruptedException {
+    final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
+    addReplica(container, new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
+    addReplica(container, new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
+    addReplica(container, new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
+    addReplica(container, new NodeStatus(DECOMMISSIONING, HEALTHY), CLOSED);
+    assertReplicaScheduled(0);
+  }
+
+  /**
+   * ReplicationManager should replicate an additional replica when min rep
+   * is not met for maintenance.
+   */
+  @Test
+  public void testUnderReplicatedDueToMaintenance() throws
+      SCMException, ContainerNotFoundException, InterruptedException {
+    final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
+    addReplica(container, new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
+    addReplica(container, new NodeStatus(IN_MAINTENANCE, HEALTHY), CLOSED);
+    addReplica(container, new NodeStatus(IN_MAINTENANCE, HEALTHY), CLOSED);
+    assertReplicaScheduled(1);
+  }
+
+  /**
+   * ReplicationManager should not replicate an additional replica when if
+   * min replica for maintenance is 1 and another replica is available.
+   */
+  @Test
+  public void testNotUnderReplicatedDueToMaintenanceMinRepOne() throws
+      SCMException, ContainerNotFoundException, InterruptedException {
+    replicationManager.stop();
+    ReplicationManagerConfiguration newConf =
+        new ReplicationManagerConfiguration();
+    newConf.setMaintenanceReplicaMinimum(1);
+    createReplicationManager(newConf);
+    final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
+    addReplica(container, new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
+    addReplica(container, new NodeStatus(IN_MAINTENANCE, HEALTHY), CLOSED);
+    addReplica(container, new NodeStatus(IN_MAINTENANCE, HEALTHY), CLOSED);
+    assertReplicaScheduled(0);
+  }
+
+  /**
+   * ReplicationManager should replicate an additional replica when all copies
+   * are going off line and min rep is 1.
+   */
+  @Test
+  public void testUnderReplicatedDueToMaintenanceMinRepOne() throws
+      SCMException, ContainerNotFoundException, InterruptedException {
+    replicationManager.stop();
+    ReplicationManagerConfiguration newConf =
+        new ReplicationManagerConfiguration();
+    newConf.setMaintenanceReplicaMinimum(1);
+    createReplicationManager(newConf);
+    final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
+    addReplica(container, new NodeStatus(IN_MAINTENANCE, HEALTHY), CLOSED);
+    addReplica(container, new NodeStatus(IN_MAINTENANCE, HEALTHY), CLOSED);
+    addReplica(container, new NodeStatus(IN_MAINTENANCE, HEALTHY), CLOSED);
+    assertReplicaScheduled(1);
+  }
+
+  /**
+   * ReplicationManager should replicate additional replica when all copies
+   * are going into maintenance.
+   */
+  @Test
+  public void testUnderReplicatedDueToAllMaintenance() throws
+      SCMException, ContainerNotFoundException, InterruptedException {
+    final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
+    addReplica(container, new NodeStatus(IN_MAINTENANCE, HEALTHY), CLOSED);
+    addReplica(container, new NodeStatus(IN_MAINTENANCE, HEALTHY), CLOSED);
+    addReplica(container, new NodeStatus(IN_MAINTENANCE, HEALTHY), CLOSED);
+    assertReplicaScheduled(2);
+  }
+
+  /**
+   * ReplicationManager should not replicate additional replica sufficient
+   * replica are available.
+   */
+  @Test
+  public void testCorrectlyReplicatedWithMaintenance() throws
+      SCMException, ContainerNotFoundException, InterruptedException {
+    final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
+    addReplica(container, new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
+    addReplica(container, new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
+    addReplica(container, new NodeStatus(IN_MAINTENANCE, HEALTHY), CLOSED);
+    addReplica(container, new NodeStatus(IN_MAINTENANCE, HEALTHY), CLOSED);
+    assertReplicaScheduled(0);
+  }
+
+  /**
+   * ReplicationManager should replicate additional replica when all copies
+   * are decommissioning or maintenance.
+   */
+  @Test
+  public void testUnderReplicatedWithDecommissionAndMaintenance() throws
+      SCMException, ContainerNotFoundException, InterruptedException {
+    final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
+    addReplica(container, new NodeStatus(DECOMMISSIONED, HEALTHY), CLOSED);
+    addReplica(container, new NodeStatus(DECOMMISSIONED, HEALTHY), CLOSED);
+    addReplica(container, new NodeStatus(IN_MAINTENANCE, HEALTHY), CLOSED);
+    addReplica(container, new NodeStatus(IN_MAINTENANCE, HEALTHY), CLOSED);
+    assertReplicaScheduled(2);
+  }
+
+  /**
+   * When a CLOSED container is over replicated, ReplicationManager
+   * deletes the excess replicas. While choosing the replica for deletion
+   * ReplicationManager should not attempt to remove a DECOMMISSION or
+   * MAINTENANCE replica.
+   */
+  @Test
+  public void testOverReplicatedClosedContainerWithDecomAndMaint()
+      throws SCMException, ContainerNotFoundException, InterruptedException {
+    final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
+    addReplica(container, NodeStatus.inServiceHealthy(), CLOSED);
+    addReplica(container, new NodeStatus(DECOMMISSIONED, HEALTHY), CLOSED);
+    addReplica(container, new NodeStatus(IN_MAINTENANCE, HEALTHY), CLOSED);
+    addReplica(container, NodeStatus.inServiceHealthy(), CLOSED);
+    addReplica(container, NodeStatus.inServiceHealthy(), CLOSED);
+    addReplica(container, NodeStatus.inServiceHealthy(), CLOSED);
+    addReplica(container, NodeStatus.inServiceHealthy(), CLOSED);
+
+    final int currentDeleteCommandCount = datanodeCommandHandler
+        .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand);
+
+    replicationManager.processContainersNow();
+    // Wait for EventQueue to call the event handler
+    Thread.sleep(100L);
+    Assert.assertEquals(currentDeleteCommandCount + 2, datanodeCommandHandler
+        .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand));
+    // Get the DECOM and Maint replica and ensure none of them are scheduled
+    // for removal
+    Set<ContainerReplica> decom =
+        containerStateManager.getContainerReplicas(container.containerID())
+        .stream()
+        .filter(r -> r.getDatanodeDetails().getPersistedOpState() != IN_SERVICE)
+        .collect(Collectors.toSet());
+    for (ContainerReplica r : decom) {
+      Assert.assertFalse(datanodeCommandHandler.received(
+          SCMCommandProto.Type.deleteContainerCommand,
+          r.getDatanodeDetails()));
+    }
+  }
+
+  /**
+   * Replication Manager should not attempt to replicate from an unhealthy
+   * (stale or dead) node. To test this, setup a scenario where a replia needs
+   * to be created, but mark all nodes stale. That way, no new replica will be
+   * scheduled.
+   */
+  @Test
+  public void testUnderReplicatedNotHealthySource()
+      throws SCMException, ContainerNotFoundException, InterruptedException {
+    final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
+    addReplica(container, NodeStatus.inServiceStale(), CLOSED);
+    addReplica(container, new NodeStatus(DECOMMISSIONED, STALE), CLOSED);
+    addReplica(container, new NodeStatus(DECOMMISSIONED, STALE), CLOSED);
+    // There should be replica scheduled, but as all nodes are stale, nothing
+    // gets scheduled.
+    assertReplicaScheduled(0);
+  }
+
+  private ContainerInfo createContainer(LifeCycleState containerState)
+      throws SCMException {
+    final ContainerInfo container = getContainer(containerState);
+    final ContainerID id = container.containerID();
+    containerStateManager.loadContainer(container);
+    return container;
+  }
+
+  private ContainerReplica addReplica(ContainerInfo container,
+      NodeStatus nodeStatus, State replicaState)
+      throws ContainerNotFoundException {
+    DatanodeDetails dn = randomDatanodeDetails();
+    dn.setPersistedOpState(nodeStatus.getOperationalState());
+    dn.setPersistedOpStateExpiryEpochSec(
+        nodeStatus.getOpStateExpiryEpochSeconds());
+    nodeManager.register(dn, nodeStatus);
+    // Using the same originID for all replica in the container set. If each
+    // replica has a unique originID, it causes problems in ReplicationManager
+    // when processing over-replicated containers.
+    final UUID originNodeId =
+        UUID.nameUUIDFromBytes(Longs.toByteArray(container.getContainerID()));
+    final ContainerReplica replica = getReplicas(
+        container.containerID(), CLOSED, 1000L, originNodeId, dn);
+    containerStateManager
+        .updateContainerReplica(container.containerID(), replica);
+    return replica;
+  }
+
+  private void assertReplicaScheduled(int delta) throws InterruptedException {
+    final int currentReplicateCommandCount = datanodeCommandHandler
+        .getInvocationCount(SCMCommandProto.Type.replicateContainerCommand);
+
+    replicationManager.processContainersNow();
+    // Wait for EventQueue to call the event handler
+    Thread.sleep(100L);
+    Assert.assertEquals(currentReplicateCommandCount + delta,
+        datanodeCommandHandler.getInvocationCount(
+            SCMCommandProto.Type.replicateContainerCommand));
   }
 
   @After

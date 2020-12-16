@@ -763,7 +763,8 @@ public class ContainerStateMachine extends BaseStateMachine {
             }
           }, getCommandExecutor(requestProto));
       future.thenApply(r -> {
-        if (trx.getServerRole() == RaftPeerRole.LEADER) {
+        if (trx.getServerRole() == RaftPeerRole.LEADER
+            && trx.getStateMachineContext() != null) {
           long startTime = (long) trx.getStateMachineContext();
           metrics.incPipelineLatency(cmdType,
               Time.monotonicNowNanos() - startTime);
@@ -811,6 +812,12 @@ public class ContainerStateMachine extends BaseStateMachine {
         }
         return applyTransactionFuture;
       }).whenComplete((r, t) ->  {
+        if (t != null) {
+          stateMachineHealthy.set(false);
+          LOG.error("gid {} : ApplyTransaction failed. cmd {} logIndex "
+                  + "{} exception {}", gid, requestProto.getCmdType(),
+              index, t);
+        }
         applyTransactionSemaphore.release();
         metrics.recordApplyTransactionCompletion(
             Time.monotonicNowNanos() - applyTxnStartTime);

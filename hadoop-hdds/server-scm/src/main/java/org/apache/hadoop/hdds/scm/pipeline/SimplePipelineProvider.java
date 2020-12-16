@@ -42,7 +42,6 @@ public class SimplePipelineProvider extends PipelineProvider {
   public Pipeline create(ReplicationFactor factor) throws IOException {
     List<DatanodeDetails> dns = pickNodesNeverUsed(ReplicationType.STAND_ALONE,
         factor);
-
     if (dns.size() < factor.getNumber()) {
       String e = String
           .format("Cannot create pipeline of factor %d using %d nodes.",

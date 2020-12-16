@@ -25,7 +25,6 @@ import javax.annotation.Nonnull;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -48,18 +47,15 @@ public class OMKeyCreateResponse extends OMClientResponse {
   private OmKeyInfo omKeyInfo;
   private long openKeySessionID;
   private List<OmKeyInfo> parentKeyInfos;
-  private OmVolumeArgs omVolumeArgs;
   private OmBucketInfo omBucketInfo;
 
   public OMKeyCreateResponse(@Nonnull OMResponse omResponse,
       @Nonnull OmKeyInfo omKeyInfo, List<OmKeyInfo> parentKeyInfos,
-      long openKeySessionID, @Nonnull OmVolumeArgs omVolumeArgs,
-      @Nonnull OmBucketInfo omBucketInfo) {
+      long openKeySessionID, @Nonnull OmBucketInfo omBucketInfo) {
     super(omResponse);
     this.omKeyInfo = omKeyInfo;
     this.openKeySessionID = openKeySessionID;
     this.parentKeyInfos = parentKeyInfos;
-    this.omVolumeArgs = omVolumeArgs;
     this.omBucketInfo = omBucketInfo;
   }
 
@@ -102,8 +98,8 @@ public class OMKeyCreateResponse extends OMClientResponse {
 
     // update bucket usedBytes.
     omMetadataManager.getBucketTable().putWithBatch(batchOperation,
-        omMetadataManager.getBucketKey(omVolumeArgs.getVolume(),
-            omBucketInfo.getBucketName()), omBucketInfo);
+        omMetadataManager.getBucketKey(omKeyInfo.getVolumeName(),
+            omKeyInfo.getBucketName()), omBucketInfo);
   }
 }
 

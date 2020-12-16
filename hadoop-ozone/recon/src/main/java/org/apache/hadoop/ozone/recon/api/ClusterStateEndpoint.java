@@ -19,9 +19,9 @@
 package org.apache.hadoop.ozone.recon.api;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.recon.api.types.ClusterStateResponse;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeStorageReport;
@@ -80,7 +80,8 @@ public class ClusterStateEndpoint {
     List<DatanodeDetails> datanodeDetails = nodeManager.getAllNodes();
     int containers = this.containerManager.getContainers().size();
     int pipelines = this.pipelineManager.getPipelines().size();
-    int healthyDatanodes = nodeManager.getNodeCount(NodeState.HEALTHY);
+    int healthyDatanodes =
+        nodeManager.getNodeCount(NodeStatus.inServiceHealthy());
     SCMNodeStat stats = nodeManager.getStats();
     DatanodeStorageReport storageReport =
         new DatanodeStorageReport(stats.getCapacity().get(),

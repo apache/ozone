@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -156,7 +157,7 @@ public class TestRatisPipelineCreateAndDestroy {
     }
 
     if (cluster.getStorageContainerManager()
-        .getScmNodeManager().getNodeCount(HddsProtos.NodeState.HEALTHY) >=
+        .getScmNodeManager().getNodeCount(NodeStatus.inServiceHealthy()) >=
         HddsProtos.ReplicationFactor.THREE.getNumber()) {
       // make sure pipelines is created after node start
       pipelineManager.triggerPipelineCreation();

@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -124,7 +125,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
       throws SCMException {
     // get nodes in HEALTHY state
     List<DatanodeDetails> healthyNodes =
-        nodeManager.getNodes(HddsProtos.NodeState.HEALTHY);
+        nodeManager.getNodes(NodeStatus.inServiceHealthy());
     boolean multipleRacks = multipleRacksAvailable(healthyNodes);
     if (excludedNodes != null) {
       healthyNodes.removeAll(excludedNodes);
