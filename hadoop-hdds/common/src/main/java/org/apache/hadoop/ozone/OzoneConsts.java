@@ -384,5 +384,5 @@ public final class OzoneConsts {
   // An on-disk transient marker file used when replacing DB with checkpoint
   public static final String DB_TRANSIENT_MARKER = "dbInconsistentMarker";
 
-  public static final String RATIS_SNAPSHOT_DIR = "snapshot";
+  public static final String OM_RATIS_SNAPSHOT_DIR = "snapshot";
 }
