@@ -215,6 +215,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAU
 import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_FILE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_TEMP_FILE;
+import static org.apache.hadoop.ozone.OzoneConsts.RATIS_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.RPC_PORT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
@@ -470,18 +471,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       omRatisSnapshotDir = OmUtils.createOMDir(
           OzoneManagerRatisServer.getOMRatisSnapshotDirectory(configuration));
 
-      // Before starting ratis server check, if previous installation has
-      // snapshot directory in Ratis storage directory if so, move it to
-      // snapshot directory.
-      File[] dirs = new File(omRatisDirectory).listFiles();
+      // Before starting ratis server, check if previous installation has
+      // snapshot directory in Ratis storage directory. if yes, move it to
+      // new snapshot directory.
 
-      if (dirs != null) {
-        for (File dir : dirs) {
-          if (dir.isDirectory() && dir.getName().equals("snapshot")) {
-            FileUtils.moveDirectory(dir.toPath(), omRatisSnapshotDir.toPath());
-            break;
-          }
-        }
+      File snapshotDir = new File(omRatisDirectory, RATIS_SNAPSHOT_DIR);
+
+      if (snapshotDir.isDirectory()) {
+        FileUtils.moveDirectory(snapshotDir.toPath(),
+            omRatisSnapshotDir.toPath());
       }
 
       if (peerNodes != null && !peerNodes.isEmpty()) {
