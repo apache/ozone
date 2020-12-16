@@ -16,8 +16,11 @@
  */
 package org.apache.hadoop.ozone.container.common.statemachine;
 
+import static org.apache.hadoop.ozone.common.Storage.StorageState.INITIALIZED;
+
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.Iterator;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -36,6 +39,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.ozone.HddsDatanodeStopService;
+import org.apache.hadoop.ozone.container.common.DataNodeStorageConfig;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.report.ReportManager;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.CloseContainerCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ClosePipelineCommandHandler;
@@ -52,7 +57,9 @@ import org.apache.hadoop.ozone.container.replication.DownloadAndImportReplicator
 import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
 import org.apache.hadoop.ozone.container.replication.SimpleContainerDownloader;
 import org.apache.hadoop.ozone.container.upgrade.DataNodeLayoutVersionManager;
+import org.apache.hadoop.ozone.container.upgrade.DataNodeUpgradeFinalizer;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.util.JvmPauseMonitor;
 import org.apache.hadoop.util.Time;
 
@@ -88,6 +95,8 @@ public class DatanodeStateMachine implements Closeable {
   private final HddsDatanodeStopService hddsDatanodeStopService;
 
   private DataNodeLayoutVersionManager dataNodeVersionManager;
+  private DataNodeStorageConfig dataNodeStorageConfig;
+  private DataNodeUpgradeFinalizer upgradeFinalizer;
 
   /**
    * Used to synchronize to the OzoneContainer object created in the
@@ -113,7 +122,15 @@ public class DatanodeStateMachine implements Closeable {
     this.hddsDatanodeStopService = hddsDatanodeStopService;
     this.conf = conf;
     this.datanodeDetails = datanodeDetails;
-    dataNodeVersionManager = DataNodeLayoutVersionManager.initialize(conf);
+    dataNodeStorageConfig = new DataNodeStorageConfig(conf,
+        datanodeDetails.getUuidString());
+    if (dataNodeStorageConfig.getState() != INITIALIZED) {
+      dataNodeStorageConfig.initialize();
+    }
+    dataNodeVersionManager = DataNodeLayoutVersionManager
+        .initialize(dataNodeStorageConfig);
+    upgradeFinalizer = new DataNodeUpgradeFinalizer(dataNodeVersionManager);
+
     executorService = Executors.newFixedThreadPool(
         getEndPointTaskThreadPoolSize(),
         new ThreadFactoryBuilder()
@@ -564,5 +581,46 @@ public class DatanodeStateMachine implements Closeable {
   @VisibleForTesting
   public DataNodeLayoutVersionManager getDataNodeVersionManager() {
     return dataNodeVersionManager;
+  }
+
+  @VisibleForTesting
+  public DataNodeStorageConfig getDataNodeStorageConfig() {
+    return dataNodeStorageConfig;
+  }
+
+  @VisibleForTesting
+  public boolean canFinalizeDataNode() {
+    // Lets be sure that we do not have any open container before we return
+    // from here. This function should be called in its own finalizer thread
+    // context.
+    Iterator<Container<?>> containerIt =
+        getContainer().getController().getContainers();
+    while (containerIt.hasNext()) {
+      Container ctr = containerIt.next();
+      switch (ctr.getContainerState()) {
+      case OPEN:
+      case CLOSING:
+      case UNHEALTHY:
+        return false;
+      default:
+        continue;
+      }
+    }
+    return true;
+  }
+
+  @VisibleForTesting
+  public boolean preFinalizeUpgrade() {
+    return canFinalizeDataNode();
+  }
+
+
+  @VisibleForTesting
+  public void postFinalizeUpgrade() {
+  }
+
+  public StatusAndMessages finalizeUpgrade()
+      throws IOException{
+    return upgradeFinalizer.finalize(datanodeDetails.getUuidString(), this);
   }
 }
