@@ -169,7 +169,6 @@ enum LifeCycleState {
     CLOSED = 4;
     DELETING = 5;
     DELETED = 6; // object is deleted.
-    TOTAL = 7;
 }
 
 enum LifeCycleEvent {
