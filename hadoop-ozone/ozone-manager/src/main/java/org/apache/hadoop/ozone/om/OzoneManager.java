@@ -3744,9 +3744,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     String userName = UserGroupInformation.getCurrentUser().getShortUserName();
     long time = Time.now();
 
+    // We need to set the updateID to -1, because when setAcl on S3v volume
+    // during updateID check it will fail if we have a value with maximum
+    // transactionID. Because updateID checks if new updateID is greater than
+    // previous updateID, otherwise it fails.
+
     OmVolumeArgs.Builder omVolumeArgs = new OmVolumeArgs.Builder()
         .setVolume(s3Volume)
-        .setUpdateID(transactionID)
+        .setUpdateID(-1)
         .setObjectID(objectID)
         .setCreationTime(time)
         .setModificationTime(time)
