@@ -132,7 +132,7 @@ hdds.scm.http.auth.type | simple
 hdds.scm.http.auth.simple.anonymous_allowed | false
 
 If you don't want to specify the user.name in the query string parameter, 
-change ozone.scm.http.auth.simple.anonymous_allowed to true.
+change hdds.scm.http.auth.simple.anonymous_allowed to true.
 
 ### Enable SIMPLE authentication for DATANODE HTTP
 Property| Value
