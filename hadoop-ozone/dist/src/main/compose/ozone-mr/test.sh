@@ -35,3 +35,4 @@ for t in ${tests}; do
   copy_results "${d}" "${ALL_RESULT_DIR}"
 done
 
+exit ${RESULT}
