@@ -101,7 +101,11 @@ public class OmOzoneAclMap {
   public void addAcl(OzoneAcl acl) throws OMException {
     Objects.requireNonNull(acl, "Acl should not be null.");
     if (acl.getAclScope().equals(OzoneAcl.AclScope.DEFAULT)) {
-      defaultAclList.add(OzoneAcl.toProtobuf(acl));
+      OzoneAclInfo ozoneAclInfo = OzoneAcl.toProtobuf(acl);
+      if (defaultAclList.contains(ozoneAclInfo)) {
+        throw new OMException("Acl " + acl + " already exist.", INVALID_REQUEST);
+      }
+      defaultAclList.add(ozoneAclInfo);
       return;
     }
 
