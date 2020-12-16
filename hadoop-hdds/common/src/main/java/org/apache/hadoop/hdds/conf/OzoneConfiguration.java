@@ -294,7 +294,6 @@ public class OzoneConfiguration extends Configuration
     return configMap;
   }
 
-
   private static void addDeprecatedKeys(){
     Configuration.addDeprecations(new DeprecationDelta[]{
         new DeprecationDelta("ozone.datanode.pipeline.limit",
