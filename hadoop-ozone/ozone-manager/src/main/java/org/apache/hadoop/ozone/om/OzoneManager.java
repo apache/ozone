@@ -1794,7 +1794,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             obj.getKeyName());
         throw new OMException("User " + context.getClientUgi().getUserName() +
             " doesn't have " + context.getAclRights() +
-            " permission to access " + obj.getResourceType(),
+            " permission to access " + obj.getResourceType() + " " +
+            obj.getVolumeName() + " " + obj.getBucketName() + " " +
+            obj.getKeyName(),
             ResultCodes.PERMISSION_DENIED);
       }
       return false;
@@ -1842,12 +1844,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * Changes the Quota on a volume.
    *
    * @param volume - Name of the volume.
-   * @param quotaInCounts - Volume quota in counts.
+   * @param quotaInNamespace - Volume quota in counts.
    * @param quotaInBytes - Volume quota in bytes.
    * @throws IOException
    */
   @Override
-  public void setQuota(String volume, long quotaInCounts,
+  public void setQuota(String volume, long quotaInNamespace,
                        long quotaInBytes) throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented. As this requests use a new approach");

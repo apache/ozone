@@ -44,6 +44,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mockito;
+import org.mockito.stubbing.Answer;
 import org.powermock.api.mockito.PowerMockito;
 import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.powermock.modules.junit4.PowerMockRunner;
@@ -79,7 +80,10 @@ public class TestCreatePipelineCommandHandler {
     Mockito.when(raftClient.getGroupManagementApi(
         Mockito.any(RaftPeerId.class))).thenReturn(raftClientGroupManager);
     PowerMockito.mockStatic(RaftClient.class);
-    PowerMockito.when(RaftClient.newBuilder()).thenReturn(builder);
+    // Work around for mockito bug:
+    // https://github.com/powermock/powermock/issues/992
+    PowerMockito.when(RaftClient.newBuilder()).thenAnswer(
+        (Answer<RaftClient.Builder>) invocation -> builder);
   }
 
   private RaftClient.Builder mockRaftClientBuilder() {
