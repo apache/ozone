@@ -91,7 +91,7 @@ def to_env(content):
   """transform to environment variables"""
   result = ""
   props = process_properties(content)
-  for key, val in props:
+  for key, val in props.items():
     result += "{}={}\n".format(key, val)
   return result
 
@@ -100,7 +100,7 @@ def to_sh(content):
   """transform to shell"""
   result = ""
   props = process_properties(content)
-  for key, val in props:
+  for key, val in props.items():
     result += "export {}=\"{}\"\n".format(key, val)
   return result
 
@@ -109,7 +109,7 @@ def to_cfg(content):
   """transform to config"""
   result = ""
   props = process_properties(content)
-  for key, val in props:
+  for key, val in props.items():
     result += "{}={}\n".format(key, val)
   return result
 
@@ -118,7 +118,7 @@ def to_conf(content):
   """transform to configuration"""
   result = ""
   props = process_properties(content)
-  for key, val in props:
+  for key, val in props.items():
     result += "export {}={}\n".format(key, val)
   return result
 
