@@ -141,4 +141,4 @@ hdds.datanode.http.auth.type | simple
 hdds.datanode.http.auth.simple.anonymous_allowed | false
 
 If you don't want to specify the user.name in the query string parameter, 
-change ozone.datanode.http.auth.simple.anonymous_allowed to true.
+change hdds.datanode.http.auth.simple.anonymous_allowed to true.
