@@ -20,6 +20,11 @@
  * Base structure
  */
 
+html, body {
+  height: 100%;
+  margin: 0;
+}
+
 /* Move down content because we have a fixed navbar that is 50px tall */
 body {
   padding-top: 50px;
@@ -181,4 +186,27 @@ figure.ozone-usage {
 
 table.table {
   margin: 20px 20px 40px;
+}
+
+.footer,
+.push {
+  height: 50px;
+}
+
+.footer {
+  background-color: #f5f5f5;
+}
+
+.wrapper {
+  min-height: 100%;
+
+  /* Equal to height of footer */
+  /* But also accounting for potential margin-bottom of last child */
+  margin-bottom: -50px;
+}
+
+.footer .container {
+  padding-top: 10px;
+  padding-bottom: 10px;
+  text-align: center;
 }

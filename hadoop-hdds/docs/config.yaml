@@ -24,6 +24,8 @@ languages:
     languageName: 中文
     weight: 2
 title: "Ozone"
+params:
+  ghrepo: https://github.com/apache/ozone/
 theme: "ozonedoc"
 pygmentsCodeFences: true
 uglyurls: true
