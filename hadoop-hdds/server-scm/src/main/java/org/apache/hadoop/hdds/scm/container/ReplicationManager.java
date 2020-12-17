@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -783,6 +784,12 @@ public class ReplicationManager
           replicationFactor + excess);
 
       final List<ContainerReplica> eligibleReplicas = new ArrayList<>(replicas);
+
+      // Iterate replicas in deterministic order to avoid potential data loss.
+      // See https://issues.apache.org/jira/browse/HDDS-4589.
+      // N.B., sort replicas by (containerID, datanodeDetails).
+      eligibleReplicas.sort(
+          Comparator.comparingLong(ContainerReplica::hashCode));
 
       final Map<UUID, ContainerReplica> uniqueReplicas =
           new LinkedHashMap<>();
