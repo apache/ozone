@@ -1183,7 +1183,7 @@ public class TestKeyManagerImpl {
       KeyManagerImpl keyManagerImpl =
           new KeyManagerImpl(ozoneManager, scmClientMock, conf, "om1");
 
-      keyManagerImpl.refreshPipeline(omKeyInfo);
+      keyManagerImpl.refresh(omKeyInfo);
 
       verify(sclProtocolMock, times(1))
           .getContainerWithPipelineBatch(containerIDs);
@@ -1228,7 +1228,7 @@ public class TestKeyManagerImpl {
           new KeyManagerImpl(ozoneManager, scmClientMock, conf, "om1");
 
       try {
-        keyManagerImpl.refreshPipeline(omKeyInfo);
+        keyManagerImpl.refresh(omKeyInfo);
         Assert.fail();
       } catch (OMException omEx) {
         Assert.assertEquals(SCM_GET_PIPELINE_EXCEPTION, omEx.getResult());

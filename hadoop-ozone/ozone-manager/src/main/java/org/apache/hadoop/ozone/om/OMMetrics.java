@@ -205,6 +205,10 @@ public class OMMetrics {
     numKeys.incr();
   }
 
+  public void incNumKeys(int count) {
+    numKeys.incr(count);
+  }
+
   public void decNumKeys() {
     numKeys.incr(-1);
   }

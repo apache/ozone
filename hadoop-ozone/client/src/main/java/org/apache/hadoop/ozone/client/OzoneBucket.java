@@ -127,7 +127,7 @@ public class OzoneBucket extends WithMetadata {
   /**
    * Quota of key count allocated for the bucket.
    */
-  private long quotaInCounts;
+  private long quotaInNamespace;
 
   private OzoneBucket(ConfigurationSource conf, String volumeName,
       String bucketName, ReplicationFactor defaultReplication,
@@ -197,13 +197,13 @@ public class OzoneBucket extends WithMetadata {
       Boolean versioning, long creationTime, long modificationTime,
       Map<String, String> metadata, String encryptionKeyName,
       String sourceVolume, String sourceBucket, long usedBytes,
-      long quotaInBytes, long quotaInCounts) {
+      long quotaInBytes, long quotaInNamespace) {
     this(conf, proxy, volumeName, bucketName, storageType, versioning,
         creationTime, metadata, encryptionKeyName, sourceVolume, sourceBucket);
     this.usedBytes = usedBytes;
     this.modificationTime = Instant.ofEpochMilli(modificationTime);
     this.quotaInBytes = quotaInBytes;
-    this.quotaInCounts = quotaInCounts;
+    this.quotaInNamespace = quotaInNamespace;
   }
 
   /**
@@ -365,10 +365,10 @@ public class OzoneBucket extends WithMetadata {
   /**
    * Returns quota of key counts allocated for the Bucket.
    *
-   * @return quotaInCounts
+   * @return quotaInNamespace
    */
-  public long getQuotaInCounts() {
-    return quotaInCounts;
+  public long getQuotaInNamespace() {
+    return quotaInNamespace;
   }
 
   /**
@@ -421,10 +421,10 @@ public class OzoneBucket extends WithMetadata {
    */
   public void clearSpaceQuota() throws IOException {
     OzoneBucket ozoneBucket = proxy.getBucketDetails(volumeName, name);
-    proxy.setBucketQuota(volumeName, name, ozoneBucket.getQuotaInCounts(),
+    proxy.setBucketQuota(volumeName, name, ozoneBucket.getQuotaInNamespace(),
         QUOTA_RESET);
     quotaInBytes = QUOTA_RESET;
-    quotaInCounts = ozoneBucket.getQuotaInCounts();
+    quotaInNamespace = ozoneBucket.getQuotaInNamespace();
   }
 
   /**
@@ -437,7 +437,7 @@ public class OzoneBucket extends WithMetadata {
     proxy.setBucketQuota(volumeName, name, QUOTA_RESET,
         ozoneBucket.getQuotaInBytes());
     quotaInBytes = ozoneBucket.getQuotaInBytes();
-    quotaInCounts = QUOTA_RESET;
+    quotaInNamespace = QUOTA_RESET;
   }
 
   /**
@@ -447,10 +447,10 @@ public class OzoneBucket extends WithMetadata {
    * @throws IOException
    */
   public void setQuota(OzoneQuota quota) throws IOException {
-    proxy.setBucketQuota(volumeName, name, quota.getQuotaInCounts(),
+    proxy.setBucketQuota(volumeName, name, quota.getQuotaInNamespace(),
         quota.getQuotaInBytes());
     quotaInBytes = quota.getQuotaInBytes();
-    quotaInCounts = quota.getQuotaInCounts();
+    quotaInNamespace = quota.getQuotaInNamespace();
   }
 
   /**
@@ -517,7 +517,8 @@ public class OzoneBucket extends WithMetadata {
    * @param keyPrefix Bucket prefix to match
    * @return {@code Iterator<OzoneKey>}
    */
-  public Iterator<? extends OzoneKey> listKeys(String keyPrefix) {
+  public Iterator<? extends OzoneKey> listKeys(String keyPrefix)
+      throws IOException{
     return listKeys(keyPrefix, null);
   }
 
@@ -532,7 +533,7 @@ public class OzoneBucket extends WithMetadata {
    * @return {@code Iterator<OzoneKey>}
    */
   public Iterator<? extends OzoneKey> listKeys(String keyPrefix,
-      String prevKey) {
+      String prevKey) throws IOException {
     return new KeyIterator(keyPrefix, prevKey);
   }
 
@@ -760,7 +761,6 @@ public class OzoneBucket extends WithMetadata {
   private class KeyIterator implements Iterator<OzoneKey> {
 
     private String keyPrefix = null;
-
     private Iterator<OzoneKey> currentIterator;
     private OzoneKey currentValue;
 
@@ -771,7 +771,7 @@ public class OzoneBucket extends WithMetadata {
      * The returned keys match key prefix.
      * @param keyPrefix
      */
-    KeyIterator(String keyPrefix, String prevKey) {
+    KeyIterator(String keyPrefix, String prevKey) throws IOException{
       this.keyPrefix = keyPrefix;
       this.currentValue = null;
       this.currentIterator = getNextListOfKeys(prevKey).iterator();
@@ -780,7 +780,12 @@ public class OzoneBucket extends WithMetadata {
     @Override
     public boolean hasNext() {
       if(!currentIterator.hasNext() && currentValue != null) {
-        currentIterator = getNextListOfKeys(currentValue.getName()).iterator();
+        try {
+          currentIterator =
+              getNextListOfKeys(currentValue.getName()).iterator();
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }
       }
       return currentIterator.hasNext();
     }
@@ -799,13 +804,10 @@ public class OzoneBucket extends WithMetadata {
      * @param prevKey
      * @return {@code List<OzoneKey>}
      */
-    private List<OzoneKey> getNextListOfKeys(String prevKey) {
-      try {
-        return proxy.listKeys(volumeName, name, keyPrefix, prevKey,
-            listCacheSize);
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
+    private List<OzoneKey> getNextListOfKeys(String prevKey) throws
+        IOException {
+      return proxy.listKeys(volumeName, name, keyPrefix, prevKey,
+          listCacheSize);
     }
   }
 }

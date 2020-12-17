@@ -239,7 +239,7 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_HEARTBEAT_RPC_TIMEOUT =
       "ozone.scm.heartbeat.rpc-timeout";
   public static final String OZONE_SCM_HEARTBEAT_RPC_TIMEOUT_DEFAULT =
-      "1s";
+      "5s";
 
   public static final String OZONE_SCM_HEARTBEAT_RPC_RETRY_COUNT =
       "ozone.scm.heartbeat.rpc-retry-count";
@@ -450,6 +450,11 @@ public final class ScmConfigKeys {
   public static final TimeDuration
       OZONE_SCM_RATIS_SERVER_ROLE_CHECK_INTERVAL_DEFAULT
       = TimeDuration.valueOf(15, TimeUnit.SECONDS);
+
+  public static final String OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL =
+      "ozone.scm.datanode.admin.monitor.interval";
+  public static final String OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL_DEFAULT =
+      "30s";
 
   /**
    * Never constructed.

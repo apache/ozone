@@ -18,11 +18,12 @@
 package org.apache.hadoop.hdds.scm.block;
 
 import java.io.IOException;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
+import java.util.Set;
+import java.util.Map;
+import java.util.LinkedHashSet;
+import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
@@ -35,9 +36,10 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerBlocksDeletionACKProto.DeleteBlockTransactionResult;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.command.CommandStatusReportHandler.DeleteBlockStatus;
-import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.server.events.EventHandler;
@@ -129,9 +131,12 @@ public class DeletedBlockLogImpl
         DeletedBlocksTransaction block =
             scmMetadataStore.getDeletedBlocksTXTable().get(txID);
         if (block == null) {
-          // Should we make this an error ? How can we not find the deleted
-          // TXID?
-          LOG.warn("Deleted TXID {} not found.", txID);
+          if (LOG.isDebugEnabled()) {
+            // This can occur due to race condition between retry and old
+            // service task where old task removes the transaction and the new
+            // task is resending
+            LOG.debug("Deleted TXID {} not found.", txID);
+          }
           continue;
         }
         DeletedBlocksTransaction.Builder builder = block.toBuilder();
@@ -196,9 +201,12 @@ public class DeletedBlockLogImpl
               transactionResult.getContainerID());
           if (dnsWithCommittedTxn == null) {
             // Mostly likely it's a retried delete command response.
-            LOG.debug("Transaction txId={} commit by dnId={} for containerID={}"
-                    + " failed. Corresponding entry not found.", txID, dnID,
-                containerId);
+            if (LOG.isDebugEnabled()) {
+              LOG.debug(
+                  "Transaction txId={} commit by dnId={} for containerID={}"
+                      + " failed. Corresponding entry not found.", txID, dnID,
+                  containerId);
+            }
             continue;
           }
 
@@ -218,12 +226,16 @@ public class DeletedBlockLogImpl
                 .collect(Collectors.toList());
             if (dnsWithCommittedTxn.containsAll(containerDns)) {
               transactionToDNsCommitMap.remove(txID);
-              LOG.debug("Purging txId={} from block deletion log", txID);
+              if (LOG.isDebugEnabled()) {
+                LOG.debug("Purging txId={} from block deletion log", txID);
+              }
               scmMetadataStore.getDeletedBlocksTXTable().delete(txID);
             }
           }
-          LOG.debug("Datanode txId={} containerId={} committed by dnId={}",
-              txID, containerId, dnID);
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Datanode txId={} containerId={} committed by dnId={}",
+                txID, containerId, dnID);
+          }
         } catch (IOException e) {
           LOG.warn("Could not commit delete block transaction: " +
               transactionResult.getTxID(), e);
@@ -354,23 +366,43 @@ public class DeletedBlockLogImpl
           ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> iter =
                scmMetadataStore.getDeletedBlocksTXTable().iterator()) {
         int numBlocksAdded = 0;
+        List<DeletedBlocksTransaction> txnsToBePurged =
+            new ArrayList<>();
         while (iter.hasNext() && numBlocksAdded < blockDeletionLimit) {
-          Table.KeyValue<Long, DeletedBlocksTransaction> keyValue =
-              iter.next();
+          Table.KeyValue<Long, DeletedBlocksTransaction> keyValue = iter.next();
           DeletedBlocksTransaction txn = keyValue.getValue();
           final ContainerID id = ContainerID.valueOf(txn.getContainerID());
-          if (txn.getCount() > -1 && txn.getCount() <= maxRetry
-              && !containerManager.getContainer(id).isOpen()) {
-            numBlocksAdded += txn.getLocalIDCount();
-            getTransaction(txn, transactions);
-            transactionToDNsCommitMap
-                .putIfAbsent(txn.getTxID(), new LinkedHashSet<>());
+          try {
+            if (txn.getCount() > -1 && txn.getCount() <= maxRetry
+                && !containerManager.getContainer(id).isOpen()) {
+              numBlocksAdded += txn.getLocalIDCount();
+              getTransaction(txn, transactions);
+              transactionToDNsCommitMap
+                  .putIfAbsent(txn.getTxID(), new LinkedHashSet<>());
+            }
+          } catch (ContainerNotFoundException ex) {
+            LOG.warn("Container: " + id + " was not found for the transaction: "
+                + txn);
+            txnsToBePurged.add(txn);
           }
         }
+        purgeTransactions(txnsToBePurged);
       }
       return transactions;
     } finally {
       lock.unlock();
+    }
+  }
+
+  public void purgeTransactions(List<DeletedBlocksTransaction> txnsToBePurged)
+      throws IOException {
+    try (BatchOperation batch = scmMetadataStore.getBatchHandler()
+        .initBatchOperation()) {
+      for (int i = 0; i < txnsToBePurged.size(); i++) {
+        scmMetadataStore.getDeletedBlocksTXTable()
+            .deleteWithBatch(batch, txnsToBePurged.get(i).getTxID());
+      }
+      scmMetadataStore.getBatchHandler().commitBatchOperation(batch);
     }
   }
 

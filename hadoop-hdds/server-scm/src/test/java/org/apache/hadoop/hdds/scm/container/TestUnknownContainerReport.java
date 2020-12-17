@@ -27,7 +27,6 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto
@@ -35,6 +34,7 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.server
     .SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -107,7 +107,7 @@ public class TestUnknownContainerReport {
 
     ContainerInfo container = getContainer(LifeCycleState.CLOSED);
     Iterator<DatanodeDetails> nodeIterator = nodeManager
-        .getNodes(NodeState.HEALTHY).iterator();
+        .getNodes(NodeStatus.inServiceHealthy()).iterator();
     DatanodeDetails datanode = nodeIterator.next();
 
     ContainerReportsProto containerReport = getContainerReportsProto(

@@ -20,6 +20,8 @@ package org.apache.hadoop.hdds.scm.node;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -35,11 +37,14 @@ public class NewNodeHandler implements EventHandler<DatanodeDetails> {
       LoggerFactory.getLogger(NewNodeHandler.class);
 
   private final PipelineManager pipelineManager;
+  private final NodeDecommissionManager decommissionManager;
   private final ConfigurationSource conf;
 
   public NewNodeHandler(PipelineManager pipelineManager,
+      NodeDecommissionManager decommissionManager,
       ConfigurationSource conf) {
     this.pipelineManager = pipelineManager;
+    this.decommissionManager = decommissionManager;
     this.conf = conf;
   }
 
@@ -48,7 +53,16 @@ public class NewNodeHandler implements EventHandler<DatanodeDetails> {
       EventPublisher publisher) {
     try {
       pipelineManager.triggerPipelineCreation();
-    } catch (NotLeaderException ex) {
+      if (datanodeDetails.getPersistedOpState()
+          != HddsProtos.NodeOperationalState.IN_SERVICE) {
+        decommissionManager.continueAdminForNode(datanodeDetails);
+      }
+    }catch (NodeNotFoundException  e) {
+      // Should not happen, as the node has just registered to call this event
+      // handler.
+      LOG.warn("NodeNotFound when adding the node to the decommissionManager",
+          e);
+    } catch (NotLeaderException nle) {
       LOG.debug("Not the current leader SCM and cannot start pipeline" +
           " creation.");
     }

@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto
@@ -190,22 +191,45 @@ public class TestDeadNodeHandler {
     TestUtils.closeContainer(containerManager, container2.containerID());
     TestUtils.quasiCloseContainer(containerManager, container3.containerID());
 
+    // First set the node to IN_MAINTENANCE and ensure the container replicas
+    // are not removed on the dead event
+    nodeManager.setNodeOperationalState(datanode1,
+        HddsProtos.NodeOperationalState.IN_MAINTENANCE);
     deadNodeHandler.onMessage(datanode1, publisher);
 
     Set<ContainerReplica> container1Replicas = containerManager
+        .getContainerReplicas(ContainerID.valueOf(container1.getContainerID()));
+    Assert.assertEquals(2, container1Replicas.size());
+
+    Set<ContainerReplica> container2Replicas = containerManager
+        .getContainerReplicas(ContainerID.valueOf(container2.getContainerID()));
+    Assert.assertEquals(2, container2Replicas.size());
+
+    Set<ContainerReplica> container3Replicas = containerManager
+            .getContainerReplicas(
+                ContainerID.valueOf(container3.getContainerID()));
+    Assert.assertEquals(1, container3Replicas.size());
+
+    // Now set the node to anything other than IN_MAINTENANCE and the relevant
+    // replicas should be removed
+    nodeManager.setNodeOperationalState(datanode1,
+        HddsProtos.NodeOperationalState.IN_SERVICE);
+    deadNodeHandler.onMessage(datanode1, publisher);
+
+    container1Replicas = containerManager
         .getContainerReplicas(ContainerID.valueOf(container1.getContainerID()));
     Assert.assertEquals(1, container1Replicas.size());
     Assert.assertEquals(datanode2,
         container1Replicas.iterator().next().getDatanodeDetails());
 
-    Set<ContainerReplica> container2Replicas = containerManager
+    container2Replicas = containerManager
         .getContainerReplicas(ContainerID.valueOf(container2.getContainerID()));
     Assert.assertEquals(1, container2Replicas.size());
     Assert.assertEquals(datanode2,
         container2Replicas.iterator().next().getDatanodeDetails());
 
-    Set<ContainerReplica> container3Replicas = containerManager
-            .getContainerReplicas(container3.containerID());
+    container3Replicas = containerManager
+        .getContainerReplicas(ContainerID.valueOf(container3.getContainerID()));
     Assert.assertEquals(1, container3Replicas.size());
     Assert.assertEquals(datanode3,
         container3Replicas.iterator().next().getDatanodeDetails());

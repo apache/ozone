@@ -23,13 +23,13 @@ import java.util.List;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState;
 import org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms.LeaderChoosePolicy;
 import org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms.LeaderChoosePolicyFactory;
@@ -91,7 +91,7 @@ public class RatisPipelineProvider extends PipelineProvider {
           ReplicationType.RATIS, factor).size() -
           getPipelineStateManager().getPipelines(ReplicationType.RATIS, factor,
               PipelineState.CLOSED).size()) > maxPipelinePerDatanode *
-          getNodeManager().getNodeCount(HddsProtos.NodeState.HEALTHY) /
+          getNodeManager().getNodeCount(NodeStatus.inServiceHealthy()) /
           factor.getNumber();
     }
 

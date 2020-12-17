@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
+import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServerConfig;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.Before;
 import org.junit.After;
@@ -46,6 +47,7 @@ import org.junit.rules.Timeout;
 
 import java.io.IOException;
 import java.net.ConnectException;
+import java.time.Duration;
 import java.util.UUID;
 import java.util.HashMap;
 
@@ -77,6 +79,7 @@ public abstract class TestOzoneManagerHA {
   private static final int OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS = 5;
   private static final int IPC_CLIENT_CONNECT_MAX_RETRIES = 4;
   private static final long SNAPSHOT_THRESHOLD = 50;
+  private static final Duration RETRY_CACHE_DURATION = Duration.ofSeconds(30);
 
   @Rule
   public ExpectedException exception = ExpectedException.none();
@@ -116,6 +119,10 @@ public abstract class TestOzoneManagerHA {
     return OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS;
   }
 
+  public static Duration getRetryCacheDuration() {
+    return RETRY_CACHE_DURATION;
+  }
+
   /**
    * Create a MiniDFSCluster for testing.
    * <p>
@@ -143,6 +150,13 @@ public abstract class TestOzoneManagerHA {
     conf.setLong(
         OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY,
         SNAPSHOT_THRESHOLD);
+
+    OzoneManagerRatisServerConfig omHAConfig =
+        conf.getObject(OzoneManagerRatisServerConfig.class);
+
+    omHAConfig.setRetryCacheTimeout(RETRY_CACHE_DURATION);
+
+    conf.setFromObject(omHAConfig);
 
     /**
      * config for key deleting service.

@@ -85,8 +85,7 @@ public class TestOMKeysDeleteResponse extends TestOMKeyResponse {
         .setCreationTime(Time.now()).build();
 
     OMClientResponse omKeysDeleteResponse = new OMKeysDeleteResponse(
-        omResponse, omKeyInfoList, true,
-        omVolumeArgs, omBucketInfo);
+        omResponse, omKeyInfoList, true, omBucketInfo);
 
     omKeysDeleteResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
 
@@ -113,16 +112,12 @@ public class TestOMKeysDeleteResponse extends TestOMKeyResponse {
             .setDeleteKeysResponse(DeleteKeysResponse.newBuilder()
                 .setStatus(false)).build();
 
-    OmVolumeArgs omVolumeArgs = OmVolumeArgs.newBuilder()
-        .setOwnerName(keyName).setAdminName(keyName)
-        .setVolume(volumeName).setCreationTime(Time.now()).build();
     OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
         .setVolumeName(volumeName).setBucketName(bucketName)
         .setCreationTime(Time.now()).build();
 
     OMClientResponse omKeysDeleteResponse = new OMKeysDeleteResponse(
-        omResponse, omKeyInfoList, true,
-        omVolumeArgs, omBucketInfo);
+        omResponse, omKeyInfoList, true, omBucketInfo);
 
     omKeysDeleteResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
 
