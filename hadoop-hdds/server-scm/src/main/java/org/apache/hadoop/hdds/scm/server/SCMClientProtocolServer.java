@@ -21,12 +21,17 @@
  */
 package org.apache.hadoop.hdds.scm.server;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.Maps;
+import com.google.protobuf.BlockingService;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.tuple.Pair;
@@ -38,23 +43,25 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ScmOps;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.ScmUtils;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
+import org.apache.hadoop.hdds.scm.safemode.SafeModePrecheck;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
-import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
-import org.apache.hadoop.hdds.scm.safemode.SafeModePrecheck;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
@@ -71,10 +78,6 @@ import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.audit.Auditor;
 import org.apache.hadoop.ozone.audit.SCMAction;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Maps;
-import com.google.protobuf.BlockingService;
 import com.google.protobuf.ProtocolMessageEnum;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StorageContainerLocationProtocolService.newReflectiveBlockingService;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
@@ -377,7 +380,8 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
-  public List<HddsProtos.Node> queryNode(HddsProtos.NodeState state,
+  public List<HddsProtos.Node> queryNode(
+      HddsProtos.NodeOperationalState opState, HddsProtos.NodeState state,
       HddsProtos.QueryScope queryScope, String poolName) throws
       IOException {
 
@@ -386,13 +390,57 @@ public class SCMClientProtocolServer implements
     }
 
     List<HddsProtos.Node> result = new ArrayList<>();
-    queryNode(state).forEach(node -> result.add(HddsProtos.Node.newBuilder()
-        .setNodeID(node.getProtoBufMessage())
-        .addNodeStates(state)
-        .build()));
-
+    for (DatanodeDetails node : queryNode(opState, state)) {
+      try {
+        NodeStatus ns = scm.getScmNodeManager().getNodeStatus(node);
+        result.add(HddsProtos.Node.newBuilder()
+            .setNodeID(node.getProtoBufMessage())
+            .addNodeStates(ns.getHealth())
+            .addNodeOperationalStates(ns.getOperationalState())
+            .build());
+      } catch (NodeNotFoundException e) {
+        throw new IOException(
+            "An unexpected error occurred querying the NodeStatus", e);
+      }
+    }
     return result;
+  }
 
+  @Override
+  public void decommissionNodes(List<String> nodes) throws IOException {
+    String remoteUser = getRpcRemoteUsername();
+    try {
+      getScm().checkAdminAccess(remoteUser);
+      scm.getScmDecommissionManager().decommissionNodes(nodes);
+    } catch (Exception ex) {
+      LOG.error("Failed to decommission nodes", ex);
+      throw ex;
+    }
+  }
+
+  @Override
+  public void recommissionNodes(List<String> nodes) throws IOException {
+    String remoteUser = getRpcRemoteUsername();
+    try {
+      getScm().checkAdminAccess(remoteUser);
+      scm.getScmDecommissionManager().recommissionNodes(nodes);
+    } catch (Exception ex) {
+      LOG.error("Failed to recommission nodes", ex);
+      throw ex;
+    }
+  }
+
+  @Override
+  public void startMaintenanceNodes(List<String> nodes, int endInHours)
+      throws IOException {
+    String remoteUser = getRpcRemoteUsername();
+    try {
+      getScm().checkAdminAccess(remoteUser);
+      scm.getScmDecommissionManager().startMaintenanceNodes(nodes, endInHours);
+    } catch (Exception ex) {
+      LOG.error("Failed to place nodes into maintenance mode", ex);
+      throw ex;
+    }
   }
 
   @Override
@@ -568,12 +616,13 @@ public class SCMClientProtocolServer implements
    * operation between the
    * operators.
    *
-   * @param state - NodeStates.
+   * @param opState - NodeOperational State
+   * @param state - NodeState.
    * @return List of Datanodes.
    */
-  public List<DatanodeDetails> queryNode(HddsProtos.NodeState state) {
-    Preconditions.checkNotNull(state, "Node Query set cannot be null");
-    return queryNodeState(state);
+  public List<DatanodeDetails> queryNode(
+      HddsProtos.NodeOperationalState opState, HddsProtos.NodeState state) {
+    return new ArrayList<>(queryNodeState(opState, state));
   }
 
   @VisibleForTesting
@@ -592,11 +641,19 @@ public class SCMClientProtocolServer implements
   /**
    * Query the System for Nodes.
    *
+   * @params opState - The node operational state
    * @param nodeState - NodeState that we are interested in matching.
-   * @return List of Datanodes that match the NodeState.
+   * @return Set of Datanodes that match the NodeState.
    */
-  private List<DatanodeDetails> queryNodeState(HddsProtos.NodeState nodeState) {
-    return scm.getScmNodeManager().getNodes(nodeState);
+  private Set<DatanodeDetails> queryNodeState(
+      HddsProtos.NodeOperationalState opState, HddsProtos.NodeState nodeState) {
+    Set<DatanodeDetails> returnSet = new TreeSet<>();
+    List<DatanodeDetails> tmp = scm.getScmNodeManager()
+        .getNodes(opState, nodeState);
+    if ((tmp != null) && (tmp.size() > 0)) {
+      returnSet.addAll(tmp);
+    }
+    return returnSet;
   }
 
   @Override

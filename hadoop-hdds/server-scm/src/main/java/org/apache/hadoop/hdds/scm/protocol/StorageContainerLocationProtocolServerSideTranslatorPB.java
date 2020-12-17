@@ -65,6 +65,12 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartReplicationManagerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopReplicationManagerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopReplicationManagerResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionNodesRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionNodesResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.RecommissionNodesRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.RecommissionNodesResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartMaintenanceNodesRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartMaintenanceNodesResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetSafeModeRuleStatusesRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetSafeModeRuleStatusesResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SafeModeRuleStatusProto;
@@ -140,6 +146,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             request.getTraceID());
   }
 
+  @SuppressWarnings("checkstyle:methodlength")
   public ScmContainerLocationResponse processRequest(
       ScmContainerLocationRequest request) throws ServiceException {
     try {
@@ -282,6 +289,27 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setGetSafeModeRuleStatusesResponse(getSafeModeRuleStatues(
                 request.getGetSafeModeRuleStatusesRequest()))
             .build();
+      case DecommissionNodes:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setDecommissionNodesResponse(decommissionNodes(
+                request.getDecommissionNodesRequest()))
+            .build();
+      case RecommissionNodes:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setRecommissionNodesResponse(recommissionNodes(
+                request.getRecommissionNodesRequest()))
+            .build();
+      case StartMaintenanceNodes:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setStartMaintenanceNodesResponse(startMaintenanceNodes(
+                request.getStartMaintenanceNodesRequest()))
+          .build();
       default:
         throw new IllegalArgumentException(
             "Unknown command type: " + request.getCmdType());
@@ -368,13 +396,19 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       StorageContainerLocationProtocolProtos.NodeQueryRequestProto request)
       throws IOException {
 
-    HddsProtos.NodeState nodeState = request.getState();
-    List<HddsProtos.Node> datanodes = impl.queryNode(nodeState,
+    HddsProtos.NodeOperationalState opState = null;
+    HddsProtos.NodeState nodeState = null;
+    if (request.hasState()) {
+      nodeState = request.getState();
+    }
+    if (request.hasOpState()) {
+      opState = request.getOpState();
+    }
+    List<HddsProtos.Node> datanodes = impl.queryNode(opState, nodeState,
         request.getScope(), request.getPoolName());
     return NodeQueryResponseProto.newBuilder()
         .addAllDatanodes(datanodes)
         .build();
-
   }
 
   public SCMCloseContainerResponseProto closeContainer(
@@ -507,6 +541,27 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       throws IOException {
     return ReplicationManagerStatusResponseProto.newBuilder()
         .setIsRunning(impl.getReplicationManagerStatus()).build();
+  }
+
+  public DecommissionNodesResponseProto decommissionNodes(
+      DecommissionNodesRequestProto request) throws IOException {
+    impl.decommissionNodes(request.getHostsList());
+    return DecommissionNodesResponseProto.newBuilder()
+        .build();
+  }
+
+  public RecommissionNodesResponseProto recommissionNodes(
+      RecommissionNodesRequestProto request) throws IOException {
+    impl.recommissionNodes(request.getHostsList());
+    return RecommissionNodesResponseProto.newBuilder().build();
+  }
+
+  public StartMaintenanceNodesResponseProto startMaintenanceNodes(
+      StartMaintenanceNodesRequestProto request) throws IOException {
+    impl.startMaintenanceNodes(request.getHostsList(),
+        (int)request.getEndInHours());
+    return StartMaintenanceNodesResponseProto.newBuilder()
+        .build();
   }
 
 }

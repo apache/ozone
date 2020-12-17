@@ -38,7 +38,7 @@ public class TestJsonUtils {
 
     assertContains(result, "\"rawSize\" : 123");
     assertContains(result, "\"unit\" : \"MB\"");
-    assertContains(result, "\"quotaInCounts\" : 1000");
+    assertContains(result, "\"quotaInNamespace\" : 1000");
   }
 
   private static void assertContains(String str, String part) {

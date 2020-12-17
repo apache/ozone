@@ -765,7 +765,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
       skipStartKey = true;
     } else {
       // This allows us to seek directly to the first key with the right prefix.
-      seekKey = getOzoneKey(volumeName, bucketName, keyPrefix);
+      seekKey = getOzoneKey(volumeName, bucketName,
+          StringUtil.isNotBlank(keyPrefix) ? keyPrefix : OM_KEY_PREFIX);
     }
 
     String seekPrefix;

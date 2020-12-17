@@ -76,7 +76,9 @@ public class TestPipelineManagerImpl {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     dbStore = DBStoreBuilder.createDBStore(conf, new SCMDBDefinition());
     nodeManager = new MockNodeManager(true, 20);
-    maxPipelineCount = nodeManager.getNodeCount(HddsProtos.NodeState.HEALTHY) *
+    maxPipelineCount = nodeManager.getNodeCount(
+        HddsProtos.NodeOperationalState.IN_SERVICE,
+        HddsProtos.NodeState.HEALTHY) *
         conf.getInt(OZONE_DATANODE_PIPELINE_LIMIT,
             OZONE_DATANODE_PIPELINE_LIMIT_DEFAULT) /
         HddsProtos.ReplicationFactor.THREE.getNumber();

@@ -34,7 +34,7 @@ public interface NodeManagerMXBean {
    *
    * @return A state to number of nodes that in this state mapping
    */
-  Map<String, Integer> getNodeCount();
+  Map<String, Map<String, Integer>> getNodeCount();
 
   /**
    * Get the disk metrics like capacity, usage and remaining based on the

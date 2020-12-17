@@ -390,7 +390,7 @@ public class TestOMDirectoryCreateRequest {
     Assert.assertNotNull(omMetadataManager.getKeyTable().get(
         omMetadataManager.getOzoneDirKey(volumeName, bucketName, keyName)));
 
-    Assert.assertEquals(1L, omMetrics.getNumKeys());
+    Assert.assertEquals(4L, omMetrics.getNumKeys());
   }
 
 

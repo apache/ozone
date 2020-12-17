@@ -824,13 +824,13 @@ public class TestRootedOzoneFileSystem {
     // Construct VolumeArgs
     VolumeArgs volumeArgs = new VolumeArgs.Builder()
         .setAcls(Collections.singletonList(aclWorldAccess))
-        .setQuotaInCounts(1000)
+        .setQuotaInNamespace(1000)
         .setQuotaInBytes(Long.MAX_VALUE).build();
     // Sanity check
     Assert.assertNull(volumeArgs.getOwner());
     Assert.assertNull(volumeArgs.getAdmin());
     Assert.assertEquals(Long.MAX_VALUE, volumeArgs.getQuotaInBytes());
-    Assert.assertEquals(1000, volumeArgs.getQuotaInCounts());
+    Assert.assertEquals(1000, volumeArgs.getQuotaInNamespace());
     Assert.assertEquals(0, volumeArgs.getMetadata().size());
     Assert.assertEquals(1, volumeArgs.getAcls().size());
     // Create volume "tmp" with world access. allow non-admin to create buckets

@@ -45,6 +45,7 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.metadata.PipelineIDCodec;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.PipelineReportFromDatanode;
 import org.apache.hadoop.hdds.server.events.EventQueue;
@@ -788,7 +789,7 @@ public class TestSCMPipelineManager {
         .setState(Pipeline.PipelineState.OPEN)
         .setNodes(
             Arrays.asList(
-                nodeManager.getNodes(HddsProtos.NodeState.HEALTHY).get(0)
+                nodeManager.getNodes(NodeStatus.inServiceHealthy()).get(0)
             )
         )
         .setNodesInOrder(Arrays.asList(0))

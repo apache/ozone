@@ -38,7 +38,10 @@ import picocli.CommandLine.Spec;
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class,
     subcommands = {
-        ListInfoSubcommand.class
+        ListInfoSubcommand.class,
+        DecommissionSubCommand.class,
+        MaintenanceSubCommand.class,
+        RecommissionSubCommand.class
     })
 @MetaInfServices(SubcommandWithParent.class)
 public class DatanodeCommands implements Callable<Void>, SubcommandWithParent {
