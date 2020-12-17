@@ -18,8 +18,7 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
-import org.apache.ratis.protocol.RaftGroupId;
-import org.apache.ratis.protocol.RaftPeer;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.apache.ratis.server.RaftServer;
 
 import java.io.IOException;
@@ -40,9 +39,15 @@ public interface SCMRatisServer {
 
   void stop() throws IOException;
 
-  RaftServer getServer();
+  RaftServer.Division getDivision();
 
-  RaftGroupId getRaftGroupId();
+  /**
+   * Returns roles of ratis peers.
+   */
+  List<String> getRatisRoles();
 
-  List<RaftPeer> getRaftPeers();
+  /**
+   * Returns NotLeaderException with useful info.
+   */
+  NotLeaderException triggerNotLeaderException();
 }

@@ -589,9 +589,7 @@ public final class PipelineManagerV2Impl implements PipelineManager {
         startPipelineCreator();
       }
     } catch (NotLeaderException ex) {
-      LOG.warn("Not the current leader SCM and cannot process pipeline" +
-              " creation. Suggested leader is: ",
-          scmhaManager.getSuggestedLeader().getAddress());
+      LOG.warn("Not leader SCM, cannot process pipeline creation.");
     }
 
   }

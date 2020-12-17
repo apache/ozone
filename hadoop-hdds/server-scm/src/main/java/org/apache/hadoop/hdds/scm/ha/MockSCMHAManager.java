@@ -33,7 +33,6 @@ import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftClientReply;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftGroupMemberId;
-import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.apache.ratis.server.RaftServer;
@@ -77,11 +76,6 @@ public final class MockSCMHAManager implements SCMHAManager {
     this.isLeader = isLeader;
   }
 
-  @Override
-  public RaftPeer getSuggestedLeader() {
-    throw new UnsupportedOperationException();
-  }
-
   /**
    * {@inheritDoc}
    */
@@ -96,24 +90,6 @@ public final class MockSCMHAManager implements SCMHAManager {
   @Override
   public void shutdown() throws IOException {
     ratisServer.stop();
-  }
-
-  @Override
-  public List<String> getRatisRoles() {
-    return Arrays.asList(
-        "180.3.14.5:9865",
-        "180.3.14.21:9865",
-        "180.3.14.145:9865");
-  }
-
-  /**
-   * {@inheritDoc}
-   */
-  @Override
-  public NotLeaderException triggerNotLeaderException() {
-    return new NotLeaderException(RaftGroupMemberId.valueOf(
-        RaftPeerId.valueOf("peer"), RaftGroupId.randomId()),
-        null, new ArrayList<>());
   }
 
   private class MockRatisServer implements SCMRatisServer {
@@ -205,23 +181,27 @@ public final class MockSCMHAManager implements SCMHAManager {
     }
 
     @Override
-    public RaftServer getServer() {
-      return null;
-    }
-
-    @Override
-    public RaftGroupId getRaftGroupId() {
-      return null;
-    }
-
-    @Override
-    public List<RaftPeer> getRaftPeers() {
-      return new ArrayList<>();
-    }
-
-    @Override
     public void stop() {
     }
-  }
 
+    @Override
+    public RaftServer.Division getDivision() {
+      return null;
+    }
+
+    @Override
+    public List<String> getRatisRoles() {
+      return Arrays.asList(
+          "180.3.14.5:9865",
+          "180.3.14.21:9865",
+          "180.3.14.145:9865");
+    }
+
+    @Override
+    public NotLeaderException triggerNotLeaderException() {
+      return new NotLeaderException(RaftGroupMemberId.valueOf(
+          RaftPeerId.valueOf("peer"), RaftGroupId.randomId()),
+          null, new ArrayList<>());
+    }
+  }
 }

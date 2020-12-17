@@ -18,14 +18,8 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import com.google.common.base.Preconditions;
-import java.util.List;
-import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.ratis.proto.RaftProtos;
-import org.apache.ratis.protocol.RaftGroupMemberId;
-import org.apache.ratis.protocol.RaftPeer;
-import org.apache.ratis.protocol.RaftPeerId;
-import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.impl.RaftServerImpl;
 import org.apache.ratis.server.impl.RaftServerProxy;
@@ -77,13 +71,14 @@ public class SCMHAManagerImpl implements SCMHAManager {
       // When SCM HA is not enabled, the current SCM is always the leader.
       return Optional.of((long)0);
     }
-    RaftServer server = ratisServer.getServer();
+    RaftServer server = ratisServer.getDivision().getRaftServer();
     Preconditions.checkState(server instanceof RaftServerProxy);
     try {
       // SCM only has one raft group.
       RaftServerImpl serverImpl = ((RaftServerProxy) server)
-          .getImpl(ratisServer.getRaftGroupId());
+          .getImpl(ratisServer.getDivision().getGroup().getGroupId());
       if (serverImpl != null) {
+        // TODO: getRoleInfoProto() will be exposed from Division later.
         RaftProtos.RoleInfoProto roleInfoProto = serverImpl.getRoleInfoProto();
         return roleInfoProto.hasLeaderInfo()
             ? Optional.of(roleInfoProto.getLeaderInfo().getTerm())
@@ -104,68 +99,11 @@ public class SCMHAManagerImpl implements SCMHAManager {
     return ratisServer;
   }
 
-  private RaftPeerId getPeerIdFromRoleInfo(RaftServerImpl serverImpl) {
-    if (serverImpl.isLeader()) {
-      return RaftPeerId.getRaftPeerId(
-          serverImpl.getRoleInfoProto().getLeaderInfo().toString());
-    } else if (serverImpl.isFollower()) {
-      return RaftPeerId.valueOf(
-          serverImpl.getRoleInfoProto().getFollowerInfo()
-              .getLeaderInfo().getId().getId());
-    } else {
-      return null;
-    }
-  }
-
-  @Override
-  public RaftPeer getSuggestedLeader() {
-    RaftServer server = ratisServer.getServer();
-    Preconditions.checkState(server instanceof RaftServerProxy);
-    RaftServerImpl serverImpl = null;
-    try {
-      // SCM only has one raft group.
-      serverImpl = ((RaftServerProxy) server)
-          .getImpl(ratisServer.getRaftGroupId());
-      if (serverImpl != null) {
-        RaftPeerId peerId =  getPeerIdFromRoleInfo(serverImpl);
-        if (peerId != null) {
-          return RaftPeer.newBuilder().setId(peerId).build();
-        }
-        return null;
-      }
-    } catch (IOException ioe) {
-      LOG.error("Fail to get RaftServer impl and therefore it's not clear " +
-          "whether it's leader. ", ioe);
-    }
-    return null;
-  }
-
   /**
    * {@inheritDoc}
    */
   @Override
   public void shutdown() throws IOException {
     ratisServer.stop();
-  }
-
-  @Override
-  public List<String> getRatisRoles() {
-    return getRatisServer()
-            .getRaftPeers()
-            .stream()
-            .map(peer -> peer.getAddress() == null ? "" : peer.getAddress())
-            .collect(Collectors.toList());
-  }
-
-  /**
-   * {@inheritDoc}
-   */
-  @Override
-  public NotLeaderException triggerNotLeaderException() {
-    return new NotLeaderException(RaftGroupMemberId.valueOf(
-        ratisServer.getServer().getId(),
-        ratisServer.getRaftGroupId()),
-        getSuggestedLeader(),
-        ratisServer.getRaftPeers());
   }
 }
