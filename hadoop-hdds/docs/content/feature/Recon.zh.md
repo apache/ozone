@@ -1,5 +1,5 @@
 ---
-title: "Recon"
+title: "Recon 服务器"
 weight: 7
 menu:
    main:
@@ -23,27 +23,10 @@ summary: Recon 是 Ozone 中用于分析服务的网页用户界面（Web UI）
   limitations under the License.
 -->
 
-Recon 是 Ozone 中用于分析服务的网页用户界面（Web UI）。它是一个可选组件，但强烈建议您使用，因为它可以增加可视性。
+Recon 作为 Ozone 的管理和监听控制台。它是一个可选组件，但强烈建议将其添加到集群中，因为 Recon 可以在关键时刻帮助您对集群进行故障排除。请参阅 [Recon 架构]({{< ref "concept/Recon.zh.md" >}}) 以获得详细的架构概述和 [Recon API]({{< ref path="interface/ReconApi.zh.md" >}}) 文档，以获得 HTTP API 参考。
 
-Recon 从 Ozone 集群中**收集**所有数据，并将其存储在 SQL数据库中，以便进一步分析。
-
- 1. Ozone Manager 的数据是通过异步过程在后台下载的。OM 会定期创建 RocksDB 快照，并将增量数据复制到 Recon 进行处理。
-
- 2. 数据节点不仅可以将心跳发送到 SCM，也能发送到 Recon。Recon 可以成为心跳的唯读（Read-only）监听器，并根据收到的信息更新本地数据库。
-
-当 Recon 配置完成时，我们便可以启动服务。
+Recon 是一个自带 HTTP 网页服务器的服务，可以通过以下命令启动。
 
 {{< highlight bash >}}
 ozone --daemon start recon
 {{< /highlight >}}
-
-## 需要关注的配置项
-
-配置项 | 默认值 | 描述
--------|--------|-----
-ozone.recon.http-address | 0.0.0.0:9888 | Recon web UI 监听的地址和基本端口。
-ozone.recon.address | 0.0.0.0:9891 | Recon 的 RPC 地址。
-ozone.recon.db.dir | none | Recon Server 存储其元数据的目录。
-ozone.recon.om.db.dir | none | Recon Server 存储其 OM 快照 DB 的目录。
-ozone.recon.om.snapshot.task.interval.delay | 10m | Recon 以分钟间隔请求 OM DB 快照。
-
