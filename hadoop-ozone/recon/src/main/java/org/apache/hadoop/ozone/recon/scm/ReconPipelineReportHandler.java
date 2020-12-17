@@ -23,6 +23,7 @@ import java.io.IOException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
@@ -46,9 +47,10 @@ public class ReconPipelineReportHandler extends PipelineReportHandler {
 
   public ReconPipelineReportHandler(SafeModeManager scmSafeModeManager,
       PipelineManager pipelineManager,
+      SCMContext scmContext,
       ConfigurationSource conf,
       StorageContainerServiceProvider scmServiceProvider) {
-    super(scmSafeModeManager, pipelineManager, conf);
+    super(scmSafeModeManager, pipelineManager, scmContext, conf);
     this.scmServiceProvider = scmServiceProvider;
   }
 

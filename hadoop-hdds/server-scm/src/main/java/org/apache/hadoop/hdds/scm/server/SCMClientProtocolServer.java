@@ -126,6 +126,7 @@ public class SCMClientProtocolServer implements
     BlockingService storageProtoPbService =
         newReflectiveBlockingService(
             new StorageContainerLocationProtocolServerSideTranslatorPB(this,
+                scm,
                 protocolMetrics));
 
     final InetSocketAddress scmAddress = HddsServerUtil

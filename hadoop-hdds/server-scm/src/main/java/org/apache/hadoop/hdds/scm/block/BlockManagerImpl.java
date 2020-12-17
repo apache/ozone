@@ -116,8 +116,8 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
             TimeUnit.MILLISECONDS);
     blockDeletingService =
         new SCMBlockDeletingService(deletedBlockLog, containerManager,
-            scm.getScmNodeManager(), scm.getEventQueue(), svcInterval,
-            serviceTimeout, conf);
+            scm.getScmNodeManager(), scm.getEventQueue(), scm.getScmContext(),
+            svcInterval, serviceTimeout, conf);
     safeModePrecheck = new SafeModePrecheck(conf);
   }
 

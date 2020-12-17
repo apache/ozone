@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.scm.container.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementPolicyFactory;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementMetrics;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.node.DeadNodeHandler;
@@ -78,6 +79,7 @@ public class ReconStorageContainerManagerFacade
   private final OzoneConfiguration ozoneConfiguration;
   private final ReconDatanodeProtocolServer datanodeProtocolServer;
   private final EventQueue eventQueue;
+  private final SCMContext scmContext;
   private final SCMStorageConfig scmStorageConfig;
   private final DBStore dbStore;
 
@@ -98,6 +100,7 @@ public class ReconStorageContainerManagerFacade
       throws IOException {
     this.eventQueue = new EventQueue();
     eventQueue.setSilent(true);
+    this.scmContext = SCMContext.emptyContext();
     this.ozoneConfiguration = getReconScmConfiguration(conf);
     this.scmStorageConfig = new ReconStorageConfig(conf);
     this.clusterMap = new NetworkTopologyImpl(conf);
@@ -131,11 +134,11 @@ public class ReconStorageContainerManagerFacade
 
     SafeModeManager safeModeManager = new ReconSafeModeManager();
     ReconPipelineReportHandler pipelineReportHandler =
-        new ReconPipelineReportHandler(
-            safeModeManager, pipelineManager, conf, scmServiceProvider);
+        new ReconPipelineReportHandler(safeModeManager,
+            pipelineManager, scmContext, conf, scmServiceProvider);
 
     PipelineActionHandler pipelineActionHandler =
-        new PipelineActionHandler(pipelineManager, conf);
+        new PipelineActionHandler(pipelineManager, scmContext, conf);
 
     StaleNodeHandler staleNodeHandler =
         new StaleNodeHandler(nodeManager, pipelineManager, conf);
@@ -146,10 +149,11 @@ public class ReconStorageContainerManagerFacade
         new ReconContainerReportHandler(nodeManager, containerManager);
 
     IncrementalContainerReportHandler icrHandler =
-         new ReconIncrementalContainerReportHandler(nodeManager,
-            containerManager);
+        new ReconIncrementalContainerReportHandler(nodeManager,
+            containerManager, scmContext);
     CloseContainerEventHandler closeContainerHandler =
-        new CloseContainerEventHandler(pipelineManager, containerManager);
+        new CloseContainerEventHandler(
+            pipelineManager, containerManager, scmContext);
     ContainerActionsHandler actionsHandler = new ContainerActionsHandler();
     ReconNewNodeHandler newNodeHandler = new ReconNewNodeHandler(nodeManager);
 

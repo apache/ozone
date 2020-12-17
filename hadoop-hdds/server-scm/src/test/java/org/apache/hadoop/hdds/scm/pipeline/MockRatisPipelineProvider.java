@@ -24,6 +24,7 @@ import java.util.List;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
@@ -40,7 +41,7 @@ public class MockRatisPipelineProvider extends RatisPipelineProvider {
       ConfigurationSource conf, EventPublisher eventPublisher,
       boolean autoOpen) {
     super(nodeManager, stateManager,
-        conf, eventPublisher);
+        conf, eventPublisher, SCMContext.emptyContext());
     autoOpenPipeline = autoOpen;
   }
 
@@ -48,14 +49,14 @@ public class MockRatisPipelineProvider extends RatisPipelineProvider {
       StateManager stateManager,
       ConfigurationSource conf) {
     super(nodeManager, stateManager,
-        conf, new EventQueue());
+        conf, new EventQueue(), SCMContext.emptyContext());
   }
 
   public MockRatisPipelineProvider(
       NodeManager nodeManager, StateManager stateManager,
       ConfigurationSource conf, EventPublisher eventPublisher) {
     super(nodeManager, stateManager,
-        conf, eventPublisher);
+        conf, eventPublisher, SCMContext.emptyContext());
     autoOpenPipeline = true;
   }
 

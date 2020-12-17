@@ -42,7 +42,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolPB;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
-import org.apache.hadoop.hdds.scm.server.SCMBlockProtocolServer;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
@@ -64,6 +64,7 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
     implements ScmBlockLocationProtocolPB {
 
   private final ScmBlockLocationProtocol impl;
+  private final StorageContainerManager scm;
 
   private static final Logger LOG = LoggerFactory
       .getLogger(ScmBlockLocationProtocolServerSideTranslatorPB.class);
@@ -79,9 +80,11 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
    */
   public ScmBlockLocationProtocolServerSideTranslatorPB(
       ScmBlockLocationProtocol impl,
+      StorageContainerManager scm,
       ProtocolMessageMetrics<ProtocolMessageEnum> metrics)
       throws IOException {
     this.impl = impl;
+    this.scm = scm;
     dispatcher = new OzoneProtocolMessageDispatcher<>(
         "BlockLocationProtocol", metrics, LOG);
 
@@ -95,19 +98,13 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
         .setTraceID(traceID);
   }
 
-  private boolean isLeader() throws ServiceException {
-    if (!(impl instanceof SCMBlockProtocolServer)) {
-      throw new ServiceException("Should be SCMBlockProtocolServer");
-    } else {
-      return ((SCMBlockProtocolServer) impl).getScm().checkLeader();
-    }
-  }
-
   @Override
   public SCMBlockLocationResponse send(RpcController controller,
       SCMBlockLocationRequest request) throws ServiceException {
-    if (!isLeader()) {
-      throw new ServiceException(new IOException("SCM IS NOT LEADER"));
+    if (!scm.getScmContext().isLeader()) {
+      throw new ServiceException(scm.getScmHAManager()
+                                    .getRatisServer()
+                                    .triggerNotLeaderException());
     }
     return dispatcher.processRequest(
         request,
