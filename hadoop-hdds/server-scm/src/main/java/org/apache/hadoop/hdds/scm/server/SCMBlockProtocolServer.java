@@ -115,7 +115,7 @@ public class SCMBlockProtocolServer implements
     BlockingService blockProtoPbService =
         ScmBlockLocationProtocolProtos.ScmBlockLocationProtocolService
             .newReflectiveBlockingService(
-                new ScmBlockLocationProtocolServerSideTranslatorPB(this,
+                new ScmBlockLocationProtocolServerSideTranslatorPB(this, scm,
                     protocolMessageMetrics));
 
     final InetSocketAddress scmBlockAddress = HddsServerUtil
@@ -291,10 +291,6 @@ public class SCMBlockProtocolServer implements
         );
       }
     }
-  }
-
-  public StorageContainerManager getScm() {
-    return scm;
   }
 
   @Override

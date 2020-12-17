@@ -27,10 +27,13 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
+import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 
 import java.io.IOException;
@@ -46,6 +49,7 @@ import java.util.function.Supplier;
 public class AbstractContainerReportHandler {
 
   private final ContainerManagerV2 containerManager;
+  private final SCMContext scmContext;
   private final Logger logger;
 
   /**
@@ -56,10 +60,13 @@ public class AbstractContainerReportHandler {
    * @param logger Logger to be used for logging
    */
   AbstractContainerReportHandler(final ContainerManagerV2 containerManager,
+                                 final SCMContext scmContext,
                                  final Logger logger) {
     Preconditions.checkNotNull(containerManager);
+    Preconditions.checkNotNull(scmContext);
     Preconditions.checkNotNull(logger);
     this.containerManager = containerManager;
+    this.scmContext = scmContext;
     this.logger = logger;
   }
 
@@ -317,11 +324,17 @@ public class AbstractContainerReportHandler {
 
   protected void deleteReplica(ContainerID containerID, DatanodeDetails dn,
       EventPublisher publisher, String reason) {
-    final DeleteContainerCommand deleteCommand =
-        new DeleteContainerCommand(containerID.getId(), true);
-    final CommandForDatanode datanodeCommand = new CommandForDatanode<>(
-        dn.getUuid(), deleteCommand);
-    publisher.fireEvent(SCMEvents.DATANODE_COMMAND, datanodeCommand);
+    SCMCommand<?> command = new DeleteContainerCommand(
+        containerID.getId(), true);
+    try {
+      command.setTerm(scmContext.getTerm());
+    } catch (NotLeaderException nle) {
+      logger.warn("Skip sending delete container command," +
+          " since not leader SCM", nle);
+      return;
+    }
+    publisher.fireEvent(SCMEvents.DATANODE_COMMAND,
+        new CommandForDatanode<>(dn.getUuid(), command));
     logger.info("Sending delete container command for " + reason +
         " container {} to datanode {}", containerID.getId(), dn);
   }

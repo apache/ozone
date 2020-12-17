@@ -47,6 +47,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -72,6 +73,8 @@ import com.google.protobuf.GeneratedMessage;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.SCM;
+
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -104,6 +107,11 @@ public class ReplicationManager
    * EventPublisher to fire Replicate and Delete container events.
    */
   private final EventPublisher eventPublisher;
+
+  /**
+   * SCMContext from StorageContainerManager.
+   */
+  private final SCMContext scmContext;
 
   /**
    * Used for locking a container using its ID while processing it.
@@ -161,11 +169,13 @@ public class ReplicationManager
                             final ContainerManagerV2 containerManager,
                             final PlacementPolicy containerPlacement,
                             final EventPublisher eventPublisher,
+                            final SCMContext scmContext,
                             final LockManager<ContainerID> lockManager,
                             final NodeManager nodeManager) {
     this.containerManager = containerManager;
     this.containerPlacement = containerPlacement;
     this.eventPublisher = eventPublisher;
+    this.scmContext = scmContext;
     this.lockManager = lockManager;
     this.nodeManager = nodeManager;
     this.conf = conf;
@@ -957,10 +967,16 @@ public class ReplicationManager
 
     LOG.info("Sending close container command for container {}" +
             " to datanode {}.", container.containerID(), datanode);
-
     CloseContainerCommand closeContainerCommand =
         new CloseContainerCommand(container.getContainerID(),
             container.getPipelineID(), force);
+    try {
+      closeContainerCommand.setTerm(scmContext.getTerm());
+    } catch (NotLeaderException nle) {
+      LOG.warn("Skip sending close container command,"
+          + " since current SCM is not leader.", nle);
+      return;
+    }
     eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
         new CommandForDatanode<>(datanode.getUuid(), closeContainerCommand));
   }
@@ -1026,6 +1042,13 @@ public class ReplicationManager
       final DatanodeDetails datanode,
       final SCMCommand<T> command,
       final Consumer<InflightAction> tracker) {
+    try {
+      command.setTerm(scmContext.getTerm());
+    } catch (NotLeaderException nle) {
+      LOG.warn("Skip sending datanode command,"
+          + " since current SCM is not leader.", nle);
+      return;
+    }
     final CommandForDatanode<T> datanodeCommand =
         new CommandForDatanode<>(datanode.getUuid(), command);
     eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND, datanodeCommand);

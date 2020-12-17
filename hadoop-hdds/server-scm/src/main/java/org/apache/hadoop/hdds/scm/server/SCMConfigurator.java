@@ -22,6 +22,7 @@ package org.apache.hadoop.hdds.scm.server;
 
 import org.apache.hadoop.hdds.scm.block.BlockManager;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
@@ -53,7 +54,8 @@ import org.apache.hadoop.hdds.security.x509.certificate.authority
  * SCMSafeModeManager scmSafeModeManager;
  * CertificateServer certificateServer;
  * SCMMetadata scmMetadataStore;
- * SCMHAManager scmHAManager.
+ * SCMHAManager scmHAManager;
+ * SCMContext scmContext.
  *
  * If any of these are *not* specified then the default version of these
  * managers are used by SCM.
@@ -70,6 +72,7 @@ public final class SCMConfigurator {
   private SCMMetadataStore metadataStore;
   private NetworkTopology networkTopology;
   private SCMHAManager scmHAManager;
+  private SCMContext scmContext;
 
   /**
    * Allows user to specify a version of Node manager to use with this SCM.
@@ -161,6 +164,15 @@ public final class SCMConfigurator {
   }
 
   /**
+   * Allows user to specify a custom version of SCMContext to be
+   * used with this SCM.
+   * @param scmContext - SCMContext.
+   */
+  public void setScmContext(SCMContext scmContext) {
+    this.scmContext = scmContext;
+  }
+
+  /**
    * Gets SCM Node Manager.
    * @return Node Manager.
    */
@@ -238,5 +250,13 @@ public final class SCMConfigurator {
    */
   public SCMHAManager getSCMHAManager() {
     return scmHAManager;
+  }
+
+  /**
+   * Get SCMContext.
+   * @return SCMContext.
+   */
+  public SCMContext getScmContext() {
+    return scmContext;
   }
 }

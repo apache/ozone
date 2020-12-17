@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.server
@@ -103,7 +104,7 @@ public class TestUnknownContainerReport {
    */
   private void sendContainerReport(OzoneConfiguration conf) {
     ContainerReportHandler reportHandler = new ContainerReportHandler(
-        nodeManager, containerManager, conf);
+        nodeManager, containerManager, SCMContext.emptyContext(), conf);
 
     ContainerInfo container = getContainer(LifeCycleState.CLOSED);
     Iterator<DatanodeDetails> nodeIterator = nodeManager

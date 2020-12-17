@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ClosePipelineInfo;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineAction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineActionsProto;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.PipelineActionsFromDatanode;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
@@ -46,7 +47,7 @@ public class TestPipelineActionHandler {
         .thenThrow(new PipelineNotFoundException());
 
     final PipelineActionHandler actionHandler =
-        new PipelineActionHandler(manager, null);
+        new PipelineActionHandler(manager, SCMContext.emptyContext(), null);
 
     final PipelineActionsProto actionsProto = PipelineActionsProto.newBuilder()
         .addPipelineActions(PipelineAction.newBuilder()

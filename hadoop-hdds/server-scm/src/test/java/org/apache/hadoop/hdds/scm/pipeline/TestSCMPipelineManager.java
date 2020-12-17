@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.metadata.PipelineIDCodec;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
@@ -238,7 +239,8 @@ public class TestSCMPipelineManager {
         pipelineManager.getPipeline(pipeline.getId()).isHealthy());
     // get pipeline report from each dn in the pipeline
     PipelineReportHandler pipelineReportHandler =
-        new PipelineReportHandler(scmSafeModeManager, pipelineManager, conf);
+        new PipelineReportHandler(scmSafeModeManager, pipelineManager,
+            SCMContext.emptyContext(), conf);
     nodes.subList(0, 2).forEach(dn -> sendPipelineReport(dn, pipeline,
         pipelineReportHandler, false, eventQueue));
     sendPipelineReport(nodes.get(nodes.size() - 1), pipeline,
@@ -495,7 +497,8 @@ public class TestSCMPipelineManager {
         new SCMSafeModeManager(new OzoneConfiguration(),
             new ArrayList<>(), pipelineManager, eventQueue);
     PipelineReportHandler pipelineReportHandler =
-        new PipelineReportHandler(scmSafeModeManager, pipelineManager, conf);
+        new PipelineReportHandler(scmSafeModeManager, pipelineManager,
+            SCMContext.emptyContext(), conf);
 
     // Report pipelines with leaders
     List<DatanodeDetails> nodes = pipeline.getNodes();

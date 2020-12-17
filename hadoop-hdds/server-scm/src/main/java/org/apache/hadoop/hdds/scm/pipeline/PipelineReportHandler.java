@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.safemode.SafeModeManager;
 import org.apache.hadoop.hdds.scm.server
     .SCMDatanodeHeartbeatDispatcher.PipelineReportFromDatanode;
@@ -36,6 +37,7 @@ import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.protocol.commands.ClosePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
+import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,14 +54,18 @@ public class PipelineReportHandler implements
   private final PipelineManager pipelineManager;
   private final ConfigurationSource conf;
   private final SafeModeManager scmSafeModeManager;
+  private final SCMContext scmContext;
   private final boolean pipelineAvailabilityCheck;
   private final SCMPipelineMetrics metrics;
 
   public PipelineReportHandler(SafeModeManager scmSafeModeManager,
-      PipelineManager pipelineManager, ConfigurationSource conf) {
+                               PipelineManager pipelineManager,
+                               SCMContext scmContext,
+                               ConfigurationSource conf) {
     Preconditions.checkNotNull(pipelineManager);
     this.scmSafeModeManager = scmSafeModeManager;
     this.pipelineManager = pipelineManager;
+    this.scmContext = scmContext;
     this.conf = conf;
     this.metrics = SCMPipelineMetrics.create();
     this.pipelineAvailabilityCheck = conf.getBoolean(
@@ -96,11 +102,10 @@ public class PipelineReportHandler implements
     try {
       pipeline = pipelineManager.getPipeline(pipelineID);
     } catch (PipelineNotFoundException e) {
-      final ClosePipelineCommand closeCommand =
-          new ClosePipelineCommand(pipelineID);
-      final CommandForDatanode datanodeCommand =
-          new CommandForDatanode<>(dn.getUuid(), closeCommand);
-      publisher.fireEvent(SCMEvents.DATANODE_COMMAND, datanodeCommand);
+      SCMCommand<?> command = new ClosePipelineCommand(pipelineID);
+      command.setTerm(scmContext.getTerm());
+      publisher.fireEvent(SCMEvents.DATANODE_COMMAND,
+          new CommandForDatanode<>(dn.getUuid(), command));
       return;
     }
 
