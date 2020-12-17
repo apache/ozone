@@ -38,6 +38,7 @@ import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacem
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementMetrics;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.node.DeadNodeHandler;
@@ -83,6 +84,7 @@ public class ReconStorageContainerManagerFacade
   private final SCMContext scmContext;
   private final SCMStorageConfig scmStorageConfig;
   private final DBStore dbStore;
+  private final SCMNodeDetails scmNodeDetails;
 
   private ReconNodeManager nodeManager;
   private ReconPipelineManager pipelineManager;
@@ -100,6 +102,7 @@ public class ReconStorageContainerManagerFacade
       ContainerHealthSchemaManager containerHealthSchemaManager,
       ContainerDBServiceProvider containerDBServiceProvider)
       throws IOException {
+    scmNodeDetails = SCMNodeDetails.loadSCMHAConfig(conf);
     this.eventQueue = new EventQueue();
     eventQueue.setSilent(true);
     this.scmContext = SCMContext.emptyContext();
@@ -297,6 +300,11 @@ public class ReconStorageContainerManagerFacade
   @Override
   public InetSocketAddress getDatanodeRpcAddress() {
     return getDatanodeProtocolServer().getDatanodeRpcAddress();
+  }
+
+  @Override
+  public SCMNodeDetails getScmNodeDetails() {
+    return scmNodeDetails;
   }
 
   public EventQueue getEventQueue() {

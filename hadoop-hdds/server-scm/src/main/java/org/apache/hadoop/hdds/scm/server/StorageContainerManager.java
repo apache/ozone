@@ -56,6 +56,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerImpl;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
+import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -213,6 +214,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private NetworkTopology clusterMap;
   private PipelineChoosePolicy pipelineChoosePolicy;
 
+  private final SCMNodeDetails scmNodeDetails;
+
   /**
    * Creates a new StorageContainerManager. Configuration will be
    * updated with information on the actual listening addresses used
@@ -243,6 +246,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     Objects.requireNonNull(configurator, "configurator cannot not be null");
     Objects.requireNonNull(conf, "configuration cannot not be null");
+
+    scmNodeDetails = SCMNodeDetails.loadSCMHAConfig(conf);
 
     configuration = conf;
     initMetrics();
@@ -816,6 +821,11 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    */
   public InetSocketAddress getDatanodeRpcAddress() {
     return getDatanodeProtocolServer().getDatanodeRpcAddress();
+  }
+
+  @Override
+  public SCMNodeDetails getScmNodeDetails() {
+    return scmNodeDetails;
   }
 
   @Override

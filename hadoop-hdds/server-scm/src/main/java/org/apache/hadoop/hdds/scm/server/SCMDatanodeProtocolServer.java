@@ -44,10 +44,10 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionResponseProto;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.PipelineReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ReportFromDatanode;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
@@ -87,7 +87,6 @@ import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProt
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.replicateContainerCommand;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.reregisterCommand;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.setNodeOperationalStateCommand;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.CONTAINER_REPORT;
@@ -137,7 +136,8 @@ public class SCMDatanodeProtocolServer implements
     heartbeatDispatcher = new SCMDatanodeHeartbeatDispatcher(
         scm.getScmNodeManager(), eventPublisher);
 
-    InetSocketAddress datanodeRpcAddr = getDataNodeBindAddress(conf);
+    InetSocketAddress datanodeRpcAddr = getDataNodeBindAddress(
+        conf, scm.getScmNodeDetails());
 
     protocolMessageMetrics = getProtocolMessageMetrics();
 
@@ -430,7 +430,7 @@ public class SCMDatanodeProtocolServer implements
    * @return
    */
   protected String getDatanodeAddressKey() {
-    return OZONE_SCM_DATANODE_ADDRESS_KEY;
+    return this.scm.getScmNodeDetails().getDatanodeAddressKey();
   }
 
   /**
@@ -438,8 +438,9 @@ public class SCMDatanodeProtocolServer implements
    * @param conf ozone configuration
    * @return InetSocketAddress
    */
-  protected InetSocketAddress getDataNodeBindAddress(OzoneConfiguration conf) {
-    return HddsServerUtil.getScmDataNodeBindAddress(conf);
+  protected InetSocketAddress getDataNodeBindAddress(
+      OzoneConfiguration conf, SCMNodeDetails scmNodeDetails) {
+    return scmNodeDetails.getDatanodeProtocolServerAddress();
   }
 
   /**
