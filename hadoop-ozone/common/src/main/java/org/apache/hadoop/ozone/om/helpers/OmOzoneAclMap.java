@@ -103,7 +103,8 @@ public class OmOzoneAclMap {
     if (acl.getAclScope().equals(OzoneAcl.AclScope.DEFAULT)) {
       OzoneAclInfo ozoneAclInfo = OzoneAcl.toProtobuf(acl);
       if (defaultAclList.contains(ozoneAclInfo)) {
-        throw new OMException("Acl " + acl + " already exist.", INVALID_REQUEST);
+        throw new OMException("Acl " + acl + " already exist.",
+                INVALID_REQUEST);
       }
       defaultAclList.add(ozoneAclInfo);
       return;
