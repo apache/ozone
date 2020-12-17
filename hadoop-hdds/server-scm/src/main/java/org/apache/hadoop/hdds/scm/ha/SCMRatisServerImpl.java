@@ -23,7 +23,6 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
@@ -42,6 +41,7 @@ import org.apache.ratis.protocol.RaftGroup;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.RaftPeerId;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.apache.ratis.server.RaftServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,12 +53,8 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMRatisServerImpl.class);
 
+  private final RaftServer.Division division;
   private final InetSocketAddress address;
-  private final RaftServer server;
-  private final RaftGroupId raftGroupId;
-  private final RaftGroup raftGroup;
-  private final RaftPeerId raftPeerId;
-  private final SCMStateMachine scmStateMachine;
   private final ClientId clientId = ClientId.randomId();
   private final AtomicLong callId = new AtomicLong();
 
@@ -69,41 +65,49 @@ public class SCMRatisServerImpl implements SCMRatisServer {
       throws IOException {
     this.address = haConf.getRatisBindAddress();
 
-    SCMHAGroupBuilder scmHAGroupBuilder = new SCMHAGroupBuilder(haConf, conf);
-    this.raftPeerId = scmHAGroupBuilder.getPeerId();
-    this.raftGroupId = scmHAGroupBuilder.getRaftGroupId();
-    this.raftGroup = scmHAGroupBuilder.getRaftGroup();
+    SCMHAGroupBuilder haGrpBuilder = new SCMHAGroupBuilder(haConf, conf);
 
     final RaftProperties serverProperties = RatisUtil
         .newRaftProperties(haConf, conf);
-    this.scmStateMachine = new SCMStateMachine();
-    this.server = RaftServer.newBuilder()
-        .setServerId(raftPeerId)
-        .setGroup(raftGroup)
+
+    RaftServer server = RaftServer.newBuilder()
+        .setServerId(haGrpBuilder.getPeerId())
+        .setGroup(haGrpBuilder.getRaftGroup())
         .setProperties(serverProperties)
-        .setStateMachine(scmStateMachine)
+        .setStateMachine(new SCMStateMachine())
         .build();
+
+    this.division = server.getDivision(haGrpBuilder.getRaftGroupId());
   }
 
   @Override
   public void start() throws IOException {
-    server.start();
+    division.getRaftServer().start();
   }
 
   @Override
   public void registerStateMachineHandler(final RequestType handlerType,
                                           final Object handler) {
-    scmStateMachine.registerHandler(handlerType, handler);
+    ((SCMStateMachine) division.getStateMachine())
+        .registerHandler(handlerType, handler);
   }
 
   @Override
   public SCMRatisResponse submitRequest(SCMRatisRequest request)
       throws IOException, ExecutionException, InterruptedException {
-    final RaftClientRequest raftClientRequest = new RaftClientRequest(
-        clientId, server.getId(), raftGroupId, nextCallId(), request.encode(),
-        RaftClientRequest.writeRequestType(), null);
+    final RaftClientRequest raftClientRequest =
+        new RaftClientRequest(
+            clientId,
+            division.getId(),
+            division.getGroup().getGroupId(),
+            nextCallId(),
+            request.encode(),
+            RaftClientRequest.writeRequestType(),
+            null);
     final RaftClientReply raftClientReply =
-        server.submitClientRequestAsync(raftClientRequest).get();
+        division.getRaftServer()
+            .submitClientRequestAsync(raftClientRequest)
+            .get();
     return SCMRatisResponse.decode(raftClientReply);
   }
 
@@ -113,25 +117,29 @@ public class SCMRatisServerImpl implements SCMRatisServer {
 
   @Override
   public void stop() throws IOException {
-    server.close();
+    division.getRaftServer().close();
   }
 
   @Override
-  public RaftServer getServer() {
-    return server;
+  public RaftServer.Division getDivision() {
+    return division;
   }
 
   @Override
-  public RaftGroupId getRaftGroupId() {
-    return raftGroupId;
+  public List<String> getRatisRoles() {
+    return division.getGroup().getPeers().stream()
+        .map(peer -> peer.getAddress() == null ? "" : peer.getAddress())
+        .collect(Collectors.toList());
   }
 
+  /**
+   * {@inheritDoc}
+   */
   @Override
-  public List<RaftPeer> getRaftPeers() {
-    return Collections.singletonList(RaftPeer.newBuilder()
-        .setId(raftPeerId).build());
+  public NotLeaderException triggerNotLeaderException() {
+    return new NotLeaderException(
+        division.getMemberId(), null, division.getGroup().getPeers());
   }
-
 
   /**
    * If the SCM group starts from {@link ScmConfigKeys#OZONE_SCM_NAMES},
