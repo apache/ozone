@@ -23,7 +23,7 @@ summary: Recon 是 Ozone 中用于分析服务的网页用户界面（Web UI）
   limitations under the License.
 -->
 
-Recon 作为 Ozone 的管理和监听控制台。它是一个可选组件，但强烈建议将其添加到集群中，因为 Recon 可以在关键时刻帮助您对集群进行故障排除。请参阅 [Recon 架构]({{< ref "concept/Recon.zh.md" >}})以获得详细的架构概述和[Recon API]({{< ref path="interface/ReconApi.zh.md" >}}) 文档，以获得 HTTP API 参考。
+Recon 作为 Ozone 的管理和监听控制台。它是一个可选组件，但强烈建议将其添加到集群中，因为 Recon 可以在关键时刻帮助您对集群进行故障排除。请参阅 [Recon 架构]({{< ref "concept/Recon.zh.md" >}}) 以获得详细的架构概述和 [Recon API]({{< ref path="interface/ReconApi.zh.md" >}}) 文档，以获得 HTTP API 参考。
 
 Recon 是一个自带 HTTP 网页服务器的服务，可以通过以下命令启动。
 
