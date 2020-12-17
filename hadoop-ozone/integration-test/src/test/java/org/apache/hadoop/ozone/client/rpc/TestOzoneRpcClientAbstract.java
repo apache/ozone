@@ -946,7 +946,6 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneBucket bucket = null;
 
     String value = "sample value";
-    int countException = 0;
 
     store.createVolume(volumeName);
     volume = store.getVolume(volumeName);
@@ -964,19 +963,18 @@ public abstract class TestOzoneRpcClientAbstract {
 
     try {
       writeKey(bucket, key3, ONE, value, value.length());
+      Assert.fail("Write key should be failed");
     } catch (IOException ex) {
-      countException++;
       GenericTestUtils.assertExceptionContains("QUOTA_EXCEEDED", ex);
     }
 
-    // Write failed, bucket usedBytes should remain as 1
+    // Write failed, bucket usedBytes should remain as 2
     Assert.assertEquals(2L,
         store.getVolume(volumeName).getBucket(bucketName).getUsedNamespace());
 
     bucket.deleteKeys(Arrays.asList(key1, key2));
     Assert.assertEquals(0L,
         store.getVolume(volumeName).getBucket(bucketName).getUsedNamespace());
-    Assert.assertEquals(1, countException);
   }
 
   private void writeKey(OzoneBucket bucket, String keyName,
