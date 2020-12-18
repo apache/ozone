@@ -314,6 +314,23 @@ public abstract class TestOzoneRpcClientAbstract {
         ozoneBucket.getQuotaInBytes());
     Assert.assertEquals(1000L, ozoneBucket.getQuotaInNamespace());
 
+    try {
+      ozoneBucket.clearSpaceQuota();
+      Assert.fail("clear quota should be failed");
+    } catch (IOException ex) {
+      GenericTestUtils.assertExceptionContains("Before clear bucket " +
+          "quotaInBytes, volume quotaInBytes need to be clear first.", ex);
+    }
+
+    try {
+      ozoneBucket.clearCountQuota();
+      Assert.fail("clear quota should be failed");
+    } catch (IOException ex) {
+      GenericTestUtils.assertExceptionContains("Before clear bucket " +
+          "quotaInNameSpace, volume quotaInNameSpace need to be clear first.",
+          ex);
+    }
+
     store.getVolume(volumeName).clearSpaceQuota();
     store.getVolume(volumeName).clearNamespaceQuota();
     OzoneVolume clrVolume = store.getVolume(volumeName);
