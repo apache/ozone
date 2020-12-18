@@ -50,13 +50,14 @@ public class TestOMDBDefinition {
     // Get list of tables from DB Definitions
     DBColumnFamilyDefinition[] columnFamilyDefinitions =
         dbDef.getColumnFamilies();
+    int countOmDefTables = columnFamilyDefinitions.length;
     ArrayList<String> missingDBDefTables = new ArrayList<>();
 
     // Get list of tables from the RocksDB Store
     Collection<String> missingOmDBTables =
         store.getTableNames().values();
     missingOmDBTables.remove("default");
-
+    int countOmDBTables = missingOmDBTables.size();
     // Remove the file if it is found in both the datastructures
     for(DBColumnFamilyDefinition definition : columnFamilyDefinitions) {
       if (!missingOmDBTables.remove(definition.getName())) {
@@ -64,7 +65,10 @@ public class TestOMDBDefinition {
       }
     }
 
-    Assert.assertEquals(missingDBDefTables.size(), 0);
-    Assert.assertEquals(missingOmDBTables.size(), 0);
+    Assert.assertEquals("Tables in OmMetadataManagerImpl are:"
+            + missingDBDefTables, 0, missingDBDefTables.size());
+    Assert.assertEquals("Tables missing in OMDBDefinition are:"
+        + missingOmDBTables, 0, missingOmDBTables.size());
+    Assert.assertEquals(countOmDBTables, countOmDefTables);
   }
 }
