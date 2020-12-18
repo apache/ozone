@@ -327,7 +327,7 @@ public abstract class TestOzoneRpcClientAbstract {
       Assert.fail("clear quota should be failed");
     } catch (IOException ex) {
       GenericTestUtils.assertExceptionContains("Before clear bucket " +
-          "quotaInNameSpace, volume quotaInNameSpace need to be clear first.",
+          "quotaInNamespace, volume quotaInNamespace need to be clear first.",
           ex);
     }
 
