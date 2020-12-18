@@ -968,7 +968,7 @@ public abstract class TestOzoneRpcClientAbstract {
       GenericTestUtils.assertExceptionContains("QUOTA_EXCEEDED", ex);
     }
 
-    // Write failed, bucket usedBytes should remain as 2
+    // Write failed, bucket usedNamespace should remain as 2
     Assert.assertEquals(2L,
         store.getVolume(volumeName).getBucket(bucketName).getUsedNamespace());
 
