@@ -30,6 +30,7 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -162,6 +163,14 @@ public class OMKeyCommitRequest extends OMKeyRequest {
             omMetadataManager)) {
           throw new OMException("Can not create file: " + keyName +
               " as there is already directory in the given path", NOT_A_FILE);
+        }
+        // Ensure the parent exist.
+        if (!"".equals(OzoneFSUtils.getParent(keyName))
+            && !checkDirectoryAlreadyExists(volumeName, bucketName,
+            OzoneFSUtils.getParent(keyName), omMetadataManager)) {
+          throw new OMException("Cannot create file : " + keyName
+              + " as parent directory doesn't exist",
+              OMException.ResultCodes.DIRECTORY_NOT_FOUND);
         }
       }
 
