@@ -231,7 +231,8 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
     if (quotaInBytes == OzoneConsts.QUOTA_RESET &&
         omVolumeArgs.getQuotaInBytes() != OzoneConsts.QUOTA_RESET) {
       throw new OMException("Before clear bucket quotaInBytes," +
-          " volume quotaInBytes need to be clear first.", OMException.ResultCodes.QUOTA_ERROR);
+          " volume quotaInBytes need to be clear first.",
+          OMException.ResultCodes.QUOTA_ERROR);
     }
 
     if (quotaInBytes == 0) {
@@ -271,7 +272,8 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
     if (quotaInNamespace == OzoneConsts.QUOTA_RESET &&
         omVolumeArgs.getQuotaInNamespace() != OzoneConsts.QUOTA_RESET) {
       throw new OMException("Before clear bucket " +
-          "quotaInNamespace, volume quotaInNamespace need to be clear first.", OMException.ResultCodes.QUOTA_ERROR);
+          "quotaInNamespace, volume quotaInNamespace need to be clear first.",
+          OMException.ResultCodes.QUOTA_ERROR);
     }
 
     if ((quotaInNamespace <= 0
