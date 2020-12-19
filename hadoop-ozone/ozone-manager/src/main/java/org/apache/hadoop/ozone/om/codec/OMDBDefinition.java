@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 
 import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
@@ -142,6 +143,33 @@ public class OMDBDefinition implements DBDefinition {
                     OMTransactionInfo.class,
                     new OMTransactionInfoCodec());
 
+  public static final DBColumnFamilyDefinition<String, OmDirectoryInfo>
+            DIRECTORY_TABLE =
+            new DBColumnFamilyDefinition<>(
+                    OmMetadataManagerImpl.DIRECTORY_TABLE,
+                    String.class,
+                    new StringCodec(),
+                    OmDirectoryInfo.class,
+                    new OmDirectoryInfoCodec());
+
+  public static final DBColumnFamilyDefinition<String, OmKeyInfo>
+            FILE_TABLE =
+            new DBColumnFamilyDefinition<>(
+                    OmMetadataManagerImpl.FILE_TABLE,
+                    String.class,
+                    new StringCodec(),
+                    OmKeyInfo.class,
+                    new OmKeyInfoCodec(true));
+
+  public static final DBColumnFamilyDefinition<String, OmKeyInfo>
+            OPEN_FILE_TABLE =
+            new DBColumnFamilyDefinition<>(
+                  OmMetadataManagerImpl.OPEN_FILE_TABLE,
+                  String.class,
+                  new StringCodec(),
+                  OmKeyInfo.class,
+                  new OmKeyInfoCodec(true));
+
   @Override
   public String getName() {
     return OzoneConsts.OM_DB_NAME;
@@ -157,7 +185,8 @@ public class OMDBDefinition implements DBDefinition {
     return new DBColumnFamilyDefinition[] {DELETED_TABLE, USER_TABLE,
         VOLUME_TABLE, OPEN_KEY_TABLE, KEY_TABLE,
         BUCKET_TABLE, MULTIPART_INFO_TABLE, PREFIX_TABLE, DTOKEN_TABLE,
-        S3_SECRET_TABLE, TRANSACTION_INFO_TABLE};
+        S3_SECRET_TABLE, TRANSACTION_INFO_TABLE, DIRECTORY_TABLE,
+        FILE_TABLE, OPEN_FILE_TABLE};
   }
 }
 
