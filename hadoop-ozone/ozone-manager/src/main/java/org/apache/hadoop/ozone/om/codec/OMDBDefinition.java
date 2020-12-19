@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -44,7 +45,7 @@ public class OMDBDefinition implements DBDefinition {
   public static final DBColumnFamilyDefinition<String, RepeatedOmKeyInfo>
             DELETED_TABLE =
             new DBColumnFamilyDefinition<>(
-                    "deletedTable",
+                    OmMetadataManagerImpl.DELETED_TABLE,
                     String.class,
                     new StringCodec(),
                     RepeatedOmKeyInfo.class,
@@ -54,7 +55,7 @@ public class OMDBDefinition implements DBDefinition {
             OzoneManagerStorageProtos.PersistedUserVolumeInfo>
             USER_TABLE =
             new DBColumnFamilyDefinition<>(
-                    "userTable",
+                    OmMetadataManagerImpl.USER_TABLE,
                     String.class,
                     new StringCodec(),
                     OzoneManagerStorageProtos.PersistedUserVolumeInfo.class,
@@ -63,7 +64,7 @@ public class OMDBDefinition implements DBDefinition {
   public static final DBColumnFamilyDefinition<String, OmVolumeArgs>
             VOLUME_TABLE =
             new DBColumnFamilyDefinition<>(
-                    "volumeTable",
+                    OmMetadataManagerImpl.VOLUME_TABLE,
                     String.class,
                     new StringCodec(),
                     OmVolumeArgs.class,
@@ -72,7 +73,7 @@ public class OMDBDefinition implements DBDefinition {
   public static final DBColumnFamilyDefinition<String, OmKeyInfo>
             OPEN_KEY_TABLE =
             new DBColumnFamilyDefinition<>(
-                    "openKeyTable",
+                    OmMetadataManagerImpl.OPEN_KEY_TABLE,
                     String.class,
                     new StringCodec(),
                     OmKeyInfo.class,
@@ -81,7 +82,7 @@ public class OMDBDefinition implements DBDefinition {
   public static final DBColumnFamilyDefinition<String, OmKeyInfo>
             KEY_TABLE =
             new DBColumnFamilyDefinition<>(
-                    "keyTable",
+                    OmMetadataManagerImpl.KEY_TABLE,
                     String.class,
                     new StringCodec(),
                     OmKeyInfo.class,
@@ -90,7 +91,7 @@ public class OMDBDefinition implements DBDefinition {
   public static final DBColumnFamilyDefinition<String, OmBucketInfo>
             BUCKET_TABLE =
             new DBColumnFamilyDefinition<>(
-                    "bucketTable",
+                    OmMetadataManagerImpl.BUCKET_TABLE,
                     String.class,
                     new StringCodec(),
                     OmBucketInfo.class,
@@ -99,7 +100,7 @@ public class OMDBDefinition implements DBDefinition {
   public static final DBColumnFamilyDefinition<String, OmMultipartKeyInfo>
             MULTIPART_INFO_TABLE =
             new DBColumnFamilyDefinition<>(
-                    "multipartInfoTable",
+                    OmMetadataManagerImpl.MULTIPARTINFO_TABLE,
                     String.class,
                     new StringCodec(),
                     OmMultipartKeyInfo.class,
@@ -108,7 +109,7 @@ public class OMDBDefinition implements DBDefinition {
   public static final DBColumnFamilyDefinition<String, OmPrefixInfo>
             PREFIX_TABLE =
             new DBColumnFamilyDefinition<>(
-                    "prefixTable",
+                    OmMetadataManagerImpl.PREFIX_TABLE,
                     String.class,
                     new StringCodec(),
                     OmPrefixInfo.class,
@@ -117,7 +118,7 @@ public class OMDBDefinition implements DBDefinition {
   public static final DBColumnFamilyDefinition<OzoneTokenIdentifier, Long>
             DTOKEN_TABLE =
             new DBColumnFamilyDefinition<>(
-                    "dTokenTable",
+                    OmMetadataManagerImpl.DELEGATION_TOKEN_TABLE,
                     OzoneTokenIdentifier.class,
                     new TokenIdentifierCodec(),
                     Long.class,
@@ -126,25 +127,24 @@ public class OMDBDefinition implements DBDefinition {
   public static final DBColumnFamilyDefinition<String, S3SecretValue>
             S3_SECRET_TABLE =
             new DBColumnFamilyDefinition<>(
-                    "s3SecretTable",
+                    OmMetadataManagerImpl.S3_SECRET_TABLE,
                     String.class,
                     new StringCodec(),
                     S3SecretValue.class,
                     new S3SecretValueCodec());
 
   public static final DBColumnFamilyDefinition<String, OMTransactionInfo>
-      TRANSACTION_INFO_TABLE =
-      new DBColumnFamilyDefinition<>(
-          OmMetadataManagerImpl.TRANSACTION_INFO_TABLE,
-          String.class,
-          new StringCodec(),
-          OMTransactionInfo.class,
-          new OMTransactionInfoCodec());
-
+            TRANSACTION_INFO_TABLE =
+            new DBColumnFamilyDefinition<>(
+                    OmMetadataManagerImpl.TRANSACTION_INFO_TABLE,
+                    String.class,
+                    new StringCodec(),
+                    OMTransactionInfo.class,
+                    new OMTransactionInfoCodec());
 
   @Override
   public String getName() {
-    return "om.db";
+    return OzoneConsts.OM_DB_NAME;
   }
 
   @Override
