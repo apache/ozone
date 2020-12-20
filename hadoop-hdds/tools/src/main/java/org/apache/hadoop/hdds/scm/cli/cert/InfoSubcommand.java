@@ -22,7 +22,6 @@ import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.hdds.cli.GenericParentCommand;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 
