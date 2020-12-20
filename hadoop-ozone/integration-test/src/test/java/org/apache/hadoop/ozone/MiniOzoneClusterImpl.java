@@ -300,6 +300,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   public void restartStorageContainerManager(boolean waitForDatanode)
       throws TimeoutException, InterruptedException, IOException,
       AuthenticationException {
+    LOG.info("Restarting SCM in cluster " + this.getClass());
     scm.stop();
     scm.join();
     scm = TestUtils.getScmSimple(conf);

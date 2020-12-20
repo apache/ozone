@@ -19,6 +19,8 @@ package org.apache.hadoop.hdds.scm.ha;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
+import org.apache.ratis.proto.RaftProtos;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,16 +41,18 @@ public class SCMHAManagerImpl implements SCMHAManager {
 
   private final SCMRatisServer ratisServer;
   private final ConfigurationSource conf;
+  private final SCMDBTransactionBuffer transactionBuffer;
 
   /**
    * Creates SCMHAManager instance.
    */
   public SCMHAManagerImpl(final ConfigurationSource conf,
-                          final StorageContainerManager scm)
+      final StorageContainerManager scm, final SCMMetadataStore store)
       throws IOException {
     this.conf = conf;
+    this.transactionBuffer = new SCMDBTransactionBuffer(store);
     this.ratisServer = new SCMRatisServerImpl(
-        conf.getObject(SCMHAConfiguration.class), conf, scm);
+        conf.getObject(SCMHAConfiguration.class), conf, scm, transactionBuffer);
   }
 
   /**
@@ -61,6 +65,11 @@ public class SCMHAManagerImpl implements SCMHAManager {
 
   public SCMRatisServer getRatisServer() {
     return ratisServer;
+  }
+
+  @Override
+  public DBTransactionBuffer getDBTransactionBuffer() {
+    return transactionBuffer;
   }
 
   /**

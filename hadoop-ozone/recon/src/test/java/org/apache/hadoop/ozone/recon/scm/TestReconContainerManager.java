@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.junit.Test;
 
 /**
@@ -72,6 +73,8 @@ public class TestReconContainerManager
     assertEquals(containerID, containersInPipeline.first());
 
     // Verify container DB.
+    SCMHAManager scmhaManager = containerManager.getSCMHAManager();
+    scmhaManager.getDBTransactionBuffer().close();
     assertTrue(getContainerTable().isExist(containerID));
   }
 
@@ -95,6 +98,8 @@ public class TestReconContainerManager
     assertEquals(1, containers.size());
     assertEquals(containerInfo, containers.get(0));
     // Verify container DB.
+    SCMHAManager scmhaManager = containerManager.getSCMHAManager();
+    scmhaManager.getDBTransactionBuffer().close();
     assertTrue(getContainerTable().isExist(containerID));
   }
 

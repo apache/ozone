@@ -32,9 +32,11 @@ import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdds.scm.ha.MockDBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.recon.persistence.ContainerSchemaManager;
@@ -66,12 +68,13 @@ public class ReconContainerManager extends ContainerManagerImpl {
    */
   public ReconContainerManager(
       Configuration conf,
+      DBStore store,
       Table<ContainerID, ContainerInfo> containerStore,
       PipelineManager pipelineManager,
       StorageContainerServiceProvider scm,
       ContainerSchemaManager containerSchemaManager) throws IOException {
-    super(conf, MockSCMHAManager.getInstance(true),
-        pipelineManager, containerStore);
+    super(conf, MockSCMHAManager.getInstance(true,
+        new MockDBTransactionBuffer(store)), pipelineManager, containerStore);
     this.scmClient = scm;
     this.pipelineManager = pipelineManager;
     this.containerSchemaManager = containerSchemaManager;

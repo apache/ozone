@@ -41,6 +41,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.states.ContainerState;
 import org.apache.hadoop.hdds.scm.container.states.ContainerStateMap;
 import org.apache.hadoop.hdds.scm.ha.CheckedConsumer;
+import org.apache.hadoop.hdds.scm.ha.DBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.ha.ExecutionUtil;
 import org.apache.hadoop.hdds.scm.ha.SCMHAInvocationHandler;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
@@ -99,7 +100,9 @@ public final class ContainerStateManagerImpl
   /**
    * Persistent store for Container States.
    */
-  private final Table<ContainerID, ContainerInfo> containerStore;
+  private Table<ContainerID, ContainerInfo> containerStore;
+
+  private final DBTransactionBuffer transactionBuffer;
 
   /**
    * PipelineManager instance.
@@ -135,7 +138,8 @@ public final class ContainerStateManagerImpl
    */
   private ContainerStateManagerImpl(final Configuration conf,
       final PipelineManager pipelineManager,
-      final Table<ContainerID, ContainerInfo> containerStore)
+      final Table<ContainerID, ContainerInfo> containerStore,
+      final DBTransactionBuffer buffer)
       throws IOException {
     this.pipelineManager = pipelineManager;
     this.containerStore = containerStore;
@@ -144,6 +148,7 @@ public final class ContainerStateManagerImpl
     this.containers = new ContainerStateMap();
     this.lastUsedMap = new ConcurrentHashMap<>();
     this.containerStateChangeActions = getContainerStateChangeActions();
+    this.transactionBuffer = buffer;
 
     initialize();
   }
@@ -298,12 +303,16 @@ public final class ContainerStateManagerImpl
     try {
       if (!containers.contains(containerID)) {
         ExecutionUtil.create(() -> {
-          containerStore.put(containerID, container);
+          containerStore.putWithBatch(
+              transactionBuffer.getCurrentBatchOperation(),
+              containerID, container);
           containers.addContainer(container);
           pipelineManager.addContainerToPipeline(pipelineID, containerID);
         }).onException(() -> {
           containers.removeContainer(containerID);
-          containerStore.delete(containerID);
+          containerStore.deleteWithBatch(
+              transactionBuffer.getCurrentBatchOperation(),
+              containerID);
         }).execute();
       }
     } finally {
@@ -339,13 +348,17 @@ public final class ContainerStateManagerImpl
         if (newState.getNumber() > oldState.getNumber()) {
           ExecutionUtil.create(() -> {
             containers.updateState(id, oldState, newState);
-            containerStore.put(id, containers.getContainerInfo(id));
+            containerStore.putWithBatch(
+                transactionBuffer.getCurrentBatchOperation(),
+                id, containers.getContainerInfo(id));
           }).onException(() -> {
-            containerStore.put(id, oldInfo);
+            containerStore.putWithBatch(
+                transactionBuffer.getCurrentBatchOperation(),
+                id, oldInfo);
             containers.updateState(id, newState, oldState);
           }).execute();
-          containerStateChangeActions.getOrDefault(event, info -> {})
-              .execute(oldInfo);
+          containerStateChangeActions.getOrDefault(event, info -> {
+          }).execute(oldInfo);
         }
       }
     } finally {
@@ -475,7 +488,9 @@ public final class ContainerStateManagerImpl
       final ContainerID cid = ContainerID.getFromProtobuf(id);
       final ContainerInfo containerInfo = containers.getContainerInfo(cid);
       ExecutionUtil.create(() -> {
-        containerStore.delete(cid);
+        containerStore.deleteWithBatch(
+            transactionBuffer.getCurrentBatchOperation(),
+            cid);
         containers.removeContainer(cid);
       }).onException(() -> containerStore.put(cid, containerInfo)).execute();
     } finally {
@@ -504,7 +519,12 @@ public final class ContainerStateManagerImpl
     private PipelineManager pipelineMgr;
     private SCMRatisServer scmRatisServer;
     private Table<ContainerID, ContainerInfo> table;
+    private DBTransactionBuffer transactionBuffer;
 
+    public Builder setSCMDBTransactionBuffer(DBTransactionBuffer buffer) {
+      this.transactionBuffer = buffer;
+      return this;
+    }
     public Builder setConfiguration(final Configuration config) {
       conf = config;
       return this;
@@ -533,7 +553,7 @@ public final class ContainerStateManagerImpl
       Preconditions.checkNotNull(table);
 
       final ContainerStateManagerV2 csm = new ContainerStateManagerImpl(
-          conf, pipelineMgr, table);
+          conf, pipelineMgr, table, transactionBuffer);
 
       final SCMHAInvocationHandler invocationHandler =
           new SCMHAInvocationHandler(RequestType.CONTAINER, csm,
