@@ -20,7 +20,9 @@ package org.apache.hadoop.ozone.shell;
 import java.util.function.Supplier;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.security.UserGroupInformation;
 
 import picocli.CommandLine.Command;
 
@@ -49,7 +51,9 @@ public class OzoneShell extends Shell {
 
   @Override
   public void execute(String[] argv) {
-    TracingUtil.initTracing("shell", createOzoneConfiguration());
+    OzoneConfiguration ozoneConf = createOzoneConfiguration();
+    TracingUtil.initTracing("shell", ozoneConf);
+    UserGroupInformation.setConfiguration(ozoneConf);
     TracingUtil.executeInNewSpan("main",
         (Supplier<Void>) () -> {
           super.execute(argv);
