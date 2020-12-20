@@ -63,8 +63,6 @@ class InfoSubcommand extends ScmCertSubcommand {
 
     // Print container report info.
     LOG.info("Certificate id: {}", serialId);
-    boolean verbose = spec.root().userObject() instanceof GenericParentCommand
-        && ((GenericParentCommand) spec.root().userObject()).isVerbose();
     try {
       X509Certificate cert = CertificateCodec.getX509Cert(certPemStr);
       LOG.info(cert.toString());

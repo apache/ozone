@@ -39,6 +39,6 @@ List revoked certificates
                      Should Contain    ${output}    Total 0 revoked certificates
 
 Info of the cert
-    ${output} =      Execute   for id in $(ozone admin cert list |grep UTC|awk '{print $1}'); do ozone admin cert info $id; done
+    ${output} =      Execute   for id in $(ozone admin cert list -c 1|grep UTC|awk '{print $1}'); do ozone admin cert info $id; done
                      Should not Contain    ${output}    Certificate not found
 

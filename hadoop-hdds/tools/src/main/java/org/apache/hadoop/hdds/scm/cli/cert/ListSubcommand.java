@@ -65,6 +65,7 @@ public class ListSubcommand extends ScmCertSubcommand {
       description = "Filter certificate by the type: valid or revoked",
       defaultValue = "valid", showDefaultValue = Visibility.ALWAYS)
   private String type;
+  private static final String OUTPUT_FORMAT = "%-17s %-30s %-30s %-110s";
 
   private HddsProtos.NodeType parseCertRole(String r) {
     if (r.equalsIgnoreCase("om")) {
@@ -77,8 +78,8 @@ public class ListSubcommand extends ScmCertSubcommand {
   }
 
   private void printCert(X509Certificate cert) {
-    LOG.info("{}\t{}\t{}\t{}", cert.getSerialNumber(), cert.getNotBefore(),
-        cert.getNotAfter(), cert.getSubjectDN());
+    LOG.info(String.format(OUTPUT_FORMAT, cert.getSerialNumber(),
+        cert.getNotBefore(), cert.getNotAfter(), cert.getSubjectDN()));
   }
 
   @Override
@@ -87,7 +88,8 @@ public class ListSubcommand extends ScmCertSubcommand {
     List<String> certPemList = client.listCertificate(
         parseCertRole(role), startSerialId, count, isRevoked);
     LOG.info("Total {} {} certificates: ", certPemList.size(), type);
-    LOG.info("SerialNumber\t\tValid From\t\tExpiry\t\tSubject");
+    LOG.info(String.format(OUTPUT_FORMAT, "SerialNumber", "Valid From",
+        "Expiry", "Subject"));
     for (String certPemStr : certPemList) {
       try {
         X509Certificate cert = CertificateCodec.getX509Certificate(certPemStr);

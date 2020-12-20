@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -59,6 +60,6 @@ public class MockCAStore implements CertificateStore {
   public List<X509Certificate> listCertificate(HddsProtos.NodeType role,
       BigInteger startSerialID, int count, CertType certType)
       throws IOException {
-    return null;
+    return Collections.emptyList();
   }
 }
