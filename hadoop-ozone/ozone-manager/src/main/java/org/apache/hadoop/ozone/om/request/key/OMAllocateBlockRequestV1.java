@@ -38,7 +38,11 @@ import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMAllocateBlockResponse;
 import org.apache.hadoop.ozone.om.response.key.OMAllocateBlockResponseV1;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.*;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AllocateBlockRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AllocateBlockResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -114,10 +118,10 @@ public class OMAllocateBlockRequestV1 extends OMAllocateBlockRequest {
 
       // check Acl
       checkKeyAclsInOpenKeyTable(ozoneManager, volumeName, bucketName, keyName,
-              IAccessAuthorizer.ACLType.WRITE, allocateBlockRequest.getClientID());
+          IAccessAuthorizer.ACLType.WRITE, allocateBlockRequest.getClientID());
 
       validateBucketAndVolume(omMetadataManager, volumeName,
-              bucketName);
+          bucketName);
 
       // Here we don't acquire bucket/volume lock because for a single client
       // allocateBlock is called in serial fashion. With this approach, it
