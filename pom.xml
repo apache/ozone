@@ -117,7 +117,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
     <java.security.egd>file:///dev/urandom</java.security.egd>
 
-    <bouncycastle.version>1.60</bouncycastle.version>
+    <bouncycastle.version>1.67</bouncycastle.version>
 
     <!-- jersey version -->
     <jersey.version>1.19</jersey.version>
