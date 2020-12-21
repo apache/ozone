@@ -174,8 +174,7 @@ public class TestDecommissionAndMaintenance {
 
     // Now the decommissioned node is dead, we should have
     // 3 replicas for the tracked container.
-    newReplicas = cm.getContainerReplicas(container.containerID());
-    assertEquals(3, newReplicas.size());
+    waitForThreeContainerReplicas(container);
   }
 
   @Test
@@ -388,10 +387,10 @@ public class TestDecommissionAndMaintenance {
       waitForDnToReachPersistedOpState(dn, IN_MAINTENANCE);
     }
 
-    // There should now be 5 replicas of the container we are tracking
+    // There should now be 5-6 replicas of the container we are tracking
     Set<ContainerReplica> newReplicas =
         cm.getContainerReplicas(container.containerID());
-    assertEquals(5, newReplicas.size());
+    assertTrue(newReplicas.size() >= 5);
 
     scmClient.recommissionNodes(forMaintenance.stream()
         .map(d -> getDNHostAndPort(d))
@@ -402,8 +401,7 @@ public class TestDecommissionAndMaintenance {
       waitForDnToReachOpState(dn, IN_SERVICE);
     }
 
-    GenericTestUtils.waitFor(() -> getContainerReplicas(container).size() == 3,
-        200, 30000);
+    waitForThreeContainerReplicas(container);
   }
 
   @Test
@@ -443,10 +441,10 @@ public class TestDecommissionAndMaintenance {
       waitForDnToReachOpState(dn, IN_MAINTENANCE);
     }
 
-    // There should now be 5 replicas of the container we are tracking
+    // There should now be 5-6 replicas of the container we are tracking
     Set<ContainerReplica> newReplicas =
         cm.getContainerReplicas(container.containerID());
-    assertEquals(5, newReplicas.size());
+    assertTrue(newReplicas.size() >= 5);
   }
 
   @Test
@@ -513,8 +511,7 @@ public class TestDecommissionAndMaintenance {
     // Ensure there are 3 replicas with one in maintenance indicating no new
     // replicas were created
     final ContainerInfo newContainer = cm.getContainer(container.containerID());
-    GenericTestUtils.waitFor(() ->
-        getContainerReplicas(newContainer).size() == 3, 200, 30000);
+    waitForThreeContainerReplicas(newContainer);
 
     ContainerReplicaCount counts =
         scm.getReplicationManager().getContainerReplicaCount(newContainer);
@@ -541,8 +538,7 @@ public class TestDecommissionAndMaintenance {
     // replica was created
     final ContainerInfo nextContainer
         = cm.getContainer(container.containerID());
-    GenericTestUtils.waitFor(() ->
-        getContainerReplicas(nextContainer).size() == 3, 200, 30000);
+    waitForThreeContainerReplicas(nextContainer);
     // There should be no IN_MAINTENANCE node:
     assertEquals(0, nm.getNodeCount(IN_MAINTENANCE, null));
     counts = scm.getReplicationManager().getContainerReplicaCount(newContainer);
@@ -687,9 +683,7 @@ public class TestDecommissionAndMaintenance {
   private ContainerInfo waitForAndReturnContainer() throws Exception {
     final ContainerInfo container = cm.getContainers().get(0);
     // Ensure all 3 replicas of the container have been reported via ICR
-    GenericTestUtils.waitFor(
-        () -> getContainerReplicas(container).size() == 3,
-        200, 30000);
+    waitForThreeContainerReplicas(container);
     return container;
   }
 
@@ -703,6 +697,13 @@ public class TestDecommissionAndMaintenance {
         () -> scm.getReplicationManager().isRunning(),
         200, 30000);
     scm.getReplicationManager().stop();
+  }
+
+  private void waitForThreeContainerReplicas(ContainerInfo container)
+      throws TimeoutException, InterruptedException {
+    GenericTestUtils.waitFor(
+        () -> getContainerReplicas(container).size() == 3,
+        200, 30000);
   }
 
 }
