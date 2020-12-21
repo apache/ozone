@@ -206,13 +206,11 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     // through.
     if (OzoneManagerPrepareState.requestAllowed(cmdType)) {
       if (cmdType == OzoneManagerProtocolProtos.Type.Prepare) {
-        OzoneManagerPrepareState.setPrepareGateEnabled(true);
+        OzoneManagerPrepareState.startPrepare();
       }
       // TODO: Add cancel prepare here after it is implemented.
       return trx;
     } else {
-      // TODO: This will cause leader in ratis to step down without
-      //  RATIS-1216 applied.
       String message = "Cannot apply write request " +
           request.getCmdType().name() + " when OM is in prepare mode.";
       OMException cause = new OMException(message,

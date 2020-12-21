@@ -37,6 +37,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 
 import org.apache.ratis.server.RaftServer;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.server.raftlog.RaftLog;
 import org.apache.ratis.statemachine.StateMachine;
 import org.slf4j.Logger;
@@ -112,13 +113,16 @@ public class OMPrepareRequest extends OMClientRequest {
       waitForLogIndex(transactionLogIndex,
           ozoneManager.getMetadataManager(), division,
           flushTimeout, flushCheckInterval);
-      takeSnapshotAndPurgeLogs(division);
+      // Prepare index could be the transaction index of this request, or the
+      // index of a ratis meta transaction saved to the state machine index
+      // during snapshot.
+      long prepareIndex = takeSnapshotAndPurgeLogs(division);
 
       // Save transaction log index to a marker file, so if the OM restarts,
       // it will remain in prepare mode on that index as long as the file
       // exists.
-      OzoneManagerPrepareState.writePrepareMarkerFile(
-          ozoneManager.getConfiguration(), transactionLogIndex);
+      OzoneManagerPrepareState.finishPrepare(
+          ozoneManager.getConfiguration(), prepareIndex);
 
       LOG.info("OM {} prepared at log index {}. Returning response {}",
           ozoneManager.getOMNodeId(),
@@ -194,6 +198,7 @@ public class OMPrepareRequest extends OMClientRequest {
   /**
    * Take a snapshot of the state machine at the last index, and purge ALL logs.
    * @param division Raft server division.
+   * @return The index the snapshot was taken on.
    * @throws IOException on Error.
    */
   public static long takeSnapshotAndPurgeLogs(RaftServer.Division division)

@@ -472,12 +472,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     OMTransactionInfo txnInfo = metadataManager.getTransactionInfoTable()
         .get(TRANSACTION_INFO_KEY);
     if (txnInfo != null) {
-      OzoneManagerPrepareState.checkPrepareMarkerFile(conf,
+      OzoneManagerPrepareState.restorePrepare(conf,
           txnInfo.getTransactionIndex());
     } else {
       // If we have no transaction info in the DB, then no prepare request
       // could have been received.
-      OzoneManagerPrepareState.setPrepareGateEnabled(false);
+      OzoneManagerPrepareState.cancelPrepare(conf);
     }
 
     // Create special volume s3v which is required for S3G.
