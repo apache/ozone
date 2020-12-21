@@ -22,6 +22,7 @@ import static org.apache.commons.io.FilenameUtils.removeExtension;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_CHECKSUM_ERROR;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.NO_SUCH_ALGORITHM;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CLOSED_CONTAINER_IO;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_NOT_OPEN;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getContainerCommandResponse;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerData.CHARSET_ENCODING;
 
@@ -78,7 +79,8 @@ public final class ContainerUtils {
       ContainerCommandRequestProto request) {
     String logInfo = "Operation: {} , Trace ID: {} , Message: {} , " +
         "Result: {} , StorageContainerException Occurred.";
-    if (ex.getResult() == CLOSED_CONTAINER_IO) {
+    if (ex.getResult() == CLOSED_CONTAINER_IO ||
+        ex.getResult() == CONTAINER_NOT_OPEN) {
       if (log.isDebugEnabled()) {
         log.debug(logInfo, request.getCmdType(), request.getTraceID(),
             ex.getMessage(), ex.getResult().getValueDescriptor().getName(), ex);
