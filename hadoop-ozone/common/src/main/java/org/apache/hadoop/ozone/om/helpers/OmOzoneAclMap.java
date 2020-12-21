@@ -106,8 +106,8 @@ public class OmOzoneAclMap {
     if (!getAccessAclMap(aclType).containsKey(acl.getName())) {
       getAccessAclMap(aclType).put(acl.getName(), acl.getAclBitSet());
     } else {
-      BitSet currBitSet = getAccessAclMap(aclType).get(acl.getName());
-      BitSet bitSet = checkAndGet(acl, currBitSet);
+      BitSet curBitSet = getAccessAclMap(aclType).get(acl.getName());
+      BitSet bitSet = checkAndGet(acl, curBitSet);
       getAccessAclMap(aclType).replace(acl.getName(), bitSet);
     }
   }
@@ -121,8 +121,8 @@ public class OmOzoneAclMap {
         OzoneAclInfo old = defaultAclList.get(i);
         if (old.getType() == ozoneAclInfo.getType() && old.getName().equals(
                 ozoneAclInfo.getName())) {
-          BitSet currBitSet = BitSet.valueOf(old.getRights().toByteArray());
-          BitSet bitSet = checkAndGet(acl, currBitSet);
+          BitSet curBitSet = BitSet.valueOf(old.getRights().toByteArray());
+          BitSet bitSet = checkAndGet(acl, curBitSet);
           ozoneAclInfo = OzoneAclInfo.newBuilder(ozoneAclInfo).setRights(
                   ByteString.copyFrom(bitSet.toByteArray())).build();
           defaultAclList.remove(i);
@@ -139,11 +139,11 @@ public class OmOzoneAclMap {
     throw new OMException("Acl " + acl + " already exist.", INVALID_REQUEST);
   }
 
-  private BitSet checkAndGet(OzoneAcl acl, BitSet currBitSet)
+  private BitSet checkAndGet(OzoneAcl acl, BitSet curBitSet)
           throws OMException {
     // Check if we are adding new rights to existing acl.
     BitSet temp = (BitSet) acl.getAclBitSet().clone();
-    BitSet curRights = (BitSet) currBitSet.clone();
+    BitSet curRights = (BitSet) curBitSet.clone();
     temp.or(curRights);
     if (temp.equals(curRights)) {
       aclExistsError(acl);
@@ -210,9 +210,7 @@ public class OmOzoneAclMap {
       BitSet acls = BitSet.valueOf(acl.getRights().toByteArray());
       getAccessAclMap(acl.getType()).put(acl.getName(), acls);
     } else {
-      // throw exception if acl is already added.
-
-      throw new OMException("Acl " + acl + " already exist.", INVALID_REQUEST);
+      aclExistsError(OzoneAcl.fromProtobuf(acl));
     }
   }
 
