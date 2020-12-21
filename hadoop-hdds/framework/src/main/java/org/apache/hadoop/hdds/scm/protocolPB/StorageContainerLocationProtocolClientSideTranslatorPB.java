@@ -28,7 +28,12 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.GetScmInfoResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.FinalizeScmUpgradeRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.FinalizeScmUpgradeResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.QueryUpgradeFinalizationProgressRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.QueryUpgradeFinalizationProgressResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SafeModeRuleStatusProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetSafeModeRuleStatusesResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetSafeModeRuleStatusesRequestProto;
@@ -72,6 +77,8 @@ import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ipc.ProtobufHelper;
 import org.apache.hadoop.ipc.ProtocolTranslator;
 import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 
 import com.google.common.base.Preconditions;
 import com.google.protobuf.RpcController;
@@ -532,6 +539,46 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
             .getReplicationManagerStatusResponse();
     return response.getIsRunning();
 
+  }
+
+  @Override
+  public StatusAndMessages finalizeScmUpgrade(String upgradeClientID)
+      throws IOException {
+    FinalizeScmUpgradeRequestProto req = FinalizeScmUpgradeRequestProto.
+        newBuilder()
+        .setUpgradeClientId(upgradeClientID)
+        .build();
+
+    FinalizeScmUpgradeResponseProto response =
+        submitRequest(Type.FinalizeScmUpgrade,
+            builder -> builder.setFinalizeScmUpgradeRequest(req))
+            .getFinalizeScmUpgradeResponse();
+
+    UpgradeFinalizationStatus status = response.getStatus();
+    return new StatusAndMessages(
+        UpgradeFinalizer.Status.valueOf(status.getStatus().name()),
+        status.getMessagesList());
+  }
+
+  @Override
+  public StatusAndMessages queryUpgradeFinalizationProgress(
+      String upgradeClientID, boolean force) throws IOException {
+    QueryUpgradeFinalizationProgressRequestProto req =
+        QueryUpgradeFinalizationProgressRequestProto.
+            newBuilder()
+            .setUpgradeClientId(upgradeClientID)
+            .setTakeover(force)
+            .build();
+
+    QueryUpgradeFinalizationProgressResponseProto response =
+        submitRequest(Type.QueryUpgradeFinalizationProgress,
+            builder -> builder.setQueryUpgradeFinalizationProgressRequest(req))
+            .getQueryUpgradeFinalizationProgressResponse();
+
+    UpgradeFinalizationStatus status = response.getStatus();
+    return new StatusAndMessages(
+        UpgradeFinalizer.Status.valueOf(status.getStatus().name()),
+        status.getMessagesList());
   }
 
   @Override

@@ -30,6 +30,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.security.KerberosInfo;
 
 /**
@@ -230,4 +231,10 @@ public interface StorageContainerLocationProtocol extends Closeable {
    */
   boolean getReplicationManagerStatus() throws IOException;
 
+  StatusAndMessages finalizeScmUpgrade(String upgradeClientID)
+      throws IOException;
+
+  StatusAndMessages queryUpgradeFinalizationProgress(String upgradeClientID,
+                                                     boolean force)
+      throws IOException;
 }

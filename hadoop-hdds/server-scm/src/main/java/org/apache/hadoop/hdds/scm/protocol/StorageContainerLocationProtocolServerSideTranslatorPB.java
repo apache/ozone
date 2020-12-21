@@ -25,6 +25,7 @@ import java.util.Map;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ActivatePipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ActivatePipelineResponseProto;
@@ -34,6 +35,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DeactivatePipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DeactivatePipelineResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.FinalizeScmUpgradeRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.FinalizeScmUpgradeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ForceExitSafeModeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ForceExitSafeModeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerRequestProto;
@@ -50,6 +53,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ListPipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.NodeQueryResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.PipelineResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.QueryUpgradeFinalizationProgressRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.QueryUpgradeFinalizationProgressResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReplicationManagerStatusRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReplicationManagerStatusResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMCloseContainerRequestProto;
@@ -81,6 +86,8 @@ import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.PipelineResponseProto.Error.errorPipelineAlreadyExists;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.PipelineResponseProto.Error.success;
+
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -90,6 +97,7 @@ import org.slf4j.LoggerFactory;
  * {@link StorageContainerLocationProtocol} server implementation.
  */
 @InterfaceAudience.Private
+@SuppressWarnings({"method"})
 public final class StorageContainerLocationProtocolServerSideTranslatorPB
     implements StorageContainerLocationProtocolPB {
 
@@ -128,6 +136,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             request.getTraceID());
   }
 
+  @SuppressWarnings("methodlength")
   public ScmContainerLocationResponse processRequest(
       ScmContainerLocationRequest request) throws ServiceException {
     try {
@@ -269,6 +278,21 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setCmdType(request.getCmdType()).setStatus(Status.OK)
             .setGetSafeModeRuleStatusesResponse(getSafeModeRuleStatues(
                 request.getGetSafeModeRuleStatusesRequest()))
+            .build();
+      case FinalizeScmUpgrade:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setFinalizeScmUpgradeResponse(getFinalizeScmUpgrade(
+                request.getFinalizeScmUpgradeRequest()))
+            .build();
+      case QueryUpgradeFinalizationProgress:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setQueryUpgradeFinalizationProgressResponse(
+                getQueryUpgradeFinalizationProgress(
+                request.getQueryUpgradeFinalizationProgressRequest()))
             .build();
       default:
         throw new IllegalArgumentException(
@@ -465,6 +489,47 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     }
     return GetSafeModeRuleStatusesResponseProto.newBuilder()
         .addAllSafeModeRuleStatusesProto(proto).build();
+  }
+
+  public FinalizeScmUpgradeResponseProto getFinalizeScmUpgrade(
+      FinalizeScmUpgradeRequestProto request) throws IOException {
+    StatusAndMessages progress =
+        impl.finalizeScmUpgrade(request.getUpgradeClientId());
+
+    UpgradeFinalizationStatus.Status protoStatus =
+        UpgradeFinalizationStatus.Status.valueOf(progress.status().name());
+
+    UpgradeFinalizationStatus response =
+        UpgradeFinalizationStatus.newBuilder()
+            .setStatus(protoStatus)
+            .addAllMessages(progress.msgs())
+            .build();
+
+    return FinalizeScmUpgradeResponseProto.newBuilder()
+        .setStatus(response)
+        .build();
+  }
+
+  public QueryUpgradeFinalizationProgressResponseProto
+      getQueryUpgradeFinalizationProgress(
+          QueryUpgradeFinalizationProgressRequestProto request)
+      throws IOException {
+    StatusAndMessages progress =
+        impl.queryUpgradeFinalizationProgress(request.getUpgradeClientId(),
+            request.getTakeover());
+
+    UpgradeFinalizationStatus.Status protoStatus =
+        UpgradeFinalizationStatus.Status.valueOf(progress.status().name());
+
+    UpgradeFinalizationStatus response =
+        UpgradeFinalizationStatus.newBuilder()
+            .setStatus(protoStatus)
+            .addAllMessages(progress.msgs())
+            .build();
+
+    return QueryUpgradeFinalizationProgressResponseProto.newBuilder()
+        .setStatus(response)
+        .build();
   }
 
   public ForceExitSafeModeResponseProto forceExitSafeMode(

@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.utils.db.SequenceNumberNotFoundException;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -73,11 +74,13 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Multipa
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartUploadListPartsResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 
 import com.google.common.collect.Lists;
@@ -95,6 +98,8 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartUploadInfo;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartInfo;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus.PREPARE_COMPLETED;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus.PREPARE_IN_PROGRESS;
 
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.slf4j.Logger;
@@ -213,6 +218,11 @@ public class OzoneManagerRequestHandler implements RequestHandler {
             reportUpgradeProgress(request.getFinalizeUpgradeProgressRequest());
         responseBuilder
             .setFinalizeUpgradeProgressResponse(upgradeProgressResponse);
+        break;
+      case PrepareStatus:
+        PrepareStatusResponse prepareStatusResponse =
+            getPrepareStatus(request.getPrepareStatusRequest());
+        responseBuilder.setPrepareStatusResponse(prepareStatusResponse);
         break;
       default:
         responseBuilder.setSuccess(false);
@@ -621,6 +631,25 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return FinalizeUpgradeProgressResponse.newBuilder()
         .setStatus(response)
         .build();
+  }
+
+  private PrepareStatusResponse getPrepareStatus(PrepareStatusRequest request)
+      throws IOException {
+    // TODO After HDDS-4569,
+    // When there is a global "prepared" state in OM, we can return
+    // PREPARE_NOT_STARTED instead of PREPARE_IN_PROGRESS appropriately.
+    PrepareStatus prepareStatus = null;
+    long txnID = request.getTxnID();
+    long ratisSnapshotIndex = impl.getRatisSnapshotIndex();
+    if (ratisSnapshotIndex != txnID) {
+      LOG.info("Last Txn Id = {}, PrepareStatusRequest Txn Id = {}",
+          ratisSnapshotIndex, request.getTxnID());
+      prepareStatus =  PREPARE_IN_PROGRESS;
+    } else {
+      prepareStatus = PREPARE_COMPLETED;
+    }
+    return PrepareStatusResponse.newBuilder().setStatus(prepareStatus)
+        .setCurrentTxnIndex(ratisSnapshotIndex).build();
   }
 
   protected OzoneManager getOzoneManager() {

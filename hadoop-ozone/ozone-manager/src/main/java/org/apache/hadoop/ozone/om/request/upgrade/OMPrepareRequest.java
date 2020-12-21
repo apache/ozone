@@ -120,14 +120,19 @@ public class OMPrepareRequest extends OMClientRequest {
       OzoneManagerPrepareState.writePrepareMarkerFile(
           ozoneManager.getConfiguration(), transactionLogIndex);
 
-      LOG.info("OM prepared at log index {}. Returning response {}",
+      LOG.info("OM {} prepared at log index {}. Returning response {}",
+          ozoneManager.getOMNodeId(),
           ozoneManager.getRatisSnapshotIndex(), omResponse);
     } catch (OMException e) {
+      LOG.error("Prepare Request Apply failed in {}. ",
+          ozoneManager.getOMNodeId(), e);
       response = new OMPrepareResponse(
           createErrorOMResponse(responseBuilder, e));
     } catch (InterruptedException | IOException e) {
       // Set error code so that prepare failure does not cause the OM to
       // terminate.
+      LOG.error("Prepare Request Apply failed in {}. ",
+          ozoneManager.getOMNodeId(), e);
       response = new OMPrepareResponse(
           createErrorOMResponse(responseBuilder, new OMException(e,
               OMException.ResultCodes.PREPARE_FAILED)));
@@ -197,6 +202,19 @@ public class OMPrepareRequest extends OMClientRequest {
     StateMachine stateMachine = division.getStateMachine();
     long snapshotIndex = stateMachine.takeSnapshot();
     RaftLog raftLog = division.getRaftLog();
+    long raftLogIndex = raftLog.getLastEntryTermIndex().getIndex();
+
+    // We can have a case where the log has a meta transaction after the
+    // prepare request or another prepare request. If there is another
+    // prepare request, this one will end up purging that request.
+    // This means that an OM cannot support 2 prepare requests in the
+    // transaction pipeline (un-applied) at the same time.
+    if (raftLogIndex > snapshotIndex) {
+      LOG.warn("Snapshot index {} does not " +
+          "match last log index {}.", snapshotIndex, raftLogIndex);
+      snapshotIndex = raftLogIndex;
+    }
+
     CompletableFuture<Long> purgeFuture =
         raftLog.syncWithSnapshot(snapshotIndex);
 
