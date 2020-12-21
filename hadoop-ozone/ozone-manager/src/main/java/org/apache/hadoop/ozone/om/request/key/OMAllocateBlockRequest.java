@@ -186,8 +186,8 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
       // Here we don't acquire bucket/volume lock because for a single client
       // allocateBlock is called in serial fashion.
 
-      openKeyName = ozoneManager.getMetadataManager().getOpenKey(volumeName,
-              bucketName, keyName, clientID);
+      openKeyName = omMetadataManager.getOpenKey(volumeName, bucketName,
+          keyName, clientID);
       openKeyInfo = omMetadataManager.getOpenKeyTable().get(openKeyName);
       if (openKeyInfo == null) {
         throw new OMException("Open Key not found " + openKeyName,
@@ -217,15 +217,15 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
 
       // Add to cache.
       omMetadataManager.getOpenKeyTable().addCacheEntry(
-              new CacheKey<>(openKeyName),
-              new CacheValue<>(Optional.of(openKeyInfo), trxnLogIndex));
+          new CacheKey<>(openKeyName),
+          new CacheValue<>(Optional.of(openKeyInfo), trxnLogIndex));
       omBucketInfo.incrUsedBytes(preAllocatedSpace);
 
       omResponse.setAllocateBlockResponse(AllocateBlockResponse.newBuilder()
           .setKeyLocation(blockLocation).build());
 
       omClientResponse = new OMAllocateBlockResponse(omResponse.build(),
-              openKeyInfo, clientID, omVolumeArgs, omBucketInfo);
+          openKeyInfo, clientID, omVolumeArgs, omBucketInfo.copyObject());
       LOG.debug("Allocated block for Volume:{}, Bucket:{}, OpenKey:{}",
           volumeName, bucketName, openKeyName);
     } catch (IOException ex) {
