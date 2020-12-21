@@ -129,7 +129,7 @@ public class OMKeyCommitRequestV1 extends OMKeyCommitRequest {
       omBucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
       long bucketId = omBucketInfo.getObjectID();
       long parentID = OMFileRequest.getParentID(bucketId, pathComponents,
-              keyName, ozoneManager);
+              keyName, omMetadataManager);
       String dbFileKey = omMetadataManager.getOzonePathKey(parentID, fileName);
       dbOpenFileKey = omMetadataManager.getOpenFileName(parentID, fileName,
               commitKeyRequest.getClientID());
