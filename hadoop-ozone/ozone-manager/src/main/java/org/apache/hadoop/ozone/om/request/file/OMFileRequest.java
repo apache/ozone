@@ -37,7 +37,6 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -548,7 +547,6 @@ public final class OMFileRequest {
           throws IOException {
 
     OmKeyInfo dbOmKeyInfo;
-    OmKeyInfo omKeyInfoCopy = null;
     if (openFileTable) {
       dbOmKeyInfo = omMetadataMgr.getOpenKeyTable().get(dbOpenFileKey);
     } else {
@@ -560,10 +558,9 @@ public final class OMFileRequest {
     // For example, the user given key path is '/a/b/c/d/e/file1', then in DB
     // keyName field stores only the leaf node name, which is 'file1'.
     if (dbOmKeyInfo != null) {
-      omKeyInfoCopy = dbOmKeyInfo.copyObject();
-      omKeyInfoCopy.setKeyName(keyName);
+      dbOmKeyInfo.setKeyName(keyName);
     }
-    return omKeyInfoCopy;
+    return dbOmKeyInfo;
   }
 
   /**
@@ -857,37 +854,18 @@ public final class OMFileRequest {
     return parentId == ancestorId;
   }
 
-
-  /**
-   * Check for directory exists with same name, if it exists throw error.
-   *
-   * @param keyName                  key name
-   * @param ozoneManager             Ozone Manager
-   * @param reachedLastPathComponent true if the path component is a fileName
-   * @throws IOException if directory exists with same name
-   */
-  private static void checkDirectoryAlreadyExists(String keyName,
-      OzoneManager ozoneManager, boolean reachedLastPathComponent)
-          throws IOException {
-    // Reached last component, which would be a file. Returns its parentID.
-    if (reachedLastPathComponent && ozoneManager.getEnableFileSystemPaths()) {
-      throw new OMException("Can not create file: " + keyName +
-              " as there is already directory in the given path", NOT_A_FILE);
-    }
-  }
-
   /**
    * Get parent id for the user given path.
    *
    * @param bucketId       bucket id
    * @param pathComponents fie path elements
    * @param keyName        user given key name
-   * @param ozoneManager   ozone manager
+   * @param omMetadataManager   om metadata manager
    * @return lastKnownParentID
    * @throws IOException DB failure or parent not exists in DirectoryTable
    */
   public static long getParentID(long bucketId, Iterator<Path> pathComponents,
-      String keyName, OzoneManager ozoneManager) throws IOException {
+      String keyName, OMMetadataManager omMetadataManager) throws IOException {
 
     long lastKnownParentId = bucketId;
 
@@ -897,7 +875,6 @@ public final class OMFileRequest {
     }
 
     OmDirectoryInfo omDirectoryInfo;
-    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     while (pathComponents.hasNext()) {
       String nodeName = pathComponents.next().toString();
       boolean reachedLastPathComponent = !pathComponents.hasNext();
@@ -907,16 +884,18 @@ public final class OMFileRequest {
       omDirectoryInfo = omMetadataManager.
               getDirectoryTable().get(dbNodeName);
       if (omDirectoryInfo != null) {
-        checkDirectoryAlreadyExists(keyName, ozoneManager,
-                reachedLastPathComponent);
+        if (reachedLastPathComponent) {
+          throw new OMException("Can not create file: " + keyName +
+                  " as there is already directory in the given path",
+                  NOT_A_FILE);
+        }
         lastKnownParentId = omDirectoryInfo.getObjectID();
       } else {
         // One of the sub-dir doesn't exists in DB. Immediate parent should
         // exists for committing the key, otherwise will fail the operation.
         if (!reachedLastPathComponent) {
-          throw new OMException("Failed to commit key, as parent directory of "
-                  + keyName + " entry is not found in DirectoryTable",
-                  KEY_NOT_FOUND);
+          throw new OMException("Failed to find parent directory of "
+                  + keyName + " in DirectoryTable", KEY_NOT_FOUND);
         }
         break;
       }

@@ -609,8 +609,8 @@ public class TestOzoneFileSystem {
       if (rootItemCount != actualPathList.size()) {
         actualPaths.removeAll(paths);
         actualPathList.removeAll(paths);
-        LOG.info("actualPaths:{}" + actualPaths);
-        LOG.info("actualPathList:{}" + actualPathList);
+        LOG.info("actualPaths: {}", actualPaths);
+        LOG.info("actualPathList: {}", actualPathList);
       }
     }
     assertEquals(
