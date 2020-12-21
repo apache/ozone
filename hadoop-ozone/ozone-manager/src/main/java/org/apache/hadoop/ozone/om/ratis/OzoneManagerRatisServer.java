@@ -83,6 +83,7 @@ import org.slf4j.LoggerFactory;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ipc.RpcConstants.DUMMY_CLIENT_ID;
 import static org.apache.hadoop.ipc.RpcConstants.INVALID_CALL_ID;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_RATIS_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HA_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_DIR;
 
@@ -636,7 +637,7 @@ public final class OzoneManagerRatisServer {
           OZONE_OM_RATIS_SNAPSHOT_DIR, OZONE_METADATA_DIRS);
       File metaDirPath = ServerUtils.getOzoneMetaDirPath(conf);
       snapshotDir = Paths.get(metaDirPath.getPath(),
-          "snapshot").toString();
+          OM_RATIS_SNAPSHOT_DIR).toString();
     }
     return snapshotDir;
   }
