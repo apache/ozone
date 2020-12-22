@@ -60,7 +60,7 @@ public final class S3Acl {
     READ_ACP("READ_ACP"),
     // Allows grantee to write the ACL for the applicable bucket
     WRITE_ACP("WRITE_ACP"),
-    //Allows grantee the READ, WRITE, READ_ACP, and WRITE_ACP permissions on the bucket
+    // Allows grantee above all permissions on the bucket
     FULL_CONTROL("FULL_CONTROL");
 
     public String getValue() {
@@ -76,6 +76,16 @@ public final class S3Acl {
      */
     ACLType(String val) {
       value = val;
+    }
+
+
+    public static ACLType getType(String typeStr) {
+      for(ACLType type: ACLType.values()) {
+        if (type.getValue().equals(typeStr)) {
+          return type;
+        }
+      }
+      return null;
     }
   }
 
@@ -233,23 +243,27 @@ public final class S3Acl {
 
   public static BitSet getOzoneAclOnBucketFromS3Permission(String permission)
       throws OS3Exception {
+    ACLType permissionType = ACLType.getType(permission);
+    if (permissionType == null) {
+      throw S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, permission);
+    }
     BitSet acls = new BitSet(IAccessAuthorizer.ACLType.getNoOfAcls());
-    switch (permission) {
-      case "FULL_CONTROL":
+    switch (permissionType) {
+      case FULL_CONTROL:
         acls.set(IAccessAuthorizer.ACLType.ALL.ordinal());
         break;
-      case "WRITE_ACP":
+      case WRITE_ACP:
         acls.set(IAccessAuthorizer.ACLType.WRITE_ACL.ordinal());
         break;
-      case "READ_ACP":
+      case READ_ACP:
         acls.set(IAccessAuthorizer.ACLType.READ_ACL.ordinal());
         break;
-      case "WRITE":
+      case WRITE:
         acls.set(IAccessAuthorizer.ACLType.WRITE.ordinal());
         acls.set(IAccessAuthorizer.ACLType.DELETE.ordinal());
         acls.set(IAccessAuthorizer.ACLType.CREATE.ordinal());
         break;
-      case "READ":
+      case READ:
         acls.set(IAccessAuthorizer.ACLType.READ.ordinal());
         acls.set(IAccessAuthorizer.ACLType.LIST.ordinal());
         break;
@@ -294,20 +308,24 @@ public final class S3Acl {
   public static BitSet getOzoneAclOnVolumeFromS3Permission(String permission)
       throws OS3Exception {
     BitSet acls = new BitSet(IAccessAuthorizer.ACLType.getNoOfAcls());
-    switch (permission) {
-      case "FULL_CONTROL":
+    ACLType permissionType = ACLType.getType(permission);
+    if (permissionType == null) {
+      throw S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, permission);
+    }
+    switch (permissionType) {
+      case FULL_CONTROL:
         acls.set(IAccessAuthorizer.ACLType.ALL.ordinal());
         break;
-      case "WRITE_ACP":
+      case WRITE_ACP:
         acls.set(IAccessAuthorizer.ACLType.WRITE.ordinal());
         break;
-      case "READ_ACP":
+      case READ_ACP:
         acls.set(IAccessAuthorizer.ACLType.READ.ordinal());
         break;
-      case "WRITE":
+      case WRITE:
         acls.set(IAccessAuthorizer.ACLType.WRITE.ordinal());
         break;
-      case "READ":
+      case READ:
         acls.set(IAccessAuthorizer.ACLType.READ.ordinal());
         break;
       default:
@@ -317,7 +335,8 @@ public final class S3Acl {
     return acls;
   }
 
-  public static List<OzoneAcl> getVolumeAclFromBucketAcl(List<OzoneAcl> aclList) {
+  public static List<OzoneAcl> getVolumeAclFromBucketAcl(
+      List<OzoneAcl> aclList) {
     List<OzoneAcl> volumeAclList = new ArrayList<>();
     if (aclList == null || aclList.isEmpty()) {
       return volumeAclList;
@@ -326,17 +345,17 @@ public final class S3Acl {
       List<IAccessAuthorizer.ACLType> acls = bucketAcl.getAclList();
       if (acls.contains(IAccessAuthorizer.ACLType.ALL)) {
         OzoneAcl volumeAcl = new OzoneAcl(bucketAcl.getType(),
-            bucketAcl.getName(),IAccessAuthorizer.ACLType.ALL,
+            bucketAcl.getName(), IAccessAuthorizer.ACLType.ALL,
             bucketAcl.getAclScope());
         volumeAclList.add(volumeAcl);
       } else if (acls.contains(IAccessAuthorizer.ACLType.WRITE_ACL)) {
         OzoneAcl volumeAcl = new OzoneAcl(bucketAcl.getType(),
-            bucketAcl.getName(),IAccessAuthorizer.ACLType.WRITE_ACL,
+            bucketAcl.getName(), IAccessAuthorizer.ACLType.WRITE_ACL,
             bucketAcl.getAclScope());
         volumeAclList.add(volumeAcl);
       } else if (acls.contains(IAccessAuthorizer.ACLType.READ_ACL)) {
         OzoneAcl volumeAcl = new OzoneAcl(bucketAcl.getType(),
-            bucketAcl.getName(),IAccessAuthorizer.ACLType.READ_ACL,
+            bucketAcl.getName(), IAccessAuthorizer.ACLType.READ_ACL,
             bucketAcl.getAclScope());
         volumeAclList.add(volumeAcl);
       } else if (acls.contains(IAccessAuthorizer.ACLType.WRITE) &&
@@ -348,7 +367,7 @@ public final class S3Acl {
         aclBits.set(IAccessAuthorizer.ACLType.CREATE.ordinal());
 
         OzoneAcl volumeAcl = new OzoneAcl(bucketAcl.getType(),
-            bucketAcl.getName(),aclBits, bucketAcl.getAclScope());
+            bucketAcl.getName(), aclBits, bucketAcl.getAclScope());
         volumeAclList.add(volumeAcl);
       } else if (acls.contains(IAccessAuthorizer.ACLType.READ) &&
           acls.contains(IAccessAuthorizer.ACLType.LIST)) {
@@ -357,7 +376,7 @@ public final class S3Acl {
         aclBits.set(IAccessAuthorizer.ACLType.LIST.ordinal());
 
         OzoneAcl volumeAcl = new OzoneAcl(bucketAcl.getType(),
-            bucketAcl.getName(),aclBits, bucketAcl.getAclScope());
+            bucketAcl.getName(), aclBits, bucketAcl.getAclScope());
         volumeAclList.add(volumeAcl);
       } else {
         LOG.error("Cannot find a good mapping for Ozone ACL {} to S3",

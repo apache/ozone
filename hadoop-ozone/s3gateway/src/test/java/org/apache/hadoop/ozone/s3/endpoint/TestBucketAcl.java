@@ -92,7 +92,7 @@ public class TestBucketAcl {
   @Test
   public void testSetAclWithNotSupportedGranteeType() throws Exception {
     when(headers.getHeaderString(S3Acl.grantRead))
-        .thenReturn(S3Acl.ACLIdentityType.GROUP.getHeaderType() + "=root" );
+        .thenReturn(S3Acl.ACLIdentityType.GROUP.getHeaderType() + "=root");
     when(parameterMap.containsKey(aclMarker)).thenReturn(true);
     try {
       Response response =
@@ -167,7 +167,7 @@ public class TestBucketAcl {
   public void testFullControl() throws Exception {
     when(parameterMap.containsKey(aclMarker)).thenReturn(true);
     when(headers.getHeaderString(S3Acl.grantFullControl))
-        .thenReturn(S3Acl.ACLIdentityType.USER.getHeaderType() + "=root" );
+        .thenReturn(S3Acl.ACLIdentityType.USER.getHeaderType() + "=root");
     Response response =
         bucketEndpoint.put(bucketName, aclMarker, headers, null);
     assertEquals(HTTP_OK, response.getStatus());
@@ -190,7 +190,7 @@ public class TestBucketAcl {
     when(headers.getHeaderString(S3Acl.grantWriteACP))
         .thenReturn(S3Acl.ACLIdentityType.USER.getHeaderType() + "=root");
     when(headers.getHeaderString(S3Acl.grantFullControl))
-        .thenReturn(S3Acl.ACLIdentityType.USER.getHeaderType() + "=root" );
+        .thenReturn(S3Acl.ACLIdentityType.USER.getHeaderType() + "=root");
     Response response =
         bucketEndpoint.put(bucketName, aclMarker, headers, null);
     assertEquals(HTTP_OK, response.getStatus());
