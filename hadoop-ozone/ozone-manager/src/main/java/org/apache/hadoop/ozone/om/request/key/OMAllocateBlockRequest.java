@@ -219,13 +219,14 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
       omMetadataManager.getOpenKeyTable().addCacheEntry(
           new CacheKey<>(openKeyName),
           new CacheValue<>(Optional.of(openKeyInfo), trxnLogIndex));
+
       omBucketInfo.incrUsedBytes(preAllocatedSpace);
 
       omResponse.setAllocateBlockResponse(AllocateBlockResponse.newBuilder()
           .setKeyLocation(blockLocation).build());
-
       omClientResponse = new OMAllocateBlockResponse(omResponse.build(),
           openKeyInfo, clientID, omVolumeArgs, omBucketInfo.copyObject());
+
       LOG.debug("Allocated block for Volume:{}, Bucket:{}, OpenKey:{}",
           volumeName, bucketName, openKeyName);
     } catch (IOException ex) {
