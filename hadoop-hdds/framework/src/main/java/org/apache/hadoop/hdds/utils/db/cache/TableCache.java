@@ -48,7 +48,7 @@ public interface TableCache<CACHEKEY extends CacheKey,
 
   /**
    * This method should be called for tables with cache type full cache.
-   * {@link TableCache.CacheType#FullCache} after system
+   * {@link TableCache.CacheType#FULL_CACHE} after system
    * restart to fill up the cache.
    * @param cacheKey
    * @param cacheValue
@@ -96,11 +96,11 @@ public interface TableCache<CACHEKEY extends CacheKey,
    *
    * If it does not exist:
    *  If cache type is
-   *  {@link TableCache.CacheType#FullCache}. It return's {@link CacheResult}
+   *  {@link TableCache.CacheType#FULL_CACHE}. It return's {@link CacheResult}
    *  with null and status as {@link CacheResult.CacheStatus#NOT_EXIST}.
    *
    *  If cache type is
-   *  {@link TableCache.CacheType#PartialCache}.
+   *  {@link TableCache.CacheType#PARTIAL_CACHE}.
    *  It return's {@link CacheResult} with null and status as MAY_EXIST.
    *
    * @param cachekey
@@ -112,9 +112,9 @@ public interface TableCache<CACHEKEY extends CacheKey,
   Set<EpochEntry<CACHEKEY>> getEpochEntrySet();
 
   enum CacheType {
-    FullCache, //  This mean's the table maintains full cache. Cache and DB
+    FULL_CACHE, //  This mean's the table maintains full cache. Cache and DB
     // state are same.
-    PartialCache // This is partial table cache, cache state is partial state
+    PARTIAL_CACHE // This is partial table cache, cache state is partial state
     // compared to DB state.
   }
 }

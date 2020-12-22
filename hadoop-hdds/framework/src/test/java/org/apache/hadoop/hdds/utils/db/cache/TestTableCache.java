@@ -49,8 +49,8 @@ public class TestTableCache {
   @Parameterized.Parameters
   public static Collection<Object[]> policy() {
     Object[][] params = new Object[][] {
-        {TableCache.CacheType.FullCache},
-        {TableCache.CacheType.PartialCache}
+        {TableCache.CacheType.FULL_CACHE},
+        {TableCache.CacheType.PARTIAL_CACHE}
     };
     return Arrays.asList(params);
   }
@@ -64,7 +64,7 @@ public class TestTableCache {
 
   @Before
   public void create() {
-    if (cacheType == TableCache.CacheType.FullCache) {
+    if (cacheType == TableCache.CacheType.FULL_CACHE) {
       tableCache = new FullTableCache<>();
     } else {
       tableCache = new PartialTableCache<>();
@@ -125,7 +125,7 @@ public class TestTableCache {
     final int count = totalCount;
 
     // If cleanup policy is manual entries should have been removed.
-    if (cacheType == TableCache.CacheType.PartialCache) {
+    if (cacheType == TableCache.CacheType.PARTIAL_CACHE) {
       Assert.assertEquals(count - epochs.size(), tableCache.size());
 
       // Check remaining entries exist or not and deleted entries does not
@@ -184,7 +184,7 @@ public class TestTableCache {
     epochs.add(3L);
     epochs.add(4L);
 
-    if (cacheType == TableCache.CacheType.PartialCache) {
+    if (cacheType == TableCache.CacheType.PARTIAL_CACHE) {
 
       tableCache.evictCache(epochs);
 
@@ -199,7 +199,7 @@ public class TestTableCache {
 
     epochs = new ArrayList<>();
     epochs.add(5L);
-    if (cacheType == TableCache.CacheType.PartialCache) {
+    if (cacheType == TableCache.CacheType.PARTIAL_CACHE) {
       tableCache.evictCache(epochs);
 
       Assert.assertEquals(0, tableCache.size());
@@ -257,7 +257,7 @@ public class TestTableCache {
     epochs.add(6L);
 
 
-    if (cacheType == TableCache.CacheType.PartialCache) {
+    if (cacheType == TableCache.CacheType.PARTIAL_CACHE) {
       tableCache.evictCache(epochs);
 
       Assert.assertEquals(0, tableCache.size());
@@ -279,7 +279,7 @@ public class TestTableCache {
     epochs = new ArrayList<>();
     epochs.add(7L);
 
-    if (cacheType == TableCache.CacheType.PartialCache) {
+    if (cacheType == TableCache.CacheType.PARTIAL_CACHE) {
       tableCache.evictCache(epochs);
 
       Assert.assertEquals(0, tableCache.size());
@@ -340,7 +340,7 @@ public class TestTableCache {
 
     totalCount += value;
 
-    if (cacheType == TableCache.CacheType.PartialCache) {
+    if (cacheType == TableCache.CacheType.PARTIAL_CACHE) {
       int deleted = 5;
 
       // cleanup first 5 entires
@@ -453,7 +453,7 @@ public class TestTableCache {
 
     tableCache.evictCache(epochs);
 
-    if(cacheType == TableCache.CacheType.PartialCache) {
+    if(cacheType == TableCache.CacheType.PARTIAL_CACHE) {
       Assert.assertTrue(tableCache.size() == 0);
       Assert.assertTrue(tableCache.getEpochEntrySet().size() == 0);
     } else {

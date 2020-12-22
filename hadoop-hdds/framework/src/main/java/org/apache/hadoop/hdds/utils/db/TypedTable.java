@@ -62,7 +62,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
   /**
    * Create an TypedTable from the raw table.
-   * Default cache type for the table is {@link CacheType#PartialCache}.
+   * Default cache type for the table is {@link CacheType#PARTIAL_CACHE}.
    * @param rawTable
    * @param codecRegistry
    * @param keyType
@@ -73,7 +73,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
       CodecRegistry codecRegistry, Class<KEY> keyType,
       Class<VALUE> valueType) throws IOException {
     this(rawTable, codecRegistry, keyType, valueType,
-        CacheType.PartialCache);
+        CacheType.PARTIAL_CACHE);
   }
 
   /**
@@ -95,7 +95,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     this.keyType = keyType;
     this.valueType = valueType;
 
-    if (cacheType == CacheType.FullCache) {
+    if (cacheType == CacheType.FULL_CACHE) {
       cache = new FullTableCache<>();
       //fill cache
       try(TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> tableIterator =
