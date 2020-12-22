@@ -459,7 +459,9 @@ public final class XceiverServerRatis implements XceiverServerSpi {
       }
       server.start();
 
-      int realPort = server.getServerRpc().getInetSocketAddress().getPort();
+      int realPort = server.getServerRpc()
+          .getInetSocketAddress()
+          .getPort();
 
       if (port == 0) {
         LOG.info("{} {} is started using port {}", getClass().getSimpleName(),
