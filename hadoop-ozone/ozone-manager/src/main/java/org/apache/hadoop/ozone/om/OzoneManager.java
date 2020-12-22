@@ -216,6 +216,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
 import static org.apache.hadoop.ozone.OzoneConsts.DEFAULT_OM_UPDATE_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_FILE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_TEMP_FILE;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_RATIS_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.RPC_PORT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
@@ -345,6 +346,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   private Thread emptier;
 
+  @SuppressWarnings("methodlength")
   private OzoneManager(OzoneConfiguration conf) throws IOException,
       AuthenticationException {
     super(OzoneVersionInfo.OZONE_VERSION_INFO);
@@ -455,7 +457,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     addS3GVolumeToDB();
 
     this.omRatisSnapshotInfo = new OMRatisSnapshotInfo();
-    initializeRatisServer();
+
     if (isRatisEnabled) {
       // Create Ratis storage dir
       String omRatisDirectory =
@@ -465,15 +467,29 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             " must be defined.");
       }
       OmUtils.createOMDir(omRatisDirectory);
+
       // Create Ratis snapshot dir
       omRatisSnapshotDir = OmUtils.createOMDir(
           OzoneManagerRatisServer.getOMRatisSnapshotDirectory(configuration));
+
+      // Before starting ratis server, check if previous installation has
+      // snapshot directory in Ratis storage directory. if yes, move it to
+      // new snapshot directory.
+
+      File snapshotDir = new File(omRatisDirectory, OM_RATIS_SNAPSHOT_DIR);
+
+      if (snapshotDir.isDirectory()) {
+        FileUtils.moveDirectory(snapshotDir.toPath(),
+            omRatisSnapshotDir.toPath());
+      }
 
       if (peerNodes != null && !peerNodes.isEmpty()) {
         this.omSnapshotProvider = new OzoneManagerSnapshotProvider(
             configuration, omRatisSnapshotDir, peerNodes);
       }
     }
+
+    initializeRatisServer();
 
     metrics = OMMetrics.create();
     omClientProtocolMetrics = ProtocolMessageMetrics
