@@ -25,7 +25,6 @@ import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -53,7 +52,6 @@ import java.util.List;
 import java.util.Map;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
 /**
@@ -130,8 +128,8 @@ public class OMKeyCommitRequestV1 extends OMKeyCommitRequest {
       String fileName = OzoneFSUtils.getFileName(keyName);
       omBucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
       long bucketId = omBucketInfo.getObjectID();
-      long parentID = getParentID(bucketId, pathComponents, keyName,
-              omMetadataManager, ozoneManager);
+      long parentID = OMFileRequest.getParentID(bucketId, pathComponents,
+              keyName, omMetadataManager);
       String dbFileKey = omMetadataManager.getOzonePathKey(parentID, fileName);
       dbOpenFileKey = omMetadataManager.getOpenFileName(parentID, fileName,
               commitKeyRequest.getClientID());
@@ -196,75 +194,5 @@ public class OMKeyCommitRequestV1 extends OMKeyCommitRequest {
             exception, omKeyInfo, result);
 
     return omClientResponse;
-  }
-
-
-  /**
-   * Check for directory exists with same name, if it exists throw error.
-   *
-   * @param keyName                  key name
-   * @param ozoneManager             Ozone Manager
-   * @param reachedLastPathComponent true if the path component is a fileName
-   * @throws IOException if directory exists with same name
-   */
-  private void checkDirectoryAlreadyExists(String keyName,
-                                           OzoneManager ozoneManager,
-                                           boolean reachedLastPathComponent)
-          throws IOException {
-    // Reached last component, which would be a file. Returns its parentID.
-    if (reachedLastPathComponent && ozoneManager.getEnableFileSystemPaths()) {
-      throw new OMException("Can not create file: " + keyName +
-              " as there is already directory in the given path", NOT_A_FILE);
-    }
-  }
-
-  /**
-   * Get parent id for the user given path.
-   *
-   * @param bucketId          bucket id
-   * @param pathComponents    fie path elements
-   * @param keyName           user given key name
-   * @param omMetadataManager metadata manager
-   * @return lastKnownParentID
-   * @throws IOException DB failure or parent not exists in DirectoryTable
-   */
-  private long getParentID(long bucketId, Iterator<Path> pathComponents,
-                           String keyName, OMMetadataManager omMetadataManager,
-                           OzoneManager ozoneManager)
-          throws IOException {
-
-    long lastKnownParentId = bucketId;
-
-    // If no sub-dirs then bucketID is the root/parent.
-    if(!pathComponents.hasNext()){
-      return bucketId;
-    }
-
-    OmDirectoryInfo omDirectoryInfo;
-    while (pathComponents.hasNext()) {
-      String nodeName = pathComponents.next().toString();
-      boolean reachedLastPathComponent = !pathComponents.hasNext();
-      String dbNodeName =
-              omMetadataManager.getOzonePathKey(lastKnownParentId, nodeName);
-
-      omDirectoryInfo = omMetadataManager.
-              getDirectoryTable().get(dbNodeName);
-      if (omDirectoryInfo != null) {
-        checkDirectoryAlreadyExists(keyName, ozoneManager,
-                reachedLastPathComponent);
-        lastKnownParentId = omDirectoryInfo.getObjectID();
-      } else {
-        // One of the sub-dir doesn't exists in DB. Immediate parent should
-        // exists for committing the key, otherwise will fail the operation.
-        if (!reachedLastPathComponent) {
-          throw new OMException("Failed to commit key, as parent directory of "
-                  + keyName + " entry is not found in DirectoryTable",
-                  KEY_NOT_FOUND);
-        }
-        break;
-      }
-    }
-
-    return lastKnownParentId;
   }
 }
