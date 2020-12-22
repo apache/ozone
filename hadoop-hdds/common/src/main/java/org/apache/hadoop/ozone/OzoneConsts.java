@@ -384,4 +384,6 @@ public final class OzoneConsts {
 
   // An on-disk transient marker file used when replacing DB with checkpoint
   public static final String DB_TRANSIENT_MARKER = "dbInconsistentMarker";
+
+  public static final long DEFAULT_OM_UPDATE_ID = -1L;
 }
