@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.om.upgrade;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
