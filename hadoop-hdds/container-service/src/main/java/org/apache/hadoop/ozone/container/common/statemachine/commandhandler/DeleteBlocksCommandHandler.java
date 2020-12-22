@@ -135,10 +135,10 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
             cont.writeLock();
             try {
               if (containerData.getSchemaVersion().equals(SCHEMA_V1)) {
-                deleteKeyValueContainerBlocks(containerData, entry);
+                markBlocksForDeletionSchemaV1(containerData, entry);
               } else if (containerData.getSchemaVersion().equals(SCHEMA_V2)) {
-                putTxns(containerData, entry, newDeletionBlocks,
-                    entry.getTxID());
+                markBlocksForDeletionSchemaV2(containerData, entry,
+                    newDeletionBlocks, entry.getTxID());
               } else {
                 throw new UnsupportedOperationException(
                     "Only schema version 1 and schema version 2 are "
@@ -202,71 +202,62 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
    * @throws IOException if I/O error occurs.
    */
 
-  private void putTxns(KeyValueContainerData containerData,
-      DeletedBlocksTransaction delTX, int newDeletionBlocks, long txnID)
-      throws IOException {
-    try(ReferenceCountedDB containerDB =
-        BlockUtils.getDB(containerData, conf)){
+  private void markBlocksForDeletionSchemaV2(
+      KeyValueContainerData containerData, DeletedBlocksTransaction delTX,
+      int newDeletionBlocks, long txnID) throws IOException {
+    long containerId = delTX.getContainerID();
+    if (!isTxnIdValid(containerId, containerData, delTX)) {
+      return;
+    }
+    try (ReferenceCountedDB containerDB = BlockUtils
+        .getDB(containerData, conf)) {
       DatanodeStore ds = containerDB.getStore();
       DatanodeStoreSchemaTwoImpl dnStoreTwoImpl =
           (DatanodeStoreSchemaTwoImpl) ds;
       Table<Long, DeletedBlocksTransaction> delTxTable =
-          dnStoreTwoImpl.getTxnTable();
-      try(BatchOperation batch = containerDB.getStore()
-          .getBatchHandler().initBatchOperation()){
+          dnStoreTwoImpl.getDeleteTransactionTable();
+      try (BatchOperation batch = containerDB.getStore().getBatchHandler()
+          .initBatchOperation()) {
         delTxTable.putWithBatch(batch, txnID, delTX);
-        containerDB.getStore().getBatchHandler()
-            .commitBatchOperation(batch);
         newDeletionBlocks += delTX.getLocalIDList().size();
+        updateMetaData(containerData, delTX, newDeletionBlocks, containerDB,
+            batch);
+        containerDB.getStore().getBatchHandler().commitBatchOperation(batch);
       }
     }
-    updateMetaData(containerData, delTX, newDeletionBlocks);
   }
 
-  private void deleteKeyValueContainerBlocks(
+  private void markBlocksForDeletionSchemaV1(
       KeyValueContainerData containerData, DeletedBlocksTransaction delTX)
       throws IOException {
     long containerId = delTX.getContainerID();
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Processing Container : {}, DB path : {}", containerId,
-          containerData.getMetadataPath());
-    }
-
-    if (delTX.getTxID() < containerData.getDeleteTransactionId()) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug(String.format("Ignoring delete blocks for containerId: %d."
-                + " Outdated delete transactionId %d < %d", containerId,
-            delTX.getTxID(), containerData.getDeleteTransactionId()));
-      }
+    if (!isTxnIdValid(containerId, containerData, delTX)) {
       return;
     }
-
     int newDeletionBlocks = 0;
-    try(ReferenceCountedDB containerDB =
-            BlockUtils.getDB(containerData, conf)) {
+    try (ReferenceCountedDB containerDB = BlockUtils
+        .getDB(containerData, conf)) {
       Table<String, BlockData> blockDataTable =
-              containerDB.getStore().getBlockDataTable();
+          containerDB.getStore().getBlockDataTable();
       Table<String, ChunkInfoList> deletedBlocksTable =
-              containerDB.getStore().getDeletedBlocksTable();
+          containerDB.getStore().getDeletedBlocksTable();
 
-      for (Long blkLong : delTX.getLocalIDList()) {
-        String blk = blkLong.toString();
-        BlockData blkInfo = blockDataTable.get(blk);
-        if (blkInfo != null) {
-          String deletingKey = OzoneConsts.DELETING_KEY_PREFIX + blk;
-
-          if (blockDataTable.get(deletingKey) != null
-              || deletedBlocksTable.get(blk) != null) {
-            if (LOG.isDebugEnabled()) {
-              LOG.debug(String.format(
-                  "Ignoring delete for block %s in container %d."
-                      + " Entry already added.", blk, containerId));
+      try (BatchOperation batch = containerDB.getStore().getBatchHandler()
+          .initBatchOperation()) {
+        for (Long blkLong : delTX.getLocalIDList()) {
+          String blk = blkLong.toString();
+          BlockData blkInfo = blockDataTable.get(blk);
+          if (blkInfo != null) {
+            String deletingKey = OzoneConsts.DELETING_KEY_PREFIX + blk;
+            if (blockDataTable.get(deletingKey) != null
+                || deletedBlocksTable.get(blk) != null) {
+              if (LOG.isDebugEnabled()) {
+                LOG.debug(String.format(
+                    "Ignoring delete for block %s in container %d."
+                        + " Entry already added.", blk, containerId));
+              }
+              continue;
             }
-            continue;
-          }
-
-          try(BatchOperation batch = containerDB.getStore()
-              .getBatchHandler().initBatchOperation()) {
             // Found the block in container db,
             // use an atomic update to change its state to deleting.
             blockDataTable.putWithBatch(batch, deletingKey, blkInfo);
@@ -278,57 +269,59 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
               LOG.debug("Transited Block {} to DELETING state in container {}",
                   blk, containerId);
             }
-          } catch (IOException e) {
-            // if some blocks failed to delete, we fail this TX,
-            // without sending this ACK to SCM, SCM will resend the TX
-            // with a certain number of retries.
-            throw new IOException(
-                "Failed to delete blocks for TXID = " + delTX.getTxID(), e);
-          }
-        } else {
-          if (LOG.isDebugEnabled()) {
-            LOG.debug("Block {} not found or already under deletion in"
-                + " container {}, skip deleting it.", blk, containerId);
+          } else {
+            if (LOG.isDebugEnabled()) {
+              LOG.debug("Block {} not found or already under deletion in"
+                  + " container {}, skip deleting it.", blk, containerId);
+            }
           }
         }
-      }
-
-      if (newDeletionBlocks > 0) {
-        // Finally commit the DB counters.
-        try(BatchOperation batchOperation =
-                containerDB.getStore().getBatchHandler().initBatchOperation()) {
-          Table< String, Long > metadataTable = containerDB.getStore()
-              .getMetadataTable();
-
-          // In memory is updated only when existing delete transactionID is
-          // greater.
-          if (delTX.getTxID() > containerData.getDeleteTransactionId()) {
-            // Update in DB pending delete key count and delete transaction ID.
-            metadataTable.putWithBatch(batchOperation,
-                OzoneConsts.DELETE_TRANSACTION_KEY, delTX.getTxID());
-          }
-
-          long pendingDeleteBlocks =
-              containerData.getNumPendingDeletionBlocks() + newDeletionBlocks;
-          metadataTable.putWithBatch(batchOperation,
-              OzoneConsts.PENDING_DELETE_BLOCK_COUNT, pendingDeleteBlocks);
-
-          containerDB.getStore().getBatchHandler()
-              .commitBatchOperation(batchOperation);
-
-          // update pending deletion blocks count and delete transaction ID in
-          // in-memory container status
-          containerData.updateDeleteTransactionId(delTX.getTxID());
-          containerData.incrPendingDeletionBlocks(newDeletionBlocks);
-        }
+        updateMetaData(containerData, delTX, newDeletionBlocks, containerDB,
+            batch);
+      } catch (IOException e) {
+        // if some blocks failed to delete, we fail this TX,
+        // without sending this ACK to SCM, SCM will resend the TX
+        // with a certain number of retries.
+        throw new IOException(
+            "Failed to delete blocks for TXID = " + delTX.getTxID(), e);
       }
     }
   }
 
-  private void updateMetaData(
-      KeyValueContainerData containerData, DeletedBlocksTransaction delTX,
-      int newDeletionBlocks) throws IOException {
-    long containerId = delTX.getContainerID();
+  private void updateMetaData(KeyValueContainerData containerData,
+      DeletedBlocksTransaction delTX, int newDeletionBlocks,
+      ReferenceCountedDB containerDB, BatchOperation batchOperation)
+      throws IOException {
+    if (newDeletionBlocks > 0) {
+      // Finally commit the DB counters.
+      Table<String, Long> metadataTable =
+          containerDB.getStore().getMetadataTable();
+
+      // In memory is updated only when existing delete transactionID is
+      // greater.
+      if (delTX.getTxID() > containerData.getDeleteTransactionId()) {
+        // Update in DB pending delete key count and delete transaction ID.
+        metadataTable
+            .putWithBatch(batchOperation, OzoneConsts.DELETE_TRANSACTION_KEY,
+                delTX.getTxID());
+      }
+
+      long pendingDeleteBlocks =
+          containerData.getNumPendingDeletionBlocks() + newDeletionBlocks;
+      metadataTable
+          .putWithBatch(batchOperation, OzoneConsts.PENDING_DELETE_BLOCK_COUNT,
+              pendingDeleteBlocks);
+
+      // update pending deletion blocks count and delete transaction ID in
+      // in-memory container status
+      containerData.updateDeleteTransactionId(delTX.getTxID());
+      containerData.incrPendingDeletionBlocks(newDeletionBlocks);
+    }
+  }
+
+  private boolean isTxnIdValid(long containerId,
+      KeyValueContainerData containerData, DeletedBlocksTransaction delTX) {
+    boolean b = true;
     if (LOG.isDebugEnabled()) {
       LOG.debug("Processing Container : {}, DB path : {}", containerId,
           containerData.getMetadataPath());
@@ -340,41 +333,9 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
                 + " Outdated delete transactionId %d < %d", containerId,
             delTX.getTxID(), containerData.getDeleteTransactionId()));
       }
-      return;
+      b = false;
     }
-
-    try(ReferenceCountedDB containerDB =
-        BlockUtils.getDB(containerData, conf)) {
-
-      if (newDeletionBlocks > 0) {
-        // Finally commit the DB counters.
-        try(BatchOperation batchOperation =
-            containerDB.getStore().getBatchHandler().initBatchOperation()) {
-          Table< String, Long > metadataTable = containerDB.getStore()
-              .getMetadataTable();
-
-          // In memory is updated only when existing delete transactionID is
-          // greater.
-          if (delTX.getTxID() > containerData.getDeleteTransactionId()) {
-            // Update in DB pending delete key count and delete transaction ID.
-            metadataTable.putWithBatch(batchOperation,
-                OzoneConsts.DELETE_TRANSACTION_KEY, delTX.getTxID());
-          }
-
-          long pendingDeleteBlocks =
-              containerData.getNumPendingDeletionBlocks() + newDeletionBlocks;
-          metadataTable.putWithBatch(batchOperation,
-              OzoneConsts.PENDING_DELETE_BLOCK_COUNT, pendingDeleteBlocks);
-          containerDB.getStore().getBatchHandler()
-              .commitBatchOperation(batchOperation);
-
-          // update pending deletion blocks count and delete transaction ID in
-          // in-memory container status
-          containerData.updateDeleteTransactionId(delTX.getTxID());
-          containerData.incrPendingDeletionBlocks(newDeletionBlocks);
-        }
-      }
-    }
+    return b;
   }
 
   @Override

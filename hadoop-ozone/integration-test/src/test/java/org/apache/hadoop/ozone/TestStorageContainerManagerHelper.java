@@ -151,12 +151,13 @@ public class TestStorageContainerManagerHelper {
       DatanodeStore ds = meta.getStore();
       DatanodeStoreSchemaTwoImpl dnStoreTwoImpl =
           (DatanodeStoreSchemaTwoImpl) ds;
-      List<? extends Table.KeyValue<Long, DeletedBlocksTransaction>> kvs =
-          dnStoreTwoImpl.getTxnTable()
-              .getRangeKVs(null, Integer.MAX_VALUE, null);
+      List<? extends Table.KeyValue<Long, DeletedBlocksTransaction>>
+          txnsInTxnTable = dnStoreTwoImpl.getDeleteTransactionTable()
+          .getRangeKVs(null, Integer.MAX_VALUE, null);
       List<Long> conID = new ArrayList<>();
-      for (Table.KeyValue<Long, DeletedBlocksTransaction> kv : kvs) {
-        conID.addAll(kv.getValue().getLocalIDList());
+      for (Table.KeyValue<Long, DeletedBlocksTransaction> txn :
+          txnsInTxnTable) {
+        conID.addAll(txn.getValue().getLocalIDList());
       }
       if (!conID.equals(containerBlocks.get(entry))) {
         return false;

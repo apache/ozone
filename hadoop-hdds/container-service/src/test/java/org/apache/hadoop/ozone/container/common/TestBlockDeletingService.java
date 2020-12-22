@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.UUID;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -225,7 +224,7 @@ public class TestBlockDeletingService {
               numOfChunksPerBlock);
         }
       } else if (data.getSchemaVersion().equals(SCHEMA_V2)) {
-        Map<Long, List<Long>> containerBlocks = new HashMap<>();
+        List<Long> containerBlocks = new ArrayList<>();
         int blockCount = 0;
         for (int i = 0; i < numOfBlocksPerContainer; i++) {
           txnID = txnID + 1;
@@ -248,25 +247,13 @@ public class TestBlockDeletingService {
           // consists of blocks equal to blockLimitPerTask and last transaction
           // consists of blocks equal to
           // (totalBlocksInContainer % blockLimitPerTask).
-          if (blockCount < blockLimitPerTask) {
-            if (containerBlocks.containsKey(containerID)) {
-              containerBlocks.get(containerID).add(blockID.getLocalID());
-            } else {
-              List<Long> item = new ArrayList<>();
-              item.add(blockID.getLocalID());
-              containerBlocks.put(containerID, item);
-            }
-            blockCount++;
-          }
-          boolean flag = false;
-          if (blockCount == blockLimitPerTask) {
-            createTxn(data, containerBlocks, txnID);
+          containerBlocks.add(blockID.getLocalID());
+          blockCount++;
+          if (blockCount == blockLimitPerTask || i == (numOfBlocksPerContainer
+              - 1)) {
+            createTxn(data, containerBlocks, txnID, containerID);
             containerBlocks.clear();
             blockCount = 0;
-            flag = true;
-          }
-          if (i == (numOfBlocksPerContainer - 1) && !flag) {
-            createTxn(data, containerBlocks, txnID);
           }
         }
         updateMetaData(data, container, numOfBlocksPerContainer,
@@ -279,25 +266,21 @@ public class TestBlockDeletingService {
     }
   }
 
-  private void createTxn(KeyValueContainerData data,
-      Map<Long, List<Long>> containerBlocks, int txnID) {
-    try(ReferenceCountedDB metadata = BlockUtils.getDB(data, conf)) {
-      for (Map.Entry<Long, List<Long>> entry : containerBlocks.entrySet()) {
-        StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction
-            dtx =
-            StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction
-                .newBuilder().setTxID(txnID)
-                .setContainerID(entry.getKey())
-                .addAllLocalID(entry.getValue()).setCount(0).build();
-        try (BatchOperation batch = metadata.getStore().getBatchHandler()
-            .initBatchOperation()) {
-          DatanodeStore ds = metadata.getStore();
-          DatanodeStoreSchemaTwoImpl dnStoreTwoImpl =
-              (DatanodeStoreSchemaTwoImpl) ds;
-          dnStoreTwoImpl.getTxnTable()
-              .putWithBatch(batch, (long) txnID, dtx);
-          metadata.getStore().getBatchHandler().commitBatchOperation(batch);
-        }
+  private void createTxn(KeyValueContainerData data, List<Long> containerBlocks,
+      int txnID, long containerID) {
+    try (ReferenceCountedDB metadata = BlockUtils.getDB(data, conf)) {
+      StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction dtx =
+          StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction
+              .newBuilder().setTxID(txnID).setContainerID(containerID)
+              .addAllLocalID(containerBlocks).setCount(0).build();
+      try (BatchOperation batch = metadata.getStore().getBatchHandler()
+          .initBatchOperation()) {
+        DatanodeStore ds = metadata.getStore();
+        DatanodeStoreSchemaTwoImpl dnStoreTwoImpl =
+            (DatanodeStoreSchemaTwoImpl) ds;
+        dnStoreTwoImpl.getDeleteTransactionTable()
+            .putWithBatch(batch, (long) txnID, dtx);
+        metadata.getStore().getBatchHandler().commitBatchOperation(batch);
       }
     } catch (IOException exception) {
       LOG.warn("Transaction creation was not successful for txnID: " + txnID
@@ -379,7 +362,7 @@ public class TestBlockDeletingService {
       try (
           TableIterator<Long, ? extends Table.KeyValue<Long, 
               StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction>> 
-              iter = dnStoreTwoImpl.getTxnTable().iterator()) {
+              iter = dnStoreTwoImpl.getDeleteTransactionTable().iterator()) {
         while (iter.hasNext()) {
           StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction
               delTx = iter.next().getValue();

@@ -28,8 +28,8 @@ import org.apache.hadoop.hdds.protocol.proto
 
 /**
  * This class defines the RocksDB structure for datanodes following schema
- * version 2, where the block data, metadata, and deleted block ids are put in
- * their own separate column families.
+ * version 2, where the block data, metadata, and transactions which are to be
+ * deleted are put in their own separate column families.
  */
 public class DatanodeSchemaTwoDBDefinition extends
         AbstractDatanodeDBDefinition {
@@ -62,7 +62,7 @@ public class DatanodeSchemaTwoDBDefinition extends
                   new ChunkInfoListCodec());
 
   public static final DBColumnFamilyDefinition<Long, DeletedBlocksTransaction>
-      TXN =
+      DELETE_TRANSACTION =
       new DBColumnFamilyDefinition<>(
           "txnTable",
           Long.class,
@@ -78,7 +78,7 @@ public class DatanodeSchemaTwoDBDefinition extends
   public DBColumnFamilyDefinition[] getColumnFamilies() {
     return new DBColumnFamilyDefinition[] {getBlockDataColumnFamily(),
         getMetadataColumnFamily(), getDeletedBlocksColumnFamily(),
-        getTxnBlocksColumnFamily()};
+        getDeleteTransactionsColumnFamily()};
   }
 
   @Override
@@ -99,7 +99,7 @@ public class DatanodeSchemaTwoDBDefinition extends
   }
 
   public DBColumnFamilyDefinition<Long, DeletedBlocksTransaction>
-      getTxnBlocksColumnFamily() {
-    return TXN;
+      getDeleteTransactionsColumnFamily() {
+    return DELETE_TRANSACTION;
   }
 }
