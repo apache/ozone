@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.om.request.file.OMFileCreateRequest;
 import org.apache.hadoop.ozone.om.request.file.OMFileCreateRequestV1;
 import org.apache.hadoop.ozone.om.request.key.OMKeysDeleteRequest;
 import org.apache.hadoop.ozone.om.request.key.OMAllocateBlockRequest;
+import org.apache.hadoop.ozone.om.request.key.OMAllocateBlockRequestV1;
 import org.apache.hadoop.ozone.om.request.key.OMKeyCommitRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyCommitRequestV1;
 import org.apache.hadoop.ozone.om.request.key.OMKeyCreateRequest;
@@ -134,6 +135,9 @@ public final class OzoneManagerRatisUtils {
     case SetBucketProperty:
       return new OMBucketSetPropertyRequest(omRequest);
     case AllocateBlock:
+      if (omLayoutVersionV1) {
+        return new OMAllocateBlockRequestV1(omRequest);
+      }
       return new OMAllocateBlockRequest(omRequest);
     case CreateKey:
       return new OMKeyCreateRequest(omRequest);
