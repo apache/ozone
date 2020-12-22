@@ -67,15 +67,14 @@ public class TestOzoneManagerPrepareState {
 
   @Test
   public void testFinishPrepare() throws Exception {
-    try {
-      prepareState.finishPrepare(TEST_INDEX);
-      Assert.fail("OMException should have been thrown when finishing prepare" +
-          " without starting.");
-    } catch (OMException ex) {
-      Assert.assertEquals(OMException.ResultCodes.INTERNAL_ERROR,
-          ex.getResult());
-    }
+    // Test finish as a follower OM, where it would be called without setting
+    // the prepare gate first.
+    prepareState.finishPrepare(TEST_INDEX);
+    assertPrepareCompleted(TEST_INDEX);
+    prepareState.cancelPrepare();
 
+    // Test finish as a leader OM, where the prepare gate would be put up
+    // before prepare is finished.
     prepareState.enablePrepareGate();
     prepareState.finishPrepare(TEST_INDEX);
     assertPrepareCompleted(TEST_INDEX);
@@ -103,23 +102,9 @@ public class TestOzoneManagerPrepareState {
 
   @Test
   public void testRequestAllowed() {
-    // When not prepared, all requests should be allowed.
-    for (Type cmdType: Type.values()) {
-      Assert.assertTrue(prepareState.requestAllowed(cmdType));
-    }
-
+    assertPrepareGateDown();
     prepareState.enablePrepareGate();
-
-    // Once preparation has begun, only prepare and cancel prepare should be
-    // allowed.
-    for (Type cmdType: Type.values()) {
-      if (cmdType == Type.Prepare) {
-        // TODO: Add cancelPrepare to allowed request types when it is added.
-        Assert.assertTrue(prepareState.requestAllowed(cmdType));
-      } else {
-        Assert.assertFalse(prepareState.requestAllowed(cmdType));
-      }
-    }
+    assertPrepareGateUp();
   }
 
   @Test
@@ -231,25 +216,51 @@ public class TestOzoneManagerPrepareState {
   }
 
   private void assertPrepareNotStarted() {
-    Assert.assertEquals(PrepareStatus.PREPARE_NOT_STARTED,
-        prepareState.getStatus());
+    OzoneManagerPrepareState.State state = prepareState.getState();
+    Assert.assertEquals(PrepareStatus.PREPARE_NOT_STARTED, state.getStatus());
     Assert.assertEquals(OzoneManagerPrepareState.NO_PREPARE_INDEX,
-        prepareState.getPrepareIndex());
+        state.getIndex());
     Assert.assertFalse(prepareState.getPrepareMarkerFile().exists());
+
+    assertPrepareGateDown();
   }
 
   private void assertPrepareInProgress() {
-    Assert.assertEquals(PrepareStatus.PREPARE_IN_PROGRESS,
-        prepareState.getStatus());
+    OzoneManagerPrepareState.State state = prepareState.getState();
+    Assert.assertEquals(PrepareStatus.PREPARE_IN_PROGRESS, state.getStatus());
     Assert.assertEquals(OzoneManagerPrepareState.NO_PREPARE_INDEX,
-        prepareState.getPrepareIndex());
+        state.getIndex());
     Assert.assertFalse(prepareState.getPrepareMarkerFile().exists());
+
+    assertPrepareGateUp();
   }
 
   private void assertPrepareCompleted(long index) throws Exception {
+    OzoneManagerPrepareState.State state = prepareState.getState();
     Assert.assertEquals(PrepareStatus.PREPARE_COMPLETED,
-        prepareState.getStatus());
-    Assert.assertEquals(index, prepareState.getPrepareIndex());
+        state.getStatus());
+    Assert.assertEquals(index, state.getIndex());
     Assert.assertEquals(index, readPrepareMarkerFile());
+
+    assertPrepareGateUp();
+  }
+
+  private void assertPrepareGateUp() {
+    // Once preparation has begun, only prepare and cancel prepare should be
+    // allowed.
+    for (Type cmdType: Type.values()) {
+      if (cmdType == Type.Prepare) {
+        // TODO: Add cancelPrepare to allowed request types when it is added.
+        Assert.assertTrue(prepareState.requestAllowed(cmdType));
+      } else {
+        Assert.assertFalse(prepareState.requestAllowed(cmdType));
+      }
+    }
+  }
+
+  private void assertPrepareGateDown() {
+    for (Type cmdType: Type.values()) {
+      Assert.assertTrue(prepareState.requestAllowed(cmdType));
+    }
   }
 }

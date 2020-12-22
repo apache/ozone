@@ -188,10 +188,6 @@ public final class OzoneManagerPrepareState {
     return status;
   }
 
-  public synchronized long getPrepareIndex() {
-    return prepareIndex;
-  }
-
   /**
    * If the prepare gate is enabled, always returns true.
    * If the prepare gate is disabled, returns true only if {@code
@@ -209,8 +205,14 @@ public final class OzoneManagerPrepareState {
     return requestAllowed;
   }
 
-  public synchronized PrepareStatus getStatus() {
-    return status;
+  /**
+   * @return the current log index and status of preparation.
+   * Both fields are returned together to provide a consistent view of the
+   * state, which would not be guaranteed if they had to be retrieved through
+   * separate getters.
+   */
+  public synchronized State getState() {
+    return new State(prepareIndex, status);
   }
 
   /**
@@ -244,5 +246,27 @@ public final class OzoneManagerPrepareState {
     File markerFileDir = new File(ServerUtils.getOzoneMetaDirPath(conf),
         OMStorage.STORAGE_DIR_CURRENT);
     return new File(markerFileDir, OzoneConsts.PREPARE_MARKER);
+  }
+
+  /**
+   * The current state of preparation is defined by the status and the
+   * prepare index that are currently set.
+   */
+  public static class State {
+    private final long index;
+    private final PrepareStatus status;
+
+    public State(long index, PrepareStatus status) {
+      this.index = index;
+      this.status = status;
+    }
+
+    public long getIndex() {
+      return index;
+    }
+
+    public PrepareStatus getStatus() {
+      return status;
+    }
   }
 }
