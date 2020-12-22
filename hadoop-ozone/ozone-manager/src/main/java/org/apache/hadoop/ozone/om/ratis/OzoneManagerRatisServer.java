@@ -131,13 +131,17 @@ public final class OzoneManagerRatisServer {
   public OMResponse submitRequest(OMRequest omRequest) throws ServiceException {
     // In prepare mode, only prepare and cancel requests are allowed to go
     // through.
-    if (OzoneManagerPrepareState.requestAllowed(omRequest.getCmdType())) {
+    if (ozoneManager.getPrepareState().requestAllowed(omRequest.getCmdType())) {
       RaftClientRequest raftClientRequest =
           createWriteRaftClientRequest(omRequest);
       RaftClientReply raftClientReply = submitRequestToRatis(raftClientRequest);
 
       return processReply(omRequest, raftClientReply);
     } else {
+      LOG.info("Rejecting write request on OM {} because it is in prepare " +
+          "mode: {}", ozoneManager.getOMNodeId(),
+          omRequest.getCmdType().name());
+
       String message = "Cannot apply write request " +
           omRequest.getCmdType().name() + " when OM is in prepare mode.";
       OMResponse.Builder omResponse = OMResponse.newBuilder()

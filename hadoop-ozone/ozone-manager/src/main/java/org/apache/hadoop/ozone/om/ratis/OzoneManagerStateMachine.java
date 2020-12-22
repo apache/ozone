@@ -204,9 +204,10 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
 
     // In prepare mode, only prepare and cancel requests are allowed to go
     // through.
-    if (OzoneManagerPrepareState.requestAllowed(cmdType)) {
+    OzoneManagerPrepareState prepareState = ozoneManager.getPrepareState();
+    if (prepareState.requestAllowed(cmdType)) {
       if (cmdType == OzoneManagerProtocolProtos.Type.Prepare) {
-        OzoneManagerPrepareState.startPrepare();
+        prepareState.enablePrepareGate();
       }
       // TODO: Add cancel prepare here after it is implemented.
       return trx;

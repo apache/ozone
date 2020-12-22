@@ -113,16 +113,16 @@ public class OMPrepareRequest extends OMClientRequest {
       waitForLogIndex(transactionLogIndex,
           ozoneManager.getMetadataManager(), division,
           flushTimeout, flushCheckInterval);
-      // Prepare index could be the transaction index of this request, or the
-      // index of a ratis meta transaction saved to the state machine index
-      // during snapshot.
+
+      // TODO: After the snapshot index update fix, the prepare index will
+      //  always be 1 more than the prepare txn index, because the Ratis
+      //  entry to commit the prepare request will be included in the snapshot.
       long prepareIndex = takeSnapshotAndPurgeLogs(division);
 
       // Save transaction log index to a marker file, so if the OM restarts,
       // it will remain in prepare mode on that index as long as the file
       // exists.
-      OzoneManagerPrepareState.finishPrepare(
-          ozoneManager.getConfiguration(), prepareIndex);
+      ozoneManager.getPrepareState().finishPrepare(prepareIndex);
 
       LOG.info("OM {} prepared at log index {}. Returning response {}",
           ozoneManager.getOMNodeId(),

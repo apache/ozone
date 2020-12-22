@@ -338,7 +338,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
       throws Exception {
     for (OzoneManager om: ozoneManagers) {
       LambdaTestUtils.await(LOG_WAIT_TIMEOUT_MILLIS, 1000,
-          () -> logFilesPresentInRatisPeer(om));
+          () -> !logFilesPresentInRatisPeer(om));
     }
   }
 }

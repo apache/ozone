@@ -341,6 +341,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   private ExitManager exitManager;
 
+  private final OzoneManagerPrepareState prepareState;
+
   private enum State {
     INITIALIZED,
     RUNNING,
@@ -351,8 +353,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private State omState;
   private Thread emptier;
 
-  // TODO: Utilize the forUpgrade parameter to remove the marker file and
-  //  take the OM out of prepare mode on startup.
   @SuppressWarnings("methodlength")
   private OzoneManager(OzoneConfiguration conf)
       throws IOException, AuthenticationException {
@@ -471,13 +471,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // instantiateServices and before the RPC server is started.
     OMTransactionInfo txnInfo = metadataManager.getTransactionInfoTable()
         .get(TRANSACTION_INFO_KEY);
+    prepareState = new OzoneManagerPrepareState(configuration);
     if (txnInfo != null) {
-      OzoneManagerPrepareState.restorePrepare(conf,
-          txnInfo.getTransactionIndex());
+      prepareState.restorePrepare(txnInfo.getTransactionIndex());
     } else {
       // If we have no transaction info in the DB, then no prepare request
-      // could have been received.
-      OzoneManagerPrepareState.cancelPrepare(conf);
+      // could have been received, since the request would update the txn
+      // index in the DB.
+      prepareState.cancelPrepare();
     }
 
     // Create special volume s3v which is required for S3G.
@@ -3826,5 +3827,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   public OmLayoutVersionManager getVersionManager() {
     return versionManager;
+  }
+
+  public OzoneManagerPrepareState getPrepareState() {
+    return prepareState;
   }
 }
