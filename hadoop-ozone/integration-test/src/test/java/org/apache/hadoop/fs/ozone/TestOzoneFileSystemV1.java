@@ -407,31 +407,6 @@ public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
     }
   }
 
-  /**
-   * Cleanup files and directories.
-   *
-   * @throws IOException DB failure
-   */
-  protected void deleteRootDir() throws IOException {
-    Path root = new Path("/");
-    FileStatus[] fileStatuses = fs.listStatus(root);
-
-    rootItemCount = 0; // reset to zero
-
-    if (fileStatuses == null) {
-      return;
-    }
-
-    for (FileStatus fStatus : fileStatuses) {
-      fs.delete(fStatus.getPath(), true);
-    }
-
-    fileStatuses = fs.listStatus(root);
-    if (fileStatuses != null) {
-      Assert.assertEquals("Delete root failed!", 0, fileStatuses.length);
-    }
-  }
-
   @Override
   @Test
   @Ignore("TODO:HDDS-2939")

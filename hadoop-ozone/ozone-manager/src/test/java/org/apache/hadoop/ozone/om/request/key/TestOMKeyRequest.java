@@ -27,11 +27,13 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.KeyManagerImpl;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.jetbrains.annotations.NotNull;
 import org.junit.After;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.rules.TemporaryFolder;
@@ -177,6 +179,29 @@ public class TestOMKeyRequest {
   @NotNull
   protected OzoneConfiguration getOzoneConfiguration() {
     return new OzoneConfiguration();
+  }
+
+
+  /**
+   * Verify path in open key table. Also, it returns OMKeyInfo for the given
+   * key path.
+   *
+   * @param key      key name
+   * @param id       client id
+   * @param doAssert if true then do assertion, otherwise it just skip.
+   * @return om key info for the given key path.
+   * @throws Exception DB failure
+   */
+  protected OmKeyInfo verifyPathInOpenKeyTable(String key, long id,
+                                               boolean doAssert)
+          throws Exception {
+    String openKey = omMetadataManager.getOpenKey(volumeName, bucketName,
+            key, id);
+    OmKeyInfo omKeyInfo = omMetadataManager.getOpenKeyTable().get(openKey);
+    if (doAssert) {
+      Assert.assertNotNull("Failed to find key in OpenKeyTable", omKeyInfo);
+    }
+    return omKeyInfo;
   }
 
   @After
