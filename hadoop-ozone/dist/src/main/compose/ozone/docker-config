@@ -31,5 +31,6 @@ OZONE-SITE.XML_ozone.scm.client.address=scm
 OZONE-SITE.XML_hdds.datanode.dir=/data/hdds
 OZONE-SITE.XML_ozone.recon.address=recon:9891
 OZONE-SITE.XML_ozone.recon.om.snapshot.task.interval.delay=1m
+OZONE-SITE.XML_ozone.datanode.pipeline.limit=1
 
 no_proxy=om,scm,s3g,recon,kdc,localhost,127.0.0.1
