@@ -594,7 +594,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
    */
   protected void checkBucketQuotaInNamespace(OmBucketInfo omBucketInfo,
       long allocatedNamespace) throws IOException {
-    if (omBucketInfo.getQuotaInNamespace() != OzoneConsts.QUOTA_RESET) {
+    if (omBucketInfo.getQuotaInNamespace() > OzoneConsts.QUOTA_RESET) {
       long usedNamespace = omBucketInfo.getUsedNamespace();
       long quotaInNamespace = omBucketInfo.getQuotaInNamespace();
       long toUseNamespaceInTotal = usedNamespace + allocatedNamespace;
