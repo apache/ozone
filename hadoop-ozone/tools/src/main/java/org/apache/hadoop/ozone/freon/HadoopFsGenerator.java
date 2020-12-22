@@ -16,6 +16,8 @@
  */
 package org.apache.hadoop.ozone.freon;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.URI;
 import java.util.concurrent.Callable;
 
@@ -26,8 +28,6 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 import com.codahale.metrics.Timer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -42,9 +42,6 @@ import picocli.CommandLine.Option;
     showDefaultValues = true)
 public class HadoopFsGenerator extends BaseFreonGenerator
     implements Callable<Void> {
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(HadoopFsGenerator.class);
 
   @Option(names = {"--path"},
       description = "Hadoop FS file system path",
@@ -70,16 +67,26 @@ public class HadoopFsGenerator extends BaseFreonGenerator
 
   private Timer timer;
 
-  private FileSystem fileSystem;
+  private OzoneConfiguration configuration;
+  private URI uri;
+  private final ThreadLocal<FileSystem> threadLocalFileSystem =
+      ThreadLocal.withInitial(this::createFS);
 
   @Override
   public Void call() throws Exception {
-
     init();
 
-    OzoneConfiguration configuration = createOzoneConfiguration();
+    configuration = createOzoneConfiguration();
+    uri = URI.create(rootPath);
+    String disableCacheName = String.format("fs.%s.impl.disable.cache",
+        uri.getScheme());
+    print("Disabling FS cache: " + disableCacheName);
+    configuration.setBoolean(disableCacheName, true);
 
-    fileSystem = FileSystem.get(URI.create(rootPath), configuration);
+    Path file = new Path(rootPath + "/" + generateObjectName(0));
+    try (FileSystem fileSystem = threadLocalFileSystem.get()) {
+      fileSystem.mkdirs(file.getParent());
+    }
 
     contentGenerator =
         new ContentGenerator(fileSize, bufferSize, copyBufferSize);
@@ -93,7 +100,7 @@ public class HadoopFsGenerator extends BaseFreonGenerator
 
   private void createFile(long counter) throws Exception {
     Path file = new Path(rootPath + "/" + generateObjectName(counter));
-    fileSystem.mkdirs(file.getParent());
+    FileSystem fileSystem = threadLocalFileSystem.get();
 
     timer.time(() -> {
       try (FSDataOutputStream output = fileSystem.create(file)) {
@@ -101,5 +108,23 @@ public class HadoopFsGenerator extends BaseFreonGenerator
       }
       return null;
     });
+  }
+
+  private FileSystem createFS() {
+    try {
+      return FileSystem.get(uri, configuration);
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
+  }
+
+  @Override
+  protected void taskLoopCompleted() {
+    FileSystem fileSystem = threadLocalFileSystem.get();
+    try {
+      fileSystem.close();
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
   }
 }

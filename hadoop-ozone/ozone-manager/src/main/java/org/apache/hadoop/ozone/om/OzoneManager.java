@@ -213,6 +213,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BL
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
+import static org.apache.hadoop.ozone.OzoneConsts.DEFAULT_OM_UPDATE_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_FILE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_TEMP_FILE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_RATIS_SNAPSHOT_DIR;
@@ -1810,7 +1811,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             obj.getKeyName());
         throw new OMException("User " + context.getClientUgi().getUserName() +
             " doesn't have " + context.getAclRights() +
-            " permission to access " + obj.getResourceType(),
+            " permission to access " + obj.getResourceType() + " " +
+            obj.getVolumeName() + " " + obj.getBucketName() + " " +
+            obj.getKeyName(),
             ResultCodes.PERMISSION_DENIED);
       }
       return false;
@@ -1858,12 +1861,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * Changes the Quota on a volume.
    *
    * @param volume - Name of the volume.
-   * @param quotaInCounts - Volume quota in counts.
+   * @param quotaInNamespace - Volume quota in counts.
    * @param quotaInBytes - Volume quota in bytes.
    * @throws IOException
    */
   @Override
-  public void setQuota(String volume, long quotaInCounts,
+  public void setQuota(String volume, long quotaInNamespace,
                        long quotaInBytes) throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented. As this requests use a new approach");
@@ -3718,8 +3721,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
       // Add volume and user info to DB and cache.
 
-      OmVolumeArgs omVolumeArgs = createS3VolumeInfo(s3VolumeName,
-          transactionID, objectID);
+      OmVolumeArgs omVolumeArgs = createS3VolumeInfo(s3VolumeName, objectID);
 
       String dbUserKey = metadataManager.getUserKey(userName);
       PersistedUserVolumeInfo userVolumeInfo =
@@ -3753,14 +3755,19 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
-  private OmVolumeArgs createS3VolumeInfo(String s3Volume, long transactionID,
+  private OmVolumeArgs createS3VolumeInfo(String s3Volume,
       long objectID) throws IOException {
     String userName = UserGroupInformation.getCurrentUser().getShortUserName();
     long time = Time.now();
 
+    // We need to set the updateID to DEFAULT_OM_UPDATE_ID, because when
+    // acl op on S3v volume during updateID check it will fail if we have a
+    // value with maximum transactionID. Because updateID checks if new
+    // new updateID is greater than previous updateID, otherwise it fails.
+
     OmVolumeArgs.Builder omVolumeArgs = new OmVolumeArgs.Builder()
         .setVolume(s3Volume)
-        .setUpdateID(transactionID)
+        .setUpdateID(DEFAULT_OM_UPDATE_ID)
         .setObjectID(objectID)
         .setCreationTime(time)
         .setModificationTime(time)

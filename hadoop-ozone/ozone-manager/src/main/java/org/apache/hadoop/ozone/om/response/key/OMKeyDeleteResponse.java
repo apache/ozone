@@ -22,7 +22,6 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
@@ -41,15 +40,13 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 public class OMKeyDeleteResponse extends AbstractOMKeyDeleteResponse {
 
   private OmKeyInfo omKeyInfo;
-  private OmVolumeArgs omVolumeArgs;
   private OmBucketInfo omBucketInfo;
 
   public OMKeyDeleteResponse(@Nonnull OMResponse omResponse,
       @Nonnull OmKeyInfo omKeyInfo, boolean isRatisEnabled,
-      @Nonnull OmVolumeArgs omVolumeArgs, @Nonnull OmBucketInfo omBucketInfo) {
+      @Nonnull OmBucketInfo omBucketInfo) {
     super(omResponse, isRatisEnabled);
     this.omKeyInfo = omKeyInfo;
-    this.omVolumeArgs = omVolumeArgs;
     this.omBucketInfo = omBucketInfo;
   }
 
@@ -75,7 +72,7 @@ public class OMKeyDeleteResponse extends AbstractOMKeyDeleteResponse {
 
     // update bucket usedBytes.
     omMetadataManager.getBucketTable().putWithBatch(batchOperation,
-        omMetadataManager.getBucketKey(omVolumeArgs.getVolume(),
+        omMetadataManager.getBucketKey(omBucketInfo.getVolumeName(),
             omBucketInfo.getBucketName()), omBucketInfo);
   }
 }

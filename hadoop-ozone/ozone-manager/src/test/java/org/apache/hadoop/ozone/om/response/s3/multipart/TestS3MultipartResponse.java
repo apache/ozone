@@ -24,7 +24,6 @@ import java.util.Collections;
 import java.util.UUID;
 
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -118,8 +117,7 @@ public class TestS3MultipartResponse {
   }
 
   public S3MultipartUploadAbortResponse createS3AbortMPUResponse(
-      String multipartKey, long timeStamp,
-      OmMultipartKeyInfo omMultipartKeyInfo, OmVolumeArgs omVolumeArgs,
+      String multipartKey, OmMultipartKeyInfo omMultipartKeyInfo,
       OmBucketInfo omBucketInfo) {
     OMResponse omResponse = OMResponse.newBuilder()
         .setCmdType(OzoneManagerProtocolProtos.Type.AbortMultiPartUpload)
@@ -129,7 +127,7 @@ public class TestS3MultipartResponse {
             MultipartUploadAbortResponse.newBuilder().build()).build();
 
     return new S3MultipartUploadAbortResponse(omResponse, multipartKey,
-        omMultipartKeyInfo, true, omVolumeArgs, omBucketInfo);
+        omMultipartKeyInfo, true, omBucketInfo);
   }
 
 

@@ -270,8 +270,9 @@ public final class OzoneConsts {
   public static final String SRC_KEY = "srcKey";
   public static final String DST_KEY = "dstKey";
   public static final String USED_BYTES = "usedBytes";
+  public static final String USED_NAMESPACE = "usedNamespace";
   public static final String QUOTA_IN_BYTES = "quotaInBytes";
-  public static final String QUOTA_IN_COUNTS = "quotaInCounts";
+  public static final String QUOTA_IN_NAMESPACE = "quotaInNamespace";
   public static final String OBJECT_ID = "objectID";
   public static final String UPDATE_ID = "updateID";
   public static final String CLIENT_ID = "clientID";
@@ -384,5 +385,8 @@ public final class OzoneConsts {
   // An on-disk transient marker file used when replacing DB with checkpoint
   public static final String DB_TRANSIENT_MARKER = "dbInconsistentMarker";
 
+
   public static final String OM_RATIS_SNAPSHOT_DIR = "snapshot";
+
+  public static final long DEFAULT_OM_UPDATE_ID = -1L;  
 }

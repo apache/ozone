@@ -46,15 +46,15 @@ public class SetQuotaHandler extends BucketHandler {
     OzoneBucket bucket = client.getObjectStore().getVolume(volumeName)
         .getBucket(bucketName);
     long spaceQuota = bucket.getQuotaInBytes();
-    long countQuota = bucket.getQuotaInCounts();
+    long countQuota = bucket.getQuotaInNamespace();
 
     if (quotaOptions.getQuotaInBytes() != null
         && !quotaOptions.getQuotaInBytes().isEmpty()) {
       spaceQuota = OzoneQuota.parseQuota(quotaOptions.getQuotaInBytes(),
-          quotaOptions.getQuotaInCounts()).getQuotaInBytes();
+          quotaOptions.getQuotaInNamespace()).getQuotaInBytes();
     }
-    if (quotaOptions.getQuotaInCounts() >= 0) {
-      countQuota = quotaOptions.getQuotaInCounts();
+    if (quotaOptions.getQuotaInNamespace() >= 0) {
+      countQuota = quotaOptions.getQuotaInNamespace();
     }
 
     bucket.setQuota(OzoneQuota.getOzoneQuota(spaceQuota, countQuota));

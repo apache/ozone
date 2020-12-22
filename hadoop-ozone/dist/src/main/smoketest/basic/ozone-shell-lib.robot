@@ -31,29 +31,29 @@ Test ozone shell
     [arguments]     ${protocol}         ${server}       ${volume}
     ${result} =     Execute And Ignore Error    ozone sh volume info ${protocol}${server}/${volume}
                     Should contain      ${result}       VOLUME_NOT_FOUND
-    ${result} =     Execute             ozone sh volume create ${protocol}${server}/${volume} --space-quota 100TB --count-quota 100
+    ${result} =     Execute             ozone sh volume create ${protocol}${server}/${volume} --space-quota 100TB --namespace-quota 100
                     Should not contain  ${result}       Failed
     ${result} =     Execute             ozone sh volume list ${protocol}${server}/ | jq -r '. | select(.name=="${volume}")'
                     Should contain      ${result}       creationTime
     ${result} =     Execute             ozone sh volume list | jq -r '. | select(.name=="${volume}")'
                     Should contain      ${result}       creationTime
 # TODO: Disable updating the owner, acls should be used to give access to other user.
-                    Execute             ozone sh volume setquota ${protocol}${server}/${volume} --space-quota 10TB --count-quota 100
+                    Execute             ozone sh volume setquota ${protocol}${server}/${volume} --space-quota 10TB --namespace-quota 100
 #    ${result} =     Execute             ozone sh volume info ${protocol}${server}/${volume} | jq -r '. | select(.volumeName=="${volume}") | .owner | .name'
 #                    Should Be Equal     ${result}       bill
     ${result} =     Execute             ozone sh volume info ${protocol}${server}/${volume} | jq -r '. | select(.name=="${volume}") | .quotaInBytes'
                     Should Be Equal     ${result}       10995116277760
-                    Execute             ozone sh bucket create ${protocol}${server}/${volume}/bb1 --space-quota 10TB --count-quota 100
+                    Execute             ozone sh bucket create ${protocol}${server}/${volume}/bb1 --space-quota 10TB --namespace-quota 100
     ${result} =     Execute             ozone sh bucket info ${protocol}${server}/${volume}/bb1 | jq -r '. | select(.name=="bb1") | .storageType'
                     Should Be Equal     ${result}       DISK
     ${result} =     Execute             ozone sh bucket info ${protocol}${server}/${volume}/bb1 | jq -r '. | select(.name=="bb1") | .quotaInBytes'
                     Should Be Equal     ${result}       10995116277760
-    ${result} =     Execute             ozone sh bucket info ${protocol}${server}/${volume}/bb1 | jq -r '. | select(.name=="bb1") | .quotaInCounts'
+    ${result} =     Execute             ozone sh bucket info ${protocol}${server}/${volume}/bb1 | jq -r '. | select(.name=="bb1") | .quotaInNamespace'
                     Should Be Equal     ${result}       100
-                    Execute             ozone sh bucket setquota ${protocol}${server}/${volume}/bb1 --space-quota 1TB --count-quota 1000
+                    Execute             ozone sh bucket setquota ${protocol}${server}/${volume}/bb1 --space-quota 1TB --namespace-quota 1000
     ${result} =     Execute             ozone sh bucket info ${protocol}${server}/${volume}/bb1 | jq -r '. | select(.name=="bb1") | .quotaInBytes'
                     Should Be Equal     ${result}       1099511627776
-    ${result} =     Execute             ozone sh bucket info ${protocol}${server}/${volume}/bb1 | jq -r '. | select(.name=="bb1") | .quotaInCounts'
+    ${result} =     Execute             ozone sh bucket info ${protocol}${server}/${volume}/bb1 | jq -r '. | select(.name=="bb1") | .quotaInNamespace'
                     Should Be Equal     ${result}       1000
     ${result} =     Execute             ozone sh bucket list ${protocol}${server}/${volume}/ | jq -r '. | select(.name=="bb1") | .volumeName'
                     Should Be Equal     ${result}       ${volume}
@@ -61,36 +61,36 @@ Test ozone shell
                     Execute             ozone sh bucket clrquota --space-quota ${protocol}${server}/${volume}/bb1
     ${result} =     Execute             ozone sh bucket info ${protocol}${server}/${volume}/bb1 | jq -r '. | select(.name=="bb1") | .quotaInBytes'
                     Should Be Equal     ${result}       -1
-                    Execute             ozone sh bucket clrquota --count-quota ${protocol}${server}/${volume}/bb1
-    ${result} =     Execute             ozone sh bucket info ${protocol}${server}/${volume}/bb1 | jq -r '. | select(.name=="bb1") | .quotaInCounts'
+                    Execute             ozone sh bucket clrquota --namespace-quota ${protocol}${server}/${volume}/bb1
+    ${result} =     Execute             ozone sh bucket info ${protocol}${server}/${volume}/bb1 | jq -r '. | select(.name=="bb1") | .quotaInNamespace'
                     Should Be Equal     ${result}       -1
                     Execute             ozone sh volume clrquota --space-quota ${protocol}${server}/${volume}
     ${result} =     Execute             ozone sh volume info ${protocol}${server}/${volume} | jq -r '. | select(.name=="${volume}") | .quotaInBytes'
                     Should Be Equal     ${result}       -1
-                    Execute             ozone sh volume clrquota --count-quota ${protocol}${server}/${volume}
-    ${result} =     Execute             ozone sh volume info ${protocol}${server}/${volume} | jq -r '. | select(.name=="${volume}") | .quotaInCounts'
+                    Execute             ozone sh volume clrquota --namespace-quota ${protocol}${server}/${volume}
+    ${result} =     Execute             ozone sh volume info ${protocol}${server}/${volume} | jq -r '. | select(.name=="${volume}") | .quotaInNamespace'
                     Should Be Equal     ${result}       -1
                     Execute             ozone sh bucket delete ${protocol}${server}/${volume}/bb1
                     Execute             ozone sh volume delete ${protocol}${server}/${volume}
                     Execute             ozone sh volume create ${protocol}${server}/${volume}
     ${result} =     Execute             ozone sh volume info ${protocol}${server}/${volume} | jq -r '. | select(.name=="${volume}") | .quotaInBytes'
                     Should Be Equal     ${result}       -1
-    ${result} =     Execute             ozone sh volume info ${protocol}${server}/${volume} | jq -r '. | select(.name=="${volume}") | .quotaInCounts'
+    ${result} =     Execute             ozone sh volume info ${protocol}${server}/${volume} | jq -r '. | select(.name=="${volume}") | .quotaInNamespace'
                     Should Be Equal     ${result}       -1
                     Execute             ozone sh bucket create ${protocol}${server}/${volume}/bb1
     ${result} =     Execute             ozone sh bucket info ${protocol}${server}/${volume}/bb1 | jq -r '. | select(.name=="bb1") | .quotaInBytes'
                     Should Be Equal     ${result}       -1
-    ${result} =     Execute             ozone sh bucket info ${protocol}${server}/${volume}/bb1 | jq -r '. | select(.name=="bb1") | .quotaInCounts'
+    ${result} =     Execute             ozone sh bucket info ${protocol}${server}/${volume}/bb1 | jq -r '. | select(.name=="bb1") | .quotaInNamespace'
                     Should Be Equal     ${result}       -1
-                    Execute             ozone sh volume setquota ${protocol}${server}/${volume} --space-quota 0TB --count-quota 0
+                    Execute             ozone sh volume setquota ${protocol}${server}/${volume} --space-quota 0TB --namespace-quota 0
     ${result} =     Execute             ozone sh volume info ${protocol}${server}/${volume} | jq -r '. | select(.name=="${volume}") | .quotaInBytes'
                     Should Be Equal     ${result}       -1
-    ${result} =     Execute             ozone sh volume info ${protocol}${server}/${volume} | jq -r '. | select(.name=="${volume}") | .quotaInCounts'
+    ${result} =     Execute             ozone sh volume info ${protocol}${server}/${volume} | jq -r '. | select(.name=="${volume}") | .quotaInNamespace'
                     Should Be Equal     ${result}       -1
-                    Execute             ozone sh bucket setquota ${protocol}${server}/${volume}/bb1 --space-quota 0TB --count-quota 0
+                    Execute             ozone sh bucket setquota ${protocol}${server}/${volume}/bb1 --space-quota 0TB --namespace-quota 0
     ${result} =     Execute             ozone sh bucket info ${protocol}${server}/${volume}/bb1 | jq -r '. | select(.name=="bb1") | .quotaInBytes'
                     Should Be Equal     ${result}       -1
-    ${result} =     Execute             ozone sh bucket info ${protocol}${server}/${volume}/bb1 | jq -r '. | select(.name=="bb1") | .quotaInCounts'
+    ${result} =     Execute             ozone sh bucket info ${protocol}${server}/${volume}/bb1 | jq -r '. | select(.name=="bb1") | .quotaInNamespace'
                     Should Be Equal     ${result}       -1
                     Execute             ozone sh bucket delete ${protocol}${server}/${volume}/bb1
                     Execute             ozone sh volume delete ${protocol}${server}/${volume}

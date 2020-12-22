@@ -274,7 +274,7 @@ jobs:
         run: ./hadoop-ozone/dev-support/checks/coverage.sh
       - name: Upload coverage to Sonar
         uses: ./.github/buildenv
-        if: github.repository == 'apache/hadoop-ozone' && github.event_name != 'pull_request'
+        if: github.repository == 'apache/ozone' && github.event_name != 'pull_request'
         with:
           args: ./hadoop-ozone/dev-support/checks/sonar.sh
         env:
@@ -282,7 +282,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v1
-        if: github.repository == 'apache/hadoop-ozone' && github.event_name != 'pull_request'
+        if: github.repository == 'apache/ozone' && github.event_name != 'pull_request'
         with:
           file: ./target/coverage/all.xml
           name: codecov-umbrella

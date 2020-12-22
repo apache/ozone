@@ -24,6 +24,7 @@ import java.util.*;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -234,12 +235,14 @@ public final class TestHelper {
 
     // wait for the pipeline to get destroyed in the datanodes
     for (Pipeline pipeline : pipelineList) {
+      HddsProtos.PipelineID pipelineId = pipeline.getId().getProtobuf();
       for (DatanodeDetails dn : pipeline.getNodes()) {
         XceiverServerSpi server =
             cluster.getHddsDatanodes().get(cluster.getHddsDatanodeIndex(dn))
                 .getDatanodeStateMachine().getContainer().getWriteChannel();
         Assert.assertTrue(server instanceof XceiverServerRatis);
-        server.removeGroup(pipeline.getId().getProtobuf());
+        GenericTestUtils.waitFor(() -> !server.isExist(pipelineId),
+            100, 30_000);
       }
     }
   }

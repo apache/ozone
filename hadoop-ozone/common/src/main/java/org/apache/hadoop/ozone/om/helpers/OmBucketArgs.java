@@ -50,7 +50,7 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
   private StorageType storageType;
 
   private long quotaInBytes;
-  private long quotaInCounts;
+  private long quotaInNamespace;
 
   /**
    * Private constructor, constructed via builder.
@@ -59,18 +59,18 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
    * @param isVersionEnabled - Bucket version flag.
    * @param storageType - Storage type to be used.
    * @param quotaInBytes Volume quota in bytes.
-   * @param quotaInCounts Volume quota in counts.
+   * @param quotaInNamespace Volume quota in counts.
    */
   private OmBucketArgs(String volumeName, String bucketName,
       Boolean isVersionEnabled, StorageType storageType,
-      Map<String, String> metadata, long quotaInBytes, long quotaInCounts) {
+      Map<String, String> metadata, long quotaInBytes, long quotaInNamespace) {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.isVersionEnabled = isVersionEnabled;
     this.storageType = storageType;
     this.metadata = metadata;
     this.quotaInBytes = quotaInBytes;
-    this.quotaInCounts = quotaInCounts;
+    this.quotaInNamespace = quotaInNamespace;
   }
 
   /**
@@ -115,10 +115,10 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
 
   /**
    * Returns Bucket Quota in key counts.
-   * @return quotaInCounts.
+   * @return quotaInNamespace.
    */
-  public long getQuotaInCounts() {
-    return quotaInCounts;
+  public long getQuotaInNamespace() {
+    return quotaInNamespace;
   }
 
   /**
@@ -154,7 +154,7 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     private StorageType storageType;
     private Map<String, String> metadata;
     private long quotaInBytes;
-    private long quotaInCounts;
+    private long quotaInNamespace;
 
     public Builder setVolumeName(String volume) {
       this.volumeName = volume;
@@ -186,8 +186,8 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
       return this;
     }
 
-    public Builder setQuotaInCounts(long quota) {
-      quotaInCounts = quota;
+    public Builder setQuotaInNamespace(long quota) {
+      quotaInNamespace = quota;
       return this;
     }
 
@@ -199,7 +199,7 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
       Preconditions.checkNotNull(volumeName);
       Preconditions.checkNotNull(bucketName);
       return new OmBucketArgs(volumeName, bucketName, isVersionEnabled,
-          storageType, metadata, quotaInBytes, quotaInCounts);
+          storageType, metadata, quotaInBytes, quotaInNamespace);
     }
   }
 
@@ -219,8 +219,8 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     if(quotaInBytes > 0 || quotaInBytes == OzoneConsts.QUOTA_RESET) {
       builder.setQuotaInBytes(quotaInBytes);
     }
-    if(quotaInCounts > 0 || quotaInCounts == OzoneConsts.QUOTA_RESET) {
-      builder.setQuotaInCounts(quotaInCounts);
+    if(quotaInNamespace > 0 || quotaInNamespace == OzoneConsts.QUOTA_RESET) {
+      builder.setQuotaInNamespace(quotaInNamespace);
     }
     return builder.build();
   }
@@ -239,6 +239,6 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
             bucketArgs.getStorageType()) : null,
         KeyValueUtil.getFromProtobuf(bucketArgs.getMetadataList()),
         bucketArgs.getQuotaInBytes(),
-        bucketArgs.getQuotaInCounts());
+        bucketArgs.getQuotaInNamespace());
   }
 }
