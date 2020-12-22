@@ -280,7 +280,7 @@ public abstract class TestOzoneRpcClientAbstract {
   }
 
   @Test
-  public void testSetAndClrQuota() throws IOException {
+  public void testSetAndClrQuota() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     OzoneVolume volume = null;
@@ -314,22 +314,13 @@ public abstract class TestOzoneRpcClientAbstract {
         ozoneBucket.getQuotaInBytes());
     Assert.assertEquals(1000L, ozoneBucket.getQuotaInNamespace());
 
-    try {
-      ozoneBucket.clearSpaceQuota();
-      Assert.fail("clear quota should be failed");
-    } catch (IOException ex) {
-      GenericTestUtils.assertExceptionContains("Before clear bucket " +
-          "quotaInBytes, volume quotaInBytes need to be clear first.", ex);
-    }
+    LambdaTestUtils.intercept(IOException.class, "Can not clear bucket" +
+        " spaceQuota because volume spaceQuota is not cleared.",
+        () -> ozoneBucket.clearSpaceQuota());
 
-    try {
-      ozoneBucket.clearCountQuota();
-      Assert.fail("clear quota should be failed");
-    } catch (IOException ex) {
-      GenericTestUtils.assertExceptionContains("Before clear bucket " +
-          "quotaInNamespace, volume quotaInNamespace need to be clear first.",
-          ex);
-    }
+    LambdaTestUtils.intercept(IOException.class, "Can not clear bucket" +
+        " namespaceQuota because volume namespaceQuota is not cleared.",
+        () -> ozoneBucket.clearCountQuota());
 
     store.getVolume(volumeName).clearSpaceQuota();
     store.getVolume(volumeName).clearNamespaceQuota();
