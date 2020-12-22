@@ -39,6 +39,7 @@ import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.Trash;
 import org.apache.hadoop.fs.TrashPolicy;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
+import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -583,6 +584,7 @@ public class TestOzoneFileSystem {
   @Test
   public void testListStatusOnLargeDirectory() throws Exception {
     Path root = new Path("/");
+    deleteRootDir(); // cleanup
     Set<String> paths = new TreeSet<>();
     int numDirs = LISTING_PAGE_SIZE + LISTING_PAGE_SIZE / 2;
     for(int i = 0; i < numDirs; i++) {
@@ -592,12 +594,52 @@ public class TestOzoneFileSystem {
     }
 
     FileStatus[] fileStatuses = o3fs.listStatus(root);
+    // Added logs for debugging failures, to check any sub-path mismatches.
+    Set<String> actualPaths = new TreeSet<>();
+    ArrayList<String> actualPathList = new ArrayList<>();
+    if (rootItemCount != fileStatuses.length) {
+      for (int i = 0; i < fileStatuses.length; i++) {
+        actualPaths.add(fileStatuses[i].getPath().getName());
+        actualPathList.add(fileStatuses[i].getPath().getName());
+      }
+      if (rootItemCount != actualPathList.size()) {
+        actualPaths.removeAll(paths);
+        actualPathList.removeAll(paths);
+        LOG.info("actualPaths: {}", actualPaths);
+        LOG.info("actualPathList: {}", actualPathList);
+      }
+    }
     assertEquals(
         "Total directories listed do not match the existing directories",
         numDirs, fileStatuses.length);
 
     for (int i=0; i < numDirs; i++) {
       assertTrue(paths.contains(fileStatuses[i].getPath().getName()));
+    }
+  }
+
+  /**
+   * Cleanup files and directories.
+   *
+   * @throws IOException DB failure
+   */
+  protected void deleteRootDir() throws IOException {
+    Path root = new Path("/");
+    FileStatus[] fileStatuses = fs.listStatus(root);
+
+    rootItemCount = 0; // reset to zero
+
+    if (fileStatuses == null) {
+      return;
+    }
+
+    for (FileStatus fStatus : fileStatuses) {
+      fs.delete(fStatus.getPath(), true);
+    }
+
+    fileStatuses = fs.listStatus(root);
+    if (fileStatuses != null) {
+      Assert.assertEquals("Delete root failed!", 0, fileStatuses.length);
     }
   }
 
@@ -662,6 +704,38 @@ public class TestOzoneFileSystem {
   }
 
   @Test
+  public void testAllocateMoreThanOneBlock() throws IOException {
+    Path file = new Path("/file");
+    String str = "TestOzoneFileSystemV1.testSeekOnFileLength";
+    byte[] strBytes = str.getBytes();
+    long numBlockAllocationsOrg =
+            cluster.getOzoneManager().getMetrics().getNumBlockAllocates();
+
+    try (FSDataOutputStream out1 = fs.create(file, FsPermission.getDefault(),
+            true, 8, (short) 3, 1, null)) {
+      for (int i = 0; i < 100000; i++) {
+        out1.write(strBytes);
+      }
+    }
+
+    try (FSDataInputStream stream = fs.open(file)) {
+      FileStatus fileStatus = fs.getFileStatus(file);
+      long blkSize = fileStatus.getBlockSize();
+      long fileLength = fileStatus.getLen();
+      Assert.assertTrue("Block allocation should happen",
+              fileLength > blkSize);
+
+      long newNumBlockAllocations =
+              cluster.getOzoneManager().getMetrics().getNumBlockAllocates();
+
+      Assert.assertTrue("Block allocation should happen",
+              (newNumBlockAllocations > numBlockAllocationsOrg));
+
+      stream.seek(fileLength);
+      assertEquals(-1, stream.read());
+    }
+  }
+
   public void testDeleteRoot() throws IOException {
     Path dir = new Path("/dir");
     fs.mkdirs(dir);
