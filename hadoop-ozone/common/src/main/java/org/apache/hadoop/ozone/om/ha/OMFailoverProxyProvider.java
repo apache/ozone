@@ -478,7 +478,7 @@ public class OMFailoverProxyProvider implements
         // Do not failover if the operation was blocked because the OM was
         // prepared.
         return omEx.getResult() !=
-            OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
+            OMException.ResultCodes.NOT_SUPPORTED_OPERATION_WHEN_PREPARED;
       }
     }
     return true;

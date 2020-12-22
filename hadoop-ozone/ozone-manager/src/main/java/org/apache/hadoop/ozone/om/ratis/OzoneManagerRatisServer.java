@@ -50,6 +50,7 @@ import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
@@ -145,7 +146,7 @@ public final class OzoneManagerRatisServer {
           omRequest.getCmdType().name() + " when OM is in prepare mode.";
       OMResponse.Builder omResponse = OMResponse.newBuilder()
           .setMessage(message)
-          .setStatus(OzoneManagerProtocolProtos.Status.NOT_SUPPORTED_OPERATION)
+          .setStatus(Status.NOT_SUPPORTED_OPERATION_WHEN_PREPARED)
           .setCmdType(omRequest.getCmdType())
           .setTraceID(omRequest.getTraceID())
           .setSuccess(false);

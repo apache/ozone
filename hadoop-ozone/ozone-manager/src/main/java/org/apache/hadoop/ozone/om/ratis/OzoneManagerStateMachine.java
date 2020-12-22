@@ -216,7 +216,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       String message = "Cannot apply write request " +
           request.getCmdType().name() + " when OM is in prepare mode.";
       OMException cause = new OMException(message,
-          OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
+          OMException.ResultCodes.NOT_SUPPORTED_OPERATION_WHEN_PREPARED);
       // Indicate that the leader should not step down because of this failure.
       throw new StateMachineException(message, cause, false);
     }
