@@ -29,7 +29,6 @@ import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -61,7 +60,7 @@ public class FullTableCache<CACHEKEY extends CacheKey,
 
   public FullTableCache() {
     // As for full table cache only we need elements to be inserted in sorted
-    // manner, so that list will be easy. But looks up have log(N) time
+    // manner, so that list will be easy. But look ups have log(N) time
     // complexity.
 
     // Here lock is required to protect cache because cleanup is not done
@@ -128,7 +127,6 @@ public class FullTableCache<CACHEKEY extends CacheKey,
   @VisibleForTesting
   public void evictCache(List<Long> epochs) {
     EpochEntry<CACHEKEY> currentEntry;
-    final AtomicBoolean removed = new AtomicBoolean();
     CACHEKEY cachekey;
     long lastEpoch = epochs.get(epochs.size() - 1);
     for (Iterator<EpochEntry<CACHEKEY>> iterator = epochEntries.iterator();
@@ -137,44 +135,33 @@ public class FullTableCache<CACHEKEY extends CacheKey,
       cachekey = currentEntry.getCachekey();
       long currentEpoch = currentEntry.getEpoch();
 
-      // Acquire lock to avoid race between cleanup and add to cache entry by
-      // client requests.
-      try {
-        lock.writeLock().lock();
-        cache.computeIfPresent(cachekey, ((k, v) -> {
-          if (v.getEpoch() == currentEpoch && epochs.contains(v.getEpoch())
-              && v.getCacheValue() == null) {
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("CacheKey {} with epoch {} is removed from cache",
-                  k.getCacheKey(), currentEpoch);
-            }
-            iterator.remove();
-            removed.set(true);
-            return null;
-          }
-          return v;
-        }));
-      } finally {
-        lock.writeLock().unlock();
-      }
-
       // If currentEntry epoch is greater than last epoch provided, we have
       // deleted all entries less than specified epoch. So, we can break.
       if (currentEpoch > lastEpoch) {
         break;
       }
 
-      // When epoch entry is not removed, this might be a override entry in
-      // cache. Clean that epoch entry.
-      if (!removed.get()) {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("CacheKey {} with epoch {} is an override entry",
-              cachekey.getCacheKey(), currentEpoch);
+      // Acquire lock to avoid race between cleanup and add to cache entry by
+      // client requests.
+      try {
+        lock.writeLock().lock();
+        if (epochs.contains(currentEpoch)) {
+          // Remove epoch entry, as the entry is there in epoch list.
+          iterator.remove();
+          // Remove only entries which are marked for delete from the cache.
+          cache.computeIfPresent(cachekey, ((k, v) -> {
+            if (v.getCacheValue() == null && v.getEpoch() == currentEpoch) {
+              LOG.debug("CacheKey {} with epoch {} is removed from cache",
+                  k.getCacheKey(), currentEpoch);
+              return null;
+            }
+            return v;
+          }));
         }
-        iterator.remove();
+      } finally {
+        lock.writeLock().unlock();
       }
 
-      removed.set(false);
     }
   }
 

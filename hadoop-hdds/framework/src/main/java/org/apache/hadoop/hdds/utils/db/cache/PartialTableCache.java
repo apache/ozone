@@ -29,7 +29,6 @@ import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -87,7 +86,7 @@ public class PartialTableCache<CACHEKEY extends CacheKey,
 
   @Override
   public void loadInitial(CACHEKEY cacheKey, CACHEVALUE cacheValue) {
-    // Do nothing for full table cache.
+    // Do nothing for partial table cache.
   }
 
   @Override
@@ -113,7 +112,6 @@ public class PartialTableCache<CACHEKEY extends CacheKey,
   @VisibleForTesting
   public void evictCache(List<Long> epochs) {
     EpochEntry<CACHEKEY> currentEntry;
-    final AtomicBoolean removed = new AtomicBoolean();
     CACHEKEY cachekey;
     long lastEpoch = epochs.get(epochs.size() - 1);
     for (Iterator<EpochEntry<CACHEKEY>> iterator = epochEntries.iterator();
@@ -122,40 +120,30 @@ public class PartialTableCache<CACHEKEY extends CacheKey,
       cachekey = currentEntry.getCachekey();
       long currentEpoch = currentEntry.getEpoch();
 
-      // As ConcurrentHashMap computeIfPresent is atomic, there is no race
-      // condition between cache cleanup and requests updating same cache entry.
-
-      cache.computeIfPresent(cachekey, ((k, v) -> {
-        if (v.getEpoch() == currentEpoch && epochs.contains(v.getEpoch())) {
-          if (LOG.isDebugEnabled()) {
-            LOG.debug("CacheKey {} with epoch {} is removed from cache",
-                k.getCacheKey(), currentEpoch);
-          }
-          iterator.remove();
-          removed.set(true);
-          return null;
-        }
-        return v;
-      }));
-
       // If currentEntry epoch is greater than last epoch provided, we have
       // deleted all entries less than specified epoch. So, we can break.
       if (currentEpoch > lastEpoch) {
         break;
       }
 
-      // When epoch entry is not removed, this might be a override entry in
-      // cache. Clean that epoch entry.
-      if (!removed.get()) {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("CacheKey {} with epoch {} is removed from epochEntry " +
-                  "for a key not existing in cache", cachekey.getCacheKey(),
-              currentEpoch);
-        }
+      // As ConcurrentHashMap computeIfPresent is atomic, there is no race
+      // condition between cache cleanup and requests updating same cache entry.
+      if (epochs.contains(currentEpoch)) {
+        // Remove epoch entry, as the entry is there in epoch list.
         iterator.remove();
+        cache.computeIfPresent(cachekey, ((k, v) -> {
+          // If cache epoch entry matches with current Epoch, remove entry
+          // from cache.
+          if (v.getEpoch() == currentEpoch) {
+            if (LOG.isDebugEnabled()) {
+              LOG.debug("CacheKey {} with epoch {} is removed from cache",
+                  k.getCacheKey(), currentEpoch);
+            }
+            return null;
+          }
+          return v;
+        }));
       }
-
-      removed.set(false);
     }
   }
 

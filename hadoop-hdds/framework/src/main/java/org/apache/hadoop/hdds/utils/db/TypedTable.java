@@ -62,7 +62,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
   /**
    * Create an TypedTable from the raw table.
-   * Default cache type for the table is {@link CacheType#FullCache}.
+   * Default cache type for the table is {@link CacheType#PartialCache}.
    * @param rawTable
    * @param codecRegistry
    * @param keyType

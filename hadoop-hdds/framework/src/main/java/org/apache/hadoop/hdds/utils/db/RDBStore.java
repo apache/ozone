@@ -307,6 +307,7 @@ public class RDBStore implements DBStore {
         valueType);
   }
 
+  @Override
   public <K, V> Table<K, V> getTable(String name,
       Class<K> keyType, Class<V> valueType,
       TableCache.CacheType cacheType) throws IOException {

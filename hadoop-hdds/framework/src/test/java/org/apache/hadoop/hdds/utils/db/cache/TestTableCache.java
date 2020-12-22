@@ -410,6 +410,68 @@ public class TestTableCache {
     Assert.assertTrue(tableCache.getEpochEntrySet().size() == 0);
   }
 
+
+  @Test
+  public void testTableCacheWithNonConsecutiveEpochList() {
+
+    // In non-HA epoch entries might be out of order.
+    tableCache.put(new CacheKey<>(Long.toString(0)),
+        new CacheValue<>(Optional.of(Long.toString(0)), 0));
+    tableCache.put(new CacheKey<>(Long.toString(0)),
+        new CacheValue<>(Optional.of(Long.toString(1)), 1));
+    tableCache.put(new CacheKey<>(Long.toString(0)),
+        new CacheValue<>(Optional.of(Long.toString(3)), 3));
+
+    tableCache.put(new CacheKey<>(Long.toString(0)),
+          new CacheValue<>(Optional.of(Long.toString(2)), 2));
+
+    tableCache.put(new CacheKey<>(Long.toString(1)),
+        new CacheValue<>(Optional.of(Long.toString(1)), 4));
+
+    List<Long> epochs = new ArrayList<>();
+    epochs.add(0L);
+    epochs.add(1L);
+    epochs.add(3L);
+
+    tableCache.evictCache(epochs);
+
+    Assert.assertTrue(tableCache.size() == 2);
+    Assert.assertTrue(tableCache.getEpochEntrySet().size() == 2);
+
+    Assert.assertNotNull(tableCache.get(new CacheKey<>(Long.toString(0))));
+    Assert.assertEquals(2,
+        tableCache.get(new CacheKey<>(Long.toString(0))).getEpoch());
+
+    Assert.assertNotNull(tableCache.get(new CacheKey<>(Long.toString(1))));
+    Assert.assertEquals(4,
+        tableCache.get(new CacheKey<>(Long.toString(1))).getEpoch());
+
+    // now evict 2,4
+    epochs = new ArrayList<>();
+    epochs.add(2L);
+    epochs.add(4L);
+
+    tableCache.evictCache(epochs);
+
+    if(cacheType == TableCache.CacheType.PartialCache) {
+      Assert.assertTrue(tableCache.size() == 0);
+      Assert.assertTrue(tableCache.getEpochEntrySet().size() == 0);
+    } else {
+      Assert.assertTrue(tableCache.size() == 2);
+      Assert.assertTrue(tableCache.getEpochEntrySet().size() == 0);
+
+      // Entries should exist, as the entries are not delete entries
+      Assert.assertNotNull(tableCache.get(new CacheKey<>(Long.toString(0))));
+      Assert.assertEquals(2,
+          tableCache.get(new CacheKey<>(Long.toString(0))).getEpoch());
+
+      Assert.assertNotNull(tableCache.get(new CacheKey<>(Long.toString(1))));
+      Assert.assertEquals(4,
+          tableCache.get(new CacheKey<>(Long.toString(1))).getEpoch());
+    }
+
+  }
+
   private int writeToCache(int count, int startVal, long sleep)
       throws InterruptedException {
     int counter = 1;
