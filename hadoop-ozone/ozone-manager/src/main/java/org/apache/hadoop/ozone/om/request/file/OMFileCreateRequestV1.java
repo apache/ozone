@@ -139,6 +139,9 @@ public class OMFileCreateRequestV1 extends OMFileCreateRequest {
                 pathInfoV1.getLeafNodeName());
         dbFileInfo = OMFileRequest.getOmKeyInfoFromFileTable(false,
                 omMetadataManager, dbFileKey, keyName);
+        if (dbFileInfo != null) {
+          ozoneManager.getKeyManager().refresh(dbFileInfo);
+        }
       }
 
       // check if the file or directory already existed in OM

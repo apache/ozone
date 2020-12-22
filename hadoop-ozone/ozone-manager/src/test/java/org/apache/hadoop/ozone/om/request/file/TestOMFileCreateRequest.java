@@ -398,28 +398,6 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
   }
 
   /**
-   * Verify path in open key table. Also, it returns OMKeyInfo for the given
-   * key path.
-   *
-   * @param key      key name
-   * @param id       client id
-   * @param doAssert if true then do assertion, otherwise it just skip.
-   * @return om key info for the given key path.
-   * @throws Exception DB failure
-   */
-  protected OmKeyInfo verifyPathInOpenKeyTable(String key, long id,
-                                               boolean doAssert)
-          throws Exception {
-    String openKey = omMetadataManager.getOpenKey(volumeName, bucketName,
-            key, id);
-    OmKeyInfo omKeyInfo = omMetadataManager.getOpenKeyTable().get(openKey);
-    if (doAssert) {
-      Assert.assertNotNull("Failed to find key in OpenKeyTable", omKeyInfo);
-    }
-    return omKeyInfo;
-  }
-
-  /**
    * Gets OMFileCreateRequest reference.
    *
    * @param omRequest om request

@@ -25,6 +25,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.util.Time;
@@ -87,6 +88,10 @@ public class TestOMKeyCommitRequestV1 extends TestOMKeyCommitRequest {
   protected OzoneConfiguration getOzoneConfiguration() {
     OzoneConfiguration config = super.getOzoneConfiguration();
     config.set(OMConfigKeys.OZONE_OM_LAYOUT_VERSION, "V1");
+    // omLayoutVersionV1 flag will be set while invoking OzoneManager#start()
+    // and its not invoked in this test. Hence it is explicitly setting
+    // this configuration to populate prefix tables.
+    OzoneManagerRatisUtils.setOmLayoutVersionV1(true);
     return config;
   }
 
