@@ -32,6 +32,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 
 /**
@@ -150,7 +151,8 @@ public final class OzoneManagerPrepareState {
       }
 
       try {
-        prepareMarkerIndex = Long.parseLong(new String(data));
+        prepareMarkerIndex = Long.parseLong(
+            new String(data, StandardCharsets.UTF_8));
       } catch (NumberFormatException e) {
         LOG.error("Failed to parse log index from prepare marker file {} " +
             "while restoring OM.", prepareMarkerFile.getAbsolutePath());
@@ -222,9 +224,14 @@ public final class OzoneManagerPrepareState {
    */
   private void writePrepareMarkerFile(long index) throws IOException {
     File markerFile = getPrepareMarkerFile();
-    markerFile.getParentFile().mkdirs();
+    File parentDir = markerFile.getParentFile();
+    if (!parentDir.mkdirs()) {
+      throw new IOException("Failed to create necessary directories in " +
+          "marker file path: " + parentDir);
+    }
+
     try(FileOutputStream stream = new FileOutputStream(markerFile)) {
-      stream.write(Long.toString(index).getBytes());
+      stream.write(Long.toString(index).getBytes(StandardCharsets.UTF_8));
     }
   }
 
