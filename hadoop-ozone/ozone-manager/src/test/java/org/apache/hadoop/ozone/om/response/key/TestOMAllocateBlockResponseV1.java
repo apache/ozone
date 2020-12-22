@@ -20,76 +20,54 @@ package org.apache.hadoop.ozone.om.response.key;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.util.Time;
 import org.jetbrains.annotations.NotNull;
-import org.junit.Assert;
 
 /**
- * Tests OMKeyCommitResponse layout version V1.
+ * Tests OMAllocateBlockResponse layout version V1.
  */
-public class TestOMKeyCommitResponseV1 extends TestOMKeyCommitResponse {
+public class TestOMAllocateBlockResponseV1
+        extends TestOMAllocateBlockResponse {
 
-  @NotNull
-  protected OMKeyCommitResponse getOmKeyCommitResponse(
-          OmVolumeArgs omVolumeArgs, OmKeyInfo omKeyInfo,
-          OzoneManagerProtocolProtos.OMResponse omResponse, String openKey,
-          String ozoneKey) {
-    Assert.assertNotNull(omBucketInfo);
-    return new OMKeyCommitResponseV1(
-            omResponse, omKeyInfo, ozoneKey, openKey, omVolumeArgs,
-            omBucketInfo);
-  }
+  // logical ID, which really doesn't exist in dirTable
+  private long parentID = 10;
+  private String fileName = "file1";
 
-  @NotNull
-  @Override
-  protected OmKeyInfo getOmKeyInfo() {
-    Assert.assertNotNull(omBucketInfo);
-    return TestOMRequestUtils.createOmKeyInfo(volumeName,
-            omBucketInfo.getBucketName(), keyName, replicationType,
-            replicationFactor,
-            omBucketInfo.getObjectID() + 1,
-            omBucketInfo.getObjectID(), 100, Time.now());
-  }
+  protected OmKeyInfo createOmKeyInfo() throws Exception {
+    // need to initialize parentID
+    String parentDir = keyName;
+    keyName = parentDir + OzoneConsts.OM_KEY_PREFIX + fileName;
 
-  @NotNull
-  @Override
-  protected void addKeyToOpenKeyTable() throws Exception {
-    Assert.assertNotNull(omBucketInfo);
-    long parentID = omBucketInfo.getObjectID();
-    long objectId = parentID + 10;
+    long txnId = 50;
+    long objectId = parentID + 1;
 
     OmKeyInfo omKeyInfoV1 =
             TestOMRequestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
                     HddsProtos.ReplicationType.RATIS,
-                    HddsProtos.ReplicationFactor.ONE, objectId, parentID, 100,
+                    HddsProtos.ReplicationFactor.ONE, objectId, parentID, txnId,
                     Time.now());
-
-    String fileName = OzoneFSUtils.getFileName(keyName);
-    TestOMRequestUtils.addFileToKeyTable(true, false,
-            fileName, omKeyInfoV1, clientID, txnLogId, omMetadataManager);
+    return omKeyInfoV1;
   }
 
-  @NotNull
-  @Override
-  protected String getOpenKeyName() {
-    Assert.assertNotNull(omBucketInfo);
+  protected String getOpenKey() throws Exception {
     return omMetadataManager.getOpenFileName(
-            omBucketInfo.getObjectID(), keyName, clientID);
+            parentID, fileName, clientID);
   }
 
   @NotNull
-  @Override
-  protected String getOzoneKey() {
-    Assert.assertNotNull(omBucketInfo);
-    return omMetadataManager.getOzonePathKey(omBucketInfo.getObjectID(),
-            keyName);
+  protected OMAllocateBlockResponse getOmAllocateBlockResponse(
+          OmKeyInfo omKeyInfo, OmVolumeArgs omVolumeArgs,
+          OmBucketInfo omBucketInfo, OMResponse omResponse) {
+    return new OMAllocateBlockResponseV1(omResponse, omKeyInfo, clientID,
+            omBucketInfo);
   }
 
   @NotNull
@@ -103,4 +81,5 @@ public class TestOMKeyCommitResponseV1 extends TestOMKeyCommitResponse {
     OzoneManagerRatisUtils.setOmLayoutVersionV1(true);
     return config;
   }
+
 }
