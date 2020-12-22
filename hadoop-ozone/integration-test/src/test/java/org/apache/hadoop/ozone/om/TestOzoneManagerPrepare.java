@@ -219,6 +219,9 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
         }
       }
     }
+
+    // In the above loop, we have waited for all threads to terminate.
+    executorService.shutdown();
   }
 
   private boolean logFilesPresentInRatisPeer(OzoneManager om) {

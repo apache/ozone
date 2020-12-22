@@ -473,6 +473,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         .get(TRANSACTION_INFO_KEY);
     prepareState = new OzoneManagerPrepareState(configuration);
     if (txnInfo != null) {
+      // Only puts OM in prepare mode if a marker file matching the txn index
+      // is found.
       prepareState.restorePrepare(txnInfo.getTransactionIndex());
     } else {
       // If we have no transaction info in the DB, then no prepare request

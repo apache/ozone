@@ -196,6 +196,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     return handleStartTransactionRequests(raftClientRequest, omRequest);
   }
 
+  @Override
   public TransactionContext preAppendTransaction(TransactionContext trx)
       throws IOException {
     OMRequest request = OMRatisHelper.convertByteStringToOMRequest(
