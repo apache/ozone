@@ -258,12 +258,13 @@ public class TestKeyValueContainer {
 
     AtomicReference<String> failed = new AtomicReference<>();
 
+    TarContainerPacker packer = new TarContainerPacker();
     List<Thread> threads = IntStream.range(0, 20)
         .mapToObj(i -> new Thread(() -> {
           try {
             File file = folder.newFile("concurrent" + i + ".tar.gz");
             try (OutputStream out = new FileOutputStream(file)) {
-              keyValueContainer.exportContainerData(out, new TarContainerPacker());
+              keyValueContainer.exportContainerData(out, packer);
             }
           } catch (Exception e) {
             failed.compareAndSet(null, e.getMessage());
