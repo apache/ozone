@@ -70,8 +70,6 @@ import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.RaftServerConfigKeys;
-import org.apache.ratis.server.impl.RaftServerImpl;
-import org.apache.ratis.server.impl.RaftServerProxy;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.util.LifeCycle;
 import org.apache.ratis.util.SizeInBytes;
@@ -577,14 +575,12 @@ public final class OzoneManagerRatisServer {
    * @return RaftServerStatus.
    */
   public RaftServerStatus checkLeaderStatus() {
-    Preconditions.checkState(server instanceof RaftServerProxy);
-    RaftServerImpl serverImpl;
     try {
-      serverImpl = ((RaftServerProxy) server).getImpl(raftGroupId);
-      if (serverImpl != null) {
-        if (!serverImpl.isLeader()) {
+      RaftServer.Division division = server.getDivision(raftGroupId);
+      if (division != null) {
+        if (!division.getInfo().isLeader()) {
           return RaftServerStatus.NOT_LEADER;
-        } else if (serverImpl.isLeaderReady()) {
+        } else if (division.getInfo().isLeaderReady()) {
           return RaftServerStatus.LEADER_AND_READY;
         } else {
           return RaftServerStatus.LEADER_AND_NOT_READY;

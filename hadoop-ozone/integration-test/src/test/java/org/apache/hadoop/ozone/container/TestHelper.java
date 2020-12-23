@@ -49,9 +49,7 @@ import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverSe
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.test.GenericTestUtils;
-import org.apache.ratis.protocol.RaftGroupId;
-import org.apache.ratis.server.impl.RaftServerImpl;
-import org.apache.ratis.server.impl.RaftServerProxy;
+import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.statemachine.StateMachine;
 import org.junit.Assert;
 import org.slf4j.Logger;
@@ -324,21 +322,19 @@ public final class TestHelper {
     return getStateMachine(cluster.getHddsDatanodes().get(0), null);
   }
 
-  private static RaftServerImpl getRaftServerImpl(HddsDatanodeService dn,
-      Pipeline pipeline) throws Exception {
-    XceiverServerSpi server = dn.getDatanodeStateMachine().
-        getContainer().getWriteChannel();
-    RaftServerProxy proxy =
-        (RaftServerProxy) (((XceiverServerRatis) server).getServer());
-    RaftGroupId groupId =
-        pipeline == null ? proxy.getGroupIds().iterator().next() :
-            RatisHelper.newRaftGroup(pipeline).getGroupId();
-    return proxy.getImpl(groupId);
+  private static RaftServer.Division getRaftServerDivision(
+      HddsDatanodeService dn, Pipeline pipeline) throws Exception {
+    XceiverServerRatis server =
+        (XceiverServerRatis) (dn.getDatanodeStateMachine().
+            getContainer().getWriteChannel());
+    return pipeline == null ? server.getServerDivision() :
+        server.getServerDivision(
+            RatisHelper.newRaftGroup(pipeline).getGroupId());
   }
 
   public static StateMachine getStateMachine(HddsDatanodeService dn,
       Pipeline pipeline) throws Exception {
-    return getRaftServerImpl(dn, pipeline).getStateMachine();
+    return getRaftServerDivision(dn, pipeline).getStateMachine();
   }
 
   public static HddsDatanodeService getDatanodeService(OmKeyLocationInfo info,
