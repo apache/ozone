@@ -329,7 +329,8 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
       clientProtocol.createVolume("vol");
       Assert.fail("Write request should fail when OM is in prepare mode.");
     } catch (OMException ex) {
-      Assert.assertEquals(OMException.ResultCodes.NOT_SUPPORTED_OPERATION,
+      Assert.assertEquals(
+          OMException.ResultCodes.NOT_SUPPORTED_OPERATION_WHEN_PREPARED,
           ex.getResult());
     }
   }
