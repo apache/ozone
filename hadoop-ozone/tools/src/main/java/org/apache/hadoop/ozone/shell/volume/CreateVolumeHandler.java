@@ -62,10 +62,10 @@ public class CreateVolumeHandler extends VolumeHandler {
     if (quotaOptions.getQuotaInBytes() != null) {
       volumeArgsBuilder.setQuotaInBytes(OzoneQuota.parseQuota(
           quotaOptions.getQuotaInBytes(),
-          quotaOptions.getQuotaInCounts()).getQuotaInBytes());
+          quotaOptions.getQuotaInNamespace()).getQuotaInBytes());
     }
 
-    volumeArgsBuilder.setQuotaInCounts(quotaOptions.getQuotaInCounts());
+    volumeArgsBuilder.setQuotaInNamespace(quotaOptions.getQuotaInNamespace());
 
     client.getObjectStore().createVolume(volumeName,
         volumeArgsBuilder.build());

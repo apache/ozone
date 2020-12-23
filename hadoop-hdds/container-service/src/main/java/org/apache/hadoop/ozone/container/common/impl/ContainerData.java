@@ -291,7 +291,7 @@ public abstract class ContainerData {
    * @return - boolean
    */
   public synchronized boolean isValid() {
-    return !(ContainerDataProto.State.INVALID == state);
+    return ContainerDataProto.State.INVALID != state;
   }
 
   /**
