@@ -3355,7 +3355,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     // TODO: We should only return the snpashotIndex to the leader.
     //  Should be fixed after RATIS-586
-    TermIndex newTermIndex = TermIndex.newTermIndex(term, lastAppliedIndex);
+    TermIndex newTermIndex = TermIndex.valueOf(term, lastAppliedIndex);
     return newTermIndex;
   }
 
