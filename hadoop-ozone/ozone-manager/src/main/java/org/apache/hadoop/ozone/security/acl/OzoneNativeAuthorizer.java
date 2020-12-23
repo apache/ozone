@@ -148,8 +148,8 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
       // key will not exist at the time of creation
       boolean keyAccess = isACLTypeCreate
           || keyManager.checkAccess(objInfo, context);
-      return (keyAccess
-          && prefixManager.checkAccess(objInfo, parentContext)
+      return ((keyAccess
+          || prefixManager.checkAccess(objInfo, parentContext))
           && bucketManager.checkAccess(objInfo, parentContext)
           && volumeManager.checkAccess(objInfo, parentContext));
     case PREFIX:
