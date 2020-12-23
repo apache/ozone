@@ -177,7 +177,6 @@ public final class OzoneManagerPrepareState {
     }
 
     if (prepareRestored) {
-      enablePrepareGate();
       // Do not rewrite the marker file, since we verified it already exists.
       finishPrepare(prepareMarkerIndex, false);
     } else {
@@ -218,9 +217,9 @@ public final class OzoneManagerPrepareState {
   }
 
   /**
-   * Creates a prepare marker file inside {@code metadataDir} which contains
-   * the log index {@code index}. If a marker file already exists, it will be
-   * overwritten.
+   * Creates a prepare marker file inside the OM metadata directory which
+   * contains the log index {@code index}.
+   * If a marker file already exists, it will be overwritten.
    */
   private void writePrepareMarkerFile(long index) throws IOException {
     File markerFile = getPrepareMarkerFile();
@@ -230,6 +229,9 @@ public final class OzoneManagerPrepareState {
     try(FileOutputStream stream = new FileOutputStream(markerFile)) {
       stream.write(Long.toString(index).getBytes(StandardCharsets.UTF_8));
     }
+
+    LOG.info("Prepare marker file written with log index {} to file {}", index,
+        markerFile.getAbsolutePath());
   }
 
   private void deletePrepareMarkerFile()
@@ -237,6 +239,10 @@ public final class OzoneManagerPrepareState {
     File markerFile = getPrepareMarkerFile();
     if (markerFile.exists()) {
       Files.delete(markerFile.toPath());
+      LOG.info("Deleted prepare marker file: {}", markerFile.getAbsolutePath());
+    } else {
+      LOG.info("Request to delete prepare marker file that does not exist: {}",
+          markerFile.getAbsolutePath());
     }
   }
 

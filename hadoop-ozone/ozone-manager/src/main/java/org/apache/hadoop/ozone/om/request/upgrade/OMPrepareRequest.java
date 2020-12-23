@@ -66,7 +66,8 @@ public class OMPrepareRequest extends OMClientRequest {
       OzoneManager ozoneManager, long transactionLogIndex,
       OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
 
-    LOG.info("Received prepare request with log index {}", transactionLogIndex);
+    LOG.info("OM {} Received prepare request with log index {}",
+        ozoneManager.getOMNodeId(), transactionLogIndex);
 
     OMRequest omRequest = getOmRequest();
     OzoneManagerProtocolProtos.PrepareRequestArgs args =

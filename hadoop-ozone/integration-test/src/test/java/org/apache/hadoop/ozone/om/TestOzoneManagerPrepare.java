@@ -214,7 +214,8 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
         } catch (ExecutionException ex) {
           Throwable cause = ex.getCause();
           Assert.assertTrue(cause instanceof OMException);
-          Assert.assertEquals(OMException.ResultCodes.NOT_SUPPORTED_OPERATION,
+          Assert.assertEquals(
+              OMException.ResultCodes.NOT_SUPPORTED_OPERATION_WHEN_PREPARED,
               ((OMException) cause).getResult());
         }
       }
