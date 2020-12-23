@@ -77,6 +77,10 @@ public class TestOzoneManagerPrepareState {
     prepareState.enablePrepareGate();
     prepareState.finishPrepare(TEST_INDEX);
     assertPrepareCompleted(TEST_INDEX);
+
+    // A following prepare operation should not raise errors.
+    prepareState.finishPrepare(TEST_INDEX);
+    assertPrepareCompleted(TEST_INDEX);
   }
 
   @Test

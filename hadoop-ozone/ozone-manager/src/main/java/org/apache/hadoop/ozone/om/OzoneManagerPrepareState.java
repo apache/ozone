@@ -225,10 +225,7 @@ public final class OzoneManagerPrepareState {
   private void writePrepareMarkerFile(long index) throws IOException {
     File markerFile = getPrepareMarkerFile();
     File parentDir = markerFile.getParentFile();
-    if (!parentDir.mkdirs()) {
-      throw new IOException("Failed to create necessary directories in " +
-          "marker file path: " + parentDir);
-    }
+    Files.createDirectories(parentDir.toPath());
 
     try(FileOutputStream stream = new FileOutputStream(markerFile)) {
       stream.write(Long.toString(index).getBytes(StandardCharsets.UTF_8));
