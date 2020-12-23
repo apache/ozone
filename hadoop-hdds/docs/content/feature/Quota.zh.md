@@ -30,10 +30,18 @@ menu:
 1. Storage space级别配额
 
  管理员应该能够定义一个Volume或Bucket可以使用多少存储空间。目前支持以下storage space quota的设置:
+ 
  a. 默认情况下volume和bucket的quota不启用。
+ 
  b. 当volume quota启用时，bucket quota的总大小不能超过volume。
+ 
  c. 可以在不启用volume quota的情况下单独给bucket设置quota。此时bucket quota的大小是不受限制的。
+ 
  d. 目前不支持单独设置volume quota，只有在设置了bucket quota的情况下volume quota才会生效。因为ozone在写入key时只检查bucket的usedBytes。
+ 
+ e. 如果集群从小于1.1.0的旧版本升级而来，则不建议在旧volume和bucket(可以通过查看volume或者bucket的info确认，如果quota值是-2，那么这个volume或者bucket就是旧的)上使用配额。由于旧的key没有计算到bucket的usedBytes中，所以此时配额设置是不准确的。
+ 
+ f. 如果volume quota被启用，那么bucket quota将不能被清除。
 
 ## 客户端用法
 ### Storage space级别配额
@@ -62,9 +70,10 @@ bin/ozone sh bucket setquota  --space-quota 10GB /volume1/bucket1
 
 bucket的总配额 不应大于其Volume的配额。让我们看一个例子，如果我们有一个10MB的Volume，该volume下所有bucket的大小之和不能超过10MB，否则设置bucket quota将失败。
 
-#### 清除Volume1的配额, Bucket清除命令与此类似
+#### 清除volume和bucket的配额
 ```shell
 bin/ozone sh volume clrquota --space-quota /volume1
+bin/ozone sh bucket clrquota --space-quota /volume1/bucket1
 ```
 #### 查看volume和bucket的quota值以及usedBytes
 ```shell
