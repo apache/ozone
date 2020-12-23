@@ -58,7 +58,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
   private static final String KEY_PREFIX = "key";
 
   // Maximum time to wait for conditions involving Ratis logs.
-  private static final int LOG_WAIT_TIMEOUT_MILLIS = 120000;
+  private static final int WAIT_TIMEOUT_MILLIS = 120000;
   private final static long PREPARE_FLUSH_WAIT_TIMEOUT_SECONDS = 120L;
   private final static long PREPARE_FLUSH_INTERVAL_SECONDS = 5L;
 
@@ -110,7 +110,8 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
    * Checks that third OM received all transactions and is prepared.
    * @throws Exception
    */
-//  @Test
+  // TODO: This test should be passing after HDDS-4610 and RATIS-1241
+  // @Test
   public void testPrepareDownedOM() throws Exception {
     setup();
     // Index of the OM that will be shut down during this test.
@@ -146,7 +147,8 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     assertKeysWritten(writtenKeys, runningOms);
   }
 
-  @Test
+  // TODO: This test should be passing after HDDS-4610 and RATIS-1241
+  // @Test
   public void testPrepareWithRestart() throws Exception {
     setup();
     writeKeysAndWaitForLogs(10);
@@ -263,7 +265,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     // Make sure all OMs have logs from writing data, so we can check that
     // they are purged after prepare.
     for (OzoneManager om: ozoneManagers) {
-      LambdaTestUtils.await(LOG_WAIT_TIMEOUT_MILLIS, 1000,
+      LambdaTestUtils.await(WAIT_TIMEOUT_MILLIS, 1000,
           () -> logFilesPresentInRatisPeer(om));
     }
 
@@ -313,12 +315,19 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
   private void assertClusterPrepared(long preparedIndex,
       List<OzoneManager> ozoneManagers) throws Exception {
 
-    // Make sure the specified OMs are prepared based on their state machine
-    // index.
     for (OzoneManager om : ozoneManagers) {
-      OMTransactionInfo txnInfo = om.getMetadataManager()
-          .getTransactionInfoTable().get(TRANSACTION_INFO_KEY);
-      Assert.assertEquals(txnInfo.getTransactionIndex(), preparedIndex);
+      // Wait for each OM to be running and transaction info to match to know
+      // it is prepared.
+      LambdaTestUtils.await(WAIT_TIMEOUT_MILLIS,
+          1000, () -> {
+          if (!om.isRunning()) {
+            return false;
+          } else {
+            OMTransactionInfo txnInfo = om.getMetadataManager()
+                .getTransactionInfoTable().get(TRANSACTION_INFO_KEY);
+            return txnInfo.getTransactionIndex() == preparedIndex;
+          }
+        });
     }
 
     // Submitting a read request should pass.
@@ -342,7 +351,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
   private void assertRatisLogsCleared(List<OzoneManager> ozoneManagers)
       throws Exception {
     for (OzoneManager om: ozoneManagers) {
-      LambdaTestUtils.await(LOG_WAIT_TIMEOUT_MILLIS, 1000,
+      LambdaTestUtils.await(WAIT_TIMEOUT_MILLIS, 1000,
           () -> !logFilesPresentInRatisPeer(om));
     }
   }
