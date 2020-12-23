@@ -314,7 +314,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
    */
   private void checkQuotaInNamespace(OmVolumeArgs omVolumeArgs,
       long allocatedNamespace) throws IOException {
-    if (omVolumeArgs.getQuotaInNamespace() != OzoneConsts.QUOTA_RESET) {
+    if (omVolumeArgs.getQuotaInNamespace() > 0) {
       long usedNamespace = omVolumeArgs.getUsedNamespace();
       long quotaInNamespace = omVolumeArgs.getQuotaInNamespace();
       long toUseNamespaceInTotal = usedNamespace + allocatedNamespace;
@@ -335,10 +335,10 @@ public class OMBucketCreateRequest extends OMClientRequest {
     long volumeQuotaInBytes = omVolumeArgs.getQuotaInBytes();
 
     long totalBucketQuota = 0;
-    if (quotaInBytes == OzoneConsts.QUOTA_RESET || quotaInBytes == 0) {
-      return false;
-    } else if (quotaInBytes > OzoneConsts.QUOTA_RESET) {
+    if (quotaInBytes > 0) {
       totalBucketQuota = quotaInBytes;
+    } else {
+      return false;
     }
 
     List<OmBucketInfo>  bucketList = metadataManager.listBuckets(
