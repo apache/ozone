@@ -21,10 +21,14 @@ package org.apache.hadoop.ozone.om.request.bucket.acl;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
+import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
+import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -92,6 +96,12 @@ public class OMBucketSetAclRequest extends OMBucketAclRequest {
   }
 
   @Override
+  OzoneObjInfo getObjectInfo() {
+    return OzoneObjInfo.fromProtobuf(
+        getOmRequest().getSetAclRequest().getObj());
+  }
+
+  @Override
   OMResponse.Builder onInit() {
     return OmResponseUtil.getOMResponseBuilder(getOmRequest());
   }
@@ -114,7 +124,11 @@ public class OMBucketSetAclRequest extends OMBucketAclRequest {
 
   @Override
   void onComplete(boolean operationResult, IOException exception,
-      OMMetrics omMetrics) {
+      OMMetrics omMetrics, AuditLogger auditLogger,
+      Map<String, String> auditMap){
+    auditLog(auditLogger, buildAuditMessage(OMAction.SET_ACL, auditMap,
+        exception, getOmRequest().getUserInfo()));
+
     if (operationResult) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Set acl: {} for path: {} success!", getAcls(), getPath());

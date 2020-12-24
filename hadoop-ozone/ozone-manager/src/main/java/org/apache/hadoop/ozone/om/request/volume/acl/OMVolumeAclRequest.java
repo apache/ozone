@@ -21,6 +21,8 @@ package org.apache.hadoop.ozone.om.request.volume.acl;
 import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.scm.storage.CheckedBiFunction;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -35,9 +37,11 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 
@@ -131,7 +135,13 @@ public abstract class OMVolumeAclRequest extends OMVolumeRequest {
       }
     }
 
-    onComplete(result, exception, trxnLogIndex);
+    OzoneObjInfo obj = getObjectInfo();
+    Map<String, String> auditMap = obj.toAuditMap();
+    if (ozoneAcls != null) {
+      auditMap.put(OzoneConsts.ACL, ozoneAcls.toString());
+    }
+    onComplete(result, exception, trxnLogIndex, ozoneManager.getAuditLogger(),
+        auditMap);
 
     return omClientResponse;
   }
@@ -150,6 +160,12 @@ public abstract class OMVolumeAclRequest extends OMVolumeRequest {
    * null.
    */
   abstract String getVolumeName();
+
+  /**
+   * Get the Volume object Info from the request.
+   * @return OzoneObjInfo
+   */
+  abstract OzoneObjInfo getObjectInfo();
 
   // TODO: Finer grain metrics can be moved to these callbacks. They can also
   // be abstracted into separate interfaces in future.
@@ -184,5 +200,6 @@ public abstract class OMVolumeAclRequest extends OMVolumeRequest {
    * Usually used for logging without lock.
    * @param ex
    */
-  abstract void onComplete(Result result, IOException ex, long trxnLogIndex);
+  abstract void onComplete(Result result, IOException ex, long trxnLogIndex,
+      AuditLogger auditLogger, Map<String, String> auditMap);
 }

@@ -21,6 +21,8 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import org.apache.hadoop.hdds.scm.storage.CheckedBiFunction;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
@@ -30,12 +32,14 @@ import org.apache.hadoop.ozone.om.response.volume.OMVolumeAclOpResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Handles volume remove acl request.
@@ -92,6 +96,12 @@ public class OMVolumeRemoveAclRequest extends OMVolumeAclRequest {
   }
 
   @Override
+  OzoneObjInfo getObjectInfo() {
+    return OzoneObjInfo.fromProtobuf(
+        getOmRequest().getRemoveAclRequest().getObj());
+  }
+
+  @Override
   OMResponse.Builder onInit() {
     return OmResponseUtil.getOMResponseBuilder(getOmRequest());
   }
@@ -111,7 +121,8 @@ public class OMVolumeRemoveAclRequest extends OMVolumeAclRequest {
   }
 
   @Override
-  void onComplete(Result result, IOException ex, long trxnLogIndex) {
+  void onComplete(Result result, IOException ex, long trxnLogIndex,
+      AuditLogger auditLogger, Map<String, String> auditMap) {
     switch (result) {
     case SUCCESS:
       if (LOG.isDebugEnabled()) {
@@ -127,6 +138,8 @@ public class OMVolumeRemoveAclRequest extends OMVolumeAclRequest {
       LOG.error("Unrecognized Result for OMVolumeRemoveAclRequest: {}",
           getOmRequest());
     }
+    auditLog(auditLogger, buildAuditMessage(OMAction.REMOVE_ACL, auditMap,
+        ex, getOmRequest().getUserInfo()));
   }
 
   @Override

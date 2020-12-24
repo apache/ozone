@@ -20,9 +20,12 @@ package org.apache.hadoop.ozone.om.request.bucket.acl;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 import com.google.common.base.Optional;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -30,6 +33,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
+import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.util.BooleanBiFunction;
 import org.apache.hadoop.ozone.om.request.util.ObjectParser;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -145,9 +149,14 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
       }
     }
 
+    OzoneObjInfo obj = getObjectInfo();
+    Map<String, String> auditMap = obj.toAuditMap();
+    if (ozoneAcls != null) {
+      auditMap.put(OzoneConsts.ACL, ozoneAcls.toString());
+    }
 
-    onComplete(operationResult, exception, ozoneManager.getMetrics());
-
+    onComplete(operationResult, exception, ozoneManager.getMetrics(),
+        ozoneManager.getAuditLogger(), auditMap);
     return omClientResponse;
   }
 
@@ -163,6 +172,13 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
    * @return path name
    */
   abstract String getPath();
+
+
+  /**
+   * Get the Bucket object Info from the request.
+   * @return OzoneObjInfo
+   */
+  abstract OzoneObjInfo getObjectInfo();
 
   // TODO: Finer grain metrics can be moved to these callbacks. They can also
   // be abstracted into separate interfaces in future.
@@ -198,10 +214,11 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
    * @param operationResult
    * @param exception
    * @param omMetrics
+   * @param auditLogger
+   * @param auditMap
    */
   abstract void onComplete(boolean operationResult, IOException exception,
-      OMMetrics omMetrics);
-
-
+      OMMetrics omMetrics, AuditLogger auditLogger,
+      Map<String, String> auditMap);
 }
 
