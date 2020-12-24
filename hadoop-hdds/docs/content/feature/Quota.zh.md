@@ -43,6 +43,18 @@ menu:
  
  f. 如果volume quota被启用，那么bucket quota将不能被清除。
 
+2. 命名空间配额
+
+ 管理员应当能够定义一个Volume或Bucket可以使用多少命名空间。目前支持命名空间的配额设置为：
+
+ a. 默认情况下volume和bucket的命名空间配额不启用(即无限配额)。
+
+ b. 当volume命名空间配额启用时，该volume的bucket数目不能超过此配额。
+
+ c. 当bucket的命名空间配额启用时，该bucket的key数目不能超过此配额。
+
+ d. Linked bucket不消耗命名空间配额。
+
 ## 客户端用法
 ### Storage space级别配额
  Storage space级别配额允许使用 KB（k），MB（m），GB（g），TB（t）， PB（p）等单位。表示将使用多少个存储空间。

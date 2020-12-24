@@ -45,6 +45,18 @@ e. If the cluster is upgraded from old version less than 1.1.0, use of quota on 
 
 f. If volume's quota is enabled then bucket's quota cannot be cleared. 
 
+2. Namespace quota
+
+Administrators should be able to define how many namespace a Volume or Bucket can use. The following settings for namespace quota are supported: 
+
+a. By default, the namespace quota for volume and bucket is not enabled.
+
+b. When volume namespace quota is enabled, the total number of buckets under the volume, cannot exceed the volume namespace quota.
+
+c. When bucket namespace quota is enabled, the totoal number of keys under the bucket, cannot exceed the bucket namespace quota.
+
+d. Linked buckets do not consume namespace quota.
+
 ## Client usage
 ### Storage Space level quota
 Storage space level quotas allow the use of units such as KB (k), MB (m), GB (g), TB (t), PB (p), etc. Represents how much storage Spaces will be used.
