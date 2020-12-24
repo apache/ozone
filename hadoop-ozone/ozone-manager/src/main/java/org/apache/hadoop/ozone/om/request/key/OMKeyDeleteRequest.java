@@ -145,6 +145,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
 
       long quotaReleased = sumBlockLengths(omKeyInfo);
       omBucketInfo.incrUsedBytes(-quotaReleased);
+      omBucketInfo.incrUsedNamespace(-1L);
 
       // No need to add cache entries to delete table. As delete table will
       // be used by DeleteKeyService only, not used for any client response

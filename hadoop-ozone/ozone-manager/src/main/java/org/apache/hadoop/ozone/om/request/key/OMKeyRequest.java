@@ -590,6 +590,25 @@ public abstract class OMKeyRequest extends OMClientRequest {
   }
 
   /**
+   * Check namespace quota.
+   */
+  protected void checkBucketQuotaInNamespace(OmBucketInfo omBucketInfo,
+      long allocatedNamespace) throws IOException {
+    if (omBucketInfo.getQuotaInNamespace() > OzoneConsts.QUOTA_RESET) {
+      long usedNamespace = omBucketInfo.getUsedNamespace();
+      long quotaInNamespace = omBucketInfo.getQuotaInNamespace();
+      long toUseNamespaceInTotal = usedNamespace + allocatedNamespace;
+      if (quotaInNamespace < toUseNamespaceInTotal) {
+        throw new OMException("The namespace quota of Bucket:"
+            + omBucketInfo.getBucketName() + " exceeded: quotaInNamespace: "
+            + quotaInNamespace + " but namespace consumed: "
+            + toUseNamespaceInTotal + ".",
+            OMException.ResultCodes.QUOTA_EXCEEDED);
+      }
+    }
+  }
+
+  /**
    * Check directory exists. If exists return true, else false.
    * @param volumeName
    * @param bucketName
