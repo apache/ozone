@@ -30,14 +30,14 @@ public class ClearSpaceQuotaOptions {
 
   @CommandLine.Option(names = {"--namespace-quota"},
       description = "clear count quota")
-  private boolean clrCountQuota;
+  private boolean clrNamespaceQuota;
 
   public boolean getClrSpaceQuota() {
     return clrSpaceQuota;
   }
 
-  public boolean getClrCountQuota() {
-    return clrCountQuota;
+  public boolean getClrNamespaceQuota() {
+    return clrNamespaceQuota;
   }
 
 }

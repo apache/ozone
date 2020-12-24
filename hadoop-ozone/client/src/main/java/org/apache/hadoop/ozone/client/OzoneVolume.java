@@ -300,7 +300,7 @@ public class OzoneVolume extends WithMetadata {
    *
    * @throws IOException
    */
-  public void clearCountQuota() throws IOException {
+  public void clearNamespaceQuota() throws IOException {
     OzoneVolume ozoneVolume = proxy.getVolumeDetails(name);
     proxy.setVolumeQuota(name, QUOTA_RESET, ozoneVolume.getQuotaInBytes());
     this.quotaInBytes = ozoneVolume.getQuotaInBytes();

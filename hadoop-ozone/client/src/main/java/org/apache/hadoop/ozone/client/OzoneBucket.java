@@ -432,7 +432,7 @@ public class OzoneBucket extends WithMetadata {
    *
    * @throws IOException
    */
-  public void clearCountQuota() throws IOException {
+  public void clearNamespaceQuota() throws IOException {
     OzoneBucket ozoneBucket = proxy.getBucketDetails(volumeName, name);
     proxy.setBucketQuota(volumeName, name, QUOTA_RESET,
         ozoneBucket.getQuotaInBytes());
