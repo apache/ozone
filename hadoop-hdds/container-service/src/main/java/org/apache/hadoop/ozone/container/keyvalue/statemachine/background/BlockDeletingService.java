@@ -398,8 +398,7 @@ public class BlockDeletingService extends BackgroundService {
         Handler handler = Objects.requireNonNull(ozoneContainer.getDispatcher()
             .getHandler(container.getContainerType()));
 
-        int deleteBlockCount =
-            deleteTransactions(delBlocks, handler, blockDataTable, container);
+        deleteTransactions(delBlocks, handler, blockDataTable, container);
 
         // Once blocks are deleted... remove the blockID from blockDataTable
         // and also remove the transactions from txnTable.
@@ -421,11 +420,10 @@ public class BlockDeletingService extends BackgroundService {
           containerData.decrKeyCount(totalBlocks);
         }
 
-        if (deleteBlockCount > 0) {
-          LOG.info("Container: {}, deleted blocks: {}, task elapsed time: {}ms",
-              containerData.getContainerID(), deleteBlockCount,
-              Time.monotonicNow() - startTime);
-        }
+        LOG.info("Container: {}, deleted blocks: {}, task elapsed time: {}ms",
+            containerData.getContainerID(), totalBlocks,
+            Time.monotonicNow() - startTime);
+
         return crr;
       } catch (IOException exception) {
         LOG.warn(
@@ -435,17 +433,15 @@ public class BlockDeletingService extends BackgroundService {
       }
     }
 
-    private int deleteTransactions(List<DeletedBlocksTransaction> delBlocks,
+    private void deleteTransactions(List<DeletedBlocksTransaction> delBlocks,
         Handler handler, Table<String, BlockData> blockDataTable,
         Container container) throws IOException {
-      int deleteBlockCount = 0;
       for (DeletedBlocksTransaction entry : delBlocks) {
         for (Long blkLong : entry.getLocalIDList()) {
           String blk = blkLong.toString();
           BlockData blkInfo = blockDataTable.get(blk);
           LOG.debug("Deleting block {}", blk);
           try {
-            deleteBlockCount++;
             handler.deleteBlock(container, blkInfo);
           } catch (InvalidProtocolBufferException e) {
             LOG.error("Failed to parse block info for block {}", blk, e);
@@ -454,7 +450,6 @@ public class BlockDeletingService extends BackgroundService {
           }
         }
       }
-      return deleteBlockCount;
     }
 
     @Override
