@@ -32,10 +32,8 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ScmOps;
 import org.apache.hadoop.hdds.scm.PipelineRequestInformation;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.ScmUtils;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -46,10 +44,7 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
-import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
-import org.apache.hadoop.hdds.scm.safemode.SafeModePrecheck;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.UniqueId;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.common.BlockGroup;
@@ -72,6 +67,7 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
   // Currently only user of the block service is Ozone, CBlock manages blocks
   // by itself and does not rely on the Block service offered by SCM.
 
+  private final StorageContainerManager scm;
   private final PipelineManager pipelineManager;
   private final ContainerManagerV2 containerManager;
 
@@ -81,7 +77,6 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
   private final SCMBlockDeletingService blockDeletingService;
 
   private ObjectName mxBean;
-  private SafeModePrecheck safeModePrecheck;
   private PipelineChoosePolicy pipelineChoosePolicy;
 
   /**
@@ -94,6 +89,7 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
   public BlockManagerImpl(final ConfigurationSource conf,
                           final StorageContainerManager scm) {
     Objects.requireNonNull(scm, "SCM cannot be null");
+    this.scm = scm;
     this.pipelineManager = scm.getPipelineManager();
     this.containerManager = scm.getContainerManager();
     this.pipelineChoosePolicy = scm.getPipelineChoosePolicy();
@@ -118,7 +114,6 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
         new SCMBlockDeletingService(deletedBlockLog, containerManager,
             scm.getScmNodeManager(), scm.getEventQueue(), scm.getScmContext(),
             svcInterval, serviceTimeout, conf);
-    safeModePrecheck = new SafeModePrecheck(conf);
   }
 
   /**
@@ -158,7 +153,10 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
     if (LOG.isTraceEnabled()) {
       LOG.trace("Size : {} , type : {}, factor : {} ", size, type, factor);
     }
-    ScmUtils.preCheck(ScmOps.allocateBlock, safeModePrecheck);
+    if (scm.getScmContext().isInSafeMode()) {
+      throw new SCMException("SafeModePrecheck failed for allocateBlock",
+          SCMException.ResultCodes.SAFE_MODE_EXCEPTION);
+    }
     if (size < 0 || size > containerSize) {
       LOG.warn("Invalid block size requested : {}", size);
       throw new SCMException("Unsupported block size: " + size,
@@ -294,8 +292,10 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
   @Override
   public void deleteBlocks(List<BlockGroup> keyBlocksInfoList)
       throws IOException {
-    ScmUtils.preCheck(ScmOps.deleteBlock, safeModePrecheck);
-
+    if (scm.getScmContext().isInSafeMode()) {
+      throw new SCMException("SafeModePrecheck failed for deleteBlocks",
+          SCMException.ResultCodes.SAFE_MODE_EXCEPTION);
+    }
     Map<Long, List<Long>> containerBlocks = new HashMap<>();
     // TODO: track the block size info so that we can reclaim the container
     // TODO: used space when the block is deleted.
@@ -366,23 +366,10 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
   }
 
   /**
-   * Returns status of scm safe mode determined by SAFE_MODE_STATUS event.
-   * */
-  public boolean isScmInSafeMode() {
-    return this.safeModePrecheck.isInSafeMode();
-  }
-
-  /**
    * Get class logger.
    * */
   public static Logger getLogger() {
     return LOG;
-  }
-
-  @Override
-  public void onMessage(SafeModeStatus status,
-      EventPublisher publisher) {
-    this.safeModePrecheck.setInSafeMode(status.isInSafeMode());
   }
 
   /**

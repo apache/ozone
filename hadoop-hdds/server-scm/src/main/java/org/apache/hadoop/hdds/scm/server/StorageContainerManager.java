@@ -362,8 +362,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         (DeletedBlockLogImpl) scmBlockManager.getDeletedBlockLog());
     eventQueue.addHandler(SCMEvents.PIPELINE_ACTIONS, pipelineActionHandler);
     eventQueue.addHandler(SCMEvents.PIPELINE_REPORT, pipelineReportHandler);
-    eventQueue.addHandler(SCMEvents.SAFE_MODE_STATUS, clientProtocolServer);
-    eventQueue.addHandler(SCMEvents.SAFE_MODE_STATUS, scmBlockManager);
+    eventQueue.addHandler(SCMEvents.SAFE_MODE_STATUS, scmContext);
+    // TODO:
+    //  handle replicationManager and pipelineManager in ServiceManager
     eventQueue
         .addHandler(SCMEvents.DELAYED_SAFE_MODE_STATUS, replicationManager);
     eventQueue

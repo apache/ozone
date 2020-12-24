@@ -345,6 +345,14 @@ public class SCMSafeModeManager implements SafeModeManager {
     public boolean isPreCheckComplete() {
       return preCheckPassed;
     }
+
+    @Override
+    public String toString() {
+      return "SafeModeStatus{" +
+          "safeModeStatus=" + safeModeStatus +
+          ", preCheckPassed=" + preCheckPassed +
+          '}';
+    }
   }
 
 }

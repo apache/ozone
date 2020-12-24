@@ -54,6 +54,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerV2Impl;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
+import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventHandler;
@@ -172,9 +173,8 @@ public class TestBlockManager {
     factor = HddsProtos.ReplicationFactor.THREE;
     type = HddsProtos.ReplicationType.RATIS;
 
-
-    blockManager.onMessage(
-        new SCMSafeModeManager.SafeModeStatus(false, false), null);
+    scm.getScmContext().onMessage(
+        new SafeModeStatus(false, true), null);
   }
 
   @After
@@ -460,7 +460,7 @@ public class TestBlockManager {
 
   @Test
   public void testAllocateBlockFailureInSafeMode() throws Exception {
-    blockManager.onMessage(
+    scm.getScmContext().onMessage(
         new SCMSafeModeManager.SafeModeStatus(true, true), null);
     // Test1: In safe mode expect an SCMException.
     thrown.expectMessage("SafeModePrecheck failed for "
