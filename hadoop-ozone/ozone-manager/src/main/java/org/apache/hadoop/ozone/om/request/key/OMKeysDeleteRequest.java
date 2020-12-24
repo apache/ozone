@@ -169,6 +169,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
         quotaReleased += sumBlockLengths(omKeyInfo);
       }
       omBucketInfo.incrUsedBytes(-quotaReleased);
+      omBucketInfo.incrUsedNamespace(-1L * omKeyInfoList.size());
 
       omClientResponse = new OMKeysDeleteResponse(omResponse
           .setDeleteKeysResponse(DeleteKeysResponse.newBuilder()

@@ -935,6 +935,48 @@ public abstract class TestOzoneRpcClientAbstract {
     Assert.assertEquals(0L, volume.getUsedNamespace());
   }
 
+  @Test
+  public void testBucketUsedNamespace() throws IOException {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String key1 = UUID.randomUUID().toString();
+    String key2 = UUID.randomUUID().toString();
+    String key3 = UUID.randomUUID().toString();
+    OzoneVolume volume = null;
+    OzoneBucket bucket = null;
+
+    String value = "sample value";
+
+    store.createVolume(volumeName);
+    volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    bucket = volume.getBucket(bucketName);
+    bucket.setQuota(OzoneQuota.parseQuota(Long.MAX_VALUE + " Bytes", 2));
+
+    writeKey(bucket, key1, ONE, value, value.length());
+    Assert.assertEquals(1L,
+        store.getVolume(volumeName).getBucket(bucketName).getUsedNamespace());
+
+    writeKey(bucket, key2, ONE, value, value.length());
+    Assert.assertEquals(2L,
+        store.getVolume(volumeName).getBucket(bucketName).getUsedNamespace());
+
+    try {
+      writeKey(bucket, key3, ONE, value, value.length());
+      Assert.fail("Write key should be failed");
+    } catch (IOException ex) {
+      GenericTestUtils.assertExceptionContains("QUOTA_EXCEEDED", ex);
+    }
+
+    // Write failed, bucket usedNamespace should remain as 2
+    Assert.assertEquals(2L,
+        store.getVolume(volumeName).getBucket(bucketName).getUsedNamespace());
+
+    bucket.deleteKeys(Arrays.asList(key1, key2));
+    Assert.assertEquals(0L,
+        store.getVolume(volumeName).getBucket(bucketName).getUsedNamespace());
+  }
+
   private void writeKey(OzoneBucket bucket, String keyName,
       ReplicationFactor replication, String value, int valueLength)
       throws IOException{
