@@ -276,10 +276,23 @@ public class BlockDeletingService extends BackgroundService {
       }
     }
 
+    public boolean checkDataDir(File dataDir) {
+      boolean b = true;
+      if (!dataDir.exists() || !dataDir.isDirectory()) {
+        LOG.error("Invalid container data dir {} : "
+            + "does not exist or not a directory", dataDir.getAbsolutePath());
+        b = false;
+      }
+      return b;
+    }
+
     public ContainerBackgroundTaskResult deleteViaSchema1(
         ReferenceCountedDB meta, Container container, File dataDir,
         long startTime) throws IOException {
       ContainerBackgroundTaskResult crr = new ContainerBackgroundTaskResult();
+      if (!checkDataDir(dataDir)) {
+        return crr;
+      }
       try {
         Table<String, BlockData> blockDataTable =
             meta.getStore().getBlockDataTable();
@@ -297,11 +310,6 @@ public class BlockDeletingService extends BackgroundService {
         List<String> succeedBlocks = new LinkedList<>();
         LOG.debug("Container : {}, To-Delete blocks : {}",
             containerData.getContainerID(), toDeleteBlocks.size());
-        if (!dataDir.exists() || !dataDir.isDirectory()) {
-          LOG.error("Invalid container data dir {} : "
-              + "does not exist or not a directory", dataDir.getAbsolutePath());
-          return crr;
-        }
 
         Handler handler = Objects.requireNonNull(ozoneContainer.getDispatcher()
             .getHandler(container.getContainerType()));
@@ -353,6 +361,9 @@ public class BlockDeletingService extends BackgroundService {
         ReferenceCountedDB meta, Container container, File dataDir,
         long startTime) throws IOException {
       ContainerBackgroundTaskResult crr = new ContainerBackgroundTaskResult();
+      if (!checkDataDir(dataDir)) {
+        return crr;
+      }
       try {
         Table<String, BlockData> blockDataTable =
             meta.getStore().getBlockDataTable();
@@ -378,21 +389,17 @@ public class BlockDeletingService extends BackgroundService {
             LOG.debug("No transaction found in container : {}",
                 containerData.getContainerID());
           }
+          return crr;
         }
 
         LOG.debug("Container : {}, To-Delete blocks : {}",
             containerData.getContainerID(), delBlocks.size());
-        if (!dataDir.exists() || !dataDir.isDirectory()) {
-          LOG.error("Invalid container data dir {} : "
-              + "does not exist or not a directory", dataDir.getAbsolutePath());
-          return crr;
-        }
 
         Handler handler = Objects.requireNonNull(ozoneContainer.getDispatcher()
             .getHandler(container.getContainerType()));
 
         int deleteBlockCount =
-            deleteTransaction(delBlocks, handler, blockDataTable, container);
+            deleteTransactions(delBlocks, handler, blockDataTable, container);
 
         // Once blocks are deleted... remove the blockID from blockDataTable
         // and also remove the transactions from txnTable.
@@ -404,14 +411,14 @@ public class BlockDeletingService extends BackgroundService {
               String bID = blk.toString();
               meta.getStore().getBlockDataTable().deleteWithBatch(batch, bID);
             }
-            meta.getStore().getBatchHandler().commitBatchOperation(batch);
           }
+          meta.getStore().getBatchHandler().commitBatchOperation(batch);
           containerData.updateAndCommitDBCounters(meta, batch,
-              deleteBlockCount);
+              totalBlocks);
           // update count of pending deletion blocks and block count in
           // in-memory container status.
-          containerData.decrPendingDeletionBlocks(deleteBlockCount);
-          containerData.decrKeyCount(deleteBlockCount);
+          containerData.decrPendingDeletionBlocks(totalBlocks);
+          containerData.decrKeyCount(totalBlocks);
         }
 
         if (deleteBlockCount > 0) {
@@ -428,7 +435,7 @@ public class BlockDeletingService extends BackgroundService {
       }
     }
 
-    private int deleteTransaction(List<DeletedBlocksTransaction> delBlocks,
+    private int deleteTransactions(List<DeletedBlocksTransaction> delBlocks,
         Handler handler, Table<String, BlockData> blockDataTable,
         Container container) throws IOException {
       int deleteBlockCount = 0;
@@ -438,8 +445,8 @@ public class BlockDeletingService extends BackgroundService {
           BlockData blkInfo = blockDataTable.get(blk);
           LOG.debug("Deleting block {}", blk);
           try {
-            handler.deleteBlock(container, blkInfo);
             deleteBlockCount++;
+            handler.deleteBlock(container, blkInfo);
           } catch (InvalidProtocolBufferException e) {
             LOG.error("Failed to parse block info for block {}", blk, e);
           } catch (IOException e) {

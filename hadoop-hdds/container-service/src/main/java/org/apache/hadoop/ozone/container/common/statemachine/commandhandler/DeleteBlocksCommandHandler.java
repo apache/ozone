@@ -262,8 +262,6 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
             // use an atomic update to change its state to deleting.
             blockDataTable.putWithBatch(batch, deletingKey, blkInfo);
             blockDataTable.deleteWithBatch(batch, blk);
-            containerDB.getStore().getBatchHandler()
-                .commitBatchOperation(batch);
             newDeletionBlocks++;
             if (LOG.isDebugEnabled()) {
               LOG.debug("Transited Block {} to DELETING state in container {}",
@@ -278,6 +276,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
         }
         updateMetaData(containerData, delTX, newDeletionBlocks, containerDB,
             batch);
+        containerDB.getStore().getBatchHandler().commitBatchOperation(batch);
       } catch (IOException e) {
         // if some blocks failed to delete, we fail this TX,
         // without sending this ACK to SCM, SCM will resend the TX
