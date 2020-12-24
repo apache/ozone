@@ -1,3 +1,19 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with this
+ * work for additional information regarding copyright ownership.  The ASF
+ * licenses this file to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations under
+ * the License.
+ */
 package org.apache.hadoop.ozone.om;
 
 import com.google.protobuf.RpcController;
@@ -37,6 +53,8 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 public class TrashOzoneFileSystem extends FileSystem {
 
   private static final RpcController NULL_RPC_CONTROLLER = null;
+
+  private static final int OZONE_FS_ITERATE_BATCH_SIZE = 100;
 
   private OzoneManager ozoneManager;
 
@@ -200,7 +218,8 @@ public class TrashOzoneFileSystem extends FileSystem {
   @Override
   public boolean exists(Path f) throws IOException {
     try {
-      return this.getFileStatus(f) != null;
+      this.getFileStatus(f);
+      return true;
     } catch (FileNotFoundException var3) {
       LOG.info("Couldn't execute getFileStatus()"  + var3);
       return false;
@@ -249,7 +268,6 @@ public class TrashOzoneFileSystem extends FileSystem {
       LOG.trace("Iterating path: {}", path);
       List<String> keyPathList = new ArrayList<>();
       //hardcoded make it read from conf
-      int batchSize = 100;
       if (status.isDirectory()) {
         LOG.trace("Iterating directory: {}", pathKey);
         OFSPath ofsPath = new OFSPath(pathKey);
@@ -264,7 +282,7 @@ public class TrashOzoneFileSystem extends FileSystem {
               && kv.getKey().startsWith("/" + pathKey)) {
             keyPathList.add(keyPath);
           }
-          if (keyPathList.size() >= batchSize) {
+          if (keyPathList.size() >= OZONE_FS_ITERATE_BATCH_SIZE) {
             if (!processKeyPath(keyPathList)) {
               return false;
             } else {
@@ -300,8 +318,6 @@ public class TrashOzoneFileSystem extends FileSystem {
       this.srcPath = pathToKey(srcPath);
       this.dstPath = pathToKey(dstPath);
       LOG.trace("rename from:{} to:{}", this.srcPath, this.dstPath);
-      // Initialize bucket here to reduce number of RPC calls
-      // TODO: Refactor later.
     }
 
     @Override
@@ -355,9 +371,6 @@ public class TrashOzoneFileSystem extends FileSystem {
           && listStatus(f).length != 0) {
         throw new PathIsNotEmptyDirectoryException(f.toString());
       }
-      // Initialize bucket here to reduce number of RPC calls
-      OFSPath ofsPath = new OFSPath(f);
-      // TODO: Refactor later.
     }
 
     @Override
