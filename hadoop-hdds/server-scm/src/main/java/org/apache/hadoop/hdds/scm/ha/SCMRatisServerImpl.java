@@ -206,7 +206,8 @@ public class SCMRatisServerImpl implements SCMRatisServer {
         RaftPeerId peerId = RaftPeerId.getRaftPeerId(nodeId);
 
         String host = hosts.get(i);
-        if (InetAddress.getByName(host).equals(localHost)) {
+        if (InetAddress.getByName(host).equals(localHost)
+            || host.toLowerCase().equals("localhost")) {
           selfPeerId = peerId;
         }
 
