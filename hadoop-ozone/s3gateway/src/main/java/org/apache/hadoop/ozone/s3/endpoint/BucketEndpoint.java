@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.s3.endpoint;
 
-import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;

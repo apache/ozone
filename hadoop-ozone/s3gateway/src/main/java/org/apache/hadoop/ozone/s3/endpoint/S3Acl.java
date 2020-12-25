@@ -249,27 +249,27 @@ public final class S3Acl {
     }
     BitSet acls = new BitSet(IAccessAuthorizer.ACLType.getNoOfAcls());
     switch (permissionType) {
-      case FULL_CONTROL:
-        acls.set(IAccessAuthorizer.ACLType.ALL.ordinal());
-        break;
-      case WRITE_ACP:
-        acls.set(IAccessAuthorizer.ACLType.WRITE_ACL.ordinal());
-        break;
-      case READ_ACP:
-        acls.set(IAccessAuthorizer.ACLType.READ_ACL.ordinal());
-        break;
-      case WRITE:
-        acls.set(IAccessAuthorizer.ACLType.WRITE.ordinal());
-        acls.set(IAccessAuthorizer.ACLType.DELETE.ordinal());
-        acls.set(IAccessAuthorizer.ACLType.CREATE.ordinal());
-        break;
-      case READ:
-        acls.set(IAccessAuthorizer.ACLType.READ.ordinal());
-        acls.set(IAccessAuthorizer.ACLType.LIST.ordinal());
-        break;
-      default:
-        LOG.error("Failed to recognize S3 permission {}", permission);
-        throw S3ErrorTable.newError(INVALID_ARGUMENT, permission);
+    case FULL_CONTROL:
+      acls.set(IAccessAuthorizer.ACLType.ALL.ordinal());
+      break;
+    case WRITE_ACP:
+      acls.set(IAccessAuthorizer.ACLType.WRITE_ACL.ordinal());
+      break;
+    case READ_ACP:
+      acls.set(IAccessAuthorizer.ACLType.READ_ACL.ordinal());
+      break;
+    case WRITE:
+      acls.set(IAccessAuthorizer.ACLType.WRITE.ordinal());
+      acls.set(IAccessAuthorizer.ACLType.DELETE.ordinal());
+      acls.set(IAccessAuthorizer.ACLType.CREATE.ordinal());
+      break;
+    case READ:
+      acls.set(IAccessAuthorizer.ACLType.READ.ordinal());
+      acls.set(IAccessAuthorizer.ACLType.LIST.ordinal());
+      break;
+    default:
+      LOG.error("Failed to recognize S3 permission {}", permission);
+      throw S3ErrorTable.newError(INVALID_ARGUMENT, permission);
     }
     return acls;
   }
@@ -313,24 +313,24 @@ public final class S3Acl {
       throw S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, permission);
     }
     switch (permissionType) {
-      case FULL_CONTROL:
-        acls.set(IAccessAuthorizer.ACLType.ALL.ordinal());
-        break;
-      case WRITE_ACP:
-        acls.set(IAccessAuthorizer.ACLType.WRITE.ordinal());
-        break;
-      case READ_ACP:
-        acls.set(IAccessAuthorizer.ACLType.READ.ordinal());
-        break;
-      case WRITE:
-        acls.set(IAccessAuthorizer.ACLType.WRITE.ordinal());
-        break;
-      case READ:
-        acls.set(IAccessAuthorizer.ACLType.READ.ordinal());
-        break;
-      default:
-        LOG.error("Failed to recognize S3 permission {}", permission);
-        throw S3ErrorTable.newError(INVALID_ARGUMENT, permission);
+    case FULL_CONTROL:
+      acls.set(IAccessAuthorizer.ACLType.ALL.ordinal());
+      break;
+    case WRITE_ACP:
+      acls.set(IAccessAuthorizer.ACLType.WRITE.ordinal());
+      break;
+    case READ_ACP:
+      acls.set(IAccessAuthorizer.ACLType.READ.ordinal());
+      break;
+    case WRITE:
+      acls.set(IAccessAuthorizer.ACLType.WRITE.ordinal());
+      break;
+    case READ:
+      acls.set(IAccessAuthorizer.ACLType.READ.ordinal());
+      break;
+    default:
+      LOG.error("Failed to recognize S3 permission {}", permission);
+      throw S3ErrorTable.newError(INVALID_ARGUMENT, permission);
     }
     return acls;
   }
