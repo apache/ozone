@@ -88,7 +88,7 @@ public class BucketEndpoint extends EndpointBase {
   @GET
   @SuppressFBWarnings
   @SuppressWarnings("parameternumber")
-  public Response list(
+  public Response get(
       @PathParam("bucket") String bucketName,
       @QueryParam("delimiter") String delimiter,
       @QueryParam("encoding-type") String encodingType,
@@ -99,7 +99,13 @@ public class BucketEndpoint extends EndpointBase {
       @QueryParam("continuation-token") String continueToken,
       @QueryParam("start-after") String startAfter,
       @QueryParam("uploads") String uploads,
+      @QueryParam("acl") String aclMarker,
       @Context HttpHeaders hh) throws OS3Exception, IOException {
+
+    if (aclMarker != null) {
+      S3BucketAcl result = getAcl(bucketName);
+      return Response.ok(result, MediaType.APPLICATION_XML_TYPE).build();
+    }
 
     if (browser != null) {
       InputStream browserPage = getClass()
@@ -375,47 +381,38 @@ public class BucketEndpoint extends EndpointBase {
    * <p>
    * see: https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketAcl.html
    */
-  @GET
-  @Produces(MediaType.APPLICATION_XML)
-  public S3BucketAcl get(
-      @PathParam("bucket") String bucketName,
-      @QueryParam("acl") String aclMarker,
-      @Context HttpServletRequest servletRequest)
+  public S3BucketAcl getAcl(String bucketName)
       throws OS3Exception, IOException {
-    if (aclMarker != null) {
-      S3BucketAcl result = new S3BucketAcl();
-      try {
-        OzoneBucket bucket = getBucket(bucketName);
-        OzoneVolume volume = getVolume();
-        S3Owner owner = new S3Owner(volume.getOwner(), volume.getOwner());
-        result.setOwner(owner);
-        // Use set to remove ACLs with different scopes(ACCESS and DEFAULT)
-        Set<Grant> grantSet = new HashSet<>();
-        // Return ACL list
-        for (OzoneAcl acl : bucket.getAcls()) {
-          List<Grant> grants = S3Acl.ozoneNativeAclToS3Acl(acl);
-          grantSet.addAll(grants);
-        }
-        ArrayList<Grant> grantList = new ArrayList<>();
-        grantList.addAll(grantSet);
-        result.setAclList(
-            new S3BucketAcl.AccessControlList(grantList));
-        return result;
-      } catch (OMException ex) {
-        if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
-          throw S3ErrorTable.newError(S3ErrorTable
-              .NO_SUCH_BUCKET, bucketName);
-        } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
-          throw S3ErrorTable.newError(S3ErrorTable
-              .ACCESS_DENIED, bucketName);
-        } else {
-          LOG.error("Failed to get acl of Bucket " + bucketName, ex);
-          throw S3ErrorTable.newError(S3ErrorTable.INTERNAL_ERROR, bucketName);
-        }
+    S3BucketAcl result = new S3BucketAcl();
+    try {
+      OzoneBucket bucket = getBucket(bucketName);
+      OzoneVolume volume = getVolume();
+      S3Owner owner = new S3Owner(volume.getOwner(), volume.getOwner());
+      result.setOwner(owner);
+      // Use set to remove ACLs with different scopes(ACCESS and DEFAULT)
+      Set<Grant> grantSet = new HashSet<>();
+      // Return ACL list
+      for (OzoneAcl acl : bucket.getAcls()) {
+        List<Grant> grants = S3Acl.ozoneNativeAclToS3Acl(acl);
+        grantSet.addAll(grants);
+      }
+      ArrayList<Grant> grantList = new ArrayList<>();
+      grantList.addAll(grantSet);
+      result.setAclList(
+          new S3BucketAcl.AccessControlList(grantList));
+      return result;
+    } catch (OMException ex) {
+      if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
+        throw S3ErrorTable.newError(S3ErrorTable
+            .NO_SUCH_BUCKET, bucketName);
+      } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
+        throw S3ErrorTable.newError(S3ErrorTable
+            .ACCESS_DENIED, bucketName);
+      } else {
+        LOG.error("Failed to get acl of Bucket " + bucketName, ex);
+        throw S3ErrorTable.newError(S3ErrorTable.INTERNAL_ERROR, bucketName);
       }
     }
-    throw S3ErrorTable.newError(NOT_IMPLEMENTED,
-        servletRequest.getRequestURI());
   }
 
   /**
