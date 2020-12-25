@@ -428,7 +428,7 @@ public class OzoneBucket extends WithMetadata {
   }
 
   /**
-   * Clean the count quota of the bucket.
+   * Clean the namespace quota of the bucket.
    *
    * @throws IOException
    */

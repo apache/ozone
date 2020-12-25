@@ -296,7 +296,7 @@ public class OzoneVolume extends WithMetadata {
   }
 
   /**
-   * Clean the count quota of the volume.
+   * Clean the namespace quota of the volume.
    *
    * @throws IOException
    */
