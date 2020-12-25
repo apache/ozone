@@ -76,7 +76,8 @@ public final class RatisUtil {
                                        final ConfigurationSource conf) {
     String storageDir = haConf.getRatisStorageDir();
     if (Strings.isNullOrEmpty(storageDir)) {
-      storageDir = ServerUtils.getDefaultRatisDirectory(conf);
+      File metaDirPath = ServerUtils.getOzoneMetaDirPath(conf);
+      storageDir = (new File(metaDirPath, "scm-ha")).getPath();
     }
     RaftServerConfigKeys.setStorageDir(properties,
         Collections.singletonList(new File(storageDir)));
@@ -100,9 +101,9 @@ public final class RatisUtil {
     Rpc.setRequestTimeout(properties, TimeDuration.valueOf(
         conf.getRatisRequestTimeout(), TimeUnit.MILLISECONDS));
     Rpc.setTimeoutMin(properties, TimeDuration.valueOf(
-        conf.getRatisRequestMinTimeout(), TimeUnit.MILLISECONDS));
+        conf.getLeaderElectionMinTimeout(), TimeUnit.MILLISECONDS));
     Rpc.setTimeoutMax(properties, TimeDuration.valueOf(
-        conf.getRatisRequestMaxTimeout(), TimeUnit.MILLISECONDS));
+        conf.getLeaderElectionMaxTimeout(), TimeUnit.MILLISECONDS));
     Rpc.setSlownessTimeout(properties, TimeDuration.valueOf(
         conf.getRatisNodeFailureTimeout(), TimeUnit.MILLISECONDS));
   }
