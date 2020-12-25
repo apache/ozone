@@ -55,6 +55,8 @@ menu:
 
  d. Linked bucket不消耗命名空间配额。
 
+ e. 如果集群从小于1.1.0的旧版本升级而来，则不建议在旧volume和bucket(可以通过查看volume或者bucket的info确认，如果quota值是-2，那么这个volume或者bucket就是旧的)上使用配额。由于旧的key没有计算到bucket的命名空间配额中，所以此时配额设置是不准确的。
+
 ## 客户端用法
 ### Storage space级别配额
  Storage space级别配额允许使用 KB（k），MB（m），GB（g），TB（t）， PB（p）等单位。表示将使用多少个存储空间。
@@ -82,10 +84,35 @@ bin/ozone sh bucket setquota  --space-quota 10GB /volume1/bucket1
 
 bucket的总配额 不应大于其Volume的配额。让我们看一个例子，如果我们有一个10MB的Volume，该volume下所有bucket的大小之和不能超过10MB，否则设置bucket quota将失败。
 
+### Namespace quota
+命名空间配额是一个数字，其代表由多少个名字能够使用。这个数字不能超过Java long数据类型的最大值。
+
+#### Volume Namespace quota
+```shell
+bin/ozone sh volume create --namespace-quota 100 /volume1
+```
+这意味着将volume1的命名空间配额设置为100。
+
+```shell
+bin/ozone sh volume setquota --namespace-quota 1000 /volume1
+```
+此行为将volume1的命名空间配额更改为1000。
+
+#### Bucket Namespace quota
+```shell
+bin/ozone sh bucket create --namespace-quota 100 /volume1/bucket1
+```
+这意味着bucket1允许我们使用100的命名空间。
+
+```shell
+bin/ozone sh bucket setquota --namespace-quota 1000 /volume1/bucket1 
+```
+该行为将bucket1的命名空间配额更改为1000。
+
 #### 清除volume和bucket的配额
 ```shell
-bin/ozone sh volume clrquota --space-quota /volume1
-bin/ozone sh bucket clrquota --space-quota /volume1/bucket1
+bin/ozone sh volume clrquota --space-quota --namespace-quota /volume1
+bin/ozone sh bucket clrquota --space-quota --namespace-quota /volume1/bucket1
 ```
 #### 查看volume和bucket的quota值以及usedBytes
 ```shell
