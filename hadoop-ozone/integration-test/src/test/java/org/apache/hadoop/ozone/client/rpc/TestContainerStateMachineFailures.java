@@ -140,7 +140,7 @@ public class TestContainerStateMachineFailures {
     conf.setQuietMode(false);
     cluster =
         MiniOzoneCluster.newBuilder(conf).setNumDatanodes(10).setHbInterval(200)
-            .build();
+            .setUseMockSCMHAManager(true).build();
     cluster.waitForClusterToBeReady();
     cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.ONE, 60000);
     //the easiest way to create an open container is creating a key

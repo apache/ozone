@@ -121,6 +121,7 @@ public class TestDecommissionAndMaintenance {
 
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(numOfDatanodes)
+        .setUseMockSCMHAManager(true)
         .build();
     cluster.waitForClusterToBeReady();
     setManagers();

@@ -110,6 +110,7 @@ public class TestOzoneClientRetriesOnExceptionFlushDelay {
         .setStreamBufferFlushSize(flushSize)
         .setStreamBufferMaxSize(maxFlushSize)
         .setStreamBufferSizeUnit(StorageUnit.BYTES)
+        .setUseMockSCMHAManager(true)
         .build();
     cluster.waitForClusterToBeReady();
     //the easiest way to create an open container is creating a key
