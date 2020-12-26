@@ -169,17 +169,21 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       throws TimeoutException, InterruptedException {
     GenericTestUtils.waitFor(() -> {
       final int healthy = scm.getNodeCount(HEALTHY);
+      // When SCM HA is not enabled, scm is always leader.
+      final boolean checkScmLeader = scm.checkLeader();
       final boolean isNodeReady = healthy == hddsDatanodes.size();
       final boolean exitSafeMode = !scm.isInSafeMode();
 
       LOG.info("{}. Got {} of {} DN Heartbeats.",
           isNodeReady ? "Nodes are ready" : "Waiting for nodes to be ready",
           healthy, hddsDatanodes.size());
+      LOG.info(checkScmLeader ? "SCM became leader" :
+          "SCM has not become leader");
       LOG.info(exitSafeMode ? "Cluster exits safe mode" :
               "Waiting for cluster to exit safe mode",
           healthy, hddsDatanodes.size());
 
-      return isNodeReady && exitSafeMode;
+      return isNodeReady && exitSafeMode && checkScmLeader;
     }, 1000, waitForClusterToBeReadyTimeout);
   }
 
