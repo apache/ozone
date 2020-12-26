@@ -24,6 +24,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.OptionalInt;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
@@ -200,6 +201,11 @@ public class SCMRatisServerImpl implements SCMRatisServer {
               .map(scmName -> HddsUtils.getHostName(scmName).get())
               .collect(Collectors.toList());
 
+      List<OptionalInt> ports =
+          Arrays.stream(conf.getTrimmedStrings(ScmConfigKeys.OZONE_SCM_NAMES))
+              .map(scmName -> HddsUtils.getHostPort(scmName))
+              .collect(Collectors.toList());
+
       final List<RaftPeer> raftPeers = new ArrayList<>();
       for (int i = 0; i < hosts.size(); ++i) {
         String nodeId = "scm" + i;
@@ -211,9 +217,11 @@ public class SCMRatisServerImpl implements SCMRatisServer {
           selfPeerId = peerId;
         }
 
+        int p = ports.get(i).isPresent() ? ports.get(i).getAsInt() : port;
+
         raftPeers.add(RaftPeer.newBuilder()
             .setId(peerId)
-            .setAddress(host + ":" + port)
+            .setAddress(host + ":" + p)
             .build());
       }
 

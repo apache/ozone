@@ -38,7 +38,7 @@ public class SCMHAConfiguration {
 
   @Config(key = "ratis.storage.dir",
       type = ConfigType.STRING,
-      defaultValue = "",
+      defaultValue = "scm-ratis",
       tags = {OZONE, SCM, HA, RATIS},
       description = "Storage directory used by SCM to write Ratis logs."
   )
@@ -163,6 +163,10 @@ public class SCMHAConfiguration {
 
   public String getRatisStorageDir() {
     return ratisStorageDir;
+  }
+
+  public void setRatisStorageDir(String dir) {
+    this.ratisStorageDir = dir;
   }
 
   public InetSocketAddress getRatisBindAddress() {

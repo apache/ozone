@@ -475,7 +475,7 @@ public final class TestUtils {
   public static StorageContainerManager getScmSimple(OzoneConfiguration conf)
       throws IOException, AuthenticationException {
     SCMConfigurator configurator = new SCMConfigurator();
-    conf.set(ScmConfigKeys.OZONE_SCM_NAMES, "localhost");
+    conf.set(ScmConfigKeys.OZONE_SCM_NAMES, "localhost:0");
 //    configurator.setSCMHAManager(MockSCMHAManager.getInstance(true));
     return StorageContainerManager.createSCM(conf, configurator);
   }

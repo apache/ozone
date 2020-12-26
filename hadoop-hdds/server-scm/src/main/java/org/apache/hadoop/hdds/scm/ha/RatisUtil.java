@@ -77,6 +77,10 @@ public final class RatisUtil {
     String storageDir = haConf.getRatisStorageDir();
     if (Strings.isNullOrEmpty(storageDir)) {
       storageDir = ServerUtils.getDefaultRatisDirectory(conf);
+    } else {
+      storageDir =
+          (new File(ServerUtils.getOzoneMetaDirPath(conf), storageDir))
+              .getPath();
     }
     RaftServerConfigKeys.setStorageDir(properties,
         Collections.singletonList(new File(storageDir)));
