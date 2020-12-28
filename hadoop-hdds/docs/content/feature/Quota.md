@@ -87,6 +87,19 @@ This behavior changes the quota for Bucket1 to 10GB
 
 Total bucket quota should not be greater than its Volume quota. If we have a 10MB Volume, The sum of the sizes of all buckets under this volume cannot exceed 10MB, otherwise the bucket set quota fails.
 
+#### Clear the quota for volume and bucket
+```shell
+bin/ozone sh volume clrquota --space-quota /volume1
+bin/ozone sh bucket clrquota --space-quota /volume1/bucket1
+```
+
+#### Check quota and usedBytes for volume and bucket
+```shell
+bin/ozone sh volume info /volume1
+bin/ozone sh bucket info /volume1/bucket1
+```
+We can get the quota value and usedBytes in the info of volume and bucket.
+
 ### Namespace quota
 Namespace quota is a number that represents how many unique names can be used. This number cannot be greater than LONG.MAX_VALUE in Java.
 
@@ -114,13 +127,13 @@ This behavior changes the quota for Bucket1 to 1000.
 
 #### Clear the quota for volume and bucket
 ```shell
-bin/ozone sh volume clrquota --space-quota --namespace-quota /volume1
-bin/ozone sh bucket clrquota --space-quota --namespace-quota /volume1/bucket1
+bin/ozone sh volume clrquota --namespace-quota /volume1
+bin/ozone sh bucket clrquota --namespace-quota /volume1/bucket1
 ```
 
-#### Check quota and usedBytes for volume and bucket
+#### Check quota and usedNamespace for volume and bucket
 ```shell
 bin/ozone sh volume info /volume1
 bin/ozone sh bucket info /volume1/bucket1
 ```
-We can get the quota value and usedBytes in the info of volume and bucket.
+We can get the quota value and usedNamespace in the info of volume and bucket.

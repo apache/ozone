@@ -84,6 +84,18 @@ bin/ozone sh bucket setquota  --space-quota 10GB /volume1/bucket1
 
 bucket的总配额 不应大于其Volume的配额。让我们看一个例子，如果我们有一个10MB的Volume，该volume下所有bucket的大小之和不能超过10MB，否则设置bucket quota将失败。
 
+#### 清除volume和bucket的配额
+```shell
+bin/ozone sh volume clrquota --space-quota /volume1
+bin/ozone sh bucket clrquota --space-quota /volume1/bucket1
+```
+#### 查看volume和bucket的quota值以及usedBytes
+```shell
+bin/ozone sh volume info /volume1
+bin/ozone sh bucket info /volume1/bucket1
+```
+我们能够在volume和bucket的info中查看quota及usedBytes的值
+
 ### Namespace quota
 命名空间配额是一个数字，其代表由多少个名字能够使用。这个数字不能超过Java long数据类型的最大值。
 
@@ -111,12 +123,12 @@ bin/ozone sh bucket setquota --namespace-quota 1000 /volume1/bucket1
 
 #### 清除volume和bucket的配额
 ```shell
-bin/ozone sh volume clrquota --space-quota --namespace-quota /volume1
-bin/ozone sh bucket clrquota --space-quota --namespace-quota /volume1/bucket1
+bin/ozone sh volume clrquota --namespace-quota /volume1
+bin/ozone sh bucket clrquota --namespace-quota /volume1/bucket1
 ```
-#### 查看volume和bucket的quota值以及usedBytes
+#### 查看volume和bucket的quota值以及usedNamespace
 ```shell
 bin/ozone sh volume info /volume1
 bin/ozone sh bucket info /volume1/bucket1
 ```
-我们能够在volume和bucket的info中查看quota及usedBytes的值
+我们能够在volume和bucket的info中查看quota及usedNamespace的值
