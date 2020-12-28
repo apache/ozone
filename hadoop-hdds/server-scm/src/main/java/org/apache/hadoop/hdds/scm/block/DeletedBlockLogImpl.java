@@ -130,15 +130,6 @@ public class DeletedBlockLogImpl
       try {
         DeletedBlocksTransaction block =
             scmMetadataStore.getDeletedBlocksTXTable().get(txID);
-        if (block == null) {
-          if (LOG.isDebugEnabled()) {
-            // This can occur due to race condition between retry and old
-            // service task where old task removes the transaction and the new
-            // task is resending
-            LOG.debug("Deleted TXID {} not found.", txID);
-          }
-          continue;
-        }
         DeletedBlocksTransaction.Builder builder = block.toBuilder();
         int currentCount = block.getCount();
         if (currentCount > -1) {
