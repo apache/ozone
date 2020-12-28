@@ -315,14 +315,14 @@ public abstract class TestOzoneRpcClientAbstract {
     Assert.assertEquals(1000L, ozoneBucket.getQuotaInNamespace());
 
     store.getVolume(volumeName).clearSpaceQuota();
-    store.getVolume(volumeName).clearCountQuota();
+    store.getVolume(volumeName).clearNamespaceQuota();
     OzoneVolume clrVolume = store.getVolume(volumeName);
     Assert.assertEquals(OzoneConsts.QUOTA_RESET, clrVolume.getQuotaInBytes());
     Assert.assertEquals(OzoneConsts.QUOTA_RESET,
         clrVolume.getQuotaInNamespace());
 
     ozoneBucket.clearSpaceQuota();
-    ozoneBucket.clearCountQuota();
+    ozoneBucket.clearNamespaceQuota();
     OzoneBucket clrBucket = store.getVolume(volumeName).getBucket(bucketName);
     Assert.assertEquals(OzoneConsts.QUOTA_RESET, clrBucket.getQuotaInBytes());
     Assert.assertEquals(OzoneConsts.QUOTA_RESET,
