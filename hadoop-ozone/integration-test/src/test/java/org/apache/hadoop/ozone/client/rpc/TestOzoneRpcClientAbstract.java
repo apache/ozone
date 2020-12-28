@@ -318,10 +318,6 @@ public abstract class TestOzoneRpcClientAbstract {
         " spaceQuota because volume spaceQuota is not cleared.",
         () -> ozoneBucket.clearSpaceQuota());
 
-    LambdaTestUtils.intercept(IOException.class, "Can not clear bucket" +
-        " namespaceQuota because volume namespaceQuota is not cleared.",
-        () -> ozoneBucket.clearCountQuota());
-
     store.getVolume(volumeName).clearSpaceQuota();
     store.getVolume(volumeName).clearNamespaceQuota();
     OzoneVolume clrVolume = store.getVolume(volumeName);

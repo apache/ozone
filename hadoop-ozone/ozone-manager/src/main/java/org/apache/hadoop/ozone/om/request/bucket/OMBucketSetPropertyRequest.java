@@ -266,15 +266,8 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
   }
 
   public boolean checkQuotaNamespaceValid(OmVolumeArgs omVolumeArgs,
-      OmBucketArgs omBucketArgs) throws IOException{
+      OmBucketArgs omBucketArgs) {
     long quotaInNamespace = omBucketArgs.getQuotaInNamespace();
-
-    if (quotaInNamespace == OzoneConsts.QUOTA_RESET &&
-        omVolumeArgs.getQuotaInNamespace() != OzoneConsts.QUOTA_RESET) {
-      throw new OMException("Can not clear bucket namespaceQuota because" +
-          " volume namespaceQuota is not cleared.",
-          OMException.ResultCodes.QUOTA_ERROR);
-    }
 
     if ((quotaInNamespace <= 0
          && quotaInNamespace != OzoneConsts.QUOTA_RESET)) {
