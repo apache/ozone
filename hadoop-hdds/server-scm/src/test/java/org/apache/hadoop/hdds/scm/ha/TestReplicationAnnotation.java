@@ -18,7 +18,7 @@ package org.apache.hadoop.hdds.scm.ha;
 
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
-import org.apache.ratis.protocol.exceptions.NotLeaderException;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -30,19 +30,23 @@ public class TestReplicationAnnotation {
 
   @Before
   public void setup() {
+    SCMHAManager mock = MockSCMHAManager.getInstance(true);
+    TestReplicationAnnotation testReplicationAnnotation =
+        new TestReplicationAnnotation();
     scmhaInvocationHandler = new SCMHAInvocationHandler(
         RequestType.CONTAINER,
-        null,
-        new MockRatisServer());
+        testReplicationAnnotation,
+        mock.getRatisServer());
   }
 
-  @Test(expected = NotLeaderException.class)
+  @Test
   public void testReplicateAnnotationBasic() throws Throwable {
     // test whether replicatedOperation will hit the Ratis based replication
-    // code path in SCMHAInvocationHandler. Expect to see a NotLeaderException
-    // cause that is what MockRatisServer process such request.
-    scmhaInvocationHandler.invoke(new Object(),
-        this.getClass().getMethod("replicatedOperation"), new Object[0]);
+    // code path in SCMHAInvocationHandler. The invoke() can return means the
+    // request is handled properly thus response is successfully. Expected
+    // result is null because replicatedOperation returns nothing.
+    Assert.assertEquals(null, scmhaInvocationHandler.invoke(new Object(),
+        this.getClass().getMethod("replicatedOperation"), new Object[0]));
   }
 
   @Replicate
