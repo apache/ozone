@@ -318,6 +318,8 @@ enum Status {
 
     QUOTA_EXCEEDED = 66;
 
+    QUOTA_ERROR = 67;
+
 }
 
 /**
