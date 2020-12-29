@@ -181,79 +181,46 @@ public final class PipelineManagerV2Impl implements PipelineManager {
   @Override
   public Pipeline getPipeline(PipelineID pipelineID)
       throws PipelineNotFoundException {
-    lock.readLock().lock();
-    try {
-      return stateManager.getPipeline(pipelineID);
-    } finally {
-      lock.readLock().unlock();
-    }
+    return stateManager.getPipeline(pipelineID);
   }
 
   @Override
   public boolean containsPipeline(PipelineID pipelineID) {
-    lock.readLock().lock();
     try {
       getPipeline(pipelineID);
       return true;
     } catch (PipelineNotFoundException e) {
       return false;
-    } finally {
-      lock.readLock().unlock();
     }
   }
 
   @Override
   public List<Pipeline> getPipelines() {
-    lock.readLock().lock();
-    try {
-      return stateManager.getPipelines();
-    } finally {
-      lock.readLock().unlock();
-    }
+    return stateManager.getPipelines();
   }
 
   @Override
   public List<Pipeline> getPipelines(ReplicationType type) {
-    lock.readLock().lock();
-    try {
-      return stateManager.getPipelines(type);
-    } finally {
-      lock.readLock().unlock();
-    }
+    return stateManager.getPipelines(type);
   }
 
   @Override
   public List<Pipeline> getPipelines(ReplicationType type,
                               ReplicationFactor factor) {
-    lock.readLock().lock();
-    try {
-      return stateManager.getPipelines(type, factor);
-    } finally {
-      lock.readLock().unlock();
-    }
+    return stateManager.getPipelines(type, factor);
   }
 
   @Override
   public List<Pipeline> getPipelines(ReplicationType type,
                               Pipeline.PipelineState state) {
-    lock.readLock().lock();
-    try {
-      return stateManager.getPipelines(type, state);
-    } finally {
-      lock.readLock().unlock();
-    }
+    return stateManager.getPipelines(type, state);
   }
 
   @Override
   public List<Pipeline> getPipelines(ReplicationType type,
                               ReplicationFactor factor,
                               Pipeline.PipelineState state) {
-    lock.readLock().lock();
-    try {
-      return stateManager.getPipelines(type, factor, state);
-    } finally {
-      lock.readLock().unlock();
-    }
+    return stateManager.getPipelines(type, factor, state);
   }
 
   @Override
@@ -261,46 +228,26 @@ public final class PipelineManagerV2Impl implements PipelineManager {
       ReplicationType type, ReplicationFactor factor,
       Pipeline.PipelineState state, Collection<DatanodeDetails> excludeDns,
       Collection<PipelineID> excludePipelines) {
-    lock.readLock().lock();
-    try {
-      return stateManager
+    return stateManager
           .getPipelines(type, factor, state, excludeDns, excludePipelines);
-    } finally {
-      lock.readLock().unlock();
-    }
   }
 
   @Override
   public void addContainerToPipeline(
       PipelineID pipelineID, ContainerID containerID) throws IOException {
-    lock.writeLock().lock();
-    try {
-      stateManager.addContainerToPipeline(pipelineID, containerID);
-    } finally {
-      lock.writeLock().unlock();
-    }
+    stateManager.addContainerToPipeline(pipelineID, containerID);
   }
 
   @Override
   public void removeContainerFromPipeline(
       PipelineID pipelineID, ContainerID containerID) throws IOException {
-    lock.writeLock().lock();
-    try {
-      stateManager.removeContainerFromPipeline(pipelineID, containerID);
-    } finally {
-      lock.writeLock().unlock();
-    }
+    stateManager.removeContainerFromPipeline(pipelineID, containerID);
   }
 
   @Override
   public NavigableSet<ContainerID> getContainersInPipeline(
       PipelineID pipelineID) throws IOException {
-    lock.readLock().lock();
-    try {
-      return stateManager.getContainers(pipelineID);
-    } finally {
-      lock.readLock().unlock();
-    }
+    return stateManager.getContainers(pipelineID);
   }
 
   @Override
