@@ -289,13 +289,13 @@ public abstract class TestOzoneRpcClientAbstract {
     store.createVolume(volumeName);
 
     store.getVolume(volumeName).setQuota(OzoneQuota.parseQuota(
-        "0GB", 0L));
+        "0GB", "0"));
     volume = store.getVolume(volumeName);
-    Assert.assertEquals(OzoneConsts.QUOTA_RESET, volume.getQuotaInBytes());
-    Assert.assertEquals(OzoneConsts.QUOTA_RESET, volume.getQuotaInNamespace());
+    Assert.assertEquals(0, volume.getQuotaInBytes());
+    Assert.assertEquals(0, volume.getQuotaInNamespace());
 
     store.getVolume(volumeName).setQuota(OzoneQuota.parseQuota(
-        "10GB", 10000L));
+        "10GB", "10000"));
     store.getVolume(volumeName).createBucket(bucketName);
     volume = store.getVolume(volumeName);
     Assert.assertEquals(10 * GB, volume.getQuotaInBytes());
@@ -305,12 +305,13 @@ public abstract class TestOzoneRpcClientAbstract {
     Assert.assertEquals(OzoneConsts.QUOTA_RESET, bucket.getQuotaInNamespace());
 
     store.getVolume(volumeName).getBucket(bucketName).setQuota(
-        OzoneQuota.parseQuota("0GB", 0));
-    Assert.assertEquals(OzoneConsts.QUOTA_RESET, bucket.getQuotaInBytes());
-    Assert.assertEquals(OzoneConsts.QUOTA_RESET, bucket.getQuotaInNamespace());
+        OzoneQuota.parseQuota("0GB", "0"));
+    bucket = store.getVolume(volumeName).getBucket(bucketName);
+    Assert.assertEquals(0, bucket.getQuotaInBytes());
+    Assert.assertEquals(0, bucket.getQuotaInNamespace());
 
     store.getVolume(volumeName).getBucket(bucketName).setQuota(
-        OzoneQuota.parseQuota("1GB", 1000L));
+        OzoneQuota.parseQuota("1GB", "1000"));
     OzoneBucket ozoneBucket = store.getVolume(volumeName).getBucket(bucketName);
     Assert.assertEquals(1024 * 1024 * 1024,
         ozoneBucket.getQuotaInBytes());
@@ -355,13 +356,13 @@ public abstract class TestOzoneRpcClientAbstract {
     String bucketName = UUID.randomUUID().toString();
     store.createVolume(volumeName);
     store.getVolume(volumeName).setQuota(OzoneQuota.parseQuota(
-        "10GB", 1000L));
+        "10GB", "1000"));
     store.getVolume(volumeName).createBucket(bucketName);
 
     int countException = 0;
     try {
       store.getVolume(volumeName).getBucket(bucketName).setQuota(
-          OzoneQuota.parseQuota("1GB", -100L));
+          OzoneQuota.parseQuota("1GB", "-100"));
     } catch (IllegalArgumentException ex) {
       countException++;
       GenericTestUtils.assertExceptionContains(
@@ -370,7 +371,7 @@ public abstract class TestOzoneRpcClientAbstract {
     // The unit should be legal.
     try {
       store.getVolume(volumeName).getBucket(bucketName).setQuota(
-          OzoneQuota.parseQuota("1TEST", 100L));
+          OzoneQuota.parseQuota("1TEST", "100"));
     } catch (IllegalArgumentException ex) {
       countException++;
       GenericTestUtils.assertExceptionContains(
@@ -380,7 +381,7 @@ public abstract class TestOzoneRpcClientAbstract {
     // The setting value cannot be greater than LONG.MAX_VALUE BYTES.
     try {
       store.getVolume(volumeName).getBucket(bucketName).setQuota(
-          OzoneQuota.parseQuota("9223372036854775808 BYTES", 100L));
+          OzoneQuota.parseQuota("9223372036854775808 BYTES", "100"));
     } catch (IllegalArgumentException ex) {
       countException++;
       GenericTestUtils.assertExceptionContains(
@@ -390,7 +391,7 @@ public abstract class TestOzoneRpcClientAbstract {
     // The value cannot be negative.
     try {
       store.getVolume(volumeName).getBucket(bucketName).setQuota(
-          OzoneQuota.parseQuota("-10GB", 100L));
+          OzoneQuota.parseQuota("-10GB", "100"));
     } catch (IllegalArgumentException ex) {
       countException++;
       GenericTestUtils.assertExceptionContains(
@@ -408,7 +409,7 @@ public abstract class TestOzoneRpcClientAbstract {
         store.getVolume(volumeName).getQuotaInBytes());
     Assert.assertEquals(OzoneConsts.QUOTA_RESET,
         store.getVolume(volumeName).getQuotaInNamespace());
-    store.getVolume(volumeName).setQuota(OzoneQuota.parseQuota("1GB", 1000L));
+    store.getVolume(volumeName).setQuota(OzoneQuota.parseQuota("1GB", "1000"));
     OzoneVolume volume = store.getVolume(volumeName);
     Assert.assertEquals(1024 * 1024 * 1024,
         volume.getQuotaInBytes());
@@ -424,7 +425,7 @@ public abstract class TestOzoneRpcClientAbstract {
     // The unit should be legal.
     try {
       store.getVolume(volumeName).setQuota(OzoneQuota.parseQuota(
-          "1TEST", 1000L));
+          "1TEST", "1000"));
     } catch (IllegalArgumentException ex) {
       countException++;
       GenericTestUtils.assertExceptionContains(
@@ -434,7 +435,7 @@ public abstract class TestOzoneRpcClientAbstract {
     // The setting value cannot be greater than LONG.MAX_VALUE BYTES.
     try {
       store.getVolume(volumeName).setQuota(OzoneQuota.parseQuota(
-          "9223372036854775808 BYTES", 1000L));
+          "9223372036854775808 BYTES", "1000"));
     } catch (IllegalArgumentException ex) {
       countException++;
       GenericTestUtils.assertExceptionContains(
@@ -444,7 +445,7 @@ public abstract class TestOzoneRpcClientAbstract {
     // The value cannot be negative.
     try {
       store.getVolume(volumeName).setQuota(OzoneQuota.parseQuota(
-          "-10GB", 1000L));
+          "-10GB", "1000"));
     } catch (IllegalArgumentException ex) {
       countException++;
       GenericTestUtils.assertExceptionContains(
@@ -858,11 +859,11 @@ public abstract class TestOzoneRpcClientAbstract {
 
     // Test bucket quota.
     store.getVolume(volumeName).setQuota(
-        OzoneQuota.parseQuota(Long.MAX_VALUE + " Bytes", 100));
+        OzoneQuota.parseQuota(Long.MAX_VALUE + " Bytes", "100"));
     bucketName = UUID.randomUUID().toString();
     volume.createBucket(bucketName);
     bucket = volume.getBucket(bucketName);
-    bucket.setQuota(OzoneQuota.parseQuota("1 Bytes", 100));
+    bucket.setQuota(OzoneQuota.parseQuota("1 Bytes", "100"));
 
     // Test bucket quota: write key.
     // The remaining quota does not satisfy a block size, so the write fails.
@@ -891,7 +892,7 @@ public abstract class TestOzoneRpcClientAbstract {
     // Test bucket quota: write large key(with five blocks), the first four
     // blocks will succeed，while the later block will fail.
     bucket.setQuota(OzoneQuota.parseQuota(
-        4 * blockSize + " Bytes", 100));
+        4 * blockSize + " Bytes", "100"));
 
     try {
       OzoneOutputStream out = bucket.createKey(UUID.randomUUID().toString(),
@@ -910,7 +911,7 @@ public abstract class TestOzoneRpcClientAbstract {
 
     // Reset bucket quota, the original usedBytes needs to remain the same
     bucket.setQuota(OzoneQuota.parseQuota(
-        100 + " GB", 100));
+        100 + " GB", "100"));
     Assert.assertEquals(4 * blockSize,
         store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
 
@@ -918,7 +919,7 @@ public abstract class TestOzoneRpcClientAbstract {
 
     // key with 0 bytes, usedBytes should not increase.
     bucket.setQuota(OzoneQuota.parseQuota(
-        5 * blockSize + " Bytes", 100));
+        5 * blockSize + " Bytes", "100"));
     OzoneOutputStream out = bucket.createKey(UUID.randomUUID().toString(),
         valueLength, STAND_ALONE, ONE, new HashMap<>());
     out.close();
@@ -967,7 +968,7 @@ public abstract class TestOzoneRpcClientAbstract {
 
     // Reset volume quota, the original usedNamespace needs to remain the same
     store.getVolume(volumeName).setQuota(OzoneQuota.parseQuota(
-        100 + " GB", 100));
+        100 + " GB", "100"));
     Assert.assertEquals(1L,
         store.getVolume(volumeName).getUsedNamespace());
 
@@ -993,7 +994,7 @@ public abstract class TestOzoneRpcClientAbstract {
     volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
     bucket = volume.getBucket(bucketName);
-    bucket.setQuota(OzoneQuota.parseQuota(Long.MAX_VALUE + " Bytes", 2));
+    bucket.setQuota(OzoneQuota.parseQuota(Long.MAX_VALUE + " Bytes", "2"));
 
     writeKey(bucket, key1, ONE, value, value.length());
     Assert.assertEquals(1L,
@@ -1015,7 +1016,8 @@ public abstract class TestOzoneRpcClientAbstract {
         store.getVolume(volumeName).getBucket(bucketName).getUsedNamespace());
 
     // Reset bucket quota, the original usedNamespace needs to remain the same
-    bucket.setQuota(OzoneQuota.parseQuota(Long.MAX_VALUE + " Bytes", 100));
+    bucket.setQuota(OzoneQuota.parseQuota(
+        Long.MAX_VALUE + " Bytes", "100"));
     Assert.assertEquals(2L,
         store.getVolume(volumeName).getBucket(bucketName).getUsedNamespace());
 

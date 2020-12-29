@@ -189,7 +189,7 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
       long volumeQuotaInBytes, String volumeName) throws IOException {
     long totalBucketQuota = 0;
 
-    if (volumeQuotaInBytes == 0) {
+    if (volumeQuotaInBytes < OzoneConsts.QUOTA_RESET) {
       return false;
     }
 
@@ -213,8 +213,7 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
 
   public boolean checkQuotaNamespaceValid(long quotaInNamespace) {
 
-    if ((quotaInNamespace <= 0
-         && quotaInNamespace != OzoneConsts.QUOTA_RESET)) {
+    if (quotaInNamespace < OzoneConsts.QUOTA_RESET) {
       return false;
     }
     return true;
