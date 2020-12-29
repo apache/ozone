@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.junit.Assert;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -99,6 +100,12 @@ public class TestOzoneFSWithObjectStoreCreate {
     o3fs = (OzoneFileSystem) FileSystem.get(new URI(rootPath), conf);
   }
 
+  @After
+  public void shutdown() {
+    if (cluster != null) {
+      cluster.shutdown();
+    }
+  }
 
   @Test
   public void test() throws Exception {

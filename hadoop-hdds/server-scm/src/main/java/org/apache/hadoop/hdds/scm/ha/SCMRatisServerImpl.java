@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.ha;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -195,10 +196,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
       InetAddress localHost = InetAddress.getLocalHost();
 
       // fetch hosts from ozone.scm.names
-      List<String> hosts =
-          Arrays.stream(conf.getTrimmedStrings(ScmConfigKeys.OZONE_SCM_NAMES))
-              .map(scmName -> HddsUtils.getHostName(scmName).get())
-              .collect(Collectors.toList());
+      List<String> hosts = parseHosts(conf);
 
       final List<RaftPeer> raftPeers = new ArrayList<>();
       for (int i = 0; i < hosts.size(); ++i) {
@@ -231,6 +229,30 @@ public class SCMRatisServerImpl implements SCMRatisServer {
           SCM_SERVICE_ID.getBytes(StandardCharsets.UTF_8)));
 
       raftGroup = RaftGroup.valueOf(raftGroupId, raftPeers);
+    }
+
+    private List<String> parseHosts(final ConfigurationSource conf)
+        throws UnknownHostException {
+      // fetch hosts from ozone.scm.names
+      List<String> hosts =
+          Arrays.stream(conf.getTrimmedStrings(ScmConfigKeys.OZONE_SCM_NAMES))
+              .map(scmName -> HddsUtils.getHostName(scmName).get())
+              .collect(Collectors.toList());
+
+      // if this is not a conf for a multi-server raft cluster,
+      // it means we are in integration test, and need to augment
+      // the conf to help build a single-server raft cluster.
+      if (hosts.size() == 0) {
+        // ozone.scm.names is not set
+        hosts.add(InetAddress.getLocalHost().getHostName());
+      } else if (hosts.size() == 1) {
+        // ozone.scm.names is set, yet the conf may not be usable.
+        hosts.set(0, InetAddress.getLocalHost().getHostName());
+      }
+
+      LOG.info("fetch hosts {} from ozone.scm.names {}.",
+          hosts, conf.get(ScmConfigKeys.OZONE_SCM_NAMES));
+      return hosts;
     }
   }
 }
