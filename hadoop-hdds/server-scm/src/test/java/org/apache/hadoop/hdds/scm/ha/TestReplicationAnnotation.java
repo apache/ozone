@@ -24,7 +24,7 @@ import org.junit.Test;
 /**
  * Tests on {@link org.apache.hadoop.hdds.scm.metadata.Replicate}.
  */
-public class TestRelicationAnnotation {
+public class TestReplicationAnnotation {
   private SCMHAInvocationHandler scmhaInvocationHandler;
 
   @Before
