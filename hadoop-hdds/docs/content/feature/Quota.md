@@ -45,6 +45,20 @@ e. If the cluster is upgraded from old version less than 1.1.0, use of quota on 
 
 f. If volume's quota is enabled then bucket's quota cannot be cleared. 
 
+2. Namespace quota
+
+Administrators should be able to define how many namespace a Volume or Bucket can use. The following settings for namespace quota are supported: 
+
+a. By default, the namespace quota for volume and bucket is not enabled (thus unlimited quota).
+
+b. When volume namespace quota is enabled, the total number of buckets under the volume, cannot exceed the volume namespace quota.
+
+c. When bucket namespace quota is enabled, the total number of keys under the bucket, cannot exceed the bucket namespace quota.
+
+d. Linked buckets do not consume namespace quota.
+
+e. If the cluster is upgraded from old version less than 1.1.0, use of quota on older volumes and buckets(We can confirm by looking at the info for the volume or bucket, and if the quota value is -2 then volume or bucket is old) is not recommended. Since the old key is not counted to the bucket's namespace quota, the quota setting is inaccurate at this point.
+
 ## Client usage
 ### Storage Space level quota
 Storage space level quotas allow the use of units such as KB (k), MB (m), GB (g), TB (t), PB (p), etc. Represents how much storage Spaces will be used.
@@ -85,3 +99,41 @@ bin/ozone sh volume info /volume1
 bin/ozone sh bucket info /volume1/bucket1
 ```
 We can get the quota value and usedBytes in the info of volume and bucket.
+
+### Namespace quota
+Namespace quota is a number that represents how many unique names can be used. This number cannot be greater than LONG.MAX_VALUE in Java.
+
+#### Volume Namespace quota
+```shell
+bin/ozone sh volume create --namespace-quota 100 /volume1
+```
+This means setting the namespace quota of Volume1 to 100.
+
+```shell
+bin/ozone sh volume setquota --namespace-quota 1000 /volume1
+```
+This behavior changes the namespace quota of Volume1 to 1000.
+
+#### Bucket Namespace quota
+```shell
+bin/ozone sh bucket create --namespace-quota 100 /volume1/bucket1
+```
+That means bucket1 allows us to use 100 of namespace.
+
+```shell
+bin/ozone sh bucket setquota --namespace-quota 1000 /volume1/bucket1 
+```
+This behavior changes the quota for Bucket1 to 1000.
+
+#### Clear the quota for volume and bucket
+```shell
+bin/ozone sh volume clrquota --namespace-quota /volume1
+bin/ozone sh bucket clrquota --namespace-quota /volume1/bucket1
+```
+
+#### Check quota and usedNamespace for volume and bucket
+```shell
+bin/ozone sh volume info /volume1
+bin/ozone sh bucket info /volume1/bucket1
+```
+We can get the quota value and usedNamespace in the info of volume and bucket.
