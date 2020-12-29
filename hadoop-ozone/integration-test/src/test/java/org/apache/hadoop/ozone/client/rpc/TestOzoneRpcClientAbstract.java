@@ -280,7 +280,7 @@ public abstract class TestOzoneRpcClientAbstract {
   }
 
   @Test
-  public void testSetAndClrQuota() throws IOException {
+  public void testSetAndClrQuota() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     OzoneVolume volume = null;
@@ -313,6 +313,10 @@ public abstract class TestOzoneRpcClientAbstract {
     Assert.assertEquals(1024 * 1024 * 1024,
         ozoneBucket.getQuotaInBytes());
     Assert.assertEquals(1000L, ozoneBucket.getQuotaInNamespace());
+
+    LambdaTestUtils.intercept(IOException.class, "Can not clear bucket" +
+        " spaceQuota because volume spaceQuota is not cleared.",
+        () -> ozoneBucket.clearSpaceQuota());
 
     store.getVolume(volumeName).clearSpaceQuota();
     store.getVolume(volumeName).clearNamespaceQuota();
