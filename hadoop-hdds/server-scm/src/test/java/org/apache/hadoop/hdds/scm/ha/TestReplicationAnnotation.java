@@ -43,7 +43,7 @@ public class TestReplicationAnnotation {
   public void testReplicateAnnotationBasic() throws Throwable {
     // test whether replicatedOperation will hit the Ratis based replication
     // code path in SCMHAInvocationHandler. The invoke() can return means the
-    // request is handled properly thus response is successfully. Expected
+    // request is handled properly thus response is successful. Expected
     // result is null because replicatedOperation returns nothing.
     Assert.assertEquals(null, scmhaInvocationHandler.invoke(new Object(),
         this.getClass().getMethod("replicatedOperation"), new Object[0]));
