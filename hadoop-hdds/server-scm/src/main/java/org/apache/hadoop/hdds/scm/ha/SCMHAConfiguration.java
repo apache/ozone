@@ -203,16 +203,12 @@ public class SCMHAConfiguration {
     return ratisRequestTimeout;
   }
 
-  public long getRatisRequestMinTimeout() {
-    return ratisRequestTimeout - 1000L;
-  }
-
-  public long getRatisRequestMaxTimeout() {
-    return ratisRequestTimeout + 1000L;
-  }
-
-  public long getRatisLeaderElectionTimeout() {
+  public long getLeaderElectionMinTimeout() {
     return ratisLeaderElectionTimeout;
+  }
+
+  public long getLeaderElectionMaxTimeout() {
+    return ratisLeaderElectionTimeout + 200L;
   }
 
   public long getRatisNodeFailureTimeout() {
