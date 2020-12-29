@@ -16,8 +16,9 @@
  */
 package org.apache.hadoop.hdds.scm.ha;
 
-import java.io.IOException;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
+import org.apache.hadoop.hdds.scm.metadata.Replicate;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -35,12 +36,16 @@ public class TestReplicationAnnotation {
         new MockRatisServer());
   }
 
-  @Test(expected = IOException.class)
+  @Test(expected = NotLeaderException.class)
   public void testReplicateAnnotationBasic() throws Throwable {
     // test whether replicatedOperation will hit the Ratis based replication
-    // code path in SCMHAInvocationHandler. Expect to see a IOException cause
-    // no handler is added yet.
+    // code path in SCMHAInvocationHandler. Expect to see a NotLeaderException
+    // cause that is what MockRatisServer process such request.
     scmhaInvocationHandler.invoke(new Object(),
         this.getClass().getMethod("replicatedOperation"), new Object[0]);
+  }
+
+  @Replicate
+  public void replicatedOperation() {
   }
 }
