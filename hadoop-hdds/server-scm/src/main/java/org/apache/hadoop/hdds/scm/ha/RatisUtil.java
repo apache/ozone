@@ -100,9 +100,9 @@ public final class RatisUtil {
     Rpc.setRequestTimeout(properties, TimeDuration.valueOf(
         conf.getRatisRequestTimeout(), TimeUnit.MILLISECONDS));
     Rpc.setTimeoutMin(properties, TimeDuration.valueOf(
-        conf.getRatisRequestMinTimeout(), TimeUnit.MILLISECONDS));
+        conf.getLeaderElectionMinTimeout(), TimeUnit.MILLISECONDS));
     Rpc.setTimeoutMax(properties, TimeDuration.valueOf(
-        conf.getRatisRequestMaxTimeout(), TimeUnit.MILLISECONDS));
+        conf.getLeaderElectionMaxTimeout(), TimeUnit.MILLISECONDS));
     Rpc.setSlownessTimeout(properties, TimeDuration.valueOf(
         conf.getRatisNodeFailureTimeout(), TimeUnit.MILLISECONDS));
   }
