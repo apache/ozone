@@ -54,7 +54,7 @@ public class SetQuotaHandler extends VolumeHandler {
 
     if (!Strings.isNullOrEmpty(quotaOptions.getQuotaInNamespace())) {
       namespaceQuota = OzoneQuota.parseNameSpaceQuota(
-          quotaOptions.getQuotaInNamespace()).getQuotaInBytes();
+          quotaOptions.getQuotaInNamespace()).getQuotaInNamespace();
     }
 
     volume.setQuota(OzoneQuota.getOzoneQuota(spaceQuota, namespaceQuota));

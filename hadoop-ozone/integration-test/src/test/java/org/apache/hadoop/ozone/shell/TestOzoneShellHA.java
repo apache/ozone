@@ -41,6 +41,7 @@ import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.hadoop.test.LambdaTestUtils;
 import org.apache.hadoop.util.ToolRunner;
 
 import com.google.common.base.Strings;
@@ -528,7 +529,7 @@ public class TestOzoneShellHA {
   }
 
   @Test
-  public void testShQuota() throws IOException {
+  public void testShQuota() throws Exception {
     ObjectStore objectStore = cluster.getClient().getObjectStore();
     // Test --quota option.
 
@@ -540,7 +541,6 @@ public class TestOzoneShellHA {
         objectStore.getVolume("vol1").getQuotaInNamespace());
     out.reset();
 
-
     args =
         new String[]{"bucket", "create", "vol1/buck1", "--quota", "10BYTES"};
     execute(ozoneShell, args);
@@ -551,7 +551,6 @@ public class TestOzoneShellHA {
             .getQuotaInNamespace());
 
     // Test --space-quota option.
-
     args = new String[]{"volume", "create", "vol2", "--space-quota",
         "100BYTES"};
     execute(ozoneShell, args);
@@ -622,6 +621,37 @@ public class TestOzoneShellHA {
     assertEquals(-1,
         objectStore.getVolume("vol4").getBucket("buck4")
             .getQuotaInNamespace());
+    out.reset();
+
+    // Test set volume quota to 0.
+    String[] volumeArgs1 = new String[]{"volume", "setquota", "vol4",
+        "--space-quota", "0GB"};
+    LambdaTestUtils.intercept(ExecutionException.class,
+        "Invalid values for quota",
+        () -> execute(ozoneShell, volumeArgs1));
+    out.reset();
+
+    String[] volumeArgs2 = new String[]{"volume", "setquota", "vol4",
+        "--namespace-quota", "0"};
+    LambdaTestUtils.intercept(ExecutionException.class,
+        "Invalid values for quota",
+        () -> execute(ozoneShell, volumeArgs2));
+    out.reset();
+
+    // Test set bucket quota to 0.
+    String[] bucketArgs1 = new String[]{"bucket", "setquota", "vol4/buck4",
+        "--space-quota", "0GB"};
+    LambdaTestUtils.intercept(ExecutionException.class,
+        "Invalid values for quota",
+        () -> execute(ozoneShell, bucketArgs1));
+    out.reset();
+
+    String[] bucketArgs2 = new String[]{"bucket", "setquota", "vol4/buck4",
+        "--namespace-quota", "0"};
+    LambdaTestUtils.intercept(ExecutionException.class,
+        "Invalid values for quota",
+        () -> execute(ozoneShell, bucketArgs2));
+    out.reset();
 
     objectStore.getVolume("vol1").deleteBucket("buck1");
     objectStore.deleteVolume("vol1");
