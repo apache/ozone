@@ -615,7 +615,7 @@ public class TestOzoneShellHA {
     out.reset();
 
     args = new String[]{"bucket", "clrquota", "vol4/buck4",
-        "--space-quota", "--namespace-quota",};
+        "--space-quota", "--namespace-quota"};
     execute(ozoneShell, args);
     assertEquals(-1,
         objectStore.getVolume("vol4").getBucket("buck4").getQuotaInBytes());
