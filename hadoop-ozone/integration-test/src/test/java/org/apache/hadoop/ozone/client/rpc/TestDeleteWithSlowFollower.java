@@ -100,6 +100,7 @@ public class TestDeleteWithSlowFollower {
     File baseDir = new File(path);
     baseDir.mkdirs();
 
+    conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 2);
     conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 200,
         TimeUnit.MILLISECONDS);
     // Make the stale, dead and server failure timeout higher so that a dead
