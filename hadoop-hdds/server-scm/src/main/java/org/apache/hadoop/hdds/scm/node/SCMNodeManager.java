@@ -436,7 +436,7 @@ public class SCMNodeManager implements NodeManager {
           reportedDn.getPersistedOpStateExpiryEpochSec(),
           scmStatus.getOperationalState(),
           scmStatus.getOpStateExpiryEpochSeconds());
-      commandQueue.addCommand(reportedDn.getUuid(),
+      addDatanodeCommand(reportedDn.getUuid(),
           new SetNodeOperationalStateCommand(
               Time.monotonicNow(), scmStatus.getOperationalState(),
               scmStatus.getOpStateExpiryEpochSeconds()));
