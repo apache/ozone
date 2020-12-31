@@ -352,6 +352,10 @@ public class HeartbeatEndpointTask
         SetNodeOperationalStateCommand setNodeOperationalStateCommand =
             SetNodeOperationalStateCommand.getFromProtobuf(
                 commandResponseProto.getSetNodeOperationalStateCommandProto());
+        if (commandResponseProto.hasTerm()) {
+          setNodeOperationalStateCommand.setTerm(
+              commandResponseProto.getTerm());
+        }
         if (LOG.isDebugEnabled()) {
           LOG.debug("Received SCM set operational state command. State: {} " +
               "Expiry: {}", setNodeOperationalStateCommand.getOpState(),
