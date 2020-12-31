@@ -35,8 +35,8 @@ import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftGroupMemberId;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
-import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.apache.ratis.server.RaftServer;
+import org.apache.ratis.protocol.exceptions.StateMachineException;
 
 // TODO: Move this class to test package after fixing Recon
 /**
@@ -55,7 +55,7 @@ public final class MockSCMHAManager implements SCMHAManager {
    * Creates MockSCMHAManager instance.
    */
   private MockSCMHAManager(boolean isLeader) {
-    this.ratisServer = new MockRatisServer(this);
+    this.ratisServer = new MockRatisServer();
     this.isLeader = isLeader;
   }
 
@@ -92,19 +92,10 @@ public final class MockSCMHAManager implements SCMHAManager {
     ratisServer.stop();
   }
 
-  /**
-   * Mock RatisServer implementation for testing.
-   */
-  private static class MockRatisServer implements SCMRatisServer {
+  private class MockRatisServer implements SCMRatisServer {
 
     private Map<RequestType, Object> handlers =
         new EnumMap<>(RequestType.class);
-
-    private MockSCMHAManager scmhaManager;
-
-    MockRatisServer(MockSCMHAManager scmhaManager) {
-      this.scmhaManager = scmhaManager;
-    }
 
     @Override
     public void start() {
@@ -122,7 +113,7 @@ public final class MockSCMHAManager implements SCMHAManager {
       final RaftGroupMemberId raftId = RaftGroupMemberId.valueOf(
           RaftPeerId.valueOf("peer"), RaftGroupId.randomId());
       RaftClientReply reply;
-      if (scmhaManager != null && scmhaManager.isLeader().isPresent()) {
+      if (isLeader().isPresent()) {
         try {
           final Message result = process(request);
           reply = RaftClientReply.newBuilder()

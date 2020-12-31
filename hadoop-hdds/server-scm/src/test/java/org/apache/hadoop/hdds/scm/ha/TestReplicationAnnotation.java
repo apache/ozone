@@ -17,123 +17,81 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
-import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ContainerStateManagerV2;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
+import org.apache.ratis.server.RaftServer;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
 import java.io.IOException;
-import java.util.Map;
-import java.util.NavigableSet;
-import java.util.Set;
+import java.lang.reflect.Proxy;
+import java.util.List;
+import java.util.concurrent.ExecutionException;
 
 /**
  * Tests on {@link org.apache.hadoop.hdds.scm.metadata.Replicate}.
  */
 public class TestReplicationAnnotation {
   private SCMHAInvocationHandler scmhaInvocationHandler;
-  private ContainerStateManagerV2 mockCSM;
 
   @Before
   public void setup() {
-    SCMHAManager mock = MockSCMHAManager.getInstance(true);
-    mockCSM = new ContainerStateManagerV2() {
+    SCMRatisServer ratisServer = new SCMRatisServer() {
       @Override
-      public boolean contains(HddsProtos.ContainerID containerID) {
-        return false;
+      public void start() throws IOException {
       }
 
       @Override
-      public Set<ContainerID> getContainerIDs() {
+      public void registerStateMachineHandler(
+          SCMRatisProtocol.RequestType handlerType, Object handler) {
+      }
+
+      @Override
+      public SCMRatisResponse submitRequest(SCMRatisRequest request)
+          throws IOException, ExecutionException, InterruptedException {
+        throw new IOException("submitRequest is called.");
+      }
+
+      @Override
+      public void stop() throws IOException {
+      }
+
+      @Override
+      public RaftServer.Division getDivision() {
         return null;
       }
 
       @Override
-      public Set<ContainerID> getContainerIDs(
-          HddsProtos.LifeCycleState state) {
+      public List<String> getRatisRoles() {
         return null;
       }
 
       @Override
-      public ContainerInfo getContainer(HddsProtos.ContainerID id) {
+      public NotLeaderException triggerNotLeaderException() {
         return null;
-      }
-
-      @Override
-      public Set<ContainerReplica> getContainerReplicas(
-          HddsProtos.ContainerID id) {
-        return null;
-      }
-
-      @Override
-      public void updateContainerReplica(
-          HddsProtos.ContainerID id, ContainerReplica replica) {
-
-      }
-
-      @Override
-      public void removeContainerReplica(
-          HddsProtos.ContainerID id, ContainerReplica replica) {
-
-      }
-
-      @Override
-      public void addContainer(HddsProtos.ContainerInfoProto containerInfo)
-          throws IOException {
-
-      }
-
-      @Override
-      public void updateContainerState(
-          HddsProtos.ContainerID id, HddsProtos.LifeCycleEvent event)
-          throws IOException, InvalidStateTransitionException {
-
-      }
-
-      @Override
-      public void updateDeleteTransactionId(
-          Map<ContainerID, Long> deleteTransactionMap) throws IOException {
-
-      }
-
-      @Override
-      public ContainerInfo getMatchingContainer(
-          long size, String owner, PipelineID pipelineID,
-          NavigableSet<ContainerID> containerIDs) {
-        return null;
-      }
-
-      @Override
-      public void removeContainer(HddsProtos.ContainerID containerInfo)
-          throws IOException {
-      }
-
-      @Override
-      public void close() throws IOException {
-
       }
     };
 
     scmhaInvocationHandler = new SCMHAInvocationHandler(
-        RequestType.CONTAINER, mockCSM, mock.getRatisServer());
+        RequestType.CONTAINER, null, ratisServer);
   }
 
   @Test
   public void testReplicateAnnotationBasic() throws Throwable {
-    // test whether this call will hit the Ratis based replication
-    // code path in SCMHAInvocationHandler. The invoke() can return means the
-    // request is handled properly thus response is successful. Expected
-    // result is null because the function returns nothing.
-    Object[] arguments = {HddsProtos.ContainerInfoProto.getDefaultInstance()};
-    Assert.assertEquals(null, scmhaInvocationHandler.invoke(new Object(),
-        mockCSM.getClass().getMethod(
-            "addContainer", HddsProtos.ContainerInfoProto.class),
-        arguments));
+    ContainerStateManagerV2 proxy =
+        (ContainerStateManagerV2) Proxy.newProxyInstance(
+        SCMHAInvocationHandler.class.getClassLoader(),
+        new Class<?>[]{ContainerStateManagerV2.class}, scmhaInvocationHandler);
+
+    try {
+      proxy.addContainer(HddsProtos.ContainerInfoProto.getDefaultInstance());
+      // Should have seen a IOException.
+      Assert.fail();
+    } catch (IOException ignore) {
+      // Expecting to hit here.
+    }
   }
 }
