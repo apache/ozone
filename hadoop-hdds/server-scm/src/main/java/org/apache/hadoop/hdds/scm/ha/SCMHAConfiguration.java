@@ -78,7 +78,7 @@ public class SCMHAConfiguration {
       description = "The size of the raft segment used by Apache Ratis on" +
           " SCM. (16 KB by default)"
   )
-  private double raftSegmentSize = 16L * 1024L;
+  private long raftSegmentSize = 16L * 1024L;
 
   @Config(key = "ratis.segment.preallocated.size",
       type = ConfigType.SIZE,
@@ -87,7 +87,7 @@ public class SCMHAConfiguration {
       description = "The size of the buffer which is preallocated for" +
           " raft segment used by Apache Ratis on SCM.(16 KB by default)"
   )
-  private double raftSegmentPreAllocatedSize = 16 * 1024;
+  private long raftSegmentPreAllocatedSize = 16L * 1024L;
 
   @Config(key = "ratis.log.appender.queue.num-elements",
       type = ConfigType.INT,
@@ -103,7 +103,7 @@ public class SCMHAConfiguration {
       tags = {SCM, OZONE, HA, RATIS},
       description = "Byte limit for Raft's Log Worker queue."
   )
-  private double raftLogAppenderQueueByteLimit = 32 * 1024 * 1024;
+  private int raftLogAppenderQueueByteLimit = 32 * 1024 * 1024;
 
   @Config(key = "ratis.log.purge.gap",
       type = ConfigType.INT,
@@ -165,6 +165,10 @@ public class SCMHAConfiguration {
     return ratisStorageDir;
   }
 
+  public void setRatisStorageDir(String dir) {
+    this.ratisStorageDir = dir;
+  }
+
   public InetSocketAddress getRatisBindAddress() {
     return NetUtils.createSocketAddr(ratisBindHost, ratisBindPort);
   }
@@ -174,11 +178,11 @@ public class SCMHAConfiguration {
   }
 
   public long getRaftSegmentSize() {
-    return (long)raftSegmentSize;
+    return raftSegmentSize;
   }
 
   public long getRaftSegmentPreAllocatedSize() {
-    return (long)raftSegmentPreAllocatedSize;
+    return raftSegmentPreAllocatedSize;
   }
 
   public int getRaftLogAppenderQueueNum() {
@@ -186,7 +190,7 @@ public class SCMHAConfiguration {
   }
 
   public int getRaftLogAppenderQueueByteLimit() {
-    return (int)raftLogAppenderQueueByteLimit;
+    return raftLogAppenderQueueByteLimit;
   }
 
   public int getRaftLogPurgeGap() {
