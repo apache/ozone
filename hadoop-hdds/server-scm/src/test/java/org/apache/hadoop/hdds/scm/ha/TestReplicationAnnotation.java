@@ -126,18 +126,14 @@ public class TestReplicationAnnotation {
 
   @Test
   public void testReplicateAnnotationBasic() throws Throwable {
-    // test whether replicatedOperation will hit the Ratis based replication
+    // test whether this call will hit the Ratis based replication
     // code path in SCMHAInvocationHandler. The invoke() can return means the
     // request is handled properly thus response is successful. Expected
-    // result is null because the funciton returns nothing.
+    // result is null because the function returns nothing.
     Object[] arguments = {HddsProtos.ContainerInfoProto.getDefaultInstance()};
     Assert.assertEquals(null, scmhaInvocationHandler.invoke(new Object(),
         mockCSM.getClass().getMethod(
             "addContainer", HddsProtos.ContainerInfoProto.class),
         arguments));
   }
-
-//  @Replicate
-//  public void replicatedOperation() {
-//  }
 }
