@@ -112,7 +112,7 @@ public final class MockSCMHAManager implements SCMHAManager {
   /**
    * Mock RatisServer implementation for testing.
    */
-  private class MockRatisServer implements SCMRatisServer {
+  private static class MockRatisServer implements SCMRatisServer {
 
     private Map<RequestType, Object> handlers =
         new EnumMap<>(RequestType.class);
