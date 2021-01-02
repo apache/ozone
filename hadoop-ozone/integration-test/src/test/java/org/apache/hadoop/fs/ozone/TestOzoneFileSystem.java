@@ -55,7 +55,6 @@ import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.commons.io.IOUtils;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
-import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_CHECKPOINT_INTERVAL_KEY;
 import static org.apache.hadoop.fs.FileSystem.TRASH_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
@@ -258,6 +257,7 @@ public class TestOzoneFileSystem {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
         enabledFileSystemPaths);
+    conf.setInt(FS_TRASH_INTERVAL_KEY, 1);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
         .build();
@@ -275,8 +275,6 @@ public class TestOzoneFileSystem {
     conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
     // Set the number of keys to be processed during batch operate.
     conf.setInt(OZONE_FS_ITERATE_BATCH_SIZE, 5);
-    conf.setInt(FS_TRASH_INTERVAL_KEY, 1);
-    conf.setInt(FS_TRASH_CHECKPOINT_INTERVAL_KEY, 1);
     fs = FileSystem.get(conf);
     trash = new Trash(conf);
   }
@@ -796,8 +794,6 @@ public class TestOzoneFileSystem {
         "fs.trash.classname", TrashPolicy.class).
         isAssignableFrom(TrashPolicyOzone.class));
     Assert.assertEquals(trash.getConf().getInt(FS_TRASH_INTERVAL_KEY, 0), 1);
-    Assert.assertEquals(trash.getConf().getInt(FS_TRASH_CHECKPOINT_INTERVAL_KEY,
-        0), 1);
     // Call moveToTrash. We can't call protected fs.rename() directly
     trash.moveToTrash(path);
 
@@ -811,7 +807,7 @@ public class TestOzoneFileSystem {
     // Wait until the TrashEmptier purges the key
     GenericTestUtils.waitFor(()-> {
       try {
-        return !fs.exists(trashPath);
+        return !o3fs.exists(trashPath);
       } catch (IOException e) {
         LOG.error("Delete from Trash Failed");
         Assert.fail("Delete from Trash Failed");
@@ -825,7 +821,7 @@ public class TestOzoneFileSystem {
     // wait for deletion of checkpoint dir
     GenericTestUtils.waitFor(()-> {
       try {
-        return fs.listStatus(userTrash).length==0;
+        return o3fs.listStatus(userTrash).length==0;
       } catch (IOException e) {
         LOG.error("Delete from Trash Failed");
         Assert.fail("Delete from Trash Failed");
