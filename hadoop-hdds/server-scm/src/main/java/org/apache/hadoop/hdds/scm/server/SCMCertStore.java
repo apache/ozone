@@ -22,12 +22,17 @@ package org.apache.hadoop.hdds.scm.server;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -111,5 +116,42 @@ public class SCMCertStore implements CertificateStore {
     } else {
       return scmMetadataStore.getRevokedCertsTable().get(serialID);
     }
+  }
+
+  @Override
+  public List<X509Certificate> listCertificate(HddsProtos.NodeType role,
+      BigInteger startSerialID, int count, CertType certType)
+      throws IOException {
+    // TODO: Filter by role
+    List<? extends Table.KeyValue<BigInteger, X509Certificate>> certs;
+    if (startSerialID.longValue() == 0) {
+      startSerialID = null;
+    }
+    if (certType == CertType.VALID_CERTS) {
+      certs = scmMetadataStore.getValidCertsTable().getRangeKVs(
+          startSerialID, count);
+    } else {
+      certs = scmMetadataStore.getRevokedCertsTable().getRangeKVs(
+          startSerialID, count);
+    }
+    List<X509Certificate> results = new ArrayList<>(certs.size());
+    for (Table.KeyValue<BigInteger, X509Certificate> kv : certs) {
+      try {
+        X509Certificate cert = kv.getValue();
+        // TODO: filter certificate based on CN and specified role.
+        // This requires change of the approved subject CN format:
+        // Subject: O=CID-e66d4728-32bb-4282-9770-351a7e913f07,
+        // OU=9a7c4f86-c862-4067-b12c-e7bca51d3dfe, CN=root@98dba189d5f0
+
+        // The new format will look like below that are easier to filter.
+        // CN=FQDN/user=root/role=datanode/...
+        results.add(cert);
+      } catch (IOException e) {
+        LOG.error("Fail to list certificate from SCM metadata store", e);
+        throw new SCMSecurityException(
+            "Fail to list certificate from SCM metadata store.");
+      }
+    }
+    return results;
   }
 }

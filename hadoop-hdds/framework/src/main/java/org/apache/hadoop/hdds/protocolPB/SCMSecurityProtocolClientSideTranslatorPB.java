@@ -18,9 +18,11 @@ package org.apache.hadoop.hdds.protocolPB;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.List;
 import java.util.function.Consumer;
 
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.OzoneManagerDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
@@ -28,6 +30,7 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCAC
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertificateRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetDataNodeCertRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMListCertificateRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityRequest;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityRequest.Builder;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityResponse;
@@ -199,6 +202,30 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
         builder -> builder.setGetCACertificateRequest(protoIns))
         .getGetCertResponseProto().getX509Certificate();
 
+  }
+
+  /**
+   *
+   * @param role            - node type: OM/SCM/DN.
+   * @param startSerialId   - start cert serial id.
+   * @param count           - max number of certificates returned in a batch.
+   * @param isRevoked       - whether return revoked cert only.
+   * @return
+   * @throws IOException
+   */
+  @Override
+  public List<String> listCertificate(HddsProtos.NodeType role,
+      long startSerialId, int count, boolean isRevoked) throws IOException {
+    SCMListCertificateRequestProto protoIns = SCMListCertificateRequestProto
+        .newBuilder()
+        .setRole(role)
+        .setStartCertId(startSerialId)
+        .setCount(count)
+        .setIsRevoked(isRevoked)
+        .build();
+    return submitRequest(Type.ListCertificate,
+        builder -> builder.setListCertificateRequest(protoIns))
+        .getListCertificateResponseProto().getCertificatesList();
   }
 
   /**
