@@ -116,7 +116,7 @@ public class BlockTokenVerifier implements TokenVerifier {
           "expired certificate " + tokenId.getOmCertSerialId());
     } catch (CertificateNotYetValidException exNyv) {
       throw new BlockTokenException("Block token can't be verified due to " +
-          "certificate " + tokenId.getOmCertSerialId() + " is not yet valid!");
+          "not yet valid certificate " + tokenId.getOmCertSerialId());
     }
 
     boolean validToken = caClient.verifySignature(tokenId.getBytes(),
