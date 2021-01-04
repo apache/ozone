@@ -22,6 +22,12 @@ import java.util.UUID;
 
 /**
  * A ContainerReplica timestamp class that tracks first and last seen time.
+ *
+ * Note this only tracks first and last seen time of a container replica.
+ * Recon does not guarantee the replica is available during the whole period
+ * from first seen time to last seen time.
+ * For example, Recon won't track records where a replica could be move out
+ * of one DN but later moved back to the same DN.
  */
 public class ContainerReplicaHistory {
   // Datanode UUID
