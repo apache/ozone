@@ -394,7 +394,7 @@
   </property>
   <property>
     <name>ozone.key.deleting.limit.per.task</name>
-    <value>1000</value>
+    <value>20000</value>
     <tag>OM, PERFORMANCE</tag>
     <description>
       A maximum number of keys to be scanned by key deleting service
@@ -776,7 +776,7 @@
     </description>
   </property>
   <property>
-  <name>ozone.datanode.pipeline.limit</name>
+  <name>ozone.scm.datanode.pipeline.limit</name>
   <value>2</value>
   <tag>OZONE, SCM, PIPELINE</tag>
   <description>Max number of pipelines per datanode can be engaged in.
@@ -1650,7 +1650,7 @@
     <description>This directory is used for storing OM's snapshot
       related files like the ratisSnapshotIndex and DB checkpoint from leader
       OM.
-      If undefined, OM snapshot dir will fallback to ozone.om.ratis.storage.dir.
+      If undefined, OM snapshot dir will fallback to ozone.metadata.dirs.
       This fallback approach is not recommended for production environments.
     </description>
   </property>

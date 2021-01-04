@@ -18,20 +18,22 @@
 
   <body>
 
-{{ partial "navbar.html" . }}
+    <div class="wrapper">
+        {{ partial "navbar.html" . }}
 
-    <div class="container-fluid">
-      <div class="row">
-        {{ partial "sidebar.html" . }}
-        <div class="col-sm-10 col-sm-offset-2 col-md-10 col-md-offset-2 main">
-            {{ partial "languages.html" .}}
+        <div class="container-fluid">
+          <div class="row">
+            {{ partial "sidebar.html" . }}
+            <div class="col-sm-10 col-sm-offset-2 col-md-10 col-md-offset-2 main">
+                {{ partial "languages.html" .}}
 
-            {{ .Content }}
+                {{ .Content }}
+            </div>
+          </div>
         </div>
-      </div>
+        <div class="push"></div>
     </div>
-
-{{ partial "footer.html" . }}
+    {{ partial "footer.html" . }}
 
   </body>
 </html>

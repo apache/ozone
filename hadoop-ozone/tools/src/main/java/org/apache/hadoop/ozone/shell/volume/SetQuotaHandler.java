@@ -45,7 +45,7 @@ public class SetQuotaHandler extends VolumeHandler {
     OzoneVolume volume = client.getObjectStore().getVolume(volumeName);
 
     long spaceQuota = volume.getQuotaInBytes();
-    long countQuota = volume.getQuotaInNamespace();
+    long namespaceQuota = volume.getQuotaInNamespace();
 
     if (quotaOptions.getQuotaInBytes() != null
         && !quotaOptions.getQuotaInBytes().isEmpty()) {
@@ -53,9 +53,9 @@ public class SetQuotaHandler extends VolumeHandler {
           quotaOptions.getQuotaInNamespace()).getQuotaInBytes();
     }
     if (quotaOptions.getQuotaInNamespace() >= 0) {
-      countQuota = quotaOptions.getQuotaInNamespace();
+      namespaceQuota = quotaOptions.getQuotaInNamespace();
     }
 
-    volume.setQuota(OzoneQuota.getOzoneQuota(spaceQuota, countQuota));
+    volume.setQuota(OzoneQuota.getOzoneQuota(spaceQuota, namespaceQuota));
   }
 }

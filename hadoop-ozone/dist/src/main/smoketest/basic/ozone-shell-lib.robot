@@ -58,17 +58,17 @@ Test ozone shell
     ${result} =     Execute             ozone sh bucket list ${protocol}${server}/${volume}/ | jq -r '. | select(.name=="bb1") | .volumeName'
                     Should Be Equal     ${result}       ${volume}
                     Run Keyword         Test key handling       ${protocol}       ${server}       ${volume}
-                    Execute             ozone sh bucket clrquota --space-quota ${protocol}${server}/${volume}/bb1
-    ${result} =     Execute             ozone sh bucket info ${protocol}${server}/${volume}/bb1 | jq -r '. | select(.name=="bb1") | .quotaInBytes'
-                    Should Be Equal     ${result}       -1
-                    Execute             ozone sh bucket clrquota --namespace-quota ${protocol}${server}/${volume}/bb1
-    ${result} =     Execute             ozone sh bucket info ${protocol}${server}/${volume}/bb1 | jq -r '. | select(.name=="bb1") | .quotaInNamespace'
-                    Should Be Equal     ${result}       -1
                     Execute             ozone sh volume clrquota --space-quota ${protocol}${server}/${volume}
     ${result} =     Execute             ozone sh volume info ${protocol}${server}/${volume} | jq -r '. | select(.name=="${volume}") | .quotaInBytes'
                     Should Be Equal     ${result}       -1
                     Execute             ozone sh volume clrquota --namespace-quota ${protocol}${server}/${volume}
     ${result} =     Execute             ozone sh volume info ${protocol}${server}/${volume} | jq -r '. | select(.name=="${volume}") | .quotaInNamespace'
+                    Should Be Equal     ${result}       -1
+                    Execute             ozone sh bucket clrquota --space-quota ${protocol}${server}/${volume}/bb1
+    ${result} =     Execute             ozone sh bucket info ${protocol}${server}/${volume}/bb1 | jq -r '. | select(.name=="bb1") | .quotaInBytes'
+                    Should Be Equal     ${result}       -1
+                    Execute             ozone sh bucket clrquota --namespace-quota ${protocol}${server}/${volume}/bb1
+    ${result} =     Execute             ozone sh bucket info ${protocol}${server}/${volume}/bb1 | jq -r '. | select(.name=="bb1") | .quotaInNamespace'
                     Should Be Equal     ${result}       -1
                     Execute             ozone sh bucket delete ${protocol}${server}/${volume}/bb1
                     Execute             ozone sh volume delete ${protocol}${server}/${volume}
