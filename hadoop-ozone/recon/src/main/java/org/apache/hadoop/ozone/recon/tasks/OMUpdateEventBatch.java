@@ -55,18 +55,6 @@ public class OMUpdateEventBatch {
   }
 
   /**
-   * Filter events based on Tables.
-   * @param tables set of tables to filter on.
-   * @return trimmed event batch.
-   */
-  public OMUpdateEventBatch filter(Collection<String> tables) {
-    return new OMUpdateEventBatch(events
-        .stream()
-        .filter(e -> tables.contains(e.getTable()))
-        .collect(Collectors.toList()));
-  }
-
-  /**
    * Return if empty.
    * @return true if empty, else false.
    */

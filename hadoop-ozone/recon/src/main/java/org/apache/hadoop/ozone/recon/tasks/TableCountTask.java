@@ -114,11 +114,15 @@ public class TableCountTask implements ReconOmTask {
   @Override
   public Pair<String, Boolean> process(OMUpdateEventBatch events) {
     Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
-
     HashMap<String, Long> objectCountMap = initializeCountMap();
+    final Collection<String> taskTables = getTaskTables();
 
     while (eventIterator.hasNext()) {
       OMDBUpdateEvent<String, Object> omdbUpdateEvent = eventIterator.next();
+      // Filter event inside process method to avoid duping
+      if (!taskTables.contains(omdbUpdateEvent.getTable())) {
+        continue;
+      }
       String rowKey = getRowKeyFromTable(omdbUpdateEvent.getTable());
       try{
         switch (omdbUpdateEvent.getAction()) {

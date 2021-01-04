@@ -78,8 +78,6 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     OMUpdateEventBatch omUpdateEventBatchMock = mock(OMUpdateEventBatch.class);
     when(omUpdateEventBatchMock.getLastSequenceNumber()).thenReturn(100L);
     when(omUpdateEventBatchMock.isEmpty()).thenReturn(false);
-    when(omUpdateEventBatchMock.filter(Collections.singleton("MockTable")))
-        .thenReturn(omUpdateEventBatchMock);
 
     long startTime = System.currentTimeMillis();
     reconTaskController.consumeOMEvents(
