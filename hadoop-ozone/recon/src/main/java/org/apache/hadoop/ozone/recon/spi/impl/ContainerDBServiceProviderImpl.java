@@ -222,7 +222,7 @@ public class ContainerDBServiceProviderImpl
    * @throws IOException
    */
   @Override
-  public Map<UUID, ContainerReplicaHistory> getContainerReplicaHistoryMap(
+  public Map<UUID, ContainerReplicaHistory> getContainerReplicaHistory(
       Long containerID) throws IOException {
 
     final ContainerReplicaHistoryList tsList =

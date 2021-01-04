@@ -145,7 +145,7 @@ public class ContainerSchemaManager {
   public void upsertContainerHistory(long containerID, UUID uuid, long time) {
     Map<UUID, ContainerReplicaHistory> tsMap;
     try {
-      tsMap = dbServiceProvider.getContainerReplicaHistoryMap(containerID);
+      tsMap = dbServiceProvider.getContainerReplicaHistory(containerID);
       ContainerReplicaHistory ts = tsMap.get(uuid);
       if (ts == null) {
         // New entry
@@ -164,7 +164,7 @@ public class ContainerSchemaManager {
     // First, get the existing entries from DB
     Map<UUID, ContainerReplicaHistory> resMap;
     try {
-      resMap = dbServiceProvider.getContainerReplicaHistoryMap(containerID);
+      resMap = dbServiceProvider.getContainerReplicaHistory(containerID);
     } catch (IOException ex) {
       resMap = new HashMap<>();
       LOG.debug("Unable to retrieve container replica history from RDB.");

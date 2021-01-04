@@ -110,7 +110,7 @@ public interface ContainerDBServiceProvider {
    * @return A map of ContainerReplicaWithTimestamp of the given containerID.
    * @throws IOException
    */
-  Map<UUID, ContainerReplicaHistory> getContainerReplicaHistoryMap(
+  Map<UUID, ContainerReplicaHistory> getContainerReplicaHistory(
       Long containerID) throws IOException;
 
   /**
