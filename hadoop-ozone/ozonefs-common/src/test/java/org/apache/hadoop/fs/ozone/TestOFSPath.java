@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.fs.ozone;
 
+import org.apache.hadoop.ozone.OFSPath;
 import org.junit.Assert;
 import org.junit.Test;
 
