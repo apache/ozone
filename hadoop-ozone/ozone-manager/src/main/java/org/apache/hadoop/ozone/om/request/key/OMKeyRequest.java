@@ -142,7 +142,9 @@ public abstract class OMKeyRequest extends OMClientRequest {
       if (grpcBlockTokenEnabled) {
         builder.setToken(secretManager
             .generateToken(remoteUser, allocatedBlock.getBlockID().toString(),
-                getAclForUser(remoteUser), scmBlockSize));
+                EnumSet.of(HddsProtos.BlockTokenSecretProto.
+                    AccessModeProto.WRITE),
+                scmBlockSize));
       }
       locationInfos.add(builder.build());
     }
@@ -155,18 +157,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
   private UserGroupInformation getRemoteUser() throws IOException {
     UserGroupInformation ugi = Server.getRemoteUser();
     return (ugi != null) ? ugi : UserGroupInformation.getCurrentUser();
-  }
-
-  /**
-   * Return acl for user.
-   * @param user
-   *
-   * */
-  private EnumSet< HddsProtos.BlockTokenSecretProto.AccessModeProto>
-      getAclForUser(String user) {
-    // TODO: Return correct acl for user.
-    return EnumSet.allOf(
-        HddsProtos.BlockTokenSecretProto.AccessModeProto.class);
   }
 
   /**
