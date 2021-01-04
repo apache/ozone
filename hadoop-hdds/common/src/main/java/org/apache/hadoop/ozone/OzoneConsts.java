@@ -381,4 +381,8 @@ public final class OzoneConsts {
 
   // An on-disk transient marker file used when replacing DB with checkpoint
   public static final String DB_TRANSIENT_MARKER = "dbInconsistentMarker";
+
+  // An on-disk marker file used to indicate that the OM is in prepare and
+  // should remain prepared even after a restart.
+  public static final String PREPARE_MARKER = "prepareMarker";
 }

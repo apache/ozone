@@ -35,8 +35,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 
-import org.apache.ratis.server.impl.RaftServerImpl;
-import org.apache.ratis.server.impl.RaftServerProxy;
+import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.raftlog.RaftLog;
 import org.apache.ratis.statemachine.StateMachine;
 import org.slf4j.Logger;
@@ -67,7 +66,8 @@ public class OMPrepareRequest extends OMClientRequest {
       OzoneManager ozoneManager, long transactionLogIndex,
       OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
 
-    LOG.info("Received prepare request with log index {}", transactionLogIndex);
+    LOG.info("OM {} Received prepare request with log index {}",
+        ozoneManager.getOMNodeId(), transactionLogIndex);
 
     OMRequest omRequest = getOmRequest();
     OzoneManagerProtocolProtos.PrepareRequestArgs args =
@@ -99,9 +99,9 @@ public class OMPrepareRequest extends OMClientRequest {
       ozoneManagerDoubleBufferHelper.add(response, transactionLogIndex);
 
       OzoneManagerRatisServer omRatisServer = ozoneManager.getOmRatisServer();
-      RaftServerProxy server = (RaftServerProxy) omRatisServer.getServer();
-      RaftServerImpl serverImpl =
-          server.getImpl(omRatisServer.getRaftGroup().getGroupId());
+      RaftServer.Division division =
+          omRatisServer.getServer()
+              .getDivision(omRatisServer.getRaftGroup().getGroupId());
 
       // Wait for outstanding double buffer entries to flush to disk,
       // so they will not be purged from the log before being persisted to
@@ -110,11 +110,18 @@ public class OMPrepareRequest extends OMClientRequest {
       // already, once this index reaches the state machine, we know all
       // transactions have been flushed.
       waitForLogIndex(transactionLogIndex,
-          ozoneManager.getMetadataManager(), serverImpl,
+          ozoneManager.getMetadataManager(), division,
           flushTimeout, flushCheckInterval);
-      takeSnapshotAndPurgeLogs(serverImpl);
 
-      // TODO: Create marker file with txn index.
+      // TODO: After the snapshot index update fix, the prepare index will
+      //  always be 1 more than the prepare txn index, because the Ratis
+      //  entry to commit the prepare request will be included in the snapshot.
+      long prepareIndex = takeSnapshotAndPurgeLogs(division);
+
+      // Save transaction log index to a marker file, so if the OM restarts,
+      // it will remain in prepare mode on that index as long as the file
+      // exists.
+      ozoneManager.getPrepareState().finishPrepare(prepareIndex);
 
       LOG.info("OM {} prepared at log index {}. Returning response {}",
           ozoneManager.getOMNodeId(),
@@ -142,7 +149,7 @@ public class OMPrepareRequest extends OMClientRequest {
    * disk, and to be updated in memory in Ratis.
    */
   private static void waitForLogIndex(long indexToWaitFor,
-      OMMetadataManager metadataManager, RaftServerImpl server,
+      OMMetadataManager metadataManager, RaftServer.Division division,
       Duration flushTimeout, Duration flushCheckInterval)
       throws InterruptedException, IOException {
 
@@ -158,7 +165,7 @@ public class OMPrepareRequest extends OMClientRequest {
       OMTransactionInfo dbTxnInfo = metadataManager
           .getTransactionInfoTable().get(TRANSACTION_INFO_KEY);
       long ratisTxnIndex =
-          server.getStateMachine().getLastAppliedTermIndex().getIndex();
+          division.getStateMachine().getLastAppliedTermIndex().getIndex();
 
       // Ratis may apply meta transactions after the prepare request, causing
       // its in memory index to always be greater than the DB index.
@@ -189,15 +196,16 @@ public class OMPrepareRequest extends OMClientRequest {
 
   /**
    * Take a snapshot of the state machine at the last index, and purge ALL logs.
-   * @param impl RaftServerImpl instance
+   * @param division Raft server division.
+   * @return The index the snapshot was taken on.
    * @throws IOException on Error.
    */
-  public static long takeSnapshotAndPurgeLogs(RaftServerImpl impl)
+  public static long takeSnapshotAndPurgeLogs(RaftServer.Division division)
       throws IOException {
 
-    StateMachine stateMachine = impl.getStateMachine();
+    StateMachine stateMachine = division.getStateMachine();
     long snapshotIndex = stateMachine.takeSnapshot();
-    RaftLog raftLog = impl.getState().getLog();
+    RaftLog raftLog = division.getRaftLog();
     long raftLogIndex = raftLog.getLastEntryTermIndex().getIndex();
 
     // We can have a case where the log has a meta transaction after the
@@ -213,6 +221,7 @@ public class OMPrepareRequest extends OMClientRequest {
 
     CompletableFuture<Long> purgeFuture =
         raftLog.syncWithSnapshot(snapshotIndex);
+
     try {
       Long purgeIndex = purgeFuture.get();
       if (purgeIndex != snapshotIndex) {
