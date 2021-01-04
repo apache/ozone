@@ -28,6 +28,7 @@ import java.util.HashSet;
 import java.util.Random;
 
 import org.apache.avro.generic.GenericData;
+import org.apache.commons.collections.ListUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -43,6 +44,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.hadoop.test.LambdaTestUtils;
 import org.apache.hadoop.tools.util.ProducerConsumer;
 import org.apache.ratis.util.TimeDuration;
 import org.junit.After;
@@ -67,9 +69,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
  */
 @RunWith(Parameterized.class)
 public class TestOpenKeyCleanupService {
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
-
   // Increase service interval of open key cleanup so we can trigger the
   // service manually between setting up the DB and checking the results.
   // Increase service interval of key deleting service to ensure it does not
@@ -87,6 +86,14 @@ public class TestOpenKeyCleanupService {
   // created by this test unless tests specify otherwise.
   private static final String DEFAULT_VOLUME = "volume";
   private static final String DEFAULT_BUCKET = "bucket";
+  private static final String OM_SERVICE_ID = "om-service-id";
+
+  // Time in milliseconds to wait for followers in the cluster to apply
+  // transactions.
+  private static final int FOLLOWER_WAIT_TIMEOUT = 10000;
+  // Time in milliseconds between checks that followers have applied
+  // transactions.
+  private static final int FOLLOWER_CHECK_INTERVAL = 1000;
 
   private MiniOzoneCluster cluster;
   private boolean isOMHA;
@@ -112,7 +119,6 @@ public class TestOpenKeyCleanupService {
       TimeDuration openKeyExpireThreshold) throws Exception {
 
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(OMConfigKeys.OZONE_OM_DB_DIRS, folder.getRoot().getAbsolutePath());
 
     // Make sure key deletion does not run during the tests.
     conf.setTimeDuration(OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL,
@@ -128,16 +134,25 @@ public class TestOpenKeyCleanupService {
         TESTING_TASK_LIMIT);
 
     if (isOMHA) {
-      cluster = MiniOzoneCluster.newHABuilder(conf).build();
+      cluster = MiniOzoneCluster.newHABuilder(conf)
+          .setClusterId("foo")
+          .setScmId("bar")
+          .setOMServiceId(OM_SERVICE_ID)
+          .setNumOfOzoneManagers(3)
+          .build();
       ozoneManagers = ((MiniOzoneHAClusterImpl) cluster).getOzoneManagersList();
     } else {
-      cluster = MiniOzoneCluster.newBuilder(conf).build();
+      cluster = MiniOzoneCluster.newBuilder(conf)
+          .setClusterId("foo")
+          .setScmId("bar")
+          .setOMServiceId(OM_SERVICE_ID)
+          .build();
       ozoneManagers = Collections.singletonList(cluster.getOzoneManager());
     }
 
     cluster.waitForClusterToBeReady();
 
-    ObjectStore store = OzoneClientFactory.getRpcClient("om-service-id", conf)
+    ObjectStore store = OzoneClientFactory.getRpcClient(OM_SERVICE_ID, conf)
             .getObjectStore();
     store.createVolume(DEFAULT_VOLUME);
     store.getVolume(DEFAULT_VOLUME).createBucket(DEFAULT_BUCKET);
@@ -213,24 +228,26 @@ public class TestOpenKeyCleanupService {
     // Setup test and verify the setup.
     Set<String> originalOpenKeys = createOpenKeys(TESTING_TASK_LIMIT);
     Assert.assertEquals(TESTING_TASK_LIMIT, originalOpenKeys.size());
-
-    Set<String> originalExpiredKeys = createExpiredOpenKeys(TESTING_TASK_LIMIT);
-    Assert.assertEquals(TESTING_TASK_LIMIT, originalExpiredKeys.size());
-
     for (OzoneManager om: ozoneManagers) {
       Assert.assertEquals(originalOpenKeys, getAllOpenKeys(om));
-      Assert.assertEquals(originalExpiredKeys, getAllExpiredOpenKeys(om));
+    }
+
+    Set<String> originalExpiredOpenKeys = createExpiredOpenKeys(TESTING_TASK_LIMIT);
+    Assert.assertEquals(TESTING_TASK_LIMIT, originalExpiredOpenKeys.size());
+    for (OzoneManager om: ozoneManagers) {
+      Assert.assertEquals(originalExpiredOpenKeys, getAllExpiredOpenKeys(om));
       Assert.assertEquals(0, getAllPendingDeleteKeys(om).size());
     }
 
     runService();
 
-    // Keys with no block data should be removed from open key table without
+    // Expired open keys with no block data should be removed from open key
+    // table without
     // being put in the delete table.
     for (OzoneManager om: ozoneManagers) {
+      LambdaTestUtils.await(FOLLOWER_WAIT_TIMEOUT, FOLLOWER_CHECK_INTERVAL,
+          () -> originalOpenKeys.equals(getAllOpenKeys(om)));
       Assert.assertEquals(0, getAllPendingDeleteKeys(om).size());
-      Assert.assertEquals(TESTING_TASK_LIMIT, getAllOpenKeys(om).size());
-      Assert.assertEquals(originalOpenKeys, getAllOpenKeys(om));
     }
   }
 
@@ -266,8 +283,9 @@ public class TestOpenKeyCleanupService {
     runService();
 
     for (OzoneManager om: ozoneManagers) {
+      LambdaTestUtils.await(FOLLOWER_WAIT_TIMEOUT, FOLLOWER_CHECK_INTERVAL,
+          () -> originalExpiredKeys.equals(getAllPendingDeleteKeys(om)));
       Assert.assertEquals(originalOpenKeys, getAllOpenKeys(om));
-      Assert.assertEquals(originalExpiredKeys, getAllPendingDeleteKeys(om));
     }
   }
 
@@ -289,7 +307,8 @@ public class TestOpenKeyCleanupService {
 
     // Tables should be unchanged since no keys are expired.
     for (OzoneManager om: ozoneManagers) {
-      Assert.assertEquals(originalOpenKeys, getAllOpenKeys(om));
+      LambdaTestUtils.await(FOLLOWER_WAIT_TIMEOUT, FOLLOWER_CHECK_INTERVAL,
+          () -> originalOpenKeys.equals(getAllOpenKeys(om)));
       Assert.assertEquals(0, getAllPendingDeleteKeys(om).size());
     }
   }
@@ -309,7 +328,8 @@ public class TestOpenKeyCleanupService {
 
     // Tables should be unchanged since no keys are expired.
     for (OzoneManager om: ozoneManagers) {
-      Assert.assertEquals(0, getAllOpenKeys(om).size());
+      LambdaTestUtils.await(FOLLOWER_WAIT_TIMEOUT, FOLLOWER_CHECK_INTERVAL,
+          () -> getAllOpenKeys(om).size() == 0);
       Assert.assertEquals(0, getAllPendingDeleteKeys(om).size());
     }
   }
@@ -327,7 +347,8 @@ public class TestOpenKeyCleanupService {
     final int numBlocks = 3;
     // Create more keys than the service will clean up in the allowed number
     // of runs.
-    final int numKeys = TESTING_TASK_LIMIT * (numServiceRuns + 1);
+    final int numKeysToDelete = TESTING_TASK_LIMIT * numServiceRuns;
+    final int numKeys = numKeysToDelete + TESTING_TASK_LIMIT;
 
     Set<String> originalExpiredKeys = createExpiredOpenKeys(numKeys, numBlocks);
 
@@ -338,7 +359,16 @@ public class TestOpenKeyCleanupService {
       Assert.assertEquals(0, getAllPendingDeleteKeys(om).size());
     }
 
-    runService(numServiceRuns);
+    // After each service run, wait for the service to finish so runs do not
+    // pick up the same keys to delete.
+    for (int run = 1; run <= numServiceRuns; run++) {
+      runService();
+      int runNum = run;
+      for (OzoneManager om: ozoneManagers) {
+        LambdaTestUtils.await(FOLLOWER_WAIT_TIMEOUT, FOLLOWER_CHECK_INTERVAL,
+            () -> getAllPendingDeleteKeys(om).size() == TESTING_TASK_LIMIT * runNum);
+      }
+    }
 
     // Order that the service deletes keys is not defined.
     // So for multiple runs that will not delete all keys, we can only
@@ -352,10 +382,10 @@ public class TestOpenKeyCleanupService {
       Assert.assertTrue(originalExpiredKeys.containsAll(expiredKeys));
 
       // Service runs should have reached but not exceeded their task limit.
-      Assert.assertEquals(TESTING_TASK_LIMIT * numServiceRuns,
-          pendingDeleteKeys.size());
+      Assert.assertEquals(numKeysToDelete, pendingDeleteKeys.size());
       // All remaining keys should still be present in the open key table.
-      Assert.assertEquals(TESTING_TASK_LIMIT, expiredKeys.size());
+      Assert.assertEquals(numKeys - numKeysToDelete,
+          expiredKeys.size());
     }
   }
 
@@ -385,8 +415,10 @@ public class TestOpenKeyCleanupService {
 
     // All keys should have been cleaned up.
     for (OzoneManager om: ozoneManagers) {
+      LambdaTestUtils.await(FOLLOWER_WAIT_TIMEOUT, FOLLOWER_CHECK_INTERVAL,
+          () -> getAllExpiredOpenKeys(om).size() == 0);
+
       Assert.assertEquals(originalExpiredKeys, getAllPendingDeleteKeys(om));
-      Assert.assertEquals(0, getAllExpiredOpenKeys(om).size());
     }
   }
 
@@ -424,11 +456,21 @@ public class TestOpenKeyCleanupService {
       Assert.assertEquals(getAllOpenKeys(om), allCreatedKeys);
     }
 
-    runService(numServiceRuns);
+    // After each service run, wait for the service to finish so runs do not
+    // pick up the same keys to delete.
+    for (int run = 1; run <= numServiceRuns; run++) {
+      runService();
+      int runNum = run;
+      for (OzoneManager om: ozoneManagers) {
+        LambdaTestUtils.await(FOLLOWER_WAIT_TIMEOUT, FOLLOWER_CHECK_INTERVAL,
+            () -> getAllPendingDeleteKeys(om).size() == TESTING_TASK_LIMIT * runNum);
+      }
+    }
 
     // All keys should have been cleaned up.
     for (OzoneManager om: ozoneManagers) {
       Assert.assertEquals(allCreatedKeys, getAllPendingDeleteKeys(om));
+
       Assert.assertEquals(0, getAllExpiredOpenKeys(om).size());
     }
   }
@@ -463,17 +505,16 @@ public class TestOpenKeyCleanupService {
     return keyNames;
   }
 
+  /**
+   * Runs the key deleting service the specified number of times on the
+   * cluster leader, but does not wait for OMs to apply results of the
+   * run to their DBs before returning.
+   *
+   * Callers should wait on their desired state for each OM after the service
+   * runs before running assertions about OM state.
+   */
   private void runService() throws Exception {
-    runService(1);
-  }
-
-  private void runService(int numRuns) throws Exception {
-    OpenKeyCleanupService service = getService();
-    for (int i = 0; i < numRuns; i++) {
-      service.getTasks().poll().call();
-    }
-
-    // TODO: Wait until all ozone managers have applied changes to disk.
+    getService().getTasks().poll().call();
   }
 
   private OpenKeyCleanupService getService() {
