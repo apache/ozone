@@ -33,8 +33,10 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -48,6 +50,7 @@ import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftClientRequest;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftPeerId;
+import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.server.storage.RaftStorage;
@@ -193,6 +196,32 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     return handleStartTransactionRequests(raftClientRequest, omRequest);
   }
 
+  @Override
+  public TransactionContext preAppendTransaction(TransactionContext trx)
+      throws IOException {
+    OMRequest request = OMRatisHelper.convertByteStringToOMRequest(
+        trx.getStateMachineLogEntry().getLogData());
+    OzoneManagerProtocolProtos.Type cmdType = request.getCmdType();
+
+    // In prepare mode, only prepare and cancel requests are allowed to go
+    // through.
+    OzoneManagerPrepareState prepareState = ozoneManager.getPrepareState();
+    if (prepareState.requestAllowed(cmdType)) {
+      if (cmdType == OzoneManagerProtocolProtos.Type.Prepare) {
+        prepareState.enablePrepareGate();
+      }
+      // TODO: Add cancel prepare here after it is implemented.
+      return trx;
+    } else {
+      String message = "Cannot apply write request " +
+          request.getCmdType().name() + " when OM is in prepare mode.";
+      OMException cause = new OMException(message,
+          OMException.ResultCodes.NOT_SUPPORTED_OPERATION_WHEN_PREPARED);
+      // Indicate that the leader should not step down because of this failure.
+      throw new StateMachineException(message, cause, false);
+    }
+  }
+
   /*
    * Apply a committed log entry to the state machine.
    */
@@ -317,7 +346,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     getLifeCycle().startAndTransition(() -> {
       this.ozoneManagerDoubleBuffer = buildDoubleBufferForRatis();
       handler.updateDoubleBuffer(ozoneManagerDoubleBuffer);
-      this.setLastAppliedTermIndex(TermIndex.newTermIndex(
+      this.setLastAppliedTermIndex(TermIndex.valueOf(
           newLastAppliedSnapShotTermIndex, newLastAppliedSnaphsotIndex));
     });
   }
@@ -510,7 +539,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         OMTransactionInfo.readTransactionInfo(
             ozoneManager.getMetadataManager());
     if (omTransactionInfo != null) {
-      setLastAppliedTermIndex(TermIndex.newTermIndex(
+      setLastAppliedTermIndex(TermIndex.valueOf(
           omTransactionInfo.getTerm(),
           omTransactionInfo.getTransactionIndex()));
       snapshotInfo.updateTermIndex(omTransactionInfo.getTerm(),

@@ -49,12 +49,14 @@ import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.security.UserGroupInformation;
 
+import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -467,6 +469,16 @@ public class OMFailoverProxyProvider implements
         if (accessControlExceptionOMs.containsAll(omNodeIDList)) {
           return false;
         }
+      }
+    } else if (ex instanceof StateMachineException) {
+      StateMachineException smEx = (StateMachineException) ex;
+      Throwable cause = smEx.getCause();
+      if (cause instanceof OMException) {
+        OMException omEx = (OMException) cause;
+        // Do not failover if the operation was blocked because the OM was
+        // prepared.
+        return omEx.getResult() !=
+            OMException.ResultCodes.NOT_SUPPORTED_OPERATION_WHEN_PREPARED;
       }
     }
     return true;

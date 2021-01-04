@@ -220,6 +220,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_FILE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_TEMP_FILE;
 import static org.apache.hadoop.ozone.OzoneConsts.RPC_PORT;
+import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT;
@@ -337,14 +338,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final boolean useRatisForReplication;
 
   private boolean isNativeAuthorizerEnabled;
-  private boolean isPrepared;
 
   private ExitManager exitManager;
+
+  private final OzoneManagerPrepareState prepareState;
 
   private enum State {
     INITIALIZED,
     RUNNING,
-    PREPARING_FOR_UPGRADE,
     STOPPED
   }
 
@@ -352,10 +353,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private State omState;
   private Thread emptier;
 
-  // TODO: Utilize the forUpgrade parameter to remove the marker file and
-  //  take the OM out of prepare mode on startup.
   @SuppressWarnings("methodlength")
-  private OzoneManager(OzoneConfiguration conf, boolean forUpgrade)
+  private OzoneManager(OzoneConfiguration conf)
       throws IOException, AuthenticationException {
     super(OzoneVersionInfo.OZONE_VERSION_INFO);
     Preconditions.checkNotNull(conf);
@@ -400,6 +399,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           ResultCodes.OM_NOT_INITIALIZED);
     }
     omMetaDir = OMStorage.getOmDbDir(configuration);
+
     this.isAclEnabled = conf.getBoolean(OZONE_ACL_ENABLED,
         OZONE_ACL_ENABLED_DEFAULT);
     this.scmBlockSize = (long) conf.getStorageSize(OZONE_SCM_BLOCK_SIZE,
@@ -464,6 +464,25 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     instantiateServices();
 
+    // If the prepare marker file is present and its index matches the last
+    // transaction index in the OM DB, turn on the in memory flag to
+    // put the ozone manager in prepare mode, disallowing write requests.
+    // This must be done after metadataManager is instantiated by
+    // instantiateServices and before the RPC server is started.
+    OMTransactionInfo txnInfo = metadataManager.getTransactionInfoTable()
+        .get(TRANSACTION_INFO_KEY);
+    prepareState = new OzoneManagerPrepareState(configuration);
+    if (txnInfo != null) {
+      // Only puts OM in prepare mode if a marker file matching the txn index
+      // is found.
+      prepareState.restorePrepare(txnInfo.getTransactionIndex());
+    } else {
+      // If we have no transaction info in the DB, then no prepare request
+      // could have been received, since the request would update the txn
+      // index in the DB.
+      prepareState.cancelPrepare();
+    }
+
     // Create special volume s3v which is required for S3G.
     addS3GVolumeToDB();
 
@@ -504,10 +523,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     ShutdownHookManager.get().addShutdownHook(shutdownHook,
         SHUTDOWN_HOOK_PRIORITY);
     omState = State.INITIALIZED;
-
-    // TODO: When marker file is added, check for that on startup to
-    //  determine prepare mode.
-    this.isPrepared = false;
   }
 
   private void logVersionMismatch(OzoneConfiguration conf, ScmInfo scmInfo) {
@@ -941,12 +956,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public static OzoneManager createOm(OzoneConfiguration conf)
       throws IOException, AuthenticationException {
-    return new OzoneManager(conf, false);
-  }
-
-  public static OzoneManager createOmUpgradeMode(OzoneConfiguration conf)
-      throws IOException, AuthenticationException {
-    return new OzoneManager(conf, true);
+    return new OzoneManager(conf);
   }
 
   /**
@@ -1220,12 +1230,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     startJVMPauseMonitor();
     setStartTime();
 
-    if (!isPrepared) {
-      omState = State.RUNNING;
-    } else {
-      omState = State.PREPARING_FOR_UPGRADE;
-      LOG.info("Started OM services in upgrade mode.");
-    }
+    omState = State.RUNNING;
   }
 
   /**
@@ -3390,7 +3395,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     // TODO: We should only return the snpashotIndex to the leader.
     //  Should be fixed after RATIS-586
-    TermIndex newTermIndex = TermIndex.newTermIndex(term, lastAppliedIndex);
+    TermIndex newTermIndex = TermIndex.valueOf(term, lastAppliedIndex);
     return newTermIndex;
   }
 
@@ -3824,5 +3829,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   public OmLayoutVersionManager getVersionManager() {
     return versionManager;
+  }
+
+  public OzoneManagerPrepareState getPrepareState() {
+    return prepareState;
   }
 }

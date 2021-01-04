@@ -21,6 +21,19 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareRequestArgs;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareRequest;
+import org.apache.ratis.proto.RaftProtos;
+import org.apache.ratis.protocol.exceptions.StateMachineException;
+import org.apache.ratis.statemachine.TransactionContext;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -42,6 +55,8 @@ public class TestOzoneManagerStateMachine {
   public TemporaryFolder tempDir = new TemporaryFolder();
 
   private OzoneManagerStateMachine ozoneManagerStateMachine;
+  private OzoneManagerPrepareState prepareState;
+
   @Before
   public void setup() throws Exception {
     OzoneManagerRatisServer ozoneManagerRatisServer =
@@ -55,6 +70,9 @@ public class TestOzoneManagerStateMachine {
     OMMetadataManager omMetadataManager = new OmMetadataManagerImpl(conf);
 
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
+
+    prepareState = new OzoneManagerPrepareState(conf);
+    when(ozoneManager.getPrepareState()).thenReturn(prepareState);
 
     when(ozoneManagerRatisServer.getOzoneManager()).thenReturn(ozoneManager);
     when(ozoneManager.getSnapshotInfo()).thenReturn(
@@ -229,5 +247,81 @@ public class TestOzoneManagerStateMachine {
         ozoneManagerStateMachine.getLastAppliedTermIndex().getTerm());
     Assert.assertEquals(10L,
         ozoneManagerStateMachine.getLastAppliedTermIndex().getIndex());
+  }
+
+  @Test
+  public void testPreAppendTransaction() throws Exception {
+    // Submit write request.
+    KeyArgs args = KeyArgs
+        .newBuilder()
+        .setVolumeName("volume")
+        .setBucketName("bucket")
+        .setKeyName("key")
+        .build();
+    OMRequest createKeyRequest = OMRequest.newBuilder()
+        .setCreateKeyRequest(CreateKeyRequest.newBuilder().setKeyArgs(args))
+        .setCmdType(Type.CreateKey)
+        .setClientId("123")
+        .build();
+
+    TransactionContext submittedTrx = mockTransactionContext(createKeyRequest);
+    TransactionContext returnedTrx =
+        ozoneManagerStateMachine.preAppendTransaction(submittedTrx);
+
+    // No prepare should be triggered, and the txn should be returned unaltered.
+    Assert.assertEquals(prepareState.getState().getStatus(),
+        PrepareStatus.PREPARE_NOT_STARTED);
+    Assert.assertSame(submittedTrx, returnedTrx);
+
+    // Submit prepare request.
+    OMRequest prepareRequest = OMRequest.newBuilder()
+        .setPrepareRequest(
+            PrepareRequest.newBuilder()
+                .setArgs(PrepareRequestArgs.getDefaultInstance()))
+        .setCmdType(Type.Prepare)
+        .setClientId("123")
+        .build();
+
+    submittedTrx = mockTransactionContext(prepareRequest);
+    returnedTrx = ozoneManagerStateMachine.preAppendTransaction(submittedTrx);
+
+    // Prepare should be started, and txn should be returned unaltered.
+    Assert.assertEquals(prepareState.getState().getStatus(),
+        PrepareStatus.PREPARE_IN_PROGRESS);
+    Assert.assertSame(submittedTrx, returnedTrx);
+
+    // Submitting a write request should now fail.
+    try {
+      ozoneManagerStateMachine.preAppendTransaction(
+          mockTransactionContext(createKeyRequest));
+      Assert.fail("Expected StateMachineException to be thrown when " +
+          "submitting write request while prepared.");
+    } catch(StateMachineException smEx) {
+      Assert.assertFalse(smEx.leaderShouldStepDown());
+
+      Throwable cause = smEx.getCause();
+      Assert.assertTrue(cause instanceof OMException);
+      Assert.assertEquals(((OMException) cause).getResult(),
+          OMException.ResultCodes.NOT_SUPPORTED_OPERATION_WHEN_PREPARED);
+    }
+
+    // Should be able to prepare again without issue.
+    Assert.assertEquals(prepareState.getState().getStatus(),
+        PrepareStatus.PREPARE_IN_PROGRESS);
+    Assert.assertSame(submittedTrx, returnedTrx);
+
+    // TODO: Add test for cancel prepare once it is implemented.
+  }
+
+  private TransactionContext mockTransactionContext(OMRequest request) {
+    RaftProtos.StateMachineLogEntryProto logEntry =
+        RaftProtos.StateMachineLogEntryProto.newBuilder()
+            .setLogData(OMRatisHelper.convertRequestToByteString(request))
+            .build();
+
+    TransactionContext mockTrx = Mockito.mock(TransactionContext.class);
+    when(mockTrx.getStateMachineLogEntry()).thenReturn(logEntry);
+
+    return mockTrx;
   }
 }
