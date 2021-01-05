@@ -114,6 +114,8 @@ import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.READ;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.WRITE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_ENABLED_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
@@ -377,8 +379,7 @@ public class KeyManagerImpl implements KeyManager {
       if (grpcBlockTokenEnabled) {
         builder.setToken(secretManager
             .generateToken(remoteUser, allocatedBlock.getBlockID().toString(),
-                EnumSet.of(HddsProtos.BlockTokenSecretProto.
-                    AccessModeProto.WRITE), scmBlockSize));
+                EnumSet.of(READ, WRITE), scmBlockSize));
       }
       locationInfos.add(builder.build());
     }
@@ -698,8 +699,7 @@ public class KeyManagerImpl implements KeyManager {
         key.getLocationList().forEach(k -> {
           k.setToken(secretManager.generateToken(remoteUser,
               k.getBlockID().getContainerBlockID().toString(),
-              EnumSet.of(HddsProtos.BlockTokenSecretProto.
-                  AccessModeProto.READ), k.getLength()));
+              EnumSet.of(READ), k.getLength()));
         });
       }
     }
