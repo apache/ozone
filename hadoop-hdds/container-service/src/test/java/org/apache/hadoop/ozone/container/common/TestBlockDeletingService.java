@@ -207,65 +207,89 @@ public class TestBlockDeletingService {
       data = (KeyValueContainerData) containerSet.getContainer(
           containerID).getContainerData();
       if (data.getSchemaVersion().equals(SCHEMA_V1)) {
-        try(ReferenceCountedDB metadata = BlockUtils.getDB(data, conf)) {
-          for (int j = 0; j < numOfBlocksPerContainer; j++) {
-            BlockID blockID =
-                ContainerTestHelper.getTestBlockID(containerID);
-            String deleteStateName = OzoneConsts.DELETING_KEY_PREFIX +
-                blockID.getLocalID();
-            BlockData kd = new BlockData(blockID);
-            List<ContainerProtos.ChunkInfo> chunks = Lists.newArrayList();
-            putChunksInBlock(numOfChunksPerBlock, j, chunks, buffer,
-                chunkManager, container, blockID);
-            kd.setChunks(chunks);
-            metadata.getStore().getBlockDataTable().put(
-                deleteStateName, kd);
-            container.getContainerData().incrPendingDeletionBlocks(1);
-          }
-          updateMetaData(data, container, numOfBlocksPerContainer,
-              numOfChunksPerBlock);
-        }
+        createPendingDeleteBlocksSchema1(numOfBlocksPerContainer, data,
+            containerID, numOfChunksPerBlock, buffer, chunkManager, container);
       } else if (data.getSchemaVersion().equals(SCHEMA_V2)) {
-        List<Long> containerBlocks = new ArrayList<>();
-        int blockCount = 0;
-        for (int i = 0; i < numOfBlocksPerContainer; i++) {
-          txnID = txnID + 1;
-          BlockID blockID =
-              ContainerTestHelper.getTestBlockID(containerID);
-          BlockData kd = new BlockData(blockID);
-          List<ContainerProtos.ChunkInfo> chunks = Lists.newArrayList();
-          putChunksInBlock(numOfChunksPerBlock, i, chunks, buffer, chunkManager,
-              container, blockID);
-          kd.setChunks(chunks);
-          try(ReferenceCountedDB metadata = BlockUtils.getDB(data, conf)) {
-            String bID = blockID.getLocalID()+"";
-            metadata.getStore().getBlockDataTable().put(bID, kd);
-          }
-          container.getContainerData().incrPendingDeletionBlocks(1);
-
-          // In below if statements we are checking if a single container
-          // consists of more blocks than 'blockLimitPerTask' then we create
-          // (totalBlocksInContainer / blockLimitPerTask) transactions which
-          // consists of blocks equal to blockLimitPerTask and last transaction
-          // consists of blocks equal to
-          // (totalBlocksInContainer % blockLimitPerTask).
-          containerBlocks.add(blockID.getLocalID());
-          blockCount++;
-          if (blockCount == blockLimitPerTask || i == (numOfBlocksPerContainer
-              - 1)) {
-            createTxn(data, containerBlocks, txnID, containerID);
-            containerBlocks.clear();
-            blockCount = 0;
-          }
-        }
-        updateMetaData(data, container, numOfBlocksPerContainer,
-            numOfChunksPerBlock);
+        createPendingDeleteBlocksSchema2(numOfBlocksPerContainer, txnID,
+            containerID, numOfChunksPerBlock, buffer, chunkManager, container,
+            data);
       } else {
         throw new UnsupportedOperationException(
             "Only schema version 1 and schema version 2 are "
                 + "supported.");
       }
     }
+  }
+
+  @SuppressWarnings("checkstyle:parameternumber")
+  private void createPendingDeleteBlocksSchema1(int numOfBlocksPerContainer,
+      KeyValueContainerData data, long containerID, int numOfChunksPerBlock,
+      ChunkBuffer buffer, ChunkManager chunkManager,
+      KeyValueContainer container) {
+    BlockID blockID = null;
+    try (ReferenceCountedDB metadata = BlockUtils.getDB(data, conf)) {
+      for (int j = 0; j < numOfBlocksPerContainer; j++) {
+        blockID = ContainerTestHelper.getTestBlockID(containerID);
+        String deleteStateName =
+            OzoneConsts.DELETING_KEY_PREFIX + blockID.getLocalID();
+        BlockData kd = new BlockData(blockID);
+        List<ContainerProtos.ChunkInfo> chunks = Lists.newArrayList();
+        putChunksInBlock(numOfChunksPerBlock, j, chunks, buffer, chunkManager,
+            container, blockID);
+        kd.setChunks(chunks);
+        metadata.getStore().getBlockDataTable().put(deleteStateName, kd);
+        container.getContainerData().incrPendingDeletionBlocks(1);
+      }
+      updateMetaData(data, container, numOfBlocksPerContainer,
+          numOfChunksPerBlock);
+    } catch (IOException exception) {
+      LOG.info("Exception " + exception);
+      LOG.warn("Failed to put block: " + blockID + " in BlockDataTable.");
+    }
+  }
+
+  @SuppressWarnings("checkstyle:parameternumber")
+  private void createPendingDeleteBlocksSchema2(int numOfBlocksPerContainer,
+      int txnID, long containerID, int numOfChunksPerBlock, ChunkBuffer buffer,
+      ChunkManager chunkManager, KeyValueContainer container,
+      KeyValueContainerData data) {
+    List<Long> containerBlocks = new ArrayList<>();
+    int blockCount = 0;
+    for (int i = 0; i < numOfBlocksPerContainer; i++) {
+      txnID = txnID + 1;
+      BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
+      BlockData kd = new BlockData(blockID);
+      List<ContainerProtos.ChunkInfo> chunks = Lists.newArrayList();
+      putChunksInBlock(numOfChunksPerBlock, i, chunks, buffer, chunkManager,
+          container, blockID);
+      kd.setChunks(chunks);
+      String bID = null;
+      try (ReferenceCountedDB metadata = BlockUtils.getDB(data, conf)) {
+        bID = blockID.getLocalID() + "";
+        metadata.getStore().getBlockDataTable().put(bID, kd);
+      } catch (IOException exception) {
+        LOG.info("Exception = " + exception);
+        LOG.warn("Failed to put block: " + bID + " in BlockDataTable.");
+      }
+      container.getContainerData().incrPendingDeletionBlocks(1);
+
+      // In below if statements we are checking if a single container
+      // consists of more blocks than 'blockLimitPerTask' then we create
+      // (totalBlocksInContainer / blockLimitPerTask) transactions which
+      // consists of blocks equal to blockLimitPerTask and last transaction
+      // consists of blocks equal to
+      // (totalBlocksInContainer % blockLimitPerTask).
+      containerBlocks.add(blockID.getLocalID());
+      blockCount++;
+      if (blockCount == blockLimitPerTask || i == (numOfBlocksPerContainer
+          - 1)) {
+        createTxn(data, containerBlocks, txnID, containerID);
+        containerBlocks.clear();
+        blockCount = 0;
+      }
+    }
+    updateMetaData(data, container, numOfBlocksPerContainer,
+        numOfChunksPerBlock);
   }
 
   private void createTxn(KeyValueContainerData data, List<Long> containerBlocks,
