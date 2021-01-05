@@ -120,7 +120,7 @@ public class SCMHAConfiguration {
       tags = {SCM, OZONE, HA, RATIS},
       description = "The threshold to trigger a Ratis taking snapshot " +
           "operation")
-  private long ratisSnapshotThreshold = 100000L;
+  private long ratisSnapshotThreshold = 1000L;
 
   @Config(key = "ratis.request.timeout",
       type = ConfigType.TIME,
