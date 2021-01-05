@@ -149,7 +149,8 @@ public final class RatisUtil {
   private static void setRaftSnapshotProperties(
       final RaftProperties properties, final SCMHAConfiguration conf) {
     Snapshot.setAutoTriggerEnabled(properties, true);
-    Snapshot.setAutoTriggerThreshold(properties, 400000);
+    Snapshot.setAutoTriggerThreshold(properties,
+        conf.getRatisSnapshotThreshold());
   }
 
 }
