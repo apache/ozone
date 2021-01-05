@@ -18,8 +18,13 @@ package org.apache.hadoop.ozone.om;
 
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
-import org.apache.hadoop.fs.*;
+import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -60,6 +65,7 @@ public class TrashOzoneFileSystem extends FileSystem {
 
   private String userName;
 
+  private String ofsPathPrefix;
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TrashOzoneFileSystem.class);
@@ -76,7 +82,7 @@ public class TrashOzoneFileSystem extends FileSystem {
   }
 
   @Override
-  public FSDataInputStream open(Path path, int i) throws IOException {
+  public FSDataInputStream open(Path path, int i) {
     return null;
   }
 
@@ -84,19 +90,19 @@ public class TrashOzoneFileSystem extends FileSystem {
   public FSDataOutputStream create(Path path,
       FsPermission fsPermission,
       boolean b, int i, short i1,
-      long l, Progressable progressable) throws IOException {
+      long l, Progressable progressable){
     return null;
   }
 
   @Override
   public FSDataOutputStream append(Path path, int i, Progressable progressable)
-      throws IOException {
+   {
     return null;
   }
 
   @Override
   public boolean rename(Path src, Path dst) throws IOException {
-    LOG.info("Src:" + src + "Dst:" + dst);
+    LOG.trace("Src:" + src + "Dst:" + dst);
     RenameIterator iterator = new RenameIterator(src, dst);
     iterator.iterate();
     return true;
@@ -112,16 +118,7 @@ public class TrashOzoneFileSystem extends FileSystem {
   @Override
   public FileStatus[] listStatus(Path path) throws  IOException {
     List<FileStatus> fileStatuses = new ArrayList<>();
-    OFSPath ofsPath = new OFSPath(path);
-    String volume = ofsPath.getVolumeName();
-    String bucket = ofsPath.getBucketName();
-    String key =  ofsPath.getKeyName();
-    String ofsPathPrefix = "/" + volume + "/" + bucket;
-    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
-        .setVolumeName(volume)
-        .setBucketName(bucket)
-        .setKeyName(key)
-        .build();
+    OmKeyArgs keyArgs = constructOmKeyArgs(path);
     List<OzoneFileStatus> list = ozoneManager.
         listStatus(keyArgs, false, null, Integer.MAX_VALUE);
     for (OzoneFileStatus status : list) {
@@ -153,24 +150,14 @@ public class TrashOzoneFileSystem extends FileSystem {
 
   @Override
   public boolean mkdirs(Path path,
-      FsPermission fsPermission) throws IOException {
+      FsPermission fsPermission) {
     return false;
   }
 
 
   @Override
   public FileStatus getFileStatus(Path path) throws IOException {
-    OFSPath ofsPath = new OFSPath(path);
-    String volume = ofsPath.getVolumeName();
-    String bucket = ofsPath.getBucketName();
-    String key =  ofsPath.getKeyName();
-    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
-        .setVolumeName(volume)
-        .setBucketName(bucket)
-        .setKeyName(key)
-        .build();
-    String ofsPathPrefix = OZONE_URI_DELIMITER +
-        volume + OZONE_URI_DELIMITER + bucket;
+    OmKeyArgs keyArgs = constructOmKeyArgs(path);
     OzoneFileStatus ofs = ozoneManager.getKeyManager().getFileStatus(keyArgs);
     Path temp = new Path(ofsPathPrefix +
         OZONE_URI_DELIMITER + ofs.getKeyInfo().getKeyName());
@@ -181,6 +168,21 @@ public class TrashOzoneFileSystem extends FileSystem {
         ofs.getKeyInfo().getModificationTime(),
         temp);
     return fileStatus;
+  }
+
+  private OmKeyArgs constructOmKeyArgs(Path path) {
+    OFSPath ofsPath = new OFSPath(path);
+    String volume = ofsPath.getVolumeName();
+    String bucket = ofsPath.getBucketName();
+    String key = ofsPath.getKeyName();
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(volume)
+        .setBucketName(bucket)
+        .setKeyName(key)
+        .build();
+    this.ofsPathPrefix = OZONE_URI_DELIMITER +
+        volume + OZONE_URI_DELIMITER + bucket;
+    return keyArgs;
   }
 
   @Override
@@ -197,7 +199,6 @@ public class TrashOzoneFileSystem extends FileSystem {
           omBucketInfo.getVolumeName());
       Path bucketPath = new Path(volumePath, omBucketInfo.getBucketName());
       Path trashRoot = new Path(bucketPath, FileSystem.TRASH_PREFIX);
-      LOG.info(trashRoot.toString());
       try {
         if (exists(trashRoot)) {
           FileStatus[] list = this.listStatus(trashRoot);
@@ -277,7 +278,6 @@ public class TrashOzoneFileSystem extends FileSystem {
           Table.KeyValue< String, OmKeyInfo > kv = keyIterator.next();
           String keyPath = ofsPathPrefix + kv.getValue().getKeyName();
           LOG.trace("iterating key path: {}", keyPath);
-          String k = kv.getKey();
           if (!kv.getValue().getKeyName().equals("")
               && kv.getKey().startsWith("/" + pathKey)) {
             keyPathList.add(keyPath);
@@ -321,10 +321,9 @@ public class TrashOzoneFileSystem extends FileSystem {
     }
 
     @Override
-    boolean processKeyPath(List<String> keyPathList) throws IOException {
+    boolean processKeyPath(List<String> keyPathList) {
       for (String keyPath : keyPathList) {
         String newPath = dstPath.concat(keyPath.substring(srcPath.length()));
-        LOG.info(newPath);
         OFSPath src = new OFSPath(keyPath);
         OFSPath dst = new OFSPath(newPath);
 
