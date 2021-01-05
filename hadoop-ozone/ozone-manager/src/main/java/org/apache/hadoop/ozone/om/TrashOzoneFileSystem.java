@@ -43,7 +43,12 @@ import org.slf4j.LoggerFactory;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Iterator;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
@@ -95,8 +100,8 @@ public class TrashOzoneFileSystem extends FileSystem {
   }
 
   @Override
-  public FSDataOutputStream append(Path path, int i, Progressable progressable)
-   {
+  public FSDataOutputStream append(Path path, int i,
+      Progressable progressable) {
     return null;
   }
 
@@ -272,11 +277,11 @@ public class TrashOzoneFileSystem extends FileSystem {
       if (status.isDirectory()) {
         LOG.trace("Iterating directory: {}", pathKey);
         OFSPath ofsPath = new OFSPath(pathKey);
-        String ofsPathPrefix =
+        String ofsPathprefix =
             ofsPath.getNonKeyPathNoPrefixDelim() + OZONE_URI_DELIMITER;
         while (keyIterator.hasNext()) {
           Table.KeyValue< String, OmKeyInfo > kv = keyIterator.next();
-          String keyPath = ofsPathPrefix + kv.getValue().getKeyName();
+          String keyPath = ofsPathprefix + kv.getValue().getKeyName();
           LOG.trace("iterating key path: {}", keyPath);
           if (!kv.getValue().getKeyName().equals("")
               && kv.getKey().startsWith("/" + pathKey)) {
