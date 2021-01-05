@@ -318,6 +318,8 @@ enum Status {
 
     QUOTA_EXCEEDED = 66;
 
+    QUOTA_ERROR = 67;
+
 }
 
 /**
@@ -363,7 +365,7 @@ message VolumeInfo {
     optional uint64 objectID = 8;
     optional uint64 updateID = 9;
     optional uint64 modificationTime = 10;
-    optional uint64 quotaInNamespace = 11;
+    optional int64 quotaInNamespace = 11 [default = -2];
     optional uint64 usedNamespace = 12;
 }
 
@@ -503,8 +505,9 @@ message BucketInfo {
     optional string sourceVolume = 12;
     optional string sourceBucket = 13;
     optional uint64 usedBytes = 14;
-    optional uint64 quotaInBytes = 15;
-    optional uint64 quotaInNamespace = 16;
+    optional int64 quotaInBytes = 15 [default = -2];
+    optional int64 quotaInNamespace = 16 [default = -2];
+    optional uint64 usedNamespace = 17;
 }
 
 enum StorageTypeProto {

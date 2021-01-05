@@ -53,6 +53,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT;
 import org.apache.ratis.protocol.exceptions.GroupMismatchException;
 import org.junit.After;
 import org.junit.Assert;
+import org.junit.Assume;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -62,6 +63,8 @@ import org.junit.rules.Timeout;
  * Tests failure detection and handling in BlockOutputStream Class.
  */
 public class TestOzoneClientRetriesOnException {
+
+  private static final int MAX_RETRIES = 3;
 
   /**
     * Set a timeout for each test.
@@ -97,7 +100,7 @@ public class TestOzoneClientRetriesOnException {
     blockSize = 2 * maxFlushSize;
 
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
-    clientConfig.setMaxRetryCount(3);
+    clientConfig.setMaxRetryCount(MAX_RETRIES);
     clientConfig.setChecksumType(ChecksumType.NONE);
     clientConfig.setStreamBufferFlushDelay(false);
     conf.setFromObject(clientConfig);
@@ -189,11 +192,12 @@ public class TestOzoneClientRetriesOnException {
   public void testMaxRetriesByOzoneClient() throws Exception {
     String keyName = getKeyName();
     OzoneOutputStream key =
-        createKey(keyName, ReplicationType.RATIS, 4 * blockSize);
+        createKey(keyName, ReplicationType.RATIS, (MAX_RETRIES+1) * blockSize);
     Assert.assertTrue(key.getOutputStream() instanceof KeyOutputStream);
     KeyOutputStream keyOutputStream = (KeyOutputStream) key.getOutputStream();
     List<BlockOutputStreamEntry> entries = keyOutputStream.getStreamEntries();
-    Assert.assertTrue(keyOutputStream.getStreamEntries().size() == 4);
+    Assert.assertEquals((MAX_RETRIES + 1),
+        keyOutputStream.getStreamEntries().size());
     int dataLength = maxFlushSize + 50;
     // write data more than 1 chunk
     byte[] data1 =
@@ -211,11 +215,10 @@ public class TestOzoneClientRetriesOnException {
               .getPipeline(container.getPipelineID());
       XceiverClientSpi xceiverClient =
           xceiverClientManager.acquireClient(pipeline);
-      if (!containerList.contains(containerID)) {
-        containerList.add(containerID);
-        xceiverClient.sendCommand(ContainerTestHelper
-            .getCreateContainerRequest(containerID, pipeline));
-      }
+      Assume.assumeFalse(containerList.contains(containerID));
+      containerList.add(containerID);
+      xceiverClient.sendCommand(ContainerTestHelper
+          .getCreateContainerRequest(containerID, pipeline));
       xceiverClientManager.releaseClient(xceiverClient, false);
     }
     key.write(data1);
@@ -223,11 +226,12 @@ public class TestOzoneClientRetriesOnException {
     Assert.assertTrue(stream instanceof BlockOutputStream);
     BlockOutputStream blockOutputStream = (BlockOutputStream) stream;
     TestHelper.waitForContainerClose(key, cluster);
-    // Ensure that blocks for the key have been allocated to atleast 3 different
-    // containers so that write request will be tried on 3 different blocks
-    // of 3 different containers and it will finally fail as it will hit
-    // the max retry count of 3.
-    Assert.assertTrue(containerList.size() >= 3);
+    // Ensure that blocks for the key have been allocated to at least N+1
+    // containers so that write request will be tried on N+1 different blocks
+    // of N+1 different containers and it will finally fail as it will hit
+    // the max retry count of N.
+    Assume.assumeTrue(containerList.size() + " <= " + MAX_RETRIES,
+        containerList.size() > MAX_RETRIES);
     try {
       key.write(data1);
       // ensure that write is flushed to dn
@@ -240,7 +244,7 @@ public class TestOzoneClientRetriesOnException {
               getMessage().contains(
               "Retry request failed. " +
                       "retries get failed due to exceeded maximum " +
-                      "allowed retries number: 3"));
+                      "allowed retries number: " + MAX_RETRIES));
     }
     try {
       key.flush();

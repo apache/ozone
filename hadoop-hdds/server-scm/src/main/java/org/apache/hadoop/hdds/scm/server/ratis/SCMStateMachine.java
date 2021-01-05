@@ -146,7 +146,7 @@ public class SCMStateMachine extends BaseStateMachine {
   public void unpause(long newLastAppliedSnaphsotIndex,
                       long newLastAppliedSnapShotTermIndex) {
     getLifeCycle().startAndTransition(() -> {
-      this.setLastAppliedTermIndex(TermIndex.newTermIndex(
+      this.setLastAppliedTermIndex(TermIndex.valueOf(
           newLastAppliedSnapShotTermIndex, newLastAppliedSnaphsotIndex));
     });
   }
@@ -223,7 +223,7 @@ public class SCMStateMachine extends BaseStateMachine {
    * Update lastAppliedIndex term in snapshot info.
    */
   public void updateLastAppliedIndexWithSnaphsotIndex() {
-    setLastAppliedTermIndex(TermIndex.newTermIndex(snapshotInfo.getTerm(),
+    setLastAppliedTermIndex(TermIndex.valueOf(snapshotInfo.getTerm(),
         snapshotInfo.getIndex()));
     LOG.info("LastAppliedIndex set from SnapShotInfo {}",
         getLastAppliedTermIndex());

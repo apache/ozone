@@ -26,7 +26,7 @@ import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.test.GenericTestUtils;
-import org.apache.ratis.server.impl.RaftServerImpl;
+import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.raftlog.RaftLog;
 import org.junit.Assert;
 import org.junit.Before;
@@ -53,7 +53,7 @@ public class TestHadoopDirTreeGenerator {
     path = GenericTestUtils
             .getTempPath(TestOzoneClientKeyGenerator.class.getSimpleName());
     GenericTestUtils.setLogLevel(RaftLog.LOG, Level.DEBUG);
-    GenericTestUtils.setLogLevel(RaftServerImpl.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(RaftServer.LOG, Level.DEBUG);
     File baseDir = new File(path);
     baseDir.mkdirs();
   }

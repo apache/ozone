@@ -142,7 +142,9 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     this.columnFamilyMap = new HashMap<>();
     DBColumnFamilyDefinition[] columnFamilyDefinitions = dbDefinition
             .getColumnFamilies();
-    for(DBColumnFamilyDefinition definition:columnFamilyDefinitions){
+    for (DBColumnFamilyDefinition definition:columnFamilyDefinitions) {
+      System.out.println("Added definition for table:" +
+          definition.getTableName());
       this.columnFamilyMap.put(definition.getTableName(), definition);
     }
   }
@@ -173,7 +175,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
             getDefinition(new File(dbPath).getName()));
     if (this.columnFamilyMap !=null) {
       if (!this.columnFamilyMap.containsKey(tableName)) {
-        System.out.print("Table with specified name does not exist");
+        System.out.print("Table with name:" + tableName + " does not exist");
       } else {
         DBColumnFamilyDefinition columnFamilyDefinition =
                 this.columnFamilyMap.get(tableName);
