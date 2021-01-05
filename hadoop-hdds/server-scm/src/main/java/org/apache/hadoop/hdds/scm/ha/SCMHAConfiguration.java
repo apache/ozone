@@ -116,7 +116,7 @@ public class SCMHAConfiguration {
 
   @Config(key = "ratis.snapshot.threshold",
       type = ConfigType.LONG,
-      defaultValue = "1000L",
+      defaultValue = "1000",
       tags = {SCM, OZONE, HA, RATIS},
       description = "The threshold to trigger a Ratis taking snapshot " +
           "operation for SCM")
