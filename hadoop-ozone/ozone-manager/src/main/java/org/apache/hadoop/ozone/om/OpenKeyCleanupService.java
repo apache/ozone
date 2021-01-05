@@ -28,9 +28,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import com.google.protobuf.ServiceException;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
-import org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBuffer;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKey;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKeyBucket;
@@ -237,7 +235,8 @@ public class OpenKeyCleanupService extends BackgroundService {
             server.getRaftPeerId(),
             server.getRaftGroupId(),
             0,
-            Message.valueOf(OMRatisHelper.convertRequestToByteString(omRequest)),
+            Message.valueOf(
+                OMRatisHelper.convertRequestToByteString(omRequest)),
             RaftClientRequest.writeRequestType(), null);
 
         server.submitRequest(omRequest, raftClientRequest);
@@ -248,8 +247,8 @@ public class OpenKeyCleanupService extends BackgroundService {
     }
 
     /**
-     * Separates {@code openKeyName} into its volume, bucket, key, and client ID.
-     * Creates an {@link OpenKey} object from {@code openKeyName}'s key and
+     * Separates {@code openKeyName} into its volume, bucket, key, and client
+     * ID. Creates an {@link OpenKey} object from {@code openKeyName}'s key and
      * client ID, and maps {@code openKeyName}'s volume and bucket to this
      * {@link OpenKey}.
      */
@@ -257,11 +256,12 @@ public class OpenKeyCleanupService extends BackgroundService {
         openKeysPerBucket, String openKeyName) {
       // First element of the split is an empty string since the key begins
       // with the separator.
-      // Key may contain multiple instances of the separator as well, for example:
-      // /volume/bucket/dir1//dir2/dir3/file1////10000
+      // Key may contain multiple instances of the separator as well,
+      // for example: /volume/bucket/dir1//dir2/dir3/file1////10000
       String[] split = openKeyName.split(OM_KEY_PREFIX);
-      Preconditions.assertTrue(split.length >= 5, "Unable to separate volume, " +
-          "bucket, key, and client ID from open key {}.", openKeyName);
+      Preconditions.assertTrue(split.length >= 5,
+          "Unable to separate volume, bucket, key, and client ID from" +
+              " open key {}.", openKeyName);
 
       Pair<String, String> volumeBucketPair = Pair.of(split[1], split[2]);
       String key = String.join(OM_KEY_PREFIX,

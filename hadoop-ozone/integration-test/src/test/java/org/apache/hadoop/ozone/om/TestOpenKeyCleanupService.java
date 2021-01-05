@@ -471,7 +471,8 @@ public class TestOpenKeyCleanupService {
     return keys;
   }
 
-  private Set<String> getAllPendingDeleteKeys(OzoneManager om) throws Exception {
+  private Set<String> getAllPendingDeleteKeys(OzoneManager om)
+      throws Exception {
     List<BlockGroup> blocks =
         om.getKeyManager().getPendingDeletionKeys(Integer.MAX_VALUE);
 
