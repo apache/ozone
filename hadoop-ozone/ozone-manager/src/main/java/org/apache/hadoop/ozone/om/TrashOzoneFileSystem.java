@@ -396,6 +396,9 @@ public class TrashOzoneFileSystem extends FileSystem {
           .map(p -> new OFSPath(p).getKeyName())
           .collect(Collectors.toList());
 
+      // since KeyPathList is a list obtained by iterating through KeyIterator,
+      // all the keys belong to the same volume and bucket.
+      // here we are just reading the volume and bucket from the first entry.
       if(!keyPathList.isEmpty()){
         OFSPath p = new OFSPath(keyPathList.get(0));
         volumeName = p.getVolumeName();
