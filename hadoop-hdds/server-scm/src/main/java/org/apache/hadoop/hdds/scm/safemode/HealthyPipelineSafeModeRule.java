@@ -149,8 +149,9 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
 
   @Override
   public String getStatusText() {
-    return "currentHealthyPipelineCount " + this.currentHealthyPipelineCount
-        + " >= healthyPipelineThresholdCount "
-        + this.healthyPipelineThresholdCount;
+    return String.format("healthy Ratis/THREE pipelines (=%d) >= "
+            + "healthyPipelineThresholdCount (=%d)",
+        this.currentHealthyPipelineCount,
+        this.healthyPipelineThresholdCount);
   }
 }
