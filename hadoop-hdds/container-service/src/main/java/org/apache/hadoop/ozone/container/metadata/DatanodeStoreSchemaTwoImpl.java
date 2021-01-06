@@ -18,6 +18,9 @@
 package org.apache.hadoop.ozone.container.metadata;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.proto.
+    StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
+import org.apache.hadoop.hdds.utils.db.Table;
 
 import java.io.IOException;
 
@@ -26,9 +29,12 @@ import java.io.IOException;
  * three column families/tables:
  * 1. A block data table.
  * 2. A metadata table.
- * 3. A deleted blocks table.
+ * 3. A Delete Transaction Table.
  */
 public class DatanodeStoreSchemaTwoImpl extends AbstractDatanodeStore {
+
+  private final Table<Long, DeletedBlocksTransaction>
+      deleteTransactionTable;
 
   /**
    * Constructs the datanode store and starts the DB Services.
@@ -41,5 +47,11 @@ public class DatanodeStoreSchemaTwoImpl extends AbstractDatanodeStore {
       throws IOException {
     super(config, containerID, new DatanodeSchemaTwoDBDefinition(dbPath),
         openReadOnly);
+    this.deleteTransactionTable = new DatanodeSchemaTwoDBDefinition(dbPath)
+        .getDeleteTransactionsColumnFamily().getTable(getStore());
+  }
+
+  public Table<Long, DeletedBlocksTransaction> getDeleteTransactionTable() {
+    return deleteTransactionTable;
   }
 }
