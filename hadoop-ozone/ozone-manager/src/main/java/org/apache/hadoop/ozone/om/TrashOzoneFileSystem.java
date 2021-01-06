@@ -127,20 +127,28 @@ public class TrashOzoneFileSystem extends FileSystem {
     List<OzoneFileStatus> list = ozoneManager.
         listStatus(keyArgs, false, null, Integer.MAX_VALUE);
     for (OzoneFileStatus status : list) {
-      Path temp = new Path(ofsPathPrefix +
-          OZONE_URI_DELIMITER + status.getKeyInfo().getKeyName());
-      FileStatus fileStatus = new FileStatus(
-          status.getKeyInfo().getDataSize(),
-          status.isDirectory(),
-          status.getKeyInfo().getFactor().getNumber(),
-          status.getBlockSize(),
-          status.getKeyInfo().getModificationTime(),
-          temp
-      );
+      FileStatus fileStatus = convertToFileStatus(status);
       fileStatuses.add(fileStatus);
 
     }
     return fileStatuses.toArray(new FileStatus[0]);
+  }
+
+
+  /**
+   * converts OzoneFileStatus object to FileStatus.
+   */
+  private FileStatus convertToFileStatus(OzoneFileStatus status) {
+    Path temp = new Path(ofsPathPrefix +
+        OZONE_URI_DELIMITER + status.getKeyInfo().getKeyName());
+    return new FileStatus(
+        status.getKeyInfo().getDataSize(),
+        status.isDirectory(),
+        status.getKeyInfo().getFactor().getNumber(),
+        status.getBlockSize(),
+        status.getKeyInfo().getModificationTime(),
+        temp
+    );
   }
 
   @Override
@@ -164,14 +172,7 @@ public class TrashOzoneFileSystem extends FileSystem {
   public FileStatus getFileStatus(Path path) throws IOException {
     OmKeyArgs keyArgs = constructOmKeyArgs(path);
     OzoneFileStatus ofs = ozoneManager.getKeyManager().getFileStatus(keyArgs);
-    Path temp = new Path(ofsPathPrefix +
-        OZONE_URI_DELIMITER + ofs.getKeyInfo().getKeyName());
-    FileStatus fileStatus = new FileStatus(ofs.getKeyInfo().getDataSize(),
-        ofs.isDirectory(),
-        ofs.getKeyInfo().getFactor().getNumber(),
-        ofs.getBlockSize(),
-        ofs.getKeyInfo().getModificationTime(),
-        temp);
+    FileStatus fileStatus = convertToFileStatus(ofs);
     return fileStatus;
   }
 
@@ -332,19 +333,8 @@ public class TrashOzoneFileSystem extends FileSystem {
         OFSPath src = new OFSPath(keyPath);
         OFSPath dst = new OFSPath(newPath);
 
-        String volumeName = src.getVolumeName();
-        String bucketName = src.getBucketName();
-        String keyName = src.getKeyName();
-
-        OzoneManagerProtocolProtos.KeyArgs keyArgs =
-            OzoneManagerProtocolProtos.KeyArgs.newBuilder().setKeyName(keyName)
-            .setVolumeName(volumeName).setBucketName(bucketName).build();
-
-        String toKeyName = dst.getKeyName();
-
         OzoneManagerProtocolProtos.RenameKeyRequest renameKeyRequest =
-            OzoneManagerProtocolProtos.RenameKeyRequest.newBuilder()
-            .setKeyArgs(keyArgs).setToKeyName(toKeyName).build();
+            constructRenameKeyRequest(src, dst);
         OzoneManagerProtocolProtos.OMRequest omRequest =
             OzoneManagerProtocolProtos.OMRequest.newBuilder()
             .setClientId(UUID.randomUUID().toString())
@@ -359,6 +349,25 @@ public class TrashOzoneFileSystem extends FileSystem {
 
       }
       return true;
+    }
+
+    private OzoneManagerProtocolProtos.RenameKeyRequest
+        constructRenameKeyRequest(
+        OFSPath src, OFSPath dst) {
+      String volumeName = src.getVolumeName();
+      String bucketName = src.getBucketName();
+      String keyName = src.getKeyName();
+
+      OzoneManagerProtocolProtos.KeyArgs keyArgs =
+          OzoneManagerProtocolProtos.KeyArgs.newBuilder().setKeyName(keyName)
+          .setVolumeName(volumeName).setBucketName(bucketName).build();
+
+      String toKeyName = dst.getKeyName();
+
+      OzoneManagerProtocolProtos.RenameKeyRequest renameKeyRequest =
+          OzoneManagerProtocolProtos.RenameKeyRequest.newBuilder()
+          .setKeyArgs(keyArgs).setToKeyName(toKeyName).build();
+      return renameKeyRequest;
     }
   }
 

@@ -95,7 +95,7 @@ Touch file
 Delete file with Trash
                    Execute               ozone fs -touch ${DEEP_URL}/testFile.txt
     ${result} =    Execute               ozone fs -rm ${DEEP_URL}/testFile.txt
-                   Should contain        ${result}     testFile.txt
+                   Should contain        ${result}     .Trash/${USER}/Current/${VOLUME}/${BUCKET}/${DEEP_DIR}/testFile.txt
 
 Delete recursively
                    Execute               ozone fs -mkdir -p ${DEEP_URL}/subdir2
