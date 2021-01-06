@@ -573,16 +573,19 @@ public class ContainerStateMachine extends BaseStateMachine {
         ReadChunkRequestProto.newBuilder()
             .setBlockID(writeChunkRequestProto.getBlockID())
             .setChunkData(chunkInfo);
-    ContainerCommandRequestProto dataContainerCommandProto =
+    ContainerCommandRequestProto.Builder dataContainerCommandProtoBuilder =
         ContainerCommandRequestProto.newBuilder(requestProto)
-            .setCmdType(Type.ReadChunk).setReadChunk(readChunkRequestProto)
-            .build();
+            .setCmdType(Type.ReadChunk).setReadChunk(readChunkRequestProto);
+    if (requestProto.hasEncodedToken()) {
+      dataContainerCommandProtoBuilder.setEncodedToken(
+          requestProto.getEncodedToken());
+    }
     DispatcherContext context =
         new DispatcherContext.Builder().setTerm(term).setLogIndex(index)
             .setReadFromTmpFile(true).build();
     // read the chunk
     ContainerCommandResponseProto response =
-        dispatchCommand(dataContainerCommandProto, context);
+        dispatchCommand(dataContainerCommandProtoBuilder.build(), context);
     if (response.getResult() != ContainerProtos.Result.SUCCESS) {
       StorageContainerException sce =
           new StorageContainerException(response.getMessage(),
