@@ -516,7 +516,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   @Override
   public void exportContainerData(OutputStream destination,
       ContainerPacker<KeyValueContainerData> packer) throws IOException {
-    readLock();
+    writeLock();
     try {
       // Closed/ Quasi closed containers are considered for replication by
       // replication manager if they are under-replicated.
@@ -530,8 +530,6 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
                 " is in state " + state);
       }
 
-      readUnlock();
-      writeLock();
       try {
         compactDB();
         // Close DB (and remove from cache) to avoid concurrent modification
@@ -544,7 +542,11 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
       packer.pack(this, destination);
     } finally {
-      readUnlock();
+      if (lock.isWriteLockedByCurrentThread()) {
+        writeUnlock();
+      } else {
+        readUnlock();
+      }
     }
   }
 
