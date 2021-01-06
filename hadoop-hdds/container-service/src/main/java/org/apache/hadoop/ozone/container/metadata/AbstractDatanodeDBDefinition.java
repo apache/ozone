@@ -60,7 +60,7 @@ public abstract class AbstractDatanodeDBDefinition implements DBDefinition {
   @Override
   public DBColumnFamilyDefinition[] getColumnFamilies() {
     return new DBColumnFamilyDefinition[] {getBlockDataColumnFamily(),
-        getMetadataColumnFamily(), getDeletedBlocksColumnFamily()};
+            getMetadataColumnFamily(), getDeletedBlocksColumnFamily()};
   }
 
   public abstract DBColumnFamilyDefinition<String, BlockData>

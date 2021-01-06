@@ -21,10 +21,9 @@ package org.apache.hadoop.ozone.container.common;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.UUID;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -35,13 +34,9 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
-import org.apache.hadoop.hdds.utils.db.BatchOperation;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
@@ -60,6 +55,7 @@ import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.keyvalue.ChunkLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
@@ -68,14 +64,11 @@ import org.apache.hadoop.ozone.container.keyvalue.impl.FilePerBlockStrategy;
 import org.apache.hadoop.ozone.container.keyvalue.impl.FilePerChunkStrategy;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.BlockDeletingService;
-import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
-import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.testutils.BlockDeletingServiceTestImpl;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.test.GenericTestUtils.LogCapturer;
 
-import static java.util.stream.Collectors.toList;
 import static org.apache.commons.lang3.RandomStringUtils.randomAlphanumeric;
 
 import org.junit.AfterClass;
@@ -89,11 +82,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_CONTA
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
-import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_VERSIONS;
-import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V1;
-import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
 import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.FILE_PER_BLOCK;
-import static org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointTask.LOG;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -112,38 +101,16 @@ public class TestBlockDeletingService {
   private static MutableConfigurationSource conf;
 
   private final ChunkLayOutVersion layout;
-  private final String schemaVersion;
   private int blockLimitPerTask;
   private static VolumeSet volumeSet;
 
-  public TestBlockDeletingService(LayoutInfo layoutInfo) {
-    this.layout = layoutInfo.layout;
-    this.schemaVersion = layoutInfo.schemaVersion;
+  public TestBlockDeletingService(ChunkLayOutVersion layout) {
+    this.layout = layout;
   }
 
   @Parameterized.Parameters
   public static Iterable<Object[]> parameters() {
-    return LayoutInfo.layoutList.stream().map(each -> new Object[] {each})
-        .collect(toList());
-  }
-
-  public static class LayoutInfo {
-    private final String schemaVersion;
-    private final ChunkLayOutVersion layout;
-
-    public LayoutInfo(String schemaVersion, ChunkLayOutVersion layout) {
-      this.schemaVersion = schemaVersion;
-      this.layout = layout;
-    }
-
-    private static List<LayoutInfo> layoutList = new ArrayList<>();
-    static {
-      for (ChunkLayOutVersion ch : ChunkLayOutVersion.getAllVersions()) {
-        for (String sch : SCHEMA_VERSIONS) {
-          layoutList.add(new LayoutInfo(sch, ch));
-        }
-      }
-    }
+    return ChunkLayoutTestInfo.chunkLayoutParameters();
   }
 
   @BeforeClass
@@ -191,7 +158,6 @@ public class TestBlockDeletingService {
     }
     byte[] arr = randomAlphanumeric(1048576).getBytes(UTF_8);
     ChunkBuffer buffer = ChunkBuffer.wrap(ByteBuffer.wrap(arr));
-    int txnID = 0;
     for (int x = 0; x < numOfContainers; x++) {
       long containerID = ContainerTestHelper.getTestContainerID();
       KeyValueContainerData data =
@@ -199,164 +165,55 @@ public class TestBlockDeletingService {
               ContainerTestHelper.CONTAINER_MAX_SIZE,
               UUID.randomUUID().toString(), datanodeUuid);
       data.closeContainer();
-      data.setSchemaVersion(schemaVersion);
       KeyValueContainer container = new KeyValueContainer(data, conf);
       container.create(volumeSet,
           new RoundRobinVolumeChoosingPolicy(), scmId);
       containerSet.addContainer(container);
       data = (KeyValueContainerData) containerSet.getContainer(
           containerID).getContainerData();
-      if (data.getSchemaVersion().equals(SCHEMA_V1)) {
-        createPendingDeleteBlocksSchema1(numOfBlocksPerContainer, data,
-            containerID, numOfChunksPerBlock, buffer, chunkManager, container);
-      } else if (data.getSchemaVersion().equals(SCHEMA_V2)) {
-        createPendingDeleteBlocksSchema2(numOfBlocksPerContainer, txnID,
-            containerID, numOfChunksPerBlock, buffer, chunkManager, container,
-            data);
-      } else {
-        throw new UnsupportedOperationException(
-            "Only schema version 1 and schema version 2 are "
-                + "supported.");
+      long chunkLength = 100;
+      try(ReferenceCountedDB metadata = BlockUtils.getDB(data, conf)) {
+        for (int j = 0; j < numOfBlocksPerContainer; j++) {
+          BlockID blockID =
+              ContainerTestHelper.getTestBlockID(containerID);
+          String deleteStateName = OzoneConsts.DELETING_KEY_PREFIX +
+              blockID.getLocalID();
+          BlockData kd = new BlockData(blockID);
+          List<ContainerProtos.ChunkInfo> chunks = Lists.newArrayList();
+          for (int k = 0; k < numOfChunksPerBlock; k++) {
+            final String chunkName = String.format("block.%d.chunk.%d", j, k);
+            final long offset = k * chunkLength;
+            ContainerProtos.ChunkInfo info =
+                ContainerProtos.ChunkInfo.newBuilder()
+                    .setChunkName(chunkName)
+                    .setLen(chunkLength)
+                    .setOffset(offset)
+                    .setChecksumData(Checksum.getNoChecksumDataProto())
+                    .build();
+            chunks.add(info);
+            ChunkInfo chunkInfo = new ChunkInfo(chunkName, offset, chunkLength);
+            ChunkBuffer chunkData = buffer.duplicate(0, (int) chunkLength);
+            chunkManager.writeChunk(container, blockID, chunkInfo, chunkData,
+                WRITE_STAGE);
+            chunkManager.writeChunk(container, blockID, chunkInfo, chunkData,
+                COMMIT_STAGE);
+          }
+          kd.setChunks(chunks);
+          metadata.getStore().getBlockDataTable().put(
+                  deleteStateName, kd);
+          container.getContainerData().incrPendingDeletionBlocks(1);
+        }
+        container.getContainerData().setKeyCount(numOfBlocksPerContainer);
+        // Set block count, bytes used and pending delete block count.
+        metadata.getStore().getMetadataTable().put(
+                OzoneConsts.BLOCK_COUNT, (long)numOfBlocksPerContainer);
+        metadata.getStore().getMetadataTable().put(
+                OzoneConsts.CONTAINER_BYTES_USED,
+            chunkLength * numOfChunksPerBlock * numOfBlocksPerContainer);
+        metadata.getStore().getMetadataTable().put(
+                OzoneConsts.PENDING_DELETE_BLOCK_COUNT,
+                (long)numOfBlocksPerContainer);
       }
-    }
-  }
-
-  @SuppressWarnings("checkstyle:parameternumber")
-  private void createPendingDeleteBlocksSchema1(int numOfBlocksPerContainer,
-      KeyValueContainerData data, long containerID, int numOfChunksPerBlock,
-      ChunkBuffer buffer, ChunkManager chunkManager,
-      KeyValueContainer container) {
-    BlockID blockID = null;
-    try (ReferenceCountedDB metadata = BlockUtils.getDB(data, conf)) {
-      for (int j = 0; j < numOfBlocksPerContainer; j++) {
-        blockID = ContainerTestHelper.getTestBlockID(containerID);
-        String deleteStateName =
-            OzoneConsts.DELETING_KEY_PREFIX + blockID.getLocalID();
-        BlockData kd = new BlockData(blockID);
-        List<ContainerProtos.ChunkInfo> chunks = Lists.newArrayList();
-        putChunksInBlock(numOfChunksPerBlock, j, chunks, buffer, chunkManager,
-            container, blockID);
-        kd.setChunks(chunks);
-        metadata.getStore().getBlockDataTable().put(deleteStateName, kd);
-        container.getContainerData().incrPendingDeletionBlocks(1);
-      }
-      updateMetaData(data, container, numOfBlocksPerContainer,
-          numOfChunksPerBlock);
-    } catch (IOException exception) {
-      LOG.info("Exception " + exception);
-      LOG.warn("Failed to put block: " + blockID + " in BlockDataTable.");
-    }
-  }
-
-  @SuppressWarnings("checkstyle:parameternumber")
-  private void createPendingDeleteBlocksSchema2(int numOfBlocksPerContainer,
-      int txnID, long containerID, int numOfChunksPerBlock, ChunkBuffer buffer,
-      ChunkManager chunkManager, KeyValueContainer container,
-      KeyValueContainerData data) {
-    List<Long> containerBlocks = new ArrayList<>();
-    int blockCount = 0;
-    for (int i = 0; i < numOfBlocksPerContainer; i++) {
-      txnID = txnID + 1;
-      BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
-      BlockData kd = new BlockData(blockID);
-      List<ContainerProtos.ChunkInfo> chunks = Lists.newArrayList();
-      putChunksInBlock(numOfChunksPerBlock, i, chunks, buffer, chunkManager,
-          container, blockID);
-      kd.setChunks(chunks);
-      String bID = null;
-      try (ReferenceCountedDB metadata = BlockUtils.getDB(data, conf)) {
-        bID = blockID.getLocalID() + "";
-        metadata.getStore().getBlockDataTable().put(bID, kd);
-      } catch (IOException exception) {
-        LOG.info("Exception = " + exception);
-        LOG.warn("Failed to put block: " + bID + " in BlockDataTable.");
-      }
-      container.getContainerData().incrPendingDeletionBlocks(1);
-
-      // In below if statements we are checking if a single container
-      // consists of more blocks than 'blockLimitPerTask' then we create
-      // (totalBlocksInContainer / blockLimitPerTask) transactions which
-      // consists of blocks equal to blockLimitPerTask and last transaction
-      // consists of blocks equal to
-      // (totalBlocksInContainer % blockLimitPerTask).
-      containerBlocks.add(blockID.getLocalID());
-      blockCount++;
-      if (blockCount == blockLimitPerTask || i == (numOfBlocksPerContainer
-          - 1)) {
-        createTxn(data, containerBlocks, txnID, containerID);
-        containerBlocks.clear();
-        blockCount = 0;
-      }
-    }
-    updateMetaData(data, container, numOfBlocksPerContainer,
-        numOfChunksPerBlock);
-  }
-
-  private void createTxn(KeyValueContainerData data, List<Long> containerBlocks,
-      int txnID, long containerID) {
-    try (ReferenceCountedDB metadata = BlockUtils.getDB(data, conf)) {
-      StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction dtx =
-          StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction
-              .newBuilder().setTxID(txnID).setContainerID(containerID)
-              .addAllLocalID(containerBlocks).setCount(0).build();
-      try (BatchOperation batch = metadata.getStore().getBatchHandler()
-          .initBatchOperation()) {
-        DatanodeStore ds = metadata.getStore();
-        DatanodeStoreSchemaTwoImpl dnStoreTwoImpl =
-            (DatanodeStoreSchemaTwoImpl) ds;
-        dnStoreTwoImpl.getDeleteTransactionTable()
-            .putWithBatch(batch, (long) txnID, dtx);
-        metadata.getStore().getBatchHandler().commitBatchOperation(batch);
-      }
-    } catch (IOException exception) {
-      LOG.warn("Transaction creation was not successful for txnID: " + txnID
-          + " consisting of " + containerBlocks.size() + " blocks.");
-    }
-  }
-
-  private void putChunksInBlock(int numOfChunksPerBlock, int i,
-      List<ContainerProtos.ChunkInfo> chunks, ChunkBuffer buffer,
-      ChunkManager chunkManager, KeyValueContainer container, BlockID blockID) {
-    long chunkLength = 100;
-    try {
-      for (int k = 0; k < numOfChunksPerBlock; k++) {
-        final String chunkName = String.format("block.%d.chunk.%d", i, k);
-        final long offset = k * chunkLength;
-        ContainerProtos.ChunkInfo info =
-            ContainerProtos.ChunkInfo.newBuilder().setChunkName(chunkName)
-                .setLen(chunkLength).setOffset(offset)
-                .setChecksumData(Checksum.getNoChecksumDataProto()).build();
-        chunks.add(info);
-        ChunkInfo chunkInfo = new ChunkInfo(chunkName, offset, chunkLength);
-        ChunkBuffer chunkData = buffer.duplicate(0, (int) chunkLength);
-        chunkManager
-            .writeChunk(container, blockID, chunkInfo, chunkData, WRITE_STAGE);
-        chunkManager
-            .writeChunk(container, blockID, chunkInfo, chunkData, COMMIT_STAGE);
-      }
-    } catch (IOException ex) {
-      LOG.warn("Putting chunks in blocks was not successful for BlockID: "
-          + blockID);
-    }
-  }
-
-  private void updateMetaData(KeyValueContainerData data,
-      KeyValueContainer container, int numOfBlocksPerContainer,
-      int numOfChunksPerBlock) {
-    long chunkLength = 100;
-    try (ReferenceCountedDB metadata = BlockUtils.getDB(data, conf)) {
-      container.getContainerData().setKeyCount(numOfBlocksPerContainer);
-      // Set block count, bytes used and pending delete block count.
-      metadata.getStore().getMetadataTable()
-          .put(OzoneConsts.BLOCK_COUNT, (long) numOfBlocksPerContainer);
-      metadata.getStore().getMetadataTable()
-          .put(OzoneConsts.CONTAINER_BYTES_USED,
-              chunkLength * numOfChunksPerBlock * numOfBlocksPerContainer);
-      metadata.getStore().getMetadataTable()
-          .put(OzoneConsts.PENDING_DELETE_BLOCK_COUNT,
-              (long) numOfBlocksPerContainer);
-    } catch (IOException exception) {
-      LOG.warn("Meta Data update was not successful for container: "+container);
     }
   }
 
@@ -374,32 +231,11 @@ public class TestBlockDeletingService {
    * Get under deletion blocks count from DB,
    * note this info is parsed from container.db.
    */
-  private int getUnderDeletionBlocksCount(ReferenceCountedDB meta,
-      KeyValueContainerData data) throws IOException {
-    if (data.getSchemaVersion().equals(SCHEMA_V1)) {
-      return meta.getStore().getBlockDataTable()
-          .getRangeKVs(null, 100, MetadataKeyFilters.getDeletingKeyFilter())
-          .size();
-    } else if (data.getSchemaVersion().equals(SCHEMA_V2)) {
-      int pendingBlocks = 0;
-      DatanodeStore ds = meta.getStore();
-      DatanodeStoreSchemaTwoImpl dnStoreTwoImpl =
-          (DatanodeStoreSchemaTwoImpl) ds;
-      try (
-          TableIterator<Long, ? extends Table.KeyValue<Long, 
-              StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction>> 
-              iter = dnStoreTwoImpl.getDeleteTransactionTable().iterator()) {
-        while (iter.hasNext()) {
-          StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction
-              delTx = iter.next().getValue();
-          pendingBlocks += delTx.getLocalIDList().size();
-        }
-      }
-      return pendingBlocks;
-    } else {
-      throw new UnsupportedOperationException(
-          "Only schema version 1 and schema version 2 are supported.");
-    }
+  private int getUnderDeletionBlocksCount(ReferenceCountedDB meta)
+      throws IOException {
+    return meta.getStore().getBlockDataTable()
+        .getRangeKVs(null, 100,
+        MetadataKeyFilters.getDeletingKeyFilter()).size();
   }
 
 
@@ -425,7 +261,6 @@ public class TestBlockDeletingService {
     // Ensure 1 container was created
     List<ContainerData> containerData = Lists.newArrayList();
     containerSet.listContainer(0L, 1, containerData);
-    KeyValueContainerData data = (KeyValueContainerData) containerData.get(0);
     Assert.assertEquals(1, containerData.size());
 
     try(ReferenceCountedDB meta = BlockUtils.getDB(
@@ -445,7 +280,7 @@ public class TestBlockDeletingService {
       Assert.assertEquals(0, transactionId);
 
       // Ensure there are 3 blocks under deletion and 0 deleted blocks
-      Assert.assertEquals(3, getUnderDeletionBlocksCount(meta, data));
+      Assert.assertEquals(3, getUnderDeletionBlocksCount(meta));
       Assert.assertEquals(3, meta.getStore().getMetadataTable()
           .get(OzoneConsts.PENDING_DELETE_BLOCK_COUNT).longValue());
 
@@ -513,9 +348,6 @@ public class TestBlockDeletingService {
   public void testBlockDeletionTimeout() throws Exception {
     conf.setInt(OZONE_BLOCK_DELETING_CONTAINER_LIMIT_PER_INTERVAL, 10);
     conf.setInt(OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER, 2);
-    this.blockLimitPerTask =
-        conf.getInt(OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER,
-            OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER_DEFAULT);
     ContainerSet containerSet = new ContainerSet();
     createToDeleteBlocks(containerSet, 1, 3, 1);
     ContainerMetrics metrics = ContainerMetrics.create(conf);
@@ -562,7 +394,7 @@ public class TestBlockDeletingService {
       LogCapturer newLog = LogCapturer.captureLogs(BackgroundService.LOG);
       GenericTestUtils.waitFor(() -> {
         try {
-          return getUnderDeletionBlocksCount(meta, data) == 0;
+          return getUnderDeletionBlocksCount(meta) == 0;
         } catch (IOException ignored) {
         }
         return false;
@@ -613,9 +445,6 @@ public class TestBlockDeletingService {
         TopNOrderedContainerDeletionChoosingPolicy.class.getName());
     conf.setInt(OZONE_BLOCK_DELETING_CONTAINER_LIMIT_PER_INTERVAL, 1);
     conf.setInt(OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER, 1);
-    this.blockLimitPerTask =
-        conf.getInt(OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER,
-            OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER_DEFAULT);
     ContainerSet containerSet = new ContainerSet();
 
     int containerCount = 2;

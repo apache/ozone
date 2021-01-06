@@ -254,14 +254,10 @@ public final class OzoneConsts {
   // versions, requiring this property to be tracked on a per container basis.
   // V1: All data in default column family.
   public static final String SCHEMA_V1 = "1";
-  // V2: Metadata, block data, and delete transactions in their own
-  // column families.
+  // V2: Metadata, block data, and deleted blocks in their own column families.
   public static final String SCHEMA_V2 = "2";
   // Most recent schema version that all new containers should be created with.
   public static final String SCHEMA_LATEST = SCHEMA_V2;
-
-  public static final String[] SCHEMA_VERSIONS =
-      new String[] {SCHEMA_V1, SCHEMA_V2};
 
   // Supported store types.
   public static final String OZONE = "ozone";
