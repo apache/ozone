@@ -25,7 +25,6 @@ import javax.annotation.Nonnull;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -34,12 +33,13 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
 
 /**
  * Response for CreateKey request.
  */
-@CleanupTableInfo(cleanupTables = OPEN_KEY_TABLE)
+@CleanupTableInfo(cleanupTables = {OPEN_KEY_TABLE, KEY_TABLE})
 public class OMKeyCreateResponse extends OMClientResponse {
 
   public static final Logger LOG =
@@ -47,18 +47,15 @@ public class OMKeyCreateResponse extends OMClientResponse {
   private OmKeyInfo omKeyInfo;
   private long openKeySessionID;
   private List<OmKeyInfo> parentKeyInfos;
-  private OmVolumeArgs omVolumeArgs;
   private OmBucketInfo omBucketInfo;
 
   public OMKeyCreateResponse(@Nonnull OMResponse omResponse,
       @Nonnull OmKeyInfo omKeyInfo, List<OmKeyInfo> parentKeyInfos,
-      long openKeySessionID, @Nonnull OmVolumeArgs omVolumeArgs,
-      @Nonnull OmBucketInfo omBucketInfo) {
+      long openKeySessionID, @Nonnull OmBucketInfo omBucketInfo) {
     super(omResponse);
     this.omKeyInfo = omKeyInfo;
     this.openKeySessionID = openKeySessionID;
     this.parentKeyInfos = parentKeyInfos;
-    this.omVolumeArgs = omVolumeArgs;
     this.omBucketInfo = omBucketInfo;
   }
 
@@ -99,14 +96,10 @@ public class OMKeyCreateResponse extends OMClientResponse {
     omMetadataManager.getOpenKeyTable().putWithBatch(batchOperation,
         openKey, omKeyInfo);
 
-    // update volume usedBytes.
-    omMetadataManager.getVolumeTable().putWithBatch(batchOperation,
-        omMetadataManager.getVolumeKey(omVolumeArgs.getVolume()),
-        omVolumeArgs);
     // update bucket usedBytes.
     omMetadataManager.getBucketTable().putWithBatch(batchOperation,
-        omMetadataManager.getBucketKey(omVolumeArgs.getVolume(),
-            omBucketInfo.getBucketName()), omBucketInfo);
+        omMetadataManager.getBucketKey(omKeyInfo.getVolumeName(),
+            omKeyInfo.getBucketName()), omBucketInfo);
   }
 }
 

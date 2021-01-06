@@ -112,7 +112,10 @@ public class TestContainerReader {
         blkNames = addBlocks(keyValueContainer, false);
         markBlocksForDelete(keyValueContainer, false, blkNames, i);
       }
-
+      // Close the RocksDB instance for this container and remove from the cache
+      // so it does not affect the ContainerReader, which avoids using the cache
+      // at startup for performance reasons.
+      BlockUtils.removeDB(keyValueContainerData, conf);
     }
   }
 
@@ -250,6 +253,10 @@ public class TestContainerReader {
         blkNames = addBlocks(keyValueContainer, false);
         markBlocksForDelete(keyValueContainer, false, blkNames, i);
       }
+      // Close the RocksDB instance for this container and remove from the cache
+      // so it does not affect the ContainerReader, which avoids using the cache
+      // at startup for performance reasons.
+      BlockUtils.removeDB(keyValueContainerData, conf);
     }
 
     List<HddsVolume> hddsVolumes = volumeSets.getVolumesList();
@@ -271,6 +278,8 @@ public class TestContainerReader {
         " costs " + (System.currentTimeMillis() - startTime) / 1000 + "s");
     Assert.assertEquals(containerCount,
         containerSet.getContainerMap().entrySet().size());
-    Assert.assertEquals(containerCount, cache.size());
+    // There should be no open containers cached by the ContainerReader as it
+    // opens and closed them avoiding the cache.
+    Assert.assertEquals(0, cache.size());
   }
 }

@@ -58,7 +58,7 @@ public final class BucketArgs {
   private final String sourceBucket;
 
   private long quotaInBytes;
-  private long quotaInCounts;
+  private long quotaInNamespace;
 
   /**
    * Private constructor, constructed via builder.
@@ -70,13 +70,13 @@ public final class BucketArgs {
    * @param sourceVolume
    * @param sourceBucket
    * @param quotaInBytes Bucket quota in bytes.
-   * @param quotaInCounts Bucket quota in counts.
+   * @param quotaInNamespace Bucket quota in counts.
    */
   @SuppressWarnings("parameternumber")
   private BucketArgs(Boolean versioning, StorageType storageType,
       List<OzoneAcl> acls, Map<String, String> metadata,
       String bucketEncryptionKey, String sourceVolume, String sourceBucket,
-      long quotaInBytes, long quotaInCounts) {
+      long quotaInBytes, long quotaInNamespace) {
     this.acls = acls;
     this.versioning = versioning;
     this.storageType = storageType;
@@ -85,7 +85,7 @@ public final class BucketArgs {
     this.sourceVolume = sourceVolume;
     this.sourceBucket = sourceBucket;
     this.quotaInBytes = quotaInBytes;
-    this.quotaInCounts = quotaInCounts;
+    this.quotaInNamespace = quotaInNamespace;
   }
 
   /**
@@ -156,10 +156,10 @@ public final class BucketArgs {
 
   /**
    * Returns Bucket Quota in key counts.
-   * @return quotaInCounts.
+   * @return quotaInNamespace.
    */
-  public long getQuotaInCounts() {
-    return quotaInCounts;
+  public long getQuotaInNamespace() {
+    return quotaInNamespace;
   }
 
   /**
@@ -174,7 +174,7 @@ public final class BucketArgs {
     private String sourceVolume;
     private String sourceBucket;
     private long quotaInBytes;
-    private long quotaInCounts;
+    private long quotaInNamespace;
 
     public Builder() {
       metadata = new HashMap<>();
@@ -220,8 +220,8 @@ public final class BucketArgs {
       return this;
     }
 
-    public BucketArgs.Builder setQuotaInCounts(long quota) {
-      quotaInCounts = quota;
+    public BucketArgs.Builder setQuotaInNamespace(long quota) {
+      quotaInNamespace = quota;
       return this;
     }
 
@@ -233,7 +233,7 @@ public final class BucketArgs {
     public BucketArgs build() {
       return new BucketArgs(versioning, storageType, acls, metadata,
           bucketEncryptionKey, sourceVolume, sourceBucket, quotaInBytes,
-          quotaInCounts);
+          quotaInNamespace);
     }
   }
 }

@@ -407,18 +407,27 @@ public class SCMContainerManager implements ContainerManager {
         ContainerID containerIdObject = new ContainerID(containerID);
         ContainerInfo containerInfo =
             containerStore.get(containerIdObject);
-        ContainerInfo containerInfoInMem = containerStateManager
-            .getContainer(containerIdObject);
-        if (containerInfo == null || containerInfoInMem == null) {
-          throw new SCMException("Failed to increment number of deleted " +
-              "blocks for container " + containerID + ", reason : " +
-              "container doesn't exist.", FAILED_TO_FIND_CONTAINER);
+        try {
+          ContainerInfo containerInfoInMem = containerStateManager
+              .getContainer(containerIdObject);
+          if (containerInfo == null || containerInfoInMem == null) {
+            throw new SCMException("Failed to increment number of deleted " +
+                "blocks for container " + containerID + ", reason : " +
+                "container doesn't exist.", FAILED_TO_FIND_CONTAINER);
+          }
+          containerInfo.updateDeleteTransactionId(entry.getValue());
+          containerInfo.setNumberOfKeys(containerInfoInMem.getNumberOfKeys());
+          containerInfo.setUsedBytes(containerInfoInMem.getUsedBytes());
+          containerStore.putWithBatch(batchOperation, containerIdObject,
+              containerInfo);
+        } catch (ContainerNotFoundException ex) {
+          // Container is not present therefore we don't need to update
+          // transaction id for this container.
+          LOG.warn(
+              "Failed to update the transaction Id as container: " + containerID
+                  + " for transaction: " + entry.getValue()
+                  + " does not exists");
         }
-        containerInfo.updateDeleteTransactionId(entry.getValue());
-        containerInfo.setNumberOfKeys(containerInfoInMem.getNumberOfKeys());
-        containerInfo.setUsedBytes(containerInfoInMem.getUsedBytes());
-        containerStore.putWithBatch(batchOperation, containerIdObject,
-            containerInfo);
       }
       batchHandler.commitBatchOperation(batchOperation);
       containerStateManager.updateDeleteTransactionId(deleteTransactionMap);

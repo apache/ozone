@@ -85,7 +85,7 @@ public final class OMConfigKeys {
 
   public static final String OZONE_KEY_DELETING_LIMIT_PER_TASK =
       "ozone.key.deleting.limit.per.task";
-  public static final int OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT = 1000;
+  public static final int OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT = 20000;
 
   public static final String OZONE_OM_METRICS_SAVE_INTERVAL =
       "ozone.om.save.metrics.interval";
@@ -168,13 +168,6 @@ public final class OMConfigKeys {
       OZONE_OM_RATIS_SERVER_FAILURE_TIMEOUT_DURATION_DEFAULT
       = TimeDuration.valueOf(120, TimeUnit.SECONDS);
 
-  // OM Leader server role check interval
-  public static final String OZONE_OM_RATIS_SERVER_ROLE_CHECK_INTERVAL_KEY
-      = "ozone.om.ratis.server.role.check.interval";
-  public static final TimeDuration
-      OZONE_OM_RATIS_SERVER_ROLE_CHECK_INTERVAL_DEFAULT
-      = TimeDuration.valueOf(15, TimeUnit.SECONDS);
-
   // OM SnapshotProvider configurations
   public static final String OZONE_OM_RATIS_SNAPSHOT_DIR =
       "ozone.om.ratis.snapshot.dir";
@@ -246,4 +239,6 @@ public final class OMConfigKeys {
       "ozone.om.enable.filesystem.paths";
   public static final boolean OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT =
       false;
+
+  public static final String OZONE_OM_HA_PREFIX = "ozone.om.ha";
 }

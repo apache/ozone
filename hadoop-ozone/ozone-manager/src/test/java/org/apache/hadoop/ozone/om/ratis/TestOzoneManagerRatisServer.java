@@ -103,7 +103,7 @@ public class TestOzoneManagerRatisServer {
         folder.newFolder().getAbsolutePath());
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
-    initialTermIndex = TermIndex.newTermIndex(0, 0);
+    initialTermIndex = TermIndex.valueOf(0, 0);
     OMRatisSnapshotInfo omRatisSnapshotInfo = new OMRatisSnapshotInfo();
     when(ozoneManager.getSnapshotInfo()).thenReturn(omRatisSnapshotInfo);
     omRatisServer = OzoneManagerRatisServer.newOMRatisServer(conf, ozoneManager,
@@ -136,7 +136,7 @@ public class TestOzoneManagerRatisServer {
     SnapshotInfo snapshotInfo =
         omRatisServer.getOmStateMachine().getLatestSnapshot();
 
-    TermIndex newSnapshotIndex = TermIndex.newTermIndex(
+    TermIndex newSnapshotIndex = TermIndex.valueOf(
         snapshotInfo.getTerm(), snapshotInfo.getIndex() + 100);
 
     omMetadataManager.getTransactionInfoTable().put(TRANSACTION_INFO_KEY,

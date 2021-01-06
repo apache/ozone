@@ -19,9 +19,12 @@
 
 package org.apache.hadoop.hdds.security.x509.certificate.authority;
 
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+
 import java.io.IOException;
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
+import java.util.List;
 
 /**
  * This interface allows the DefaultCA to be portable and use different DB
@@ -67,6 +70,19 @@ public interface CertificateStore {
    * @throws IOException
    */
   X509Certificate getCertificateByID(BigInteger serialID, CertType certType)
+      throws IOException;
+
+  /**
+   *
+   * @param role - role of the certificate owner (OM/DN).
+   * @param startSerialID - start cert serial id.
+   * @param count - max number of certs returned.
+   * @param certType cert type (valid/revoked).
+   * @return list of X509 certificates.
+   * @throws IOException
+   */
+  List<X509Certificate> listCertificate(HddsProtos.NodeType role,
+      BigInteger startSerialID, int count, CertType certType)
       throws IOException;
 
   /**

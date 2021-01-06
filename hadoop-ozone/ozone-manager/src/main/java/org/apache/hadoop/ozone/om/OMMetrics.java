@@ -77,6 +77,11 @@ public class OMMetrics {
   private @Metric MutableCounterLong numOpenKeysSubmittedForDeletion;
   private @Metric MutableCounterLong numOpenKeysDeleted;
 
+  private @Metric MutableCounterLong numAddAcl;
+  private @Metric MutableCounterLong numSetAcl;
+  private @Metric MutableCounterLong numGetAcl;
+  private @Metric MutableCounterLong numRemoveAcl;
+
   // Failure Metrics
   private @Metric MutableCounterLong numVolumeCreateFails;
   private @Metric MutableCounterLong numVolumeUpdateFails;
@@ -198,6 +203,10 @@ public class OMMetrics {
 
   public void incNumKeys() {
     numKeys.incr();
+  }
+
+  public void incNumKeys(int count) {
+    numKeys.incr(count);
   }
 
   public void decNumKeys() {
@@ -560,6 +569,22 @@ public class OMMetrics {
     numOpenKeyDeleteRequestFails.incr();
   }
 
+  public void incNumAddAcl() {
+    numAddAcl.incr();
+  }
+
+  public void incNumSetAcl() {
+    numSetAcl.incr();
+  }
+
+  public void incNumGetAcl() {
+    numGetAcl.incr();
+  }
+
+  public void incNumRemoveAcl() {
+    numRemoveAcl.incr();
+  }
+
   @VisibleForTesting
   public long getNumVolumeCreates() {
     return numVolumeCreates.value();
@@ -830,6 +855,22 @@ public class OMMetrics {
 
   public long getNumOpenKeyDeleteRequestFails() {
     return numOpenKeyDeleteRequestFails.value();
+  }
+
+  public long getNumAddAcl() {
+    return numAddAcl.value();
+  }
+
+  public long getNumSetAcl() {
+    return numSetAcl.value();
+  }
+
+  public long getNumGetAcl() {
+    return numGetAcl.value();
+  }
+
+  public long getNumRemoveAcl() {
+    return numRemoveAcl.value();
   }
 
   public void unRegister() {

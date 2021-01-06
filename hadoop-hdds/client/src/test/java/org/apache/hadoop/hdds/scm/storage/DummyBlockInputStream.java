@@ -24,7 +24,7 @@ import java.util.function.Function;
 
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
-import org.apache.hadoop.hdds.scm.XceiverClientManager;
+import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
@@ -34,25 +34,9 @@ import org.apache.hadoop.security.token.Token;
  */
 class DummyBlockInputStream extends BlockInputStream {
 
-  private List<ChunkInfo> chunks;
+  private final List<ChunkInfo> chunks;
 
-  private Map<String, byte[]> chunkDataMap;
-
-  @SuppressWarnings("parameternumber")
-  DummyBlockInputStream(
-      BlockID blockId,
-      long blockLen,
-      Pipeline pipeline,
-      Token<OzoneBlockTokenIdentifier> token,
-      boolean verifyChecksum,
-      XceiverClientManager xceiverClientManager,
-      List<ChunkInfo> chunkList,
-      Map<String, byte[]> chunkMap) {
-    super(blockId, blockLen, pipeline, token, verifyChecksum,
-        xceiverClientManager);
-    this.chunks = chunkList;
-    this.chunkDataMap = chunkMap;
-  }
+  private final Map<String, byte[]> chunkDataMap;
 
   @SuppressWarnings("parameternumber")
   DummyBlockInputStream(
@@ -61,7 +45,7 @@ class DummyBlockInputStream extends BlockInputStream {
       Pipeline pipeline,
       Token<OzoneBlockTokenIdentifier> token,
       boolean verifyChecksum,
-      XceiverClientManager xceiverClientManager,
+      XceiverClientFactory xceiverClientManager,
       Function<BlockID, Pipeline> refreshFunction,
       List<ChunkInfo> chunkList,
       Map<String, byte[]> chunks) {
@@ -78,11 +62,10 @@ class DummyBlockInputStream extends BlockInputStream {
   }
 
   @Override
-  protected void addStream(ChunkInfo chunkInfo) {
-    TestChunkInputStream testChunkInputStream = new TestChunkInputStream();
-    getChunkStreams().add(new DummyChunkInputStream(testChunkInputStream,
+  protected ChunkInputStream createChunkInputStream(ChunkInfo chunkInfo) {
+    return new DummyChunkInputStream(
         chunkInfo, null, null, false,
-        chunkDataMap.get(chunkInfo.getChunkName()).clone()));
+        chunkDataMap.get(chunkInfo.getChunkName()).clone(), null);
   }
 
   @Override

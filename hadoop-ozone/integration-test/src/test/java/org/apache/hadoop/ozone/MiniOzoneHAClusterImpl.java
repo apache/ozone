@@ -171,7 +171,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
   public OzoneManager getOMLeader() {
     OzoneManager res = null;
     for (OzoneManager ozoneManager : this.ozoneManagers) {
-      if (ozoneManager.isLeader()) {
+      if (ozoneManager.isLeaderReady()) {
         if (res != null) {
           // Found more than one leader
           // Return null, expect the caller to retry in a while

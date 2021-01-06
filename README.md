@@ -13,7 +13,7 @@ Ozone is a scalable, redundant, and distributed object store for Hadoop and Clou
 
 ## Documentation
 
-The latest documentation is generated together with the releases and hosted on the apache side.
+The latest documentation is generated together with the releases and hosted on the apache site.
 
 Please check [the documentation page](https://ozone.apache.org/docs/) for more information.
 
@@ -27,6 +27,7 @@ Ozone is a top level project under the [Apache Software Foundation](https://apac
  * Chat: You can find the #ozone channel on the official ASF slack. Invite link is [here](http://s.apache.org/slack-invite).
  * There are Open [Weekly calls](https://cwiki.apache.org/confluence/display/HADOOP/Ozone+Community+Calls) where you can ask anything about Ozone.
      * Past meeting notes are also available from the wiki.
+ * Reporting security issues: Please consult with [SECURITY.md](./SECURITY.md) about reporting security vulnerabilities and issues.
 
 ## Download
 

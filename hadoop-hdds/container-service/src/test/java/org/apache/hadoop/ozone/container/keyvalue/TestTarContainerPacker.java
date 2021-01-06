@@ -23,7 +23,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -55,7 +55,6 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.commons.compress.compressors.CompressorStreamFactory.GZIP;
 
 /**
@@ -187,7 +186,7 @@ public class TestTarContainerPacker {
     //read the container descriptor only
     try (FileInputStream input = new FileInputStream(targetFile.toFile())) {
       String containerYaml = new String(packer.unpackContainerDescriptor(input),
-          Charset.forName(UTF_8.name()));
+          StandardCharsets.UTF_8);
       Assert.assertEquals(TEST_DESCRIPTOR_FILE_CONTENT, containerYaml);
     }
 
@@ -203,7 +202,7 @@ public class TestTarContainerPacker {
     try (FileInputStream input = new FileInputStream(targetFile.toFile())) {
       descriptor =
           new String(packer.unpackContainerData(destinationContainer, input),
-              Charset.forName(UTF_8.name()));
+              StandardCharsets.UTF_8);
     }
 
     assertExampleMetadataDbIsGood(
@@ -359,7 +358,7 @@ public class TestTarContainerPacker {
 
     try (FileInputStream testFile = new FileInputStream(dbFile.toFile())) {
       List<String> strings = IOUtils
-          .readLines(testFile, Charset.forName(UTF_8.name()));
+          .readLines(testFile, StandardCharsets.UTF_8);
       Assert.assertEquals(1, strings.size());
       Assert.assertEquals(TEST_DB_FILE_CONTENT, strings.get(0));
     }
@@ -377,7 +376,7 @@ public class TestTarContainerPacker {
 
     try (FileInputStream testFile = new FileInputStream(chunkFile.toFile())) {
       List<String> strings = IOUtils
-          .readLines(testFile, Charset.forName(UTF_8.name()));
+          .readLines(testFile, StandardCharsets.UTF_8);
       Assert.assertEquals(1, strings.size());
       Assert.assertEquals(TEST_CHUNK_FILE_CONTENT, strings.get(0));
     }

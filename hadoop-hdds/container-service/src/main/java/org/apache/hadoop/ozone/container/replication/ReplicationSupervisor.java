@@ -59,7 +59,8 @@ public class ReplicationSupervisor {
   @VisibleForTesting
   ReplicationSupervisor(
       ContainerSet containerSet, ContainerReplicator replicator,
-      ExecutorService executor) {
+      ExecutorService executor
+  ) {
     this.containerSet = containerSet;
     this.replicator = replicator;
     this.containersInFlight = ConcurrentHashMap.newKeySet();
@@ -68,9 +69,10 @@ public class ReplicationSupervisor {
 
   public ReplicationSupervisor(
       ContainerSet containerSet,
-      ContainerReplicator replicator, int poolSize) {
+      ContainerReplicator replicator, int poolSize
+  ) {
     this(containerSet, replicator, new ThreadPoolExecutor(
-        0, poolSize, 60, TimeUnit.SECONDS,
+        poolSize, poolSize, 60, TimeUnit.SECONDS,
         new LinkedBlockingQueue<>(),
         new ThreadFactoryBuilder().setDaemon(true)
             .setNameFormat("ContainerReplicationThread-%d")
@@ -84,6 +86,12 @@ public class ReplicationSupervisor {
     if (containersInFlight.add(task.getContainerId())) {
       executor.execute(new TaskRunner(task));
     }
+  }
+
+  @VisibleForTesting
+  public void shutdownAfterFinish() throws InterruptedException {
+    executor.shutdown();
+    executor.awaitTermination(1L, TimeUnit.DAYS);
   }
 
   public void stop() {
@@ -101,6 +109,7 @@ public class ReplicationSupervisor {
   /**
    * Get the number of containers currently being downloaded
    * or scheduled for download.
+   *
    * @return Count of in-flight replications.
    */
   @VisibleForTesting

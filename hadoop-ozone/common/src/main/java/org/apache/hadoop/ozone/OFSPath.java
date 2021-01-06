@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.fs.ozone;
+package org.apache.hadoop.ozone;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -66,7 +66,7 @@ public class OFSPath {
   private static final String OFS_MOUNT_NAME_TMP = "tmp";
   // Hard-code the volume name to tmp for the first implementation
   @VisibleForTesting
-  static final String OFS_MOUNT_TMP_VOLUMENAME = "tmp";
+  public static final String OFS_MOUNT_TMP_VOLUMENAME = "tmp";
 
   public OFSPath(Path path) {
     initOFSPath(path.toUri());
@@ -283,7 +283,8 @@ public class OFSPath {
    * @return Username MD5 hash in hex digits.
    * @throws IOException When UserGroupInformation.getCurrentUser() fails.
    */
-  static String getTempMountBucketNameOfCurrentUser() throws IOException {
+  public static String getTempMountBucketNameOfCurrentUser()
+      throws IOException {
     String username = UserGroupInformation.getCurrentUser().getUserName();
     return getTempMountBucketName(username);
   }
