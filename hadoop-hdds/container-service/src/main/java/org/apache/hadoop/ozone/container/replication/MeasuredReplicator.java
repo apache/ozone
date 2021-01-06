@@ -64,7 +64,7 @@ public class MeasuredReplicator implements ContainerReplicator, AutoCloseable {
     long start = System.currentTimeMillis();
 
     long msInQueue =
-        Instant.now().getNano() - task.getQueued().getNano() / 1_000_000;
+        (Instant.now().getNano() - task.getQueued().getNano()) / 1_000_000;
     queueTime.incr(msInQueue);
     delegate.replicate(task);
     if (task.getStatus() == Status.FAILED) {
