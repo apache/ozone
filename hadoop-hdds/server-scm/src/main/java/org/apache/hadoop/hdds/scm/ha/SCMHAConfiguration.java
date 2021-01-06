@@ -114,6 +114,14 @@ public class SCMHAConfiguration {
   )
   private int raftLogPurgeGap = 1000000;
 
+  @Config(key = "ratis.snapshot.threshold",
+      type = ConfigType.LONG,
+      defaultValue = "1000",
+      tags = {SCM, OZONE, HA, RATIS},
+      description = "The threshold to trigger a Ratis taking snapshot " +
+          "operation for SCM")
+  private long ratisSnapshotThreshold = 1000L;
+
   @Config(key = "ratis.request.timeout",
       type = ConfigType.TIME,
       defaultValue = "3000ms",
@@ -195,6 +203,14 @@ public class SCMHAConfiguration {
 
   public int getRaftLogPurgeGap() {
     return raftLogPurgeGap;
+  }
+
+  public long getRatisSnapshotThreshold() {
+    return ratisSnapshotThreshold;
+  }
+
+  public void setRatisSnapshotThreshold(long threshold) {
+    this.ratisSnapshotThreshold = threshold;
   }
 
   public long getRatisRetryCacheTimeout() {
