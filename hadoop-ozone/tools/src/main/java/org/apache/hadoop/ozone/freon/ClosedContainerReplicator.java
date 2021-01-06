@@ -105,7 +105,7 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
 
         //if datanode is specified, replicate only container if it has a
         //replica.
-        if (datanode.equals("") || datanodeUUIDs.contains(datanode)) {
+        if (datanode.isEmpty() || datanodeUUIDs.contains(datanode)) {
           replicationTasks.add(new ReplicationTask(container.getContainerID(),
               datanodesWithContainer));
         }
@@ -128,7 +128,7 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
       throws IOException {
     String fakeDatanodeUuid = datanode;
 
-    if (fakeDatanodeUuid.equals("")) {
+    if (fakeDatanodeUuid.isEmpty()) {
       fakeDatanodeUuid = UUID.randomUUID().toString();
     }
 
