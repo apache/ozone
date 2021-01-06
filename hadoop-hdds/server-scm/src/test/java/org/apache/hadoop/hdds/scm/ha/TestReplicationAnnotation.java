@@ -88,8 +88,7 @@ public class TestReplicationAnnotation {
 
     try {
       proxy.addContainer(HddsProtos.ContainerInfoProto.getDefaultInstance());
-      // Should have seen a IOException.
-      Assert.fail();
+      Assert.fail("Cannot reach here: should have seen a IOException");
     } catch (IOException ignore) {
       // Expecting to hit here.
     }
