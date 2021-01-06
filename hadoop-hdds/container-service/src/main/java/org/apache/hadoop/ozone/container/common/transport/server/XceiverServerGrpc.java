@@ -45,7 +45,6 @@ import com.google.common.base.Preconditions;
 import io.opentracing.Scope;
 import io.opentracing.Span;
 import io.opentracing.util.GlobalTracer;
-import org.apache.ratis.thirdparty.io.grpc.BindableService;
 import org.apache.ratis.thirdparty.io.grpc.Server;
 import org.apache.ratis.thirdparty.io.grpc.ServerBuilder;
 import org.apache.ratis.thirdparty.io.grpc.ServerInterceptors;
@@ -78,8 +77,7 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
    */
   public XceiverServerGrpc(DatanodeDetails datanodeDetails,
       ConfigurationSource conf,
-      ContainerDispatcher dispatcher, CertificateClient caClient,
-      BindableService... additionalServices) {
+      ContainerDispatcher dispatcher, CertificateClient caClient) {
     Preconditions.checkNotNull(conf);
 
     this.id = datanodeDetails.getUuid();
@@ -99,10 +97,6 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
     GrpcServerInterceptor tracingInterceptor = new GrpcServerInterceptor();
     nettyServerBuilder.addService(ServerInterceptors.intercept(
         new GrpcXceiverService(dispatcher), tracingInterceptor));
-
-    for (BindableService service : additionalServices) {
-      nettyServerBuilder.addService(service);
-    }
 
     SecurityConfig secConf = new SecurityConfig(conf);
     if (secConf.isGrpcTlsEnabled()) {

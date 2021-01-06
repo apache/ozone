@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.container.replication;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.cert.X509Certificate;
@@ -87,6 +88,7 @@ public class SimpleContainerDownloader implements ContainerDownloader {
         if (result == null) {
           result = downloadContainer(containerId, datanode);
         } else {
+
           result = result.exceptionally(t -> {
             LOG.error("Error on replicating container: " + containerId, t);
             try {
@@ -128,11 +130,11 @@ public class SimpleContainerDownloader implements ContainerDownloader {
   protected CompletableFuture<Path> downloadContainer(
       long containerId,
       DatanodeDetails datanode
-  ) throws Exception {
+  ) throws IOException {
     CompletableFuture<Path> result;
     GrpcReplicationClient grpcReplicationClient =
         new GrpcReplicationClient(datanode.getIpAddress(),
-            datanode.getPort(Name.STANDALONE).getValue(),
+            datanode.getPort(Name.REPLICATION).getValue(),
             workingDirectory, securityConfig, caCert);
     result = grpcReplicationClient.download(containerId)
         .thenApply(r -> {
