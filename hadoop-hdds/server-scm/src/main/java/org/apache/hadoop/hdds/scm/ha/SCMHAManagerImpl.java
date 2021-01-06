@@ -17,12 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
-import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.ratis.proto.RaftProtos;
-import org.apache.ratis.server.RaftServer;
-import org.apache.ratis.server.impl.RaftServerImpl;
-import org.apache.ratis.server.impl.RaftServerProxy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -71,24 +67,12 @@ public class SCMHAManagerImpl implements SCMHAManager {
       // When SCM HA is not enabled, the current SCM is always the leader.
       return Optional.of((long)0);
     }
-    RaftServer server = ratisServer.getDivision().getRaftServer();
-    Preconditions.checkState(server instanceof RaftServerProxy);
-    try {
-      // SCM only has one raft group.
-      RaftServerImpl serverImpl = ((RaftServerProxy) server)
-          .getImpl(ratisServer.getDivision().getGroup().getGroupId());
-      if (serverImpl != null) {
-        // TODO: getRoleInfoProto() will be exposed from Division later.
-        RaftProtos.RoleInfoProto roleInfoProto = serverImpl.getRoleInfoProto();
-        return roleInfoProto.hasLeaderInfo()
-            ? Optional.of(roleInfoProto.getLeaderInfo().getTerm())
-            : Optional.empty();
-      }
-    } catch (IOException ioe) {
-      LOG.error("Fail to get RaftServer impl and therefore it's not clear " +
-          "whether it's leader. ", ioe);
-    }
-    return Optional.empty();
+    RaftProtos.RoleInfoProto roleInfoProto
+        = ratisServer.getDivision().getInfo().getRoleInfoProto();
+
+    return roleInfoProto.hasLeaderInfo()
+        ? Optional.of(roleInfoProto.getLeaderInfo().getTerm())
+        : Optional.empty();
   }
 
   /**

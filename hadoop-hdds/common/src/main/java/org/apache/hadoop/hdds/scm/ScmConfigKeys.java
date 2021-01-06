@@ -308,7 +308,7 @@ public final class ScmConfigKeys {
   // Pipeline placement policy:
   // Upper limit for how many pipelines a datanode can engage in.
   public static final String OZONE_DATANODE_PIPELINE_LIMIT =
-          "ozone.datanode.pipeline.limit";
+          "ozone.scm.datanode.pipeline.limit";
   public static final int OZONE_DATANODE_PIPELINE_LIMIT_DEFAULT = 2;
 
   // Upper limit for how many pipelines can be created

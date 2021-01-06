@@ -126,7 +126,7 @@ public class SCMRatisSnapshotInfo implements SnapshotInfo {
 
   @Override
   public TermIndex getTermIndex() {
-    return TermIndex.newTermIndex(term, snapshotIndex);
+    return TermIndex.valueOf(term, snapshotIndex);
   }
 
   @Override

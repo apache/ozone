@@ -65,9 +65,9 @@ source "${COMPOSE_DIR}/../testlib.sh"
 export OZONE_KEEP_RESULTS=true
 start_docker_env
 execute_robot_test scm -v PREFIX:pre freon/validate.robot
-# TODO can be enabled with HDDS-4562:
-# execute_robot_test scm -v PREFIX:post freon/generate.robot
-# execute_robot_test scm -v PREFIX:post freon/validate.robot
+# test write key to old bucket after upgrade
+execute_robot_test scm -v PREFIX:post freon/generate.robot
+execute_robot_test scm -v PREFIX:post freon/validate.robot
 stop_docker_env
 
 generate_report
