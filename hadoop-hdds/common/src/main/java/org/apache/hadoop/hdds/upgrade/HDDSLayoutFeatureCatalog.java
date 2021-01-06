@@ -27,6 +27,7 @@ import org.apache.hadoop.ozone.upgrade.LayoutFeature;
  */
 public class HDDSLayoutFeatureCatalog {
 
+
   /**
    * List of HDDS Features.
    */
@@ -39,7 +40,11 @@ public class HDDSLayoutFeatureCatalog {
 
     private int layoutVersion;
     private String description;
-    private Optional< ? extends HDDSUpgradeAction> hddsUpgradeAction =
+
+    private Optional<? extends HDDSUpgradeAction> scmUpgradeAction =
+        Optional.empty();
+
+    private Optional<? extends HDDSUpgradeAction> datanodeUpgradeAction =
         Optional.empty();
 
     HDDSLayoutFeature(final int layoutVersion, String description) {
@@ -48,10 +53,12 @@ public class HDDSLayoutFeatureCatalog {
     }
 
     HDDSLayoutFeature(final int layoutVersion, String description,
-                    HDDSUpgradeAction upgradeAction) {
+                      Optional<? extends HDDSUpgradeAction> scmAction,
+                      Optional<? extends HDDSUpgradeAction> datanodeAction) {
       this.layoutVersion = layoutVersion;
       this.description = description;
-      hddsUpgradeAction = Optional.of(upgradeAction);
+      this.scmUpgradeAction = scmAction;
+      this.datanodeUpgradeAction = datanodeAction;
     }
 
     @Override
@@ -64,9 +71,12 @@ public class HDDSLayoutFeatureCatalog {
       return description;
     }
 
-    @Override
-    public Optional<? extends HDDSUpgradeAction> onFinalizeAction() {
-      return hddsUpgradeAction;
+    public Optional<? extends HDDSUpgradeAction> onFinalizeSCMAction() {
+      return scmUpgradeAction;
+    }
+
+    public Optional<? extends HDDSUpgradeAction> onFinalizeDataNodeAction() {
+      return datanodeUpgradeAction;
     }
   }
 }

@@ -132,9 +132,9 @@ public class BasicUpgradeFinalizer<T, V extends AbstractLayoutVersionManager>
     }
   }
 
-  protected void finalizeFeature(LayoutFeature feature, Storage config)
+  protected void finalizeFeature(LayoutFeature feature, Storage config,
+                                 Optional<? extends UpgradeAction> action)
       throws UpgradeException {
-    Optional<? extends UpgradeAction> action = feature.onFinalizeAction();
 
     if (!action.isPresent()) {
       emitNOOPMsg(feature.name());

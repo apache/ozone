@@ -23,11 +23,13 @@ import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATI
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_REQUIRED;
 
 import java.io.IOException;
+import java.util.Optional;
 import java.util.concurrent.Callable;
 
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeatureCatalog.HDDSLayoutFeature;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
+import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 
 /**
  * UpgradeFinalizer for the DataNode.
@@ -81,7 +83,10 @@ public class DataNodeUpgradeFinalizer extends
          */
 
         for (HDDSLayoutFeature f : versionManager.unfinalizedFeatures()) {
-          finalizeFeature(f, datanodeStateMachine.getDataNodeStorageConfig());
+          Optional<? extends LayoutFeature.UpgradeAction> action =
+              f.onFinalizeDataNodeAction();
+          finalizeFeature(f, datanodeStateMachine.getDataNodeStorageConfig(),
+              action);
           updateLayoutVersionInVersionFile(f,
               datanodeStateMachine.getDataNodeStorageConfig());
           versionManager.finalized(f);
