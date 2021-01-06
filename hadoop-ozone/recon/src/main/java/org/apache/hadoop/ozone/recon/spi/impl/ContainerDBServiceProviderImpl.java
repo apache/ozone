@@ -39,6 +39,7 @@ import javax.inject.Singleton;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
@@ -183,22 +184,52 @@ public class ContainerDBServiceProviderImpl
   }
 
   /**
-   * Store the containerID -> ContainerReplicaWithTimestamp mapping to the
-   * container DB store.
+   * Store the ContainerID -> ContainerReplicaHistory (container first and last
+   * seen time) mapping to the container DB store.
    *
    * @param containerID the containerID.
-   * @param tsMap A map from datanode UUID to ContainerReplicaWithTimestamp.
+   * @param tsMap A map from Datanode UUID to ContainerReplicaHistory.
    * @throws IOException
    */
   @Override
-  public void storeContainerReplicaHistoryMap(Long containerID,
+  public void storeContainerReplicaHistory(Long containerID,
       Map<UUID, ContainerReplicaHistory> tsMap) throws IOException {
     List<ContainerReplicaHistory> tsList = new ArrayList<>();
     for (Map.Entry<UUID, ContainerReplicaHistory> e : tsMap.entrySet()) {
       tsList.add(e.getValue());
     }
+
     containerReplicaHistoryTable.put(containerID,
         new ContainerReplicaHistoryList(tsList));
+  }
+
+  /**
+   * Batch version of storeContainerReplicaHistory.
+   *
+   * @param replicaHistoryMap Replica history map
+   * @throws IOException
+   */
+  @Override
+  public void batchStoreContainerReplicaHistory(
+      Map<Long, Map<UUID, ContainerReplicaHistory>> replicaHistoryMap)
+      throws IOException {
+    BatchOperation batchOperation = containerDbStore.initBatchOperation();
+
+    for (Map.Entry<Long, Map<UUID, ContainerReplicaHistory>> entry :
+        replicaHistoryMap.entrySet()) {
+      final long containerId = entry.getKey();
+      final Map<UUID, ContainerReplicaHistory> tsMap = entry.getValue();
+
+      List<ContainerReplicaHistory> tsList = new ArrayList<>();
+      for (Map.Entry<UUID, ContainerReplicaHistory> e : tsMap.entrySet()) {
+        tsList.add(e.getValue());
+      }
+
+      containerReplicaHistoryTable.putWithBatch(batchOperation, containerId,
+          new ContainerReplicaHistoryList(tsList));
+    }
+
+    containerDbStore.commitBatchOperation(batchOperation);
   }
 
   /**

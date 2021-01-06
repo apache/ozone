@@ -75,8 +75,18 @@ public interface ContainerDBServiceProvider {
    * @param tsMap A map from datanode UUID to ContainerReplicaWithTimestamp.
    * @throws IOException
    */
-  void storeContainerReplicaHistoryMap(Long containerID,
+  void storeContainerReplicaHistory(Long containerID,
       Map<UUID, ContainerReplicaHistory> tsMap) throws IOException;
+
+  /**
+   * Batch version of storeContainerReplicaHistory.
+   *
+   * @param replicaHistoryMap Replica history map
+   * @throws IOException
+   */
+  void batchStoreContainerReplicaHistory(
+      Map<Long, Map<UUID, ContainerReplicaHistory>> replicaHistoryMap)
+      throws IOException;
 
   /**
    * Store the total count of containers into the container DB store.

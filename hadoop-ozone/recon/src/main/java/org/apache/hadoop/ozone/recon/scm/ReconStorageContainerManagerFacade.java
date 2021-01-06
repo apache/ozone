@@ -240,7 +240,7 @@ public class ReconStorageContainerManagerFacade
     IOUtils.cleanupWithLogger(LOG, nodeManager);
     IOUtils.cleanupWithLogger(LOG, containerManager);
     IOUtils.cleanupWithLogger(LOG, pipelineManager);
-    LOG.info("Flushing container replicas last seen map to DB.");
+    LOG.info("Flushing container replica history to DB.");
     containerManager.flushReplicaHistoryMapToDB(true);
     try {
       dbStore.close();

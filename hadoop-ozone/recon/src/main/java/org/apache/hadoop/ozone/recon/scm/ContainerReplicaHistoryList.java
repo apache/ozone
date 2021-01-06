@@ -22,7 +22,9 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * A list of ContainerReplicaTimestamp.
+ * A list of ContainerReplicaHistory.
+ *
+ * For Recon DB table definition.
  */
 public class ContainerReplicaHistoryList {
 

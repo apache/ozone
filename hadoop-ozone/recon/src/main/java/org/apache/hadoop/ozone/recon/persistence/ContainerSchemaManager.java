@@ -154,7 +154,7 @@ public class ContainerSchemaManager {
         // Entry exists, update last seen time and put it back to DB.
         ts.setLastSeenTime(time);
       }
-      dbServiceProvider.storeContainerReplicaHistoryMap(containerID, tsMap);
+      dbServiceProvider.storeContainerReplicaHistory(containerID, tsMap);
     } catch (IOException e) {
       LOG.debug("Error on DB operations. {}", e.getMessage());
     }
@@ -244,14 +244,9 @@ public class ContainerSchemaManager {
     }
     synchronized (replicaHistoryMap) {
       try {
-        for (Map.Entry<Long, Map<UUID, ContainerReplicaHistory>> entry :
-            replicaHistoryMap.entrySet()) {
-          final long containerId = entry.getKey();
-          final Map<UUID, ContainerReplicaHistory> map = entry.getValue();
-          dbServiceProvider.storeContainerReplicaHistoryMap(containerId, map);
-        }
+        dbServiceProvider.batchStoreContainerReplicaHistory(replicaHistoryMap);
       } catch (IOException e) {
-        LOG.debug("Error flushing container replica history map to DB. {}",
+        LOG.debug("Error flushing container replica history to DB. {}",
             e.getMessage());
       }
       if (clearMap) {
