@@ -77,6 +77,8 @@ Ozone Manager 使用 Apache Ratis（一种 Raft 协议的开源实现）来复�
 
 为了详细地了解 Ozone Manager ，本节针对它所提供的网络服务和持久化状态提供一个快速概述。
 
+### Ozone Manager 提供的网络服务
+
 Ozone 为客户端和管理命令提供网络服务，主要的服务如下：
 
  * 键、桶、卷 / 增删改查
@@ -93,7 +95,7 @@ Ozone 为客户端和管理命令提供网络服务，主要的服务如下：
    * ServiceList（用于服务发现）
    * DBUpdates（用于 [Recon]({{< ref path="feature/Recon.md" lang="en" >}}) 下载快照）
  
- **持久化状态**
+### 持久化状态
 
 以下数据将保存在 Ozone Manager 端的指定 RocksDB 目录中：
 

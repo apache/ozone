@@ -283,6 +283,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
           * ozoneManager.getScmBlockSize()
           * omKeyInfo.getFactor().getNumber();
       checkBucketQuotaInBytes(omBucketInfo, preAllocatedSpace);
+      checkBucketQuotaInNamespace(omBucketInfo, 1L);
 
       // Add to cache entry can be done outside of lock for this openKey.
       // Even if bucket gets deleted, when commitKey we shall identify if
@@ -298,6 +299,8 @@ public class OMFileCreateRequest extends OMKeyRequest {
           trxnLogIndex);
 
       omBucketInfo.incrUsedBytes(preAllocatedSpace);
+      // Update namespace quota
+      omBucketInfo.incrUsedNamespace(1L);
 
       numMissingParents = missingParentInfos.size();
       // Prepare response

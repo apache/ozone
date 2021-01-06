@@ -231,7 +231,9 @@ public class OMException extends IOException {
 
     PARTIAL_RENAME,
 
-    QUOTA_EXCEEDED
+    QUOTA_EXCEEDED,
+
+    QUOTA_ERROR
 
   }
 }

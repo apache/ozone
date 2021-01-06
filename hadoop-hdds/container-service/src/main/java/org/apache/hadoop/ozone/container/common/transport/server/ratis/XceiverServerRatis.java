@@ -100,7 +100,6 @@ import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.RaftServerConfigKeys;
-import org.apache.ratis.server.impl.RaftServerProxy;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.util.SizeInBytes;
 import org.apache.ratis.util.TimeDuration;
@@ -460,9 +459,9 @@ public final class XceiverServerRatis implements XceiverServerSpi {
       }
       server.start();
 
-      int realPort =
-          ((RaftServerProxy) server).getServerRpc().getInetSocketAddress()
-              .getPort();
+      int realPort = server.getServerRpc()
+          .getInetSocketAddress()
+          .getPort();
 
       if (port == 0) {
         LOG.info("{} {} is started using port {}", getClass().getSimpleName(),
@@ -514,6 +513,15 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   @VisibleForTesting
   public RaftServer getServer() {
     return server;
+  }
+
+  public RaftServer.Division getServerDivision() throws IOException {
+    return getServerDivision(server.getGroupIds().iterator().next());
+  }
+
+  public RaftServer.Division getServerDivision(RaftGroupId id)
+      throws IOException {
+    return server.getDivision(id);
   }
 
   private void processReply(RaftClientReply reply) throws IOException {

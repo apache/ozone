@@ -391,4 +391,9 @@ public final class OzoneConsts {
   public static final String SCM_RATIS_SNAPSHOT_TERM = "scmRatisSnapshotTerm";
   // An on-disk transient marker file used when replacing DB with checkpoint
   public static final String DB_TRANSIENT_MARKER = "dbInconsistentMarker";
+
+
+  public static final String OM_RATIS_SNAPSHOT_DIR = "snapshot";
+
+  public static final long DEFAULT_OM_UPDATE_ID = -1L;  
 }

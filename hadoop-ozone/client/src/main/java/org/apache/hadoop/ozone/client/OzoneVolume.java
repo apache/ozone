@@ -296,11 +296,11 @@ public class OzoneVolume extends WithMetadata {
   }
 
   /**
-   * Clean the count quota of the volume.
+   * Clean the namespace quota of the volume.
    *
    * @throws IOException
    */
-  public void clearCountQuota() throws IOException {
+  public void clearNamespaceQuota() throws IOException {
     OzoneVolume ozoneVolume = proxy.getVolumeDetails(name);
     proxy.setVolumeQuota(name, QUOTA_RESET, ozoneVolume.getQuotaInBytes());
     this.quotaInBytes = ozoneVolume.getQuotaInBytes();

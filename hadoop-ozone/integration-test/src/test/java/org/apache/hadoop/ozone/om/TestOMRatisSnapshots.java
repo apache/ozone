@@ -155,7 +155,7 @@ public class TestOMRatisSnapshots {
     OMTransactionInfo omTransactionInfo =
         OMTransactionInfo.readTransactionInfo(leaderOM.getMetadataManager());
     TermIndex leaderOMTermIndex =
-        TermIndex.newTermIndex(omTransactionInfo.getTerm(),
+        TermIndex.valueOf(omTransactionInfo.getTerm(),
             omTransactionInfo.getTransactionIndex());
     long leaderOMSnaphsotIndex = leaderOMTermIndex.getIndex();
     long leaderOMSnapshotTermIndex = leaderOMTermIndex.getTerm();
