@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -85,7 +86,7 @@ public class TestPipelineDatanodesIntersection {
         stateManager, conf);
 
     int healthyNodeCount = nodeManager
-        .getNodeCount(HddsProtos.NodeState.HEALTHY);
+        .getNodeCount(NodeStatus.inServiceHealthy());
     int intersectionCount = 0;
     int createdPipelineCount = 0;
     while (!end && createdPipelineCount <= healthyNodeCount * nodeHeaviness) {

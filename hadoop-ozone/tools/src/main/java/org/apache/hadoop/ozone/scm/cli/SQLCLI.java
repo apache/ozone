@@ -45,7 +45,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -72,7 +71,6 @@ public class SQLCLI  extends Configured implements Tool {
 
   private Options options;
   private BasicParser parser;
-  private final Charset encoding = Charset.forName("UTF-8");
   private final OzoneConfiguration conf;
 
   // for container.db

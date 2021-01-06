@@ -52,10 +52,6 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.ratis.util.ExitUtils;
 
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
-import static org.apache.hadoop.ozone.OzoneConsts.BUCKET;
-import static org.apache.hadoop.ozone.OzoneConsts.VOLUME;
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.DeleteBucket;
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.DeleteVolume;
 
 /**
  * This class implements DoubleBuffer implementation of OMClientResponse's. In
@@ -258,7 +254,7 @@ public final class OzoneManagerDoubleBuffer {
                       return null;
                     });
 
-                setCleanupEpoch(entry, cleanupEpochs);
+                addCleanupEntry(entry, cleanupEpochs);
 
               } catch (IOException ex) {
                 // During Adding to RocksDB batch entry got an exception.
@@ -364,34 +360,6 @@ public final class OzoneManagerDoubleBuffer {
             Thread.currentThread().getName() + "encountered Throwable error";
         ExitUtils.terminate(2, s, t, LOG);
       }
-    }
-  }
-
-  /**
-   * Set cleanup epoch for the DoubleBufferEntry.
-   * @param entry
-   * @param cleanupEpochs
-   */
-  private void setCleanupEpoch(DoubleBufferEntry entry, Map<String,
-      List<Long>> cleanupEpochs) {
-    // Add epochs depending on operated tables. In this way
-    // cleanup will be called only when required.
-
-    // As bucket and volume table is full cache add cleanup
-    // epochs only when request is delete to cleanup deleted
-    // entries.
-
-    String opName =
-        entry.getResponse().getOMResponse().getCmdType().name();
-
-    if (opName.toLowerCase().contains(VOLUME) ||
-        opName.toLowerCase().contains(BUCKET)) {
-      if (DeleteBucket.name().equals(opName)
-          || DeleteVolume.name().equals(opName)) {
-        addCleanupEntry(entry, cleanupEpochs);
-      }
-    } else {
-      addCleanupEntry(entry, cleanupEpochs);
     }
   }
 

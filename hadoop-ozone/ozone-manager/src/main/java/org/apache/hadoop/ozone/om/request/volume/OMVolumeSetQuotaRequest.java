@@ -135,11 +135,12 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
       } else {
         omVolumeArgs.setQuotaInBytes(omVolumeArgs.getQuotaInBytes());
       }
-      if (checkQuotaCountsValid(setVolumePropertyRequest.getQuotaInCounts())) {
-        omVolumeArgs.setQuotaInCounts(
-            setVolumePropertyRequest.getQuotaInCounts());
+      if (checkQuotaNamespaceValid(
+          setVolumePropertyRequest.getQuotaInNamespace())) {
+        omVolumeArgs.setQuotaInNamespace(
+            setVolumePropertyRequest.getQuotaInNamespace());
       } else {
-        omVolumeArgs.setQuotaInCounts(omVolumeArgs.getQuotaInCounts());
+        omVolumeArgs.setQuotaInNamespace(omVolumeArgs.getQuotaInNamespace());
       }
 
       omVolumeArgs.setUpdateID(transactionLogIndex,
@@ -210,9 +211,10 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
     return true;
   }
 
-  public boolean checkQuotaCountsValid(long quotaInCounts) {
+  public boolean checkQuotaNamespaceValid(long quotaInNamespace) {
 
-    if ((quotaInCounts <= 0 && quotaInCounts != OzoneConsts.QUOTA_RESET)) {
+    if ((quotaInNamespace <= 0
+         && quotaInNamespace != OzoneConsts.QUOTA_RESET)) {
       return false;
     }
     return true;

@@ -162,6 +162,12 @@ public final class SCMEvents {
       new TypedEvent<>(DatanodeDetails.class, "Dead_Node");
 
   /**
+   * This event will be triggered whenever a datanode is moved into maintenance.
+   */
+  public static final TypedEvent<DatanodeDetails> START_ADMIN_ON_NODE =
+      new TypedEvent<>(DatanodeDetails.class, "START_ADMIN_ON_NODE");
+
+  /**
    * This event will be triggered whenever a datanode is moved from non-healthy
    * state to healthy state.
    */

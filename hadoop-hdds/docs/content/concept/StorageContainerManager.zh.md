@@ -44,7 +44,7 @@ SCM 负责创建 Ozone 集群。当通过 `init` 命令启动 SCM 时，SCM 将�
 
 针对 Storage Container Manager 的详细视图，本节提供有关网络服务和持久化数据的快速概述。
 
-**Storage Container Manager 提供的网络服务:**
+### Storage Container Manager 提供的网络服务:
 
  * 管道: 列出/删除/激活/停用
     * 管道是形成一组复制组的数据节点
@@ -62,7 +62,7 @@ SCM 负责创建 Ozone 集群。当通过 `init` 命令启动 SCM 时，SCM 将�
    
  注意：客户端不能直接连接 SCM 。
  
-**持久化状态**
+### 持久化状态
  
  以下数据持久化在 Storage Container Manager 端的指定 RocksDB 目录中
  

@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.TestUtils;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.container.CloseContainerEventHandler;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
@@ -505,8 +506,8 @@ public class TestBlockManager {
     nodeManager.setNumHealthyVolumes(1);
     // create pipelines
     for (int i = 0;
-         i < nodeManager.getNodes(HddsProtos.NodeState.HEALTHY).size() / factor
-             .getNumber(); i++) {
+         i < nodeManager.getNodes(NodeStatus.inServiceHealthy()).size()
+             / factor.getNumber(); i++) {
       pipelineManager.createPipeline(type, factor);
     }
     TestUtils.openAllRatisPipelines(pipelineManager);
