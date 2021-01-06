@@ -297,8 +297,10 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
     // TODO: track the block size info so that we can reclaim the container
     // TODO: used space when the block is deleted.
     for (BlockGroup bg : keyBlocksInfoList) {
-      LOG.info("Deleting blocks {}",
-          StringUtils.join(",", bg.getBlockIDList()));
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Deleting blocks {}",
+            StringUtils.join(",", bg.getBlockIDList()));
+      }
       for (BlockID block : bg.getBlockIDList()) {
         long containerID = block.getContainerID();
         if (containerBlocks.containsKey(containerID)) {

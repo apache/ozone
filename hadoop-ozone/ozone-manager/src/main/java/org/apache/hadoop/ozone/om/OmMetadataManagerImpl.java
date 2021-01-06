@@ -43,7 +43,7 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
-import org.apache.hadoop.hdds.utils.db.cache.TableCacheImpl;
+import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.BlockGroup;
@@ -359,17 +359,16 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
             PersistedUserVolumeInfo.class);
     checkTableStatus(userTable, USER_TABLE);
 
-    TableCacheImpl.CacheCleanupPolicy cleanupPolicy =
-        TableCacheImpl.CacheCleanupPolicy.NEVER;
+    CacheType cacheType = CacheType.FULL_CACHE;
 
     volumeTable =
         this.store.getTable(VOLUME_TABLE, String.class, OmVolumeArgs.class,
-            cleanupPolicy);
+            cacheType);
     checkTableStatus(volumeTable, VOLUME_TABLE);
 
     bucketTable =
         this.store.getTable(BUCKET_TABLE, String.class, OmBucketInfo.class,
-            cleanupPolicy);
+            cacheType);
 
     checkTableStatus(bucketTable, BUCKET_TABLE);
 
@@ -765,7 +764,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
       skipStartKey = true;
     } else {
       // This allows us to seek directly to the first key with the right prefix.
-      seekKey = getOzoneKey(volumeName, bucketName, keyPrefix);
+      seekKey = getOzoneKey(volumeName, bucketName,
+          StringUtil.isNotBlank(keyPrefix) ? keyPrefix : OM_KEY_PREFIX);
     }
 
     String seekPrefix;

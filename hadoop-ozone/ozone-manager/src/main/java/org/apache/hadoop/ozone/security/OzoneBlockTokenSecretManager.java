@@ -31,6 +31,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.EnumSet;
 
 /**
@@ -86,11 +87,10 @@ public class OzoneBlockTokenSecretManager extends
       String blockId, EnumSet<AccessModeProto> modes, long maxLength) {
     OzoneBlockTokenIdentifier tokenIdentifier = createIdentifier(user,
         blockId, modes, maxLength);
-    if (LOG.isTraceEnabled()) {
+    if (LOG.isDebugEnabled()) {
       long expiryTime = tokenIdentifier.getExpiryDate();
-      String tokenId = tokenIdentifier.toString();
-      LOG.trace("Issued delegation token -> expiryTime:{}, tokenId:{}",
-          expiryTime, tokenId);
+      LOG.info("Issued delegation token -> expiryTime:{}, tokenId:{}",
+          Instant.ofEpochMilli(expiryTime), tokenIdentifier);
     }
     // Pass blockId as service.
     return new Token<>(tokenIdentifier.getBytes(),

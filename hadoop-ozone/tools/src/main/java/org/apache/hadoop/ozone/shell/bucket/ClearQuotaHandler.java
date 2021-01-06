@@ -48,8 +48,8 @@ public class ClearQuotaHandler extends BucketHandler {
     if (clrSpaceQuota.getClrSpaceQuota()) {
       bucket.clearSpaceQuota();
     }
-    if (clrSpaceQuota.getClrCountQuota()) {
-      bucket.clearCountQuota();
+    if (clrSpaceQuota.getClrNamespaceQuota()) {
+      bucket.clearNamespaceQuota();
     }
   }
 }

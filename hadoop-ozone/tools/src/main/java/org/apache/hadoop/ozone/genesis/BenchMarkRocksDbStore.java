@@ -28,7 +28,7 @@ import org.rocksdb.*;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 
 /**
@@ -68,7 +68,7 @@ public class BenchMarkRocksDbStore {
   @Setup(Level.Trial)
   public void initialize() throws IOException {
     data = RandomStringUtils.randomAlphanumeric(DATA_LEN)
-        .getBytes(Charset.forName("UTF-8"));
+        .getBytes(StandardCharsets.UTF_8);
     org.rocksdb.Options opts = new org.rocksdb.Options();
     File dbFile = Paths.get(System.getProperty(TMP_DIR))
         .resolve(RandomStringUtils.randomNumeric(DB_FILE_LEN))
@@ -112,8 +112,8 @@ public class BenchMarkRocksDbStore {
   @Benchmark
   public void test(Blackhole bh) throws IOException {
     long x = org.apache.commons.lang3.RandomUtils.nextLong(0L, MAX_KEYS);
-    store.put(Long.toHexString(x).getBytes(Charset.forName("UTF-8")), data);
+    store.put(Long.toHexString(x).getBytes(StandardCharsets.UTF_8), data);
     bh.consume(
-        store.get(Long.toHexString(x).getBytes(Charset.forName("UTF-8"))));
+        store.get(Long.toHexString(x).getBytes(StandardCharsets.UTF_8)));
   }
 }

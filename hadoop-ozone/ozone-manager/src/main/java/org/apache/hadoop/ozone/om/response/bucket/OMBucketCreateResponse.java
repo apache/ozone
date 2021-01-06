@@ -22,6 +22,7 @@ import java.io.IOException;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -40,11 +41,20 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
 public final class OMBucketCreateResponse extends OMClientResponse {
 
   private final OmBucketInfo omBucketInfo;
+  private final OmVolumeArgs omVolumeArgs;
+
+  public OMBucketCreateResponse(@Nonnull OMResponse omResponse,
+      @Nonnull OmBucketInfo omBucketInfo, @Nonnull OmVolumeArgs omVolumeArgs) {
+    super(omResponse);
+    this.omBucketInfo = omBucketInfo;
+    this.omVolumeArgs = omVolumeArgs;
+  }
 
   public OMBucketCreateResponse(@Nonnull OMResponse omResponse,
       @Nonnull OmBucketInfo omBucketInfo) {
     super(omResponse);
     this.omBucketInfo = omBucketInfo;
+    this.omVolumeArgs = null;
   }
 
   /**
@@ -55,6 +65,7 @@ public final class OMBucketCreateResponse extends OMClientResponse {
     super(omResponse);
     checkStatusNotOK();
     omBucketInfo = null;
+    omVolumeArgs = null;
   }
 
   @Override
@@ -66,6 +77,12 @@ public final class OMBucketCreateResponse extends OMClientResponse {
             omBucketInfo.getBucketName());
     omMetadataManager.getBucketTable().putWithBatch(batchOperation,
         dbBucketKey, omBucketInfo);
+    // update volume usedNamespace
+    if (omVolumeArgs != null) {
+      omMetadataManager.getVolumeTable().putWithBatch(batchOperation,
+              omMetadataManager.getVolumeKey(omVolumeArgs.getVolume()),
+              omVolumeArgs);
+    }
   }
 
   @Nullable

@@ -71,7 +71,6 @@ import org.apache.ratis.protocol.RaftGroupMemberId;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.apache.ratis.server.RaftServer;
-import org.apache.ratis.server.impl.RaftServerProxy;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.server.raftlog.RaftLog;
 import org.apache.ratis.server.storage.RaftStorage;
@@ -220,8 +219,7 @@ public class ContainerStateMachine extends BaseStateMachine {
   private long loadSnapshot(SingleFileSnapshotInfo snapshot)
       throws IOException {
     if (snapshot == null) {
-      TermIndex empty =
-          TermIndex.newTermIndex(0, RaftLog.INVALID_LOG_INDEX);
+      TermIndex empty = TermIndex.valueOf(0, RaftLog.INVALID_LOG_INDEX);
       LOG.info("{}: The snapshot info is null. Setting the last applied index" +
               "to:{}", gid, empty);
       setLastAppliedTermIndex(empty);
@@ -301,8 +299,8 @@ public class ContainerStateMachine extends BaseStateMachine {
             snapshotFile);
         throw ioe;
       }
-      LOG.info("{}: Finished taking a snapshot at:{} file:{} time:{}", gid, ti,
-          snapshotFile, (Time.monotonicNow() - startTime));
+      LOG.info("{}: Finished taking a snapshot at:{} file:{} took: {} ms",
+          gid, ti, snapshotFile, (Time.monotonicNow() - startTime));
       return ti.getIndex();
     }
     return -1;
@@ -420,10 +418,9 @@ public class ContainerStateMachine extends BaseStateMachine {
       ContainerCommandRequestProto requestProto, long entryIndex, long term,
       long startTime) {
     final WriteChunkRequestProto write = requestProto.getWriteChunk();
-    RaftServer server = ratisServer.getServer();
-    Preconditions.checkState(server instanceof RaftServerProxy);
     try {
-      if (((RaftServerProxy) server).getImpl(gid).isLeader()) {
+      RaftServer.Division division = ratisServer.getServerDivision();
+      if (division.getInfo().isLeader()) {
         stateMachineDataCache.put(entryIndex, write.getData());
       }
     } catch (InterruptedException ioe) {
@@ -763,7 +760,8 @@ public class ContainerStateMachine extends BaseStateMachine {
             }
           }, getCommandExecutor(requestProto));
       future.thenApply(r -> {
-        if (trx.getServerRole() == RaftPeerRole.LEADER) {
+        if (trx.getServerRole() == RaftPeerRole.LEADER
+            && trx.getStateMachineContext() != null) {
           long startTime = (long) trx.getStateMachineContext();
           metrics.incPipelineLatency(cmdType,
               Time.monotonicNowNanos() - startTime);
@@ -811,6 +809,12 @@ public class ContainerStateMachine extends BaseStateMachine {
         }
         return applyTransactionFuture;
       }).whenComplete((r, t) ->  {
+        if (t != null) {
+          stateMachineHealthy.set(false);
+          LOG.error("gid {} : ApplyTransaction failed. cmd {} logIndex "
+                  + "{} exception {}", gid, requestProto.getCmdType(),
+              index, t);
+        }
         applyTransactionSemaphore.release();
         metrics.recordApplyTransactionCompletion(
             Time.monotonicNowNanos() - applyTxnStartTime);

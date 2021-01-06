@@ -18,32 +18,29 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
-import com.google.protobuf.ByteString;
-import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.protocol.proto
-    .OzoneManagerProtocolProtos.OzoneAclInfo;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo.OzoneAclScope;
-import org.apache.hadoop.ozone.protocol.proto
-    .OzoneManagerProtocolProtos.OzoneAclInfo.OzoneAclType;
-import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
-import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
-import org.apache.hadoop.security.UserGroupInformation;
-
-import java.util.BitSet;
-import java.util.Collection;
-import java.util.List;
-import java.util.LinkedList;
-import java.util.Map;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Objects;
-import java.util.stream.Collectors;
-
 import static org.apache.hadoop.ozone.OzoneAcl.ZERO_BITSET;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.NONE;
+
+import com.google.protobuf.ByteString;
+import java.util.ArrayList;
+import java.util.BitSet;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
+import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo.OzoneAclScope;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo.OzoneAclType;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
+import org.apache.hadoop.security.UserGroupInformation;
 
 /**
  * This helper class keeps a map of all user and their permissions.
@@ -100,28 +97,58 @@ public class OmOzoneAclMap {
   // Add a new acl to the map
   public void addAcl(OzoneAcl acl) throws OMException {
     Objects.requireNonNull(acl, "Acl should not be null.");
+    OzoneAclType aclType = OzoneAclType.valueOf(acl.getType().name());
     if (acl.getAclScope().equals(OzoneAcl.AclScope.DEFAULT)) {
-      defaultAclList.add(OzoneAcl.toProtobuf(acl));
+      addDefaultAcl(acl);
       return;
     }
 
-    OzoneAclType aclType = OzoneAclType.valueOf(acl.getType().name());
     if (!getAccessAclMap(aclType).containsKey(acl.getName())) {
       getAccessAclMap(aclType).put(acl.getName(), acl.getAclBitSet());
     } else {
-      // Check if we are adding new rights to existing acl.
-      BitSet temp = (BitSet) acl.getAclBitSet().clone();
-      BitSet curRights = (BitSet) getAccessAclMap(aclType).
-          get(acl.getName()).clone();
-      temp.or(curRights);
-
-      if (temp.equals(curRights)) {
-        // throw exception if acl is already added.
-        throw new OMException("Acl " + acl + " already exist.",
-            INVALID_REQUEST);
-      }
-      getAccessAclMap(aclType).replace(acl.getName(), temp);
+      BitSet curBitSet = getAccessAclMap(aclType).get(acl.getName());
+      BitSet bitSet = checkAndGet(acl, curBitSet);
+      getAccessAclMap(aclType).replace(acl.getName(), bitSet);
     }
+  }
+
+  private void addDefaultAcl(OzoneAcl acl) throws OMException {
+    OzoneAclInfo ozoneAclInfo = OzoneAcl.toProtobuf(acl);
+    if (defaultAclList.contains(ozoneAclInfo)) {
+      aclExistsError(acl);
+    } else {
+      for (int i = 0; i < defaultAclList.size(); i++) {
+        OzoneAclInfo old = defaultAclList.get(i);
+        if (old.getType() == ozoneAclInfo.getType() && old.getName().equals(
+                ozoneAclInfo.getName())) {
+          BitSet curBitSet = BitSet.valueOf(old.getRights().toByteArray());
+          BitSet bitSet = checkAndGet(acl, curBitSet);
+          ozoneAclInfo = OzoneAclInfo.newBuilder(ozoneAclInfo).setRights(
+                  ByteString.copyFrom(bitSet.toByteArray())).build();
+          defaultAclList.remove(i);
+          defaultAclList.add(ozoneAclInfo);
+          return;
+        }
+      }
+    }
+    defaultAclList.add(ozoneAclInfo);
+  }
+
+  private void aclExistsError(OzoneAcl acl) throws OMException {
+    // throw exception if acl is already added.
+    throw new OMException("Acl " + acl + " already exist.", INVALID_REQUEST);
+  }
+
+  private BitSet checkAndGet(OzoneAcl acl, BitSet curBitSet)
+          throws OMException {
+    // Check if we are adding new rights to existing acl.
+    BitSet temp = (BitSet) acl.getAclBitSet().clone();
+    BitSet curRights = (BitSet) curBitSet.clone();
+    temp.or(curRights);
+    if (temp.equals(curRights)) {
+      aclExistsError(acl);
+    }
+    return temp;
   }
 
   // Add a new acl to the map
@@ -175,7 +202,7 @@ public class OmOzoneAclMap {
   public void addAcl(OzoneAclInfo acl) throws OMException {
     Objects.requireNonNull(acl, "Acl should not be null.");
     if (acl.getAclScope().equals(OzoneAclInfo.OzoneAclScope.DEFAULT)) {
-      defaultAclList.add(acl);
+      addDefaultAcl(OzoneAcl.fromProtobuf(acl));
       return;
     }
 
@@ -183,9 +210,7 @@ public class OmOzoneAclMap {
       BitSet acls = BitSet.valueOf(acl.getRights().toByteArray());
       getAccessAclMap(acl.getType()).put(acl.getName(), acls);
     } else {
-      // throw exception if acl is already added.
-
-      throw new OMException("Acl " + acl + " already exist.", INVALID_REQUEST);
+      aclExistsError(OzoneAcl.fromProtobuf(acl));
     }
   }
 

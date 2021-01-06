@@ -24,8 +24,15 @@ if [ ! "$(which hugo)" ]; then
    exit 0
 fi
 
+export OZONE_VERSION=$(grep "<ozone.version>" "${DOCDIR}/../../pom.xml" | sed 's/<[^>]*>//g'|  sed 's/^[ \t]*//')
+
+ENABLE_GIT_INFO=
+if git -C $(pwd) status >& /dev/null; then
+  ENABLE_GIT_INFO="--enableGitInfo"
+fi
+
 DESTDIR="$DOCDIR/target/classes/docs"
 mkdir -p "$DESTDIR"
 cd "$DOCDIR"
-hugo -d "$DESTDIR" "$@"
+hugo "${ENABLE_GIT_INFO}" -d "$DESTDIR" "$@"
 cd -

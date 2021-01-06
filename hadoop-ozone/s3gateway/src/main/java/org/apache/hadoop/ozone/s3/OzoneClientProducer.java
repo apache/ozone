@@ -24,7 +24,7 @@ import javax.inject.Inject;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.Context;
 import java.io.IOException;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.security.PrivilegedExceptionAction;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -54,9 +54,7 @@ import org.slf4j.LoggerFactory;
  */
 @RequestScoped
 public class OzoneClientProducer {
-
-  private static final Charset UTF_8 = Charset.forName("utf-8");
-
+  
   private final static Logger LOG =
       LoggerFactory.getLogger(OzoneClientProducer.class);
   private OzoneClient client;
@@ -121,7 +119,7 @@ public class OzoneClientProducer {
           LOG.trace("Adding token for service:{}", omService);
         }
         Token<OzoneTokenIdentifier> token = new Token(identifier.getBytes(),
-            identifier.getSignature().getBytes(UTF_8),
+            identifier.getSignature().getBytes(StandardCharsets.UTF_8),
             identifier.getKind(),
             omService);
         remoteUser.addToken(token);

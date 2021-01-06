@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.fs.ozone;
 
+import org.apache.hadoop.fs.CanUnbuffer;
+
 import java.nio.ByteBuffer;
 
 /**
@@ -35,4 +37,11 @@ final class OzoneStreamCapabilities {
    * TODO: If Hadoop dependency is upgraded, this string can be removed.
    */
   static final String READBYTEBUFFER = "in:readbytebuffer";
+
+  /**
+   * Stream unbuffer capability implemented by {@link CanUnbuffer#unbuffer()}.
+   *
+   * TODO: If Hadoop dependency is upgraded, this string can be removed.
+   */
+  static final String UNBUFFER = "in:unbuffer";
 }
