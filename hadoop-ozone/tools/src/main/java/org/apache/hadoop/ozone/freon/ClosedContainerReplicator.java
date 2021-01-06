@@ -103,7 +103,8 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
                 .stream().map(DatanodeDetails::getUuidString)
                 .collect(Collectors.toList());
 
-        //if datanode is specific replicate only container if has a replica.
+        //if datanode is specified, replicate only container if it has a
+        //replica.
         if (datanode.equals("") || datanodeUUIDs.contains(datanode)) {
           replicationTasks.add(new ReplicationTask(container.getContainerID(),
               datanodesWithContainer));
