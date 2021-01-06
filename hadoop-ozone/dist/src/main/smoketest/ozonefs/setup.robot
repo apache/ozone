@@ -27,7 +27,6 @@ ${BUCKET}            ${BUCKET_TYPE}1-${SCHEME}
 ${BUCKET2}           ${BUCKET_TYPE}2-${SCHEME}
 ${BUCKET_IN_VOL2}    ${BUCKET_TYPE}3-${SCHEME}
 ${DEEP_DIR}          test/${SCHEME}/dir
-${USER}              hadoop
 
 *** Keywords ***
 Setup for FS test
