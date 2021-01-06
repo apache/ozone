@@ -280,13 +280,6 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONARCLOUD_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v1
-        if: github.repository == 'apache/ozone' && github.event_name != 'pull_request'
-        with:
-          file: ./target/coverage/all.xml
-          name: codecov-umbrella
-          fail_ci_if_error: false
       - name: Archive build results
         uses: actions/upload-artifact@v2
         with:
