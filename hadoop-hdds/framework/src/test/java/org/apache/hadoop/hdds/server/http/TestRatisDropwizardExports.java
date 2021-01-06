@@ -24,7 +24,10 @@ import java.util.concurrent.TimeUnit;
 import com.codahale.metrics.MetricRegistry;
 import io.prometheus.client.CollectorRegistry;
 import io.prometheus.client.exporter.common.TextFormat;
-import org.apache.ratis.server.metrics.RaftLogMetrics;
+import org.apache.ratis.protocol.RaftGroupId;
+import org.apache.ratis.protocol.RaftGroupMemberId;
+import org.apache.ratis.protocol.RaftPeerId;
+import org.apache.ratis.server.metrics.SegmentedRaftLogMetrics;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -36,7 +39,9 @@ public class TestRatisDropwizardExports {
   @Test
   public void export() throws IOException {
     //create Ratis metrics
-    RaftLogMetrics instance = new RaftLogMetrics("instance");
+    SegmentedRaftLogMetrics instance = new SegmentedRaftLogMetrics(
+        RaftGroupMemberId.valueOf(
+            RaftPeerId.valueOf("peerId"), RaftGroupId.randomId()));
     instance.getRaftLogSyncTimer().update(10, TimeUnit.MILLISECONDS);
     MetricRegistry dropWizardMetricRegistry =
         instance.getRegistry().getDropWizardMetricRegistry();
