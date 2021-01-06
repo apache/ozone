@@ -17,7 +17,11 @@
 package org.apache.hadoop.ozone.freon;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +30,7 @@ import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
@@ -33,6 +38,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
@@ -76,8 +82,17 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
   @Override
   public Void call() throws Exception {
 
+    OzoneConfiguration conf = createOzoneConfiguration();
+
+    final Collection<String> datanodeStorageDirs =
+        MutableVolumeSet.getDatanodeStorageDirs(conf);
+
+    for (String dir : datanodeStorageDirs) {
+      checkDestinationDirectory(dir);
+    }
+
     //logic same as the download+import on the destination datanode
-    OzoneConfiguration conf = initializeReplicationSupervisor();
+    initializeReplicationSupervisor(conf);
 
     final ContainerOperationClient containerOperationClient =
         new ContainerOperationClient(conf);
@@ -123,16 +138,34 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
     return null;
   }
 
+  /**
+   * Check id target directory is not re-used.
+   */
+  private void checkDestinationDirectory(String dirUrl) throws IOException {
+    final StorageLocation storageLocation = StorageLocation.parse(dirUrl);
+    final Path dirPath = Paths.get(storageLocation.getUri().getPath());
+
+    if (Files.notExists(dirPath)) {
+      return;
+    }
+
+    if (Files.list(dirPath).count() == 0) {
+      return;
+    }
+
+    throw new IllegalArgumentException(
+        "Configured storage directory " + dirUrl
+            + " (used as destination) should be empty");
+  }
+
   @NotNull
-  private OzoneConfiguration initializeReplicationSupervisor()
+  private void initializeReplicationSupervisor(ConfigurationSource conf)
       throws IOException {
     String fakeDatanodeUuid = datanode;
 
     if (fakeDatanodeUuid.isEmpty()) {
       fakeDatanodeUuid = UUID.randomUUID().toString();
     }
-
-    OzoneConfiguration conf = createOzoneConfiguration();
 
     ContainerSet containerSet = new ContainerSet();
 
@@ -167,7 +200,6 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
             new TarContainerPacker());
 
     supervisor = new ReplicationSupervisor(containerSet, replicator, 10);
-    return conf;
   }
 
   private void replicateContainer(long counter) throws Exception {
