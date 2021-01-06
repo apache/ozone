@@ -445,7 +445,7 @@ public class ContainerStateMachine extends BaseStateMachine {
             return runCommand(requestProto, context);
           } catch (Exception e) {
             LOG.error("{}: writeChunk writeStateMachineData failed: blockId" +
-                "{} logIndex {} chunkName {} {}", gid, write.getBlockID(),
+                "{} logIndex {} chunkName {}", gid, write.getBlockID(),
                 entryIndex, write.getChunkData().getChunkName(), e);
             metrics.incNumWriteDataFails();
             // write chunks go in parallel. It's possible that one write chunk
@@ -458,8 +458,8 @@ public class ContainerStateMachine extends BaseStateMachine {
 
     writeChunkFutureMap.put(entryIndex, writeChunkFuture);
     if (LOG.isDebugEnabled()) {
-      LOG.error("{}: writeChunk writeStateMachineData : blockId" +
-              "{} logIndex {} chunkName {} {}", gid, write.getBlockID(),
+      LOG.debug("{}: writeChunk writeStateMachineData : blockId" +
+              "{} logIndex {} chunkName {}", gid, write.getBlockID(),
           entryIndex, write.getChunkData().getChunkName());
     }
     // Remove the future once it finishes execution from the
