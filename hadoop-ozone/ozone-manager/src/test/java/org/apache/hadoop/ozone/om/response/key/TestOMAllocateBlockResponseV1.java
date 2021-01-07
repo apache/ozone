@@ -64,8 +64,8 @@ public class TestOMAllocateBlockResponseV1
 
   @NotNull
   protected OMAllocateBlockResponse getOmAllocateBlockResponse(
-          OmKeyInfo omKeyInfo, OmVolumeArgs omVolumeArgs,
-          OmBucketInfo omBucketInfo, OMResponse omResponse) {
+          OmKeyInfo omKeyInfo, OmBucketInfo omBucketInfo,
+          OMResponse omResponse) {
     return new OMAllocateBlockResponseV1(omResponse, omKeyInfo, clientID,
             omBucketInfo);
   }
