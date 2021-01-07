@@ -25,6 +25,8 @@ import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import com.google.common.base.Preconditions;
 
@@ -97,7 +99,7 @@ public final class ContainerStateManagerImpl
   /**
    * Persistent store for Container States.
    */
-  private Table<ContainerID, ContainerInfo> containerStore;
+  private final Table<ContainerID, ContainerInfo> containerStore;
 
   /**
    * PipelineManager instance.
@@ -117,6 +119,11 @@ public final class ContainerStateManagerImpl
 
   private final Map<LifeCycleEvent, CheckedConsumer<ContainerInfo, IOException>>
       containerStateChangeActions;
+
+  // Protect containers and containerStore against the potential
+  // contentions between RaftServer and ContainerManager.
+  private final ReadWriteLock lock = new ReentrantReadWriteLock();
+
   /**
    * constructs ContainerStateManagerImpl instance and loads the containers
    * form the persistent storage.
@@ -246,18 +253,32 @@ public final class ContainerStateManagerImpl
 
   @Override
   public Set<ContainerID> getContainerIDs() {
-    return containers.getAllContainerIDs();
+    lock.readLock().lock();
+    try {
+      return containers.getAllContainerIDs();
+    } finally {
+      lock.readLock().unlock();
+    }
   }
 
   @Override
   public Set<ContainerID> getContainerIDs(final LifeCycleState state) {
-    return containers.getContainerIDsByState(state);
+    lock.readLock().lock();
+    try {
+      return containers.getContainerIDsByState(state);
+    } finally {
+      lock.readLock().unlock();
+    }
   }
 
   @Override
   public ContainerInfo getContainer(final HddsProtos.ContainerID id) {
-    return containers.getContainerInfo(
-        ContainerID.getFromProtobuf(id));
+    lock.readLock().lock();
+    try {
+      return containers.getContainerInfo(ContainerID.getFromProtobuf(id));
+    } finally {
+      lock.readLock().unlock();
+    }
   }
 
   @Override
@@ -273,45 +294,62 @@ public final class ContainerStateManagerImpl
     final ContainerID containerID = container.containerID();
     final PipelineID pipelineID = container.getPipelineID();
 
-    if (!containers.contains(containerID)) {
-      ExecutionUtil.create(() -> {
-        containerStore.put(containerID, container);
-        containers.addContainer(container);
-        pipelineManager.addContainerToPipeline(pipelineID, containerID);
-      }).onException(() -> {
-        containers.removeContainer(containerID);
-        containerStore.delete(containerID);
-      }).execute();
+    lock.writeLock().lock();
+    try {
+      if (!containers.contains(containerID)) {
+        ExecutionUtil.create(() -> {
+          containerStore.put(containerID, container);
+          containers.addContainer(container);
+          pipelineManager.addContainerToPipeline(pipelineID, containerID);
+        }).onException(() -> {
+          containers.removeContainer(containerID);
+          containerStore.delete(containerID);
+        }).execute();
+      }
+    } finally {
+      lock.writeLock().unlock();
     }
   }
 
   @Override
   public boolean contains(final HddsProtos.ContainerID id) {
-    // TODO: Remove the protobuf conversion after fixing ContainerStateMap.
-    return containers.contains(ContainerID.getFromProtobuf(id));
+    lock.readLock().lock();
+    try {
+      // TODO: Remove the protobuf conversion after fixing ContainerStateMap.
+      return containers.contains(ContainerID.getFromProtobuf(id));
+    } finally {
+      lock.readLock().unlock();
+    }
   }
 
+  @Override
   public void updateContainerState(final HddsProtos.ContainerID containerID,
                                    final LifeCycleEvent event)
       throws IOException, InvalidStateTransitionException {
     // TODO: Remove the protobuf conversion after fixing ContainerStateMap.
     final ContainerID id = ContainerID.getFromProtobuf(containerID);
-    if (containers.contains(id)) {
-      final ContainerInfo oldInfo = containers.getContainerInfo(id);
-      final LifeCycleState oldState = oldInfo.getState();
-      final LifeCycleState newState = stateMachine.getNextState(
-          oldInfo.getState(), event);
-      if (newState.getNumber() > oldState.getNumber()) {
-        ExecutionUtil.create(() -> {
-          containers.updateState(id, oldState, newState);
-          containerStore.put(id, containers.getContainerInfo(id));
-        }).onException(() -> {
-          containerStore.put(id, oldInfo);
-          containers.updateState(id, newState, oldState);
-        }).execute();
-        containerStateChangeActions.getOrDefault(event, info -> {})
-            .execute(oldInfo);
+
+    lock.writeLock().lock();
+    try {
+      if (containers.contains(id)) {
+        final ContainerInfo oldInfo = containers.getContainerInfo(id);
+        final LifeCycleState oldState = oldInfo.getState();
+        final LifeCycleState newState = stateMachine.getNextState(
+            oldInfo.getState(), event);
+        if (newState.getNumber() > oldState.getNumber()) {
+          ExecutionUtil.create(() -> {
+            containers.updateState(id, oldState, newState);
+            containerStore.put(id, containers.getContainerInfo(id));
+          }).onException(() -> {
+            containerStore.put(id, oldInfo);
+            containers.updateState(id, newState, oldState);
+          }).execute();
+          containerStateChangeActions.getOrDefault(event, info -> {})
+              .execute(oldInfo);
+        }
       }
+    } finally {
+      lock.writeLock().unlock();
     }
   }
 
@@ -319,35 +357,54 @@ public final class ContainerStateManagerImpl
   @Override
   public Set<ContainerReplica> getContainerReplicas(
       final HddsProtos.ContainerID id) {
-    return containers.getContainerReplicas(
-        ContainerID.getFromProtobuf(id));
+    lock.readLock().lock();
+    try {
+      return containers.getContainerReplicas(
+          ContainerID.getFromProtobuf(id));
+    } finally {
+      lock.readLock().unlock();
+    }
   }
 
   @Override
   public void updateContainerReplica(final HddsProtos.ContainerID id,
                                      final ContainerReplica replica) {
-    containers.updateContainerReplica(ContainerID.getFromProtobuf(id),
-        replica);
+    lock.writeLock().lock();
+    try {
+      containers.updateContainerReplica(ContainerID.getFromProtobuf(id),
+          replica);
+    } finally {
+      lock.writeLock().unlock();
+    }
   }
 
   @Override
   public void removeContainerReplica(final HddsProtos.ContainerID id,
                                      final ContainerReplica replica) {
-    containers.removeContainerReplica(ContainerID.getFromProtobuf(id),
-        replica);
-
+    lock.writeLock().lock();
+    try {
+      containers.removeContainerReplica(ContainerID.getFromProtobuf(id),
+          replica);
+    } finally {
+      lock.writeLock().unlock();
+    }
   }
 
   @Override
   public void updateDeleteTransactionId(
       final Map<ContainerID, Long> deleteTransactionMap) throws IOException {
-    // TODO: Refactor this. Error handling is not done.
-    for (Map.Entry<ContainerID, Long> transaction :
-        deleteTransactionMap.entrySet()) {
-      final ContainerInfo info = containers.getContainerInfo(
-          transaction.getKey());
-      info.updateDeleteTransactionId(transaction.getValue());
-      containerStore.put(info.containerID(), info);
+    lock.writeLock().lock();
+    try {
+      // TODO: Refactor this. Error handling is not done.
+      for (Map.Entry<ContainerID, Long> transaction :
+          deleteTransactionMap.entrySet()) {
+        final ContainerInfo info = containers.getContainerInfo(
+            transaction.getKey());
+        info.updateDeleteTransactionId(transaction.getValue());
+        containerStore.put(info.containerID(), info);
+      }
+    } finally {
+      lock.writeLock().unlock();
     }
   }
 
@@ -370,26 +427,31 @@ public final class ContainerStateManagerImpl
       resultSet = containerIDs;
     }
 
-    ContainerInfo selectedContainer = findContainerWithSpace(size, resultSet);
-    if (selectedContainer == null) {
+    lock.readLock().lock();
+    try {
+      ContainerInfo selectedContainer = findContainerWithSpace(size, resultSet);
+      if (selectedContainer == null) {
 
-      // If we did not find any space in the tailSet, we need to look for
-      // space in the headset, we need to pass true to deal with the
-      // situation that we have a lone container that has space. That is we
-      // ignored the last used container under the assumption we can find
-      // other containers with space, but if have a single container that is
-      // not true. Hence we need to include the last used container as the
-      // last element in the sorted set.
+        // If we did not find any space in the tailSet, we need to look for
+        // space in the headset, we need to pass true to deal with the
+        // situation that we have a lone container that has space. That is we
+        // ignored the last used container under the assumption we can find
+        // other containers with space, but if have a single container that is
+        // not true. Hence we need to include the last used container as the
+        // last element in the sorted set.
 
-      resultSet = containerIDs.headSet(lastID, true);
-      selectedContainer = findContainerWithSpace(size, resultSet);
+        resultSet = containerIDs.headSet(lastID, true);
+        selectedContainer = findContainerWithSpace(size, resultSet);
+      }
+
+      // TODO: cleanup entries in lastUsedMap
+      if (selectedContainer != null) {
+        lastUsedMap.put(key, selectedContainer.containerID());
+      }
+      return selectedContainer;
+    } finally {
+      lock.readLock().unlock();
     }
-
-    // TODO: cleanup entries in lastUsedMap
-    if (selectedContainer != null) {
-      lastUsedMap.put(key, selectedContainer.containerID());
-    }
-    return selectedContainer;
   }
 
   private ContainerInfo findContainerWithSpace(final long size,
@@ -408,12 +470,17 @@ public final class ContainerStateManagerImpl
 
   public void removeContainer(final HddsProtos.ContainerID id)
       throws IOException {
-    final ContainerID cid = ContainerID.getFromProtobuf(id);
-    final ContainerInfo containerInfo = containers.getContainerInfo(cid);
-    ExecutionUtil.create(() -> {
-      containerStore.delete(cid);
-      containers.removeContainer(cid);
-    }).onException(() -> containerStore.put(cid, containerInfo)).execute();
+    lock.writeLock().lock();
+    try {
+      final ContainerID cid = ContainerID.getFromProtobuf(id);
+      final ContainerInfo containerInfo = containers.getContainerInfo(cid);
+      ExecutionUtil.create(() -> {
+        containerStore.delete(cid);
+        containers.removeContainer(cid);
+      }).onException(() -> containerStore.put(cid, containerInfo)).execute();
+    } finally {
+      lock.writeLock().unlock();
+    }
   }
 
   @Override

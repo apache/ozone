@@ -28,8 +28,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
 import com.google.common.base.Preconditions;
@@ -70,8 +70,8 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
   /**
    *
    */
-  //Can we move this lock to ContainerStateManager?
-  private final ReadWriteLock lock;
+  // Limit the number of on-going ratis operations.
+  private final Lock lock;
 
   /**
    *
@@ -102,7 +102,7 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
       final Table<ContainerID, ContainerInfo> containerStore)
       throws IOException {
     // Introduce builder for this class?
-    this.lock = new ReentrantReadWriteLock();
+    this.lock = new ReentrantLock();
     this.pipelineManager = pipelineManager;
     this.haManager = scmHaManager;
     this.containerStateManager = ContainerStateManagerImpl.newBuilder()
@@ -124,56 +124,41 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
   @Override
   public ContainerInfo getContainer(final ContainerID id)
       throws ContainerNotFoundException {
-    lock.readLock().lock();
-    try {
-      return Optional.ofNullable(containerStateManager
-          .getContainer(id.getProtobuf()))
-          .orElseThrow(() -> new ContainerNotFoundException("ID " + id));
-    } finally {
-      lock.readLock().unlock();
-    }
+    return Optional.ofNullable(containerStateManager
+        .getContainer(id.getProtobuf()))
+        .orElseThrow(() -> new ContainerNotFoundException("ID " + id));
   }
 
   @Override
   public List<ContainerInfo> getContainers(final ContainerID startID,
                                            final int count) {
-    lock.readLock().lock();
     scmContainerManagerMetrics.incNumListContainersOps();
-    try {
-      // TODO: Remove the null check, startID should not be null. Fix the unit
-      //  test before removing the check.
-      final long start = startID == null ? 0 : startID.getId();
-      final List<ContainerID> containersIds =
-          new ArrayList<>(containerStateManager.getContainerIDs());
-      Collections.sort(containersIds);
-      return containersIds.stream()
-          .filter(id -> id.getId() > start).limit(count)
-          .map(ContainerID::getProtobuf)
-          .map(containerStateManager::getContainer)
-          .collect(Collectors.toList());
-    } finally {
-      lock.readLock().unlock();
-    }
+    // TODO: Remove the null check, startID should not be null. Fix the unit
+    //  test before removing the check.
+    final long start = startID == null ? 0 : startID.getId();
+    final List<ContainerID> containersIds =
+        new ArrayList<>(containerStateManager.getContainerIDs());
+    Collections.sort(containersIds);
+    return containersIds.stream()
+        .filter(id -> id.getId() > start).limit(count)
+        .map(ContainerID::getProtobuf)
+        .map(containerStateManager::getContainer)
+        .collect(Collectors.toList());
   }
 
   @Override
   public List<ContainerInfo> getContainers(final LifeCycleState state) {
-    lock.readLock().lock();
-    try {
-      return containerStateManager.getContainerIDs(state).stream()
-          .map(ContainerID::getProtobuf)
-          .map(containerStateManager::getContainer)
-          .filter(Objects::nonNull).collect(Collectors.toList());
-    } finally {
-      lock.readLock().unlock();
-    }
+    return containerStateManager.getContainerIDs(state).stream()
+        .map(ContainerID::getProtobuf)
+        .map(containerStateManager::getContainer)
+        .filter(Objects::nonNull).collect(Collectors.toList());
   }
 
   @Override
   public ContainerInfo allocateContainer(final ReplicationType type,
       final ReplicationFactor replicationFactor, final String owner)
       throws IOException {
-    lock.writeLock().lock();
+    lock.lock();
     try {
       final List<Pipeline> pipelines = pipelineManager
           .getPipelines(type, replicationFactor, Pipeline.PipelineState.OPEN);
@@ -198,7 +183,7 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
       }
       return containerInfo;
     } finally {
-      lock.writeLock().unlock();
+      lock.unlock();
     }
   }
 
@@ -233,7 +218,7 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
                                    final LifeCycleEvent event)
       throws IOException, InvalidStateTransitionException {
     final HddsProtos.ContainerID cid = id.getProtobuf();
-    lock.writeLock().lock();
+    lock.lock();
     try {
       if (containerExist(cid)) {
         containerStateManager.updateContainerState(cid, event);
@@ -241,21 +226,16 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
         throwContainerNotFoundException(cid);
       }
     } finally {
-      lock.writeLock().unlock();
+      lock.unlock();
     }
   }
 
   @Override
   public Set<ContainerReplica> getContainerReplicas(final ContainerID id)
       throws ContainerNotFoundException {
-    lock.readLock().lock();
-    try {
-      return Optional.ofNullable(containerStateManager
-          .getContainerReplicas(id.getProtobuf()))
-          .orElseThrow(() -> new ContainerNotFoundException("ID " + id));
-    } finally {
-      lock.readLock().unlock();
-    }
+    return Optional.ofNullable(containerStateManager
+        .getContainerReplicas(id.getProtobuf()))
+        .orElseThrow(() -> new ContainerNotFoundException("ID " + id));
   }
 
   @Override
@@ -263,15 +243,10 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
                                      final ContainerReplica replica)
       throws ContainerNotFoundException {
     final HddsProtos.ContainerID cid = id.getProtobuf();
-    lock.writeLock().lock();
-    try {
-      if (containerExist(cid)) {
-        containerStateManager.updateContainerReplica(cid, replica);
-      } else {
-        throwContainerNotFoundException(cid);
-      }
-    } finally {
-      lock.writeLock().unlock();
+    if (containerExist(cid)) {
+      containerStateManager.updateContainerReplica(cid, replica);
+    } else {
+      throwContainerNotFoundException(cid);
     }
   }
 
@@ -280,27 +255,17 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
                                      final ContainerReplica replica)
       throws ContainerNotFoundException, ContainerReplicaNotFoundException {
     final HddsProtos.ContainerID cid = id.getProtobuf();
-    lock.writeLock().lock();
-    try {
-      if (containerExist(cid)) {
-        containerStateManager.removeContainerReplica(cid, replica);
-      } else {
-        throwContainerNotFoundException(cid);
-      }
-    } finally {
-      lock.writeLock().unlock();
+    if (containerExist(cid)) {
+      containerStateManager.removeContainerReplica(cid, replica);
+    } else {
+      throwContainerNotFoundException(cid);
     }
   }
 
   @Override
   public void updateDeleteTransactionId(
       final Map<ContainerID, Long> deleteTransactionMap) throws IOException {
-    lock.writeLock().lock();
-    try {
-      containerStateManager.updateDeleteTransactionId(deleteTransactionMap);
-    } finally {
-      lock.writeLock().unlock();
-    }
+    containerStateManager.updateDeleteTransactionId(deleteTransactionMap);
   }
 
   @Override
@@ -384,7 +349,7 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
   public void deleteContainer(final ContainerID id)
       throws IOException {
     final HddsProtos.ContainerID cid = id.getProtobuf();
-    lock.writeLock().lock();
+    lock.lock();
     try {
       if (containerExist(cid)) {
         containerStateManager.removeContainer(cid);
@@ -394,7 +359,7 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
         throwContainerNotFoundException(cid);
       }
     } finally {
-      lock.writeLock().unlock();
+      lock.unlock();
     }
   }
 
