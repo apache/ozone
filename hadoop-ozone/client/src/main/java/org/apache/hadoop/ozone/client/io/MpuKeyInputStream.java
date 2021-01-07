@@ -22,6 +22,8 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.crypto.CryptoInputStream;
 import org.apache.hadoop.fs.CanUnbuffer;
 import org.apache.hadoop.fs.Seekable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.EOFException;
 import java.io.IOException;
@@ -30,6 +32,8 @@ import java.util.List;
 
 public class MpuKeyInputStream extends OzoneInputStream implements Seekable,
     CanUnbuffer {
+
+  private static Logger LOG = LoggerFactory.getLogger(MpuKeyInputStream.class);
 
   private List<CryptoInputStream> partInputStreams;
   private List<LengthInputStream> lengthInputStreams;
@@ -59,7 +63,11 @@ public class MpuKeyInputStream extends OzoneInputStream implements Seekable,
     for (LengthInputStream lengthInputStream : lengthInputStreams) {
       this.partOffsets[i++] = length;
       length += lengthInputStream.getLength();
+      LOG.info("PartIndex {} offset{} length {}", i-1, partOffsets[i-1],
+          lengthInputStream.getLength());
     }
+
+
   }
 
 
@@ -86,6 +94,7 @@ public class MpuKeyInputStream extends OzoneInputStream implements Seekable,
     int totalReadLen = 0;
 
     while (len > 0) {
+      LOG.info("len {}, partIndex {}", len, partIndex);
       if (partInputStreams.size() == 0 ||
           (partInputStreams.size() - 1 <= partIndex &&
               getRemainingInPartIndex(partIndex) == 0)) {
@@ -109,8 +118,10 @@ public class MpuKeyInputStream extends OzoneInputStream implements Seekable,
       len -= numBytesRead;
       if (getRemainingInPartIndex(partIndex) <= 0 &&
           ((partIndex + 1) < partInputStreams.size())) {
+        LOG.info("PartIndex incremented");
         partIndex += 1;
       }
+
     }
     return totalReadLen;
   }
@@ -205,6 +216,9 @@ public class MpuKeyInputStream extends OzoneInputStream implements Seekable,
 
 
   private long getRemainingInPartIndex(int partIndex) throws IOException {
+    LOG.info("getRemainingInPartIndex index - {} len -{}, rem - {}", partIndex,
+        length, lengthInputStreams.get(partIndex).getLength() -
+            partInputStreams.get(partIndex).getPos());
     return lengthInputStreams.get(partIndex).getLength() -
         partInputStreams.get(partIndex).getPos();
   }

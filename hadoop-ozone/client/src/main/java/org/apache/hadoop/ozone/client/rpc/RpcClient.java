@@ -1212,22 +1212,31 @@ public class RpcClient implements ClientProtocol {
       LengthInputStream lengthInputStream = KeyInputStream
           .getFromOmKeyInfo(keyInfo, xceiverClientManager,
               clientConfig.isChecksumVerify(), retryFunction);
-      try {
-        GDPRSymmetricKey gk;
-        Map< String, String > keyInfoMetadata = keyInfo.getMetadata();
-        if (Boolean.valueOf(keyInfoMetadata.get(OzoneConsts.GDPR_FLAG))) {
-          gk = new GDPRSymmetricKey(
-              keyInfoMetadata.get(OzoneConsts.GDPR_SECRET),
-              keyInfoMetadata.get(OzoneConsts.GDPR_ALGORITHM)
-          );
-          gk.getCipher().init(Cipher.DECRYPT_MODE, gk.getSecretKey());
-          return new OzoneInputStream(
-              new CipherInputStream(lengthInputStream, gk.getCipher()));
+      if (feInfo != null) {
+        final KeyProvider.KeyVersion decrypted = getDEK(feInfo);
+        final CryptoInputStream cryptoIn =
+            new CryptoInputStream(lengthInputStream.getWrappedStream(),
+                OzoneKMSUtil.getCryptoCodec(conf, feInfo),
+                decrypted.getMaterial(), feInfo.getIV());
+        return new OzoneInputStream(cryptoIn);
+      } else {
+        try {
+          GDPRSymmetricKey gk;
+          Map< String, String > keyInfoMetadata = keyInfo.getMetadata();
+          if (Boolean.valueOf(keyInfoMetadata.get(OzoneConsts.GDPR_FLAG))) {
+            gk = new GDPRSymmetricKey(
+                keyInfoMetadata.get(OzoneConsts.GDPR_SECRET),
+                keyInfoMetadata.get(OzoneConsts.GDPR_ALGORITHM)
+            );
+            gk.getCipher().init(Cipher.DECRYPT_MODE, gk.getSecretKey());
+            return new OzoneInputStream(
+                new CipherInputStream(lengthInputStream, gk.getCipher()));
+          }
+        } catch (Exception ex) {
+          throw new IOException(ex);
         }
-      } catch (Exception ex) {
-        throw new IOException(ex);
+        return new OzoneInputStream(lengthInputStream.getWrappedStream());
       }
-      return new OzoneInputStream(lengthInputStream.getWrappedStream());
     } else {
       List<LengthInputStream> lengthInputStreams = KeyInputStream
           .getStreamsFromKeyInfo(keyInfo, xceiverClientManager,

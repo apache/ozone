@@ -106,6 +106,7 @@ public class KeyInputStream extends InputStream
 
     int partNumber = keyLocationInfos.get(0).getPartNumber();
 
+
     List<OmKeyLocationInfo> blocksInMpuPart = new ArrayList<>();
     long partLength = 0;
     for (OmKeyLocationInfo omKeyLocationInfo: keyLocationInfos) {
@@ -128,6 +129,18 @@ public class KeyInputStream extends InputStream
         partLength = omKeyLocationInfo.getLength();
       }
     }
+
+    //Finally add last block
+    if (blocksInMpuPart != null) {
+      LOG.info("Add last block part");
+      KeyInputStream keyInputStream = new KeyInputStream();
+      keyInputStream.initialize(keyInfo, blocksInMpuPart,
+          xceiverClientFactory, verifyChecksum, retryFunction);
+
+      lengthInputStreams.add(new LengthInputStream(keyInputStream,
+          partLength));
+    }
+
     return lengthInputStreams;
   }
 
