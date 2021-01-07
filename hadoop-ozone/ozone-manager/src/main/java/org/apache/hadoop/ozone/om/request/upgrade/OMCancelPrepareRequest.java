@@ -64,9 +64,10 @@ public class OMCancelPrepareRequest extends OMClientRequest {
       responseBuilder.setCancelPrepareResponse(omResponse);
       response = new OMCancelPrepareResponse(responseBuilder.build());
 
-      ozoneManagerDoubleBufferHelper.add(response, transactionLogIndex);
-
+      // Deletes on disk marker file, does not update DB and therefore does
+      // not update cache.
       ozoneManager.getPrepareState().cancelPrepare();
+      ozoneManagerDoubleBufferHelper.add(response, transactionLogIndex);
 
       LOG.info("OM {} prepare state cancelled at log index {}. Returning " +
               "response {}",

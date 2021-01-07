@@ -36,7 +36,7 @@ public class OMCancelPrepareResponse extends OMClientResponse {
 
   @Override
   protected void addToDBBatch(OMMetadataManager omMetadataManager,
-    BatchOperation batchOperation) throws IOException {
+      BatchOperation batchOperation) throws IOException {
     // The cancel prepare request will delete the prepare marker file and
     // update in memory state, so this response does not need to perform  DB
     // update.

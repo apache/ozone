@@ -23,6 +23,8 @@ import java.util.List;
 import java.util.UUID;
 
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.KeyManagerImpl;
@@ -75,6 +77,7 @@ public class TestOMKeyRequest {
   protected OMMetrics omMetrics;
   protected OMMetadataManager omMetadataManager;
   protected AuditLogger auditLogger;
+  protected OzoneManagerPrepareState prepareState;
 
   protected ScmClient scmClient;
   protected OzoneBlockTokenSecretManager ozoneBlockTokenSecretManager;
@@ -106,6 +109,8 @@ public class TestOMKeyRequest {
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         folder.newFolder().getAbsolutePath());
+    ozoneConfiguration.set(OzoneConfigKeys.OZONE_METADATA_DIRS,
+        folder.newFolder().getAbsolutePath());
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration);
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
@@ -133,6 +138,9 @@ public class TestOMKeyRequest {
     when(ozoneManager.getOMNodeId()).thenReturn(UUID.randomUUID().toString());
     when(scmClient.getBlockClient()).thenReturn(scmBlockLocationProtocol);
     when(ozoneManager.getKeyManager()).thenReturn(keyManager);
+
+    prepareState = new OzoneManagerPrepareState(ozoneConfiguration);
+    when(ozoneManager.getPrepareState()).thenReturn(prepareState);
 
     Pipeline pipeline = Pipeline.newBuilder()
         .setState(Pipeline.PipelineState.OPEN)
