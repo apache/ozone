@@ -52,8 +52,8 @@ import java.util.NavigableSet;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * SCM Pipeline Manager implementation.
@@ -64,7 +64,8 @@ public final class PipelineManagerV2Impl implements PipelineManager {
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMPipelineManager.class);
 
-  private final ReadWriteLock lock;
+  // Limit the number of on-going ratis operation to be 1.
+  private final Lock lock;
   private PipelineFactory pipelineFactory;
   private StateManager stateManager;
   private Scheduler scheduler;
@@ -88,7 +89,7 @@ public final class PipelineManagerV2Impl implements PipelineManager {
                                 StateManager pipelineStateManager,
                                 PipelineFactory pipelineFactory,
                                 EventPublisher eventPublisher) {
-    this.lock = new ReentrantReadWriteLock();
+    this.lock = new ReentrantLock();
     this.pipelineFactory = pipelineFactory;
     this.stateManager = pipelineStateManager;
     this.conf = conf;
@@ -149,7 +150,7 @@ public final class PipelineManagerV2Impl implements PipelineManager {
       throw new IOException("Pipeline creation is not allowed as safe mode " +
           "prechecks have not yet passed");
     }
-    lock.writeLock().lock();
+    lock.lock();
     try {
       Pipeline pipeline = pipelineFactory.create(type, factor);
       stateManager.addPipeline(pipeline.getProtobufMessage());
@@ -161,7 +162,7 @@ public final class PipelineManagerV2Impl implements PipelineManager {
       metrics.incNumPipelineCreationFailed();
       throw ex;
     } finally {
-      lock.writeLock().unlock();
+      lock.unlock();
     }
   }
 
@@ -170,90 +171,52 @@ public final class PipelineManagerV2Impl implements PipelineManager {
                                  List<DatanodeDetails> nodes) {
     // This will mostly be used to create dummy pipeline for SimplePipelines.
     // We don't update the metrics for SimplePipelines.
-    lock.writeLock().lock();
-    try {
-      return pipelineFactory.create(type, factor, nodes);
-    } finally {
-      lock.writeLock().unlock();
-    }
+    return pipelineFactory.create(type, factor, nodes);
   }
 
   @Override
   public Pipeline getPipeline(PipelineID pipelineID)
       throws PipelineNotFoundException {
-    lock.readLock().lock();
-    try {
-      return stateManager.getPipeline(pipelineID);
-    } finally {
-      lock.readLock().unlock();
-    }
+    return stateManager.getPipeline(pipelineID);
   }
 
   @Override
   public boolean containsPipeline(PipelineID pipelineID) {
-    lock.readLock().lock();
     try {
       getPipeline(pipelineID);
       return true;
     } catch (PipelineNotFoundException e) {
       return false;
-    } finally {
-      lock.readLock().unlock();
     }
   }
 
   @Override
   public List<Pipeline> getPipelines() {
-    lock.readLock().lock();
-    try {
-      return stateManager.getPipelines();
-    } finally {
-      lock.readLock().unlock();
-    }
+    return stateManager.getPipelines();
   }
 
   @Override
   public List<Pipeline> getPipelines(ReplicationType type) {
-    lock.readLock().lock();
-    try {
-      return stateManager.getPipelines(type);
-    } finally {
-      lock.readLock().unlock();
-    }
+    return stateManager.getPipelines(type);
   }
 
   @Override
   public List<Pipeline> getPipelines(ReplicationType type,
-                              ReplicationFactor factor) {
-    lock.readLock().lock();
-    try {
-      return stateManager.getPipelines(type, factor);
-    } finally {
-      lock.readLock().unlock();
-    }
+                                     ReplicationFactor factor) {
+    return stateManager.getPipelines(type, factor);
   }
 
   @Override
   public List<Pipeline> getPipelines(ReplicationType type,
-                              Pipeline.PipelineState state) {
-    lock.readLock().lock();
-    try {
-      return stateManager.getPipelines(type, state);
-    } finally {
-      lock.readLock().unlock();
-    }
+                                     Pipeline.PipelineState state) {
+    return stateManager.getPipelines(type, state);
   }
 
   @Override
   public List<Pipeline> getPipelines(ReplicationType type,
-                              ReplicationFactor factor,
-                              Pipeline.PipelineState state) {
-    lock.readLock().lock();
-    try {
-      return stateManager.getPipelines(type, factor, state);
-    } finally {
-      lock.readLock().unlock();
-    }
+                                     ReplicationFactor factor,
+                                     Pipeline.PipelineState state) {
+    return stateManager.getPipelines(type, factor, state);
   }
 
   @Override
@@ -261,46 +224,28 @@ public final class PipelineManagerV2Impl implements PipelineManager {
       ReplicationType type, ReplicationFactor factor,
       Pipeline.PipelineState state, Collection<DatanodeDetails> excludeDns,
       Collection<PipelineID> excludePipelines) {
-    lock.readLock().lock();
-    try {
-      return stateManager
-          .getPipelines(type, factor, state, excludeDns, excludePipelines);
-    } finally {
-      lock.readLock().unlock();
-    }
+    return stateManager
+        .getPipelines(type, factor, state, excludeDns, excludePipelines);
   }
 
   @Override
   public void addContainerToPipeline(
       PipelineID pipelineID, ContainerID containerID) throws IOException {
-    lock.writeLock().lock();
-    try {
-      stateManager.addContainerToPipeline(pipelineID, containerID);
-    } finally {
-      lock.writeLock().unlock();
-    }
+    // should not lock here, since no ratis operation happens.
+    stateManager.addContainerToPipeline(pipelineID, containerID);
   }
 
   @Override
   public void removeContainerFromPipeline(
       PipelineID pipelineID, ContainerID containerID) throws IOException {
-    lock.writeLock().lock();
-    try {
-      stateManager.removeContainerFromPipeline(pipelineID, containerID);
-    } finally {
-      lock.writeLock().unlock();
-    }
+    // should not lock here, since no ratis operation happens.
+    stateManager.removeContainerFromPipeline(pipelineID, containerID);
   }
 
   @Override
   public NavigableSet<ContainerID> getContainersInPipeline(
       PipelineID pipelineID) throws IOException {
-    lock.readLock().lock();
-    try {
-      return stateManager.getContainers(pipelineID);
-    } finally {
-      lock.readLock().unlock();
-    }
+    return stateManager.getContainers(pipelineID);
   }
 
   @Override
@@ -310,7 +255,7 @@ public final class PipelineManagerV2Impl implements PipelineManager {
 
   @Override
   public void openPipeline(PipelineID pipelineId) throws IOException {
-    lock.writeLock().lock();
+    lock.lock();
     try {
       Pipeline pipeline = stateManager.getPipeline(pipelineId);
       if (pipeline.isClosed()) {
@@ -324,7 +269,7 @@ public final class PipelineManagerV2Impl implements PipelineManager {
       metrics.incNumPipelineCreated();
       metrics.createPerPipelineMetrics(pipeline);
     } finally {
-      lock.writeLock().unlock();
+      lock.unlock();
     }
   }
 
@@ -337,7 +282,7 @@ public final class PipelineManagerV2Impl implements PipelineManager {
   protected void removePipeline(Pipeline pipeline) throws IOException {
     pipelineFactory.close(pipeline.getType(), pipeline);
     PipelineID pipelineID = pipeline.getId();
-    lock.writeLock().lock();
+    lock.lock();
     try {
       stateManager.removePipeline(pipelineID.getProtobuf());
       metrics.incNumPipelineDestroyed();
@@ -345,7 +290,7 @@ public final class PipelineManagerV2Impl implements PipelineManager {
       metrics.incNumPipelineDestroyFailed();
       throw ex;
     } finally {
-      lock.writeLock().unlock();
+      lock.unlock();
     }
   }
 
@@ -372,7 +317,7 @@ public final class PipelineManagerV2Impl implements PipelineManager {
   public void closePipeline(Pipeline pipeline, boolean onTimeout)
       throws IOException {
     PipelineID pipelineID = pipeline.getId();
-    lock.writeLock().lock();
+    lock.lock();
     try {
       if (!pipeline.isClosed()) {
         stateManager.updatePipelineState(pipelineID.getProtobuf(),
@@ -381,7 +326,7 @@ public final class PipelineManagerV2Impl implements PipelineManager {
       }
       metrics.removePipelineMetrics(pipelineID);
     } finally {
-      lock.writeLock().unlock();
+      lock.unlock();
     }
     // close containers.
     closeContainersForPipeline(pipelineID);
