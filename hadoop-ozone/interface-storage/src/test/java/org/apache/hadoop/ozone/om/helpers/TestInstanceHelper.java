@@ -56,8 +56,9 @@ public final class TestInstanceHelper {
         .build();
   }
 
-  public static OzoneManagerStorageProtos.PersistedPrefixInfo getDefaultTestPrefixInfo(
-      String name, String aclString, HddsProtos.KeyValue metadata){
+  public static OzoneManagerStorageProtos.PersistedPrefixInfo
+      getDefaultTestPrefixInfo(String name, String aclString,
+      HddsProtos.KeyValue metadata) {
     return OzoneManagerStorageProtos.PersistedPrefixInfo.newBuilder()
         .setName(name)
         .addAcls(buildTestOzoneAclInfo(aclString))

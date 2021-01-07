@@ -100,7 +100,8 @@ public class TestOmPrefixInfo {
         username, IAccessAuthorizer.ACLType.WRITE,
         ACCESS);
     omPrefixInfo.getMetadata().put("key", "value");
-    OzoneManagerStorageProtos.PersistedPrefixInfo pi = omPrefixInfo.getProtobuf();
+    OzoneManagerStorageProtos.PersistedPrefixInfo pi =
+        omPrefixInfo.getProtobuf();
     Assert.assertEquals(testPath, pi.getName());
     Assert.assertEquals(1, pi.getAclsCount());
     Assert.assertEquals(1, pi.getMetadataCount());
