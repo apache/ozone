@@ -546,6 +546,41 @@ public abstract class OMKeyRequest extends OMClientRequest {
     }
   }
 
+  protected void getFileEncryptionInfoForMpuKey(KeyArgs keyArgs,
+      KeyArgs.Builder newKeyArgs, OzoneManager ozoneManager)
+      throws IOException {
+
+    String volumeName = keyArgs.getVolumeName();
+    String bucketName = keyArgs.getBucketName();
+
+    boolean acquireLock = false;
+    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+
+    if (ozoneManager.getKmsProvider() != null) {
+      try {
+        acquireLock = omMetadataManager.getLock().acquireReadLock(
+            BUCKET_LOCK, volumeName, bucketName);
+
+
+        OmKeyInfo omKeyInfo =
+            omMetadataManager.getKeyTable().get(
+                omMetadataManager.getMultipartKey(volumeName, bucketName,
+                    keyArgs.getKeyName(), keyArgs.getMultipartUploadID()));
+
+        if (omKeyInfo != null) {
+          newKeyArgs.setFileEncryptionInfo(
+              OMPBHelper.convert(omKeyInfo.getFileEncryptionInfo()));
+
+        }
+      } finally {
+        if (acquireLock) {
+          omMetadataManager.getLock().releaseReadLock(
+              BUCKET_LOCK, volumeName, bucketName);
+        }
+      }
+    }
+  }
+
   /**
    * Get FileEncryptionInfoProto from KeyArgs.
    * @param keyArgs

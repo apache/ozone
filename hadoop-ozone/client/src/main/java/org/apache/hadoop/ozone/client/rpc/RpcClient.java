@@ -22,6 +22,7 @@ import javax.crypto.Cipher;
 import javax.crypto.CipherInputStream;
 import javax.crypto.CipherOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.security.InvalidKeyException;
 import java.security.SecureRandom;
@@ -67,6 +68,7 @@ import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.LengthInputStream;
+import org.apache.hadoop.ozone.client.io.MpuKeyInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
@@ -942,7 +944,17 @@ public class RpcClient implements ClientProtocol {
     keyOutputStream.addPreallocateBlocks(
         openKey.getKeyInfo().getLatestVersionLocations(),
         openKey.getOpenVersion());
-    return new OzoneOutputStream(keyOutputStream);
+    FileEncryptionInfo feInfo = keyOutputStream.getFileEncryptionInfo();
+    if (feInfo != null) {
+      KeyProvider.KeyVersion decrypted = getDEK(feInfo);
+      final CryptoOutputStream cryptoOut =
+          new CryptoOutputStream(keyOutputStream,
+              OzoneKMSUtil.getCryptoCodec(conf, feInfo),
+              decrypted.getMaterial(), feInfo.getIV());
+      return new OzoneOutputStream(cryptoOut);
+    } else {
+      return new OzoneOutputStream(keyOutputStream);
+    }
   }
 
   @Override
@@ -1192,22 +1204,18 @@ public class RpcClient implements ClientProtocol {
   private OzoneInputStream createInputStream(
       OmKeyInfo keyInfo, Function<OmKeyInfo, OmKeyInfo> retryFunction)
       throws IOException {
-    LengthInputStream lengthInputStream = KeyInputStream
-        .getFromOmKeyInfo(keyInfo, xceiverClientManager,
-            clientConfig.isChecksumVerify(), retryFunction);
+    // When Key is not MPU or when Key is MPU and encryption is not enabled
+    // Need to revisit for GDP.
     FileEncryptionInfo feInfo = keyInfo.getFileEncryptionInfo();
-    if (feInfo != null) {
-      final KeyProvider.KeyVersion decrypted = getDEK(feInfo);
-      final CryptoInputStream cryptoIn =
-          new CryptoInputStream(lengthInputStream.getWrappedStream(),
-              OzoneKMSUtil.getCryptoCodec(conf, feInfo),
-              decrypted.getMaterial(), feInfo.getIV());
-      return new OzoneInputStream(cryptoIn);
-    } else {
-      try{
+    if (!keyInfo.getLatestVersionLocations().isMultipartKey() ||
+        (keyInfo.getLatestVersionLocations().isMultipartKey() && feInfo == null)) {
+      LengthInputStream lengthInputStream = KeyInputStream
+          .getFromOmKeyInfo(keyInfo, xceiverClientManager,
+              clientConfig.isChecksumVerify(), retryFunction);
+      try {
         GDPRSymmetricKey gk;
-        Map<String, String> keyInfoMetadata = keyInfo.getMetadata();
-        if(Boolean.valueOf(keyInfoMetadata.get(OzoneConsts.GDPR_FLAG))){
+        Map< String, String > keyInfoMetadata = keyInfo.getMetadata();
+        if (Boolean.valueOf(keyInfoMetadata.get(OzoneConsts.GDPR_FLAG))) {
           gk = new GDPRSymmetricKey(
               keyInfoMetadata.get(OzoneConsts.GDPR_SECRET),
               keyInfoMetadata.get(OzoneConsts.GDPR_ALGORITHM)
@@ -1216,11 +1224,26 @@ public class RpcClient implements ClientProtocol {
           return new OzoneInputStream(
               new CipherInputStream(lengthInputStream, gk.getCipher()));
         }
-      }catch (Exception ex){
+      } catch (Exception ex) {
         throw new IOException(ex);
       }
+      return new OzoneInputStream(lengthInputStream.getWrappedStream());
+    } else {
+      List<LengthInputStream> lengthInputStreams = KeyInputStream
+          .getStreamsFromKeyInfo(keyInfo, xceiverClientManager,
+              clientConfig.isChecksumVerify(), retryFunction);
+      final KeyProvider.KeyVersion decrypted = getDEK(feInfo);
+
+      List<CryptoInputStream> cryptoInputStreams = new ArrayList<>();
+      for(InputStream lengthInputStream : lengthInputStreams) {
+        final CryptoInputStream cryptoIn =
+            new CryptoInputStream(((LengthInputStream) lengthInputStream).getWrappedStream(),
+                OzoneKMSUtil.getCryptoCodec(conf, feInfo),
+                decrypted.getMaterial(), feInfo.getIV());
+        cryptoInputStreams.add(cryptoIn);
+      }
+      return new MpuKeyInputStream(cryptoInputStreams, lengthInputStreams);
     }
-    return new OzoneInputStream(lengthInputStream.getWrappedStream());
   }
 
   private OzoneOutputStream createOutputStream(OpenKeySession openKey,

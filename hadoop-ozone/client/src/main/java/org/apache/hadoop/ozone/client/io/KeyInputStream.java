@@ -96,6 +96,41 @@ public class KeyInputStream extends InputStream
     return new LengthInputStream(keyInputStream, keyInputStream.length);
   }
 
+  public static List<LengthInputStream> getStreamsFromKeyInfo(OmKeyInfo keyInfo,
+      XceiverClientFactory xceiverClientFactory,boolean verifyChecksum,  Function<OmKeyInfo, OmKeyInfo> retryFunction) {
+    List<OmKeyLocationInfo> keyLocationInfos = keyInfo
+        .getLatestVersionLocations().getBlocksLatestVersionOnly();
+
+    List<LengthInputStream> lengthInputStreams = new ArrayList<>();
+
+
+    int partNumber = keyLocationInfos.get(0).getPartNumber();
+
+    List<OmKeyLocationInfo> blocksInMpuPart = new ArrayList<>();
+    long partLength = 0;
+    for (OmKeyLocationInfo omKeyLocationInfo: keyLocationInfos) {
+      if (partNumber == omKeyLocationInfo.getPartNumber()) {
+        blocksInMpuPart.add(omKeyLocationInfo);
+        partLength += omKeyLocationInfo.getLength();
+      } else {
+        // Create new stream for the part
+        KeyInputStream keyInputStream = new KeyInputStream();
+        keyInputStream.initialize(keyInfo, blocksInMpuPart,
+            xceiverClientFactory, verifyChecksum, retryFunction);
+
+        lengthInputStreams.add(new LengthInputStream(keyInputStream,
+            partLength));
+
+        blocksInMpuPart = new ArrayList<>();
+        blocksInMpuPart.add(omKeyLocationInfo);
+        partNumber = omKeyLocationInfo.getPartNumber();
+
+        partLength = omKeyLocationInfo.getLength();
+      }
+    }
+    return lengthInputStreams;
+  }
+
   private synchronized void initialize(OmKeyInfo keyInfo,
       List<OmKeyLocationInfo> blockInfos,
       XceiverClientFactory xceiverClientFactory,
