@@ -33,6 +33,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.HddsUtils;
@@ -51,13 +52,12 @@ import org.apache.hadoop.hdds.tracing.TracingUtil;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Supplier;
 import org.apache.ratis.client.RaftClient;
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.proto.RaftProtos;
-import org.apache.ratis.protocol.GroupMismatchException;
+import org.apache.ratis.protocol.exceptions.GroupMismatchException;
+import org.apache.ratis.protocol.exceptions.RaftException;
 import org.apache.ratis.protocol.RaftClientReply;
-import org.apache.ratis.protocol.RaftException;
 import org.apache.ratis.retry.RetryPolicy;
 import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
@@ -217,12 +217,12 @@ public final class XceiverClientRatis extends XceiverClientSpi {
             if (LOG.isDebugEnabled()) {
               LOG.debug("sendCommandAsync ReadOnly {}", message);
             }
-            return getClient().sendReadOnlyAsync(message);
+            return getClient().async().sendReadOnly(message);
           } else {
             if (LOG.isDebugEnabled()) {
               LOG.debug("sendCommandAsync {}", message);
             }
-            return getClient().sendAsync(message);
+            return getClient().async().send(message);
           }
 
         }
@@ -258,8 +258,8 @@ public final class XceiverClientRatis extends XceiverClientSpi {
     }
     RaftClientReply reply;
     try {
-      CompletableFuture<RaftClientReply> replyFuture = getClient()
-          .sendWatchAsync(index, RaftProtos.ReplicationLevel.ALL_COMMITTED);
+      CompletableFuture<RaftClientReply> replyFuture = getClient().async()
+          .watch(index, RaftProtos.ReplicationLevel.ALL_COMMITTED);
       replyFuture.get();
     } catch (Exception e) {
       Throwable t = HddsClientUtils.checkForException(e);
@@ -267,8 +267,8 @@ public final class XceiverClientRatis extends XceiverClientSpi {
       if (t instanceof GroupMismatchException) {
         throw e;
       }
-      reply = getClient()
-          .sendWatchAsync(index, RaftProtos.ReplicationLevel.MAJORITY_COMMITTED)
+      reply = getClient().async()
+          .watch(index, RaftProtos.ReplicationLevel.MAJORITY_COMMITTED)
           .get();
       List<RaftProtos.CommitInfoProto> commitInfoProtoList =
           reply.getCommitInfos().stream()

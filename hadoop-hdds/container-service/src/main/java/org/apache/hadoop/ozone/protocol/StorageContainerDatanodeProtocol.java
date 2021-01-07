@@ -17,9 +17,9 @@
 package org.apache.hadoop.ozone.protocol;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ExtendedDatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto
-        .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
+    .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
 import org.apache.hadoop.hdds.protocol.proto
@@ -73,15 +73,15 @@ public interface StorageContainerDatanodeProtocol {
 
   /**
    * Register Datanode.
-   * @param datanodeDetails - Datanode Details.
+   * @param extendedDatanodeDetailsProto - extended Datanode Details.
    * @param nodeReport - Node Report.
    * @param containerReportsRequestProto - Container Reports.
    * @return SCM Command.
    */
   SCMRegisteredResponseProto register(
-          DatanodeDetailsProto datanodeDetails,
-          NodeReportProto nodeReport,
-          ContainerReportsProto containerReportsRequestProto,
-          PipelineReportsProto pipelineReports) throws IOException;
+      ExtendedDatanodeDetailsProto extendedDatanodeDetailsProto,
+      NodeReportProto nodeReport,
+      ContainerReportsProto containerReportsRequestProto,
+      PipelineReportsProto pipelineReports) throws IOException;
 
 }

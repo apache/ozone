@@ -27,6 +27,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -113,7 +114,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
     boolean deleteStatus = true;
     try {
       ResolvedBucket bucket = ozoneManager.resolveBucketLink(
-          Pair.of(volumeName, bucketName));
+          Pair.of(volumeName, bucketName), this);
       bucket.audit(auditMap);
       volumeName = bucket.realVolume();
       bucketName = bucket.realBucket();
@@ -122,6 +123,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
           volumeName, bucketName);
       // Validate bucket and volume exists or not.
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
+      String volumeOwner = getVolumeOwner(omMetadataManager, volumeName);
 
       for (indexFailed = 0; indexFailed < length; indexFailed++) {
         String keyName = deleteKeyArgs.getKeys(indexFailed);
@@ -141,7 +143,8 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
         try {
           // check Acl
           checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
-              IAccessAuthorizer.ACLType.DELETE, OzoneObj.ResourceType.KEY);
+              IAccessAuthorizer.ACLType.DELETE, OzoneObj.ResourceType.KEY,
+              volumeOwner);
           omKeyInfoList.add(omKeyInfo);
         } catch (Exception ex) {
           deleteStatus = false;
@@ -151,21 +154,29 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
         }
       }
 
+      long quotaReleased = 0;
+      OmBucketInfo omBucketInfo =
+          getBucketInfo(omMetadataManager, volumeName, bucketName);
+
       // Mark all keys which can be deleted, in cache as deleted.
       for (OmKeyInfo omKeyInfo : omKeyInfoList) {
         omMetadataManager.getKeyTable().addCacheEntry(
             new CacheKey<>(omMetadataManager.getOzoneKey(volumeName, bucketName,
                 omKeyInfo.getKeyName())),
             new CacheValue<>(Optional.absent(), trxnLogIndex));
+
+        omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
+        quotaReleased += sumBlockLengths(omKeyInfo);
       }
+      omBucketInfo.incrUsedBytes(-quotaReleased);
+      omBucketInfo.incrUsedNamespace(-1L * omKeyInfoList.size());
 
       omClientResponse = new OMKeysDeleteResponse(omResponse
           .setDeleteKeysResponse(DeleteKeysResponse.newBuilder()
               .setStatus(deleteStatus).setUnDeletedKeys(unDeletedKeys))
           .setStatus(deleteStatus ? OK : PARTIAL_DELETE)
-          .setSuccess(deleteStatus).build(),
-          omKeyInfoList, trxnLogIndex,
-          ozoneManager.isRatisEnabled());
+          .setSuccess(deleteStatus).build(), omKeyInfoList,
+          ozoneManager.isRatisEnabled(), omBucketInfo.copyObject());
 
       result = Result.SUCCESS;
 

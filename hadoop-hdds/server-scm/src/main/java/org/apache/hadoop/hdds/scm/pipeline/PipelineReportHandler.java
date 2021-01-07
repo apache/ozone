@@ -83,7 +83,7 @@ public class PipelineReportHandler implements
       try {
         processPipelineReport(report, dn, publisher);
       } catch (IOException e) {
-        LOGGER.error("Could not process pipeline report={} from dn={} {}",
+        LOGGER.error("Could not process pipeline report={} from dn={}.",
             report, dn, e);
       }
     }
@@ -114,9 +114,11 @@ public class PipelineReportHandler implements
       }
       if (pipeline.isHealthy()) {
         pipelineManager.openPipeline(pipelineID);
-        if (pipelineAvailabilityCheck && scmSafeModeManager.getInSafeMode()) {
-          publisher.fireEvent(SCMEvents.OPEN_PIPELINE, pipeline);
-        }
+      }
+    }
+    if (pipeline.isHealthy()) {
+      if (pipelineAvailabilityCheck && scmSafeModeManager.getInSafeMode()) {
+        publisher.fireEvent(SCMEvents.OPEN_PIPELINE, pipeline);
       }
     }
   }

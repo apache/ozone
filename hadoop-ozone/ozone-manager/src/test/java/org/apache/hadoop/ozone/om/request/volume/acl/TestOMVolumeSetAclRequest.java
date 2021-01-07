@@ -49,6 +49,8 @@ public class TestOMVolumeSetAclRequest extends TestOMVolumeRequest {
     OMRequest originalRequest =
         TestOMRequestUtils.createVolumeSetAclRequest(volumeName,
             Lists.newArrayList(acl));
+    long originModTime = originalRequest.getSetAclRequest()
+        .getModificationTime();
 
     OMVolumeSetAclRequest omVolumeSetAclRequest =
         new OMVolumeSetAclRequest(originalRequest);
@@ -56,6 +58,11 @@ public class TestOMVolumeSetAclRequest extends TestOMVolumeRequest {
     OMRequest modifiedRequest = omVolumeSetAclRequest.preExecute(
         ozoneManager);
     Assert.assertNotEquals(modifiedRequest, originalRequest);
+
+    long newModTime = modifiedRequest.getSetAclRequest().getModificationTime();
+    // When preExecute() of setting acl,
+    // the new modification time is greater than origin one.
+    Assert.assertTrue(newModTime > originModTime);
   }
 
   @Test

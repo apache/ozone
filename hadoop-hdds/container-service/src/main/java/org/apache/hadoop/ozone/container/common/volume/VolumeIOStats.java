@@ -18,27 +18,49 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
-import java.util.concurrent.atomic.AtomicLong;
+import org.apache.hadoop.metrics2.MetricsSystem;
+import org.apache.hadoop.metrics2.annotation.Metric;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 
 /**
  * This class is used to track Volume IO stats for each HDDS Volume.
  */
 public class VolumeIOStats {
+  private String metricsSourceName = VolumeIOStats.class.getSimpleName();
 
-  private final AtomicLong readBytes;
-  private final AtomicLong readOpCount;
-  private final AtomicLong writeBytes;
-  private final AtomicLong writeOpCount;
-  private final AtomicLong readTime;
-  private final AtomicLong writeTime;
+  private @Metric MutableCounterLong readBytes;
+  private @Metric MutableCounterLong readOpCount;
+  private @Metric MutableCounterLong writeBytes;
+  private @Metric MutableCounterLong writeOpCount;
+  private @Metric MutableCounterLong readTime;
+  private @Metric MutableCounterLong writeTime;
 
+  @Deprecated
   public VolumeIOStats() {
-    readBytes = new AtomicLong(0);
-    readOpCount = new AtomicLong(0);
-    writeBytes = new AtomicLong(0);
-    writeOpCount = new AtomicLong(0);
-    readTime = new AtomicLong(0);
-    writeTime = new AtomicLong(0);
+    init();
+  }
+
+  /**
+   * @param identifier Typically, path to volume root. e.g. /data/hdds
+   */
+  public VolumeIOStats(String identifier) {
+    this.metricsSourceName += '-' + identifier;
+    init();
+  }
+
+  public void init() {
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    ms.register(metricsSourceName, "Volume I/O Statistics", this);
+  }
+
+  public void unregister() {
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    ms.unregisterSource(metricsSourceName);
+  }
+
+  public String getMetricsSourceName() {
+    return metricsSourceName;
   }
 
   /**
@@ -46,14 +68,14 @@ public class VolumeIOStats {
    * @param bytesRead
    */
   public void incReadBytes(long bytesRead) {
-    readBytes.addAndGet(bytesRead);
+    readBytes.incr(bytesRead);
   }
 
   /**
    * Increment the read operations performed on the volume.
    */
   public void incReadOpCount() {
-    readOpCount.incrementAndGet();
+    readOpCount.incr();
   }
 
   /**
@@ -61,14 +83,14 @@ public class VolumeIOStats {
    * @param bytesWritten
    */
   public void incWriteBytes(long bytesWritten) {
-    writeBytes.addAndGet(bytesWritten);
+    writeBytes.incr(bytesWritten);
   }
 
   /**
    * Increment the write operations performed on the volume.
    */
   public void incWriteOpCount() {
-    writeOpCount.incrementAndGet();
+    writeOpCount.incr();
   }
 
   /**
@@ -76,7 +98,7 @@ public class VolumeIOStats {
    * @param time
    */
   public void incReadTime(long time) {
-    readTime.addAndGet(time);
+    readTime.incr(time);
   }
 
   /**
@@ -84,7 +106,7 @@ public class VolumeIOStats {
    * @param time
    */
   public void incWriteTime(long time) {
-    writeTime.addAndGet(time);
+    writeTime.incr(time);
   }
 
   /**
@@ -92,7 +114,7 @@ public class VolumeIOStats {
    * @return long
    */
   public long getReadBytes() {
-    return readBytes.get();
+    return readBytes.value();
   }
 
   /**
@@ -100,7 +122,7 @@ public class VolumeIOStats {
    * @return long
    */
   public long getWriteBytes() {
-    return writeBytes.get();
+    return writeBytes.value();
   }
 
   /**
@@ -108,7 +130,7 @@ public class VolumeIOStats {
    * @return long
    */
   public long getReadOpCount() {
-    return readOpCount.get();
+    return readOpCount.value();
   }
 
   /**
@@ -116,7 +138,7 @@ public class VolumeIOStats {
    * @return long
    */
   public long getWriteOpCount() {
-    return writeOpCount.get();
+    return writeOpCount.value();
   }
 
   /**
@@ -124,7 +146,7 @@ public class VolumeIOStats {
    * @return long
    */
   public long getReadTime() {
-    return readTime.get();
+    return readTime.value();
   }
 
   /**
@@ -132,7 +154,7 @@ public class VolumeIOStats {
    * @return long
    */
   public long getWriteTime() {
-    return writeTime.get();
+    return writeTime.value();
   }
 
 

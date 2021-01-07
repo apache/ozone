@@ -21,7 +21,6 @@ import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.UriInfo;
-import java.io.IOException;
 import java.net.URI;
 import java.util.Arrays;
 import java.util.Collection;
@@ -29,7 +28,7 @@ import java.util.Collection;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.apache.hadoop.test.LambdaTestUtils;
+import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 
 import static org.apache.hadoop.ozone.s3.SignatureProcessor.AUTHORIZATION_HEADER;
 import static org.apache.hadoop.ozone.s3.SignatureProcessor.CONTENT_MD5;
@@ -37,6 +36,9 @@ import static org.apache.hadoop.ozone.s3.SignatureProcessor.CONTENT_TYPE;
 import static org.apache.hadoop.ozone.s3.SignatureProcessor.HOST_HEADER;
 import static org.apache.hadoop.ozone.s3.SignatureProcessor.X_AMAZ_DATE;
 import static org.apache.hadoop.ozone.s3.SignatureProcessor.X_AMZ_CONTENT_SHA256;
+import static org.junit.Assert.fail;
+
+import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -84,9 +86,13 @@ public class TestOzoneClientProducer {
   }
 
   @Test
-  public void testGetClientFailure() throws Exception {
-    LambdaTestUtils.intercept(IOException.class, "Couldn't create",
-        () -> producer.createClient());
+  public void testGetClientFailure() {
+    try {
+      producer.createClient();
+      fail("testGetClientFailure");
+    } catch (Exception ex) {
+      Assert.assertTrue(ex instanceof OS3Exception);
+    }
   }
 
   private void setupContext() throws Exception {
@@ -106,6 +112,12 @@ public class TestOzoneClientProducer {
         .thenReturn(authHeader);
     Mockito.when(context.getUriInfo().getQueryParameters())
         .thenReturn(queryMap);
+
+    AWSSignatureProcessor awsSignatureProcessor = new AWSSignatureProcessor();
+    awsSignatureProcessor.setContext(context);
+    awsSignatureProcessor.init();
+
+    producer.setSignatureParser(awsSignatureProcessor);
   }
 
   @Parameterized.Parameters
@@ -137,6 +149,9 @@ public class TestOzoneClientProducer {
             "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             "20150830T123600Z",
             "application/x-www-form-urlencoded; charset=utf-8"
+        },
+        {
+            null, null, null, null, null, null
         }
     });
   }

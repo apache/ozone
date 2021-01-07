@@ -22,6 +22,8 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -29,11 +31,13 @@ import java.util.concurrent.Future;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.OzoneManagerDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolPB;
 import org.apache.hadoop.hdds.scm.protocol.SCMSecurityProtocolServerSideTranslatorPB;
+import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -69,7 +73,6 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
   SCMSecurityProtocolServer(OzoneConfiguration conf,
       CertificateServer certificateServer) throws IOException {
     this.certificateServer = certificateServer;
-
     final int handlerCount =
         conf.getInt(ScmConfigKeys.OZONE_SCM_SECURITY_HANDLER_COUNT_KEY,
             ScmConfigKeys.OZONE_SCM_SECURITY_HANDLER_COUNT_DEFAULT);
@@ -190,6 +193,33 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
     } catch (CertificateException e) {
       throw new IOException("getRootCertificate operation failed. ", e);
     }
+  }
+
+  /**
+   *
+   * @param role            - node role: OM/SCM/DN.
+   * @param startSerialId   - start certificate serial id.
+   * @param count           - max number of certificates returned in a batch.
+   * @param isRevoked       - whether list for revoked certs only.
+   * @return
+   * @throws IOException
+   */
+  @Override
+  public List<String> listCertificate(HddsProtos.NodeType role,
+      long startSerialId, int count, boolean isRevoked) throws IOException {
+    List<X509Certificate> certificates =
+        certificateServer.listCertificate(role, startSerialId, count,
+            isRevoked);
+    List<String> results = new ArrayList<>(certificates.size());
+    for (X509Certificate cert : certificates) {
+      try {
+        String certStr = CertificateCodec.getPEMEncodedString(cert);
+        results.add(certStr);
+      } catch (SCMSecurityException e) {
+        throw new IOException("listCertificate operation failed. ", e);
+      }
+    }
+    return results;
   }
 
   public RPC.Server getRpcServer() {

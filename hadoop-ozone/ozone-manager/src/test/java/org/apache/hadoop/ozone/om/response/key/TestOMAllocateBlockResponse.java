@@ -18,16 +18,16 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.util.Time;
 import org.junit.Assert;
 import org.junit.Test;
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .AllocateBlockResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AllocateBlockResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
 /**
  * Tests OMAllocateBlockResponse.
@@ -39,6 +39,9 @@ public class TestOMAllocateBlockResponse extends TestOMKeyResponse {
 
     OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo(volumeName,
         bucketName, keyName, replicationType, replicationFactor);
+    OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
+        .setVolumeName(volumeName).setBucketName(bucketName)
+        .setCreationTime(Time.now()).build();
 
     OMResponse omResponse = OMResponse.newBuilder()
         .setAllocateBlockResponse(
@@ -47,7 +50,8 @@ public class TestOMAllocateBlockResponse extends TestOMKeyResponse {
         .setCmdType(OzoneManagerProtocolProtos.Type.AllocateBlock)
         .build();
     OMAllocateBlockResponse omAllocateBlockResponse =
-        new OMAllocateBlockResponse(omResponse, omKeyInfo, clientID);
+        new OMAllocateBlockResponse(omResponse, omKeyInfo, clientID,
+            omBucketInfo);
 
     String openKey = omMetadataManager.getOpenKey(volumeName, bucketName,
         keyName, clientID);
@@ -66,6 +70,9 @@ public class TestOMAllocateBlockResponse extends TestOMKeyResponse {
   public void testAddToDBBatchWithErrorResponse() throws Exception {
     OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo(volumeName,
         bucketName, keyName, replicationType, replicationFactor);
+    OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
+        .setVolumeName(volumeName).setBucketName(bucketName)
+        .setCreationTime(Time.now()).build();
 
     OMResponse omResponse = OMResponse.newBuilder()
         .setAllocateBlockResponse(
@@ -74,7 +81,8 @@ public class TestOMAllocateBlockResponse extends TestOMKeyResponse {
         .setCmdType(OzoneManagerProtocolProtos.Type.AllocateBlock)
         .build();
     OMAllocateBlockResponse omAllocateBlockResponse =
-        new OMAllocateBlockResponse(omResponse, omKeyInfo, clientID);
+        new OMAllocateBlockResponse(omResponse, omKeyInfo, clientID,
+            omBucketInfo);
 
     // Before calling addToDBBatch
     String openKey = omMetadataManager.getOpenKey(volumeName, bucketName,

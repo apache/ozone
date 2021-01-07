@@ -17,7 +17,6 @@
 package org.apache.hadoop.ozone.protocolPB;
 
 import java.io.IOException;
-import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -26,10 +25,12 @@ import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBuffer;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
+import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -43,6 +44,9 @@ import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.util.ExitUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.LEADER_AND_READY;
+import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.NOT_LEADER;
 
 /**
  * This class is the server-side translator that forwards requests received on
@@ -58,9 +62,9 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
   private final boolean isRatisEnabled;
   private final OzoneManager ozoneManager;
   private final OzoneManagerDoubleBuffer ozoneManagerDoubleBuffer;
-  private final AtomicLong transactionIndex = new AtomicLong(0L);
-  private final OzoneProtocolMessageDispatcher<OMRequest, OMResponse>
-      dispatcher;
+  private final AtomicLong transactionIndex;
+  private final OzoneProtocolMessageDispatcher<OMRequest, OMResponse,
+      ProtocolMessageEnum> dispatcher;
 
   /**
    * Constructs an instance of the server handler.
@@ -71,9 +75,14 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
       OzoneManager impl,
       OzoneManagerRatisServer ratisServer,
       ProtocolMessageMetrics<ProtocolMessageEnum> metrics,
-      boolean enableRatis) {
+      boolean enableRatis,
+      long lastTransactionIndexForNonRatis) {
     this.ozoneManager = impl;
     this.isRatisEnabled = enableRatis;
+    // Update the transactionIndex with the last TransactionIndex read from DB.
+    // New requests should have transactionIndex incremented from this index
+    // onwards to ensure unique objectIDs.
+    this.transactionIndex = new AtomicLong(lastTransactionIndexForNonRatis);
 
     if (isRatisEnabled) {
       // In case of ratis is enabled, handler in ServerSideTransaltorPB is used
@@ -116,13 +125,14 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
 
   private OMResponse processRequest(OMRequest request) throws
       ServiceException {
-
+    RaftServerStatus raftServerStatus;
     if (isRatisEnabled) {
       // Check if the request is a read only request
       if (OmUtils.isReadOnly(request)) {
         return submitReadRequestToOM(request);
       } else {
-        if (omRatisServer.isLeader()) {
+        raftServerStatus = omRatisServer.checkLeaderStatus();
+        if (raftServerStatus == LEADER_AND_READY) {
           try {
             OMClientRequest omClientRequest =
                 OzoneManagerRatisUtils.createClientRequest(request);
@@ -133,12 +143,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
           }
           return submitRequestToRatis(request);
         } else {
-          // throw not leader exception. This is being done, so to avoid
-          // unnecessary execution of preExecute on follower OM's. This
-          // will be helpful in the case like where we we reduce the
-          // chance of allocate blocks on follower OM's. Right now our
-          // leader status is updated every 1 second.
-          throw createNotLeaderException();
+          throw createLeaderErrorException(raftServerStatus);
         }
       }
     } else {
@@ -180,31 +185,48 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
   private OMResponse submitReadRequestToOM(OMRequest request)
       throws ServiceException {
     // Check if this OM is the leader.
-    if (omRatisServer.isLeader()) {
+    RaftServerStatus raftServerStatus = omRatisServer.checkLeaderStatus();
+    if (raftServerStatus == LEADER_AND_READY) {
       return handler.handleReadRequest(request);
     } else {
-      throw createNotLeaderException();
+      throw createLeaderErrorException(raftServerStatus);
     }
   }
 
   private ServiceException createNotLeaderException() {
     RaftPeerId raftPeerId = omRatisServer.getRaftPeerId();
-    Optional<RaftPeerId> leaderRaftPeerId = omRatisServer
-        .getCachedLeaderPeerId();
 
-    OMNotLeaderException notLeaderException;
-    if (leaderRaftPeerId.isPresent()) {
-      notLeaderException = new OMNotLeaderException(
-          raftPeerId, leaderRaftPeerId.get());
-    } else {
-      notLeaderException = new OMNotLeaderException(raftPeerId);
-    }
+    // TODO: Set suggest leaderID. Right now, client is not using suggest
+    // leaderID. Need to fix this.
+
+    OMNotLeaderException notLeaderException =
+        new OMNotLeaderException(raftPeerId);
 
     if (LOG.isDebugEnabled()) {
       LOG.debug(notLeaderException.getMessage());
     }
 
     return new ServiceException(notLeaderException);
+  }
+
+  private ServiceException createLeaderErrorException(
+      RaftServerStatus raftServerStatus) {
+    if (raftServerStatus == NOT_LEADER) {
+      return createNotLeaderException();
+    } else {
+      return createLeaderNotReadyException();
+    }
+  }
+
+
+  private ServiceException createLeaderNotReadyException() {
+    RaftPeerId raftPeerId = omRatisServer.getRaftPeerId();
+
+    OMLeaderNotReadyException leaderNotReadyException =
+        new OMLeaderNotReadyException(raftPeerId.toString() + " is Leader " +
+            "but not ready to process request");
+
+    return new ServiceException(leaderNotReadyException);
   }
 
   /**

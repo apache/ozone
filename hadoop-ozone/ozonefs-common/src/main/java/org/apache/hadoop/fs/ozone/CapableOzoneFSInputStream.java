@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -34,6 +34,7 @@ final class CapableOzoneFSInputStream extends OzoneFSInputStream
   public boolean hasCapability(String capability) {
     switch (StringUtils.toLowerCase(capability)) {
     case OzoneStreamCapabilities.READBYTEBUFFER:
+    case OzoneStreamCapabilities.UNBUFFER:
       return true;
     default:
       return false;

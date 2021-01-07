@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.commands.CreatePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ratis.client.RaftClient;
+import org.apache.ratis.client.api.GroupManagementApi;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.RaftGroup;
@@ -43,12 +44,15 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mockito;
+import org.mockito.stubbing.Answer;
 import org.powermock.api.mockito.PowerMockito;
 import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.powermock.modules.junit4.PowerMockRunner;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -62,6 +66,7 @@ public class TestCreatePipelineCommandHandler {
   private StateContext stateContext;
   private SCMConnectionManager connectionManager;
   private RaftClient raftClient;
+  private GroupManagementApi raftClientGroupManager;
 
   @Before
   public void setup() throws Exception {
@@ -69,10 +74,16 @@ public class TestCreatePipelineCommandHandler {
     stateContext = Mockito.mock(StateContext.class);
     connectionManager = Mockito.mock(SCMConnectionManager.class);
     raftClient = Mockito.mock(RaftClient.class);
+    raftClientGroupManager = Mockito.mock(GroupManagementApi.class);
     final RaftClient.Builder builder = mockRaftClientBuilder();
     Mockito.when(builder.build()).thenReturn(raftClient);
+    Mockito.when(raftClient.getGroupManagementApi(
+        Mockito.any(RaftPeerId.class))).thenReturn(raftClientGroupManager);
     PowerMockito.mockStatic(RaftClient.class);
-    PowerMockito.when(RaftClient.newBuilder()).thenReturn(builder);
+    // Work around for mockito bug:
+    // https://github.com/powermock/powermock/issues/992
+    PowerMockito.when(RaftClient.newBuilder()).thenAnswer(
+        (Answer<RaftClient.Builder>) invocation -> builder);
   }
 
   private RaftClient.Builder mockRaftClientBuilder() {
@@ -113,11 +124,14 @@ public class TestCreatePipelineCommandHandler {
     commandHandler.handle(command, ozoneContainer, stateContext,
         connectionManager);
 
-    Mockito.verify(writeChanel, Mockito.times(1))
-        .addGroup(pipelineID.getProtobuf(), datanodes);
+    List<Integer> priorityList =
+        new ArrayList<>(Collections.nCopies(datanodes.size(), 0));
 
-    Mockito.verify(raftClient, Mockito.times(2))
-        .groupAdd(Mockito.any(RaftGroup.class), Mockito.any(RaftPeerId.class));
+    Mockito.verify(writeChanel, Mockito.times(1))
+        .addGroup(pipelineID.getProtobuf(), datanodes, priorityList);
+
+    Mockito.verify(raftClientGroupManager, Mockito.times(2))
+        .add(Mockito.any(RaftGroup.class));
   }
 
   @Test
@@ -145,8 +159,8 @@ public class TestCreatePipelineCommandHandler {
     Mockito.verify(writeChanel, Mockito.times(0))
         .addGroup(pipelineID.getProtobuf(), datanodes);
 
-    Mockito.verify(raftClient, Mockito.times(0))
-        .groupAdd(Mockito.any(RaftGroup.class), Mockito.any(RaftPeerId.class));
+    Mockito.verify(raftClientGroupManager, Mockito.times(0))
+        .add(Mockito.any(RaftGroup.class));
   }
 
   private List<DatanodeDetails> getDatanodes() {

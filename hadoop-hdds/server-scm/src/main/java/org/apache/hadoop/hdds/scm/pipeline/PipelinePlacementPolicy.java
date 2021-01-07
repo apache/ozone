@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -75,9 +76,8 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     this.nodeManager = nodeManager;
     this.conf = conf;
     this.stateManager = stateManager;
-    this.heavyNodeCriteria = conf.getInt(
-        ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT,
-        ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT_DEFAULT);
+    String dnLimit = conf.get(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT);
+    this.heavyNodeCriteria = dnLimit == null ? 0 : Integer.parseInt(dnLimit);
   }
 
   int currentPipelineCount(DatanodeDetails datanodeDetails, int nodesRequired) {
@@ -124,7 +124,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
       throws SCMException {
     // get nodes in HEALTHY state
     List<DatanodeDetails> healthyNodes =
-        nodeManager.getNodes(HddsProtos.NodeState.HEALTHY);
+        nodeManager.getNodes(NodeStatus.inServiceHealthy());
     boolean multipleRacks = multipleRacksAvailable(healthyNodes);
     if (excludedNodes != null) {
       healthyNodes.removeAll(excludedNodes);
@@ -149,7 +149,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
         .map(d ->
             new DnWithPipelines(d, currentPipelineCount(d, nodesRequired)))
         .filter(d ->
-            ((d.getPipelines() < heavyNodeCriteria) || heavyNodeCriteria == 0))
+            (d.getPipelines() < nodeManager.pipelineLimit(d.getDn())))
         .sorted(Comparator.comparingInt(DnWithPipelines::getPipelines))
         .map(d -> d.getDn())
         .collect(Collectors.toList());

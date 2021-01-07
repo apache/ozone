@@ -17,26 +17,22 @@
 
 package org.apache.hadoop.ozone.container.metrics;
 
-import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
-import static org.apache.hadoop.test.MetricsAsserts.assertCounter;
-import static org.apache.hadoop.test.MetricsAsserts.assertQuantileGauges;
-import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
-
-import com.google.common.collect.Maps;
+import java.io.File;
+import java.util.Map;
+import java.util.UUID;
 
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
-import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .ContainerCommandRequestProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .ContainerCommandResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
+import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
@@ -48,23 +44,21 @@ import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerGrpc;
-import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
-import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
-import org.apache.hadoop.ozone.container.replication.GrpcReplicationService;
-import org.apache.hadoop.ozone.container.replication.OnDemandContainerReplicationSource;
+import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.test.GenericTestUtils;
 
+import com.google.common.collect.Maps;
+import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.apache.hadoop.test.MetricsAsserts.assertCounter;
+import static org.apache.hadoop.test.MetricsAsserts.assertQuantileGauges;
+import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
 import org.junit.Assert;
-import org.junit.Test;
-import org.mockito.Mockito;
-
-import java.io.File;
-import java.util.Map;
-import java.util.UUID;
 import org.junit.Rule;
+import org.junit.Test;
 import org.junit.rules.Timeout;
+import org.mockito.Mockito;
 
 /**
  * Test for metrics published by storage containers.
@@ -76,12 +70,6 @@ public class TestContainerMetrics {
     */
   @Rule
   public Timeout timeout = new Timeout(300000);
-
-  private GrpcReplicationService createReplicationService(
-      ContainerController controller) {
-    return new GrpcReplicationService(
-        new OnDemandContainerReplicationSource(controller));
-  }
 
   @Test
   public void testContainerMetrics() throws Exception {
@@ -126,9 +114,7 @@ public class TestContainerMetrics {
           volumeSet, handlers, context, metrics, null);
       dispatcher.setScmId(UUID.randomUUID().toString());
 
-      server = new XceiverServerGrpc(datanodeDetails, conf, dispatcher, null,
-          createReplicationService(new ContainerController(
-              containerSet, handlers)));
+      server = new XceiverServerGrpc(datanodeDetails, conf, dispatcher, null);
       client = new XceiverClientGrpc(pipeline, conf);
 
       server.start();
@@ -171,6 +157,16 @@ public class TestContainerMetrics {
       String sec = interval + "s";
       Thread.sleep((interval + 1) * 1000);
       assertQuantileGauges("WriteChunkNanos" + sec, containerMetrics);
+
+      // Check VolumeIOStats metrics
+      HddsVolume hddsVolume = volumeSet.getVolumesList().get(0);
+      MetricsRecordBuilder volumeIOMetrics =
+          getMetrics(hddsVolume.getVolumeIOStats().getMetricsSourceName());
+      assertCounter("ReadBytes", 1024L, volumeIOMetrics);
+      assertCounter("ReadOpCount", 1L, volumeIOMetrics);
+      assertCounter("WriteBytes", 1024L, volumeIOMetrics);
+      assertCounter("WriteOpCount", 1L, volumeIOMetrics);
+
     } finally {
       if (client != null) {
         client.close();

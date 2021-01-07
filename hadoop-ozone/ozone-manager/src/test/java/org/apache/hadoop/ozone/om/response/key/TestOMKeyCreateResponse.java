@@ -18,6 +18,9 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.util.Time;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -41,6 +44,13 @@ public class TestOMKeyCreateResponse extends TestOMKeyResponse {
     OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo(volumeName,
         bucketName, keyName, replicationType, replicationFactor);
 
+    OmVolumeArgs omVolumeArgs = OmVolumeArgs.newBuilder()
+        .setOwnerName(keyName).setAdminName(keyName)
+        .setVolume(volumeName).setCreationTime(Time.now()).build();
+    OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
+        .setVolumeName(volumeName).setBucketName(bucketName)
+        .setCreationTime(Time.now()).build();
+
     OMResponse omResponse = OMResponse.newBuilder().setCreateKeyResponse(
                 CreateKeyResponse.getDefaultInstance())
             .setStatus(OzoneManagerProtocolProtos.Status.OK)
@@ -48,7 +58,8 @@ public class TestOMKeyCreateResponse extends TestOMKeyResponse {
             .build();
 
     OMKeyCreateResponse omKeyCreateResponse =
-        new OMKeyCreateResponse(omResponse, omKeyInfo, null, clientID);
+        new OMKeyCreateResponse(omResponse, omKeyInfo, null, clientID,
+            omBucketInfo);
 
     String openKey = omMetadataManager.getOpenKey(volumeName, bucketName,
         keyName, clientID);
@@ -66,6 +77,10 @@ public class TestOMKeyCreateResponse extends TestOMKeyResponse {
     OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo(volumeName,
         bucketName, keyName, replicationType, replicationFactor);
 
+    OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
+        .setVolumeName(volumeName).setBucketName(bucketName)
+        .setCreationTime(Time.now()).build();
+
     OMResponse omResponse = OMResponse.newBuilder().setCreateKeyResponse(
         CreateKeyResponse.getDefaultInstance())
         .setStatus(OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND)
@@ -73,7 +88,8 @@ public class TestOMKeyCreateResponse extends TestOMKeyResponse {
         .build();
 
     OMKeyCreateResponse omKeyCreateResponse =
-        new OMKeyCreateResponse(omResponse, omKeyInfo, null, clientID);
+        new OMKeyCreateResponse(omResponse, omKeyInfo, null, clientID,
+            omBucketInfo);
 
     // Before calling addToDBBatch
     String openKey = omMetadataManager.getOpenKey(volumeName, bucketName,

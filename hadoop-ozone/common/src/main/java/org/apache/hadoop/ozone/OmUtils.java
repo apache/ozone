@@ -17,6 +17,9 @@
 
 package org.apache.hadoop.ozone;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.protobuf.ServiceException;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -33,20 +36,26 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
+import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.conf.OMClientConfig;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.security.AccessControlException;
+import org.apache.hadoop.security.token.SecretManager;
 
 import com.google.common.base.Joiner;
 import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_BIND_HOST_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTPS_ADDRESS_KEY;
@@ -59,6 +68,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_INTERNAL_SERVICE_
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NODES_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_PORT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,6 +80,18 @@ public final class OmUtils {
   public static final Logger LOG = LoggerFactory.getLogger(OmUtils.class);
   private static final SecureRandom SRAND = new SecureRandom();
   private static byte[] randomBytes = new byte[32];
+
+  private static final long TRANSACTION_ID_SHIFT = 8;
+  // from the 64 bits of ObjectID (long variable), 2 bits are reserved for
+  // epoch and 8 bits for recursive directory creation, if required. This
+  // leaves 54 bits for the transaction ID. Also, the last transaction ID is
+  // reserved for creating S3G volume on OM start {@link
+  // OzoneManager#addS3GVolumeToDB()}.
+  public static final long EPOCH_ID_SHIFT = 62; // 64 - 2
+  public static final long REVERSE_EPOCH_ID_SHIFT = 2; // 64 - EPOCH_ID_SHIFT
+  public static final long MAX_TRXN_ID = (1L << 54) - 2;
+  public static final int EPOCH_WHEN_RATIS_NOT_ENABLED = 1;
+  public static final int EPOCH_WHEN_RATIS_ENABLED = 2;
 
   private OmUtils() {
   }
@@ -266,6 +288,7 @@ public final class OmUtils {
     case AddAcl:
     case PurgeKeys:
     case RecoverTrash:
+    case DeleteOpenKeys:
       return false;
     default:
       LOG.error("CmdType {} is not categorized as readOnly or not.", cmdType);
@@ -353,8 +376,6 @@ public final class OmUtils {
       return coll;
     }
   }
-
-
 
   /**
    * If a OM conf is only set with key suffixed with OM Node ID, return the
@@ -518,6 +539,49 @@ public final class OmUtils {
     }
   }
 
+  public static int getOMEpoch(boolean isRatisEnabled) {
+    return isRatisEnabled ? EPOCH_WHEN_RATIS_ENABLED :
+        EPOCH_WHEN_RATIS_NOT_ENABLED;
+  }
+
+  /**
+   * Get the valid base object id given the transaction id.
+   * @param epoch a 2 bit epoch number. The 2 most significant bits of the
+   *              object will be set to this epoch.
+   * @param txId of the transaction. This value cannot exceed 2^54 - 1 as
+   *           out of the 64 bits for a long, 2 are reserved for the epoch
+   *           and 8 for recursive directory creation.
+   * @return base object id allocated against the transaction
+   */
+  public static long getObjectIdFromTxId(long epoch, long txId) {
+    Preconditions.checkArgument(txId <= MAX_TRXN_ID, "TransactionID " +
+        "exceeds max limit of " + MAX_TRXN_ID);
+    return addEpochToTxId(epoch, txId);
+  }
+
+  /**
+   * Note - This function should not be called directly. It is directly called
+   * only from OzoneManager#addS3GVolumeToDB() which is a one time operation
+   * when OM is started first time to add S3G volume. In call other cases,
+   * getObjectIdFromTxId() should be called to append epoch to objectID.
+   */
+  public static long addEpochToTxId(long epoch, long txId) {
+    long lsb54 = txId << TRANSACTION_ID_SHIFT;
+    long msb2 = epoch << EPOCH_ID_SHIFT;
+
+    return msb2 | lsb54;
+  }
+
+  /**
+   * Given an objectId, unset the 2 most significant bits to get the
+   * corresponding transaction index.
+   */
+  @VisibleForTesting
+  public static long getTxIdFromObjectId(long objectId) {
+    return ((Long.MAX_VALUE >> REVERSE_EPOCH_ID_SHIFT) & objectId)
+        >> TRANSACTION_ID_SHIFT;
+  }
+
   /**
    * Verify key name is a valid name.
    */
@@ -574,5 +638,62 @@ public final class OmUtils {
       LOG.info("Using OzoneManager ServiceID '{}'.", serviceId);
       return serviceId;
     }
+  }
+
+  /**
+   * Unwrap exception to check if it is some kind of access control problem
+   * ({@link AccessControlException} or {@link SecretManager.InvalidToken}).
+   */
+  public static boolean isAccessControlException(Exception ex) {
+    if (ex instanceof ServiceException) {
+      Throwable t = ex.getCause();
+      if (t instanceof RemoteException) {
+        t = ((RemoteException) t).unwrapRemoteException();
+      }
+      while (t != null) {
+        if (t instanceof AccessControlException ||
+            t instanceof SecretManager.InvalidToken) {
+          return true;
+        }
+        t = t.getCause();
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Normalize the key name. This method used {@link Path} to
+   * normalize the key name.
+   * @param keyName
+   * @param preserveTrailingSlash - if True preserves trailing slash, else
+   * does not preserve.
+   * @return normalized key name.
+   */
+  @SuppressFBWarnings("DMI_HARDCODED_ABSOLUTE_FILENAME")
+  public static String normalizeKey(String keyName,
+      boolean preserveTrailingSlash) {
+    // For empty strings do nothing, just return the same.
+    // Reason to check here is the Paths method fail with NPE.
+    if (!StringUtils.isBlank(keyName)) {
+      String normalizedKeyName;
+      if (keyName.startsWith(OM_KEY_PREFIX)) {
+        normalizedKeyName = new Path(keyName).toUri().getPath();
+      } else {
+        normalizedKeyName = new Path(OM_KEY_PREFIX + keyName)
+            .toUri().getPath();
+      }
+      if (!keyName.equals(normalizedKeyName)) {
+        LOG.debug("Normalized key {} to {} ", keyName,
+            normalizedKeyName.substring(1));
+      }
+      if (preserveTrailingSlash) {
+        if (keyName.endsWith("/")) {
+          return normalizedKeyName.substring(1) + "/";
+        }
+      }
+      return normalizedKeyName.substring(1);
+    }
+
+    return keyName;
   }
 }

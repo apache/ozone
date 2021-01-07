@@ -33,10 +33,10 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.RocksDBStoreMBean;
+import org.apache.hadoop.hdds.utils.db.cache.TableCache;
 import org.apache.hadoop.metrics2.util.MBeans;
 
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.hdds.utils.db.cache.TableCacheImpl;
 import org.apache.ratis.thirdparty.com.google.common.annotations.VisibleForTesting;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
@@ -71,12 +71,13 @@ public class RDBStore implements DBStore {
   @VisibleForTesting
   public RDBStore(File dbFile, DBOptions options,
                   Set<TableConfig> families) throws IOException {
-    this(dbFile, options, new WriteOptions(), families, new CodecRegistry());
+    this(dbFile, options, new WriteOptions(), families, new CodecRegistry(),
+        false);
   }
 
   public RDBStore(File dbFile, DBOptions options,
       WriteOptions writeOptions, Set<TableConfig> families,
-                  CodecRegistry registry)
+                  CodecRegistry registry, boolean readOnly)
       throws IOException {
     Preconditions.checkNotNull(dbFile, "DB file location cannot be null");
     Preconditions.checkNotNull(families);
@@ -108,8 +109,13 @@ public class RDBStore implements DBStore {
         extraCf.forEach(cf -> columnFamilyDescriptors.add(cf.getDescriptor()));
       }
 
-      db = RocksDB.open(dbOptions, dbLocation.getAbsolutePath(),
-          columnFamilyDescriptors, columnFamilyHandles);
+      if (readOnly) {
+        db = RocksDB.openReadOnly(dbOptions, dbLocation.getAbsolutePath(),
+            columnFamilyDescriptors, columnFamilyHandles);
+      } else {
+        db = RocksDB.open(dbOptions, dbLocation.getAbsolutePath(),
+            columnFamilyDescriptors, columnFamilyHandles);
+      }
 
       for (int x = 0; x < columnFamilyHandles.size(); x++) {
         handleTable.put(
@@ -304,9 +310,9 @@ public class RDBStore implements DBStore {
   @Override
   public <K, V> Table<K, V> getTable(String name,
       Class<K> keyType, Class<V> valueType,
-      TableCacheImpl.CacheCleanupPolicy cleanupPolicy) throws IOException {
+      TableCache.CacheType cacheType) throws IOException {
     return new TypedTable<>(getTable(name), codecRegistry, keyType,
-        valueType, cleanupPolicy);
+        valueType, cacheType);
   }
 
   @Override
@@ -319,7 +325,7 @@ public class RDBStore implements DBStore {
   }
 
   @Override
-  public void flush() throws IOException {
+  public void flushDB() throws IOException {
     try (FlushOptions flushOptions = new FlushOptions()) {
       flushOptions.setWaitForFlush(true);
       db.flush(flushOptions);
@@ -329,9 +335,22 @@ public class RDBStore implements DBStore {
   }
 
   @Override
+  public void flushLog(boolean sync) throws IOException {
+    if (db != null) {
+      try {
+        // for RocksDB it is sufficient to flush the WAL as entire db can
+        // be reconstructed using it.
+        db.flushWal(sync);
+      } catch (RocksDBException e) {
+        throw toIOException("Failed to flush db", e);
+      }
+    }
+  }
+
+  @Override
   public DBCheckpoint getCheckpoint(boolean flush) throws IOException {
     if (flush) {
-      this.flush();
+      this.flushDB();
     }
     return checkPointManager.createCheckpoint(checkpointsParentDir);
   }

@@ -239,7 +239,7 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_HEARTBEAT_RPC_TIMEOUT =
       "ozone.scm.heartbeat.rpc-timeout";
   public static final String OZONE_SCM_HEARTBEAT_RPC_TIMEOUT_DEFAULT =
-      "1s";
+      "5s";
 
   public static final String OZONE_SCM_HEARTBEAT_RPC_RETRY_COUNT =
       "ozone.scm.heartbeat.rpc-retry-count";
@@ -298,7 +298,7 @@ public final class ScmConfigKeys {
   // Pipeline placement policy:
   // Upper limit for how many pipelines a datanode can engage in.
   public static final String OZONE_DATANODE_PIPELINE_LIMIT =
-          "ozone.datanode.pipeline.limit";
+          "ozone.scm.datanode.pipeline.limit";
   public static final int OZONE_DATANODE_PIPELINE_LIMIT_DEFAULT = 2;
 
   // Upper limit for how many pipelines can be created
@@ -313,9 +313,16 @@ public final class ScmConfigKeys {
       OZONE_SCM_KEY_VALUE_CONTAINER_DELETION_CHOOSING_POLICY =
       "ozone.scm.keyvalue.container.deletion-choosing.policy";
 
+  public static final String OZONE_SCM_PIPELINE_PER_METADATA_VOLUME =
+      "ozone.scm.pipeline.per.metadata.disk";
+
+  public static final int OZONE_SCM_PIPELINE_PER_METADATA_VOLUME_DEFAULT = 2;
   // Max timeout for pipeline to stay at ALLOCATED state before scrubbed.
   public static final String OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT =
       "ozone.scm.pipeline.allocated.timeout";
+
+  public static final String OZONE_SCM_PIPELINE_LEADER_CHOOSING_POLICY =
+      "ozone.scm.pipeline.leader-choose.policy";
 
   public static final String OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT_DEFAULT =
       "5m";
@@ -356,6 +363,11 @@ public final class ScmConfigKeys {
 
   public static final String HDDS_TRACING_ENABLED = "hdds.tracing.enabled";
   public static final boolean HDDS_TRACING_ENABLED_DEFAULT = false;
+
+  public static final String OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL =
+      "ozone.scm.datanode.admin.monitor.interval";
+  public static final String OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL_DEFAULT =
+      "30s";
 
   /**
    * Never constructed.

@@ -33,9 +33,9 @@ import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.HttpURLConnection;
 import java.nio.charset.Charset;
 import java.nio.file.Paths;
-import java.net.URLConnection;
 import java.net.URL;
 
 import org.apache.commons.io.FileUtils;
@@ -147,12 +147,12 @@ public class TestReconUtils {
     String contents;
     URLConnectionFactory connectionFactoryMock =
         mock(URLConnectionFactory.class);
-    URLConnection urlConnectionMock = mock(URLConnection.class);
+    HttpURLConnection urlConnectionMock = mock(HttpURLConnection.class);
     when(urlConnectionMock.getInputStream()).thenReturn(fileInputStream);
     when(connectionFactoryMock.openConnection(any(URL.class), anyBoolean()))
         .thenReturn(urlConnectionMock);
     try (InputStream inputStream = new ReconUtils()
-        .makeHttpCall(connectionFactoryMock, url, false)) {
+        .makeHttpCall(connectionFactoryMock, url, false).getInputStream()) {
       contents = IOUtils.toString(inputStream, Charset.defaultCharset());
     }
 

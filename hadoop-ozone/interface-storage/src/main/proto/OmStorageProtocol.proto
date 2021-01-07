@@ -1,0 +1,66 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/**
+ * These .proto interfaces are private and unstable.
+ * Please see http://wiki.apache.org/hadoop/Compatibility
+ * for what changes are allowed for a *unstable* .proto interface.
+ */
+
+syntax = "proto2";
+option java_package = "org.apache.hadoop.ozone.storage.proto";
+option java_outer_classname = "OzoneManagerStorageProtos";
+option java_generic_services = true;
+option java_generate_equals_and_hash = true;
+package hadoop.ozone;
+
+import "hdds.proto";
+
+message OzoneAclInfo {
+  enum OzoneAclType {
+    USER = 1;
+    GROUP = 2;
+    WORLD = 3;
+    ANONYMOUS = 4;
+    CLIENT_IP = 5;
+  }
+
+  enum OzoneAclScope {
+    ACCESS = 0;
+    DEFAULT = 1;
+  }
+
+  required OzoneAclType type = 1;
+  required string name = 2;
+  required bytes rights = 3;
+  required OzoneAclScope aclScope = 4 [default = ACCESS];
+}
+
+message PersistedPrefixInfo {
+  required string name = 1;
+  repeated OzoneAclInfo acls = 2;
+  repeated hadoop.hdds.KeyValue metadata = 3;
+  optional uint64 objectID = 4;
+  optional uint64 updateID = 5;
+}
+
+message PersistedUserVolumeInfo {
+  repeated string volumeNames = 1;
+  optional uint64 objectID = 2;
+  optional uint64 updateID = 3;
+}

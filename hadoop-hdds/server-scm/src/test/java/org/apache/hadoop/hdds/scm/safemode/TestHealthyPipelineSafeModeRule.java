@@ -128,12 +128,15 @@ public class TestHealthyPipelineSafeModeRule {
       Pipeline pipeline1 =
           pipelineManager.createPipeline(HddsProtos.ReplicationType.RATIS,
               HddsProtos.ReplicationFactor.THREE);
+      pipelineManager.openPipeline(pipeline1.getId());
       Pipeline pipeline2 =
           pipelineManager.createPipeline(HddsProtos.ReplicationType.RATIS,
               HddsProtos.ReplicationFactor.THREE);
+      pipelineManager.openPipeline(pipeline2.getId());
       Pipeline pipeline3 =
           pipelineManager.createPipeline(HddsProtos.ReplicationType.RATIS,
               HddsProtos.ReplicationFactor.THREE);
+      pipelineManager.openPipeline(pipeline3.getId());
 
       SCMSafeModeManager scmSafeModeManager = new SCMSafeModeManager(
           config, containers, pipelineManager, eventQueue);
@@ -204,12 +207,15 @@ public class TestHealthyPipelineSafeModeRule {
       Pipeline pipeline1 =
           pipelineManager.createPipeline(HddsProtos.ReplicationType.RATIS,
               HddsProtos.ReplicationFactor.ONE);
+      pipelineManager.openPipeline(pipeline1.getId());
       Pipeline pipeline2 =
           pipelineManager.createPipeline(HddsProtos.ReplicationType.RATIS,
               HddsProtos.ReplicationFactor.THREE);
+      pipelineManager.openPipeline(pipeline2.getId());
       Pipeline pipeline3 =
           pipelineManager.createPipeline(HddsProtos.ReplicationType.RATIS,
               HddsProtos.ReplicationFactor.THREE);
+      pipelineManager.openPipeline(pipeline3.getId());
 
 
       SCMSafeModeManager scmSafeModeManager = new SCMSafeModeManager(

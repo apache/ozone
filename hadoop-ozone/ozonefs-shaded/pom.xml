@@ -59,6 +59,10 @@
           <groupId>org.slf4j</groupId>
           <artifactId>slf4j-api</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>com.google.protobuf</groupId>
+          <artifactId>protobuf-java</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
   </dependencies>
@@ -113,6 +117,7 @@
                     <include>org.apache.commons.logging.**.*</include>
                     <include>org.apache.commons.pool2.**.*</include>
                     <include>org.apache.commons.validator.**.*</include>
+                    <include>org.apache.commons.lang3.**.*</include>
                     <include>org.sqlite.**.*</include>
                     <include>org.apache.thrift.**.*</include>
                   </includes>

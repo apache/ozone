@@ -36,12 +36,14 @@ import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto.ErrorCode;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.VersionInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
@@ -63,11 +65,13 @@ import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.hadoop.ozone.protocol.commands.SetNodeOperationalStateCommand;
 import org.apache.hadoop.util.ReflectionUtils;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import org.apache.hadoop.util.Time;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -103,6 +107,8 @@ public class SCMNodeManager implements NodeManager {
   private final boolean useHostname;
   private final ConcurrentHashMap<String, Set<String>> dnsToUuidMap =
       new ConcurrentHashMap<>();
+  private final int numPipelinesPerMetadataVolume;
+  private final int heavyNodeCriteria;
 
   /**
    * Constructs SCM machine Manager.
@@ -130,6 +136,11 @@ public class SCMNodeManager implements NodeManager {
     this.useHostname = conf.getBoolean(
         DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME,
         DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
+    this.numPipelinesPerMetadataVolume =
+        conf.getInt(ScmConfigKeys.OZONE_SCM_PIPELINE_PER_METADATA_VOLUME,
+            ScmConfigKeys.OZONE_SCM_PIPELINE_PER_METADATA_VOLUME_DEFAULT);
+    String dnLimit = conf.get(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT);
+    this.heavyNodeCriteria = dnLimit == null ? 0 : Integer.parseInt(dnLimit);
   }
 
   private void registerMXBean() {
@@ -153,9 +164,29 @@ public class SCMNodeManager implements NodeManager {
    * @return List of Datanodes that are known to SCM in the requested state.
    */
   @Override
-  public List<DatanodeDetails> getNodes(NodeState nodestate) {
-    return nodeStateManager.getNodes(nodestate).stream()
-        .map(node -> (DatanodeDetails) node).collect(Collectors.toList());
+  public List<DatanodeDetails> getNodes(NodeStatus nodeStatus) {
+    return nodeStateManager.getNodes(nodeStatus)
+        .stream()
+        .map(node -> (DatanodeDetails)node).collect(Collectors.toList());
+  }
+
+  /**
+   * Returns all datanode that are in the given states. Passing null for one of
+   * of the states acts like a wildcard for that state. This function works by
+   * taking a snapshot of the current collection and then returning the list
+   * from that collection. This means that real map might have changed by the
+   * time we return this list.
+   *
+   * @param opState The operational state of the node
+   * @param health The health of the node
+   * @return List of Datanodes that are known to SCM in the requested states.
+   */
+  @Override
+  public List<DatanodeDetails> getNodes(
+      NodeOperationalState opState, NodeState health) {
+    return nodeStateManager.getNodes(opState, health)
+        .stream()
+        .map(node -> (DatanodeDetails)node).collect(Collectors.toList());
   }
 
   /**
@@ -175,24 +206,60 @@ public class SCMNodeManager implements NodeManager {
    * @return count
    */
   @Override
-  public int getNodeCount(NodeState nodestate) {
-    return nodeStateManager.getNodeCount(nodestate);
+  public int getNodeCount(NodeStatus nodeStatus) {
+    return nodeStateManager.getNodeCount(nodeStatus);
   }
 
   /**
-   * Returns the node state of a specific node.
+   * Returns the Number of Datanodes by State they are in. Passing null for
+   * either of the states acts like a wildcard for that state.
    *
-   * @param datanodeDetails Datanode Details
-   * @return Healthy/Stale/Dead/Unknown.
+   * @parem nodeOpState - The Operational State of the node
+   * @param health - The health of the node
+   * @return count
    */
   @Override
-  public NodeState getNodeState(DatanodeDetails datanodeDetails) {
-    try {
-      return nodeStateManager.getNodeState(datanodeDetails);
-    } catch (NodeNotFoundException e) {
-      // TODO: should we throw NodeNotFoundException?
-      return null;
-    }
+  public int getNodeCount(NodeOperationalState nodeOpState, NodeState health) {
+    return nodeStateManager.getNodeCount(nodeOpState, health);
+  }
+
+  /**
+   * Returns the node status of a specific node.
+   *
+   * @param datanodeDetails Datanode Details
+   * @return NodeStatus for the node
+   */
+  @Override
+  public NodeStatus getNodeStatus(DatanodeDetails datanodeDetails)
+      throws NodeNotFoundException {
+    return nodeStateManager.getNodeStatus(datanodeDetails);
+  }
+
+  /**
+   * Set the operation state of a node.
+   * @param datanodeDetails The datanode to set the new state for
+   * @param newState The new operational state for the node
+   */
+  @Override
+  public void setNodeOperationalState(DatanodeDetails datanodeDetails,
+      NodeOperationalState newState) throws NodeNotFoundException{
+    setNodeOperationalState(datanodeDetails, newState, 0);
+  }
+
+  /**
+   * Set the operation state of a node.
+   * @param datanodeDetails The datanode to set the new state for
+   * @param newState The new operational state for the node
+   * @param opStateExpiryEpocSec Seconds from the epoch when the operational
+   *                             state should end. Zero indicates the state
+   *                             never end.
+   */
+  @Override
+  public void setNodeOperationalState(DatanodeDetails datanodeDetails,
+      NodeOperationalState newState, long opStateExpiryEpocSec)
+      throws NodeNotFoundException{
+    nodeStateManager.setNodeOperationalState(
+        datanodeDetails, newState, opStateExpiryEpocSec);
   }
 
   /**
@@ -323,12 +390,48 @@ public class SCMNodeManager implements NodeManager {
     try {
       nodeStateManager.updateLastHeartbeatTime(datanodeDetails);
       metrics.incNumHBProcessed();
+      updateDatanodeOpState(datanodeDetails);
     } catch (NodeNotFoundException e) {
       metrics.incNumHBProcessingFailed();
       LOG.error("SCM trying to process heartbeat from an " +
           "unregistered node {}. Ignoring the heartbeat.", datanodeDetails);
     }
     return commandQueue.getCommand(datanodeDetails.getUuid());
+  }
+
+  /**
+   * If the operational state or expiry reported in the datanode heartbeat do
+   * not match those store in SCM, queue a command to update the state persisted
+   * on the datanode. Additionally, ensure the datanodeDetails stored in SCM
+   * match those reported in the heartbeat.
+   * This method should only be called when processing the
+   * heartbeat, and for a registered node, the information stored in SCM is the
+   * source of truth.
+   * @param reportedDn The DatanodeDetails taken from the node heartbeat.
+   * @throws NodeNotFoundException
+   */
+  private void updateDatanodeOpState(DatanodeDetails reportedDn)
+      throws NodeNotFoundException {
+    NodeStatus scmStatus = getNodeStatus(reportedDn);
+    if (scmStatus.getOperationalState() != reportedDn.getPersistedOpState()
+        || scmStatus.getOpStateExpiryEpochSeconds()
+        != reportedDn.getPersistedOpStateExpiryEpochSec()) {
+      LOG.info("Scheduling a command to update the operationalState " +
+          "persisted on the datanode as the reported value ({}, {}) does not " +
+          "match the value stored in SCM ({}, {})",
+          reportedDn.getPersistedOpState(),
+          reportedDn.getPersistedOpStateExpiryEpochSec(),
+          scmStatus.getOperationalState(),
+          scmStatus.getOpStateExpiryEpochSeconds());
+      commandQueue.addCommand(reportedDn.getUuid(),
+          new SetNodeOperationalStateCommand(
+              Time.monotonicNow(), scmStatus.getOperationalState(),
+              scmStatus.getOpStateExpiryEpochSeconds()));
+    }
+    DatanodeDetails scmDnd = nodeStateManager.getNode(reportedDn);
+    scmDnd.setPersistedOpStateExpiryEpochSec(
+        reportedDn.getPersistedOpStateExpiryEpochSec());
+    scmDnd.setPersistedOpState(reportedDn.getPersistedOpState());
   }
 
   @Override
@@ -363,6 +466,8 @@ public class SCMNodeManager implements NodeManager {
       DatanodeInfo datanodeInfo = nodeStateManager.getNode(datanodeDetails);
       if (nodeReport != null) {
         datanodeInfo.updateStorageReports(nodeReport.getStorageReportList());
+        datanodeInfo.updateMetaDataStorageReports(nodeReport.
+            getMetadataStorageReportList());
         metrics.incNumNodeReportProcessed();
       }
     } catch (NodeNotFoundException e) {
@@ -401,10 +506,10 @@ public class SCMNodeManager implements NodeManager {
 
     final Map<DatanodeDetails, SCMNodeStat> nodeStats = new HashMap<>();
 
-    final List<DatanodeInfo> healthyNodes = nodeStateManager
-        .getNodes(NodeState.HEALTHY);
+    final List<DatanodeInfo> healthyNodes =  nodeStateManager
+        .getHealthyNodes();
     final List<DatanodeInfo> staleNodes = nodeStateManager
-        .getNodes(NodeState.STALE);
+        .getStaleNodes();
     final List<DatanodeInfo> datanodes = new ArrayList<>(healthyNodes);
     datanodes.addAll(staleNodes);
 
@@ -453,69 +558,105 @@ public class SCMNodeManager implements NodeManager {
     }
   }
 
-  @Override
-  public Map<String, Integer> getNodeCount() {
-    Map<String, Integer> nodeCountMap = new HashMap<String, Integer>();
-    for (NodeState state : NodeState.values()) {
-      nodeCountMap.put(state.toString(), getNodeCount(state));
+  @Override // NodeManagerMXBean
+  public Map<String, Map<String, Integer>> getNodeCount() {
+    Map<String, Map<String, Integer>> nodes = new HashMap<>();
+    for (NodeOperationalState opState : NodeOperationalState.values()) {
+      Map<String, Integer> states = new HashMap<>();
+      for (NodeState health : NodeState.values()) {
+        states.put(health.name(), 0);
+      }
+      nodes.put(opState.name(), states);
     }
-    return nodeCountMap;
+    for (DatanodeInfo dni : nodeStateManager.getAllNodes()) {
+      NodeStatus status = dni.getNodeStatus();
+      nodes.get(status.getOperationalState().name())
+          .compute(status.getHealth().name(), (k, v) -> v+1);
+    }
+    return nodes;
   }
 
   // We should introduce DISK, SSD, etc., notion in
   // SCMNodeStat and try to use it.
-  @Override
+  @Override // NodeManagerMXBean
   public Map<String, Long> getNodeInfo() {
-    long diskCapacity = 0L;
-    long diskUsed = 0L;
-    long diskRemaning = 0L;
-
-    long ssdCapacity = 0L;
-    long ssdUsed = 0L;
-    long ssdRemaining = 0L;
-
-    List<DatanodeInfo> healthyNodes = nodeStateManager
-        .getNodes(NodeState.HEALTHY);
-    List<DatanodeInfo> staleNodes = nodeStateManager
-        .getNodes(NodeState.STALE);
-
-    List<DatanodeInfo> datanodes = new ArrayList<>(healthyNodes);
-    datanodes.addAll(staleNodes);
-
-    for (DatanodeInfo dnInfo : datanodes) {
-      List<StorageReportProto> storageReportProtos = dnInfo.getStorageReports();
-      for (StorageReportProto reportProto : storageReportProtos) {
-        if (reportProto.getStorageType() ==
-            StorageContainerDatanodeProtocolProtos.StorageTypeProto.DISK) {
-          diskCapacity += reportProto.getCapacity();
-          diskRemaning += reportProto.getRemaining();
-          diskUsed += reportProto.getScmUsed();
-        } else if (reportProto.getStorageType() ==
-            StorageContainerDatanodeProtocolProtos.StorageTypeProto.SSD) {
-          ssdCapacity += reportProto.getCapacity();
-          ssdRemaining += reportProto.getRemaining();
-          ssdUsed += reportProto.getScmUsed();
-        }
+    Map<String, Long> nodeInfo = new HashMap<>();
+    // Compute all the possible stats from the enums, and default to zero:
+    for (UsageStates s : UsageStates.values()) {
+      for (UsageMetrics stat : UsageMetrics.values()) {
+        nodeInfo.put(s.label + stat.name(), 0L);
       }
     }
 
-    Map<String, Long> nodeInfo = new HashMap<>();
-    nodeInfo.put("DISKCapacity", diskCapacity);
-    nodeInfo.put("DISKUsed", diskUsed);
-    nodeInfo.put("DISKRemaining", diskRemaning);
-
-    nodeInfo.put("SSDCapacity", ssdCapacity);
-    nodeInfo.put("SSDUsed", ssdUsed);
-    nodeInfo.put("SSDRemaining", ssdRemaining);
+    for (DatanodeInfo node : nodeStateManager.getAllNodes()) {
+      String keyPrefix = "";
+      NodeStatus status = node.getNodeStatus();
+      if (status.isMaintenance()) {
+        keyPrefix = UsageStates.MAINT.getLabel();
+      } else if (status.isDecommission()) {
+        keyPrefix = UsageStates.DECOM.getLabel();
+      } else if (status.isAlive()) {
+        // Inservice but not dead
+        keyPrefix = UsageStates.ONLINE.getLabel();
+      } else {
+        // dead inservice node, skip it
+        continue;
+      }
+      List<StorageReportProto> storageReportProtos = node.getStorageReports();
+      for (StorageReportProto reportProto : storageReportProtos) {
+        if (reportProto.getStorageType() ==
+            StorageContainerDatanodeProtocolProtos.StorageTypeProto.DISK) {
+          nodeInfo.compute(keyPrefix + UsageMetrics.DiskCapacity.name(),
+              (k, v) -> v + reportProto.getCapacity());
+          nodeInfo.compute(keyPrefix + UsageMetrics.DiskRemaining.name(),
+              (k, v) -> v + reportProto.getRemaining());
+          nodeInfo.compute(keyPrefix + UsageMetrics.DiskUsed.name(),
+              (k, v) -> v + reportProto.getScmUsed());
+        } else if (reportProto.getStorageType() ==
+            StorageContainerDatanodeProtocolProtos.StorageTypeProto.SSD) {
+          nodeInfo.compute(keyPrefix + UsageMetrics.SSDCapacity.name(),
+              (k, v) -> v + reportProto.getCapacity());
+          nodeInfo.compute(keyPrefix + UsageMetrics.SSDRemaining.name(),
+              (k, v) -> v + reportProto.getRemaining());
+          nodeInfo.compute(keyPrefix + UsageMetrics.SSDUsed.name(),
+              (k, v) -> v + reportProto.getScmUsed());
+        }
+      }
+    }
     return nodeInfo;
   }
 
+  private enum UsageMetrics {
+    DiskCapacity,
+    DiskUsed,
+    DiskRemaining,
+    SSDCapacity,
+    SSDUsed,
+    SSDRemaining
+  }
+
+  private enum UsageStates {
+    ONLINE(""),
+    MAINT("Maintenance"),
+    DECOM("Decommissioned");
+
+    private final String label;
+
+    public String getLabel() {
+      return label;
+    }
+
+    UsageStates(String label) {
+      this.label = label;
+    }
+  }
+
   /**
-   * Returns the max of no healthy volumes reported out of the set
+   * Returns the min of no healthy volumes reported out of the set
    * of datanodes constituting the pipeline.
    */
   @Override
-  public int getNumHealthyVolumes(List<DatanodeDetails> dnList) {
+  public int minHealthyVolumeNum(List<DatanodeDetails> dnList) {
     List<Integer> volumeCountList = new ArrayList<>(dnList.size());
     for (DatanodeDetails dn : dnList) {
       try {
@@ -527,7 +668,44 @@ public class SCMNodeManager implements NodeManager {
       }
     }
     Preconditions.checkArgument(!volumeCountList.isEmpty());
-    return Collections.max(volumeCountList);
+    return Collections.min(volumeCountList);
+  }
+
+  /**
+   * Returns the pipeline limit for the datanode.
+   * if the datanode pipeline limit is set, consider that as the max
+   * pipeline limit.
+   * In case, the pipeline limit is not set, the max pipeline limit
+   * will be based on the no of raft log volume reported and provided
+   * that it has atleast one healthy data volume.
+   */
+  @Override
+  public int pipelineLimit(DatanodeDetails dn) {
+    try {
+      if (heavyNodeCriteria > 0) {
+        return heavyNodeCriteria;
+      } else if (nodeStateManager.getNode(dn).getHealthyVolumeCount() > 0) {
+        return numPipelinesPerMetadataVolume *
+            nodeStateManager.getNode(dn).getMetaDataVolumeCount();
+      }
+    } catch (NodeNotFoundException e) {
+      LOG.warn("Cannot generate NodeStat, datanode {} not found.",
+          dn.getUuid());
+    }
+    return 0;
+  }
+
+  /**
+   * Returns the pipeline limit for set of datanodes.
+   */
+  @Override
+  public int minPipelineLimit(List<DatanodeDetails> dnList) {
+    List<Integer> pipelineCountList = new ArrayList<>(dnList.size());
+    for (DatanodeDetails dn : dnList) {
+      pipelineCountList.add(pipelineLimit(dn));
+    }
+    Preconditions.checkArgument(!pipelineCountList.isEmpty());
+    return Collections.min(pipelineCountList);
   }
 
   /**

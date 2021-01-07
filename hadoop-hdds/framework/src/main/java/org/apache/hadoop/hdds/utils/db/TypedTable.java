@@ -19,18 +19,21 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
+import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheResult;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
-import org.apache.hadoop.hdds.utils.db.cache.TableCacheImpl;
+import org.apache.hadoop.hdds.utils.db.cache.FullTableCache;
+import org.apache.hadoop.hdds.utils.db.cache.PartialTableCache;
+import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache;
-import org.apache.hadoop.hdds.utils.db.cache.TableCacheImpl.CacheCleanupPolicy;
 
 import static org.apache.hadoop.hdds.utils.db.cache.CacheResult.CacheStatus.EXISTS;
 import static org.apache.hadoop.hdds.utils.db.cache.CacheResult.CacheStatus.NOT_EXIST;
@@ -59,8 +62,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
   /**
    * Create an TypedTable from the raw table.
-   * Default cleanup policy used for the table is
-   * {@link CacheCleanupPolicy#MANUAL}.
+   * Default cache type for the table is {@link CacheType#PARTIAL_CACHE}.
    * @param rawTable
    * @param codecRegistry
    * @param keyType
@@ -71,30 +73,30 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
       CodecRegistry codecRegistry, Class<KEY> keyType,
       Class<VALUE> valueType) throws IOException {
     this(rawTable, codecRegistry, keyType, valueType,
-        CacheCleanupPolicy.MANUAL);
+        CacheType.PARTIAL_CACHE);
   }
 
   /**
-   * Create an TypedTable from the raw table with specified cleanup policy
-   * for table cache.
+   * Create an TypedTable from the raw table with specified cache type.
    * @param rawTable
    * @param codecRegistry
    * @param keyType
    * @param valueType
-   * @param cleanupPolicy
+   * @param cacheType
+   * @throws IOException
    */
   public TypedTable(
       Table<byte[], byte[]> rawTable,
       CodecRegistry codecRegistry, Class<KEY> keyType,
       Class<VALUE> valueType,
-      TableCacheImpl.CacheCleanupPolicy cleanupPolicy) throws IOException {
+      CacheType cacheType) throws IOException {
     this.rawTable = rawTable;
     this.codecRegistry = codecRegistry;
     this.keyType = keyType;
     this.valueType = valueType;
-    cache = new TableCacheImpl<>(cleanupPolicy);
 
-    if (cleanupPolicy == CacheCleanupPolicy.NEVER) {
+    if (cacheType == CacheType.FULL_CACHE) {
+      cache = new FullTableCache<>();
       //fill cache
       try(TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> tableIterator =
               iterator()) {
@@ -109,6 +111,8 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
               new CacheValue<>(Optional.of(kv.getValue()), EPOCH_DEFAULT));
         }
       }
+    } else {
+      cache = new PartialTableCache<>();
     }
   }
 
@@ -306,6 +310,50 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
   public Iterator<Map.Entry<CacheKey<KEY>, CacheValue<VALUE>>> cacheIterator() {
     return cache.iterator();
+  }
+
+  @Override
+  public List<TypedKeyValue> getRangeKVs(
+          KEY startKey, int count,
+          MetadataKeyFilters.MetadataKeyFilter... filters)
+          throws IOException, IllegalArgumentException {
+
+    // A null start key means to start from the beginning of the table.
+    // Cannot convert a null key to bytes.
+    byte[] startKeyBytes = null;
+    if (startKey != null) {
+      startKeyBytes = codecRegistry.asRawData(startKey);
+    }
+
+    List<? extends KeyValue<byte[], byte[]>> rangeKVBytes =
+            rawTable.getRangeKVs(startKeyBytes, count, filters);
+
+    List<TypedKeyValue> rangeKVs = new ArrayList<>();
+    rangeKVBytes.forEach(byteKV -> rangeKVs.add(new TypedKeyValue(byteKV)));
+
+    return rangeKVs;
+  }
+
+  @Override
+  public List<TypedKeyValue> getSequentialRangeKVs(
+          KEY startKey, int count,
+          MetadataKeyFilters.MetadataKeyFilter... filters)
+          throws IOException, IllegalArgumentException {
+
+    // A null start key means to start from the beginning of the table.
+    // Cannot convert a null key to bytes.
+    byte[] startKeyBytes = null;
+    if (startKey != null) {
+      startKeyBytes = codecRegistry.asRawData(startKey);
+    }
+
+    List<? extends KeyValue<byte[], byte[]>> rangeKVBytes =
+            rawTable.getSequentialRangeKVs(startKeyBytes, count, filters);
+
+    List<TypedKeyValue> rangeKVs = new ArrayList<>();
+    rangeKVBytes.forEach(byteKV -> rangeKVs.add(new TypedKeyValue(byteKV)));
+
+    return rangeKVs;
   }
 
   @Override

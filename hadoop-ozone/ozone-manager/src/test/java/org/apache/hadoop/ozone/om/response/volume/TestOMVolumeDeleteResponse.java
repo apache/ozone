@@ -28,10 +28,10 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .CreateVolumeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .UserVolumeInfo;
+import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -63,12 +63,19 @@ public class TestOMVolumeDeleteResponse {
     batchOperation = omMetadataManager.getStore().initBatchOperation();
   }
 
+  @After
+  public void tearDown() {
+    if (batchOperation != null) {
+      batchOperation.close();
+    }
+  }
+
   @Test
   public void testAddToDBBatch() throws Exception {
 
     String volumeName = UUID.randomUUID().toString();
     String userName = "user1";
-    UserVolumeInfo volumeList = UserVolumeInfo.newBuilder()
+    PersistedUserVolumeInfo volumeList = PersistedUserVolumeInfo.newBuilder()
         .setObjectID(1)
         .setUpdateID(1)
         .addVolumeNames(volumeName).build();
@@ -87,7 +94,8 @@ public class TestOMVolumeDeleteResponse {
         new OMVolumeCreateResponse(omResponse, omVolumeArgs, volumeList);
 
     // As we are deleting updated volume list should be empty.
-    UserVolumeInfo updatedVolumeList = UserVolumeInfo.newBuilder()
+    PersistedUserVolumeInfo updatedVolumeList =
+        PersistedUserVolumeInfo.newBuilder()
         .setObjectID(1).setUpdateID(1).build();
     OMVolumeDeleteResponse omVolumeDeleteResponse =
         new OMVolumeDeleteResponse(omResponse, volumeName, userName,

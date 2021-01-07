@@ -160,6 +160,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
         <artifactId>hadoop-hdds-common</artifactId>
         <version>${hdds.version}</version>
         <type>test-jar</type>
+        <scope>test</scope>
       </dependency>
 
       <dependency>
@@ -167,6 +168,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
         <artifactId>hadoop-hdds-container-service</artifactId>
         <version>${hdds.version}</version>
         <type>test-jar</type>
+        <scope>test</scope>
       </dependency>
 
       <dependency>
@@ -174,6 +176,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
         <artifactId>hadoop-hdds-server-scm</artifactId>
         <type>test-jar</type>
         <version>${hdds.version}</version>
+        <scope>test</scope>
       </dependency>
 
       <dependency>
@@ -263,9 +266,9 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
             <exclude>**/report.html</exclude>
             <exclude>.gitattributes</exclude>
             <exclude>.idea/**</exclude>
-            <exclude>src/main/resources/webapps/static/angular-1.7.9.min.js</exclude>
+            <exclude>src/main/resources/webapps/static/angular-1.8.0.min.js</exclude>
             <exclude>src/main/resources/webapps/static/angular-nvd3-1.0.9.min.js</exclude>
-            <exclude>src/main/resources/webapps/static/angular-route-1.7.9.min.js</exclude>
+            <exclude>src/main/resources/webapps/static/angular-route-1.8.0.min.js</exclude>
             <exclude>src/main/resources/webapps/static/d3-3.5.17.min.js</exclude>
             <exclude>src/main/resources/webapps/static/nvd3-1.8.5.min.css.map</exclude>
             <exclude>src/main/resources/webapps/static/nvd3-1.8.5.min.css</exclude>
@@ -277,28 +280,11 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
             <exclude>src/test/resources/incorrect.checksum.container</exclude>
             <exclude>src/test/resources/incorrect.container</exclude>
             <exclude>src/test/resources/test.db.ini</exclude>
+            <exclude>src/test/resources/123-dn-container.db/**</exclude>
+            <exclude>src/test/resources/123.container</exclude>
             <exclude>src/main/resources/proto.lock</exclude>
           </excludes>
         </configuration>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-dependency-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>add-classpath-descriptor</id>
-            <phase>prepare-package</phase>
-            <goals>
-              <goal>build-classpath</goal>
-            </goals>
-            <configuration>
-              <outputFile>${project.build.outputDirectory}/${project.artifactId}.classpath</outputFile>
-              <prefix>$HDDS_LIB_JARS_DIR</prefix>
-              <outputFilterFile>true</outputFilterFile>
-              <includeScope>runtime</includeScope>
-            </configuration>
-          </execution>
-        </executions>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -358,6 +344,37 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
                 <test.unique.fork.id>fork-${surefire.forkNumber}</test.unique.fork.id>
               </systemPropertyVariables>
             </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>add-classpath-descriptor</id>
+      <activation>
+        <file>
+          <exists>src/main/java</exists>
+        </file>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-dependency-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>add-classpath-descriptor</id>
+                <phase>prepare-package</phase>
+                <goals>
+                  <goal>build-classpath</goal>
+                </goals>
+                <configuration>
+                  <outputFile>${project.build.outputDirectory}/${project.artifactId}.classpath</outputFile>
+                  <prefix>$HDDS_LIB_JARS_DIR</prefix>
+                  <outputFilterFile>true</outputFilterFile>
+                  <includeScope>runtime</includeScope>
+                </configuration>
+              </execution>
+            </executions>
           </plugin>
         </plugins>
       </build>

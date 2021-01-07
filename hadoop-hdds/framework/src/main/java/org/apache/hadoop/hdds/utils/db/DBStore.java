@@ -25,7 +25,7 @@ import java.util.ArrayList;
 import java.util.Map;
 
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
-import org.apache.hadoop.hdds.utils.db.cache.TableCacheImpl;
+import org.apache.hadoop.hdds.utils.db.cache.TableCache;
 
 /**
  * The DBStore interface provides the ability to create Tables, which store
@@ -49,8 +49,7 @@ public interface DBStore extends AutoCloseable, BatchOperationHandler {
 
   /**
    * Gets an existing TableStore with implicit key/value conversion and
-   * with default cleanup policy for cache. Default cache clean up policy is
-   * manual.
+   * with default cache type for cache. Default cache type is partial cache.
    *
    * @param name - Name of the TableStore to get
    * @param keyType
@@ -63,12 +62,17 @@ public interface DBStore extends AutoCloseable, BatchOperationHandler {
 
   /**
    * Gets an existing TableStore with implicit key/value conversion and
-   * with specified cleanup policy for cache.
+   * with specified cache type.
+   * @param name - Name of the TableStore to get
+   * @param keyType
+   * @param valueType
+   * @param cacheType
+   * @return - TableStore.
    * @throws IOException
    */
   <KEY, VALUE> Table<KEY, VALUE> getTable(String name,
       Class<KEY> keyType, Class<VALUE> valueType,
-      TableCacheImpl.CacheCleanupPolicy cleanupPolicy) throws IOException;
+      TableCache.CacheType cacheType) throws IOException;
 
   /**
    * Lists the Known list of Tables in a DB.
@@ -83,7 +87,13 @@ public interface DBStore extends AutoCloseable, BatchOperationHandler {
    * Flush the DB buffer onto persistent storage.
    * @throws IOException
    */
-  void flush() throws IOException;
+  void flushDB() throws IOException;
+
+  /**
+   * Flush the outstanding I/O operations of the DB.
+   * @param sync if true will sync the outstanding I/Os to the disk.
+   */
+  void flushLog(boolean sync) throws IOException;
 
   /**
    * Compact the entire database.

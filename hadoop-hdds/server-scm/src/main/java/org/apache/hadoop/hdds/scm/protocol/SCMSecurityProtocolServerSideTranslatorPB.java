@@ -16,26 +16,30 @@
  */
 package org.apache.hadoop.hdds.scm.protocol;
 
-import com.google.protobuf.RpcController;
-import com.google.protobuf.ServiceException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
+import java.util.List;
 
+import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto.ResponseCode;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertificateRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetDataNodeCertRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto.ResponseCode;
-import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetOMCertRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMListCertificateRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMListCertificateResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityRequest;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityResponse;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.Status;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolPB;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
+
+import com.google.protobuf.ProtocolMessageEnum;
+import com.google.protobuf.RpcController;
+import com.google.protobuf.ServiceException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This class is the server-side translator that forwards requests received on
@@ -51,7 +55,7 @@ public class SCMSecurityProtocolServerSideTranslatorPB
   private final SCMSecurityProtocol impl;
 
   private OzoneProtocolMessageDispatcher<SCMSecurityRequest,
-      SCMSecurityResponse>
+      SCMSecurityResponse, ProtocolMessageEnum>
       dispatcher;
 
   public SCMSecurityProtocolServerSideTranslatorPB(SCMSecurityProtocol impl,
@@ -100,6 +104,13 @@ public class SCMSecurityProtocolServerSideTranslatorPB
             .setStatus(Status.OK)
             .setGetCertResponseProto(
                 getDataNodeCertificate(request.getGetDataNodeCertRequest()))
+            .build();
+      case ListCertificate:
+        return SCMSecurityResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setListCertificateResponseProto(
+                listCertificate(request.getListCertificateRequest()))
             .build();
       default:
         throw new IllegalArgumentException(
@@ -183,4 +194,19 @@ public class SCMSecurityProtocolServerSideTranslatorPB
 
   }
 
+  public SCMListCertificateResponseProto listCertificate(
+      SCMListCertificateRequestProto request) throws IOException {
+    List<String> certs = impl.listCertificate(request.getRole(),
+        request.getStartCertId(), request.getCount(), request.getIsRevoked());
+
+    SCMListCertificateResponseProto.Builder builder =
+        SCMListCertificateResponseProto
+            .newBuilder()
+            .setResponseCode(SCMListCertificateResponseProto
+                .ResponseCode.success)
+            .addAllCertificates(certs);
+    return builder.build();
+
+
+  }
 }

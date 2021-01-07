@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
+import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeletedKeys;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PurgeKeysRequest;
@@ -51,6 +52,8 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.ratis.protocol.ClientId;
+import org.apache.ratis.protocol.Message;
+import org.apache.ratis.protocol.RaftClientRequest;
 import org.apache.ratis.util.Preconditions;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
@@ -66,13 +69,15 @@ public class KeyDeletingService extends BackgroundService {
   private static final Logger LOG =
       LoggerFactory.getLogger(KeyDeletingService.class);
 
-  // The thread pool size for key deleting service.
-  private final static int KEY_DELETING_CORE_POOL_SIZE = 2;
+  // Use only a single thread for KeyDeletion. Multiple threads would read
+  // from the same table and can send deletion requests for same key multiple
+  // times.
+  private final static int KEY_DELETING_CORE_POOL_SIZE = 1;
 
   private final OzoneManager ozoneManager;
   private final ScmBlockLocationProtocol scmClient;
   private final KeyManager manager;
-  private ClientId clientId = ClientId.randomId();
+  private static ClientId clientId = ClientId.randomId();
   private final int keyLimitPerTask;
   private final AtomicLong deletedKeyCount;
   private final AtomicLong runCount;
@@ -124,7 +129,7 @@ public class KeyDeletingService extends BackgroundService {
       // OzoneManager can be null for testing
       return true;
     }
-    return ozoneManager.isLeader();
+    return ozoneManager.isLeaderReady();
   }
 
   private boolean isRatisEnabled() {
@@ -141,8 +146,7 @@ public class KeyDeletingService extends BackgroundService {
    * the blocks info in its deletedBlockLog), it removes these keys from the
    * DB.
    */
-  private class KeyDeletingTask implements
-      BackgroundTask<BackgroundTaskResult> {
+  private class KeyDeletingTask implements BackgroundTask {
 
     @Override
     public int getPriority() {
@@ -263,7 +267,10 @@ public class KeyDeletingService extends BackgroundService {
 
       // Submit PurgeKeys request to OM
       try {
-        ozoneManager.getOmServerProtocol().submitRequest(null, omRequest);
+        RaftClientRequest raftClientRequest =
+            createRaftClientRequestForPurge(omRequest);
+        ozoneManager.getOmRatisServer().submitRequest(omRequest,
+            raftClientRequest);
       } catch (ServiceException e) {
         LOG.error("PurgeKey request failed. Will retry at next run.");
         return 0;
@@ -271,6 +278,15 @@ public class KeyDeletingService extends BackgroundService {
 
       return deletedCount;
     }
+  }
+
+  private RaftClientRequest createRaftClientRequestForPurge(
+      OMRequest omRequest) {
+    return new RaftClientRequest(clientId,
+        ozoneManager.getOmRatisServer().getRaftPeerId(),
+        ozoneManager.getOmRatisServer().getRaftGroupId(), runCount.get(),
+        Message.valueOf(OMRatisHelper.convertRequestToByteString(omRequest)),
+        RaftClientRequest.writeRequestType(), null);
   }
 
   /**

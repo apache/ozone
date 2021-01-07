@@ -44,6 +44,7 @@ import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServicePort.Type;
+import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.metrics.OzoneManagerSyncMetrics;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
@@ -61,15 +62,15 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_DB_CHECKPOINT_HTTP_EN
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OM_SNAPSHOT_DB;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_CONNECTION_REQUEST_TIMEOUT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_CONNECTION_REQUEST_TIMEOUT_DEFAULT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_CONNECTION_TIMEOUT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_CONNECTION_TIMEOUT_DEFAULT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_SNAPSHOT_TASK_FLUSH_PARAM;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_SNAPSHOT_TASK_INTERVAL;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_SNAPSHOT_TASK_INTERVAL_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_CONNECTION_REQUEST_TIMEOUT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_CONNECTION_REQUEST_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_CONNECTION_TIMEOUT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_CONNECTION_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_TASK_FLUSH_PARAM;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_TASK_INTERVAL_DELAY;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_TASK_INTERVAL_DEFAULT;
 import static org.apache.ratis.proto.RaftProtos.RaftPeerRole.LEADER;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
@@ -121,11 +122,18 @@ public class OzoneManagerServiceProviderImpl
       OzoneManagerProtocol ozoneManagerClient) {
 
     int connectionTimeout = (int) configuration.getTimeDuration(
-        RECON_OM_CONNECTION_TIMEOUT,
-        RECON_OM_CONNECTION_TIMEOUT_DEFAULT, TimeUnit.MILLISECONDS);
+        OZONE_RECON_OM_CONNECTION_TIMEOUT,
+        configuration.get(
+            ReconServerConfigKeys.RECON_OM_CONNECTION_TIMEOUT,
+            OZONE_RECON_OM_CONNECTION_TIMEOUT_DEFAULT),
+        TimeUnit.MILLISECONDS);
     int connectionRequestTimeout = (int)configuration.getTimeDuration(
-        RECON_OM_CONNECTION_REQUEST_TIMEOUT,
-        RECON_OM_CONNECTION_REQUEST_TIMEOUT_DEFAULT, TimeUnit.MILLISECONDS);
+        OZONE_RECON_OM_CONNECTION_REQUEST_TIMEOUT,
+        configuration.get(
+            ReconServerConfigKeys.RECON_OM_CONNECTION_REQUEST_TIMEOUT,
+            OZONE_RECON_OM_CONNECTION_REQUEST_TIMEOUT_DEFAULT),
+        TimeUnit.MILLISECONDS
+    );
 
     connectionFactory =
         URLConnectionFactory.newDefaultURLConnectionFactory(connectionTimeout,
@@ -151,7 +159,11 @@ public class OzoneManagerServiceProviderImpl
     }
 
     boolean flushParam = configuration.getBoolean(
-        RECON_OM_SNAPSHOT_TASK_FLUSH_PARAM, false);
+        OZONE_RECON_OM_SNAPSHOT_TASK_FLUSH_PARAM,
+        configuration.getBoolean(
+            ReconServerConfigKeys.RECON_OM_SNAPSHOT_TASK_FLUSH_PARAM,
+            false)
+    );
 
     if (flushParam) {
       omDBSnapshotUrl += "?" + OZONE_DB_CHECKPOINT_REQUEST_FLUSH + "=true";
@@ -205,12 +217,16 @@ public class OzoneManagerServiceProviderImpl
     }
     reconTaskController.start();
     long initialDelay = configuration.getTimeDuration(
-        RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY,
-        RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT,
+        OZONE_RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY,
+        configuration.get(
+            ReconServerConfigKeys.RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY,
+            OZONE_RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT),
         TimeUnit.MILLISECONDS);
     long interval = configuration.getTimeDuration(
-        RECON_OM_SNAPSHOT_TASK_INTERVAL,
-        RECON_OM_SNAPSHOT_TASK_INTERVAL_DEFAULT,
+        OZONE_RECON_OM_SNAPSHOT_TASK_INTERVAL_DELAY,
+        configuration.get(
+            ReconServerConfigKeys.RECON_OM_SNAPSHOT_TASK_INTERVAL_DELAY,
+            OZONE_RECON_OM_SNAPSHOT_TASK_INTERVAL_DEFAULT),
         TimeUnit.MILLISECONDS);
     scheduler.scheduleWithFixedDelay(() -> {
       try {
@@ -281,7 +297,7 @@ public class OzoneManagerServiceProviderImpl
       SecurityUtil.doAsLoginUser(() -> {
         try (InputStream inputStream = reconUtils.makeHttpCall(
             connectionFactory, getOzoneManagerSnapshotUrl(),
-            isOmSpengoEnabled())) {
+            isOmSpengoEnabled()).getInputStream()) {
           FileUtils.copyInputStreamToFile(inputStream, targetFile);
         }
         return null;

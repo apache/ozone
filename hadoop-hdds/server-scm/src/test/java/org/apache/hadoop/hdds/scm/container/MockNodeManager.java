@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.scm.net.NetConstants;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.net.Node;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
@@ -35,6 +36,7 @@ import org.apache.hadoop.hdds.scm.node.states.Node2PipelineMap;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto
@@ -68,6 +70,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
  * Test Helper for testing container Mapping.
  */
 public class MockNodeManager implements NodeManager {
+  public final static int NUM_PIPELINE_PER_METADATA_DISK = 2;
   private final static NodeData[] NODES = {
       new NodeData(10L * OzoneConsts.TB, OzoneConsts.GB),
       new NodeData(64L * OzoneConsts.TB, 100 * OzoneConsts.GB),
@@ -93,6 +96,8 @@ public class MockNodeManager implements NodeManager {
   private NetworkTopology clusterMap;
   private ConcurrentMap<String, Set<String>> dnsToUuidMap;
   private int numHealthyDisksPerDatanode;
+  private int numRaftLogDisksPerDatanode;
+  private int numPipelinePerDatanode;
 
   public MockNodeManager(NetworkTopologyImpl clusterMap,
                          List<DatanodeDetails> nodes,
@@ -123,6 +128,9 @@ public class MockNodeManager implements NodeManager {
     safemode = false;
     this.commandMap = new HashMap<>();
     numHealthyDisksPerDatanode = 1;
+    numRaftLogDisksPerDatanode = 1;
+    numPipelinePerDatanode = numRaftLogDisksPerDatanode *
+        NUM_PIPELINE_PER_METADATA_DISK;
   }
 
   public MockNodeManager(boolean initializeFakeNodes, int nodeCount) {
@@ -167,14 +175,28 @@ public class MockNodeManager implements NodeManager {
     this.safemode = safemode;
   }
 
+
   /**
    * Gets all Live Datanodes that is currently communicating with SCM.
    *
-   * @param nodestate - State of the node
+   * @param status The status of the node
    * @return List of Datanodes that are Heartbeating SCM.
    */
   @Override
-  public List<DatanodeDetails> getNodes(HddsProtos.NodeState nodestate) {
+  public List<DatanodeDetails> getNodes(NodeStatus status) {
+    return getNodes(status.getOperationalState(), status.getHealth());
+  }
+
+  /**
+   * Gets all Live Datanodes that is currently communicating with SCM.
+   *
+   * @param opState - The operational State of the node
+   * @param nodestate - The health of the node
+   * @return List of Datanodes that are Heartbeating SCM.
+   */
+  @Override
+  public List<DatanodeDetails> getNodes(
+      HddsProtos.NodeOperationalState opState, HddsProtos.NodeState nodestate) {
     if (nodestate == HEALTHY) {
       return healthyNodes;
     }
@@ -193,12 +215,24 @@ public class MockNodeManager implements NodeManager {
   /**
    * Returns the Number of Datanodes that are communicating with SCM.
    *
+   * @param status - Status of the node
+   * @return int -- count
+   */
+  @Override
+  public int getNodeCount(NodeStatus status) {
+    return getNodeCount(status.getOperationalState(), status.getHealth());
+  }
+
+  /**
+   * Returns the Number of Datanodes that are communicating with SCM.
+   *
    * @param nodestate - State of the node
    * @return int -- count
    */
   @Override
-  public int getNodeCount(HddsProtos.NodeState nodestate) {
-    List<DatanodeDetails> nodes = getNodes(nodestate);
+  public int getNodeCount(
+      HddsProtos.NodeOperationalState opState, HddsProtos.NodeState nodestate) {
+    List<DatanodeDetails> nodes = getNodes(opState, nodestate);
     if (nodes != null) {
       return nodes.size();
     }
@@ -255,8 +289,28 @@ public class MockNodeManager implements NodeManager {
    * @return Healthy/Stale/Dead.
    */
   @Override
-  public HddsProtos.NodeState getNodeState(DatanodeDetails dd) {
+  public NodeStatus getNodeStatus(DatanodeDetails dd)
+      throws NodeNotFoundException {
     return null;
+  }
+
+  /**
+   * Set the operation state of a node.
+   * @param datanodeDetails The datanode to set the new state for
+   * @param newState The new operational state for the node
+   */
+  public void setNodeOperationalState(DatanodeDetails datanodeDetails,
+      HddsProtos.NodeOperationalState newState) throws NodeNotFoundException {
+  }
+
+  /**
+   * Set the operation state of a node.
+   * @param datanodeDetails The datanode to set the new state for
+   * @param newState The new operational state for the node
+   */
+  public void setNodeOperationalState(DatanodeDetails datanodeDetails,
+      HddsProtos.NodeOperationalState newState, long opStateExpiryEpocSec)
+      throws NodeNotFoundException {
   }
 
   /**
@@ -492,12 +546,23 @@ public class MockNodeManager implements NodeManager {
   }
 
   @Override
-  public Map<String, Integer> getNodeCount() {
-    Map<String, Integer> nodeCountMap = new HashMap<String, Integer>();
-    for (HddsProtos.NodeState state : HddsProtos.NodeState.values()) {
-      nodeCountMap.put(state.toString(), getNodeCount(state));
+  public Map<String, Map<String, Integer>> getNodeCount() {
+    Map<String, Map<String, Integer>> nodes = new HashMap<>();
+    for (NodeOperationalState opState : NodeOperationalState.values()) {
+      Map<String, Integer> states = new HashMap<>();
+      for (HddsProtos.NodeState health : HddsProtos.NodeState.values()) {
+        states.put(health.name(), 0);
+      }
+      nodes.put(opState.name(), states);
     }
-    return nodeCountMap;
+    // At the moment MockNodeManager is not aware of decommission and
+    // maintenance states, therefore loop over all nodes and assume all nodes
+    // are IN_SERVICE. This will be fixed as part of HDDS-2673
+    for (HddsProtos.NodeState state : HddsProtos.NodeState.values()) {
+      nodes.get(NodeOperationalState.IN_SERVICE.name())
+          .compute(state.name(), (k, v) -> v + 1);
+    }
+    return nodes;
   }
 
   @Override
@@ -585,12 +650,32 @@ public class MockNodeManager implements NodeManager {
   }
 
   @Override
-  public int getNumHealthyVolumes(List<DatanodeDetails> dnList) {
+  public int minHealthyVolumeNum(List<DatanodeDetails> dnList) {
     return numHealthyDisksPerDatanode;
+  }
+
+  @Override
+  public int pipelineLimit(DatanodeDetails dn) {
+    // by default 1 single node pipeline and 1 three node pipeline
+    return numPipelinePerDatanode;
+  }
+
+  @Override
+  public int minPipelineLimit(List<DatanodeDetails> dn) {
+    // by default 1 single node pipeline and 1 three node pipeline
+    return numPipelinePerDatanode;
+  }
+
+  public void setNumPipelinePerDatanode(int value) {
+    numPipelinePerDatanode = value;
   }
 
   public void setNumHealthyVolumes(int value) {
     numHealthyDisksPerDatanode = value;
+  }
+
+  public void setNumMetaDataVolumes(int value) {
+    numRaftLogDisksPerDatanode = value;
   }
 
   /**

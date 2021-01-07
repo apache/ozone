@@ -79,7 +79,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <declared.ozone.version>${ozone.version}</declared.ozone.version>
 
     <!-- Apache Ratis version -->
-    <ratis.version>1.1.0-ea949f1-SNAPSHOT</ratis.version>
+    <ratis.version>1.1.0-c5eafb9-SNAPSHOT</ratis.version>
 
     <!-- Apache Ratis thirdparty version -->
     <ratis.thirdparty.version>0.6.0-SNAPSHOT</ratis.thirdparty.version>
@@ -103,18 +103,12 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
     <failIfNoTests>false</failIfNoTests>
     <maven.test.redirectTestOutputToFile>true</maven.test.redirectTestOutputToFile>
-    <jetty.version>9.4.26.v20200117</jetty.version>
+    <jetty.version>9.4.34.v20201102</jetty.version>
     <test.exclude>_</test.exclude>
     <test.exclude.pattern>_</test.exclude.pattern>
 
     <!-- number of threads/forks to use when running tests in parallel, see parallel-tests profile -->
     <testsThreadCount>4</testsThreadCount>
-
-    <!-- These 2 versions are defined here because they are used -->
-    <!-- JDIFF generation from embedded ant in the antrun plugin -->
-    <jdiff.version>1.0.9</jdiff.version>
-    <!-- Version number for xerces used by JDiff -->
-    <xerces.jdiff.version>2.11.0</xerces.jdiff.version>
 
     <commons-daemon.version>1.0.13</commons-daemon.version>
 
@@ -123,7 +117,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
     <java.security.egd>file:///dev/urandom</java.security.egd>
 
-    <bouncycastle.version>1.60</bouncycastle.version>
+    <bouncycastle.version>1.67</bouncycastle.version>
 
     <!-- jersey version -->
     <jersey.version>1.19</jersey.version>
@@ -140,11 +134,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <hk2.version>2.5.0</hk2.version>
 
     <!-- httpcomponents versions -->
-    <httpclient.version>4.5.2</httpclient.version>
-    <httpcore.version>4.4.4</httpcore.version>
+    <httpclient.version>4.5.13</httpclient.version>
+    <httpcore.version>4.4.13</httpcore.version>
 
     <!-- SLF4J/LOG4J version -->
-    <slf4j.version>1.7.25</slf4j.version>
+    <slf4j.version>1.7.30</slf4j.version>
     <log4j.version>1.2.17</log4j.version>
     <log4j2.version>2.13.3</log4j2.version>
     <disruptor.version>3.4.2</disruptor.version>
@@ -211,7 +205,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <maven-compiler-plugin.version>3.1</maven-compiler-plugin.version>
     <maven-install-plugin.version>2.5.1</maven-install-plugin.version>
     <maven-resources-plugin.version>3.1.0</maven-resources-plugin.version>
-    <maven-shade-plugin.version>3.2.0</maven-shade-plugin.version>
+    <maven-shade-plugin.version>3.2.4</maven-shade-plugin.version>
     <maven-jar-plugin.version>2.5</maven-jar-plugin.version>
     <maven-war-plugin.version>3.1.0</maven-war-plugin.version>
     <maven-source-plugin.version>2.3</maven-source-plugin.version>
@@ -227,10 +221,10 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <exec-maven-plugin.version>1.3.1</exec-maven-plugin.version>
     <make-maven-plugin.version>1.0-beta-1</make-maven-plugin.version>
     <native-maven-plugin.version>1.0-alpha-8</native-maven-plugin.version>
-    <maven-checkstyle-plugin.version>3.0.0</maven-checkstyle-plugin.version>
-    <checkstyle.version>8.19</checkstyle.version>
+    <maven-checkstyle-plugin.version>3.1.0</maven-checkstyle-plugin.version>
+    <checkstyle.version>8.29</checkstyle.version>
     <surefire.fork.timeout>1200</surefire.fork.timeout>
-    <aws-java-sdk.version>1.11.615</aws-java-sdk.version>
+    <aws-java-sdk.version>1.11.901</aws-java-sdk.version>
     <hsqldb.version>2.3.4</hsqldb.version>
     <frontend-maven-plugin.version>1.10.0</frontend-maven-plugin.version>
     <!-- the version of Hadoop declared in the version resources; can be overridden
@@ -239,7 +233,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <proto-backwards-compatibility.version>1.0.5</proto-backwards-compatibility.version>
 
     <swagger-annotations-version>1.5.4</swagger-annotations-version>
-    <snakeyaml.version>1.16</snakeyaml.version>
+    <snakeyaml.version>1.26</snakeyaml.version>
     <sonar.java.binaries>${basedir}/target/classes</sonar.java.binaries>
   </properties>
 
@@ -261,11 +255,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>info.picocli</groupId>
         <artifactId>picocli</artifactId>
         <version>4.4.0</version>
-      </dependency>
-      <dependency>
-        <groupId>jdiff</groupId>
-        <artifactId>jdiff</artifactId>
-        <version>${jdiff.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop</groupId>
@@ -1032,12 +1021,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
       <dependency>
         <groupId>io.netty</groupId>
-        <artifactId>netty</artifactId>
-        <version>3.10.5.Final</version>
-      </dependency>
-
-      <dependency>
-        <groupId>io.netty</groupId>
         <artifactId>netty-all</artifactId>
         <version>${netty.version}</version>
       </dependency>
@@ -1290,11 +1273,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>net.sf.kosmosfs</groupId>
         <artifactId>kfs</artifactId>
         <version>0.3</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.ant</groupId>
-        <artifactId>ant</artifactId>
-        <version>1.8.1</version>
       </dependency>
       <dependency>
         <groupId>com.google.re2j</groupId>

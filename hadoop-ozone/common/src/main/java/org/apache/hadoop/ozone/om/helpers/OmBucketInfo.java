@@ -31,8 +31,7 @@ import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.Auditable;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .BucketInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketInfo;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 
 import com.google.common.base.Preconditions;
@@ -80,6 +79,13 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
 
   private final String sourceBucket;
 
+  private long usedBytes;
+
+  private long usedNamespace;
+
+  private long quotaInBytes;
+  private long quotaInNamespace;
+
   /**
    * Private constructor, constructed via builder.
    * @param volumeName - Volume name.
@@ -93,6 +99,9 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
    * @param bekInfo - bucket encryption key info.
    * @param sourceVolume - source volume for bucket links, null otherwise
    * @param sourceBucket - source bucket for bucket links, null otherwise
+   * @param usedBytes - Bucket Quota Usage in bytes.
+   * @param quotaInBytes Bucket quota in bytes.
+   * @param quotaInNamespace Bucket quota in counts.
    */
   @SuppressWarnings("checkstyle:ParameterNumber")
   private OmBucketInfo(String volumeName,
@@ -107,7 +116,11 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
       Map<String, String> metadata,
       BucketEncryptionKeyInfo bekInfo,
       String sourceVolume,
-      String sourceBucket) {
+      String sourceBucket,
+      long usedBytes,
+      long usedNamespace,
+      long quotaInBytes,
+      long quotaInNamespace) {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.acls = acls;
@@ -121,6 +134,10 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     this.bekInfo = bekInfo;
     this.sourceVolume = sourceVolume;
     this.sourceBucket = sourceBucket;
+    this.usedBytes = usedBytes;
+    this.usedNamespace = usedNamespace;
+    this.quotaInBytes = quotaInBytes;
+    this.quotaInNamespace = quotaInNamespace;
   }
 
   /**
@@ -226,6 +243,31 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     return sourceBucket;
   }
 
+
+  public long getUsedBytes() {
+    return usedBytes;
+  }
+
+  public long getUsedNamespace() {
+    return usedNamespace;
+  }
+
+  public void incrUsedBytes(long bytes) {
+    this.usedBytes += bytes;
+  }
+
+  public void incrUsedNamespace(long namespaceToUse) {
+    this.usedNamespace += namespaceToUse;
+  }
+
+  public long getQuotaInBytes() {
+    return quotaInBytes;
+  }
+
+  public long getQuotaInNamespace() {
+    return quotaInNamespace;
+  }
+
   public boolean isLink() {
     return sourceVolume != null && sourceBucket != null;
   }
@@ -261,6 +303,9 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
       auditMap.put(OzoneConsts.SOURCE_VOLUME, sourceVolume);
       auditMap.put(OzoneConsts.SOURCE_BUCKET, sourceBucket);
     }
+    auditMap.put(OzoneConsts.USED_BYTES, String.valueOf(this.usedBytes));
+    auditMap.put(OzoneConsts.USED_NAMESPACE,
+        String.valueOf(this.usedNamespace));
     return auditMap;
   }
 
@@ -296,7 +341,11 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         .setSourceVolume(sourceVolume)
         .setSourceBucket(sourceBucket)
         .setAcls(acls)
-        .addAllMetadata(metadata);
+        .addAllMetadata(metadata)
+        .setUsedBytes(usedBytes)
+        .setUsedNamespace(usedNamespace)
+        .setQuotaInBytes(quotaInBytes)
+        .setQuotaInNamespace(quotaInNamespace);
   }
 
   /**
@@ -316,6 +365,10 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     private BucketEncryptionKeyInfo bekInfo;
     private String sourceVolume;
     private String sourceBucket;
+    private long usedBytes;
+    private long usedNamespace;
+    private long quotaInBytes;
+    private long quotaInNamespace;
 
     public Builder() {
       //Default values
@@ -323,6 +376,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
       this.isVersionEnabled = false;
       this.storageType = StorageType.DISK;
       this.metadata = new HashMap<>();
+      this.quotaInBytes = OzoneConsts.QUOTA_RESET;
+      this.quotaInNamespace = OzoneConsts.QUOTA_RESET;
     }
 
     public Builder setVolumeName(String volume) {
@@ -407,6 +462,26 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
       return this;
     }
 
+    public Builder setUsedBytes(long quotaUsage) {
+      this.usedBytes = quotaUsage;
+      return this;
+    }
+
+    public Builder setUsedNamespace(long quotaUsage) {
+      this.usedNamespace = quotaUsage;
+      return this;
+    }
+
+    public Builder setQuotaInBytes(long quota) {
+      this.quotaInBytes = quota;
+      return this;
+    }
+
+    public Builder setQuotaInNamespace(long quota) {
+      this.quotaInNamespace = quota;
+      return this;
+    }
+
     /**
      * Constructs the OmBucketInfo.
      * @return instance of OmBucketInfo.
@@ -420,7 +495,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
 
       return new OmBucketInfo(volumeName, bucketName, acls, isVersionEnabled,
           storageType, creationTime, modificationTime, objectID, updateID,
-          metadata, bekInfo, sourceVolume, sourceBucket);
+          metadata, bekInfo, sourceVolume, sourceBucket, usedBytes,
+          usedNamespace, quotaInBytes, quotaInNamespace);
     }
   }
 
@@ -438,7 +514,11 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         .setModificationTime(modificationTime)
         .setObjectID(objectID)
         .setUpdateID(updateID)
-        .addAllMetadata(KeyValueUtil.toProtobuf(metadata));
+        .setUsedBytes(usedBytes)
+        .setUsedNamespace(usedNamespace)
+        .addAllMetadata(KeyValueUtil.toProtobuf(metadata))
+        .setQuotaInBytes(quotaInBytes)
+        .setQuotaInNamespace(quotaInNamespace);
     if (bekInfo != null && bekInfo.getKeyName() != null) {
       bib.setBeinfo(OMPBHelper.convert(bekInfo));
     }
@@ -465,7 +545,11 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         .setIsVersionEnabled(bucketInfo.getIsVersionEnabled())
         .setStorageType(StorageType.valueOf(bucketInfo.getStorageType()))
         .setCreationTime(bucketInfo.getCreationTime())
-        .setModificationTime(bucketInfo.getModificationTime());
+        .setUsedBytes(bucketInfo.getUsedBytes())
+        .setModificationTime(bucketInfo.getModificationTime())
+        .setQuotaInBytes(bucketInfo.getQuotaInBytes())
+        .setUsedNamespace(bucketInfo.getUsedNamespace())
+        .setQuotaInNamespace(bucketInfo.getQuotaInNamespace());
     if (bucketInfo.hasObjectID()) {
       obib.setObjectID(bucketInfo.getObjectID());
     }
@@ -500,6 +584,10 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         ", isVersionEnabled='" + isVersionEnabled + "'" +
         ", storageType='" + storageType + "'" +
         ", creationTime='" + creationTime + "'" +
+        ", usedBytes='" + usedBytes + "'" +
+        ", usedNamespace='" + usedNamespace + "'" +
+        ", quotaInBytes='" + quotaInBytes + "'" +
+        ", quotaInNamespace='" + quotaInNamespace + '\'' +
         sourceInfo +
         '}';
   }
@@ -522,6 +610,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         storageType == that.storageType &&
         objectID == that.objectID &&
         updateID == that.updateID &&
+        usedBytes == that.usedBytes &&
+        usedNamespace == that.usedNamespace &&
         Objects.equals(sourceVolume, that.sourceVolume) &&
         Objects.equals(sourceBucket, that.sourceBucket) &&
         Objects.equals(metadata, that.metadata) &&
@@ -548,6 +638,10 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         ", objectID=" + objectID +
         ", updateID=" + updateID +
         ", metadata=" + metadata +
+        ", usedBytes=" + usedBytes +
+        ", usedNamespace=" + usedNamespace +
+        ", quotaInBytes=" + quotaInBytes +
+        ", quotaInNamespace=" + quotaInNamespace +
         '}';
   }
 }

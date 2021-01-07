@@ -54,6 +54,11 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
 
     <dependency>
       <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-ozone-interface-storage</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-hdds-test-utils</artifactId>
       <scope>test</scope>
     </dependency>
@@ -80,6 +85,12 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <groupId>com.github.spotbugs</groupId>
       <artifactId>spotbugs</artifactId>
       <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-hdds-common</artifactId>
+      <type>test-jar</type>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>

@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.response.s3.multipart;
 
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
@@ -56,6 +57,7 @@ public class S3MultipartUploadCommitPartResponse extends OMClientResponse {
   private OzoneManagerProtocolProtos.PartKeyInfo oldPartKeyInfo;
   private OmKeyInfo openPartKeyInfoToBeDeleted;
   private boolean isRatisEnabled;
+  private OmBucketInfo omBucketInfo;
 
   /**
    * Regular response.
@@ -68,12 +70,13 @@ public class S3MultipartUploadCommitPartResponse extends OMClientResponse {
    * @param omMultipartKeyInfo
    * @param oldPartKeyInfo
    */
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public S3MultipartUploadCommitPartResponse(@Nonnull OMResponse omResponse,
       String multipartKey, String openKey,
       @Nullable OmMultipartKeyInfo omMultipartKeyInfo,
       @Nullable OzoneManagerProtocolProtos.PartKeyInfo oldPartKeyInfo,
       @Nullable OmKeyInfo openPartKeyInfoToBeDeleted,
-      boolean isRatisEnabled) {
+      boolean isRatisEnabled, @Nonnull OmBucketInfo omBucketInfo) {
     super(omResponse);
     this.multipartKey = multipartKey;
     this.openKey = openKey;
@@ -81,6 +84,7 @@ public class S3MultipartUploadCommitPartResponse extends OMClientResponse {
     this.oldPartKeyInfo = oldPartKeyInfo;
     this.openPartKeyInfoToBeDeleted = openPartKeyInfoToBeDeleted;
     this.isRatisEnabled = isRatisEnabled;
+    this.omBucketInfo = omBucketInfo;
   }
 
   @Override
@@ -143,6 +147,11 @@ public class S3MultipartUploadCommitPartResponse extends OMClientResponse {
     //  safely delete part key info from open key table.
     omMetadataManager.getOpenKeyTable().deleteWithBatch(batchOperation,
         openKey);
+
+    // update bucket usedBytes.
+    omMetadataManager.getBucketTable().putWithBatch(batchOperation,
+        omMetadataManager.getBucketKey(omBucketInfo.getVolumeName(),
+            omBucketInfo.getBucketName()), omBucketInfo);
   }
 }
 

@@ -43,7 +43,6 @@ public class ObjectParser {
   public ObjectParser(String path, ObjectType objectType) throws OMException {
     Preconditions.checkNotNull(path);
     String[] tokens = StringUtils.split(path, OZONE_URI_DELIMITER, 3);
-
     if (objectType == ObjectType.VOLUME && tokens.length == 1) {
       volume = tokens[0];
     } else if (objectType == ObjectType.BUCKET && tokens.length == 2) {
@@ -53,6 +52,11 @@ public class ObjectParser {
       volume = tokens[0];
       bucket = tokens[1];
       key = tokens[2];
+    } else if (objectType == ObjectType.PREFIX && tokens.length >= 1) {
+      volume = tokens[0];
+      if (tokens.length >= 2) {
+        bucket = tokens[1];
+      }
     } else {
       throw new OMException("Illegal path " + path,
           OMException.ResultCodes.INVALID_PATH_IN_ACL_REQUEST);

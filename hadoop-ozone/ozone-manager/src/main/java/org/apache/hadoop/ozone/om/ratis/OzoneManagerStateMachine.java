@@ -149,7 +149,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    * @param index index which is being updated
    */
   @Override
-  public void notifyIndexUpdate(long currentTerm, long index) {
+  public void notifyTermIndexUpdated(long currentTerm, long index) {
     // SnapshotInfo should be updated when the term changes.
     // The index here refers to the log entry index and the index in
     // SnapshotInfo represents the snapshotIndex i.e. the index of the last
@@ -317,7 +317,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     getLifeCycle().startAndTransition(() -> {
       this.ozoneManagerDoubleBuffer = buildDoubleBufferForRatis();
       handler.updateDoubleBuffer(ozoneManagerDoubleBuffer);
-      this.setLastAppliedTermIndex(TermIndex.newTermIndex(
+      this.setLastAppliedTermIndex(TermIndex.valueOf(
           newLastAppliedSnapShotTermIndex, newLastAppliedSnaphsotIndex));
     });
   }
@@ -347,7 +347,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     long lastAppliedIndex = lastTermIndex.getIndex();
     snapshotInfo.updateTermIndex(lastTermIndex.getTerm(),
         lastAppliedIndex);
-    ozoneManager.getMetadataManager().getStore().flush();
+    ozoneManager.getMetadataManager().getStore().flushDB();
     return lastAppliedIndex;
   }
 
@@ -380,7 +380,6 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   @Override
   public void notifyNotLeader(Collection<TransactionContext> pendingEntries)
       throws IOException {
-    omRatisServer.updateServerRole();
   }
 
   @Override
@@ -510,7 +509,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         OMTransactionInfo.readTransactionInfo(
             ozoneManager.getMetadataManager());
     if (omTransactionInfo != null) {
-      setLastAppliedTermIndex(TermIndex.newTermIndex(
+      setLastAppliedTermIndex(TermIndex.valueOf(
           omTransactionInfo.getTerm(),
           omTransactionInfo.getTransactionIndex()));
       snapshotInfo.updateTermIndex(omTransactionInfo.getTerm(),

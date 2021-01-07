@@ -51,18 +51,12 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.response.key.OMKeyCreateResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .CreateKeyRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .CreateKeyResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .KeyArgs;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .Type;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.util.Time;
@@ -202,6 +196,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     OmKeyInfo omKeyInfo = null;
+    OmBucketInfo omBucketInfo = null;
     final List< OmKeyLocationInfo > locations = new ArrayList<>();
 
     boolean acquireLock = false;
@@ -211,6 +206,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
     IOException exception = null;
     Result result = null;
     List<OmKeyInfo> missingParentInfos = null;
+    int numMissingParents = 0;
     try {
       keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
       volumeName = keyArgs.getVolumeName();
@@ -270,12 +266,13 @@ public class OMKeyCreateRequest extends OMKeyRequest {
         OMFileRequest.addKeyTableCacheEntries(omMetadataManager, volumeName,
             bucketName, Optional.absent(), Optional.of(missingParentInfos),
             trxnLogIndex);
-
+        numMissingParents = missingParentInfos.size();
       }
 
       omKeyInfo = prepareKeyInfo(omMetadataManager, keyArgs, dbKeyInfo,
           keyArgs.getDataSize(), locations, getFileEncryptionInfo(keyArgs),
           ozoneManager.getPrefixManager(), bucketInfo, trxnLogIndex,
+          ozoneManager.getObjectIdFromTxId(trxnLogIndex),
           ozoneManager.isRatisEnabled());
 
       long openVersion = omKeyInfo.getLatestVersionLocations().getVersion();
@@ -284,9 +281,25 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           bucketName, keyName, clientID);
 
       // Append new blocks
-      omKeyInfo.appendNewBlocks(keyArgs.getKeyLocationsList().stream()
-          .map(OmKeyLocationInfo::getFromProtobuf)
-          .collect(Collectors.toList()), false);
+      List<OmKeyLocationInfo> newLocationList = keyArgs.getKeyLocationsList()
+          .stream().map(OmKeyLocationInfo::getFromProtobuf)
+          .collect(Collectors.toList());
+      omKeyInfo.appendNewBlocks(newLocationList, false);
+
+      omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
+      // Here we refer to the implementation of HDFS:
+      // If the key size is 600MB, when createKey, keyLocationInfo in
+      // keyLocationList is 3, and  the every pre-allocated block length is
+      // 256MB. If the number of factor  is 3, the total pre-allocated block
+      // ize is 256MB * 3 * 3. We will allocate more 256MB * 3 * 3 - 600mb * 3
+      // = 504MB in advance, and we  will subtract this part when we finally
+      // commitKey.
+      long preAllocatedSpace = newLocationList.size()
+          * ozoneManager.getScmBlockSize()
+          * omKeyInfo.getFactor().getNumber();
+      // check bucket and volume quota
+      checkBucketQuotaInBytes(omBucketInfo, preAllocatedSpace);
+      checkBucketQuotaInNamespace(omBucketInfo, 1L);
 
       // Add to cache entry can be done outside of lock for this openKey.
       // Even if bucket gets deleted, when commitKey we shall identify if
@@ -295,6 +308,10 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           new CacheKey<>(dbOpenKeyName),
           new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
 
+      omBucketInfo.incrUsedBytes(preAllocatedSpace);
+      // Update namespace quota
+      omBucketInfo.incrUsedNamespace(1L);
+
       // Prepare response
       omResponse.setCreateKeyResponse(CreateKeyResponse.newBuilder()
           .setKeyInfo(omKeyInfo.getProtobuf())
@@ -302,7 +319,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           .setOpenVersion(openVersion).build())
           .setCmdType(Type.CreateKey);
       omClientResponse = new OMKeyCreateResponse(omResponse.build(),
-          omKeyInfo, missingParentInfos, clientID);
+          omKeyInfo, missingParentInfos, clientID, omBucketInfo.copyObject());
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
@@ -328,6 +345,9 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
     switch (result) {
     case SUCCESS:
+      // Missing directories are created immediately, counting that here.
+      // The metric for the key is incremented as part of the key commit.
+      omMetrics.incNumKeys(numMissingParents);
       LOG.debug("Key created. Volume:{}, Bucket:{}, Key:{}", volumeName,
           bucketName, keyName);
       break;

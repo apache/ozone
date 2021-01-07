@@ -21,6 +21,8 @@ package org.apache.hadoop.ozone.container.common.helpers;
 import static org.apache.commons.io.FilenameUtils.removeExtension;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_CHECKSUM_ERROR;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.NO_SUCH_ALGORITHM;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CLOSED_CONTAINER_IO;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_NOT_OPEN;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getContainerCommandResponse;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerData.CHARSET_ENCODING;
 
@@ -42,6 +44,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
@@ -55,6 +58,9 @@ public final class ContainerUtils {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerUtils.class);
+
+  private static final ByteString REDACTED =
+      ByteString.copyFromUtf8("<redacted>");
 
   private ContainerUtils() {
     //never constructed.
@@ -73,8 +79,16 @@ public final class ContainerUtils {
       ContainerCommandRequestProto request) {
     String logInfo = "Operation: {} , Trace ID: {} , Message: {} , " +
         "Result: {} , StorageContainerException Occurred.";
-    log.info(logInfo, request.getCmdType().name(), request.getTraceID(),
-        ex.getMessage(), ex.getResult().getValueDescriptor().getName(), ex);
+    if (ex.getResult() == CLOSED_CONTAINER_IO ||
+        ex.getResult() == CONTAINER_NOT_OPEN) {
+      if (log.isDebugEnabled()) {
+        log.debug(logInfo, request.getCmdType(), request.getTraceID(),
+            ex.getMessage(), ex.getResult().getValueDescriptor().getName(), ex);
+      }
+    } else {
+      log.info(logInfo, request.getCmdType(), request.getTraceID(),
+          ex.getMessage(), ex.getResult().getValueDescriptor().getName(), ex);
+    }
     return getContainerCommandResponse(request, ex.getResult(), ex.getMessage())
         .build();
   }
@@ -101,7 +115,6 @@ public final class ContainerUtils {
    * Verifies that this is indeed a new container.
    *
    * @param containerFile - Container File to verify
-   * @throws FileAlreadyExistsException
    */
   public static void verifyIsNewContainer(File containerFile) throws
       FileAlreadyExistsException {
@@ -125,7 +138,7 @@ public final class ContainerUtils {
    *
    * @throws IOException when read/write error occurs
    */
-  public synchronized static void writeDatanodeDetailsTo(
+  public static synchronized void writeDatanodeDetailsTo(
       DatanodeDetails datanodeDetails, File path) throws IOException {
     if (path.exists()) {
       if (!path.delete() || !path.createNewFile()) {
@@ -147,7 +160,7 @@ public final class ContainerUtils {
    * @return {@link DatanodeDetails}
    * @throws IOException If the id file is malformed or other I/O exceptions
    */
-  public synchronized static DatanodeDetails readDatanodeDetailsFrom(File path)
+  public static synchronized DatanodeDetails readDatanodeDetailsFrom(File path)
       throws IOException {
     if (!path.exists()) {
       throw new IOException("Datanode ID file not found.");
@@ -155,7 +168,7 @@ public final class ContainerUtils {
     try {
       return DatanodeIdYaml.readDatanodeIdFile(path);
     } catch (IOException e) {
-      LOG.warn("Error loading DatanodeDetails yaml from " +
+      LOG.warn("Error loading DatanodeDetails yaml from {}",
           path.getAbsolutePath(), e);
       // Try to load as protobuf before giving up
       try (FileInputStream in = new FileInputStream(path)) {
@@ -171,8 +184,6 @@ public final class ContainerUtils {
   /**
    * Verify that the checksum stored in containerData is equal to the
    * computed checksum.
-   * @param containerData
-   * @throws IOException
    */
   public static void verifyChecksum(ContainerData containerData)
       throws IOException {
@@ -196,7 +207,6 @@ public final class ContainerUtils {
    * Return the SHA-256 checksum of the containerData.
    * @param containerDataYamlStr ContainerData as a Yaml String
    * @return Checksum of the container data
-   * @throws StorageContainerException
    */
   public static String getChecksum(String containerDataYamlStr)
       throws StorageContainerException {
@@ -230,5 +240,55 @@ public final class ContainerUtils {
    */
   public static long getContainerID(File containerBaseDir) {
     return Long.parseLong(containerBaseDir.getName());
+  }
+
+  /**
+   * Remove binary data from request {@code msg}.  (May be incomplete, feel
+   * free to add any missing cleanups.)
+   */
+  public static ContainerCommandRequestProto processForDebug(
+      ContainerCommandRequestProto msg) {
+
+    if (msg == null) {
+      return null;
+    }
+
+    if (msg.hasWriteChunk() || msg.hasPutSmallFile()) {
+      ContainerCommandRequestProto.Builder builder = msg.toBuilder();
+      if (msg.hasWriteChunk()) {
+        builder.getWriteChunkBuilder().setData(REDACTED);
+      }
+      if (msg.hasPutSmallFile()) {
+        builder.getPutSmallFileBuilder().setData(REDACTED);
+      }
+      return builder.build();
+    }
+
+    return msg;
+  }
+
+  /**
+   * Remove binary data from response {@code msg}.  (May be incomplete, feel
+   * free to add any missing cleanups.)
+   */
+  public static ContainerCommandResponseProto processForDebug(
+      ContainerCommandResponseProto msg) {
+
+    if (msg == null) {
+      return null;
+    }
+
+    if (msg.hasReadChunk() || msg.hasGetSmallFile()) {
+      ContainerCommandResponseProto.Builder builder = msg.toBuilder();
+      if (msg.hasReadChunk()) {
+        builder.getReadChunkBuilder().setData(REDACTED);
+      }
+      if (msg.hasGetSmallFile()) {
+        builder.getGetSmallFileBuilder().getDataBuilder().setData(REDACTED);
+      }
+      return builder.build();
+    }
+
+    return msg;
   }
 }

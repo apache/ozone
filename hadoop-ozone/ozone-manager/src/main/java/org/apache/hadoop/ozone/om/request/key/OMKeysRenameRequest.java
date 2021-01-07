@@ -109,7 +109,7 @@ public class OMKeysRenameRequest extends OMKeyRequest {
 
     try {
       ResolvedBucket bucket = ozoneManager.resolveBucketLink(
-          Pair.of(volumeName, bucketName));
+          Pair.of(volumeName, bucketName), this);
       bucket.audit(auditMap);
       volumeName = bucket.realVolume();
       bucketName = bucket.realBucket();
@@ -117,6 +117,9 @@ public class OMKeysRenameRequest extends OMKeyRequest {
           omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
               volumeName, bucketName);
 
+      // Validate bucket and volume exists or not.
+      validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
+      String volumeOwner = getVolumeOwner(omMetadataManager, volumeName);
       for (RenameKeysMap renameKey : renameKeysArgs.getRenameKeysMapList()) {
 
         fromKeyName = renameKey.getFromKeyName();
@@ -137,9 +140,11 @@ public class OMKeysRenameRequest extends OMKeyRequest {
           // check Acls to see if user has access to perform delete operation
           // on old key and create operation on new key
           checkKeyAcls(ozoneManager, volumeName, bucketName, fromKeyName,
-              IAccessAuthorizer.ACLType.DELETE, OzoneObj.ResourceType.KEY);
+              IAccessAuthorizer.ACLType.DELETE, OzoneObj.ResourceType.KEY,
+              volumeOwner);
           checkKeyAcls(ozoneManager, volumeName, bucketName, toKeyName,
-              IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
+              IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY,
+              volumeOwner);
         } catch (Exception ex) {
           renameStatus = false;
           unRenamedKeys.add(

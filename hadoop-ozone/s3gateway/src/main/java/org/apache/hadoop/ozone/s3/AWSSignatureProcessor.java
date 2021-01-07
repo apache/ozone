@@ -28,6 +28,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URLEncoder;
 import java.net.UnknownHostException;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
@@ -54,6 +55,7 @@ import org.apache.kerby.util.Hex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 /**
  * Parser to process AWS V2 & V4 auth request. Creates string to sign and auth
  * header. For more details refer to AWS documentation https://docs.aws
@@ -75,6 +77,7 @@ public class AWSSignatureProcessor implements SignatureProcessor {
   private AuthorizationHeaderV4 v4Header;
   private AuthorizationHeaderV2 v2Header;
   private String stringToSign;
+  private Exception exception;
 
   @PostConstruct
   public void init()
@@ -108,23 +111,38 @@ public class AWSSignatureProcessor implements SignatureProcessor {
 
     this.method = context.getMethod();
     String authHeader = headers.get(AUTHORIZATION_HEADER);
-    String[] split = authHeader.split(" ");
-    if (split[0].equals(AuthorizationHeaderV2.IDENTIFIER)) {
-      if (v2Header == null) {
-        v2Header = new AuthorizationHeaderV2(authHeader);
+    try {
+      if (authHeader != null) {
+        String[] split = authHeader.split(" ");
+        if (split[0].equals(AuthorizationHeaderV2.IDENTIFIER)) {
+          if (v2Header == null) {
+            v2Header = new AuthorizationHeaderV2(authHeader);
+          }
+        } else {
+          if (v4Header == null) {
+            v4Header = new AuthorizationHeaderV4(authHeader);
+          }
+          parse();
+        }
+      } else { // no auth header
+        v4Header = null;
+        v2Header = null;
       }
-    } else {
-      if (v4Header == null) {
-        v4Header = new AuthorizationHeaderV4(authHeader);
+    } catch (Exception ex) {
+      // During validation of auth header, create instance and set Exception.
+      // This way it can be handled in OzoneClientProducer creation of
+      // SignatureProcessor instance failure.
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Error during Validation of Auth Header:{}", authHeader);
       }
-      parse();
+      this.exception = ex;
     }
   }
 
 
-  public void parse() throws Exception {
-    StringBuilder strToSign = new StringBuilder();
+  private void parse() throws Exception {
 
+    StringBuilder strToSign = new StringBuilder();
     // According to AWS sigv4 documentation, authorization header should be
     // in following format.
     // Authorization: algorithm Credential=access key ID/credential scope,
@@ -167,7 +185,8 @@ public class AWSSignatureProcessor implements SignatureProcessor {
   }
 
   @VisibleForTesting
-  public String buildCanonicalRequest() throws OS3Exception {
+  protected String buildCanonicalRequest() throws OS3Exception {
+
     Iterable<String> parts = split("/", uri);
     List<String> encParts = new ArrayList<>();
     for (String p : parts) {
@@ -292,7 +311,7 @@ public class AWSSignatureProcessor implements SignatureProcessor {
   private String urlEncode(String str) {
     try {
 
-      return URLEncoder.encode(str, UTF_8.name())
+      return URLEncoder.encode(str, StandardCharsets.UTF_8.name())
           .replaceAll("\\+", "%20")
           .replaceAll("%7E", "~");
     } catch (UnsupportedEncodingException e) {
@@ -323,7 +342,7 @@ public class AWSSignatureProcessor implements SignatureProcessor {
 
   public static String hash(String payload) throws NoSuchAlgorithmException {
     MessageDigest md = MessageDigest.getInstance("SHA-256");
-    md.update(payload.getBytes(UTF_8));
+    md.update(payload.getBytes(StandardCharsets.UTF_8));
     return Hex.encode(md.digest()).toLowerCase();
   }
 
@@ -355,6 +374,10 @@ public class AWSSignatureProcessor implements SignatureProcessor {
   @VisibleForTesting
   public void setV2Header(AuthorizationHeaderV2 v2Header) {
     this.v2Header = v2Header;
+  }
+
+  public Exception getException() {
+    return this.exception;
   }
 
   /**

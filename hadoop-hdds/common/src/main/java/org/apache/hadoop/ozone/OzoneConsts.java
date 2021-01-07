@@ -18,12 +18,13 @@
 
 package org.apache.hadoop.ozone;
 
-import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.thirdparty.io.grpc.Context;
 import org.apache.ratis.thirdparty.io.grpc.Metadata;
 
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.regex.Pattern;
 
 import static org.apache.ratis.thirdparty.io.grpc.Metadata.ASCII_STRING_MARSHALLER;
@@ -139,29 +140,16 @@ public final class OzoneConsts {
     }
   }
 
+  // Block ID prefixes used in datanode containers.
   public static final String DELETING_KEY_PREFIX = "#deleting#";
-  public static final String DELETED_KEY_PREFIX = "#deleted#";
-  public static final String DELETE_TRANSACTION_KEY_PREFIX = "#delTX#";
-  public static final String BLOCK_COMMIT_SEQUENCE_ID_PREFIX = "#BCSID";
 
+  // Metadata keys for datanode containers.
+  public static final String DELETE_TRANSACTION_KEY = "#delTX";
+  public static final String BLOCK_COMMIT_SEQUENCE_ID = "#BCSID";
   public static final String BLOCK_COUNT = "#BLOCKCOUNT";
   public static final String CONTAINER_BYTES_USED = "#BYTESUSED";
   public static final String PENDING_DELETE_BLOCK_COUNT =
       "#PENDINGDELETEBLOCKCOUNT";
-
-
-  public static final byte[] DB_BLOCK_COUNT_KEY =
-      StringUtils.string2Bytes(OzoneConsts.BLOCK_COUNT);
-  public static final byte[] DB_CONTAINER_BYTES_USED_KEY =
-      StringUtils.string2Bytes(OzoneConsts.CONTAINER_BYTES_USED);
-  public static final byte[] DB_PENDING_DELETE_BLOCK_COUNT_KEY =
-      StringUtils.string2Bytes(PENDING_DELETE_BLOCK_COUNT);
-  public static final byte[] DB_CONTAINER_DELETE_TRANSACTION_KEY =
-      StringUtils.string2Bytes(DELETE_TRANSACTION_KEY_PREFIX);
-  public static final byte[] DB_BLOCK_COMMIT_SEQUENCE_ID_KEY =
-      StringUtils.string2Bytes(BLOCK_COMMIT_SEQUENCE_ID_PREFIX);
-
-
 
   /**
    * OM LevelDB prefixes.
@@ -200,9 +188,9 @@ public final class OzoneConsts {
 
 
   /**
-   * Max OM Quota size of 1024 PB.
+   * Max OM Quota size of Long.MAX_VALUE.
    */
-  public static final long MAX_QUOTA_IN_BYTES = 1024L * 1024 * TB;
+  public static final long MAX_QUOTA_IN_BYTES = Long.MAX_VALUE;
 
   /**
    * Quota RESET default is -1, which means quota is not set.
@@ -258,6 +246,22 @@ public final class OzoneConsts {
   public static final String DATA_SCAN_TIMESTAMP = "dataScanTimestamp";
   public static final String ORIGIN_PIPELINE_ID = "originPipelineId";
   public static final String ORIGIN_NODE_ID = "originNodeId";
+  public static final String SCHEMA_VERSION = "schemaVersion";
+
+  // Supported .container datanode schema versions.
+  // Since containers in older schema versions are currently not reformatted to
+  // newer schema versions, a datanode may have containers with a mix of schema
+  // versions, requiring this property to be tracked on a per container basis.
+  // V1: All data in default column family.
+  public static final String SCHEMA_V1 = "1";
+  // V2: Metadata, block data, and delete transactions in their own
+  // column families.
+  public static final String SCHEMA_V2 = "2";
+  // Most recent schema version that all new containers should be created with.
+  public static final String SCHEMA_LATEST = SCHEMA_V2;
+
+  public static final String[] SCHEMA_VERSIONS =
+      new String[] {SCHEMA_V1, SCHEMA_V2};
 
   // Supported store types.
   public static final String OZONE = "ozone";
@@ -269,8 +273,10 @@ public final class OzoneConsts {
   public static final String KEY = "key";
   public static final String SRC_KEY = "srcKey";
   public static final String DST_KEY = "dstKey";
+  public static final String USED_BYTES = "usedBytes";
+  public static final String USED_NAMESPACE = "usedNamespace";
   public static final String QUOTA_IN_BYTES = "quotaInBytes";
-  public static final String QUOTA_IN_COUNTS = "quotaInCounts";
+  public static final String QUOTA_IN_NAMESPACE = "quotaInNamespace";
   public static final String OBJECT_ID = "objectID";
   public static final String UPDATE_ID = "updateID";
   public static final String CLIENT_ID = "clientID";
@@ -352,7 +358,7 @@ public final class OzoneConsts {
   public static final String GDPR_FLAG = "gdprEnabled";
   public static final String GDPR_ALGORITHM_NAME = "AES";
   public static final int GDPR_DEFAULT_RANDOM_SECRET_LENGTH = 16;
-  public static final String GDPR_CHARSET = "UTF-8";
+  public static final Charset GDPR_CHARSET = StandardCharsets.UTF_8;
   public static final String GDPR_LENGTH = "length";
   public static final String GDPR_SECRET = "secret";
   public static final String GDPR_ALGORITHM = "algorithm";
@@ -382,4 +388,9 @@ public final class OzoneConsts {
 
   // An on-disk transient marker file used when replacing DB with checkpoint
   public static final String DB_TRANSIENT_MARKER = "dbInconsistentMarker";
+
+
+  public static final String OM_RATIS_SNAPSHOT_DIR = "snapshot";
+
+  public static final long DEFAULT_OM_UPDATE_ID = -1L;  
 }

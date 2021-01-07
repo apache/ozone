@@ -27,10 +27,10 @@ import com.google.common.base.Optional;
 
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
-import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -192,24 +192,35 @@ public class OMBucketCreateRequest extends OMClientRequest {
         throw new OMException("Bucket already exist", BUCKET_ALREADY_EXISTS);
       }
 
+      //Check quotaInBytes to update
+      checkQuotaBytesValid(metadataManager, omVolumeArgs, omBucketInfo,
+          volumeKey);
+
       // Add objectID and updateID
       omBucketInfo.setObjectID(
-          OMFileRequest.getObjIDFromTxId(transactionLogIndex));
+          ozoneManager.getObjectIdFromTxId(transactionLogIndex));
       omBucketInfo.setUpdateID(transactionLogIndex,
           ozoneManager.isRatisEnabled());
 
       // Add default acls from volume.
       addDefaultAcls(omBucketInfo, omVolumeArgs);
 
+      // check namespace quota
+      checkQuotaInNamespace(omVolumeArgs, 1L);
+
+      // update used namespace for volume
+      omVolumeArgs.incrUsedNamespace(1L);
 
       // Update table cache.
+      metadataManager.getVolumeTable().addCacheEntry(new CacheKey<>(volumeKey),
+          new CacheValue<>(Optional.of(omVolumeArgs), transactionLogIndex));
       metadataManager.getBucketTable().addCacheEntry(new CacheKey<>(bucketKey),
           new CacheValue<>(Optional.of(omBucketInfo), transactionLogIndex));
 
       omResponse.setCreateBucketResponse(
           CreateBucketResponse.newBuilder().build());
       omClientResponse = new OMBucketCreateResponse(omResponse.build(),
-          omBucketInfo);
+          omBucketInfo, omVolumeArgs.copyObject());
     } catch (IOException ex) {
       exception = ex;
       omClientResponse = new OMBucketCreateResponse(
@@ -297,4 +308,56 @@ public class OMBucketCreateRequest extends OMClientRequest {
             CipherSuite.convert(metadata.getCipher())));
     return bekb.build();
   }
+
+  /**
+   * Check namespace quota.
+   */
+  private void checkQuotaInNamespace(OmVolumeArgs omVolumeArgs,
+      long allocatedNamespace) throws IOException {
+    if (omVolumeArgs.getQuotaInNamespace() > 0) {
+      long usedNamespace = omVolumeArgs.getUsedNamespace();
+      long quotaInNamespace = omVolumeArgs.getQuotaInNamespace();
+      long toUseNamespaceInTotal = usedNamespace + allocatedNamespace;
+      if (quotaInNamespace < toUseNamespaceInTotal) {
+        throw new OMException("The namespace quota of Volume:"
+            + omVolumeArgs.getVolume() + " exceeded: quotaInNamespace: "
+            + quotaInNamespace + " but namespace consumed: "
+            + toUseNamespaceInTotal + ".",
+            OMException.ResultCodes.QUOTA_EXCEEDED);
+      }
+    }
+  }
+
+  public boolean checkQuotaBytesValid(OMMetadataManager metadataManager,
+      OmVolumeArgs omVolumeArgs, OmBucketInfo omBucketInfo, String volumeKey)
+      throws IOException {
+    long quotaInBytes = omBucketInfo.getQuotaInBytes();
+    long volumeQuotaInBytes = omVolumeArgs.getQuotaInBytes();
+
+    long totalBucketQuota = 0;
+    if (quotaInBytes > 0) {
+      totalBucketQuota = quotaInBytes;
+    } else {
+      return false;
+    }
+
+    List<OmBucketInfo>  bucketList = metadataManager.listBuckets(
+        omVolumeArgs.getVolume(), null, null, Integer.MAX_VALUE);
+    for(OmBucketInfo bucketInfo : bucketList) {
+      long nextQuotaInBytes = bucketInfo.getQuotaInBytes();
+      if(nextQuotaInBytes > OzoneConsts.QUOTA_RESET) {
+        totalBucketQuota += nextQuotaInBytes;
+      }
+    }
+    if(volumeQuotaInBytes < totalBucketQuota
+        && volumeQuotaInBytes != OzoneConsts.QUOTA_RESET) {
+      throw new IllegalArgumentException("Total buckets quota in this volume " +
+          "should not be greater than volume quota : the total space quota is" +
+          " set to:" + totalBucketQuota + ". But the volume space quota is:" +
+          volumeQuotaInBytes);
+    }
+    return true;
+
+  }
+
 }

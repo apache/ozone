@@ -65,6 +65,7 @@ import com.google.protobuf.ProtocolMessageEnum;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY;
+import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.IO_EXCEPTION;
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.startRpcServer;
 import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
@@ -174,6 +175,7 @@ public class SCMBlockProtocolServer implements
       String owner, ExcludeList excludeList) throws IOException {
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("size", String.valueOf(size));
+    auditMap.put("num", String.valueOf(num));
     auditMap.put("type", type.name());
     auditMap.put("factor", factor.name());
     auditMap.put("owner", owner);
@@ -217,58 +219,52 @@ public class SCMBlockProtocolServer implements
   @Override
   public List<DeleteBlockGroupResult> deleteKeyBlocks(
       List<BlockGroup> keyBlocksInfoList) throws IOException {
-    LOG.info("SCM is informed by OM to delete {} blocks", keyBlocksInfoList
-        .size());
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("SCM is informed by OM to delete {} blocks",
+          keyBlocksInfoList.size());
+    }
     List<DeleteBlockGroupResult> results = new ArrayList<>();
     Map<String, String> auditMap = Maps.newHashMap();
-    for (BlockGroup keyBlocks : keyBlocksInfoList) {
-      ScmBlockLocationProtocolProtos.DeleteScmBlockResult.Result resultCode;
-      try {
-        // We delete blocks in an atomic operation to prevent getting
-        // into state like only a partial of blocks are deleted,
-        // which will leave key in an inconsistent state.
-        auditMap.put("keyBlockToDelete", keyBlocks.toString());
-        scm.getScmBlockManager().deleteBlocks(keyBlocks.getBlockIDList());
-        resultCode = ScmBlockLocationProtocolProtos.DeleteScmBlockResult
-            .Result.success;
-        AUDIT.logWriteSuccess(
-            buildAuditMessageForSuccess(SCMAction.DELETE_KEY_BLOCK, auditMap)
-        );
-      } catch (SCMException scmEx) {
-        LOG.warn("Fail to delete block: {}", keyBlocks.getGroupID(), scmEx);
-        AUDIT.logWriteFailure(
-            buildAuditMessageForFailure(SCMAction.DELETE_KEY_BLOCK, auditMap,
-                scmEx)
-        );
-        switch (scmEx.getResult()) {
-        case SAFE_MODE_EXCEPTION:
-          resultCode = ScmBlockLocationProtocolProtos.DeleteScmBlockResult
-              .Result.safeMode;
-          break;
-        case FAILED_TO_FIND_BLOCK:
-          resultCode = ScmBlockLocationProtocolProtos.DeleteScmBlockResult
-              .Result.errorNotFound;
-          break;
-        default:
-          resultCode = ScmBlockLocationProtocolProtos.DeleteScmBlockResult
-              .Result.unknownFailure;
-        }
-      } catch (IOException ex) {
-        LOG.warn("Fail to delete blocks for object key: {}", keyBlocks
-            .getGroupID(), ex);
-        AUDIT.logWriteFailure(
-            buildAuditMessageForFailure(SCMAction.DELETE_KEY_BLOCK, auditMap,
-                ex)
-        );
-        resultCode = ScmBlockLocationProtocolProtos.DeleteScmBlockResult
-            .Result.unknownFailure;
+    ScmBlockLocationProtocolProtos.DeleteScmBlockResult.Result resultCode;
+    Exception e = null;
+    try {
+      scm.getScmBlockManager().deleteBlocks(keyBlocksInfoList);
+      resultCode = ScmBlockLocationProtocolProtos.
+          DeleteScmBlockResult.Result.success;
+    } catch (IOException ioe) {
+      e = ioe;
+      LOG.warn("Fail to delete {} keys", keyBlocksInfoList.size(), ioe);
+      switch (ioe instanceof SCMException ? ((SCMException) ioe).getResult() :
+          IO_EXCEPTION) {
+      case SAFE_MODE_EXCEPTION:
+        resultCode =
+            ScmBlockLocationProtocolProtos.DeleteScmBlockResult.Result.safeMode;
+        break;
+      case FAILED_TO_FIND_BLOCK:
+        resultCode =
+            ScmBlockLocationProtocolProtos.DeleteScmBlockResult.Result.
+                errorNotFound;
+        break;
+      default:
+        resultCode =
+            ScmBlockLocationProtocolProtos.DeleteScmBlockResult.Result.
+                unknownFailure;
       }
-      List<DeleteBlockResult> blockResultList = new ArrayList<>();
-      for (BlockID blockKey : keyBlocks.getBlockIDList()) {
-        blockResultList.add(new DeleteBlockResult(blockKey, resultCode));
+    }
+    for (BlockGroup bg : keyBlocksInfoList) {
+      auditMap.put("KeyBlockToDelete", bg.toString());
+      List<DeleteBlockResult> blockResult = new ArrayList<>();
+      for (BlockID b : bg.getBlockIDList()) {
+        blockResult.add(new DeleteBlockResult(b, resultCode));
       }
-      results.add(new DeleteBlockGroupResult(keyBlocks.getGroupID(),
-          blockResultList));
+      results.add(new DeleteBlockGroupResult(bg.getGroupID(), blockResult));
+    }
+    if (e == null) {
+      AUDIT.logWriteSuccess(
+          buildAuditMessageForSuccess(SCMAction.DELETE_KEY_BLOCK, auditMap));
+    } else {
+      AUDIT.logWriteFailure(
+          buildAuditMessageForFailure(SCMAction.DELETE_KEY_BLOCK, auditMap, e));
     }
     return results;
   }

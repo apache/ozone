@@ -77,5 +77,7 @@ public class TestSCMContainerMetrics {
         "Number of containers in deleting state"), 6);
     verify(mb, times(1)).addGauge(Interns.info("DeletedContainers",
         "Number of containers in deleted state"), 7);
+    verify(mb, times(1)).addGauge(Interns.info("TotalContainers",
+        "Number of all containers"), 27);
   }
 }

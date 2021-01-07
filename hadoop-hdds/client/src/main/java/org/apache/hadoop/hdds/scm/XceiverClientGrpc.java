@@ -384,7 +384,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         responseProto = null;
       } catch (ExecutionException e) {
         LOG.debug("Failed to execute command {} on datanode {}",
-            request, dn.getUuid(), e);
+            request, dn, e);
         if (Status.fromThrowable(e.getCause()).getCode()
             == Status.UNAUTHENTICATED.getCode()) {
           throw new SCMSecurityException("Failed to authenticate with "
@@ -463,7 +463,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     UUID dnId = dn.getUuid();
     if (LOG.isDebugEnabled()) {
       LOG.debug("Send command {} to datanode {}",
-          request.getCmdType(), dn.getNetworkFullPath());
+          request.getCmdType(), dn.getIpAddress());
     }
     final CompletableFuture<ContainerCommandResponseProto> replyFuture =
         new CompletableFuture<>();
@@ -482,8 +482,14 @@ public class XceiverClientGrpc extends XceiverClientSpi {
               public void onNext(ContainerCommandResponseProto value) {
                 replyFuture.complete(value);
                 metrics.decrPendingContainerOpsMetrics(request.getCmdType());
+                long cost = System.nanoTime() - requestTime;
                 metrics.addContainerOpsLatency(request.getCmdType(),
-                    System.nanoTime() - requestTime);
+                    cost);
+                if (LOG.isDebugEnabled()) {
+                  LOG.debug("Executed command {} on datanode {}, cost = {}, "
+                          + "cmdType = {}", request, dn,
+                      cost, request.getCmdType());
+                }
                 semaphore.release();
               }
 
@@ -491,8 +497,14 @@ public class XceiverClientGrpc extends XceiverClientSpi {
               public void onError(Throwable t) {
                 replyFuture.completeExceptionally(t);
                 metrics.decrPendingContainerOpsMetrics(request.getCmdType());
+                long cost = System.nanoTime() - requestTime;
                 metrics.addContainerOpsLatency(request.getCmdType(),
                     System.nanoTime() - requestTime);
+                if (LOG.isDebugEnabled()) {
+                  LOG.debug("Executed command {} on datanode {}, cost = {}, "
+                          + "cmdType = {}", request, dn,
+                      cost, request.getCmdType());
+                }
                 semaphore.release();
               }
 

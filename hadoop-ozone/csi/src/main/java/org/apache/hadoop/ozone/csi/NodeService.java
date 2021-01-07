@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.csi;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.concurrent.TimeUnit;
@@ -86,8 +87,8 @@ public class NodeService extends NodeImplBase {
     exec.waitFor(10, TimeUnit.SECONDS);
 
     LOG.info("Command is executed with  stdout: {}, stderr: {}",
-        IOUtils.toString(exec.getInputStream(), "UTF-8"),
-        IOUtils.toString(exec.getErrorStream(), "UTF-8"));
+        IOUtils.toString(exec.getInputStream(), StandardCharsets.UTF_8),
+        IOUtils.toString(exec.getErrorStream(), StandardCharsets.UTF_8));
     if (exec.exitValue() != 0) {
       throw new RuntimeException(String
           .format("Return code of the command %s was %d", command,

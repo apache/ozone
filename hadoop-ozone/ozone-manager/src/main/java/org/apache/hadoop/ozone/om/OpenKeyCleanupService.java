@@ -62,8 +62,7 @@ public class OpenKeyCleanupService extends BackgroundService {
     return queue;
   }
 
-  private class OpenKeyDeletingTask
-      implements BackgroundTask<BackgroundTaskResult> {
+  private class OpenKeyDeletingTask implements BackgroundTask {
 
     @Override
     public int getPriority() {

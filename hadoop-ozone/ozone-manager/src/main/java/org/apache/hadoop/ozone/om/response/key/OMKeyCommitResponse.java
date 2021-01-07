@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.response.key;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -40,13 +41,16 @@ public class OMKeyCommitResponse extends OMClientResponse {
   private OmKeyInfo omKeyInfo;
   private String ozoneKeyName;
   private String openKeyName;
+  private OmBucketInfo omBucketInfo;
 
   public OMKeyCommitResponse(@Nonnull OMResponse omResponse,
-      @Nonnull OmKeyInfo omKeyInfo, String ozoneKeyName, String openKeyName) {
+      @Nonnull OmKeyInfo omKeyInfo, String ozoneKeyName, String openKeyName,
+      @Nonnull OmBucketInfo omBucketInfo) {
     super(omResponse);
     this.omKeyInfo = omKeyInfo;
     this.ozoneKeyName = ozoneKeyName;
     this.openKeyName = openKeyName;
+    this.omBucketInfo = omBucketInfo;
   }
 
   /**
@@ -68,6 +72,11 @@ public class OMKeyCommitResponse extends OMClientResponse {
 
     omMetadataManager.getKeyTable().putWithBatch(batchOperation, ozoneKeyName,
         omKeyInfo);
+
+    // update bucket usedBytes.
+    omMetadataManager.getBucketTable().putWithBatch(batchOperation,
+        omMetadataManager.getBucketKey(omBucketInfo.getVolumeName(),
+            omBucketInfo.getBucketName()), omBucketInfo);
   }
 
 }

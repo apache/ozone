@@ -37,7 +37,6 @@ import com.google.gson.GsonBuilder;
 import org.kohsuke.MetaInfServices;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
-import org.rocksdb.Options;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksIterator;
 import picocli.CommandLine;
@@ -143,26 +142,21 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     this.columnFamilyMap = new HashMap<>();
     DBColumnFamilyDefinition[] columnFamilyDefinitions = dbDefinition
             .getColumnFamilies();
-    for(DBColumnFamilyDefinition definition:columnFamilyDefinitions){
+    for (DBColumnFamilyDefinition definition:columnFamilyDefinitions) {
+      System.out.println("Added definition for table:" +
+          definition.getTableName());
       this.columnFamilyMap.put(definition.getTableName(), definition);
     }
   }
 
   @Override
   public Void call() throws Exception {
-    List<ColumnFamilyDescriptor> cfs = new ArrayList<>();
+    List<ColumnFamilyDescriptor> cfs =
+        RocksDBUtils.getColumnFamilyDescriptors(parent.getDbPath());
+
     final List<ColumnFamilyHandle> columnFamilyHandleList =
-            new ArrayList<>();
-    List<byte[]> cfList = null;
-    cfList = RocksDB.listColumnFamilies(new Options(),
-            parent.getDbPath());
-    if (cfList != null) {
-      for (byte[] b : cfList) {
-        cfs.add(new ColumnFamilyDescriptor(b));
-      }
-    }
-    RocksDB rocksDB = null;
-    rocksDB = RocksDB.openReadOnly(parent.getDbPath(),
+        new ArrayList<>();
+    RocksDB rocksDB = RocksDB.openReadOnly(parent.getDbPath(),
             cfs, columnFamilyHandleList);
     this.printAppropriateTable(columnFamilyHandleList,
            rocksDB, parent.getDbPath());
@@ -181,7 +175,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
             getDefinition(new File(dbPath).getName()));
     if (this.columnFamilyMap !=null) {
       if (!this.columnFamilyMap.containsKey(tableName)) {
-        System.out.print("Table with specified name does not exist");
+        System.out.print("Table with name:" + tableName + " does not exist");
       } else {
         DBColumnFamilyDefinition columnFamilyDefinition =
                 this.columnFamilyMap.get(tableName);
