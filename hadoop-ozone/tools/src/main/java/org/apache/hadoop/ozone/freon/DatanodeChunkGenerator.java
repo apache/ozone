@@ -18,9 +18,11 @@ package org.apache.hadoop.ozone.freon;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Set;
 import java.util.List;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Arrays;
 import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
 
@@ -112,48 +114,47 @@ public class DatanodeChunkGenerator extends BaseFreonGenerator implements
 
     List<String> datanodeHosts = Arrays.asList(this.datanodes.split(","));
 
-    List<Pipeline> pipelines;
+    Set<Pipeline> pipelines;
 
     try (StorageContainerLocationProtocol scmLocationClient =
                createStorageContainerLocationClient(ozoneConf)) {
       List<Pipeline> pipelinesFromSCM = scmLocationClient.listPipelines();
-      Pipeline temp;
+      Pipeline firstPipeline;
+      init();
       if (!arePipelinesOrDatanodesProvided()) {
         //default behaviour if no arguments provided
-        init();
-        temp = pipelinesFromSCM.stream()
+        firstPipeline = pipelinesFromSCM.stream()
               .filter(p -> p.getFactor() == ReplicationFactor.THREE)
               .findFirst()
               .orElseThrow(() -> new IllegalArgumentException(
                   "Pipeline ID is NOT defined, and no pipeline " +
                       "has been found with factor=THREE"));
         XceiverClientSpi xceiverClientSpi = xceiverClientManager
-            .acquireClient(temp);
+            .acquireClient(firstPipeline);
         xceiverClients = new ArrayList<>();
         xceiverClients.add(xceiverClientSpi);
-        LOG.info("Using pipeline {}", temp.getId());
-        runTest(xceiverClientSpi);
+        LOG.info("Using pipeline {}", firstPipeline.getId());
+        runTest();
       } else {
-        pipelines = new ArrayList<>();
+        xceiverClients = new ArrayList<>();
+        pipelines = new HashSet<>();
         for(String pipelineId:pipelinesFromCmd){
-          List<Pipeline> tempPipelines =  pipelinesFromSCM.stream()
+          List<Pipeline> selectedPipelines =  pipelinesFromSCM.stream()
               .filter((p -> p.getId().toString()
                   .equals("PipelineID=" + pipelineId)
                   || pipelineContainsDatanode(p, datanodeHosts)))
                .collect(Collectors.toList());
-          for (Pipeline p:tempPipelines){
-            // avoid duplicates
-            if (!pipelines.contains(p)){
-              pipelines.add(p);
-            }
-          }
+          pipelines.addAll(selectedPipelines);
+        }
+        for (Pipeline p:pipelines){
+          LOG.info("Writing to pipeline: " + p.getId());
+          xceiverClients.add(xceiverClientManager.acquireClient(p));
         }
         if (pipelines.isEmpty()){
           throw new IllegalArgumentException(
               "Coudln't find the any/the selected pipeline");
         } else {
-          writeOnPipeline(
-              ozoneConf, pipelines);
+          runTest();
         }
       }
     } finally {
@@ -176,25 +177,12 @@ public class DatanodeChunkGenerator extends BaseFreonGenerator implements
     return false;
   }
 
-  private void writeOnPipeline(OzoneConfiguration ozoneConf,
-      List<Pipeline> pipelines) throws IOException {
-    LOG.info("Inside write Pipeline and pipeline size" + pipelines.size());
-    xceiverClients = new ArrayList<>();
-    for (Pipeline p: pipelines){
-      init();
-      LOG.info("run test on pipeline" + p.getId().toString());
-      XceiverClientSpi clientSpi = xceiverClientManager.acquireClient(p);
-      xceiverClients.add(clientSpi);
-      runTest(clientSpi);
-    }
-  }
-
   private boolean arePipelinesOrDatanodesProvided() {
     return !(pipelineIds.equals("") && datanodes.equals(""));
   }
 
 
-  private void runTest(XceiverClientSpi clientSpi)
+  private void runTest()
       throws IOException {
 
     timer = getMetrics().timer("chunk-write");
@@ -207,10 +195,10 @@ public class DatanodeChunkGenerator extends BaseFreonGenerator implements
     Checksum checksum = new Checksum(ChecksumType.CRC32, chunkSize);
     checksumProtobuf = checksum.computeChecksum(data).getProtoBufMessage();
 
-    runTests(stepNo -> writeChunk(stepNo, clientSpi));
+    runTests(this::writeChunk);
   }
 
-  private void writeChunk(long stepNo, XceiverClientSpi clientSpi)
+  private void writeChunk(long stepNo)
       throws Exception {
 
     //Always use this fake blockid.
@@ -234,6 +222,8 @@ public class DatanodeChunkGenerator extends BaseFreonGenerator implements
             .setChunkData(chunkInfo)
             .setData(dataToWrite);
 
+    XceiverClientSpi clientSpi = xceiverClients.get(
+        (int) (stepNo%(xceiverClients.size())));
     sendWriteChunkRequest(blockId, writeChunkRequest,
         clientSpi);
 
