@@ -74,7 +74,7 @@ public class TestOMKeyCreateResponse extends TestOMKeyResponse {
   @Test
   public void testAddToDBBatchWithErrorResponse() throws Exception {
 
-    OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
+    omBucketInfo = OmBucketInfo.newBuilder()
         .setVolumeName(volumeName).setBucketName(bucketName)
         .setCreationTime(Time.now()).build();
 
