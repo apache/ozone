@@ -252,8 +252,7 @@ public class TestOzoneManagerPrepareState {
     // Once preparation has begun, only prepare and cancel prepare should be
     // allowed.
     for (Type cmdType: Type.values()) {
-      if (cmdType == Type.Prepare) {
-        // TODO: Add cancelPrepare to allowed request types when it is added.
+      if (cmdType == Type.Prepare || cmdType == Type.CancelPrepare) {
         Assert.assertTrue(prepareState.requestAllowed(cmdType));
       } else {
         Assert.assertFalse(prepareState.requestAllowed(cmdType));
