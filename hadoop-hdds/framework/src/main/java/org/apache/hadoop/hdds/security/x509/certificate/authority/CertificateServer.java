@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.hdds.security.x509.certificate.authority;
 
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateApprover.ApprovalType;
@@ -28,6 +29,7 @@ import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import java.io.IOException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.util.List;
 import java.util.concurrent.Future;
 
 /**
@@ -112,6 +114,16 @@ public interface CertificateServer {
    * framework.
    */
 
+  /**
+   * List certificates.
+   * @param type            - node type: OM/SCM/DN
+   * @param startSerialId   - start certificate serial id
+   * @param count           - max number of certificates returned in a batch
+   * @return
+   * @throws IOException
+   */
+  List<X509Certificate> listCertificate(HddsProtos.NodeType type,
+      long startSerialId, int count, boolean isRevoked) throws IOException;
 
   /**
    * Make it explicit what type of CertificateServer we are creating here.

@@ -299,6 +299,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           * omKeyInfo.getFactor().getNumber();
       // check bucket and volume quota
       checkBucketQuotaInBytes(omBucketInfo, preAllocatedSpace);
+      checkBucketQuotaInNamespace(omBucketInfo, 1L);
 
       // Add to cache entry can be done outside of lock for this openKey.
       // Even if bucket gets deleted, when commitKey we shall identify if
@@ -308,6 +309,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
 
       omBucketInfo.incrUsedBytes(preAllocatedSpace);
+      // Update namespace quota
+      omBucketInfo.incrUsedNamespace(1L);
 
       // Prepare response
       omResponse.setCreateKeyResponse(CreateKeyResponse.newBuilder()

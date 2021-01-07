@@ -101,6 +101,11 @@ public class OzoneBucket extends WithMetadata {
   private long usedBytes;
 
   /**
+   * Used namespace of the bucket.
+   */
+  private long usedNamespace;
+
+  /**
    * Creation time of the bucket.
    */
   private Instant creationTime;
@@ -197,10 +202,11 @@ public class OzoneBucket extends WithMetadata {
       Boolean versioning, long creationTime, long modificationTime,
       Map<String, String> metadata, String encryptionKeyName,
       String sourceVolume, String sourceBucket, long usedBytes,
-      long quotaInBytes, long quotaInNamespace) {
+      long usedNamespace, long quotaInBytes, long quotaInNamespace) {
     this(conf, proxy, volumeName, bucketName, storageType, versioning,
         creationTime, metadata, encryptionKeyName, sourceVolume, sourceBucket);
     this.usedBytes = usedBytes;
+    this.usedNamespace = usedNamespace;
     this.modificationTime = Instant.ofEpochMilli(modificationTime);
     this.quotaInBytes = quotaInBytes;
     this.quotaInNamespace = quotaInNamespace;
@@ -428,11 +434,11 @@ public class OzoneBucket extends WithMetadata {
   }
 
   /**
-   * Clean the count quota of the bucket.
+   * Clean the namespace quota of the bucket.
    *
    * @throws IOException
    */
-  public void clearCountQuota() throws IOException {
+  public void clearNamespaceQuota() throws IOException {
     OzoneBucket ozoneBucket = proxy.getBucketDetails(volumeName, name);
     proxy.setBucketQuota(volumeName, name, QUOTA_RESET,
         ozoneBucket.getQuotaInBytes());
@@ -507,6 +513,10 @@ public class OzoneBucket extends WithMetadata {
 
   public long getUsedBytes() {
     return usedBytes;
+  }
+
+  public long getUsedNamespace() {
+    return usedNamespace;
   }
 
   /**

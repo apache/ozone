@@ -54,6 +54,18 @@ public class OzoneClientConfig {
       tags = ConfigTag.CLIENT)
   private int streamBufferSize = 4 * 1024 * 1024;
 
+  @Config(key = "stream.buffer.increment",
+      defaultValue = "0B",
+      type = ConfigType.SIZE,
+      description = "Buffer (defined by ozone.client.stream.buffer.size) "
+          + "will be incremented with this steps. If zero, the full buffer "
+          + "will "
+          + "be created at once. Setting it to a variable between 0 and "
+          + "ozone.client.stream.buffer.size can reduce the memory usage for "
+          + "very small keys, but has a performance overhead.",
+      tags = ConfigTag.CLIENT)
+  private int bufferIncrement = 0;
+
   @Config(key = "stream.buffer.flush.delay",
       defaultValue = "true",
       description = "Default true, when call flush() and determine whether "
@@ -118,6 +130,9 @@ public class OzoneClientConfig {
     Preconditions.checkState(streamBufferFlushSize > 0);
     Preconditions.checkState(streamBufferMaxSize > 0);
 
+    Preconditions.checkArgument(bufferIncrement < streamBufferSize,
+        "Buffer increment should be smaller than the size of the stream "
+            + "buffer");
     Preconditions.checkState(streamBufferMaxSize % streamBufferFlushSize == 0,
         "expected max. buffer size (%s) to be a multiple of flush size (%s)",
         streamBufferMaxSize, streamBufferFlushSize);
@@ -209,4 +224,7 @@ public class OzoneClientConfig {
     this.checksumVerify = checksumVerify;
   }
 
+  public int getBufferIncrement() {
+    return bufferIncrement;
+  }
 }

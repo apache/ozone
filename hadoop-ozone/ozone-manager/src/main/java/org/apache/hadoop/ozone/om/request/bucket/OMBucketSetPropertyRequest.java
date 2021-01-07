@@ -228,6 +228,13 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       throws IOException {
     long quotaInBytes = omBucketArgs.getQuotaInBytes();
 
+    if (quotaInBytes == OzoneConsts.QUOTA_RESET &&
+        omVolumeArgs.getQuotaInBytes() != OzoneConsts.QUOTA_RESET) {
+      throw new OMException("Can not clear bucket spaceQuota because" +
+          " volume spaceQuota is not cleared.",
+          OMException.ResultCodes.QUOTA_ERROR);
+    }
+
     if (quotaInBytes == 0) {
       return false;
     }

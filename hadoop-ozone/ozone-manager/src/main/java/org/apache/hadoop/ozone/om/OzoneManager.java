@@ -31,7 +31,6 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.security.KeyPair;
 import java.security.PrivateKey;
-import java.security.PrivilegedExceptionAction;
 import java.security.PublicKey;
 import java.security.cert.CertificateException;
 import java.util.ArrayList;
@@ -213,8 +212,10 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BL
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
+import static org.apache.hadoop.ozone.OzoneConsts.DEFAULT_OM_UPDATE_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_FILE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_TEMP_FILE;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_RATIS_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.RPC_PORT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
@@ -344,6 +345,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   private Thread emptier;
 
+  @SuppressWarnings("methodlength")
   private OzoneManager(OzoneConfiguration conf) throws IOException,
       AuthenticationException {
     super(OzoneVersionInfo.OZONE_VERSION_INFO);
@@ -454,7 +456,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     addS3GVolumeToDB();
 
     this.omRatisSnapshotInfo = new OMRatisSnapshotInfo();
-    initializeRatisServer();
+
     if (isRatisEnabled) {
       // Create Ratis storage dir
       String omRatisDirectory =
@@ -464,15 +466,29 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             " must be defined.");
       }
       OmUtils.createOMDir(omRatisDirectory);
+
       // Create Ratis snapshot dir
       omRatisSnapshotDir = OmUtils.createOMDir(
           OzoneManagerRatisServer.getOMRatisSnapshotDirectory(configuration));
+
+      // Before starting ratis server, check if previous installation has
+      // snapshot directory in Ratis storage directory. if yes, move it to
+      // new snapshot directory.
+
+      File snapshotDir = new File(omRatisDirectory, OM_RATIS_SNAPSHOT_DIR);
+
+      if (snapshotDir.isDirectory()) {
+        FileUtils.moveDirectory(snapshotDir.toPath(),
+            omRatisSnapshotDir.toPath());
+      }
 
       if (peerNodes != null && !peerNodes.isEmpty()) {
         this.omSnapshotProvider = new OzoneManagerSnapshotProvider(
             configuration, omRatisSnapshotDir, peerNodes);
       }
     }
+
+    initializeRatisServer();
 
     metrics = OMMetrics.create();
     omClientProtocolMetrics = ProtocolMessageMetrics
@@ -1268,21 +1284,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throw new IOException("Cannot start trash emptier with negative interval."
               + " Set " + FS_TRASH_INTERVAL_KEY + " to a positive value.");
     }
-
-    // configuration for the FS instance that  points to a root OFS uri.
-    // This will ensure that it will cover all volumes and buckets
-    Configuration fsconf = new Configuration();
-    String rootPath = String.format("%s://%s/",
-            OzoneConsts.OZONE_OFS_URI_SCHEME, conf.get(OZONE_OM_ADDRESS_KEY));
-
-    fsconf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
-    FileSystem fs = SecurityUtil.doAsLoginUser(
-            new PrivilegedExceptionAction<FileSystem>() {
-          @Override
-          public FileSystem run() throws IOException {
-            return FileSystem.get(fsconf);
-          }
-        });
+    FileSystem fs = new TrashOzoneFileSystem(this);
     this.emptier = new Thread(new OzoneTrash(fs, conf, this).
       getEmptier(), "Trash Emptier");
     this.emptier.setDaemon(true);
@@ -3338,7 +3340,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     // TODO: We should only return the snpashotIndex to the leader.
     //  Should be fixed after RATIS-586
-    TermIndex newTermIndex = TermIndex.newTermIndex(term, lastAppliedIndex);
+    TermIndex newTermIndex = TermIndex.valueOf(term, lastAppliedIndex);
     return newTermIndex;
   }
 
@@ -3704,8 +3706,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
       // Add volume and user info to DB and cache.
 
-      OmVolumeArgs omVolumeArgs = createS3VolumeInfo(s3VolumeName,
-          transactionID, objectID);
+      OmVolumeArgs omVolumeArgs = createS3VolumeInfo(s3VolumeName, objectID);
 
       String dbUserKey = metadataManager.getUserKey(userName);
       PersistedUserVolumeInfo userVolumeInfo =
@@ -3739,14 +3740,19 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
-  private OmVolumeArgs createS3VolumeInfo(String s3Volume, long transactionID,
+  private OmVolumeArgs createS3VolumeInfo(String s3Volume,
       long objectID) throws IOException {
     String userName = UserGroupInformation.getCurrentUser().getShortUserName();
     long time = Time.now();
 
+    // We need to set the updateID to DEFAULT_OM_UPDATE_ID, because when
+    // acl op on S3v volume during updateID check it will fail if we have a
+    // value with maximum transactionID. Because updateID checks if new
+    // new updateID is greater than previous updateID, otherwise it fails.
+
     OmVolumeArgs.Builder omVolumeArgs = new OmVolumeArgs.Builder()
         .setVolume(s3Volume)
-        .setUpdateID(transactionID)
+        .setUpdateID(DEFAULT_OM_UPDATE_ID)
         .setObjectID(objectID)
         .setCreationTime(time)
         .setModificationTime(time)

@@ -34,7 +34,6 @@ import java.util.Objects;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -118,6 +117,7 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
 import com.google.protobuf.BlockingService;
+import org.apache.commons.lang3.tuple.Pair;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT_DEFAULT;
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.slf4j.Logger;
@@ -1147,11 +1147,13 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-  public Map<String, String> getRuleStatusMetrics() {
-    Map<String, String> map = new HashMap<>();
+  public Map<String, String[]> getSafeModeRuleStatus() {
+    Map<String, String[]> map = new HashMap<>();
     for (Map.Entry<String, Pair<Boolean, String>> entry :
         scmSafeModeManager.getRuleStatus().entrySet()) {
-      map.put(entry.getKey(), entry.getValue().getRight());
+      String[] status =
+          {entry.getValue().getRight(), entry.getValue().getLeft().toString()};
+      map.put(entry.getKey(), status);
     }
     return map;
   }

@@ -81,6 +81,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
 
   private long usedBytes;
 
+  private long usedNamespace;
+
   private long quotaInBytes;
   private long quotaInNamespace;
 
@@ -116,6 +118,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
       String sourceVolume,
       String sourceBucket,
       long usedBytes,
+      long usedNamespace,
       long quotaInBytes,
       long quotaInNamespace) {
     this.volumeName = volumeName;
@@ -132,6 +135,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     this.sourceVolume = sourceVolume;
     this.sourceBucket = sourceBucket;
     this.usedBytes = usedBytes;
+    this.usedNamespace = usedNamespace;
     this.quotaInBytes = quotaInBytes;
     this.quotaInNamespace = quotaInNamespace;
   }
@@ -244,8 +248,16 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     return usedBytes;
   }
 
+  public long getUsedNamespace() {
+    return usedNamespace;
+  }
+
   public void incrUsedBytes(long bytes) {
     this.usedBytes += bytes;
+  }
+
+  public void incrUsedNamespace(long namespaceToUse) {
+    this.usedNamespace += namespaceToUse;
   }
 
   public long getQuotaInBytes() {
@@ -292,6 +304,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
       auditMap.put(OzoneConsts.SOURCE_BUCKET, sourceBucket);
     }
     auditMap.put(OzoneConsts.USED_BYTES, String.valueOf(this.usedBytes));
+    auditMap.put(OzoneConsts.USED_NAMESPACE,
+        String.valueOf(this.usedNamespace));
     return auditMap;
   }
 
@@ -329,6 +343,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         .setAcls(acls)
         .addAllMetadata(metadata)
         .setUsedBytes(usedBytes)
+        .setUsedNamespace(usedNamespace)
         .setQuotaInBytes(quotaInBytes)
         .setQuotaInNamespace(quotaInNamespace);
   }
@@ -351,6 +366,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     private String sourceVolume;
     private String sourceBucket;
     private long usedBytes;
+    private long usedNamespace;
     private long quotaInBytes;
     private long quotaInNamespace;
 
@@ -451,6 +467,11 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
       return this;
     }
 
+    public Builder setUsedNamespace(long quotaUsage) {
+      this.usedNamespace = quotaUsage;
+      return this;
+    }
+
     public Builder setQuotaInBytes(long quota) {
       this.quotaInBytes = quota;
       return this;
@@ -475,7 +496,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
       return new OmBucketInfo(volumeName, bucketName, acls, isVersionEnabled,
           storageType, creationTime, modificationTime, objectID, updateID,
           metadata, bekInfo, sourceVolume, sourceBucket, usedBytes,
-              quotaInBytes, quotaInNamespace);
+          usedNamespace, quotaInBytes, quotaInNamespace);
     }
   }
 
@@ -494,6 +515,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         .setObjectID(objectID)
         .setUpdateID(updateID)
         .setUsedBytes(usedBytes)
+        .setUsedNamespace(usedNamespace)
         .addAllMetadata(KeyValueUtil.toProtobuf(metadata))
         .setQuotaInBytes(quotaInBytes)
         .setQuotaInNamespace(quotaInNamespace);
@@ -526,6 +548,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         .setUsedBytes(bucketInfo.getUsedBytes())
         .setModificationTime(bucketInfo.getModificationTime())
         .setQuotaInBytes(bucketInfo.getQuotaInBytes())
+        .setUsedNamespace(bucketInfo.getUsedNamespace())
         .setQuotaInNamespace(bucketInfo.getQuotaInNamespace());
     if (bucketInfo.hasObjectID()) {
       obib.setObjectID(bucketInfo.getObjectID());
@@ -562,6 +585,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         ", storageType='" + storageType + "'" +
         ", creationTime='" + creationTime + "'" +
         ", usedBytes='" + usedBytes + "'" +
+        ", usedNamespace='" + usedNamespace + "'" +
         ", quotaInBytes='" + quotaInBytes + "'" +
         ", quotaInNamespace='" + quotaInNamespace + '\'' +
         sourceInfo +
@@ -587,6 +611,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         objectID == that.objectID &&
         updateID == that.updateID &&
         usedBytes == that.usedBytes &&
+        usedNamespace == that.usedNamespace &&
         Objects.equals(sourceVolume, that.sourceVolume) &&
         Objects.equals(sourceBucket, that.sourceBucket) &&
         Objects.equals(metadata, that.metadata) &&
@@ -614,6 +639,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         ", updateID=" + updateID +
         ", metadata=" + metadata +
         ", usedBytes=" + usedBytes +
+        ", usedNamespace=" + usedNamespace +
         ", quotaInBytes=" + quotaInBytes +
         ", quotaInNamespace=" + quotaInNamespace +
         '}';

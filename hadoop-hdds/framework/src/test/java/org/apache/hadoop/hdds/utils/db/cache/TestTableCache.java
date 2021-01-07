@@ -26,11 +26,13 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 import com.google.common.base.Optional;
+import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
+import org.slf4j.event.Level;
 
 import static org.junit.Assert.fail;
 
@@ -38,31 +40,35 @@ import static org.junit.Assert.fail;
  * Class tests partial table cache.
  */
 @RunWith(value = Parameterized.class)
-public class TestTableCacheImpl {
-  private TableCacheImpl<CacheKey<String>, CacheValue<String>> tableCache;
+public class TestTableCache {
+  private TableCache<CacheKey<String>, CacheValue<String>> tableCache;
 
-  private final TableCacheImpl.CacheCleanupPolicy cacheCleanupPolicy;
+  private final TableCache.CacheType cacheType;
 
 
   @Parameterized.Parameters
   public static Collection<Object[]> policy() {
     Object[][] params = new Object[][] {
-        {TableCacheImpl.CacheCleanupPolicy.NEVER},
-        {TableCacheImpl.CacheCleanupPolicy.MANUAL}
+        {TableCache.CacheType.FULL_CACHE},
+        {TableCache.CacheType.PARTIAL_CACHE}
     };
     return Arrays.asList(params);
   }
 
-  public TestTableCacheImpl(
-      TableCacheImpl.CacheCleanupPolicy cacheCleanupPolicy) {
-    this.cacheCleanupPolicy = cacheCleanupPolicy;
+  public TestTableCache(
+      TableCache.CacheType cacheType) {
+    GenericTestUtils.setLogLevel(FullTableCache.LOG, Level.DEBUG);
+    this.cacheType = cacheType;
   }
 
 
   @Before
   public void create() {
-    tableCache =
-        new TableCacheImpl<>(cacheCleanupPolicy);
+    if (cacheType == TableCache.CacheType.FULL_CACHE) {
+      tableCache = new FullTableCache<>();
+    } else {
+      tableCache = new PartialTableCache<>();
+    }
   }
   @Test
   public void testPartialTableCache() {
@@ -119,7 +125,7 @@ public class TestTableCacheImpl {
     final int count = totalCount;
 
     // If cleanup policy is manual entries should have been removed.
-    if (cacheCleanupPolicy == TableCacheImpl.CacheCleanupPolicy.MANUAL) {
+    if (cacheType == TableCache.CacheType.PARTIAL_CACHE) {
       Assert.assertEquals(count - epochs.size(), tableCache.size());
 
       // Check remaining entries exist or not and deleted entries does not
@@ -178,14 +184,13 @@ public class TestTableCacheImpl {
     epochs.add(3L);
     epochs.add(4L);
 
-    if (cacheCleanupPolicy == cacheCleanupPolicy.MANUAL) {
+    if (cacheType == TableCache.CacheType.PARTIAL_CACHE) {
 
       tableCache.evictCache(epochs);
 
       Assert.assertEquals(0, tableCache.size());
 
-      // Epoch entries which are overrided still exist.
-      Assert.assertEquals(2, tableCache.getEpochEntrySet().size());
+      Assert.assertEquals(0, tableCache.getEpochEntrySet().size());
     }
 
     // Add a new entry.
@@ -194,7 +199,7 @@ public class TestTableCacheImpl {
 
     epochs = new ArrayList<>();
     epochs.add(5L);
-    if (cacheCleanupPolicy == cacheCleanupPolicy.MANUAL) {
+    if (cacheType == TableCache.CacheType.PARTIAL_CACHE) {
       tableCache.evictCache(epochs);
 
       Assert.assertEquals(0, tableCache.size());
@@ -252,21 +257,19 @@ public class TestTableCacheImpl {
     epochs.add(6L);
 
 
-    if (cacheCleanupPolicy == cacheCleanupPolicy.MANUAL) {
+    if (cacheType == TableCache.CacheType.PARTIAL_CACHE) {
       tableCache.evictCache(epochs);
 
       Assert.assertEquals(0, tableCache.size());
 
-      // Epoch entries which are overrided still exist.
-      Assert.assertEquals(4, tableCache.getEpochEntrySet().size());
+      Assert.assertEquals(0, tableCache.getEpochEntrySet().size());
     } else {
       tableCache.evictCache(epochs);
 
       Assert.assertEquals(1, tableCache.size());
 
-      // Epoch entries which are overrided still exist and one not deleted As
-      // this cache clean up policy is NEVER.
-      Assert.assertEquals(5, tableCache.getEpochEntrySet().size());
+      // Epoch entries which are overrided also will be cleaned up.
+      Assert.assertEquals(0, tableCache.getEpochEntrySet().size());
     }
 
     // Add a new entry, now old override entries will be cleaned up.
@@ -276,7 +279,7 @@ public class TestTableCacheImpl {
     epochs = new ArrayList<>();
     epochs.add(7L);
 
-    if (cacheCleanupPolicy == cacheCleanupPolicy.MANUAL) {
+    if (cacheType == TableCache.CacheType.PARTIAL_CACHE) {
       tableCache.evictCache(epochs);
 
       Assert.assertEquals(0, tableCache.size());
@@ -289,9 +292,9 @@ public class TestTableCacheImpl {
       // 2 entries will be in cache, as 2 are not deleted.
       Assert.assertEquals(2, tableCache.size());
 
-      // Epoch entries which are not marked for delete will exist override
-      // entries will be cleaned up.
-      Assert.assertEquals(2, tableCache.getEpochEntrySet().size());
+      // Epoch entries which are not marked for delete will also be cleaned up.
+      // As they are override entries in full cache.
+      Assert.assertEquals(0, tableCache.getEpochEntrySet().size());
     }
 
 
@@ -337,7 +340,7 @@ public class TestTableCacheImpl {
 
     totalCount += value;
 
-    if (cacheCleanupPolicy == TableCacheImpl.CacheCleanupPolicy.MANUAL) {
+    if (cacheType == TableCache.CacheType.PARTIAL_CACHE) {
       int deleted = 5;
 
       // cleanup first 5 entires
@@ -377,6 +380,95 @@ public class TestTableCacheImpl {
       Assert.assertEquals(totalCount, tableCache.size());
     }
 
+
+  }
+
+  @Test
+  public void testTableCache() {
+
+    // In non-HA epoch entries might be out of order.
+    // Scenario is like create vol, set vol, set vol, delete vol
+    tableCache.put(new CacheKey<>(Long.toString(0)),
+        new CacheValue<>(Optional.of(Long.toString(0)), 0));
+    tableCache.put(new CacheKey<>(Long.toString(0)),
+        new CacheValue<>(Optional.of(Long.toString(1)), 1));
+    tableCache.put(new CacheKey<>(Long.toString(0)),
+        new CacheValue<>(Optional.of(Long.toString(2)), 3));
+
+    tableCache.put(new CacheKey<>(Long.toString(0)),
+        new CacheValue<>(Optional.absent(), 2));
+
+    List<Long> epochs = new ArrayList<>();
+    epochs.add(0L);
+    epochs.add(1L);
+    epochs.add(2L);
+    epochs.add(3L);
+
+    tableCache.evictCache(epochs);
+
+    Assert.assertTrue(tableCache.size() == 0);
+    Assert.assertTrue(tableCache.getEpochEntrySet().size() == 0);
+  }
+
+
+  @Test
+  public void testTableCacheWithNonConsecutiveEpochList() {
+
+    // In non-HA epoch entries might be out of order.
+    tableCache.put(new CacheKey<>(Long.toString(0)),
+        new CacheValue<>(Optional.of(Long.toString(0)), 0));
+    tableCache.put(new CacheKey<>(Long.toString(0)),
+        new CacheValue<>(Optional.of(Long.toString(1)), 1));
+    tableCache.put(new CacheKey<>(Long.toString(0)),
+        new CacheValue<>(Optional.of(Long.toString(3)), 3));
+
+    tableCache.put(new CacheKey<>(Long.toString(0)),
+          new CacheValue<>(Optional.of(Long.toString(2)), 2));
+
+    tableCache.put(new CacheKey<>(Long.toString(1)),
+        new CacheValue<>(Optional.of(Long.toString(1)), 4));
+
+    List<Long> epochs = new ArrayList<>();
+    epochs.add(0L);
+    epochs.add(1L);
+    epochs.add(3L);
+
+    tableCache.evictCache(epochs);
+
+    Assert.assertTrue(tableCache.size() == 2);
+    Assert.assertTrue(tableCache.getEpochEntrySet().size() == 2);
+
+    Assert.assertNotNull(tableCache.get(new CacheKey<>(Long.toString(0))));
+    Assert.assertEquals(2,
+        tableCache.get(new CacheKey<>(Long.toString(0))).getEpoch());
+
+    Assert.assertNotNull(tableCache.get(new CacheKey<>(Long.toString(1))));
+    Assert.assertEquals(4,
+        tableCache.get(new CacheKey<>(Long.toString(1))).getEpoch());
+
+    // now evict 2,4
+    epochs = new ArrayList<>();
+    epochs.add(2L);
+    epochs.add(4L);
+
+    tableCache.evictCache(epochs);
+
+    if(cacheType == TableCache.CacheType.PARTIAL_CACHE) {
+      Assert.assertTrue(tableCache.size() == 0);
+      Assert.assertTrue(tableCache.getEpochEntrySet().size() == 0);
+    } else {
+      Assert.assertTrue(tableCache.size() == 2);
+      Assert.assertTrue(tableCache.getEpochEntrySet().size() == 0);
+
+      // Entries should exist, as the entries are not delete entries
+      Assert.assertNotNull(tableCache.get(new CacheKey<>(Long.toString(0))));
+      Assert.assertEquals(2,
+          tableCache.get(new CacheKey<>(Long.toString(0))).getEpoch());
+
+      Assert.assertNotNull(tableCache.get(new CacheKey<>(Long.toString(1))));
+      Assert.assertEquals(4,
+          tableCache.get(new CacheKey<>(Long.toString(1))).getEpoch());
+    }
 
   }
 

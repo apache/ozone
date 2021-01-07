@@ -41,7 +41,7 @@ Execute PI calculation
 
 Execute WordCount
                     ${exampleJar}    Find example jar
-                    ${random}        Generate Random String  2   [NUMBERS]
+    ${random} =     Generate Random String
     ${root} =       Format FS URL    ${SCHEME}    ${volume}    ${bucket}
     ${dir} =        Format FS URL    ${SCHEME}    ${volume}    ${bucket}   input/
     ${result} =     Format FS URL    ${SCHEME}    ${volume}    ${bucket}   wordcount-${random}.txt

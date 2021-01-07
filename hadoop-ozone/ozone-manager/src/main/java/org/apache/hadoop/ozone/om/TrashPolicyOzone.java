@@ -24,15 +24,20 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Collection;
 import java.util.Date;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.TrashPolicyDefault;
+import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.fs.FileAlreadyExistsException;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.conf.OMClientConfig;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -98,8 +103,10 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
 
   @Override
   public Runnable getEmptier() throws IOException {
-    return new TrashPolicyOzone.Emptier(configuration, emptierInterval);
+    return new TrashPolicyOzone.Emptier((OzoneConfiguration)configuration,
+        emptierInterval);
   }
+
 
   protected class Emptier implements Runnable {
 
@@ -107,7 +114,10 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
     // same as checkpoint interval
     private long emptierInterval;
 
-    Emptier(Configuration conf, long emptierInterval) throws IOException {
+
+    private ThreadPoolExecutor executor;
+
+    Emptier(OzoneConfiguration conf, long emptierInterval) throws IOException {
       this.conf = conf;
       this.emptierInterval = emptierInterval;
       if (emptierInterval > deletionInterval || emptierInterval <= 0) {
@@ -118,24 +128,31 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
             " minutes that is used for deletion instead");
         this.emptierInterval = deletionInterval;
       }
+      int trashEmptierCorePoolSize = conf.getObject(OMClientConfig.class)
+          .getTrashEmptierPoolSize();
       LOG.info("Ozone Manager trash configuration: Deletion interval = "
           + (deletionInterval / MSECS_PER_MINUTE)
           + " minutes, Emptier interval = "
           + (this.emptierInterval / MSECS_PER_MINUTE) + " minutes.");
+      executor = new ThreadPoolExecutor(trashEmptierCorePoolSize,
+          trashEmptierCorePoolSize, 1,
+          TimeUnit.SECONDS, new ArrayBlockingQueue<>(1024),
+          new ThreadPoolExecutor.CallerRunsPolicy());
     }
 
     @Override
     public void run() {
-      // if this is not the leader node,don't run the emptier
-      if (emptierInterval == 0 || !om.isLeaderReady()) {
+      if (emptierInterval == 0) {
         return;                                   // trash disabled
       }
       long now, end;
       while (true) {
         now = Time.now();
         end = ceiling(now, emptierInterval);
-        try {                                     // sleep for interval
+        try {
+          // sleep for interval
           Thread.sleep(end - now);
+          // if not leader, thread will always be sleeping
           if (!om.isLeaderReady()){
             continue;
           }
@@ -147,20 +164,24 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
           now = Time.now();
           if (now >= end) {
             Collection<FileStatus> trashRoots;
-            trashRoots = fs.getTrashRoots(true);      // list all trash dirs
-
-            for (FileStatus trashRoot : trashRoots) {   // dump each trash
+            trashRoots = fs.getTrashRoots(true); // list all trash dirs
+            LOG.debug("Trash root Size: " + trashRoots.size());
+            for (FileStatus trashRoot : trashRoots) {  // dump each trash
+              LOG.info("Trashroot:" + trashRoot.getPath().toString());
               if (!trashRoot.isDirectory()) {
                 continue;
               }
-              try {
-                TrashPolicyOzone trash = new TrashPolicyOzone(fs, conf, om);
-                trash.deleteCheckpoint(trashRoot.getPath(), false);
-                trash.createCheckpoint(trashRoot.getPath(), new Date(now));
-              } catch (IOException e) {
-                LOG.warn("Trash caught: "+e+". Skipping " +
-                    trashRoot.getPath() + ".");
-              }
+              TrashPolicyOzone trash = new TrashPolicyOzone(fs, conf, om);
+              Runnable task = ()->{
+                try {
+                  trash.deleteCheckpoint(trashRoot.getPath(), false);
+                  trash.createCheckpoint(trashRoot.getPath(),
+                      new Date(Time.now()));
+                } catch (Exception e) {
+                  LOG.info("Unable to checkpoint");
+                }
+              };
+              executor.submit(task);
             }
           }
         } catch (Exception e) {
@@ -171,6 +192,13 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
         fs.close();
       } catch(IOException e) {
         LOG.warn("Trash cannot close FileSystem: ", e);
+      } finally {
+        executor.shutdown();
+        try {
+          executor.awaitTermination(60, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+          LOG.error("Error attempting to shutdown");
+        }
       }
     }
 
