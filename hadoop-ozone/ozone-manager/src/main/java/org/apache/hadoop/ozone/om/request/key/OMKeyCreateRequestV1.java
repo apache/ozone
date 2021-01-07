@@ -133,8 +133,7 @@ public class OMKeyCreateRequestV1 extends OMKeyCreateRequest {
         throw new OMException("Cannot write to " +
                 "directory. createIntermediateDirs behavior is enabled and " +
                 "hence / has special interpretation: " + keyName, NOT_A_FILE);
-      } else
-      if (pathInfoV1.getDirectoryResult() == FILE_EXISTS_IN_GIVENPATH) {
+      } else if (pathInfoV1.getDirectoryResult() == FILE_EXISTS_IN_GIVENPATH) {
         throw new OMException("Can not create file: " + keyName +
                 " as there is already file in the given path", NOT_A_FILE);
       }
