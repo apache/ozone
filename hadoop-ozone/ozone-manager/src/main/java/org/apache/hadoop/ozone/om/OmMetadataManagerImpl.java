@@ -731,6 +731,16 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     return result;
   }
 
+  public Iterator<Map.Entry<CacheKey<String>, CacheValue<OmBucketInfo>>>
+      getBucketIterator(){
+    return bucketTable.cacheIterator();
+  }
+
+  public TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
+      getKeyIterator(){
+    return keyTable.iterator();
+  }
+
   @Override
   public List<OmKeyInfo> listKeys(String volumeName, String bucketName,
       String startKey, String keyPrefix, int maxKeys) throws IOException {
