@@ -82,9 +82,11 @@ public class SCMHAInvocationHandler implements InvocationHandler {
    */
   private Object invokeRatis(Method method, Object[] args)
       throws Exception {
-    LOG.trace("Invoking method {} on target {}", method, ratisHandler);
+    long startTime = Time.monotonicNowNanos();
     final SCMRatisResponse response =  ratisHandler.submitRequest(
         SCMRatisRequest.of(requestType, method.getName(), args));
+    LOG.info("Invoking method {} on target {}, cost {}us",
+        method, ratisHandler, (Time.monotonicNowNanos() - startTime) / 1000.0);
     if (response.isSuccess()) {
       return response.getResult();
     }
