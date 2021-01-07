@@ -21,7 +21,7 @@ package org.apache.hadoop.ozone.om.helpers;
 import com.google.protobuf.ByteString;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos;
 
 
 /**
@@ -35,15 +35,15 @@ public final class TestInstanceHelper {
     super();
   }
 
-  public static OzoneManagerProtocolProtos.OzoneAclInfo buildTestOzoneAclInfo(
+  public static OzoneManagerStorageProtos.OzoneAclInfo buildTestOzoneAclInfo(
       String aclString){
     OzoneAcl oacl = OzoneAcl.parseAcl(aclString);
     ByteString rights = ByteString.copyFrom(oacl.getAclBitSet().toByteArray());
-    return OzoneManagerProtocolProtos.OzoneAclInfo.newBuilder()
-        .setType(OzoneManagerProtocolProtos.OzoneAclInfo.OzoneAclType.USER)
+    return OzoneManagerStorageProtos.OzoneAclInfo.newBuilder()
+        .setType(OzoneManagerStorageProtos.OzoneAclInfo.OzoneAclType.USER)
         .setName(oacl.getName())
         .setRights(rights)
-        .setAclScope(OzoneManagerProtocolProtos.
+        .setAclScope(OzoneManagerStorageProtos.
             OzoneAclInfo.OzoneAclScope.ACCESS)
         .build();
   }
@@ -56,9 +56,9 @@ public final class TestInstanceHelper {
         .build();
   }
 
-  public static OzoneManagerProtocolProtos.PrefixInfo getDefaultTestPrefixInfo(
+  public static OzoneManagerStorageProtos.PersistedPrefixInfo getDefaultTestPrefixInfo(
       String name, String aclString, HddsProtos.KeyValue metadata){
-    return OzoneManagerProtocolProtos.PrefixInfo.newBuilder()
+    return OzoneManagerStorageProtos.PersistedPrefixInfo.newBuilder()
         .setName(name)
         .addAcls(buildTestOzoneAclInfo(aclString))
         .addMetadata(metadata)

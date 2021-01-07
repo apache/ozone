@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.junit.Assert;
 import org.junit.Test;
@@ -79,7 +79,7 @@ public class TestOmPrefixInfo {
     String metaval = "metaval";
     HddsProtos.KeyValue metadata = TestInstanceHelper
         .getDefaultTestMetadata(metakey, metaval);
-    OzoneManagerProtocolProtos.PrefixInfo prefixInfo =
+    OzoneManagerStorageProtos.PersistedPrefixInfo prefixInfo =
         TestInstanceHelper.getDefaultTestPrefixInfo(prefixInfoPath,
             aclString, metadata);
 
@@ -100,7 +100,7 @@ public class TestOmPrefixInfo {
         username, IAccessAuthorizer.ACLType.WRITE,
         ACCESS);
     omPrefixInfo.getMetadata().put("key", "value");
-    OzoneManagerProtocolProtos.PrefixInfo pi = omPrefixInfo.getProtobuf();
+    OzoneManagerStorageProtos.PersistedPrefixInfo pi = omPrefixInfo.getProtobuf();
     Assert.assertEquals(testPath, pi.getName());
     Assert.assertEquals(1, pi.getAclsCount());
     Assert.assertEquals(1, pi.getMetadataCount());
