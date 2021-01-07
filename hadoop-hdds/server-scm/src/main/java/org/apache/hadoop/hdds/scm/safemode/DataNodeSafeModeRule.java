@@ -82,7 +82,8 @@ public class DataNodeSafeModeRule extends
 
   @Override
   public String getStatusText() {
-    return "registeredDns " + this.registeredDns + " >= requiredDns "
-        + this.requiredDns;
+    return String
+        .format("registered datanodes (=%d) >= required datanodes (=%d)",
+            this.registeredDns, this.requiredDns);
   }
 }

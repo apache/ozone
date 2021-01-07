@@ -31,7 +31,6 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.security.KeyPair;
 import java.security.PrivateKey;
-import java.security.PrivilegedExceptionAction;
 import java.security.PublicKey;
 import java.security.cert.CertificateException;
 import java.util.ArrayList;
@@ -1285,21 +1284,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throw new IOException("Cannot start trash emptier with negative interval."
               + " Set " + FS_TRASH_INTERVAL_KEY + " to a positive value.");
     }
-
-    // configuration for the FS instance that  points to a root OFS uri.
-    // This will ensure that it will cover all volumes and buckets
-    Configuration fsconf = new Configuration();
-    String rootPath = String.format("%s://%s/",
-            OzoneConsts.OZONE_OFS_URI_SCHEME, conf.get(OZONE_OM_ADDRESS_KEY));
-
-    fsconf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
-    FileSystem fs = SecurityUtil.doAsLoginUser(
-            new PrivilegedExceptionAction<FileSystem>() {
-          @Override
-          public FileSystem run() throws IOException {
-            return FileSystem.get(fsconf);
-          }
-        });
+    FileSystem fs = new TrashOzoneFileSystem(this);
     this.emptier = new Thread(new OzoneTrash(fs, conf, this).
       getEmptier(), "Trash Emptier");
     this.emptier.setDaemon(true);
