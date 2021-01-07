@@ -1595,7 +1595,6 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     OMRequest omRequest = createOMRequest(Type.CancelPrepare)
         .setCancelPrepareRequest(cancelPrepareRequest).build();
 
-    // Cancel prepare response has no information for the caller.
     return handleError(submitRequest(omRequest)).getCancelPrepareResponse();
   }
 

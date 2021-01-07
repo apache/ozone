@@ -27,7 +27,7 @@ import java.io.IOException;
 /**
  * Response for cancel prepare.
  */
-@CleanupTableInfo
+@CleanupTableInfo()
 public class OMCancelPrepareResponse extends OMClientResponse {
   public OMCancelPrepareResponse(
       OzoneManagerProtocolProtos.OMResponse omResponse) {
