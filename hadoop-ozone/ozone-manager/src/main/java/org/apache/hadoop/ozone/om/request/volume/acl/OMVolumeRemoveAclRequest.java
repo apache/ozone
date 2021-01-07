@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.om.response.volume.OMVolumeAclOpResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
@@ -70,6 +71,7 @@ public class OMVolumeRemoveAclRequest extends OMVolumeAclRequest {
 
   private List<OzoneAcl> ozoneAcls;
   private String volumeName;
+  private OzoneObj obj;
 
   public OMVolumeRemoveAclRequest(OMRequest omRequest) {
     super(omRequest, volumeRemoveAclOp);
@@ -78,7 +80,8 @@ public class OMVolumeRemoveAclRequest extends OMVolumeAclRequest {
     Preconditions.checkNotNull(removeAclRequest);
     ozoneAcls = Lists.newArrayList(
         OzoneAcl.fromProtobuf(removeAclRequest.getAcl()));
-    volumeName = removeAclRequest.getObj().getPath().substring(1);
+    obj = OzoneObjInfo.fromProtobuf(removeAclRequest.getObj());
+    volumeName = obj.getPath().substring(1);
   }
 
   @Override
@@ -96,9 +99,8 @@ public class OMVolumeRemoveAclRequest extends OMVolumeAclRequest {
   }
 
   @Override
-  OzoneObjInfo getObjectInfo() {
-    return OzoneObjInfo.fromProtobuf(
-        getOmRequest().getRemoveAclRequest().getObj());
+  OzoneObj getObject() {
+    return obj;
   }
 
   @Override

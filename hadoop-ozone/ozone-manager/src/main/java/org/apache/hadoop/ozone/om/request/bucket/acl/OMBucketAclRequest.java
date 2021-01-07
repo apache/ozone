@@ -149,7 +149,7 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
       }
     }
 
-    OzoneObjInfo obj = getObjectInfo();
+    OzoneObj obj = getObject();
     Map<String, String> auditMap = obj.toAuditMap();
     if (ozoneAcls != null) {
       auditMap.put(OzoneConsts.ACL, ozoneAcls.toString());
@@ -178,7 +178,7 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
    * Get the Bucket object Info from the request.
    * @return OzoneObjInfo
    */
-  abstract OzoneObjInfo getObjectInfo();
+  abstract OzoneObj getObject();
 
   // TODO: Finer grain metrics can be moved to these callbacks. They can also
   // be abstracted into separate interfaces in future.

@@ -28,6 +28,7 @@ import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
@@ -55,6 +56,7 @@ public class OMBucketSetAclRequest extends OMBucketAclRequest {
         OmBucketInfo > bucketAddAclOp;
   private String path;
   private List<OzoneAcl> ozoneAcls;
+  private OzoneObj obj;
 
   static {
     bucketAddAclOp = (ozoneAcls, omBucketInfo) -> {
@@ -79,7 +81,8 @@ public class OMBucketSetAclRequest extends OMBucketAclRequest {
     super(omRequest, bucketAddAclOp);
     OzoneManagerProtocolProtos.SetAclRequest setAclRequest =
         getOmRequest().getSetAclRequest();
-    path = setAclRequest.getObj().getPath();
+    obj = OzoneObjInfo.fromProtobuf(setAclRequest.getObj());
+    path = obj.getPath();
     ozoneAcls = new ArrayList<>();
     setAclRequest.getAclList().forEach(aclInfo ->
         ozoneAcls.add(OzoneAcl.fromProtobuf(aclInfo)));
@@ -96,9 +99,8 @@ public class OMBucketSetAclRequest extends OMBucketAclRequest {
   }
 
   @Override
-  OzoneObjInfo getObjectInfo() {
-    return OzoneObjInfo.fromProtobuf(
-        getOmRequest().getSetAclRequest().getObj());
+  OzoneObj getObject() {
+    return obj;
   }
 
   @Override
