@@ -29,23 +29,24 @@ import org.junit.Test;
 
 import java.util.UUID;
 
+/**
+ * Unit testing of cancel prepare request. Cancel prepare response does not
+ * perform an action, so it has no unit testing.
+ */
 public class TestOMCancelPrepareRequest extends TestOMKeyRequest {
   private static final long LOG_INDEX = 1;
 
   @Test
-  public void testCancelPrepareWhenUnprepared() throws Exception {
-    assertUnprepared();
+  public void testCancelPrepare() throws Exception {
+    assertNotPrepared();
     ozoneManager.getPrepareState().finishPrepare(LOG_INDEX);
     assertPrepared(LOG_INDEX);
     submitCancelPrepareRequest();
-    assertUnprepared();
-  }
+    assertNotPrepared();
 
-  @Test
-  public void testCancelPrepareWhenPrepared() throws Exception {
-    assertUnprepared();
+    // Another cancel prepare should be able to be submitted without error.
     submitCancelPrepareRequest();
-    assertUnprepared();
+    assertNotPrepared();
   }
 
   private void assertPrepared(long logIndex) {
@@ -58,7 +59,7 @@ public class TestOMCancelPrepareRequest extends TestOMKeyRequest {
     Assert.assertFalse(prepareState.requestAllowed(Type.CreateVolume));
   }
 
-  private void assertUnprepared() {
+  private void assertNotPrepared() {
     OzoneManagerPrepareState prepareState = ozoneManager.getPrepareState();
     OzoneManagerPrepareState.State state = prepareState.getState();
 

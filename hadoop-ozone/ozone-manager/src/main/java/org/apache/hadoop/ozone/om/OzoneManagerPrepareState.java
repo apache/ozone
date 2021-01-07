@@ -199,8 +199,8 @@ public final class OzoneManagerPrepareState {
     boolean requestAllowed = true;
 
     if (prepareGateEnabled) {
-      // TODO: Also return true for cancel prepare when it is implemented.
-      requestAllowed = (requestType == Type.Prepare);
+      requestAllowed =
+          (requestType == Type.Prepare) || (requestType == Type.CancelPrepare);
     }
 
     return requestAllowed;
