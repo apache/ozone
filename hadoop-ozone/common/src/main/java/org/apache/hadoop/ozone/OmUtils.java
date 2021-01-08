@@ -296,6 +296,7 @@ public final class OmUtils {
     case RecoverTrash:
     case FinalizeUpgrade:
     case Prepare:
+    case CancelPrepare:
     case DeleteOpenKeys:
       return false;
     default:
