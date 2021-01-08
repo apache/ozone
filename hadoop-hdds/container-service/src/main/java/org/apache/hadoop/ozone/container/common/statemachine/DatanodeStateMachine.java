@@ -56,6 +56,7 @@ import org.apache.hadoop.ozone.container.replication.ContainerReplicator;
 import org.apache.hadoop.ozone.container.replication.DownloadAndImportReplicator;
 import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
 import org.apache.hadoop.ozone.container.replication.SimpleContainerDownloader;
+import org.apache.hadoop.ozone.container.upgrade.DataNodeLayoutActionCatalog.DataNodeLayoutAction;
 import org.apache.hadoop.ozone.container.upgrade.DataNodeLayoutVersionManager;
 import org.apache.hadoop.ozone.container.upgrade.DataNodeUpgradeFinalizer;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
@@ -122,6 +123,8 @@ public class DatanodeStateMachine implements Closeable {
     this.hddsDatanodeStopService = hddsDatanodeStopService;
     this.conf = conf;
     this.datanodeDetails = datanodeDetails;
+
+    loadDataNodeUpgradeActions();
     dataNodeStorageConfig = new DataNodeStorageConfig(conf,
         datanodeDetails.getUuidString());
     if (dataNodeStorageConfig.getState() != INITIALIZED) {
@@ -622,5 +625,14 @@ public class DatanodeStateMachine implements Closeable {
   public StatusAndMessages finalizeUpgrade()
       throws IOException{
     return upgradeFinalizer.finalize(datanodeDetails.getUuidString(), this);
+  }
+
+  private void loadDataNodeUpgradeActions() {
+    // we just need to iterate through the enum list to load
+    // the actions.
+    for (DataNodeLayoutAction action : DataNodeLayoutAction.values() ) {
+      LOG.info("Loading datanode action for {}",
+          action.getHddsFeature().description());
+    }
   }
 }

@@ -74,6 +74,7 @@ public class FinalizeNewLayoutVersionCommandHandler implements CommandHandler {
             FINALIZATION_REQUIRED) {
           // SCM will keep sending Finalize command until datanode mlv == slv
           // we need to avoid multiple invocations of finalizeUpgrade.
+          LOG.info("Finalize Upgrade called!");
           dsm.finalizeUpgrade();
         }
       }

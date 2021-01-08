@@ -24,8 +24,6 @@ import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachin
 /**
  * Upgrade Action for DataNode which takes in a 'DataNodeStateMachine' instance.
  */
-public class DataNodeUpgradeAction extends
+public interface DataNodeUpgradeAction extends
     HDDSUpgradeAction<DatanodeStateMachine> {
-  public void executeAction(DatanodeStateMachine arg) throws Exception {
-  }
 }

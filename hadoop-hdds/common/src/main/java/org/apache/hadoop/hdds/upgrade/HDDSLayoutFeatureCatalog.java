@@ -52,12 +52,13 @@ public class HDDSLayoutFeatureCatalog {
       this.description = description;
     }
 
-    HDDSLayoutFeature(final int layoutVersion, String description,
-                      Optional<? extends HDDSUpgradeAction> scmAction,
-                      Optional<? extends HDDSUpgradeAction> datanodeAction) {
-      this.layoutVersion = layoutVersion;
-      this.description = description;
+    public void setSCMUpgradeAction(Optional<? extends HDDSUpgradeAction>
+                                        scmAction) {
       this.scmUpgradeAction = scmAction;
+    }
+
+    public void setDataNodeUpgradeAction(Optional<? extends HDDSUpgradeAction>
+                                             datanodeAction) {
       this.datanodeUpgradeAction = datanodeAction;
     }
 
