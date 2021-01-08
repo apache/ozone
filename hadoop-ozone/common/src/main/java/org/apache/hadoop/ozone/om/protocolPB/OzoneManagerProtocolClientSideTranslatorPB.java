@@ -1587,6 +1587,17 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     return prepareStatusResponse;
   }
 
+  @Override
+  public CancelPrepareResponse cancelOzoneManagerPrepare() throws IOException {
+    CancelPrepareRequest cancelPrepareRequest =
+        CancelPrepareRequest.newBuilder().build();
+
+    OMRequest omRequest = createOMRequest(Type.CancelPrepare)
+        .setCancelPrepareRequest(cancelPrepareRequest).build();
+
+    return handleError(submitRequest(omRequest)).getCancelPrepareResponse();
+  }
+
   @VisibleForTesting
   public OmTransport getTransport() {
     return transport;
