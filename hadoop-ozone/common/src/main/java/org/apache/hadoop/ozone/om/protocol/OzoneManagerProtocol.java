@@ -51,6 +51,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelPrepareResponse;
 import org.apache.hadoop.ozone.security.OzoneDelegationTokenSelector;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
@@ -617,5 +618,14 @@ public interface OzoneManagerProtocol
         .setCurrentTxnIndex(-1)
         .setStatus(PrepareStatus.PREPARE_NOT_STARTED)
         .build();
+  }
+
+  /**
+   * Cancel the prepare state of the Ozone Manager. If ozone manager is not
+   * prepared, has no effect.
+   * @throws IOException on exception.
+   */
+  default CancelPrepareResponse cancelOzoneManagerPrepare() throws IOException {
+    return CancelPrepareResponse.newBuilder().build();
   }
 }
