@@ -780,6 +780,8 @@
   <value>2</value>
   <tag>OZONE, SCM, PIPELINE</tag>
   <description>Max number of pipelines per datanode can be engaged in.
+    Setting the value to 0 means the pipeline limit per dn will be determined
+    by the no of metadata volumes reported per dn.
   </description>
   </property>
   <property>
@@ -807,7 +809,7 @@
   <property>
     <name>ozone.scm.pipeline.leader-choose.policy</name>
     <value>
-      org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms.DefaultLeaderChoosePolicy
+      org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms.MinLeaderCountChoosePolicy
     </value>
     <tag>OZONE, SCM, PIPELINE</tag>
     <description>

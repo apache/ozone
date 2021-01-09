@@ -102,6 +102,7 @@ public class TestDeleteWithSlowFollower {
 
     conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 200,
         TimeUnit.MILLISECONDS);
+    conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 1);
     // Make the stale, dead and server failure timeout higher so that a dead
     // node is not detecte at SCM as well as the pipeline close action
     // never gets initiated early at Datanode in the test.
