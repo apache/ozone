@@ -97,9 +97,12 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
         continue;
       }
       if (pipeline != null &&
+            // single node pipeline are not accounted for while determining
+            // the pipeline limit for dn
+            pipeline.getType() == HddsProtos.ReplicationType.RATIS &&
+            (pipeline.getFactor() == HddsProtos.ReplicationFactor.ONE ||
           pipeline.getFactor().getNumber() == nodesRequired &&
-          pipeline.getType() == HddsProtos.ReplicationType.RATIS &&
-          pipeline.getPipelineState() == Pipeline.PipelineState.CLOSED) {
+          pipeline.getPipelineState() == Pipeline.PipelineState.CLOSED)) {
         pipelineNumDeductable++;
       }
     }
