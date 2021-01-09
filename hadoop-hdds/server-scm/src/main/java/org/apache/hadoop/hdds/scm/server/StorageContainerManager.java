@@ -1287,8 +1287,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private void loadSCMUpgradeActions() {
     // we just need to iterate through the enum list to load
     // the actions.
-    for (SCMLayoutAction action :
-        SCMLayoutAction.values() ) {
+    for (SCMLayoutAction action : SCMLayoutAction.values()) {
       LOG.info("Loading datanode action for {}",
           action.getHddsFeature().description());
     }

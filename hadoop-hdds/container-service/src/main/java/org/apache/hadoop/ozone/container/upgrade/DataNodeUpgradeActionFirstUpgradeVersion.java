@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.ozone.container.upgrade;
 
-import static java.lang.Thread.sleep;
-
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

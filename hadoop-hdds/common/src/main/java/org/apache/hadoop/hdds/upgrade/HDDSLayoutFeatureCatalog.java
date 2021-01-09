@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.upgrade;
 
 import java.util.Optional;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 
@@ -52,11 +53,13 @@ public class HDDSLayoutFeatureCatalog {
       this.description = description;
     }
 
+    @SuppressFBWarnings("ME_ENUM_FIELD_SETTER")
     public void setSCMUpgradeAction(Optional<? extends HDDSUpgradeAction>
                                         scmAction) {
       this.scmUpgradeAction = scmAction;
     }
 
+    @SuppressFBWarnings("ME_ENUM_FIELD_SETTER")
     public void setDataNodeUpgradeAction(Optional<? extends HDDSUpgradeAction>
                                              datanodeAction) {
       this.datanodeUpgradeAction = datanodeAction;

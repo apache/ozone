@@ -630,7 +630,7 @@ public class DatanodeStateMachine implements Closeable {
   private void loadDataNodeUpgradeActions() {
     // we just need to iterate through the enum list to load
     // the actions.
-    for (DataNodeLayoutAction action : DataNodeLayoutAction.values() ) {
+    for (DataNodeLayoutAction action : DataNodeLayoutAction.values()) {
       LOG.info("Loading datanode action for {}",
           action.getHddsFeature().description());
     }

@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.hdds.scm.server.upgrade; 
 
-import static java.lang.Thread.sleep;
-
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
