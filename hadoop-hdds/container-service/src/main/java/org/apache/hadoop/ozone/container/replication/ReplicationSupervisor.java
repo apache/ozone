@@ -44,6 +44,7 @@ public class ReplicationSupervisor {
   private final ContainerSet containerSet;
   private final ContainerReplicator replicator;
   private final ExecutorService executor;
+
   private final AtomicLong requestCounter = new AtomicLong();
   private final AtomicLong successCounter = new AtomicLong();
   private final AtomicLong failureCounter = new AtomicLong();
@@ -116,10 +117,10 @@ public class ReplicationSupervisor {
     return containersInFlight.size();
   }
 
-  private final class TaskRunner implements Runnable {
+  public final class TaskRunner implements Runnable {
     private final ReplicationTask task;
 
-    private TaskRunner(ReplicationTask task) {
+    public TaskRunner(ReplicationTask task) {
       this.task = task;
     }
 
