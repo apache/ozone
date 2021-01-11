@@ -657,9 +657,11 @@ public class KeyManagerImpl implements KeyManager {
         bucketName);
     OmKeyInfo value = null;
     try {
-      String keyBytes = metadataManager.getOzoneKey(
-          volumeName, bucketName, keyName);
-      value = metadataManager.getKeyTable().get(keyBytes);
+      if (OzoneManagerRatisUtils.isOmLayoutVersionV1()) {
+        value = getOmKeyInfoV1(volumeName, bucketName, keyName);
+      } else {
+        value = getOmKeyInfo(volumeName, bucketName, keyName);
+      }
     } catch (IOException ex) {
       if (ex instanceof OMException) {
         throw ex;
@@ -694,6 +696,28 @@ public class KeyManagerImpl implements KeyManager {
       sortDatanodes(clientAddress, value);
     }
     return value;
+  }
+
+  private OmKeyInfo getOmKeyInfo(String volumeName, String bucketName,
+                                 String keyName) throws IOException {
+    String keyBytes = metadataManager.getOzoneKey(
+            volumeName, bucketName, keyName);
+    return metadataManager.getKeyTable().get(keyBytes);
+  }
+
+  /**
+   * Look up will return only closed fileInfo. This will return null if the
+   * keyName is a directory or if the keyName is still open for writing.
+   */
+  private OmKeyInfo getOmKeyInfoV1(String volumeName, String bucketName,
+                                   String keyName) throws IOException {
+    OzoneFileStatus fileStatus =
+            OMFileRequest.getOMKeyInfoIfExists(metadataManager,
+                    volumeName, bucketName, keyName, scmBlockSize);
+    if (fileStatus == null) {
+      return null;
+    }
+    return fileStatus.isFile() ? fileStatus.getKeyInfo() : null;
   }
 
   private void addBlockToken4Read(OmKeyInfo value) throws IOException {

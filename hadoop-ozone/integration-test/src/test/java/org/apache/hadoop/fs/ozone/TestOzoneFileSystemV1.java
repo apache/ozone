@@ -366,6 +366,11 @@ public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
     testListStatusOnLargeDirectory();
     deleteRootDir();
 
+    testCreateDoesNotAddParentDirKeys();
+    deleteRootDir();
+    testDeleteCreatesFakeParentDir();
+    deleteRootDir();
+
     testNonExplicitlyCreatedPathExistsAfterItsLeafsWereRemoved();
     deleteRootDir();
 
