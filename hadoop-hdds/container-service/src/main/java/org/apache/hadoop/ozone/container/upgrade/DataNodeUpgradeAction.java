@@ -16,12 +16,14 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.upgrade;
+package org.apache.hadoop.ozone.container.upgrade;
 
-import org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeAction;
+import org.apache.hadoop.hdds.upgrade.HDDSUpgradeAction;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 
 /**
- * Upgrade Action for SCM and DataNodes.
+ * Upgrade Action for DataNode which takes in a 'DataNodeStateMachine' instance.
  */
-public interface HDDSUpgradeAction<T> extends UpgradeAction<T> {
+public interface DataNodeUpgradeAction extends
+    HDDSUpgradeAction<DatanodeStateMachine> {
 }

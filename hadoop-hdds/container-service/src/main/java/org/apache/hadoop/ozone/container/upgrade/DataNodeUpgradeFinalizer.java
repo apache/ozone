@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.scm.server.upgrade;
+package org.apache.hadoop.ozone.container.upgrade;
 
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_DONE;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_IN_PROGRESS;
@@ -26,49 +26,53 @@ import java.io.IOException;
 import java.util.Optional;
 import java.util.concurrent.Callable;
 
-import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.hdds
-    .upgrade.HDDSLayoutFeatureCatalog.HDDSLayoutFeature;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeatureCatalog.HDDSLayoutFeature;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 
 /**
- * UpgradeFinalizer for the Storage Container Manager service.
+ * UpgradeFinalizer for the DataNode.
  */
-public class SCMUpgradeFinalizer extends
-    BasicUpgradeFinalizer<StorageContainerManager, HDDSLayoutVersionManager> {
+public class DataNodeUpgradeFinalizer extends
+    BasicUpgradeFinalizer<DatanodeStateMachine, DataNodeLayoutVersionManager> {
 
-  public SCMUpgradeFinalizer(HDDSLayoutVersionManager versionManager) {
+  public DataNodeUpgradeFinalizer(DataNodeLayoutVersionManager versionManager) {
     super(versionManager);
   }
 
   @Override
   public StatusAndMessages finalize(String upgradeClientID,
-                                    StorageContainerManager scm)
+                                    DatanodeStateMachine dsm)
       throws IOException {
-    StatusAndMessages response = preFinalize(upgradeClientID, scm);
+    StatusAndMessages response = preFinalize(upgradeClientID, dsm);
     if (response.status() != FINALIZATION_REQUIRED) {
       return response;
     }
-    new Worker(scm).call();
+    new Worker(dsm).call();
     return STARTING_MSG;
   }
 
   private class Worker implements Callable<Void> {
-    private StorageContainerManager storageContainerManager;
+    private DatanodeStateMachine datanodeStateMachine;
 
     /**
-     * Initiates the Worker, for the specified SCM instance.
-     * @param scm the StorageContainerManager instance on which to finalize the
+     * Initiates the Worker, for the specified DataNode instance.
+     * @param dsm the DataNodeStateMachine instance on which to finalize the
      *           new LayoutFeatures.
      */
-    Worker(StorageContainerManager scm) {
-      storageContainerManager = scm;
+    Worker(DatanodeStateMachine dsm) {
+      datanodeStateMachine = dsm;
     }
 
     @Override
     public Void call() throws IOException {
+      if(!datanodeStateMachine.preFinalizeUpgrade()) {
+      // datanode is not yet ready to finalize.
+      // Reset the Finalization state.
+        versionManager.setUpgradeState(FINALIZATION_REQUIRED);
+        return null;
+      }
       try {
         emitStartingMsg();
         versionManager.setUpgradeState(FINALIZATION_IN_PROGRESS);
@@ -77,24 +81,18 @@ public class SCMUpgradeFinalizer extends
          * all existing pipelines are closed and pipeline Manger would freeze
          * all new pipeline creation.
          */
-        String msg = "  Existing pipelines and containers will be closed " +
-            "during Upgrade.";
-        msg += "\n  New pipelines creation will remain frozen until Upgrade " +
-            "is finalized.";
-        storageContainerManager.preFinalizeUpgrade();
-        logAndEmit(msg);
 
         for (HDDSLayoutFeature f : versionManager.unfinalizedFeatures()) {
           Optional<? extends LayoutFeature.UpgradeAction> action =
-              f.onFinalizeSCMAction();
-          finalizeFeature(f, storageContainerManager.getScmStorageConfig(),
+              f.onFinalizeDataNodeAction();
+          finalizeFeature(f, datanodeStateMachine.getDataNodeStorageConfig(),
               action);
           updateLayoutVersionInVersionFile(f,
-              storageContainerManager.getScmStorageConfig());
+              datanodeStateMachine.getDataNodeStorageConfig());
           versionManager.finalized(f);
         }
         versionManager.completeFinalization();
-        storageContainerManager.postFinalizeUpgrade();
+        datanodeStateMachine.postFinalizeUpgrade();
         emitFinishedMsg();
         return null;
       } finally {

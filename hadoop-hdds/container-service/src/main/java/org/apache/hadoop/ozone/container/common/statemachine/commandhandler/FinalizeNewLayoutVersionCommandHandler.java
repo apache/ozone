@@ -16,12 +16,16 @@
  */
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_REQUIRED;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.FinalizeNewLayoutVersionCommandProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMCommandProto;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine
     .SCMConnectionManager;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
+import org.apache.hadoop.ozone.protocol.commands.FinalizeNewLayoutVersionCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
@@ -60,10 +64,19 @@ public class FinalizeNewLayoutVersionCommandHandler implements CommandHandler {
     LOG.info("Processing FinalizeNewLayoutVersionCommandHandler command.");
     invocationCount.incrementAndGet();
     final long startTime = Time.monotonicNow();
+    DatanodeStateMachine dsm = context.getParent();
+    final FinalizeNewLayoutVersionCommandProto finalizeCommand =
+        ((FinalizeNewLayoutVersionCommand)command).getProto();
     try {
-      // TODO : finalization logic
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Finalize Upgrade called!");
+      if (finalizeCommand.getFinalizeNewLayoutVersion()) {
+        // SCM is asking datanode to finalize
+        if (dsm.getDataNodeVersionManager().getUpgradeState() ==
+            FINALIZATION_REQUIRED) {
+          // SCM will keep sending Finalize command until datanode mlv == slv
+          // we need to avoid multiple invocations of finalizeUpgrade.
+          LOG.info("Finalize Upgrade called!");
+          dsm.finalizeUpgrade();
+        }
       }
     } catch (Exception e) {
       LOG.debug("Unexpected Error: {} ", e);

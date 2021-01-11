@@ -16,12 +16,21 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.upgrade;
+package org.apache.hadoop.hdds.scm.server.upgrade; 
 
-import org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeAction;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
- * Upgrade Action for SCM and DataNodes.
+ * SCM Upgrade Action for the very first Upgrade Version.
  */
-public interface HDDSUpgradeAction<T> extends UpgradeAction<T> {
+public class SCMUpgradeActionFirstUpgradeVersion implements
+    SCMUpgradeAction {
+  public static final Logger LOG =
+      LoggerFactory.getLogger(SCMUpgradeActionFirstUpgradeVersion.class);
+  @Override
+  public void executeAction(StorageContainerManager arg) throws Exception {
+    LOG.info("Executing SCM Upgrade action for Very first Upgrade Version");
+  }
 }

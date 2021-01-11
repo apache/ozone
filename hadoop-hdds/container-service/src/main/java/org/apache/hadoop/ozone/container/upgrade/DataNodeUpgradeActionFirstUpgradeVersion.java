@@ -16,12 +16,23 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.upgrade;
+package org.apache.hadoop.ozone.container.upgrade;
 
-import org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeAction;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
- * Upgrade Action for SCM and DataNodes.
+ * Upgrade Action for DataNode for the very first first Upgrade Version.
  */
-public interface HDDSUpgradeAction<T> extends UpgradeAction<T> {
+public class DataNodeUpgradeActionFirstUpgradeVersion
+    implements DataNodeUpgradeAction {
+
+  public static final Logger LOG =
+      LoggerFactory.getLogger(DataNodeUpgradeActionFirstUpgradeVersion.class);
+  @Override
+  public void executeAction(DatanodeStateMachine arg) throws Exception {
+    LOG.info("Executing datanode upgrade action for the very First Upgrade " +
+        "Version.");
+  }
 }

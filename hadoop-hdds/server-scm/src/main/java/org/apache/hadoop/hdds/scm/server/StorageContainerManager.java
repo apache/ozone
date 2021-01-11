@@ -90,6 +90,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineReportHandler;
 import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.PipelineChoosePolicyFactory;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
+import org.apache.hadoop.hdds.scm.server.upgrade.SCMLayoutActionCatalog.SCMLayoutAction;
 import org.apache.hadoop.hdds.scm.server.upgrade.SCMUpgradeFinalizer;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
@@ -262,6 +263,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           "failure.", ResultCodes.SCM_NOT_INITIALIZED);
     }
 
+    loadSCMUpgradeActions();
     scmLayoutVersionManager =
         HDDSLayoutVersionManager.initialize(scmStorageConfig);
 
@@ -1280,5 +1282,14 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       String upgradeClientID, boolean takeover
   ) throws IOException {
     return upgradeFinalizer.reportStatus(upgradeClientID, takeover);
+  }
+
+  private void loadSCMUpgradeActions() {
+    // we just need to iterate through the enum list to load
+    // the actions.
+    for (SCMLayoutAction action : SCMLayoutAction.values()) {
+      LOG.info("Loading datanode action for {}",
+          action.getHddsFeature().description());
+    }
   }
 }
