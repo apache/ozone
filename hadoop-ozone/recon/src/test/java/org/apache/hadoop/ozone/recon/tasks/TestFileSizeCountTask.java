@@ -198,6 +198,7 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
         .setAction(PUT)
         .setKey("newKey")
         .setValue(newKey)
+        .setTable(OmMetadataManagerImpl.KEY_TABLE)
         .build();
 
     // Update existing key.
@@ -211,6 +212,7 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
         .setKey("updatedKey")
         .setValue(updatedKey)
         .setOldValue(toBeUpdatedKey)
+        .setTable(OmMetadataManagerImpl.KEY_TABLE)
         .build();
 
     // Delete another existing key.
@@ -218,6 +220,7 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
         .setAction(DELETE)
         .setKey("deletedKey")
         .setValue(toBeDeletedKey)
+        .setTable(OmMetadataManagerImpl.KEY_TABLE)
         .build();
 
     omUpdateEventBatch = new OMUpdateEventBatch(
