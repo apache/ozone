@@ -110,7 +110,8 @@ public class TestObjectStoreV1 {
     Assert.assertNotNull("Failed to find dir path: a/b/c", dirPathC);
 
     // after file creation
-    verifyKeyInFileTable(openKeyTable, file, dirPathC.getObjectID(), false);
+    verifyKeyInOpenFileTable(openKeyTable, file, dirPathC.getObjectID(),
+            false);
 
     ozoneOutputStream.write(data.getBytes(), 0, data.length());
     ozoneOutputStream.close();
@@ -118,13 +119,18 @@ public class TestObjectStoreV1 {
     Table<String, OmKeyInfo> keyTable =
             cluster.getOzoneManager().getMetadataManager().getKeyTable();
 
-    // after closing the file
+    // After closing the file. File entry should be removed from openFileTable
+    // and it should be added to fileTable.
     verifyKeyInFileTable(keyTable, file, dirPathC.getObjectID(), false);
+    verifyKeyInOpenFileTable(openKeyTable, file, dirPathC.getObjectID(),
+            true);
 
     ozoneBucket.deleteKey(key);
 
     // after key delete
     verifyKeyInFileTable(keyTable, file, dirPathC.getObjectID(), true);
+    verifyKeyInOpenFileTable(openKeyTable, file, dirPathC.getObjectID(),
+            true);
   }
 
   private OmDirectoryInfo getDirInfo(String volumeName, String bucketName,
@@ -147,17 +153,43 @@ public class TestObjectStoreV1 {
     return dirInfo;
   }
 
-  private void verifyKeyInFileTable(Table<String, OmKeyInfo> keyTable,
+  private void verifyKeyInFileTable(Table<String, OmKeyInfo> fileTable,
       String fileName, long parentID, boolean isEmpty) throws IOException {
     TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> iterator
-            = keyTable.iterator();
+            = fileTable.iterator();
 
     if (isEmpty) {
-      Assert.assertTrue("Table is not empty!", keyTable.isEmpty());
+      Assert.assertTrue("Table is not empty!", fileTable.isEmpty());
     } else {
-      Assert.assertFalse("Table is empty!", keyTable.isEmpty());
+      Assert.assertFalse("Table is empty!", fileTable.isEmpty());
       while (iterator.hasNext()) {
         Table.KeyValue<String, OmKeyInfo> next = iterator.next();
+        Assert.assertEquals("Invalid Key: " + next.getKey(),
+                parentID + "/" + fileName, next.getKey());
+        OmKeyInfo omKeyInfo = next.getValue();
+        Assert.assertEquals("Invalid Key", fileName,
+                omKeyInfo.getFileName());
+        Assert.assertEquals("Invalid Key", fileName,
+                omKeyInfo.getKeyName());
+        Assert.assertEquals("Invalid Key", parentID,
+                omKeyInfo.getParentObjectID());
+      }
+    }
+  }
+
+  private void verifyKeyInOpenFileTable(Table<String, OmKeyInfo> openFileTable,
+      String fileName, long parentID, boolean isEmpty) throws IOException {
+    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> iterator
+            = openFileTable.iterator();
+
+    if (isEmpty) {
+      Assert.assertTrue("Table is not empty!", openFileTable.isEmpty());
+    } else {
+      Assert.assertFalse("Table is empty!", openFileTable.isEmpty());
+      while (iterator.hasNext()) {
+        Table.KeyValue<String, OmKeyInfo> next = iterator.next();
+        // used startsWith because the key format is,
+        // <parentID>/fileName/<clientID> and clientID is not visible.
         Assert.assertTrue("Invalid Key: " + next.getKey(),
                 next.getKey().startsWith(parentID + "/" + fileName));
         OmKeyInfo omKeyInfo = next.getValue();
