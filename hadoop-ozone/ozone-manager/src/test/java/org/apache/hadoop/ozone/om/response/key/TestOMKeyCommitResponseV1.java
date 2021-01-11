@@ -42,8 +42,7 @@ public class TestOMKeyCommitResponseV1 extends TestOMKeyCommitResponse {
           OzoneManagerProtocolProtos.OMResponse omResponse, String openKey,
           String ozoneKey) {
     Assert.assertNotNull(omBucketInfo);
-    return new OMKeyCommitResponseV1(
-            omResponse, omKeyInfo, ozoneKey, openKey, omVolumeArgs,
+    return new OMKeyCommitResponseV1(omResponse, omKeyInfo, ozoneKey, openKey,
             omBucketInfo);
   }
 
