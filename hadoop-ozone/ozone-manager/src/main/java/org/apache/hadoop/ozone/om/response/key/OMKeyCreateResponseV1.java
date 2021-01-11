@@ -18,42 +18,31 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
-import org.apache.hadoop.hdds.utils.db.BatchOperation;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
+import org.apache.hadoop.ozone.om.response.file.OMFileCreateResponseV1;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
 import javax.annotation.Nonnull;
-import java.io.IOException;
+import java.util.List;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
 
 /**
- * Response for AllocateBlock request layout version V1.
+ * Response for CreateKey request layout version V1.
  */
-@CleanupTableInfo(cleanupTables = {OPEN_FILE_TABLE})
-public class OMAllocateBlockResponseV1 extends OMAllocateBlockResponse {
+@CleanupTableInfo(cleanupTables = {DIRECTORY_TABLE, OPEN_FILE_TABLE})
+public class OMKeyCreateResponseV1 extends OMFileCreateResponseV1 {
 
-  public OMAllocateBlockResponseV1(@Nonnull OMResponse omResponse,
-      @Nonnull OmKeyInfo omKeyInfo, long clientID,
-      @Nonnull OmBucketInfo omBucketInfo) {
-    super(omResponse, omKeyInfo, clientID, omBucketInfo);
-  }
-
-  @Override
-  public void addToDBBatch(OMMetadataManager omMetadataManager,
-      BatchOperation batchOperation) throws IOException {
-
-    OMFileRequest.addToOpenFileTable(omMetadataManager, batchOperation,
-            getOmKeyInfo(), getClientID());
-
-    // update bucket usedBytes.
-    omMetadataManager.getBucketTable().putWithBatch(batchOperation,
-            omMetadataManager.getBucketKey(getOmKeyInfo().getVolumeName(),
-                    getOmKeyInfo().getBucketName()), getOmBucketInfo());
+  public OMKeyCreateResponseV1(@Nonnull OMResponse omResponse,
+                               @Nonnull OmKeyInfo omKeyInfo,
+                               @Nonnull List<OmDirectoryInfo> parentDirInfos,
+                               long openKeySessionID,
+                               @Nonnull OmBucketInfo omBucketInfo) {
+    super(omResponse, omKeyInfo, parentDirInfos, openKeySessionID,
+            omBucketInfo);
   }
 }
-
