@@ -89,7 +89,8 @@ public class ReconContainerManager extends SCMContainerManager {
       DBStore batchHandler,
       PipelineManager pipelineManager,
       StorageContainerServiceProvider scm,
-      ContainerHealthSchemaManager containerHealthSchemaManager) throws IOException {
+      ContainerHealthSchemaManager containerHealthSchemaManager)
+      throws IOException {
     super(conf, containerStore, batchHandler, pipelineManager);
     this.scmClient = scm;
     this.containerHealthSchemaManager = containerHealthSchemaManager;

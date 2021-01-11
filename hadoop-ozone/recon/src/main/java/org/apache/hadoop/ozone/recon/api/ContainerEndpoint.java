@@ -89,7 +89,7 @@ public class ContainerEndpoint {
 
   @Inject
   public ContainerEndpoint(OzoneStorageContainerManager reconSCM,
-                           ContainerHealthSchemaManager containerHealthSchemaManager) {
+      ContainerHealthSchemaManager containerHealthSchemaManager) {
     this.containerManager =
         (ReconContainerManager) reconSCM.getContainerManager();
     this.containerHealthSchemaManager = containerHealthSchemaManager;
