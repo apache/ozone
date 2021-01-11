@@ -29,10 +29,10 @@ import org.apache.hadoop.ozone.upgrade.AbstractLayoutVersionManager;
  * and DataNodes.
  */
 @SuppressWarnings("FinalClass")
-public class SCMLayoutVersionManager extends
+public class HDDSLayoutVersionManager extends
     AbstractLayoutVersionManager<HDDSLayoutFeature> {
 
-  public SCMLayoutVersionManager(Storage hddsStorage) throws IOException {
+  public HDDSLayoutVersionManager(Storage hddsStorage) throws IOException {
     init(hddsStorage.getLayoutVersion(), HDDSLayoutFeature.values());
   }
 }

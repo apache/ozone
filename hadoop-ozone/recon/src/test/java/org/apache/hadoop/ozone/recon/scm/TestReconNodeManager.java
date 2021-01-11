@@ -33,7 +33,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.server.events.EventQueue;
-import org.apache.hadoop.hdds.upgrade.SCMLayoutVersionManager;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -54,7 +54,7 @@ public class TestReconNodeManager {
   private OzoneConfiguration conf;
   private DBStore store;
   private ReconStorageConfig reconStorageConfig;
-  private SCMLayoutVersionManager versionManager;
+  private HDDSLayoutVersionManager versionManager;
 
   @Before
   public void setUp() throws Exception {
@@ -63,7 +63,7 @@ public class TestReconNodeManager {
         temporaryFolder.newFolder().getAbsolutePath());
     conf.set(OZONE_SCM_NAMES, "localhost");
     reconStorageConfig = new ReconStorageConfig(conf);
-    versionManager = new SCMLayoutVersionManager(reconStorageConfig);
+    versionManager = new HDDSLayoutVersionManager(reconStorageConfig);
     store = DBStoreBuilder.createDBStore(conf, new ReconSCMDBDefinition());
   }
 

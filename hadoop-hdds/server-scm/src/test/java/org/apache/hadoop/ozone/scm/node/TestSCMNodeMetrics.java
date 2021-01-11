@@ -37,7 +37,7 @@ import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.node.SCMNodeMetrics;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventQueue;
-import org.apache.hadoop.hdds.upgrade.SCMLayoutVersionManager;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 
 import static java.lang.Thread.sleep;
@@ -71,8 +71,8 @@ public class TestSCMNodeMetrics {
     EventQueue publisher = new EventQueue();
     SCMStorageConfig config =
         new SCMStorageConfig(NodeType.DATANODE, new File("/tmp"), "storage");
-    SCMLayoutVersionManager versionManager =
-        Mockito.mock(SCMLayoutVersionManager.class);
+    HDDSLayoutVersionManager versionManager =
+        Mockito.mock(HDDSLayoutVersionManager.class);
     Mockito.when(versionManager.getMetadataLayoutVersion())
         .thenReturn(METADATA_LAYOUT_VERSION);
     Mockito.when(versionManager.getSoftwareLayoutVersion())

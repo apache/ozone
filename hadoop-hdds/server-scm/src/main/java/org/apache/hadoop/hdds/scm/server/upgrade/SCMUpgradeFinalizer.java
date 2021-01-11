@@ -28,7 +28,7 @@ import java.util.concurrent.Callable;
 
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
-import org.apache.hadoop.hdds.upgrade.SCMLayoutVersionManager;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 
@@ -36,9 +36,9 @@ import org.apache.hadoop.ozone.upgrade.LayoutFeature;
  * UpgradeFinalizer for the Storage Container Manager service.
  */
 public class SCMUpgradeFinalizer extends
-    BasicUpgradeFinalizer<StorageContainerManager, SCMLayoutVersionManager> {
+    BasicUpgradeFinalizer<StorageContainerManager, HDDSLayoutVersionManager> {
 
-  public SCMUpgradeFinalizer(SCMLayoutVersionManager versionManager) {
+  public SCMUpgradeFinalizer(HDDSLayoutVersionManager versionManager) {
     super(versionManager);
   }
 

@@ -100,7 +100,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.server.ServiceRuntimeInfoImpl;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
-import org.apache.hadoop.hdds.upgrade.SCMLayoutVersionManager;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
@@ -214,7 +214,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private NetworkTopology clusterMap;
   private PipelineChoosePolicy pipelineChoosePolicy;
 
-  private SCMLayoutVersionManager scmLayoutVersionManager;
+  private HDDSLayoutVersionManager scmLayoutVersionManager;
   private UpgradeFinalizer<StorageContainerManager> upgradeFinalizer;
 
   /**
@@ -264,7 +264,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
 
     loadSCMUpgradeActions();
-    scmLayoutVersionManager = new SCMLayoutVersionManager(scmStorageConfig);
+    scmLayoutVersionManager = new HDDSLayoutVersionManager(scmStorageConfig);
     upgradeFinalizer = new SCMUpgradeFinalizer(scmLayoutVersionManager);
 
     /**
@@ -1165,7 +1165,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     return getScmStorageConfig().getClusterID();
   }
 
-  public SCMLayoutVersionManager getLayoutVersionManager() {
+  public HDDSLayoutVersionManager getLayoutVersionManager() {
     return scmLayoutVersionManager;
   }
 
