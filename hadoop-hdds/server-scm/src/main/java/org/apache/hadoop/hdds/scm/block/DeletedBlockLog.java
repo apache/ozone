@@ -81,17 +81,6 @@ public interface DeletedBlockLog extends Closeable {
       UUID dnID);
 
   /**
-   * Creates a block deletion transaction and adds that into the log.
-   *
-   * @param containerID - container ID.
-   * @param blocks - blocks that belong to the same container.
-   *
-   * @throws IOException
-   */
-  void addTransaction(long containerID, List<Long> blocks)
-      throws IOException;
-
-  /**
    * Creates block deletion transactions for a set of containers,
    * add into the log and persist them atomically. An object key
    * might be stored in multiple containers and multiple blocks,

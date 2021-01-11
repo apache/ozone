@@ -16,7 +16,11 @@
  */
 package org.apache.hadoop.hdds.scm.ha;
 
+import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
+import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImplV2;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.ratis.statemachine.SnapshotInfo;
@@ -32,17 +36,21 @@ import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
  * operation in DB.
  */
 public class SCMDBTransactionBuffer implements DBTransactionBuffer {
+  private final StorageContainerManager scm;
   private final SCMMetadataStore metadataStore;
   private BatchOperation currentBatchOperation;
   private SCMTransactionInfo latestTrxInfo;
   private SnapshotInfo latestSnapshot;
 
-  public SCMDBTransactionBuffer(SCMMetadataStore store) throws IOException {
-    this.metadataStore = store;
+  public SCMDBTransactionBuffer(StorageContainerManager scm)
+      throws IOException {
+    this.scm = scm;
+    this.metadataStore = scm.getScmMetadataStore();
 
     // initialize a batch operation during construction time
     currentBatchOperation = this.metadataStore.getStore().initBatchOperation();
-    latestTrxInfo = store.getTransactionInfoTable().get(TRANSACTION_INFO_KEY);
+    latestTrxInfo = this.metadataStore.getTransactionInfoTable()
+        .get(TRANSACTION_INFO_KEY);
     if (latestTrxInfo == null) {
       // transaction table is empty
       latestTrxInfo =
@@ -98,6 +106,12 @@ public class SCMDBTransactionBuffer implements DBTransactionBuffer {
     this.latestSnapshot = latestTrxInfo.toSnapshotInfo();
     // reset batch operation
     currentBatchOperation = metadataStore.getStore().initBatchOperation();
+
+    DeletedBlockLog deletedBlockLog = scm.getScmBlockManager()
+        .getDeletedBlockLog();
+    Preconditions.checkArgument(
+        deletedBlockLog instanceof DeletedBlockLogImplV2);
+    ((DeletedBlockLogImplV2) deletedBlockLog).onFlush();
   }
 
   @Override
