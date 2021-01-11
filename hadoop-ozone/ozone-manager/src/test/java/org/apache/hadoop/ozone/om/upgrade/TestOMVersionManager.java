@@ -85,19 +85,6 @@ public class TestOMVersionManager {
   }
 
   @Test
-  public void testOMLayoutVersionManagerReset() throws IOException {
-    OMStorage omStorage = mock(OMStorage.class);
-    when(omStorage.getLayoutVersion()).thenReturn(0);
-    OMLayoutVersionManagerImpl omVersionManager =
-        new OMLayoutVersionManagerImpl(omStorage);
-    int numLayoutVersions = OMLayoutFeature.values().length;
-    assertEquals(
-        OMLayoutFeature.values()[numLayoutVersions - 1].layoutVersion(),
-        omVersionManager.getSoftwareLayoutVersion());
-    assertEquals(0, omVersionManager.getSoftwareLayoutVersion());
-  }
-
-  @Test
   public void testOMLayoutFeatureCatalog() {
     OMLayoutFeature[] values = OMLayoutFeature.values();
     int currVersion = Integer.MIN_VALUE;
