@@ -54,8 +54,6 @@ import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.inject.Inject;
-
 /**
  * Recon's overriding implementation of SCM's Container Manager.
  */
