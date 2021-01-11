@@ -197,6 +197,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
                 mockScmServiceProvider)
             .addBinding(OzoneStorageContainerManager.class,
                 ReconStorageContainerManagerFacade.class)
+            .withContainerDB()
             .addBinding(ClusterStateEndpoint.class)
             .addBinding(NodeEndpoint.class)
             .addBinding(MetricsServiceProviderFactory.class)
