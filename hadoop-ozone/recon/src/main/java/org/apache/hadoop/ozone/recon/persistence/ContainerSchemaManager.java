@@ -17,19 +17,12 @@
  */
 package org.apache.hadoop.ozone.recon.persistence;
 
-import static java.util.Comparator.comparingLong;
 import static org.hadoop.ozone.recon.schema.tables.UnhealthyContainersTable.UNHEALTHY_CONTAINERS;
 import static org.jooq.impl.DSL.count;
 
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.utils.db.DBStore;
-import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersSummary;
-import org.apache.hadoop.ozone.recon.scm.ContainerReplicaHistory;
-import org.apache.hadoop.ozone.recon.scm.ReconSCMDBDefinition;
-import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
 import org.hadoop.ozone.recon.schema.tables.daos.UnhealthyContainersDao;
@@ -39,50 +32,23 @@ import org.jooq.Cursor;
 import org.jooq.DSLContext;
 import org.jooq.Record;
 import org.jooq.SelectQuery;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.stream.Collectors;
 
 /**
  * Provide a high level API to access the Container Schema.
  */
 @Singleton
 public class ContainerSchemaManager {
-  private static final Logger LOG = LoggerFactory.getLogger(
-      ContainerSchemaManager.class);
 
   private final UnhealthyContainersDao unhealthyContainersDao;
   private final ContainerSchemaDefinition containerSchemaDefinition;
 
-  private Map<Long, Map<UUID, ContainerReplicaHistory>> replicaHistoryMap;
-
-  private final ContainerDBServiceProvider dbServiceProvider;
-
-  private DBStore scmDBStore;
-  private Table<UUID, DatanodeDetails> nodeDB;
-
-  public Table<UUID, DatanodeDetails> getNodeDB() {
-    return nodeDB;
-  }
-
   @Inject
   public ContainerSchemaManager(
       ContainerSchemaDefinition containerSchemaDefinition,
-      UnhealthyContainersDao unhealthyContainersDao,
-      ContainerDBServiceProvider containerDBServiceProvider) {
+      UnhealthyContainersDao unhealthyContainersDao) {
     this.unhealthyContainersDao = unhealthyContainersDao;
     this.containerSchemaDefinition = containerSchemaDefinition;
-    this.dbServiceProvider = containerDBServiceProvider;
-    this.replicaHistoryMap = null;
-    this.scmDBStore = null;
-    this.nodeDB = null;
   }
 
   /**
@@ -142,116 +108,4 @@ public class ContainerSchemaManager {
     unhealthyContainersDao.insert(recs);
   }
 
-  public void upsertContainerHistory(long containerID, UUID uuid, long time) {
-    Map<UUID, ContainerReplicaHistory> tsMap;
-    try {
-      tsMap = dbServiceProvider.getContainerReplicaHistory(containerID);
-      ContainerReplicaHistory ts = tsMap.get(uuid);
-      if (ts == null) {
-        // New entry
-        tsMap.put(uuid, new ContainerReplicaHistory(uuid, time, time));
-      } else {
-        // Entry exists, update last seen time and put it back to DB.
-        ts.setLastSeenTime(time);
-      }
-      dbServiceProvider.storeContainerReplicaHistory(containerID, tsMap);
-    } catch (IOException e) {
-      LOG.debug("Error on DB operations. {}", e.getMessage());
-    }
-  }
-
-  public List<ContainerHistory> getAllContainerHistory(long containerID) {
-    // First, get the existing entries from DB
-    Map<UUID, ContainerReplicaHistory> resMap;
-    try {
-      resMap = dbServiceProvider.getContainerReplicaHistory(containerID);
-    } catch (IOException ex) {
-      resMap = new HashMap<>();
-      LOG.debug("Unable to retrieve container replica history from RDB.");
-    }
-
-    // Then, update the entries with the latest in-memory info, if available
-    if (replicaHistoryMap != null) {
-      Map<UUID, ContainerReplicaHistory> replicaLastSeenMap =
-          replicaHistoryMap.get(containerID);
-      if (replicaLastSeenMap != null) {
-        Map<UUID, ContainerReplicaHistory> finalResMap = resMap;
-        replicaLastSeenMap.forEach((k, v) ->
-            finalResMap.merge(k, v, (old, latest) -> latest));
-        resMap = finalResMap;
-      }
-    }
-
-    // Finally, convert map to list for output
-    List<ContainerHistory> resList = new ArrayList<>();
-    for (Map.Entry<UUID, ContainerReplicaHistory> entry : resMap.entrySet()) {
-      final UUID uuid = entry.getKey();
-      String hostname = "N/A";
-      // Attempt to retrieve hostname from NODES table
-      if (nodeDB != null) {
-        try {
-          DatanodeDetails dnDetails = nodeDB.get(uuid);
-          if (dnDetails != null) {
-            hostname = dnDetails.getHostName();
-          }
-        } catch (IOException ex) {
-          LOG.debug("Unable to retrieve from NODES table of node {}. {}",
-              uuid, ex.getMessage());
-        }
-      }
-      final long firstSeenTime = entry.getValue().getFirstSeenTime();
-      final long lastSeenTime = entry.getValue().getLastSeenTime();
-      resList.add(new ContainerHistory(containerID, uuid.toString(), hostname,
-          firstSeenTime, lastSeenTime));
-    }
-    return resList;
-  }
-
-  public List<ContainerHistory> getLatestContainerHistory(long containerID,
-                                                          int limit) {
-    List<ContainerHistory> res = getAllContainerHistory(containerID);
-    res.sort(comparingLong(ContainerHistory::getLastSeenTime).reversed());
-    return res.stream().limit(limit).collect(Collectors.toList());
-  }
-
-  /**
-   * Should only be called once during ReconContainerManager init.
-   */
-  public void setReplicaHistoryMap(
-      Map<Long, Map<UUID, ContainerReplicaHistory>> replicaHistoryMap) {
-    this.replicaHistoryMap = replicaHistoryMap;
-  }
-
-  /**
-   * Should only be called once during ReconContainerManager init.
-   */
-  public void setScmDBStore(DBStore scmDBStore) {
-    this.scmDBStore = scmDBStore;
-    try {
-      this.nodeDB = ReconSCMDBDefinition.NODES.getTable(scmDBStore);
-    } catch (IOException ex) {
-      LOG.debug("Failed to get NODES table. {}", ex.getMessage());
-    }
-  }
-
-  /**
-   * Flush the container replica history in-memory map to DB.
-   * @param clearMap true to clear the in-memory map after flushing completes.
-   */
-  public void flushReplicaHistoryMapToDB(boolean clearMap) {
-    if (replicaHistoryMap == null) {
-      return;
-    }
-    synchronized (replicaHistoryMap) {
-      try {
-        dbServiceProvider.batchStoreContainerReplicaHistory(replicaHistoryMap);
-      } catch (IOException e) {
-        LOG.debug("Error flushing container replica history to DB. {}",
-            e.getMessage());
-      }
-      if (clearMap) {
-        replicaHistoryMap.clear();
-      }
-    }
-  }
 }

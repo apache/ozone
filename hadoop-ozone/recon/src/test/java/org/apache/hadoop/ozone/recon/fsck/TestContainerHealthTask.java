@@ -69,8 +69,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     ContainerSchemaManager containerSchemaManager =
         new ContainerSchemaManager(
             getSchemaDefinition(ContainerSchemaDefinition.class),
-            unHealthyContainersTableHandle,
-            mock(ContainerDBServiceProvider.class));
+            unHealthyContainersTableHandle);
     ReconStorageContainerManagerFacade scmMock =
         mock(ReconStorageContainerManagerFacade.class);
     MockPlacementPolicy placementMock = new MockPlacementPolicy();

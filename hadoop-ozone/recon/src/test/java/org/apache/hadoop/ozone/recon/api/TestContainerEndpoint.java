@@ -431,10 +431,10 @@ public class TestContainerEndpoint {
     final UUID u2 = newDatanode("host2", "127.0.0.2");
     final UUID u3 = newDatanode("host3", "127.0.0.3");
     final UUID u4 = newDatanode("host4", "127.0.0.4");
-    containerSchemaManager.upsertContainerHistory(1L, u1, 1L);
-    containerSchemaManager.upsertContainerHistory(1L, u2, 2L);
-    containerSchemaManager.upsertContainerHistory(1L, u3, 3L);
-    containerSchemaManager.upsertContainerHistory(1L, u4, 4L);
+    reconContainerManager.upsertContainerHistory(1L, u1, 1L);
+    reconContainerManager.upsertContainerHistory(1L, u2, 2L);
+    reconContainerManager.upsertContainerHistory(1L, u3, 3L);
+    reconContainerManager.upsertContainerHistory(1L, u4, 4L);
 
     response = containerEndpoint.getMissingContainers();
     responseObject = (MissingContainersResponse) response.getEntity();
@@ -663,12 +663,12 @@ public class TestContainerEndpoint {
     final UUID u2 = newDatanode("host2", "127.0.0.2");
     final UUID u3 = newDatanode("host3", "127.0.0.3");
     final UUID u4 = newDatanode("host4", "127.0.0.4");
-    containerSchemaManager.upsertContainerHistory(1L, u1, 1L);
-    containerSchemaManager.upsertContainerHistory(1L, u2, 2L);
-    containerSchemaManager.upsertContainerHistory(1L, u3, 3L);
-    containerSchemaManager.upsertContainerHistory(1L, u4, 4L);
+    reconContainerManager.upsertContainerHistory(1L, u1, 1L);
+    reconContainerManager.upsertContainerHistory(1L, u2, 2L);
+    reconContainerManager.upsertContainerHistory(1L, u3, 3L);
+    reconContainerManager.upsertContainerHistory(1L, u4, 4L);
 
-    containerSchemaManager.upsertContainerHistory(1L, u1, 5L);
+    reconContainerManager.upsertContainerHistory(1L, u1, 5L);
 
     Response response = containerEndpoint.getReplicaHistoryForContainer(1L);
     List<ContainerHistory> histories =
@@ -687,7 +687,7 @@ public class TestContainerEndpoint {
     });
 
     // Check getLatestContainerHistory
-    List<ContainerHistory> hist1 = containerSchemaManager
+    List<ContainerHistory> hist1 = reconContainerManager
         .getLatestContainerHistory(1L, 10);
     Assert.assertTrue(hist1.size() <= 10);
     // Descending order by last report timestamp
@@ -699,7 +699,7 @@ public class TestContainerEndpoint {
 
   UUID newDatanode(String hostName, String ipAddress) throws IOException {
     final UUID uuid = UUID.randomUUID();
-    containerSchemaManager.getNodeDB().put(uuid,
+    reconContainerManager.getNodeDB().put(uuid,
         DatanodeDetails.newBuilder()
             .setUuid(uuid)
             .setHostName(hostName)
@@ -748,9 +748,9 @@ public class TestContainerEndpoint {
     missingList.add(missing);
     containerSchemaManager.insertUnhealthyContainerRecords(missingList);
 
-    containerSchemaManager.upsertContainerHistory(cID, uuid1, 1L);
-    containerSchemaManager.upsertContainerHistory(cID, uuid2, 2L);
-    containerSchemaManager.upsertContainerHistory(cID, uuid3, 3L);
-    containerSchemaManager.upsertContainerHistory(cID, uuid4, 4L);
+    reconContainerManager.upsertContainerHistory(cID, uuid1, 1L);
+    reconContainerManager.upsertContainerHistory(cID, uuid2, 2L);
+    reconContainerManager.upsertContainerHistory(cID, uuid3, 3L);
+    reconContainerManager.upsertContainerHistory(cID, uuid4, 4L);
   }
 }

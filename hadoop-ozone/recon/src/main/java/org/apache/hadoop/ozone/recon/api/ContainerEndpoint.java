@@ -226,7 +226,7 @@ public class ContainerEndpoint {
   public Response getReplicaHistoryForContainer(
       @PathParam("id") Long containerID) {
     return Response.ok(
-        containerSchemaManager.getAllContainerHistory(containerID)).build();
+        containerManager.getAllContainerHistory(containerID)).build();
   }
 
   /**
@@ -251,7 +251,7 @@ public class ContainerEndpoint {
             UUID pipelineID = containerInfo.getPipelineID().getId();
 
             List<ContainerHistory> datanodes =
-                containerSchemaManager.getLatestContainerHistory(containerID,
+                containerManager.getLatestContainerHistory(containerID,
                     containerInfo.getReplicationFactor().getNumber());
             missingContainers.add(new MissingContainerMetadata(containerID,
                 container.getInStateSince(), keyCount, pipelineID, datanodes));
@@ -311,8 +311,7 @@ public class ContainerEndpoint {
         long keyCount = containerInfo.getNumberOfKeys();
         UUID pipelineID = containerInfo.getPipelineID().getId();
         List<ContainerHistory> datanodes =
-            containerSchemaManager.getLatestContainerHistory(
-                containerID,
+            containerManager.getLatestContainerHistory(containerID,
                 containerInfo.getReplicationFactor().getNumber());
         unhealthyMeta.add(new UnhealthyContainerMetadata(
             c, datanodes, pipelineID, keyCount));
