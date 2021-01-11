@@ -255,6 +255,10 @@ public class TestOzoneFileSystem {
   private void setupOzoneFileSystem()
       throws IOException, TimeoutException, InterruptedException {
     OzoneConfiguration conf = new OzoneConfiguration();
+    // TODO: HDDS-4669: Fix testTrash to work when OM Ratis is enabled and
+    //  then run TestOzoneFileSystem for both OM Ratis enabled and disabled
+    //  case.
+    conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, false);
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
         enabledFileSystemPaths);
     conf.setInt(FS_TRASH_INTERVAL_KEY, 1);
