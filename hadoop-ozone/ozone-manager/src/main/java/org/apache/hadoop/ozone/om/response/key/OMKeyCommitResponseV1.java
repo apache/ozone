@@ -22,7 +22,6 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -43,7 +42,6 @@ public class OMKeyCommitResponseV1 extends OMKeyCommitResponse {
   public OMKeyCommitResponseV1(@Nonnull OMResponse omResponse,
                                @Nonnull OmKeyInfo omKeyInfo,
                                String ozoneKeyName, String openKeyName,
-                               @Nonnull OmVolumeArgs omVolumeArgs,
                                @Nonnull OmBucketInfo omBucketInfo) {
     super(omResponse, omKeyInfo, ozoneKeyName, openKeyName,
             omBucketInfo);
