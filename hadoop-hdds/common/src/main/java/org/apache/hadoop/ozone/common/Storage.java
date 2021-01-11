@@ -145,7 +145,7 @@ public abstract class Storage {
   abstract protected Properties getNodeProperties();
 
   /**
-   * Sets the Node properties specific to OM/SCM.
+   * Sets the Node properties specific to OM/SCM/DataNode.
    */
   private void setNodeProperties() {
     Properties nodeProperties = getNodeProperties();

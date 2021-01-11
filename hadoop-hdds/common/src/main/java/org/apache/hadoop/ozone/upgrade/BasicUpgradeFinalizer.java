@@ -23,8 +23,6 @@ import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.LAYOU
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.PERSIST_UPGRADE_TO_LAYOUT_VERSION_FAILED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.REMOVE_UPGRADE_TO_LAYOUT_VERSION_FAILED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.UPDATE_LAYOUT_VERSION_FAILED;
-import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_DONE;
-import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_IN_PROGRESS;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_REQUIRED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.STARTING_FINALIZATION;
 
@@ -71,6 +69,11 @@ public class BasicUpgradeFinalizer<T, V extends AbstractLayoutVersionManager>
       return FINALIZATION_IN_PROGRESS_MSG;
     case FINALIZATION_DONE:
     case ALREADY_FINALIZED:
+      if (versionManager.needsFinalization()) {
+        throw new UpgradeException("Upgrade found in inconsistent state. " +
+            "Upgrade state is FINALIZATION Complete while MLV has not been " +
+            "upgraded to SLV.", INVALID_REQUEST);
+      }
       return FINALIZED_MSG;
     default:
       if (!versionManager.needsFinalization()) {
@@ -129,9 +132,9 @@ public class BasicUpgradeFinalizer<T, V extends AbstractLayoutVersionManager>
     }
   }
 
-  protected void finalizeFeature(LayoutFeature feature, Storage config)
+  protected void finalizeFeature(LayoutFeature feature, Storage config,
+                                 Optional<? extends UpgradeAction> action)
       throws UpgradeException {
-    Optional<? extends UpgradeAction> action = feature.onFinalizeAction();
 
     if (!action.isPresent()) {
       emitNOOPMsg(feature.name());
