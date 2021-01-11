@@ -65,10 +65,7 @@ public class ReconContainerManager extends SCMContainerManager {
       LoggerFactory.getLogger(ReconContainerManager.class);
   private final StorageContainerServiceProvider scmClient;
   private final ContainerHealthSchemaManager containerHealthSchemaManager;
-
-  @Inject
-  private ContainerDBServiceProvider cdbServiceProvider;
-
+  private final ContainerDBServiceProvider cdbServiceProvider;
   private final Table<UUID, DatanodeDetails> nodeDB;
   // Container ID -> Datanode UUID -> Timestamp
   private final Map<Long, Map<UUID, ContainerReplicaHistory>> replicaHistoryMap;
@@ -89,14 +86,16 @@ public class ReconContainerManager extends SCMContainerManager {
       DBStore batchHandler,
       PipelineManager pipelineManager,
       StorageContainerServiceProvider scm,
-      ContainerHealthSchemaManager containerHealthSchemaManager)
+      ContainerHealthSchemaManager containerHealthSchemaManager,
+      ContainerDBServiceProvider containerDBServiceProvider)
       throws IOException {
     super(conf, containerStore, batchHandler, pipelineManager);
     this.scmClient = scm;
     this.containerHealthSchemaManager = containerHealthSchemaManager;
-    this.replicaHistoryMap = new ConcurrentHashMap<>();
-    // batchHandler == scmDBStore
+    this.cdbServiceProvider = containerDBServiceProvider;
+    // batchHandler = scmDBStore
     this.nodeDB = ReconSCMDBDefinition.NODES.getTable(batchHandler);
+    this.replicaHistoryMap = new ConcurrentHashMap<>();
   }
 
   /**

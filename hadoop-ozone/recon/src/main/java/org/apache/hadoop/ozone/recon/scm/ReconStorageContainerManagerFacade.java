@@ -55,6 +55,7 @@ import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.recon.fsck.ContainerHealthTask;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
+import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
 import com.google.inject.Inject;
@@ -92,7 +93,8 @@ public class ReconStorageContainerManagerFacade
   public ReconStorageContainerManagerFacade(OzoneConfiguration conf,
       StorageContainerServiceProvider scmServiceProvider,
       ReconTaskStatusDao reconTaskStatusDao,
-      ContainerHealthSchemaManager containerHealthSchemaManager)
+      ContainerHealthSchemaManager containerHealthSchemaManager,
+      ContainerDBServiceProvider containerDBServiceProvider)
       throws IOException {
     this.eventQueue = new EventQueue();
     eventQueue.setSilent(true);
@@ -112,16 +114,14 @@ public class ReconStorageContainerManagerFacade
     this.datanodeProtocolServer = new ReconDatanodeProtocolServer(
         conf, this, eventQueue);
     this.pipelineManager =
-
         new ReconPipelineManager(conf,
             nodeManager,
             ReconSCMDBDefinition.PIPELINES.getTable(dbStore),
             eventQueue);
     this.containerManager = new ReconContainerManager(conf,
         ReconSCMDBDefinition.CONTAINERS.getTable(dbStore),
-        dbStore,
-        pipelineManager,
-        scmServiceProvider, containerHealthSchemaManager);
+        dbStore, pipelineManager, scmServiceProvider,
+        containerHealthSchemaManager, containerDBServiceProvider);
     this.scmServiceProvider = scmServiceProvider;
 
     NodeReportHandler nodeReportHandler =
