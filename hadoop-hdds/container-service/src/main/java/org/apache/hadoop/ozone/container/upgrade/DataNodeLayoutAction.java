@@ -18,41 +18,35 @@
 
 package org.apache.hadoop.ozone.container.upgrade;
 
-import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeatureCatalog.HDDSLayoutFeature.FIRST_UPGRADE_VERSION;
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.FIRST_UPGRADE_VERSION;
 
 import java.util.Optional;
 
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeatureCatalog.HDDSLayoutFeature;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 
 /**
  * Catalog of HDDS features and their corresponding DataNode action.
  * It is OK to skip HDDS features from the catalog that do not have
  * any specific DataNodeActions.
  */
-public class DataNodeLayoutActionCatalog {
+public enum DataNodeLayoutAction {
+  DataNodeUpgradeFirstAction(FIRST_UPGRADE_VERSION,
+      new DataNodeUpgradeActionFirstUpgradeVersion());
 
-  /**
-   * List of HDDS Features and corresponding DataNode actions.
-   */
-  public enum DataNodeLayoutAction {
-    DataNodeAction1(FIRST_UPGRADE_VERSION,
-        new DataNodeUpgradeActionFirstUpgradeVersion());
+  //////////////////////////////  //////////////////////////////
 
-    //////////////////////////////  //////////////////////////////
+  private HDDSLayoutFeature hddsFeature;
+  private DataNodeUpgradeAction dataNodeAction;
 
-    private HDDSLayoutFeature hddsFeature;
-    private DataNodeUpgradeAction dataNodeAction;
+  DataNodeLayoutAction(HDDSLayoutFeature feature,
+                       DataNodeUpgradeAction action) {
+    this.hddsFeature = feature;
+    this.dataNodeAction = action;
+    this.hddsFeature.setDataNodeUpgradeAction(Optional.of(dataNodeAction));
+  }
 
-    DataNodeLayoutAction(HDDSLayoutFeature feature,
-                         DataNodeUpgradeAction action) {
-      this.hddsFeature = feature;
-      this.dataNodeAction = action;
-      this.hddsFeature.setDataNodeUpgradeAction(Optional.of(dataNodeAction));
-    }
-
-    public HDDSLayoutFeature getHddsFeature() {
-      return hddsFeature;
-    }
+  public HDDSLayoutFeature getHddsFeature() {
+    return hddsFeature;
   }
 }
 

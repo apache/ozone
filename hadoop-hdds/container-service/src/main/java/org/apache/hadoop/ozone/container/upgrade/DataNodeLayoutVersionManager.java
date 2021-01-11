@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.container.upgrade;
 
 import java.io.IOException;
 
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeatureCatalog.HDDSLayoutFeature;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.upgrade.AbstractLayoutVersionManager;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;

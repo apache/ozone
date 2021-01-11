@@ -18,38 +18,34 @@
 
 package org.apache.hadoop.hdds.scm.server.upgrade;
 
-import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeatureCatalog.HDDSLayoutFeature.FIRST_UPGRADE_VERSION;
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.FIRST_UPGRADE_VERSION;
+
 import java.util.Optional;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeatureCatalog.HDDSLayoutFeature;
+
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 
 /**
  * Catalog of HDDS features and their corresponding SCM action.
  * It is OK to skip HDDS features from the catalog that do not have
  * any specific SCMActions.
  */
-public class SCMLayoutActionCatalog {
+public enum SCMLayoutAction {
+  SCMUpgradeFirstAction(FIRST_UPGRADE_VERSION,
+      new SCMUpgradeActionFirstUpgradeVersion());
 
-  /**
-   * List of HDDS Features and corresponding SCM actions.
-   */
-  public enum SCMLayoutAction {
-    SCMAction1(FIRST_UPGRADE_VERSION,
-        new SCMUpgradeActionFirstUpgradeVersion());
+  //////////////////////////////  //////////////////////////////
 
-    //////////////////////////////  //////////////////////////////
+  private HDDSLayoutFeature hddsFeature;
+  private SCMUpgradeAction scmAction;
 
-    private HDDSLayoutFeature hddsFeature;
-    private SCMUpgradeAction scmAction;
+  SCMLayoutAction(HDDSLayoutFeature feature, SCMUpgradeAction action) {
+    this.hddsFeature = feature;
+    this.scmAction = action;
+    hddsFeature.setSCMUpgradeAction(Optional.of(scmAction));
+  }
 
-    SCMLayoutAction(HDDSLayoutFeature feature, SCMUpgradeAction action) {
-      this.hddsFeature = feature;
-      this.scmAction = action;
-      hddsFeature.setSCMUpgradeAction(Optional.of(scmAction));
-    }
-
-    public HDDSLayoutFeature getHddsFeature() {
-      return hddsFeature;
-    }
+  public HDDSLayoutFeature getHddsFeature() {
+    return hddsFeature;
   }
 }
 

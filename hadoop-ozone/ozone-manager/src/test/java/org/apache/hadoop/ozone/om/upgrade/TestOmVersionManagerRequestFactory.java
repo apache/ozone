@@ -54,7 +54,7 @@ public class TestOmVersionManagerRequestFactory {
   public static void setup() throws OMException {
     OMStorage omStorage = mock(OMStorage.class);
     when(omStorage.getLayoutVersion()).thenReturn(0);
-    omVersionManager = OMLayoutVersionManagerImpl.initialize(omStorage);
+    omVersionManager = new OMLayoutVersionManagerImpl(omStorage);
     om = mock(OzoneManager.class);
     when(om.getOmStorage()).thenReturn(omStorage);
   }

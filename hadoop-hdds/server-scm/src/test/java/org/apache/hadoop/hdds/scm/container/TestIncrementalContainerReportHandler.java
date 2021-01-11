@@ -35,7 +35,7 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
+import org.apache.hadoop.hdds.upgrade.SCMLayoutVersionManager;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
@@ -64,7 +64,7 @@ public class TestIncrementalContainerReportHandler {
   private EventPublisher publisher;
   private static final Integer SOFTWARE_LAYOUT_VERSION = 1;
   private static final Integer METADATA_LAYOUT_VERSION = 1;
-  private HDDSLayoutVersionManager versionManager;
+  private SCMLayoutVersionManager versionManager;
 
   @Before
   public void setup() throws IOException {
@@ -78,7 +78,7 @@ public class TestIncrementalContainerReportHandler {
     EventQueue eventQueue = new EventQueue();
     SCMStorageConfig storageConfig = new SCMStorageConfig(conf);
     this.versionManager =
-        Mockito.mock(HDDSLayoutVersionManager.class);
+        Mockito.mock(SCMLayoutVersionManager.class);
     Mockito.when(versionManager.getMetadataLayoutVersion())
         .thenReturn(METADATA_LAYOUT_VERSION);
     Mockito.when(versionManager.getSoftwareLayoutVersion())

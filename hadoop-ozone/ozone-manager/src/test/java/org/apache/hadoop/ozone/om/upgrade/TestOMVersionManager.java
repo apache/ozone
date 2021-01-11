@@ -40,7 +40,6 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.UnsupportedMockNewOMRequest;
 import org.apache.hadoop.test.GenericTestUtils;
-import org.junit.After;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -49,17 +48,12 @@ import org.junit.Test;
  */
 public class TestOMVersionManager {
 
-  @After
-  public void cleanup() {
-    OMLayoutVersionManagerImpl.resetLayoutVersionManager();
-  }
-
   @Test
   public void testOMLayoutVersionManager() throws IOException {
     OMStorage omStorage = mock(OMStorage.class);
     when(omStorage.getLayoutVersion()).thenReturn(0);
     OMLayoutVersionManagerImpl omVersionManager =
-        OMLayoutVersionManagerImpl.initialize(omStorage);
+        new OMLayoutVersionManagerImpl(omStorage);
     OzoneManager om = mock(OzoneManager.class);
     when(om.getOmStorage()).thenReturn(omStorage);
 
@@ -82,7 +76,8 @@ public class TestOMVersionManager {
         OMLayoutFeature.values()[OMLayoutFeature.values().length - 1]
             .layoutVersion() + 1);
     try {
-      OMLayoutVersionManagerImpl.initialize(omStorage);
+      OMLayoutVersionManagerImpl omVersionManager =
+          new OMLayoutVersionManagerImpl(omStorage);
       Assert.fail();
     } catch (OMException ex) {
       assertEquals(NOT_SUPPORTED_OPERATION, ex.getResult());
@@ -94,12 +89,11 @@ public class TestOMVersionManager {
     OMStorage omStorage = mock(OMStorage.class);
     when(omStorage.getLayoutVersion()).thenReturn(0);
     OMLayoutVersionManagerImpl omVersionManager =
-        OMLayoutVersionManagerImpl.initialize(omStorage);
+        new OMLayoutVersionManagerImpl(omStorage);
     int numLayoutVersions = OMLayoutFeature.values().length;
     assertEquals(
         OMLayoutFeature.values()[numLayoutVersions - 1].layoutVersion(),
         omVersionManager.getSoftwareLayoutVersion());
-    OMLayoutVersionManagerImpl.resetLayoutVersionManager();
     assertEquals(0, omVersionManager.getSoftwareLayoutVersion());
   }
 
@@ -149,7 +143,7 @@ public class TestOMVersionManager {
     OMStorage omStorage = mock(OMStorage.class);
     when(omStorage.getLayoutVersion()).thenReturn(0);
     OMLayoutVersionManagerImpl omVersionManager =
-        OMLayoutVersionManagerImpl.initialize(omStorage);
+        new OMLayoutVersionManagerImpl(omStorage);
     OzoneManager om = mock(OzoneManager.class);
     when(om.getOmStorage()).thenReturn(omStorage);
 

@@ -33,7 +33,6 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.upgrade.AbstractLayoutVersionManager;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionInstanceFactory;
-import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.ozone.upgrade.VersionFactoryKey;
 import org.reflections.Reflections;
 import org.reflections.scanners.SubTypesScanner;
@@ -56,39 +55,18 @@ public final class OMLayoutVersionManagerImpl
 
   private static final String OM_REQUEST_CLASS_PACKAGE =
       "org.apache.hadoop.ozone.om.request";
-  private static OMLayoutVersionManagerImpl omVersionManager;
   private LayoutVersionInstanceFactory<Class<? extends OMClientRequest>>
       requestFactory;
 
-  private OMLayoutVersionManagerImpl() {
+  public OMLayoutVersionManagerImpl(OMStorage omStorage) throws OMException {
     requestFactory = new LayoutVersionInstanceFactory<>();
+    init(omStorage);
   }
 
-  /**
-   * Read only instance to OM Version Manager.
-   * @return version manager instance.
-   */
-  public static synchronized LayoutVersionManager getInstance() {
-    if (omVersionManager == null) {
-      throw new RuntimeException("OM Layout Version Manager not yet " +
-          "initialized.");
-    }
-    return omVersionManager;
-  }
-
-
-  /**
-   * Initialize OM version manager from storage.
-   * @return version manager instance.
-   */
-  public static synchronized OMLayoutVersionManagerImpl initialize(
-      OMStorage omStorage)
-      throws OMException {
-    if (omVersionManager == null) {
-      omVersionManager = new OMLayoutVersionManagerImpl();
-      omVersionManager.init(omStorage);
-    }
-    return omVersionManager;
+  public OMLayoutVersionManagerImpl() throws IOException {
+    requestFactory = new LayoutVersionInstanceFactory<>();
+    OMLayoutFeature[] features = OMLayoutFeature.values();
+    init(features[features.length - 1].layoutVersion(), features);
   }
 
   /**
@@ -108,14 +86,6 @@ public final class OMLayoutVersionManagerImpl
           NOT_SUPPORTED_OPERATION);
     }
     registerOzoneManagerRequests();
-  }
-
-  @VisibleForTesting
-  protected synchronized static void resetLayoutVersionManager() {
-    if (omVersionManager != null) {
-      omVersionManager.reset();
-      omVersionManager = null;
-    }
   }
 
   public void reset() {

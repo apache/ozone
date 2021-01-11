@@ -90,7 +90,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineReportHandler;
 import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.PipelineChoosePolicyFactory;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
-import org.apache.hadoop.hdds.scm.server.upgrade.SCMLayoutActionCatalog.SCMLayoutAction;
+import org.apache.hadoop.hdds.scm.server.upgrade.SCMLayoutAction;
 import org.apache.hadoop.hdds.scm.server.upgrade.SCMUpgradeFinalizer;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
@@ -100,7 +100,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.server.ServiceRuntimeInfoImpl;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
+import org.apache.hadoop.hdds.upgrade.SCMLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
@@ -214,7 +214,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private NetworkTopology clusterMap;
   private PipelineChoosePolicy pipelineChoosePolicy;
 
-  private HDDSLayoutVersionManager scmLayoutVersionManager;
+  private SCMLayoutVersionManager scmLayoutVersionManager;
   private UpgradeFinalizer<StorageContainerManager> upgradeFinalizer;
 
   /**
@@ -264,9 +264,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
 
     loadSCMUpgradeActions();
-    scmLayoutVersionManager =
-        HDDSLayoutVersionManager.initialize(scmStorageConfig);
-
+    scmLayoutVersionManager = new SCMLayoutVersionManager(scmStorageConfig);
     upgradeFinalizer = new SCMUpgradeFinalizer(scmLayoutVersionManager);
 
     /**
@@ -1167,7 +1165,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     return getScmStorageConfig().getClusterID();
   }
 
-  public HDDSLayoutVersionManager getLayoutVersionManager() {
+  public SCMLayoutVersionManager getLayoutVersionManager() {
     return scmLayoutVersionManager;
   }
 

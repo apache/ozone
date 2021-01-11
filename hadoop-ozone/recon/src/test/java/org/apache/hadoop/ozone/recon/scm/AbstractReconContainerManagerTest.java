@@ -32,7 +32,7 @@ import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventQueue;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
+import org.apache.hadoop.hdds.upgrade.SCMLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -66,7 +66,7 @@ public class AbstractReconContainerManagerTest {
   private ReconPipelineManager pipelineManager;
   private ReconContainerManager containerManager;
   private DBStore store;
-  private HDDSLayoutVersionManager layoutVersionManager;
+  private SCMLayoutVersionManager layoutVersionManager;
   public static final int SOFTWARE_LAYOUT_VERSION = 1;
   public static final int METADATA_LAYOUT_VERSION = 1;
 
@@ -80,7 +80,7 @@ public class AbstractReconContainerManagerTest {
     scmStorageConfig = new ReconStorageConfig(conf);
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     EventQueue eventQueue = new EventQueue();
-    layoutVersionManager = mock(HDDSLayoutVersionManager.class);
+    layoutVersionManager = mock(SCMLayoutVersionManager.class);
     when(layoutVersionManager.getSoftwareLayoutVersion())
         .thenReturn(SOFTWARE_LAYOUT_VERSION);
     when(layoutVersionManager.getMetadataLayoutVersion())

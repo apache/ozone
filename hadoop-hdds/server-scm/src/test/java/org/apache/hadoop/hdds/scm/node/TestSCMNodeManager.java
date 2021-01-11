@@ -51,7 +51,7 @@ import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
+import org.apache.hadoop.hdds.upgrade.SCMLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
@@ -555,8 +555,8 @@ public class TestSCMNodeManager {
     SCMStorageConfig scmStorageConfig = mock(SCMStorageConfig.class);
     when(scmStorageConfig.getClusterID()).thenReturn("xyz111");
     EventPublisher eventPublisher = mock(EventPublisher.class);
-    HDDSLayoutVersionManager lvm  =
-        HDDSLayoutVersionManager.initialize(scmStorageConfig);
+    SCMLayoutVersionManager lvm  =
+        new SCMLayoutVersionManager(scmStorageConfig);
     SCMNodeManager nodeManager  = new SCMNodeManager(conf,
         scmStorageConfig, eventPublisher, new NetworkTopologyImpl(conf), lvm);
     DatanodeDetails node1 =

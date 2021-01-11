@@ -56,7 +56,7 @@ import org.apache.hadoop.ozone.container.replication.ContainerReplicator;
 import org.apache.hadoop.ozone.container.replication.DownloadAndImportReplicator;
 import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
 import org.apache.hadoop.ozone.container.replication.SimpleContainerDownloader;
-import org.apache.hadoop.ozone.container.upgrade.DataNodeLayoutActionCatalog.DataNodeLayoutAction;
+import org.apache.hadoop.ozone.container.upgrade.DataNodeLayoutAction;
 import org.apache.hadoop.ozone.container.upgrade.DataNodeLayoutVersionManager;
 import org.apache.hadoop.ozone.container.upgrade.DataNodeUpgradeFinalizer;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;

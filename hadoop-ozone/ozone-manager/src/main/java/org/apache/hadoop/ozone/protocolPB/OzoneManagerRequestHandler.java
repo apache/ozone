@@ -637,7 +637,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .setCurrentTxnIndex(prepareState.getIndex()).build();
   }
 
-  protected OzoneManager getOzoneManager() {
+  public OzoneManager getOzoneManager() {
     return impl;
   }
 }

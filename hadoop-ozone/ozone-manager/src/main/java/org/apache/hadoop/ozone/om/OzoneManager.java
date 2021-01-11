@@ -369,7 +369,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     omStorage = new OMStorage(conf);
     omId = omStorage.getOmId();
 
-    versionManager = OMLayoutVersionManagerImpl.initialize(omStorage);
+    versionManager = new OMLayoutVersionManagerImpl(omStorage);
     upgradeFinalizer = new OMUpgradeFinalizer(versionManager);
 
     // In case of single OM Node Service there will be no OM Node ID

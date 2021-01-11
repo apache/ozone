@@ -50,7 +50,7 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.Incremen
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
+import org.apache.hadoop.hdds.upgrade.SCMLayoutVersionManager;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.Test;
 import org.mockito.Mockito;
@@ -60,7 +60,7 @@ import org.mockito.Mockito;
  */
 public class TestReconIncrementalContainerReportHandler
     extends AbstractReconContainerManagerTest {
-  private HDDSLayoutVersionManager versionManager;
+  private SCMLayoutVersionManager versionManager;
 
   @Test
   public void testProcessICR() throws IOException, NodeNotFoundException {
@@ -85,7 +85,7 @@ public class TestReconIncrementalContainerReportHandler
     EventQueue eventQueue = new EventQueue();
     SCMStorageConfig storageConfig = new SCMStorageConfig(conf);
     this.versionManager =
-        Mockito.mock(HDDSLayoutVersionManager.class);
+        Mockito.mock(SCMLayoutVersionManager.class);
     Mockito.when(versionManager.getMetadataLayoutVersion())
         .thenReturn(METADATA_LAYOUT_VERSION);
     Mockito.when(versionManager.getSoftwareLayoutVersion())

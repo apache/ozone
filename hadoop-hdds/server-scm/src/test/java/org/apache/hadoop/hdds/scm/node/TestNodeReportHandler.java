@@ -32,7 +32,7 @@ import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.Event;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
+import org.apache.hadoop.hdds.upgrade.SCMLayoutVersionManager;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.Before;
@@ -49,7 +49,7 @@ public class TestNodeReportHandler implements EventPublisher {
   private static final Logger LOG = LoggerFactory
       .getLogger(TestNodeReportHandler.class);
   private NodeReportHandler nodeReportHandler;
-  private HDDSLayoutVersionManager versionManager;
+  private SCMLayoutVersionManager versionManager;
   private static final Integer SOFTWARE_LAYOUT_VERSION = 1;
   private static final Integer METADATA_LAYOUT_VERSION = 1;
   private SCMNodeManager nodeManager;
@@ -64,7 +64,7 @@ public class TestNodeReportHandler implements EventPublisher {
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
 
     this.versionManager =
-        Mockito.mock(HDDSLayoutVersionManager.class);
+        Mockito.mock(SCMLayoutVersionManager.class);
     Mockito.when(versionManager.getMetadataLayoutVersion())
         .thenReturn(METADATA_LAYOUT_VERSION);
     Mockito.when(versionManager.getSoftwareLayoutVersion())

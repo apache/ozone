@@ -57,7 +57,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
+import org.apache.hadoop.hdds.upgrade.SCMLayoutVersionManager;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.net.CachedDNSToSwitchMapping;
@@ -111,7 +111,7 @@ public class SCMNodeManager implements NodeManager {
       new ConcurrentHashMap<>();
   private final int numPipelinesPerMetadataVolume;
   private final int heavyNodeCriteria;
-  private final HDDSLayoutVersionManager scmLayoutVersionManager;
+  private final SCMLayoutVersionManager scmLayoutVersionManager;
   private final EventPublisher scmNodeEventPublisher;
 
   /**
@@ -121,7 +121,7 @@ public class SCMNodeManager implements NodeManager {
                         SCMStorageConfig scmStorageConfig,
                         EventPublisher eventPublisher,
                         NetworkTopology networkTopology,
-                        HDDSLayoutVersionManager layoutVersionManager) {
+                        SCMLayoutVersionManager layoutVersionManager) {
     this.scmNodeEventPublisher = eventPublisher;
     this.nodeStateManager = new NodeStateManager(conf, eventPublisher,
         layoutVersionManager);
@@ -881,7 +881,7 @@ public class SCMNodeManager implements NodeManager {
    */
   @VisibleForTesting
   @Override
-  public HDDSLayoutVersionManager getLayoutVersionManager() {
+  public SCMLayoutVersionManager getLayoutVersionManager() {
     return scmLayoutVersionManager;
   }
 
