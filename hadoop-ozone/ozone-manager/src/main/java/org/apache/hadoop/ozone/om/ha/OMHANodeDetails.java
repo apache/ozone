@@ -182,14 +182,11 @@ public class OMHANodeDetails {
         }
       }
       if (found == 1) {
-        LOG.debug("Found one matching OM address with service ID: {} and node" +
-            " ID: {}", localOMServiceId, localOMNodeId);
 
         LOG.info("Found matching OM address with OMServiceId: {}, " +
                 "OMNodeId: {}, RPC Address: {} and Ratis port: {}",
             localOMServiceId, localOMNodeId,
             NetUtils.getHostPortString(localRpcAddress), localRatisPort);
-
 
         setOMNodeSpecificConfigs(conf, localOMServiceId, localOMNodeId);
         return new OMHANodeDetails(getHAOMNodeDetails(conf, localOMServiceId,
