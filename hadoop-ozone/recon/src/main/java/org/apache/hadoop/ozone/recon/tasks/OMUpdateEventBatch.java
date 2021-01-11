@@ -18,10 +18,8 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
-import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * Wrapper class to hold multiple OM DB update events.
