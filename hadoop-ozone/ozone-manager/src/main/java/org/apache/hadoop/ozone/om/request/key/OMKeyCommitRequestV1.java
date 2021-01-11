@@ -25,7 +25,6 @@ import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
@@ -91,7 +90,6 @@ public class OMKeyCommitRequestV1 extends OMKeyCommitRequest {
 
     IOException exception = null;
     OmKeyInfo omKeyInfo = null;
-    OmVolumeArgs omVolumeArgs = null;
     OmBucketInfo omBucketInfo = null;
     OMClientResponse omClientResponse = null;
     boolean bucketLockAcquired = false;
@@ -168,8 +166,7 @@ public class OMKeyCommitRequestV1 extends OMKeyCommitRequest {
       omBucketInfo.incrUsedBytes(correctedSpace);
 
       omClientResponse = new OMKeyCommitResponseV1(omResponse.build(),
-              omKeyInfo, dbFileKey, dbOpenFileKey, omVolumeArgs,
-              omBucketInfo.copyObject());
+              omKeyInfo, dbFileKey, dbOpenFileKey, omBucketInfo.copyObject());
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
