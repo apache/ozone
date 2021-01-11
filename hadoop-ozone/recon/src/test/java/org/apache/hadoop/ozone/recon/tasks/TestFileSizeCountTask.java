@@ -153,6 +153,7 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
         .setAction(PUT)
         .setKey("deletedKey")
         .setValue(toBeDeletedKey)
+        .setTable(OmMetadataManagerImpl.KEY_TABLE)
         .build();
 
     OmKeyInfo toBeUpdatedKey = mock(OmKeyInfo.class);
@@ -164,6 +165,7 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
         .setAction(PUT)
         .setKey("updatedKey")
         .setValue(toBeUpdatedKey)
+        .setTable(OmMetadataManagerImpl.KEY_TABLE)
         .build();
 
     OMUpdateEventBatch omUpdateEventBatch =
@@ -322,6 +324,7 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
               .setAction(PUT)
               .setKey("key" + keyIndex)
               .setValue(omKeyInfo)
+              .setTable(OmMetadataManagerImpl.KEY_TABLE)
               .build());
         }
       }
@@ -365,6 +368,7 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
                 .setAction(DELETE)
                 .setKey("key" + keyIndex)
                 .setValue(omKeyInfo)
+                .setTable(OmMetadataManagerImpl.KEY_TABLE)
                 .build());
           } else {
             // update all the files with keyIndex > 5 to filesize 1023L
@@ -374,6 +378,7 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
                 .setAction(UPDATE)
                 .setKey("key" + keyIndex)
                 .setValue(omKeyInfo)
+                .setTable(OmMetadataManagerImpl.KEY_TABLE)
                 .setOldValue(
                     omKeyInfoList.get((volIndex * bktIndex) + keyIndex))
                 .build());
