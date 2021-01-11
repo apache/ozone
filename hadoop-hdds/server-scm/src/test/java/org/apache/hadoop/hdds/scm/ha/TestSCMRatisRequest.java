@@ -19,10 +19,13 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import com.google.protobuf.InvalidProtocolBufferException;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.ratis.protocol.Message;
 import org.junit.Assert;
 import org.junit.Test;
+
+import java.util.ArrayList;
 
 import static org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType.PIPELINE;
 
@@ -34,13 +37,20 @@ public class TestSCMRatisRequest {
   @Test
   public void testEncodeAndDecodeSuccess() throws Exception {
     PipelineID pipelineID = PipelineID.randomId();
-    Object[] args = new Object[] {pipelineID.getProtobuf()};
+    ArrayList<HddsProtos.PipelineID> list = new ArrayList<>();
+    list.add(pipelineID.getProtobuf());
+    Object[] args = new Object[] {pipelineID.getProtobuf(), list, 1L};
     String operation = "test";
     SCMRatisRequest request = SCMRatisRequest.of(PIPELINE, operation, args);
+    SCMRatisRequest decodeRequest = SCMRatisRequest.decode(request.encode());
     Assert.assertEquals(operation,
-        SCMRatisRequest.decode(request.encode()).getOperation());
+        decodeRequest.getOperation());
     Assert.assertEquals(args[0],
-        SCMRatisRequest.decode(request.encode()).getArguments()[0]);
+        decodeRequest.getArguments()[0]);
+    Assert.assertEquals(((ArrayList)args[1]).get(0),
+        ((ArrayList)decodeRequest.getArguments()[1]).get(0));
+    Assert.assertEquals(args[2],
+        decodeRequest.getArguments()[2]);
   }
 
   @Test(expected = InvalidProtocolBufferException.class)

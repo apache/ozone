@@ -35,6 +35,11 @@ message MethodArgument {
     required bytes value = 2;
 }
 
+message ListArgument {
+    required string type = 1;
+    repeated bytes value = 2;
+}
+
 message SCMRatisRequestProto {
     required RequestType type = 1;
     required Method method = 2;

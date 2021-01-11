@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import java.lang.reflect.InvocationTargetException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -30,6 +31,7 @@ import com.google.protobuf.ProtocolMessageEnum;
 
 import org.apache.ratis.protocol.Message;
 
+import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.ListArgument;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.Method;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.MethodArgument;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
@@ -79,6 +81,48 @@ public final class SCMRatisRequest {
     return arguments.clone();
   }
 
+  private static MethodArgument toMethodArgument(
+      String type, ByteString value) {
+    final MethodArgument.Builder argBuilder = MethodArgument.newBuilder();
+    argBuilder.setType(type);
+    argBuilder.setValue(value);
+    return argBuilder.build();
+  }
+
+  private List<MethodArgument> encodeArgs()
+      throws InvalidProtocolBufferException {
+    final List<MethodArgument> args = new ArrayList<>();
+    for (Object argument : arguments) {
+      args.add(
+          toMethodArgument(argument.getClass().getName(), encodeArg(argument)));
+    }
+    return args;
+  }
+
+  private ByteString encodeArg(Object argument)
+      throws InvalidProtocolBufferException {
+    if (argument instanceof GeneratedMessage) {
+      return ((GeneratedMessage) argument).toByteString();
+    } else if (argument instanceof ProtocolMessageEnum) {
+      return ByteString.copyFrom(Ints.toByteArray(
+          ((ProtocolMessageEnum) argument).getNumber()));
+    } else if (argument instanceof Long) {
+      return ByteString.copyFrom(
+          ((ByteBuffer) ByteBuffer.allocate(8)
+              .putLong((Long)argument).flip()));
+    } else if (argument instanceof List<?>) {
+      final ListArgument.Builder listBuilder = ListArgument.newBuilder();
+      for (Object o : (List<?>) argument) {
+        listBuilder.setType(o.getClass().getName());
+        listBuilder.addValue(encodeArg(o));
+      }
+      return listBuilder.build().toByteString();
+    } else {
+      throw new InvalidProtocolBufferException(argument.getClass() +
+          " is not a protobuf object!");
+    }
+  }
+
   /**
    * Encodes the request into Ratis Message.
    */
@@ -89,29 +133,58 @@ public final class SCMRatisRequest {
 
     final Method.Builder methodBuilder = Method.newBuilder();
     methodBuilder.setName(operation);
-
-    final List<MethodArgument> args = new ArrayList<>();
-    for (Object argument : arguments) {
-      final MethodArgument.Builder argBuilder = MethodArgument.newBuilder();
-      argBuilder.setType(argument.getClass().getName());
-      if (argument instanceof GeneratedMessage) {
-        argBuilder.setValue(((GeneratedMessage) argument).toByteString());
-      } else if (argument instanceof ProtocolMessageEnum) {
-        argBuilder.setValue(ByteString.copyFrom(Ints.toByteArray(
-            ((ProtocolMessageEnum) argument).getNumber())));
-      } else {
-        throw new InvalidProtocolBufferException(argument.getClass() +
-            " is not a protobuf object!");
-      }
-      args.add(argBuilder.build());
-    }
-    methodBuilder.addAllArgs(args);
+    methodBuilder.addAllArgs(encodeArgs());
     requestProtoBuilder.setMethod(methodBuilder.build());
     return Message.valueOf(
         org.apache.ratis.thirdparty.com.google.protobuf.ByteString.copyFrom(
             requestProtoBuilder.build().toByteArray()));
   }
 
+  private static Object[] decodeArgs(List<MethodArgument> arguments)
+      throws InvalidProtocolBufferException {
+    List<Object> args = new ArrayList<>();
+    for (MethodArgument argument : arguments) {
+      args.add(decodeArg(argument));
+    }
+    return args.toArray();
+  }
+
+  private static Object decodeArg(MethodArgument argument)
+      throws InvalidProtocolBufferException {
+    try {
+      final Class<?> clazz = ReflectionUtil.getClass(argument.getType());
+      if (GeneratedMessage.class.isAssignableFrom(clazz)) {
+        return ReflectionUtil.getMethod(clazz, "parseFrom", byte[].class)
+            .invoke(null, (Object) argument.getValue().toByteArray());
+      } else if (Enum.class.isAssignableFrom(clazz)) {
+        return ReflectionUtil.getMethod(clazz, "valueOf", int.class)
+            .invoke(null, Ints.fromByteArray(
+                argument.getValue().toByteArray()));
+      } else if (Long.class.isAssignableFrom(clazz)) {
+        return ((ByteBuffer) ByteBuffer.allocate(8)
+            .put(argument.getValue().toByteArray())
+            .flip()).getLong();
+      } else if (List.class.isAssignableFrom(clazz)) {
+        ListArgument listArgument = (ListArgument) ReflectionUtil
+            .getMethod(ListArgument.class, "parseFrom", byte[].class)
+            .invoke(null, (Object) argument.getValue().toByteArray());
+
+        List<Object> list = new ArrayList<>();
+        for (ByteString v : listArgument.getValueList()) {
+          list.add(decodeArg(toMethodArgument(listArgument.getType(), v)));
+        }
+
+        return list;
+      } else {
+        throw new InvalidProtocolBufferException(argument.getType() +
+            " is not a protobuf object!");
+      }
+    } catch (ClassNotFoundException | NoSuchMethodException |
+        IllegalAccessException | InvocationTargetException ex) {
+      throw new InvalidProtocolBufferException(argument.getType() +
+          " cannot be decoded!" + ex.getMessage());
+    }
+  }
   /**
    * Decodes the request from Ratis Message.
    */
@@ -120,29 +193,8 @@ public final class SCMRatisRequest {
     final SCMRatisRequestProto requestProto =
         SCMRatisRequestProto.parseFrom(message.getContent().toByteArray());
     final Method method = requestProto.getMethod();
-    List<Object> args = new ArrayList<>();
-    for (MethodArgument argument : method.getArgsList()) {
-      try {
-        final Class<?> clazz = ReflectionUtil.getClass(argument.getType());
-        if (GeneratedMessage.class.isAssignableFrom(clazz)) {
-          args.add(ReflectionUtil.getMethod(clazz, "parseFrom", byte[].class)
-              .invoke(null, (Object) argument.getValue().toByteArray()));
-        } else if (Enum.class.isAssignableFrom(clazz)) {
-          args.add(ReflectionUtil.getMethod(clazz, "valueOf", int.class)
-              .invoke(null, Ints.fromByteArray(
-                  argument.getValue().toByteArray())));
-        } else {
-          throw new InvalidProtocolBufferException(argument.getType() +
-              " is not a protobuf object!");
-        }
-      } catch (ClassNotFoundException | NoSuchMethodException |
-          IllegalAccessException | InvocationTargetException ex) {
-        throw new InvalidProtocolBufferException(argument.getType() +
-            " cannot be decoded!" + ex.getMessage());
-      }
-    }
     return new SCMRatisRequest(requestProto.getType(),
-        method.getName(), args.toArray());
+        method.getName(), decodeArgs(method.getArgsList()));
   }
 
 }
