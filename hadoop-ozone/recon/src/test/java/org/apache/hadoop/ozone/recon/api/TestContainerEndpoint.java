@@ -68,7 +68,7 @@ import org.apache.hadoop.ozone.recon.api.types.MissingContainersResponse;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersResponse;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHistory;
-import org.apache.hadoop.ozone.recon.persistence.ContainerSchemaManager;
+import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
@@ -100,7 +100,7 @@ public class TestContainerEndpoint {
   private ContainerDBServiceProvider containerDbServiceProvider;
   private ContainerEndpoint containerEndpoint;
   private boolean isSetupDone = false;
-  private ContainerSchemaManager containerSchemaManager;
+  private ContainerHealthSchemaManager containerHealthSchemaManager;
   private ReconOMMetadataManager reconOMMetadataManager;
   private ContainerID containerID = new ContainerID(1L);
   private PipelineID pipelineID;
@@ -132,7 +132,7 @@ public class TestContainerEndpoint {
             .addBinding(StorageContainerServiceProvider.class,
                 mock(StorageContainerServiceProviderImpl.class))
             .addBinding(ContainerEndpoint.class)
-            .addBinding(ContainerSchemaManager.class)
+            .addBinding(ContainerHealthSchemaManager.class)
             .build();
 
     ozoneStorageContainerManager =
@@ -142,8 +142,8 @@ public class TestContainerEndpoint {
     containerDbServiceProvider =
         reconTestInjector.getInstance(ContainerDBServiceProvider.class);
     containerEndpoint = reconTestInjector.getInstance(ContainerEndpoint.class);
-    containerSchemaManager =
-        reconTestInjector.getInstance(ContainerSchemaManager.class);
+    containerHealthSchemaManager =
+        reconTestInjector.getInstance(ContainerHealthSchemaManager.class);
   }
 
   @Before
@@ -423,7 +423,7 @@ public class TestContainerEndpoint {
     ArrayList<UnhealthyContainers> missingList =
         new ArrayList<UnhealthyContainers>();
     missingList.add(missing);
-    containerSchemaManager.insertUnhealthyContainerRecords(missingList);
+    containerHealthSchemaManager.insertUnhealthyContainerRecords(missingList);
 
     putContainerInfos(1);
     // Add container history for id 1
@@ -746,7 +746,7 @@ public class TestContainerEndpoint {
 
     ArrayList<UnhealthyContainers> missingList = new ArrayList<>();
     missingList.add(missing);
-    containerSchemaManager.insertUnhealthyContainerRecords(missingList);
+    containerHealthSchemaManager.insertUnhealthyContainerRecords(missingList);
 
     reconContainerManager.upsertContainerHistory(cID, uuid1, 1L);
     reconContainerManager.upsertContainerHistory(cID, uuid2, 2L);

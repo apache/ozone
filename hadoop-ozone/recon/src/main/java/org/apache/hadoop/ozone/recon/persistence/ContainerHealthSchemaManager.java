@@ -38,13 +38,13 @@ import java.util.List;
  * Provide a high level API to access the Container Schema.
  */
 @Singleton
-public class ContainerSchemaManager {
+public class ContainerHealthSchemaManager {
 
   private final UnhealthyContainersDao unhealthyContainersDao;
   private final ContainerSchemaDefinition containerSchemaDefinition;
 
   @Inject
-  public ContainerSchemaManager(
+  public ContainerHealthSchemaManager(
       ContainerSchemaDefinition containerSchemaDefinition,
       UnhealthyContainersDao unhealthyContainersDao) {
     this.unhealthyContainersDao = unhealthyContainersDao;

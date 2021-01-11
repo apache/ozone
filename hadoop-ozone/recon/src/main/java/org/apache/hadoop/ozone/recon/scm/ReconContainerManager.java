@@ -47,7 +47,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHistory;
-import org.apache.hadoop.ozone.recon.persistence.ContainerSchemaManager;
+import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 
@@ -64,7 +64,7 @@ public class ReconContainerManager extends SCMContainerManager {
   private static final Logger LOG =
       LoggerFactory.getLogger(ReconContainerManager.class);
   private final StorageContainerServiceProvider scmClient;
-  private final ContainerSchemaManager containerSchemaManager;
+  private final ContainerHealthSchemaManager containerHealthSchemaManager;
 
   @Inject
   private ContainerDBServiceProvider cdbServiceProvider;
@@ -89,10 +89,10 @@ public class ReconContainerManager extends SCMContainerManager {
       DBStore batchHandler,
       PipelineManager pipelineManager,
       StorageContainerServiceProvider scm,
-      ContainerSchemaManager containerSchemaManager) throws IOException {
+      ContainerHealthSchemaManager containerHealthSchemaManager) throws IOException {
     super(conf, containerStore, batchHandler, pipelineManager);
     this.scmClient = scm;
-    this.containerSchemaManager = containerSchemaManager;
+    this.containerHealthSchemaManager = containerHealthSchemaManager;
     this.replicaHistoryMap = new ConcurrentHashMap<>();
     // batchHandler == scmDBStore
     this.nodeDB = ReconSCMDBDefinition.NODES.getTable(batchHandler);
@@ -266,8 +266,8 @@ public class ReconContainerManager extends SCMContainerManager {
   }
 
   @VisibleForTesting
-  public ContainerSchemaManager getContainerSchemaManager() {
-    return containerSchemaManager;
+  public ContainerHealthSchemaManager getContainerSchemaManager() {
+    return containerHealthSchemaManager;
   }
 
   @VisibleForTesting

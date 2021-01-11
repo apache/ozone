@@ -56,7 +56,7 @@ import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersResponse;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersSummary;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHistory;
-import org.apache.hadoop.ozone.recon.persistence.ContainerSchemaManager;
+import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
@@ -84,15 +84,15 @@ public class ContainerEndpoint {
   @Inject
   private ReconOMMetadataManager omMetadataManager;
 
-  private ReconContainerManager containerManager;
-  private ContainerSchemaManager containerSchemaManager;
+  private final ReconContainerManager containerManager;
+  private final ContainerHealthSchemaManager containerHealthSchemaManager;
 
   @Inject
   public ContainerEndpoint(OzoneStorageContainerManager reconSCM,
-                           ContainerSchemaManager containerSchemaManager) {
+                           ContainerHealthSchemaManager containerHealthSchemaManager) {
     this.containerManager =
         (ReconContainerManager) reconSCM.getContainerManager();
-    this.containerSchemaManager = containerSchemaManager;
+    this.containerHealthSchemaManager = containerHealthSchemaManager;
   }
 
   /**
@@ -240,7 +240,7 @@ public class ContainerEndpoint {
   @Path("/missing")
   public Response getMissingContainers() {
     List<MissingContainerMetadata> missingContainers = new ArrayList<>();
-    containerSchemaManager.getUnhealthyContainers(
+    containerHealthSchemaManager.getUnhealthyContainers(
         UnHealthyContainerStates.MISSING, 0, Integer.MAX_VALUE)
         .forEach(container -> {
           long containerID = container.getContainerId();
@@ -301,8 +301,8 @@ public class ContainerEndpoint {
         internalState = UnHealthyContainerStates.valueOf(state);
       }
 
-      summary = containerSchemaManager.getUnhealthyContainersSummary();
-      List<UnhealthyContainers> containers = containerSchemaManager
+      summary = containerHealthSchemaManager.getUnhealthyContainersSummary();
+      List<UnhealthyContainers> containers = containerHealthSchemaManager
           .getUnhealthyContainers(internalState, offset, limit);
       for (UnhealthyContainers c : containers) {
         long containerID = c.getContainerId();
