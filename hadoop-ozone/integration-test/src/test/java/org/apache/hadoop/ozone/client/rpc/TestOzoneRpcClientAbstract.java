@@ -397,6 +397,16 @@ public abstract class TestOzoneRpcClientAbstract {
   @Test
   public void testSetVolumeQuotaIllegal() throws Exception {
     String volumeName = UUID.randomUUID().toString();
+
+    VolumeArgs volumeArgs = VolumeArgs.newBuilder()
+        .addMetadata("key1", "val1")
+        .setQuotaInNamespace(0)
+        .setQuotaInBytes(0)
+        .build();
+    LambdaTestUtils.intercept(IllegalArgumentException.class,
+        "Invalid values for quota",
+        () -> store.createVolume(volumeName, volumeArgs));
+
     store.createVolume(volumeName);
 
     // test volume set quota 0
@@ -450,7 +460,8 @@ public abstract class TestOzoneRpcClientAbstract {
         .build();
     store.createVolume(volumeName, volumeArgs);
     OzoneVolume volume = store.getVolume(volumeName);
-
+    Assert.assertEquals(OzoneConsts.QUOTA_RESET, volume.getQuotaInNamespace());
+    Assert.assertEquals(OzoneConsts.QUOTA_RESET, volume.getQuotaInBytes());
     Assert.assertEquals("val1", volume.getMetadata().get("key1"));
     Assert.assertEquals(volumeName, volume.getName());
   }
@@ -462,11 +473,15 @@ public abstract class TestOzoneRpcClientAbstract {
     String bucketName = UUID.randomUUID().toString();
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
+    Assert.assertEquals(OzoneConsts.QUOTA_RESET, volume.getQuotaInNamespace());
+    Assert.assertEquals(OzoneConsts.QUOTA_RESET, volume.getQuotaInBytes());
     BucketArgs args = BucketArgs.newBuilder()
         .addMetadata("key1", "value1").build();
     volume.createBucket(bucketName, args);
     OzoneBucket bucket = volume.getBucket(bucketName);
     Assert.assertEquals(bucketName, bucket.getName());
+    Assert.assertEquals(OzoneConsts.QUOTA_RESET, bucket.getQuotaInNamespace());
+    Assert.assertEquals(OzoneConsts.QUOTA_RESET, bucket.getQuotaInBytes());
     Assert.assertNotNull(bucket.getMetadata());
     Assert.assertEquals("value1", bucket.getMetadata().get("key1"));
 
