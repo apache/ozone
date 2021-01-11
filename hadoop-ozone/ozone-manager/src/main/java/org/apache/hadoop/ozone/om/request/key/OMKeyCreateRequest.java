@@ -349,24 +349,34 @@ public class OMKeyCreateRequest extends OMKeyRequest {
         OMAction.ALLOCATE_KEY, auditMap, exception,
         getOmRequest().getUserInfo()));
 
+    logResult(createKeyRequest, omMetrics, exception, result,
+            numMissingParents);
+
+    return omClientResponse;
+  }
+
+  protected void logResult(CreateKeyRequest createKeyRequest,
+      OMMetrics omMetrics, IOException exception, Result result,
+       int numMissingParents) {
     switch (result) {
     case SUCCESS:
       // Missing directories are created immediately, counting that here.
       // The metric for the key is incremented as part of the key commit.
       omMetrics.incNumKeys(numMissingParents);
-      LOG.debug("Key created. Volume:{}, Bucket:{}, Key:{}", volumeName,
-          bucketName, keyName);
+      LOG.debug("Key created. Volume:{}, Bucket:{}, Key:{}",
+              createKeyRequest.getKeyArgs().getVolumeName(),
+              createKeyRequest.getKeyArgs().getBucketName(),
+              createKeyRequest.getKeyArgs().getKeyName());
       break;
     case FAILURE:
       LOG.error("Key creation failed. Volume:{}, Bucket:{}, Key{}. " +
-          "Exception:{}", volumeName, bucketName, keyName, exception);
+          "Exception:{}", createKeyRequest.getKeyArgs().getVolumeName(),
+              createKeyRequest.getKeyArgs().getBucketName(),
+              createKeyRequest.getKeyArgs().getKeyName(), exception);
       break;
     default:
       LOG.error("Unrecognized Result for OMKeyCreateRequest: {}",
           createKeyRequest);
     }
-
-    return omClientResponse;
   }
-
 }
