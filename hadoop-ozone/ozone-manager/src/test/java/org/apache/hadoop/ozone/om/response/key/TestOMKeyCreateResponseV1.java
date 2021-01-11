@@ -19,8 +19,6 @@
 package org.apache.hadoop.ozone.om.response.key;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -29,45 +27,12 @@ import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.util.Time;
 import org.jetbrains.annotations.NotNull;
+import org.junit.Assert;
 
 /**
- * Tests OMAllocateBlockResponse layout version V1.
+ * Tests OMKeyCreateResponseV1.
  */
-public class TestOMAllocateBlockResponseV1
-        extends TestOMAllocateBlockResponse {
-
-  // logical ID, which really doesn't exist in dirTable
-  private long parentID = 10;
-  private String fileName = "file1";
-
-  protected OmKeyInfo createOmKeyInfo() throws Exception {
-    // need to initialize parentID
-    String parentDir = keyName;
-    keyName = parentDir + OzoneConsts.OM_KEY_PREFIX + fileName;
-
-    long txnId = 50;
-    long objectId = parentID + 1;
-
-    OmKeyInfo omKeyInfoV1 =
-            TestOMRequestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
-                    HddsProtos.ReplicationType.RATIS,
-                    HddsProtos.ReplicationFactor.ONE, objectId, parentID, txnId,
-                    Time.now());
-    return omKeyInfoV1;
-  }
-
-  protected String getOpenKey() throws Exception {
-    return omMetadataManager.getOpenFileName(
-            parentID, fileName, clientID);
-  }
-
-  @NotNull
-  protected OMAllocateBlockResponse getOmAllocateBlockResponse(
-          OmKeyInfo omKeyInfo, OmBucketInfo omBucketInfo,
-          OMResponse omResponse) {
-    return new OMAllocateBlockResponseV1(omResponse, omKeyInfo, clientID,
-            omBucketInfo);
-  }
+public class TestOMKeyCreateResponseV1 extends TestOMKeyCreateResponse {
 
   @NotNull
   @Override
@@ -81,4 +46,30 @@ public class TestOMAllocateBlockResponseV1
     return config;
   }
 
+  @NotNull
+  @Override
+  protected String getOpenKeyName() {
+    Assert.assertNotNull(omBucketInfo);
+    return omMetadataManager.getOpenFileName(
+            omBucketInfo.getObjectID(), keyName, clientID);
+  }
+
+  @NotNull
+  @Override
+  protected OmKeyInfo getOmKeyInfo() {
+    Assert.assertNotNull(omBucketInfo);
+    return TestOMRequestUtils.createOmKeyInfo(volumeName,
+            omBucketInfo.getBucketName(), keyName, replicationType,
+            replicationFactor,
+            omBucketInfo.getObjectID() + 1,
+            omBucketInfo.getObjectID(), 100, Time.now());
+  }
+
+  @NotNull
+  protected OMKeyCreateResponse getOmKeyCreateResponse(OmKeyInfo keyInfo,
+      OmBucketInfo bucketInfo, OMResponse response) {
+
+    return new OMKeyCreateResponseV1(response, keyInfo, null, clientID,
+            bucketInfo);
+  }
 }
