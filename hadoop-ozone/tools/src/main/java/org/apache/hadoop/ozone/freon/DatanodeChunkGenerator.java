@@ -85,7 +85,9 @@ public class DatanodeChunkGenerator extends BaseFreonGenerator implements
   private String pipelineIds;
 
   @Option(names = {"-d", "--datanodes"},
-      description = "Datanodes to use. ",
+      description = "Datanodes to use." +
+          " Test will write to all the existing pipelines " +
+          "which this datanode is member of.",
       defaultValue = "")
   private String datanodes;
 
@@ -133,8 +135,6 @@ public class DatanodeChunkGenerator extends BaseFreonGenerator implements
             .acquireClient(firstPipeline);
         xceiverClients = new ArrayList<>();
         xceiverClients.add(xceiverClientSpi);
-        LOG.info("Using pipeline {}", firstPipeline.getId());
-        runTest();
       } else {
         xceiverClients = new ArrayList<>();
         pipelines = new HashSet<>();
@@ -152,11 +152,10 @@ public class DatanodeChunkGenerator extends BaseFreonGenerator implements
         }
         if (pipelines.isEmpty()){
           throw new IllegalArgumentException(
-              "Coudln't find the any/the selected pipeline");
-        } else {
-          runTest();
+              "Couldn't find the any/the selected pipeline");
         }
       }
+      runTest();
     } finally {
       for (XceiverClientSpi xceiverClientSpi : xceiverClients) {
         if (xceiverClientSpi != null) {
