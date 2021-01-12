@@ -72,8 +72,8 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <hadoop.version>3.2.1</hadoop.version>
 
     <!-- version for hdds/ozone components -->
-    <hdds.version>${ozone.version}</hdds.version>
-    <ozone.version>1.1.0-SNAPSHOT</ozone.version>
+    <hdds.version>${project.version}</hdds.version>
+    <ozone.version>${project.version}</ozone.version>
     <ozone.release>Denali</ozone.release>
     <declared.hdds.version>${hdds.version}</declared.hdds.version>
     <declared.ozone.version>${ozone.version}</declared.ozone.version>
