@@ -104,7 +104,8 @@ public class TestRootedOzoneFileSystem {
         new Object[]{false, false});
   }
 
-  public TestRootedOzoneFileSystem(boolean setDefaultFs, boolean enableOMRatis) {
+  public TestRootedOzoneFileSystem(boolean setDefaultFs,
+      boolean enableOMRatis) {
     enabledFileSystemPaths = setDefaultFs;
     omRatisEnabled = enableOMRatis;
   }
