@@ -99,7 +99,6 @@ public class TableCountTask implements ReconOmTask {
     return "TableCountTask";
   }
 
-  @Override
   public Collection<String> getTaskTables() {
     return new ArrayList<>(reconOMMetadataManager.listTableNames());
   }

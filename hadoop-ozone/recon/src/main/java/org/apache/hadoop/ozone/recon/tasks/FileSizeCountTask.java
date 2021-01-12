@@ -110,7 +110,6 @@ public class FileSizeCountTask implements ReconOmTask {
     return "FileSizeCountTask";
   }
 
-  @Override
   public Collection<String> getTaskTables() {
     return Collections.singletonList(KEY_TABLE);
   }

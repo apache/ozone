@@ -104,7 +104,6 @@ public class ContainerKeyMapperTask implements ReconOmTask {
     return "ContainerKeyMapperTask";
   }
 
-  @Override
   public Collection<String> getTaskTables() {
     return Collections.singletonList(KEY_TABLE);
   }
