@@ -63,7 +63,7 @@ public class TestIncrementalContainerReportHandler {
   private ContainerManagerV2 containerManager;
   private ContainerStateManager containerStateManager;
   private EventPublisher publisher;
-  private SCMContext scmContext;
+  private SCMContext scmContext = SCMContext.emptyContext();
 
   @Before
   public void setup() throws IOException, InvalidStateTransitionException {
@@ -76,12 +76,11 @@ public class TestIncrementalContainerReportHandler {
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     EventQueue eventQueue = new EventQueue();
     SCMStorageConfig storageConfig = new SCMStorageConfig(conf);
-    this.nodeManager =
-        new SCMNodeManager(conf, storageConfig, eventQueue, clusterMap);
+    this.nodeManager = new SCMNodeManager(
+        conf, storageConfig, eventQueue, clusterMap, scmContext);
 
     this.containerStateManager = new ContainerStateManager(conf);
     this.publisher = Mockito.mock(EventPublisher.class);
-    this.scmContext = SCMContext.emptyContext();
 
     Mockito.when(containerManager.getContainer(Mockito.any(ContainerID.class)))
         .thenAnswer(invocation -> containerStateManager

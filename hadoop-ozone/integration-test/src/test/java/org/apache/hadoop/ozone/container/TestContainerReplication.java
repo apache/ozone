@@ -46,6 +46,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.ozoneimpl.TestOzoneContainer;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
+import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.test.GenericTestUtils;
 
 import static org.apache.hadoop.ozone.container.ozoneimpl.TestOzoneContainer
@@ -137,10 +138,13 @@ public class TestContainerReplication {
     Assert.assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
 
     //WHEN: send the order to replicate the container
+    SCMCommand<?> command = new ReplicateContainerCommand(containerId,
+        sourcePipelines.getNodes());
+    command.setTerm(
+        cluster.getStorageContainerManager().getScmContext().getTerm());
     cluster.getStorageContainerManager().getScmNodeManager()
         .addDatanodeCommand(destinationDatanode.getDatanodeDetails().getUuid(),
-            new ReplicateContainerCommand(containerId,
-                sourcePipelines.getNodes()));
+            command);
 
     DatanodeStateMachine destinationDatanodeDatanodeStateMachine =
         destinationDatanode.getDatanodeStateMachine();

@@ -108,7 +108,7 @@ public class TestContainerPlacement {
     Mockito.when(storageConfig.getClusterID()).thenReturn("cluster1");
 
     SCMNodeManager nodeManager = new SCMNodeManager(config,
-        storageConfig, eventQueue, null);
+        storageConfig, eventQueue, null, SCMContext.emptyContext());
     return nodeManager;
   }
 

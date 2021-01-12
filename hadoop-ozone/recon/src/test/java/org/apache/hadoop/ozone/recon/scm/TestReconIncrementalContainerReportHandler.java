@@ -84,8 +84,8 @@ public class TestReconIncrementalContainerReportHandler
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     EventQueue eventQueue = new EventQueue();
     SCMStorageConfig storageConfig = new SCMStorageConfig(conf);
-    NodeManager nodeManager =
-        new SCMNodeManager(conf, storageConfig, eventQueue, clusterMap);
+    NodeManager nodeManager = new SCMNodeManager(conf, storageConfig,
+        eventQueue, clusterMap, SCMContext.emptyContext());
     nodeManager.register(datanodeDetails, null, null);
 
     ReconContainerManager containerManager = getContainerManager();

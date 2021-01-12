@@ -91,6 +91,9 @@ public class CloseContainerEventHandler implements EventHandler<ContainerID> {
             containerID, container.getState());
       }
 
+    } catch (NotLeaderException nle) {
+      LOG.warn("Skip sending close container command,"
+          + " since current SCM is not leader.", nle);
     } catch (IOException | InvalidStateTransitionException ex) {
       LOG.error("Failed to close the container {}.", containerID, ex);
     }

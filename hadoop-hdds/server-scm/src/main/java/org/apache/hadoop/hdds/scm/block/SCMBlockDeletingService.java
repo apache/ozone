@@ -46,6 +46,7 @@ import org.apache.hadoop.util.Time;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -176,6 +177,9 @@ public class SCMBlockDeletingService extends BackgroundService {
               transactions.getBlocksDeleted(),
               transactions.getDatanodeTransactionMap().size(),
               Time.monotonicNow() - startTime);
+        } catch (NotLeaderException nle) {
+          LOG.warn("Skip current run, since not leader any more.", nle);
+          return EmptyTaskResult.newResult();
         } catch (IOException e) {
           // We may tolerate a number of failures for sometime
           // but if it continues to fail, at some point we need to raise

@@ -26,6 +26,7 @@ import java.util.List;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -109,8 +110,8 @@ public class TestReconPipelineManager {
 
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     EventQueue eventQueue = new EventQueue();
-    NodeManager nodeManager =
-        new SCMNodeManager(conf, scmStorageConfig, eventQueue, clusterMap);
+    NodeManager nodeManager = new SCMNodeManager(conf, scmStorageConfig,
+        eventQueue, clusterMap, SCMContext.emptyContext());
 
     try (ReconPipelineManager reconPipelineManager =
         new ReconPipelineManager(conf, nodeManager,
@@ -145,8 +146,8 @@ public class TestReconPipelineManager {
     Pipeline pipeline = getRandomPipeline();
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     EventQueue eventQueue = new EventQueue();
-    NodeManager nodeManager =
-        new SCMNodeManager(conf, scmStorageConfig, eventQueue, clusterMap);
+    NodeManager nodeManager = new SCMNodeManager(conf, scmStorageConfig,
+        eventQueue, clusterMap, SCMContext.emptyContext());
 
     ReconPipelineManager reconPipelineManager =
         new ReconPipelineManager(conf, nodeManager,
