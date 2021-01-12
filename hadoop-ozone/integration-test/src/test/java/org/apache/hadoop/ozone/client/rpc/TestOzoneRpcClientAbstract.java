@@ -283,6 +283,8 @@ public abstract class TestOzoneRpcClientAbstract {
   public void testSetAndClrQuota() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
+    String value = "sample value";
+    int valueLength = value.getBytes().length;
     OzoneVolume volume = null;
     store.createVolume(volumeName);
 
@@ -318,6 +320,14 @@ public abstract class TestOzoneRpcClientAbstract {
         " spaceQuota because volume spaceQuota is not cleared.",
         () -> ozoneBucket.clearSpaceQuota());
 
+    writeKey(bucket, UUID.randomUUID().toString(), ONE, value, valueLength);
+    Assert.assertEquals(1L,
+        store.getVolume(volumeName).getBucket(bucketName).getUsedNamespace());
+    Assert.assertEquals(valueLength,
+        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
+    Assert.assertEquals(1L,
+        store.getVolume(volumeName).getUsedNamespace());
+
     store.getVolume(volumeName).clearSpaceQuota();
     store.getVolume(volumeName).clearNamespaceQuota();
     OzoneVolume clrVolume = store.getVolume(volumeName);
@@ -331,6 +341,12 @@ public abstract class TestOzoneRpcClientAbstract {
     Assert.assertEquals(OzoneConsts.QUOTA_RESET, clrBucket.getQuotaInBytes());
     Assert.assertEquals(OzoneConsts.QUOTA_RESET,
         clrBucket.getQuotaInNamespace());
+    Assert.assertEquals(1L,
+        store.getVolume(volumeName).getBucket(bucketName).getUsedNamespace());
+    Assert.assertEquals(valueLength,
+        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
+    Assert.assertEquals(1L,
+        store.getVolume(volumeName).getUsedNamespace());
   }
 
   @Test
@@ -891,6 +907,12 @@ public abstract class TestOzoneRpcClientAbstract {
     Assert.assertEquals(4 * blockSize,
         store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
 
+    // Reset bucket quota, the original usedBytes needs to remain the same
+    bucket.setQuota(OzoneQuota.parseQuota(
+        100 + " GB", 100));
+    Assert.assertEquals(4 * blockSize,
+        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
+
     Assert.assertEquals(3, countException);
   }
 
@@ -933,6 +955,12 @@ public abstract class TestOzoneRpcClientAbstract {
     // namespace quota
     Assert.assertEquals(0L, volumeWithLinkedBucket.getUsedNamespace());
 
+    // Reset volume quota, the original usedNamespace needs to remain the same
+    store.getVolume(volumeName).setQuota(OzoneQuota.parseQuota(
+        100 + " GB", 100));
+    Assert.assertEquals(1L,
+        store.getVolume(volumeName).getUsedNamespace());
+
     volume.deleteBucket(bucketName);
     // Used namespace should be 0
     volume = store.getVolume(volumeName);
@@ -973,6 +1001,11 @@ public abstract class TestOzoneRpcClientAbstract {
     }
 
     // Write failed, bucket usedNamespace should remain as 2
+    Assert.assertEquals(2L,
+        store.getVolume(volumeName).getBucket(bucketName).getUsedNamespace());
+
+    // Reset bucket quota, the original usedNamespace needs to remain the same
+    bucket.setQuota(OzoneQuota.parseQuota(Long.MAX_VALUE + " Bytes", 100));
     Assert.assertEquals(2L,
         store.getVolume(volumeName).getBucket(bucketName).getUsedNamespace());
 

@@ -70,6 +70,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
   }
 
   @Override
+  @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
       long transactionLogIndex,
       OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
@@ -180,6 +181,9 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
 
       // Set the updateID to current transaction log index
       bucketInfoBuilder.setUpdateID(transactionLogIndex);
+      // Quota used remains unchanged
+      bucketInfoBuilder.setUsedBytes(dbBucketInfo.getUsedBytes());
+      bucketInfoBuilder.setUsedNamespace(dbBucketInfo.getUsedNamespace());
 
       omBucketInfo = bucketInfoBuilder.build();
 
