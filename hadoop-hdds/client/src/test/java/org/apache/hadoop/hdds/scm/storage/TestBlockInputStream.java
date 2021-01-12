@@ -52,10 +52,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_NOT_FOUND;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_UNHEALTHY;
 import static org.apache.hadoop.hdds.scm.storage.TestChunkInputStream.generateRandomData;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -281,7 +283,7 @@ public class TestBlockInputStream {
     final int len = 200;
     final ChunkInputStream stream = mock(ChunkInputStream.class);
     when(stream.read(any(), anyInt(), anyInt()))
-        .thenThrow(new OzoneChecksumException("no checksums"));
+        .thenThrow(new StorageContainerException("test", CONTAINER_UNHEALTHY));
     when(stream.getRemaining())
         .thenReturn((long) len);
 
@@ -299,11 +301,42 @@ public class TestBlockInputStream {
 
     // WHEN
     byte[] b = new byte[len];
-    LambdaTestUtils.intercept(OzoneChecksumException.class,
+    LambdaTestUtils.intercept(StorageContainerException.class,
         () -> subject.read(b, 0, len));
 
     // THEN
     verify(refreshPipeline).apply(blockID);
+  }
+
+  @Test
+  public void testReadNotRetriedOnOtherException() throws Exception {
+    // GIVEN
+    BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
+    Pipeline pipeline = MockPipeline.createSingleNodePipeline();
+
+    final int len = 200;
+    final ChunkInputStream stream = mock(ChunkInputStream.class);
+    when(stream.read(any(), anyInt(), anyInt()))
+        .thenThrow(new OzoneChecksumException("checksum missing"));
+    when(stream.getRemaining())
+        .thenReturn((long) len);
+
+    BlockInputStream subject = new DummyBlockInputStream(blockID, blockSize,
+        pipeline, null, false, null, refreshPipeline, chunks, null) {
+      @Override
+      protected ChunkInputStream createChunkInputStream(ChunkInfo chunkInfo) {
+        return stream;
+      }
+    };
+    subject.initialize();
+
+    // WHEN
+    byte[] b = new byte[len];
+    LambdaTestUtils.intercept(OzoneChecksumException.class,
+        () -> subject.read(b, 0, len));
+
+    // THEN
+    verify(refreshPipeline, never()).apply(blockID);
   }
 
   private Pipeline samePipelineWithNewId(Pipeline pipeline) {
