@@ -111,9 +111,13 @@ public class OzoneManagerStarter extends GenericCli {
       mixinStandardHelpOptions = true,
       versionProvider = HddsVersionProvider.class)
   public void startOmUpgrade() throws Exception {
-    commonInit();
-    receiver.startAndCancelPrepare(conf);
-    System.exit(0);
+    try {
+      commonInit();
+      receiver.startAndCancelPrepare(conf);
+    } catch (Exception ex) {
+      LOG.error("Starting OM in upgrade mode failed with exception", ex);
+      throw ex;
+    }
   }
 
   /**
@@ -156,6 +160,7 @@ public class OzoneManagerStarter extends GenericCli {
       OzoneManager om = OzoneManager.createOm(conf);
       om.getPrepareState().cancelPrepare();
       om.start();
+      om.join();
     }
   }
 }
