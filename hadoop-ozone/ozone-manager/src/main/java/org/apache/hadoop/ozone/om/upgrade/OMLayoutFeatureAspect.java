@@ -60,7 +60,7 @@ public class OMLayoutFeatureAspect {
             .getMethod(GET_VERSION_MANAGER_METHOD_NAME);
         lvm = (LayoutVersionManager) method.invoke(joinPoint.getTarget());
       } catch (Exception ex) {
-        lvm = new OMLayoutVersionManagerImpl();
+        lvm = new OMLayoutVersionManager();
       }
     }
     if (!lvm.isAllowed(featureName)) {

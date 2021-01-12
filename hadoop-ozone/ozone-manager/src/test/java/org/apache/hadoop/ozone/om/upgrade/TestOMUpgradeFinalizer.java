@@ -67,7 +67,7 @@ public class TestOMUpgradeFinalizer {
   private static final String OTHER_CLIENT_ID = "otherClientID";
 
   @Mock
-  private OMLayoutVersionManagerImpl versionManager;
+  private OMLayoutVersionManager versionManager;
 
   @Rule
   public ExpectedException exception = ExpectedException.none();

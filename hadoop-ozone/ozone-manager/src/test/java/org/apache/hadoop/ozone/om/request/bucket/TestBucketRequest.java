@@ -19,7 +19,7 @@
 
 package org.apache.hadoop.ozone.om.request.bucket;
 
-import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManagerImpl;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -73,7 +73,7 @@ public class TestBucketRequest {
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     when(ozoneManager.isRatisEnabled()).thenReturn(true);
-    OMLayoutVersionManagerImpl lvm = mock(OMLayoutVersionManagerImpl.class);
+    OMLayoutVersionManager lvm = mock(OMLayoutVersionManager.class);
     when(lvm.getMetadataLayoutVersion()).thenReturn(0);
     when(ozoneManager.getVersionManager()).thenReturn(lvm);
     auditLogger = Mockito.mock(AuditLogger.class);

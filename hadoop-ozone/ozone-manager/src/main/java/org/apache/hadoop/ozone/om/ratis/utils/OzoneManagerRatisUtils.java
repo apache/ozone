@@ -81,7 +81,7 @@ public final class OzoneManagerRatisUtils {
     default:
       Class<? extends OMClientRequest> requestClass =
           om.getVersionManager()
-              .getRequestHandler(omRequest.getCmdType().name());
+              .getHandler(omRequest.getCmdType().name());
       return getClientRequest(requestClass, omRequest);
     }
   }
@@ -141,7 +141,7 @@ public final class OzoneManagerRatisUtils {
       }
     }
     Class<? extends OMClientRequest> requestClass =
-        om.getVersionManager().getRequestHandler(requestType);
+        om.getVersionManager().getHandler(requestType);
     return getClientRequest(requestClass, omRequest);
   }
 
@@ -161,7 +161,7 @@ public final class OzoneManagerRatisUtils {
     String requestType = hasQuota ? OMVolumeSetQuotaRequest.getRequestType() :
         OMVolumeSetOwnerRequest.getRequestType();
     Class<? extends OMClientRequest> requestClass =
-        om.getVersionManager().getRequestHandler(requestType);
+        om.getVersionManager().getHandler(requestType);
     return getClientRequest(requestClass, omRequest);
   }
 

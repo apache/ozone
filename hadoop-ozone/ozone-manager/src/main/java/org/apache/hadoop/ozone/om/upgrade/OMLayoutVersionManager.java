@@ -46,24 +46,23 @@ import com.google.common.annotations.VisibleForTesting;
 /**
  * Class to manage layout versions and features for Ozone Manager.
  */
-public final class OMLayoutVersionManagerImpl
-    extends AbstractLayoutVersionManager<OMLayoutFeature>
-    implements OmLayoutVersionManager {
+public final class OMLayoutVersionManager
+    extends AbstractLayoutVersionManager<OMLayoutFeature> {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(OMLayoutVersionManagerImpl.class);
+      LoggerFactory.getLogger(OMLayoutVersionManager.class);
 
   private static final String OM_REQUEST_CLASS_PACKAGE =
       "org.apache.hadoop.ozone.om.request";
   private LayoutVersionInstanceFactory<Class<? extends OMClientRequest>>
       requestFactory;
 
-  public OMLayoutVersionManagerImpl(OMStorage omStorage) throws OMException {
+  public OMLayoutVersionManager(OMStorage omStorage) throws OMException {
     requestFactory = new LayoutVersionInstanceFactory<>();
     init(omStorage);
   }
 
-  public OMLayoutVersionManagerImpl() throws IOException {
+  public OMLayoutVersionManager() throws IOException {
     requestFactory = new LayoutVersionInstanceFactory<>();
     OMLayoutFeature[] features = OMLayoutFeature.values();
     init(features[features.length - 1].layoutVersion(), features);
@@ -152,7 +151,7 @@ public final class OMLayoutVersionManagerImpl
    * @return class type.
    */
   @Override
-  public Class<? extends OMClientRequest> getRequestHandler(String type) {
+  public Class<? extends OMClientRequest> getHandler(String type) {
     VersionFactoryKey versionFactoryKey = new VersionFactoryKey.Builder()
         .key(type).build();
     return requestFactory.get(this, versionFactoryKey);

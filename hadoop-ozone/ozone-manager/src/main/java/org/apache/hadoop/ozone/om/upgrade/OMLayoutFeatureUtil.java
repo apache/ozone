@@ -60,7 +60,7 @@ public class OMLayoutFeatureUtil {
     Path tempDirWithPrefix = Files.createTempDirectory("TestAspect");
     configuration.set("ozone.metadata.dirs",
         tempDirWithPrefix.toAbsolutePath().toString());
-    return new OMLayoutVersionManagerImpl(new OMStorage(configuration));
+    return new OMLayoutVersionManager(new OMStorage(configuration));
   }
 
 }
