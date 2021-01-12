@@ -242,11 +242,32 @@ public class PipelineStateManagerV2Impl implements StateManager {
       throws IOException {
     lock.writeLock().lock();
     try {
+      PipelineID pipelineID = PipelineID.getFromProtobuf(pipelineIDProto);
+      Pipeline.PipelineState state = getPipeline(pipelineID)
+                                       .getPipelineState();
       pipelineStateMap.updatePipelineState(
           PipelineID.getFromProtobuf(pipelineIDProto),
           Pipeline.PipelineState.fromProtobuf(newState));
+      updatePipelineStateInDb(pipelineID, state);
     } finally {
       lock.writeLock().unlock();
+    }
+  }
+
+  private void updatePipelineStateInDb(PipelineID pipelineId,
+                                       Pipeline.PipelineState state)
+    throws IOException {
+    // null check is here to prevent the case where SCM store
+    // is closed but the staleNode handlers/pipleine creations
+    // still try to access it.
+    if (pipelineStore != null) {
+      try {
+        pipelineStore.put(pipelineId, getPipeline(pipelineId));
+      } catch (IOException ex) {
+        LOG.info("Pipeline {} state update failed", pipelineId);
+        // revert back to old state in memory
+        updatePipelineState(pipelineId, state);
+      }
     }
   }
 

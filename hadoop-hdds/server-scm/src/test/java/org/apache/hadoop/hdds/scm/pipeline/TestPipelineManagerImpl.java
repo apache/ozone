@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.test.GenericTestUtils;
@@ -149,12 +150,16 @@ public class TestPipelineManagerImpl {
   @Test
   public void testUpdatePipelineStates() throws Exception {
     PipelineManagerV2Impl pipelineManager = createPipelineManager(true);
+    Table<PipelineID, Pipeline> pipelineStore = SCMDBDefinition
+                                                  .PIPELINES.getTable(dbStore);
     pipelineManager.allowPipelineCreation();
     Pipeline pipeline = pipelineManager.createPipeline(
         HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.THREE);
     Assert.assertEquals(1, pipelineManager.getPipelines().size());
     Assert.assertTrue(pipelineManager.containsPipeline(pipeline.getId()));
     Assert.assertEquals(ALLOCATED, pipeline.getPipelineState());
+    Assert.assertEquals(ALLOCATED,pipelineStore.get(pipeline.getId())
+                                    .getPipelineState());
     PipelineID pipelineID = pipeline.getId();
 
     pipelineManager.openPipeline(pipelineID);
@@ -163,10 +168,14 @@ public class TestPipelineManagerImpl {
         .getPipelines(HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.THREE,
             Pipeline.PipelineState.OPEN).contains(pipeline));
+    Assert.assertTrue(pipelineStore.get(pipeline.getId()).isOpen());
 
     pipelineManager.deactivatePipeline(pipeline.getId());
     Assert.assertEquals(Pipeline.PipelineState.DORMANT,
         pipelineManager.getPipeline(pipelineID).getPipelineState());
+    Assert.assertEquals(Pipeline.PipelineState.DORMANT,pipelineStore
+                                                         .get(pipeline.getId())
+                                                         .getPipelineState());
     Assert.assertFalse(pipelineManager
         .getPipelines(HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.THREE,
@@ -177,7 +186,7 @@ public class TestPipelineManagerImpl {
         .getPipelines(HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.THREE,
             Pipeline.PipelineState.OPEN).contains(pipeline));
-
+    Assert.assertTrue(pipelineStore.get(pipeline.getId()).isOpen());
     pipelineManager.close();
   }
 
