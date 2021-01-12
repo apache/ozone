@@ -203,11 +203,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
    */
   private ReconOmTask getMockTask(String taskName) {
     ReconOmTask reconOmTaskMock = mock(ReconOmTask.class);
-    when(reconOmTaskMock.getTaskTables()).thenReturn(Collections
-        .EMPTY_LIST);
     when(reconOmTaskMock.getTaskName()).thenReturn(taskName);
-    when(reconOmTaskMock.getTaskTables())
-        .thenReturn(Collections.singleton("MockTable"));
     return reconOmTaskMock;
   }
 }
