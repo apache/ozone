@@ -299,8 +299,9 @@ public class RpcClient implements ClientProtocol {
     // that it is not recommended to enable quota.
     OmVolumeArgs omVolumeArgs = ozoneManagerClient.getVolumeInfo(volumeName);
     if (omVolumeArgs.getQuotaInNamespace() == OLD_QUOTA_DEFAULT) {
-      LOG.warn("Volume: {} is a old volume, usedNamespace may be " +
-          "inaccurate and it is not recommended to enable quota.", volumeName);
+      LOG.warn("Volume {} is created before version 1.1.0, usedNamespace " +
+          "may be inaccurate and it is not recommended to enable quota.",
+          volumeName);
     }
     ozoneManagerClient.setQuota(volumeName, quotaInNamespace, quotaInBytes);
   }
@@ -594,14 +595,17 @@ public class RpcClient implements ClientProtocol {
     OmBucketInfo omBucketInfo = ozoneManagerClient.getBucketInfo(
         volumeName, bucketName);
     if (omBucketInfo.getQuotaInNamespace() == OLD_QUOTA_DEFAULT) {
-      LOG.warn("Bucket: {} is a old bucket, usedNamespace may be " +
-          "inaccurate and it is not recommended to enable quota.", bucketName);
+      LOG.warn("Bucket {} is created before version 1.1.0, usedNamespace " +
+          "may be inaccurate and it is not recommended to enable quota.",
+          bucketName);
     }
     if (omBucketInfo.getUsedBytes() == OLD_QUOTA_DEFAULT) {
-      LOG.warn("Bucket: {} is a old bucket, usedBytes may be " +
-          "inaccurate and it is not recommended to enable quota.", bucketName);
+      LOG.warn("Bucket {} is created before version 1.1.0, usedBytes " +
+          "may be inaccurate and it is not recommended to enable quota.",
+          bucketName);
     }
     ozoneManagerClient.setBucketProperty(builder.build());
+
   }
 
   @Override
