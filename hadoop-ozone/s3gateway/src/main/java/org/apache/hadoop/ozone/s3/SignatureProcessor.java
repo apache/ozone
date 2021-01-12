@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.s3;
 
-import java.nio.charset.Charset;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 
@@ -32,7 +31,6 @@ public interface SignatureProcessor {
   String X_AMAZ_DATE = "X-Amz-Date";
   String CONTENT_MD5 = "content-md5";
   String AUTHORIZATION_HEADER = "Authorization";
-  Charset UTF_8 = Charset.forName("utf-8");
   String X_AMZ_CONTENT_SHA256 = "X-Amz-Content-SHA256";
   String HOST = "host";
 
@@ -61,4 +59,6 @@ public interface SignatureProcessor {
   String getSignature();
 
   String getAwsAccessId();
+
+  Exception getException();
 }

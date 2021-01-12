@@ -59,21 +59,25 @@ public class SafeModeWaitSubcommand implements Callable<Void> {
 
     while (getRemainingTimeInSec() > 0) {
       try (ScmClient scmClient = scmOption.createScmClient()) {
-        while (getRemainingTimeInSec() > 0) {
-
-          boolean isSafeModeActive = scmClient.inSafeMode();
-
-          if (!isSafeModeActive) {
+        long remainingTime;
+        do {
+          if (!scmClient.inSafeMode()) {
             LOG.info("SCM is out of safe mode.");
             return null;
-          } else {
+          }
+
+          remainingTime = getRemainingTimeInSec();
+
+          if (remainingTime > 0) {
             LOG.info(
                 "SCM is in safe mode. Will retry in 1 sec. Remaining time "
                     + "(sec): {}",
-                getRemainingTimeInSec());
+                remainingTime);
             Thread.sleep(1000);
+          } else {
+            LOG.info("SCM is in safe mode. No more retries.");
           }
-        }
+        } while (remainingTime > 0);
       } catch (Exception ex) {
         LOG.info(
             "SCM is not available (yet?). Error is {}. Will retry in 1 sec. "

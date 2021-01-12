@@ -32,7 +32,6 @@ import java.util.Map;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
-import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.PrefixManager;
@@ -46,7 +45,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
-import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -75,6 +73,8 @@ import org.apache.hadoop.ozone.security.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.READ;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.WRITE;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
     .BUCKET_NOT_FOUND;
@@ -144,7 +144,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
       if (grpcBlockTokenEnabled) {
         builder.setToken(secretManager
             .generateToken(remoteUser, allocatedBlock.getBlockID().toString(),
-                getAclForUser(remoteUser), scmBlockSize));
+                EnumSet.of(READ, WRITE),
+                scmBlockSize));
       }
       locationInfos.add(builder.build());
     }
@@ -157,18 +158,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
   private UserGroupInformation getRemoteUser() throws IOException {
     UserGroupInformation ugi = Server.getRemoteUser();
     return (ugi != null) ? ugi : UserGroupInformation.getCurrentUser();
-  }
-
-  /**
-   * Return acl for user.
-   * @param user
-   *
-   * */
-  private EnumSet< HddsProtos.BlockTokenSecretProto.AccessModeProto>
-      getAclForUser(String user) {
-    // TODO: Return correct acl for user.
-    return EnumSet.allOf(
-        HddsProtos.BlockTokenSecretProto.AccessModeProto.class);
   }
 
   /**
@@ -263,9 +252,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       @Nullable FileEncryptionInfo encInfo,
       @Nonnull PrefixManager prefixManager,
       @Nullable OmBucketInfo omBucketInfo,
-        long transactionLogIndex) {
-    long objectID = OMFileRequest.getObjIDFromTxId(transactionLogIndex);
-
+      long transactionLogIndex, long objectID) {
     return new OmKeyInfo.Builder()
         .setVolumeName(keyArgs.getVolumeName())
         .setBucketName(keyArgs.getBucketName())
@@ -336,12 +323,14 @@ public abstract class OMKeyRequest extends OMClientRequest {
       @Nullable FileEncryptionInfo encInfo,
       @Nonnull PrefixManager prefixManager,
       @Nullable OmBucketInfo omBucketInfo,
-      long transactionLogIndex, boolean isRatisEnabled)
+      long transactionLogIndex,
+      @Nonnull long objectID,
+      boolean isRatisEnabled)
       throws IOException {
     if (keyArgs.getIsMultipartKey()) {
       return prepareMultipartKeyInfo(omMetadataManager, keyArgs,
           size, locations, encInfo, prefixManager, omBucketInfo,
-          transactionLogIndex);
+          transactionLogIndex, objectID);
       //TODO args.getMetadata
     }
     if (dbKeyInfo != null) {
@@ -363,7 +352,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     // Blocks will be appended as version 0.
     return createKeyInfo(keyArgs, locations, keyArgs.getFactor(),
         keyArgs.getType(), keyArgs.getDataSize(), encInfo, prefixManager,
-        omBucketInfo, transactionLogIndex);
+        omBucketInfo, transactionLogIndex, objectID);
   }
 
   /**
@@ -378,7 +367,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
       @Nonnull KeyArgs args, long size,
       @Nonnull List<OmKeyLocationInfo> locations,
       FileEncryptionInfo encInfo,  @Nonnull PrefixManager prefixManager,
-      @Nullable OmBucketInfo omBucketInfo, @Nonnull long transactionLogIndex)
+      @Nullable OmBucketInfo omBucketInfo, @Nonnull long transactionLogIndex,
+      @Nonnull long objectId)
       throws IOException {
     HddsProtos.ReplicationFactor factor;
     HddsProtos.ReplicationType type;
@@ -407,7 +397,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     // For this upload part we don't need to check in KeyTable. As this
     // is not an actual key, it is a part of the key.
     return createKeyInfo(args, locations, factor, type, size, encInfo,
-        prefixManager, omBucketInfo, transactionLogIndex);
+        prefixManager, omBucketInfo, transactionLogIndex, objectId);
   }
 
   /**
@@ -570,27 +560,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
   }
 
   /**
-   * Check volume quota in bytes.
-   * @param omVolumeArgs
-   * @param allocateSize
-   * @throws IOException
-   */
-  protected void checkVolumeQuotaInBytes(OmVolumeArgs omVolumeArgs,
-      long allocateSize) throws IOException {
-    if (omVolumeArgs.getQuotaInBytes() > OzoneConsts.QUOTA_RESET) {
-      long usedBytes = omVolumeArgs.getUsedBytes().sum();
-      long quotaInBytes = omVolumeArgs.getQuotaInBytes();
-      if (quotaInBytes - usedBytes < allocateSize) {
-        throw new OMException("The DiskSpace quota of volume:"
-            + omVolumeArgs.getVolume() + "exceeded: quotaInBytes: "
-            + quotaInBytes + " Bytes but diskspace consumed: " + (usedBytes
-            + allocateSize) + " Bytes.",
-            OMException.ResultCodes.QUOTA_EXCEEDED);
-      }
-    }
-  }
-
-  /**
    * Check bucket quota in bytes.
    * @param omBucketInfo
    * @param allocateSize
@@ -599,13 +568,32 @@ public abstract class OMKeyRequest extends OMClientRequest {
   protected void checkBucketQuotaInBytes(OmBucketInfo omBucketInfo,
       long allocateSize) throws IOException {
     if (omBucketInfo.getQuotaInBytes() > OzoneConsts.QUOTA_RESET) {
-      long usedBytes = omBucketInfo.getUsedBytes().sum();
+      long usedBytes = omBucketInfo.getUsedBytes();
       long quotaInBytes = omBucketInfo.getQuotaInBytes();
       if (quotaInBytes - usedBytes < allocateSize) {
         throw new OMException("The DiskSpace quota of bucket:"
             + omBucketInfo.getBucketName() + "exceeded: quotaInBytes: "
             + quotaInBytes + " Bytes but diskspace consumed: " + (usedBytes
             + allocateSize) + " Bytes.",
+            OMException.ResultCodes.QUOTA_EXCEEDED);
+      }
+    }
+  }
+
+  /**
+   * Check namespace quota.
+   */
+  protected void checkBucketQuotaInNamespace(OmBucketInfo omBucketInfo,
+      long allocatedNamespace) throws IOException {
+    if (omBucketInfo.getQuotaInNamespace() > OzoneConsts.QUOTA_RESET) {
+      long usedNamespace = omBucketInfo.getUsedNamespace();
+      long quotaInNamespace = omBucketInfo.getQuotaInNamespace();
+      long toUseNamespaceInTotal = usedNamespace + allocatedNamespace;
+      if (quotaInNamespace < toUseNamespaceInTotal) {
+        throw new OMException("The namespace quota of Bucket:"
+            + omBucketInfo.getBucketName() + " exceeded: quotaInNamespace: "
+            + quotaInNamespace + " but namespace consumed: "
+            + toUseNamespaceInTotal + ".",
             OMException.ResultCodes.QUOTA_EXCEEDED);
       }
     }
@@ -628,30 +616,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
       return true;
     }
     return false;
-  }
-
-  /**
-   * Return volume info for the specified volume. If the volume does not
-   * exist, returns {@code null}.
-   * @param omMetadataManager
-   * @param volume
-   * @return OmVolumeArgs
-   * @throws IOException
-   */
-  protected OmVolumeArgs getVolumeInfo(OMMetadataManager omMetadataManager,
-      String volume) {
-
-    OmVolumeArgs volumeArgs = null;
-
-    CacheValue<OmVolumeArgs> value =
-        omMetadataManager.getVolumeTable().getCacheValue(
-        new CacheKey<>(omMetadataManager.getVolumeKey(volume)));
-
-    if (value != null) {
-      volumeArgs = value.getCacheValue();
-    }
-
-    return volumeArgs;
   }
 
   /**

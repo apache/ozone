@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -65,6 +66,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType;
 import org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType;
 
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
+import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -296,7 +298,7 @@ public final class TestOMRequestUtils {
         OmVolumeArgs.newBuilder().setCreationTime(Time.now())
             .setVolume(volumeName).setAdminName(volumeName)
             .setOwnerName(volumeName).setQuotaInBytes(quotaInBytes)
-            .setQuotaInCounts(10000L).build();
+            .setQuotaInNamespace(10000L).build();
     omMetadataManager.getVolumeTable().put(
         omMetadataManager.getVolumeKey(volumeName), omVolumeArgs);
 
@@ -319,7 +321,7 @@ public final class TestOMRequestUtils {
         OmVolumeArgs.newBuilder().setCreationTime(Time.now())
             .setVolume(volumeName).setAdminName(ownerName)
             .setOwnerName(ownerName).setQuotaInBytes(Long.MAX_VALUE)
-            .setQuotaInCounts(10000L).build();
+            .setQuotaInNamespace(10000L).build();
     omMetadataManager.getVolumeTable().put(
         omMetadataManager.getVolumeKey(volumeName), omVolumeArgs);
 
@@ -410,10 +412,11 @@ public final class TestOMRequestUtils {
   public static void addUserToDB(String volumeName, String ownerName,
       OMMetadataManager omMetadataManager) throws Exception {
 
-    OzoneManagerProtocolProtos.UserVolumeInfo userVolumeInfo = omMetadataManager
-        .getUserTable().get(omMetadataManager.getUserKey(ownerName));
+    OzoneManagerStorageProtos.PersistedUserVolumeInfo userVolumeInfo =
+        omMetadataManager.getUserTable().get(
+            omMetadataManager.getUserKey(ownerName));
     if (userVolumeInfo == null) {
-      userVolumeInfo = OzoneManagerProtocolProtos.UserVolumeInfo
+      userVolumeInfo = OzoneManagerStorageProtos.PersistedUserVolumeInfo
           .newBuilder()
           .addVolumeNames(volumeName)
           .setObjectID(1)
@@ -451,15 +454,15 @@ public final class TestOMRequestUtils {
    * Create OMRequest for set volume property request with quota set.
    * @param volumeName
    * @param quotaInBytes
-   * @param quotaInCounts
+   * @param quotaInNamespace
    * @return OMRequest
    */
   public static OMRequest createSetVolumePropertyRequest(String volumeName,
-      long quotaInBytes, long quotaInCounts) {
+      long quotaInBytes, long quotaInNamespace) {
     SetVolumePropertyRequest setVolumePropertyRequest =
         SetVolumePropertyRequest.newBuilder().setVolumeName(volumeName)
             .setQuotaInBytes(quotaInBytes)
-            .setQuotaInCounts(quotaInCounts)
+            .setQuotaInNamespace(quotaInNamespace)
             .setModificationTime(Time.now()).build();
 
     return OMRequest.newBuilder().setClientId(UUID.randomUUID().toString())
@@ -700,7 +703,8 @@ public final class TestOMRequestUtils {
       String adminName, String ownerName) {
     OzoneManagerProtocolProtos.VolumeInfo volumeInfo =
         OzoneManagerProtocolProtos.VolumeInfo.newBuilder().setVolume(volumeName)
-        .setAdminName(adminName).setOwnerName(ownerName).build();
+        .setAdminName(adminName).setOwnerName(ownerName)
+        .setQuotaInNamespace(OzoneConsts.QUOTA_RESET).build();
     OzoneManagerProtocolProtos.CreateVolumeRequest createVolumeRequest =
         OzoneManagerProtocolProtos.CreateVolumeRequest.newBuilder()
             .setVolumeInfo(volumeInfo).build();

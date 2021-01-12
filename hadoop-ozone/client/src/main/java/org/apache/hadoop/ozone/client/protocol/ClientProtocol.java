@@ -100,12 +100,12 @@ public interface ClientProtocol {
   /**
    * Set Volume Quota.
    * @param volumeName Name of the Volume
-   * @param quotaInCounts The maximum number of buckets in this volume.
+   * @param quotaInNamespace The maximum number of buckets in this volume.
    * @param quotaInBytes The maximum size this volume can be used.
    * @throws IOException
    */
-  void setVolumeQuota(String volumeName, long quotaInCounts, long quotaInBytes)
-      throws IOException;
+  void setVolumeQuota(String volumeName, long quotaInNamespace,
+      long quotaInBytes) throws IOException;
 
   /**
    * Returns {@link OzoneVolume}.
@@ -661,9 +661,9 @@ public interface ClientProtocol {
    * @param volumeName Name of the Volume.
    * @param bucketName Name of the Bucket.
    * @param quotaInBytes The maximum size this buckets can be used.
-   * @param quotaInCounts The maximum number of keys in this bucket.
+   * @param quotaInNamespace The maximum number of keys in this bucket.
    * @throws IOException
    */
-  void setBucketQuota(String volumeName, String bucketName, long quotaInCounts,
-      long quotaInBytes) throws IOException;
+  void setBucketQuota(String volumeName, String bucketName,
+      long quotaInNamespace, long quotaInBytes) throws IOException;
 }

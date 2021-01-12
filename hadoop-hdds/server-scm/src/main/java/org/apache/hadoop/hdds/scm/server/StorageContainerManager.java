@@ -34,7 +34,6 @@ import java.util.Objects;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -74,11 +73,13 @@ import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.node.DeadNodeHandler;
 import org.apache.hadoop.hdds.scm.node.NewNodeHandler;
+import org.apache.hadoop.hdds.scm.node.StartDatanodeAdminHandler;
+import org.apache.hadoop.hdds.scm.node.NonHealthyToHealthyNodeHandler;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeReportHandler;
-import org.apache.hadoop.hdds.scm.node.NonHealthyToHealthyNodeHandler;
 import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.node.StaleNodeHandler;
+import org.apache.hadoop.hdds.scm.node.NodeDecommissionManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineActionHandler;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineReportHandler;
@@ -105,7 +106,6 @@ import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.common.Storage.StorageState;
 import org.apache.hadoop.ozone.lease.LeaseManager;
 import org.apache.hadoop.ozone.lock.LockManager;
-import org.apache.hadoop.ozone.protocol.commands.RetriableDatanodeEventWatcher;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
@@ -117,6 +117,7 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
 import com.google.protobuf.BlockingService;
+import org.apache.commons.lang3.tuple.Pair;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT_DEFAULT;
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.slf4j.Logger;
@@ -162,6 +163,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private ContainerManager containerManager;
   private BlockManager scmBlockManager;
   private final SCMStorageConfig scmStorageConfig;
+  private NodeDecommissionManager scmDecommissionManager;
 
   private SCMMetadataStore scmMetadataStore;
 
@@ -293,11 +295,14 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     CommandStatusReportHandler cmdStatusReportHandler =
         new CommandStatusReportHandler();
 
-    NewNodeHandler newNodeHandler = new NewNodeHandler(pipelineManager, conf);
+    NewNodeHandler newNodeHandler = new NewNodeHandler(pipelineManager,
+        scmDecommissionManager, conf);
     StaleNodeHandler staleNodeHandler =
         new StaleNodeHandler(scmNodeManager, pipelineManager, conf);
     DeadNodeHandler deadNodeHandler = new DeadNodeHandler(scmNodeManager,
         pipelineManager, containerManager);
+    StartDatanodeAdminHandler datanodeStartAdminHandler =
+        new StartDatanodeAdminHandler(scmNodeManager, pipelineManager);
     NonHealthyToHealthyNodeHandler nonHealthyToHealthyNodeHandler =
         new NonHealthyToHealthyNodeHandler(pipelineManager, conf);
     ContainerActionsHandler actionsHandler = new ContainerActionsHandler();
@@ -314,14 +319,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     PipelineActionHandler pipelineActionHandler =
         new PipelineActionHandler(pipelineManager, conf);
 
-
-    RetriableDatanodeEventWatcher retriableDatanodeEventWatcher =
-        new RetriableDatanodeEventWatcher<>(
-            SCMEvents.RETRIABLE_DATANODE_COMMAND,
-            SCMEvents.DELETE_BLOCK_STATUS,
-            commandWatcherLeaseManager);
-    retriableDatanodeEventWatcher.start(eventQueue);
-
     scmAdminUsernames = conf.getTrimmedStringCollection(OzoneConfigKeys
         .OZONE_ADMINISTRATORS);
     String scmUsername = UserGroupInformation.getCurrentUser().getUserName();
@@ -334,7 +331,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     blockProtocolServer = new SCMBlockProtocolServer(conf, this);
     clientProtocolServer = new SCMClientProtocolServer(conf, this);
     httpServer = new StorageContainerManagerHttpServer(conf);
-
     eventQueue.addHandler(SCMEvents.DATANODE_COMMAND, scmNodeManager);
     eventQueue.addHandler(SCMEvents.RETRIABLE_DATANODE_COMMAND, scmNodeManager);
     eventQueue.addHandler(SCMEvents.NODE_REPORT, nodeReportHandler);
@@ -348,6 +344,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     eventQueue.addHandler(SCMEvents.NON_HEALTHY_TO_HEALTHY_NODE,
         nonHealthyToHealthyNodeHandler);
     eventQueue.addHandler(SCMEvents.DEAD_NODE, deadNodeHandler);
+    eventQueue.addHandler(SCMEvents.START_ADMIN_ON_NODE,
+        datanodeStartAdminHandler);
     eventQueue.addHandler(SCMEvents.CMD_STATUS_REPORT, cmdStatusReportHandler);
     eventQueue
         .addHandler(SCMEvents.PENDING_DELETE_STATUS, pendingDeleteHandler);
@@ -448,6 +446,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       scmSafeModeManager = new SCMSafeModeManager(conf,
           containerManager.getContainers(), pipelineManager, eventQueue);
     }
+    scmDecommissionManager = new NodeDecommissionManager(conf, scmNodeManager,
+        containerManager, eventQueue, replicationManager);
   }
 
   /**
@@ -836,6 +836,13 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
 
     try {
+      LOG.info("Stopping the Datanode Admin Monitor.");
+      scmDecommissionManager.stop();
+    } catch (Exception ex) {
+      LOG.error("The Datanode Admin Monitor failed to stop", ex);
+    }
+
+    try {
       LOG.info("Stopping Lease Manager of the command watchers");
       commandWatcherLeaseManager.shutdown();
     } catch (Exception ex) {
@@ -950,7 +957,18 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    * @return int -- count
    */
   public int getNodeCount(NodeState nodestate) {
-    return scmNodeManager.getNodeCount(nodestate);
+    // TODO - decomm - this probably needs to accept opState and health
+    return scmNodeManager.getNodeCount(null, nodestate);
+  }
+
+  /**
+   * Returns the node decommission manager.
+   *
+   * @return NodeDecommissionManager The decommission manger for the used by
+   *         scm
+   */
+  public NodeDecommissionManager getScmDecommissionManager() {
+    return scmDecommissionManager;
   }
 
   /**
@@ -1129,11 +1147,13 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-  public Map<String, String> getRuleStatusMetrics() {
-    Map<String, String> map = new HashMap<>();
+  public Map<String, String[]> getSafeModeRuleStatus() {
+    Map<String, String[]> map = new HashMap<>();
     for (Map.Entry<String, Pair<Boolean, String>> entry :
         scmSafeModeManager.getRuleStatus().entrySet()) {
-      map.put(entry.getKey(), entry.getValue().getRight());
+      String[] status =
+          {entry.getValue().getRight(), entry.getValue().getLeft().toString()};
+      map.put(entry.getKey(), status);
     }
     return map;
   }

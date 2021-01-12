@@ -26,7 +26,6 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
-import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
@@ -42,14 +41,13 @@ final class AWSV4AuthValidator {
   private final static Logger LOG =
       LoggerFactory.getLogger(AWSV4AuthValidator.class);
   private static final String HMAC_SHA256_ALGORITHM = "HmacSHA256";
-  private static final Charset UTF_8 = Charset.forName("utf-8");
 
   private AWSV4AuthValidator() {
   }
 
   private static String urlDecode(String str) {
     try {
-      return URLDecoder.decode(str, UTF_8.name());
+      return URLDecoder.decode(str, StandardCharsets.UTF_8.name());
     } catch (UnsupportedEncodingException e) {
       throw new RuntimeException(e);
     }
@@ -57,7 +55,7 @@ final class AWSV4AuthValidator {
 
   public static String hash(String payload) throws NoSuchAlgorithmException {
     MessageDigest md = MessageDigest.getInstance("SHA-256");
-    md.update(payload.getBytes(UTF_8));
+    md.update(payload.getBytes(StandardCharsets.UTF_8));
     return String.format("%064x", new java.math.BigInteger(1, md.digest()));
   }
 
@@ -91,7 +89,8 @@ final class AWSV4AuthValidator {
     String dateStamp = signData[0];
     String regionName = signData[1];
     String serviceName = signData[2];
-    byte[] kDate = sign(("AWS4" + key).getBytes(UTF_8), dateStamp);
+    byte[] kDate = sign(("AWS4" + key)
+        .getBytes(StandardCharsets.UTF_8), dateStamp);
     byte[] kRegion = sign(kDate, regionName);
     byte[] kService = sign(kRegion, serviceName);
     byte[] kSigning = sign(kService, "aws4_request");

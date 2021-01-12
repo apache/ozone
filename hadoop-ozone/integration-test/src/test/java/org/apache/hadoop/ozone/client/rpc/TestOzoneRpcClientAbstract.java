@@ -44,6 +44,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -51,8 +52,8 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneTestUtils;
 import org.apache.hadoop.ozone.client.BucketArgs;
@@ -106,31 +107,32 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.commons.lang3.StringUtils;
-
 import static org.apache.hadoop.hdds.StringUtils.string2Bytes;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.client.ReplicationType.STAND_ALONE;
+import static org.apache.hadoop.ozone.OmUtils.MAX_TRXN_ID;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConsts.DEFAULT_OM_UPDATE_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PARTIAL_RENAME;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.GROUP;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
-
 import org.junit.Assert;
+
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-
 import org.junit.Test;
 
 /**
@@ -254,13 +256,14 @@ public abstract class TestOzoneRpcClientAbstract {
     Assert.assertEquals(ozoneVolume.getName(), s3VolumeName);
     OMMetadataManager omMetadataManager =
         cluster.getOzoneManager().getMetadataManager();
-    long transactionID = Long.MAX_VALUE -1 >> 8;
-    long objectID = transactionID << 8;
+    long transactionID = MAX_TRXN_ID + 1;
+    long objectID = OmUtils.addEpochToTxId(omMetadataManager.getOmEpoch(),
+        transactionID);
     OmVolumeArgs omVolumeArgs =
         cluster.getOzoneManager().getMetadataManager().getVolumeTable().get(
             omMetadataManager.getVolumeKey(s3VolumeName));
     Assert.assertEquals(objectID, omVolumeArgs.getObjectID());
-    Assert.assertEquals(transactionID, omVolumeArgs.getUpdateID());
+    Assert.assertEquals(DEFAULT_OM_UPDATE_ID, omVolumeArgs.getUpdateID());
   }
 
   @Test
@@ -277,9 +280,11 @@ public abstract class TestOzoneRpcClientAbstract {
   }
 
   @Test
-  public void testSetAndClrQuota() throws IOException {
+  public void testSetAndClrQuota() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
+    String value = "sample value";
+    int valueLength = value.getBytes().length;
     OzoneVolume volume = null;
     store.createVolume(volumeName);
 
@@ -287,41 +292,61 @@ public abstract class TestOzoneRpcClientAbstract {
         "0GB", 0L));
     volume = store.getVolume(volumeName);
     Assert.assertEquals(OzoneConsts.QUOTA_RESET, volume.getQuotaInBytes());
-    Assert.assertEquals(OzoneConsts.QUOTA_RESET, volume.getQuotaInCounts());
+    Assert.assertEquals(OzoneConsts.QUOTA_RESET, volume.getQuotaInNamespace());
 
     store.getVolume(volumeName).setQuota(OzoneQuota.parseQuota(
         "10GB", 10000L));
     store.getVolume(volumeName).createBucket(bucketName);
     volume = store.getVolume(volumeName);
     Assert.assertEquals(10 * GB, volume.getQuotaInBytes());
-    Assert.assertEquals(10000L, volume.getQuotaInCounts());
+    Assert.assertEquals(10000L, volume.getQuotaInNamespace());
     OzoneBucket bucket = store.getVolume(volumeName).getBucket(bucketName);
     Assert.assertEquals(OzoneConsts.QUOTA_RESET, bucket.getQuotaInBytes());
-    Assert.assertEquals(OzoneConsts.QUOTA_RESET, bucket.getQuotaInCounts());
+    Assert.assertEquals(OzoneConsts.QUOTA_RESET, bucket.getQuotaInNamespace());
 
     store.getVolume(volumeName).getBucket(bucketName).setQuota(
         OzoneQuota.parseQuota("0GB", 0));
     Assert.assertEquals(OzoneConsts.QUOTA_RESET, bucket.getQuotaInBytes());
-    Assert.assertEquals(OzoneConsts.QUOTA_RESET, bucket.getQuotaInCounts());
+    Assert.assertEquals(OzoneConsts.QUOTA_RESET, bucket.getQuotaInNamespace());
 
     store.getVolume(volumeName).getBucket(bucketName).setQuota(
         OzoneQuota.parseQuota("1GB", 1000L));
     OzoneBucket ozoneBucket = store.getVolume(volumeName).getBucket(bucketName);
     Assert.assertEquals(1024 * 1024 * 1024,
         ozoneBucket.getQuotaInBytes());
-    Assert.assertEquals(1000L, ozoneBucket.getQuotaInCounts());
+    Assert.assertEquals(1000L, ozoneBucket.getQuotaInNamespace());
+
+    LambdaTestUtils.intercept(IOException.class, "Can not clear bucket" +
+        " spaceQuota because volume spaceQuota is not cleared.",
+        () -> ozoneBucket.clearSpaceQuota());
+
+    writeKey(bucket, UUID.randomUUID().toString(), ONE, value, valueLength);
+    Assert.assertEquals(1L,
+        store.getVolume(volumeName).getBucket(bucketName).getUsedNamespace());
+    Assert.assertEquals(valueLength,
+        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
+    Assert.assertEquals(1L,
+        store.getVolume(volumeName).getUsedNamespace());
 
     store.getVolume(volumeName).clearSpaceQuota();
-    store.getVolume(volumeName).clearCountQuota();
+    store.getVolume(volumeName).clearNamespaceQuota();
     OzoneVolume clrVolume = store.getVolume(volumeName);
     Assert.assertEquals(OzoneConsts.QUOTA_RESET, clrVolume.getQuotaInBytes());
-    Assert.assertEquals(OzoneConsts.QUOTA_RESET, clrVolume.getQuotaInCounts());
+    Assert.assertEquals(OzoneConsts.QUOTA_RESET,
+        clrVolume.getQuotaInNamespace());
 
     ozoneBucket.clearSpaceQuota();
-    ozoneBucket.clearCountQuota();
+    ozoneBucket.clearNamespaceQuota();
     OzoneBucket clrBucket = store.getVolume(volumeName).getBucket(bucketName);
     Assert.assertEquals(OzoneConsts.QUOTA_RESET, clrBucket.getQuotaInBytes());
-    Assert.assertEquals(OzoneConsts.QUOTA_RESET, clrBucket.getQuotaInCounts());
+    Assert.assertEquals(OzoneConsts.QUOTA_RESET,
+        clrBucket.getQuotaInNamespace());
+    Assert.assertEquals(1L,
+        store.getVolume(volumeName).getBucket(bucketName).getUsedNamespace());
+    Assert.assertEquals(valueLength,
+        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
+    Assert.assertEquals(1L,
+        store.getVolume(volumeName).getUsedNamespace());
   }
 
   @Test
@@ -382,12 +407,12 @@ public abstract class TestOzoneRpcClientAbstract {
     Assert.assertEquals(OzoneConsts.QUOTA_RESET,
         store.getVolume(volumeName).getQuotaInBytes());
     Assert.assertEquals(OzoneConsts.QUOTA_RESET,
-        store.getVolume(volumeName).getQuotaInCounts());
+        store.getVolume(volumeName).getQuotaInNamespace());
     store.getVolume(volumeName).setQuota(OzoneQuota.parseQuota("1GB", 1000L));
     OzoneVolume volume = store.getVolume(volumeName);
     Assert.assertEquals(1024 * 1024 * 1024,
         volume.getQuotaInBytes());
-    Assert.assertEquals(1000L, volume.getQuotaInCounts());
+    Assert.assertEquals(1000L, volume.getQuotaInNamespace());
   }
 
   @Test
@@ -815,7 +840,6 @@ public abstract class TestOzoneRpcClientAbstract {
   }
 
   @Test
-  @SuppressWarnings("methodlength")
   public void testCheckUsedBytesQuota() throws IOException {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
@@ -829,74 +853,10 @@ public abstract class TestOzoneRpcClientAbstract {
 
     store.createVolume(volumeName);
     volume = store.getVolume(volumeName);
-
-    // Test volume quota.
-    // Set quota In Bytes for a smaller value
-    store.getVolume(volumeName).setQuota(
-        OzoneQuota.parseQuota("1 Bytes", 100));
     volume.createBucket(bucketName);
     OzoneBucket bucket = volume.getBucket(bucketName);
 
-    // Test volume quota: write key.
-    // The remaining quota does not satisfy a block size, so the write fails.
-    try {
-      writeKey(bucket, UUID.randomUUID().toString(), ONE, value, valueLength);
-    } catch (IOException ex) {
-      countException++;
-      GenericTestUtils.assertExceptionContains("QUOTA_EXCEEDED", ex);
-    }
-    // Write failed, volume usedBytes should be 0
-    Assert.assertEquals(0L, store.getVolume(volumeName).getUsedBytes());
-
-    // Test volume quota: write file.
-    // The remaining quota does not satisfy a block size, so the write fails.
-    try {
-      writeFile(bucket, UUID.randomUUID().toString(), ONE, value, 0);
-    } catch (IOException ex) {
-      countException++;
-      GenericTestUtils.assertExceptionContains("QUOTA_EXCEEDED", ex);
-    }
-    // Write failed, volume usedBytes should be 0
-    Assert.assertEquals(0L, store.getVolume(volumeName).getUsedBytes());
-
-    // Test volume quota: write key(with two blocks), test allocateBlock fails.
-    store.getVolume(volumeName).setQuota(
-        OzoneQuota.parseQuota(blockSize + "Bytes", 100));
-    try {
-      OzoneOutputStream out = bucket.createKey(UUID.randomUUID().toString(),
-          valueLength, STAND_ALONE, ONE, new HashMap<>());
-      for (int i = 0; i <= blockSize / value.length(); i++) {
-        out.write(value.getBytes());
-      }
-      out.close();
-    } catch (IOException ex) {
-      countException++;
-      GenericTestUtils.assertExceptionContains("QUOTA_EXCEEDED", ex);
-    }
-    // AllocateBlock failed, volume usedBytes should be 1 * blockSize.
-    Assert.assertEquals(blockSize, store.getVolume(volumeName).getUsedBytes());
-
-    // Test volume quota: write large key(with five blocks), the first four
-    // blocks will succeed，while the later block will fail.
-    store.getVolume(volumeName).setQuota(
-        OzoneQuota.parseQuota(5 * blockSize + "Bytes", 100));
-    try {
-      OzoneOutputStream out = bucket.createKey(UUID.randomUUID().toString(),
-          valueLength, STAND_ALONE, ONE, new HashMap<>());
-      for (int i = 0; i <= (4 * blockSize) / value.length(); i++) {
-        out.write(value.getBytes());
-      }
-      out.close();
-    } catch (IOException ex) {
-      countException++;
-      GenericTestUtils.assertExceptionContains("QUOTA_EXCEEDED", ex);
-    }
-    // AllocateBlock failed, volume usedBytes should be (4 + 1) * blockSize
-    Assert.assertEquals(5 * blockSize,
-        store.getVolume(volumeName).getUsedBytes());
-
     // Test bucket quota.
-    // Set quota In Bytes for a smaller value
     store.getVolume(volumeName).setQuota(
         OzoneQuota.parseQuota(Long.MAX_VALUE + " Bytes", 100));
     bucketName = UUID.randomUUID().toString();
@@ -947,229 +907,111 @@ public abstract class TestOzoneRpcClientAbstract {
     Assert.assertEquals(4 * blockSize,
         store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
 
-    Assert.assertEquals(7, countException);
+    // Reset bucket quota, the original usedBytes needs to remain the same
+    bucket.setQuota(OzoneQuota.parseQuota(
+        100 + " GB", 100));
+    Assert.assertEquals(4 * blockSize,
+        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
+
+    Assert.assertEquals(3, countException);
   }
 
   @Test
-  @SuppressWarnings("methodlength")
-  public void testVolumeUsedBytes() throws IOException {
+  public void testVolumeUsedNamespace() throws IOException {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
+    String bucketName2 = UUID.randomUUID().toString();
+    OzoneVolume volume = null;
+
+    // set Volume namespace quota as 1
+    store.createVolume(volumeName,
+        VolumeArgs.newBuilder().setQuotaInNamespace(1L).build());
+    volume = store.getVolume(volumeName);
+    // The initial value should be 0
+    Assert.assertEquals(0L, volume.getUsedNamespace());
+    volume.createBucket(bucketName);
+    // Used namespace should be 1
+    volume = store.getVolume(volumeName);
+    Assert.assertEquals(1L, volume.getUsedNamespace());
+
+    try {
+      volume.createBucket(bucketName2);
+    } catch (IOException ex) {
+      GenericTestUtils.assertExceptionContains("QUOTA_EXCEEDED", ex);
+    }
+
+    // test linked bucket
+    String targetVolName = UUID.randomUUID().toString();
+    store.createVolume(targetVolName);
+    OzoneVolume volumeWithLinkedBucket = store.getVolume(targetVolName);
+    String targetBucketName = UUID.randomUUID().toString();
+    BucketArgs.Builder argsBuilder = new BucketArgs.Builder()
+        .setStorageType(StorageType.DEFAULT)
+        .setVersioning(false)
+        .setSourceVolume(volumeName)
+        .setSourceBucket(bucketName);
+    volumeWithLinkedBucket.createBucket(targetBucketName, argsBuilder.build());
+    // Used namespace should be 0 because linked bucket does not consume
+    // namespace quota
+    Assert.assertEquals(0L, volumeWithLinkedBucket.getUsedNamespace());
+
+    // Reset volume quota, the original usedNamespace needs to remain the same
+    store.getVolume(volumeName).setQuota(OzoneQuota.parseQuota(
+        100 + " GB", 100));
+    Assert.assertEquals(1L,
+        store.getVolume(volumeName).getUsedNamespace());
+
+    volume.deleteBucket(bucketName);
+    // Used namespace should be 0
+    volume = store.getVolume(volumeName);
+    Assert.assertEquals(0L, volume.getUsedNamespace());
+  }
+
+  @Test
+  public void testBucketUsedNamespace() throws IOException {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String key1 = UUID.randomUUID().toString();
+    String key2 = UUID.randomUUID().toString();
+    String key3 = UUID.randomUUID().toString();
     OzoneVolume volume = null;
     OzoneBucket bucket = null;
 
-    int blockSize = (int) ozoneManager.getConfiguration().getStorageSize(
-        OZONE_SCM_BLOCK_SIZE, OZONE_SCM_BLOCK_SIZE_DEFAULT, StorageUnit.BYTES);
+    String value = "sample value";
 
-    // Write data larger than one block size.
-    String value = generateData(blockSize + 100,
-        (byte) RandomUtils.nextLong()).toString();
-
-    int valueLength = value.getBytes().length;
-    long currentQuotaUsage = 0L;
     store.createVolume(volumeName);
     volume = store.getVolume(volumeName);
-    // The initial value should be 0
-    Assert.assertEquals(0L, volume.getUsedBytes());
     volume.createBucket(bucketName);
     bucket = volume.getBucket(bucketName);
+    bucket.setQuota(OzoneQuota.parseQuota(Long.MAX_VALUE + " Bytes", 2));
 
-    //Case1: Test the volumeUsedBytes of ONE replications.
-    String keyName1 = UUID.randomUUID().toString();
-    writeKey(bucket, keyName1, ONE, value, valueLength);
-    volume = store.getVolume(volumeName);
-    bucket = volume.getBucket(bucketName);
-    Assert.assertEquals(valueLength, volume.getUsedBytes());
-    Assert.assertEquals(valueLength, bucket.getUsedBytes());
-    currentQuotaUsage += valueLength;
+    writeKey(bucket, key1, ONE, value, value.length());
+    Assert.assertEquals(1L,
+        store.getVolume(volumeName).getBucket(bucketName).getUsedNamespace());
 
-    // Case2: Test overwrite the same KeyName under ONE Replicates, the
-    // keyLocationVersions of the Key is 2.
-    String keyName2 = UUID.randomUUID().toString();
-    writeKey(bucket, keyName2, ONE, value, valueLength);
-    // Overwrite the keyName2
-    writeKey(bucket, keyName2, ONE, value, valueLength);
-    volume = store.getVolume(volumeName);
-    bucket = volume.getBucket(bucketName);
-    Assert.assertEquals(valueLength * 2 + currentQuotaUsage,
-        volume.getUsedBytes());
-    Assert.assertEquals(valueLength * 2 + currentQuotaUsage,
-        bucket.getUsedBytes());
-    currentQuotaUsage += valueLength * 2;
+    writeKey(bucket, key2, ONE, value, value.length());
+    Assert.assertEquals(2L,
+        store.getVolume(volumeName).getBucket(bucketName).getUsedNamespace());
 
-    // Case3: Test the volumeUsedBytes of THREE replications.
-    String keyName3 = UUID.randomUUID().toString();
-    writeKey(bucket, keyName3, THREE, value, valueLength);
-    volume = store.getVolume(volumeName);
-    bucket = volume.getBucket(bucketName);
-    Assert.assertEquals(valueLength * 3 + currentQuotaUsage,
-        volume.getUsedBytes());
-    Assert.assertEquals(valueLength * 3 + currentQuotaUsage,
-        bucket.getUsedBytes());
-    currentQuotaUsage += valueLength * 3;
-
-    // Case4: Test overwrite the same KeyName under THREE Replicates, the
-    // keyLocationVersions of the Key is 2.
-    String keyName4 = UUID.randomUUID().toString();
-    writeKey(bucket, keyName4, THREE, value, valueLength);
-    // Overwrite the keyName4
-    writeKey(bucket, keyName4, THREE, value, valueLength);
-    volume = store.getVolume(volumeName);
-    bucket = volume.getBucket(bucketName);
-    Assert.assertEquals(valueLength * 3 * 2 + currentQuotaUsage,
-        volume.getUsedBytes());
-    Assert.assertEquals(valueLength * 3 * 2 + currentQuotaUsage,
-        bucket.getUsedBytes());
-    currentQuotaUsage += valueLength * 3 * 2;
-
-    //Case5: Do not specify the value Length, simulate HDFS api writing.
-    // Test the volumeUsedBytes of ONE replications.
-    String keyName5 = UUID.randomUUID().toString();
-    writeFile(bucket, keyName5, ONE, value, 0);
-    volume = store.getVolume(volumeName);
-    bucket = volume.getBucket(bucketName);
-    Assert.assertEquals(valueLength + currentQuotaUsage,
-        volume.getUsedBytes());
-    Assert.assertEquals(valueLength + currentQuotaUsage,
-        bucket.getUsedBytes());
-    currentQuotaUsage += valueLength;
-
-    // Case6: Do not specify the value Length, simulate HDFS api writing.
-    // Test overwrite the same KeyName under ONE Replicates, the
-    // keyLocationVersions of the Key is 2.
-    String keyName6 = UUID.randomUUID().toString();
-    writeFile(bucket, keyName6, ONE, value, 0);
-    // Overwrite the keyName6
-    writeFile(bucket, keyName6, ONE, value, 0);
-    volume = store.getVolume(volumeName);
-    bucket = volume.getBucket(bucketName);
-    Assert.assertEquals(valueLength * 2 + currentQuotaUsage,
-        volume.getUsedBytes());
-    Assert.assertEquals(valueLength * 2 + currentQuotaUsage,
-        bucket.getUsedBytes());
-    currentQuotaUsage += valueLength * 2;
-
-    // Case7: Do not specify the value Length, simulate HDFS api writing.
-    // Test the volumeUsedBytes of THREE replications.
-    String keyName7 = UUID.randomUUID().toString();
-    writeFile(bucket, keyName7, THREE, value, 0);
-    volume = store.getVolume(volumeName);
-    bucket = volume.getBucket(bucketName);
-    Assert.assertEquals(valueLength * 3 + currentQuotaUsage,
-        volume.getUsedBytes());
-    Assert.assertEquals(valueLength * 3 + currentQuotaUsage,
-        bucket.getUsedBytes());
-    currentQuotaUsage += valueLength * 3;
-
-    // Case8: Do not specify the value Length, simulate HDFS api writing.
-    // Test overwrite the same KeyName under THREE Replicates, the
-    // keyLocationVersions of the Key is 2.
-    String keyName8 = UUID.randomUUID().toString();
-    writeFile(bucket, keyName8, THREE, value, 0);
-    // Overwrite the keyName8
-    writeFile(bucket, keyName8, THREE, value, 0);
-    volume = store.getVolume(volumeName);
-    bucket = volume.getBucket(bucketName);
-    Assert.assertEquals(valueLength * 3 * 2 + currentQuotaUsage,
-        volume.getUsedBytes());
-    Assert.assertEquals(valueLength * 3 * 2 + currentQuotaUsage,
-        bucket.getUsedBytes());
-    currentQuotaUsage += valueLength * 3 * 2;
-
-    // Case9: Test volumeUsedBytes when delete key of ONE replications.
-    bucket.deleteKey(keyName1);
-    volume = store.getVolume(volumeName);
-    bucket = volume.getBucket(bucketName);
-    Assert.assertEquals(currentQuotaUsage - valueLength,
-        volume.getUsedBytes());
-    Assert.assertEquals(currentQuotaUsage - valueLength,
-        bucket.getUsedBytes());
-    currentQuotaUsage -= valueLength;
-
-    // Case10: Test volumeUsedBytes when delete key of THREE
-    // replications.
-    bucket.deleteKey(keyName3);
-    volume = store.getVolume(volumeName);
-    bucket = volume.getBucket(bucketName);
-    Assert.assertEquals(currentQuotaUsage - valueLength * 3,
-        volume.getUsedBytes());
-    Assert.assertEquals(currentQuotaUsage - valueLength * 3,
-        bucket.getUsedBytes());
-    currentQuotaUsage -= valueLength * 3;
-
-    // Case11: Test volumeUsedBytes when Test Delete keys. At this
-    // point all keys are deleted, volumeUsedBytes should be 0
-    List<String> keyList = new ArrayList<>();
-    keyList.add(keyName2);
-    keyList.add(keyName4);
-    keyList.add(keyName5);
-    keyList.add(keyName6);
-    keyList.add(keyName7);
-    keyList.add(keyName8);
-    bucket.deleteKeys(keyList);
-    volume = store.getVolume(volumeName);
-    bucket = volume.getBucket(bucketName);
-    Assert.assertEquals(0, volume.getUsedBytes());
-    Assert.assertEquals(0, bucket.getUsedBytes());
-  }
-
-  @Test
-  public void testVolumeQuotaWithMultiThread() throws IOException,
-      InterruptedException{
-    String volumeName = UUID.randomUUID().toString();
-
-    int blockSize = (int) ozoneManager.getConfiguration().getStorageSize(
-        OZONE_SCM_BLOCK_SIZE, OZONE_SCM_BLOCK_SIZE_DEFAULT, StorageUnit.BYTES);
-    // Write data larger than one block size.
-    String value = generateData(blockSize + 100,
-        (byte) RandomUtils.nextLong()).toString();
-
-    int valueLength = value.getBytes().length;
-    long currentQuotaUsage = 0L;
-    store.createVolume(volumeName);
-    OzoneVolume volume = store.getVolume(volumeName);
-    // The initial value should be 0
-    Assert.assertEquals(0L, volume.getUsedBytes());
-
-    CountDownLatch latch = new CountDownLatch(2);
-    AtomicInteger failCount = new AtomicInteger(0);
-
-    // Multiple threads write different buckets and ensure that the volume
-    // quota is correct.
-    Runnable r = () -> {
-      try {
-        for (int i = 0; i < 10; i++) {
-          String keyName = UUID.randomUUID().toString();
-          String bucketName = UUID.randomUUID().toString();
-          volume.createBucket(bucketName);
-          OzoneBucket bucket = volume.getBucket(bucketName);
-          OzoneOutputStream out = bucket.createKey(keyName, valueLength,
-              STAND_ALONE, ONE, new HashMap<>());
-          out.write(value.getBytes());
-          out.close();
-        }
-        latch.countDown();
-      } catch (IOException ex) {
-        latch.countDown();
-        failCount.incrementAndGet();
-      }
-    };
-
-    Thread thread1 = new Thread(r);
-    Thread thread2 = new Thread(r);
-
-    thread1.start();
-    thread2.start();
-
-    latch.await(6000, TimeUnit.SECONDS);
-
-    if (failCount.get() > 0) {
-      fail("testVolumeQuotaWithMultiThread failed");
+    try {
+      writeKey(bucket, key3, ONE, value, value.length());
+      Assert.fail("Write key should be failed");
+    } catch (IOException ex) {
+      GenericTestUtils.assertExceptionContains("QUOTA_EXCEEDED", ex);
     }
-    currentQuotaUsage += valueLength * 10 * 2;
-    Assert.assertEquals(currentQuotaUsage,
-        store.getVolume(volumeName).getUsedBytes());
 
+    // Write failed, bucket usedNamespace should remain as 2
+    Assert.assertEquals(2L,
+        store.getVolume(volumeName).getBucket(bucketName).getUsedNamespace());
+
+    // Reset bucket quota, the original usedNamespace needs to remain the same
+    bucket.setQuota(OzoneQuota.parseQuota(Long.MAX_VALUE + " Bytes", 100));
+    Assert.assertEquals(2L,
+        store.getVolume(volumeName).getBucket(bucketName).getUsedNamespace());
+
+    bucket.deleteKeys(Arrays.asList(key1, key2));
+    Assert.assertEquals(0L,
+        store.getVolume(volumeName).getBucket(bucketName).getUsedNamespace());
   }
 
   private void writeKey(OzoneBucket bucket, String keyName,
@@ -1203,8 +1045,6 @@ public abstract class TestOzoneRpcClientAbstract {
 
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
-    // The initial value should be 0
-    Assert.assertEquals(0L, volume.getUsedBytes());
     volume.createBucket(bucketName);
     OzoneBucket bucket = volume.getBucket(bucketName);
     OmMultipartInfo multipartInfo = bucket.initiateMultipartUpload(keyName,
@@ -1224,13 +1064,10 @@ public abstract class TestOzoneRpcClientAbstract {
     ozoneOutputStream.close();
 
     Assert.assertEquals(valueLength, store.getVolume(volumeName)
-        .getUsedBytes());
-    Assert.assertEquals(valueLength, store.getVolume(volumeName)
         .getBucket(bucketName).getUsedBytes());
 
-    // Abort uploaded partKey and the usedBytes of volume should be 0.
+    // Abort uploaded partKey and the usedBytes of bucket should be 0.
     bucket.abortMultipartUpload(keyName, uploadID);
-    Assert.assertEquals(0, store.getVolume(volumeName).getUsedBytes());
     Assert.assertEquals(0, store.getVolume(volumeName)
         .getBucket(bucketName).getUsedBytes());
   }
@@ -1466,9 +1303,14 @@ public abstract class TestOzoneRpcClientAbstract {
   private void readCorruptedKey(String volumeName, String bucketName,
       String keyName, boolean verifyChecksum) {
     try {
+
       OzoneConfiguration configuration = cluster.getConf();
-      configuration.setBoolean(OzoneConfigKeys.OZONE_CLIENT_VERIFY_CHECKSUM,
-          verifyChecksum);
+
+      final OzoneClientConfig clientConfig =
+          configuration.getObject(OzoneClientConfig.class);
+      clientConfig.setChecksumVerify(verifyChecksum);
+      configuration.setFromObject(clientConfig);
+
       RpcClient client = new RpcClient(configuration, null);
       OzoneInputStream is = client.getKey(volumeName, bucketName, keyName);
       is.read(new byte[100]);
@@ -3498,5 +3340,25 @@ public abstract class TestOzoneRpcClientAbstract {
       Assert.assertFalse(
           deletedKeyMetadata.containsKey(OzoneConsts.GDPR_ALGORITHM));
     }
+  }
+
+
+  @Test
+  public void setS3VolumeAcl() throws Exception {
+    OzoneObj s3vVolume = new OzoneObjInfo.Builder()
+        .setVolumeName(HddsClientUtils.getS3VolumeName(cluster.getConf()))
+        .setResType(OzoneObj.ResourceType.VOLUME)
+        .setStoreType(OzoneObj.StoreType.OZONE)
+        .build();
+
+    OzoneAcl ozoneAcl = new OzoneAcl(USER, remoteUserName, WRITE, DEFAULT);
+
+    boolean result = store.addAcl(s3vVolume, ozoneAcl);
+
+    Assert.assertTrue("SetAcl on default s3v failed", result);
+
+    List<OzoneAcl> ozoneAclList = store.getAcl(s3vVolume);
+
+    Assert.assertTrue(ozoneAclList.contains(ozoneAcl));
   }
 }

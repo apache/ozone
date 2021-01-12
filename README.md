@@ -1,7 +1,7 @@
-Apache Hadoop Ozone
+Apache Ozone
 ===
 
-Ozone is a scalable, redundant, and distributed object store for Hadoop. Apart from scaling to billions of objects of varying sizes, Ozone can function effectively in containerized environments such as Kubernetes and YARN.
+Ozone is a scalable, redundant, and distributed object store for Hadoop and Cloud-native environments. Apart from scaling to billions of objects of varying sizes, Ozone can function effectively in containerized environments such as Kubernetes and YARN.
 
 
  * MULTI-PROTOCOL SUPPORT: Ozone supports different protocols like S3 and Hadoop File System APIs.
@@ -13,26 +13,25 @@ Ozone is a scalable, redundant, and distributed object store for Hadoop. Apart f
 
 ## Documentation
 
-The latest documentation is generated together with the releases and hosted on the apache side.
+The latest documentation is generated together with the releases and hosted on the apache site.
 
-Please check [the documentation page](https://hadoop.apache.org/ozone/docs/) for more information.
+Please check [the documentation page](https://ozone.apache.org/docs/) for more information.
 
 ## Contact
 
-Ozone is part of the [Apache Hadoop](https://hadoop.apache.org) project.
+Ozone is a top level project under the [Apache Software Foundation](https://apache.org)
 
- * Ozone [web page](https://hadoop.apache.org/ozone/) is available from the Hadoop site
+ * Ozone [web page](https://ozone.apache.org)
  * Mailing lists
-     * For dev questions use: [ozone-dev@hadoop.apache.org](https://lists.apache.org/list.html?ozone-dev@hadoop.apache.org)
-     * For user questions use: [user@hadoop.apache.org](https://lists.apache.org/list.html?user@hadoop.apache.org)
+     * For any questions use: [dev@ozone.apache.org](https://lists.apache.org/list.html?dev@ozone.apache.org)
  * Chat: You can find the #ozone channel on the official ASF slack. Invite link is [here](http://s.apache.org/slack-invite).
  * There are Open [Weekly calls](https://cwiki.apache.org/confluence/display/HADOOP/Ozone+Community+Calls) where you can ask anything about Ozone.
      * Past meeting notes are also available from the wiki.
-
+ * Reporting security issues: Please consult with [SECURITY.md](./SECURITY.md) about reporting security vulnerabilities and issues.
 
 ## Download
 
-Latest release artifacts (source release and binary packages) are [available](https://hadoop.apache.org/ozone/downloads/) from the Ozone web page.
+Latest release artifacts (source release and binary packages) are [available](https://ozone.apache.org/downloads/) from the Ozone web page.
 
 ## Quick start
 
@@ -53,7 +52,7 @@ aws s3 --endpoint http://localhost:9878 cp --storage-class REDUCED_REDUNDANCY  /
 
 ### Run Ozone from released artifact
 
-If you need a more realistic cluster, you can [download](https://hadoop.apache.org/ozone/downloads/) the last (binary) release package, and start a cluster with the help of docker-compose:
+If you need a more realistic cluster, you can [download](https://ozone.apache.org/downloads/) the latest (binary) release package, and start a cluster with the help of docker-compose:
 
 After you untar the binary:
 
@@ -95,4 +94,4 @@ For more information, you can check the [Contribution guideline](./CONTRIBUTING.
 
 ## License
 
-The Apache Hadoop Ozone  project is licensed under the Apache 2.0 License. See the [LICENSE](./LICENSE.txt) file for details.
+The Apache Ozone project is licensed under the Apache 2.0 License. See the [LICENSE](./LICENSE.txt) file for details.

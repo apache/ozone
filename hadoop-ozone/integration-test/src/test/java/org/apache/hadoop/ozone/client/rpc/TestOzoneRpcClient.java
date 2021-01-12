@@ -18,12 +18,13 @@
 
 package org.apache.hadoop.ozone.client.rpc;
 
+import java.io.IOException;
+
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
-
-import java.io.IOException;
 import org.junit.Rule;
 import org.junit.rules.Timeout;
 

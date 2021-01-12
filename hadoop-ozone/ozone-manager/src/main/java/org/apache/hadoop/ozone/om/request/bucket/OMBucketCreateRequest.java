@@ -31,7 +31,6 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
-import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -199,22 +198,29 @@ public class OMBucketCreateRequest extends OMClientRequest {
 
       // Add objectID and updateID
       omBucketInfo.setObjectID(
-          OMFileRequest.getObjIDFromTxId(transactionLogIndex));
+          ozoneManager.getObjectIdFromTxId(transactionLogIndex));
       omBucketInfo.setUpdateID(transactionLogIndex,
           ozoneManager.isRatisEnabled());
 
       // Add default acls from volume.
       addDefaultAcls(omBucketInfo, omVolumeArgs);
 
+      // check namespace quota
+      checkQuotaInNamespace(omVolumeArgs, 1L);
+
+      // update used namespace for volume
+      omVolumeArgs.incrUsedNamespace(1L);
 
       // Update table cache.
+      metadataManager.getVolumeTable().addCacheEntry(new CacheKey<>(volumeKey),
+          new CacheValue<>(Optional.of(omVolumeArgs), transactionLogIndex));
       metadataManager.getBucketTable().addCacheEntry(new CacheKey<>(bucketKey),
           new CacheValue<>(Optional.of(omBucketInfo), transactionLogIndex));
 
       omResponse.setCreateBucketResponse(
           CreateBucketResponse.newBuilder().build());
       omClientResponse = new OMBucketCreateResponse(omResponse.build(),
-          omBucketInfo);
+          omBucketInfo, omVolumeArgs.copyObject());
     } catch (IOException ex) {
       exception = ex;
       omClientResponse = new OMBucketCreateResponse(
@@ -303,6 +309,25 @@ public class OMBucketCreateRequest extends OMClientRequest {
     return bekb.build();
   }
 
+  /**
+   * Check namespace quota.
+   */
+  private void checkQuotaInNamespace(OmVolumeArgs omVolumeArgs,
+      long allocatedNamespace) throws IOException {
+    if (omVolumeArgs.getQuotaInNamespace() > 0) {
+      long usedNamespace = omVolumeArgs.getUsedNamespace();
+      long quotaInNamespace = omVolumeArgs.getQuotaInNamespace();
+      long toUseNamespaceInTotal = usedNamespace + allocatedNamespace;
+      if (quotaInNamespace < toUseNamespaceInTotal) {
+        throw new OMException("The namespace quota of Volume:"
+            + omVolumeArgs.getVolume() + " exceeded: quotaInNamespace: "
+            + quotaInNamespace + " but namespace consumed: "
+            + toUseNamespaceInTotal + ".",
+            OMException.ResultCodes.QUOTA_EXCEEDED);
+      }
+    }
+  }
+
   public boolean checkQuotaBytesValid(OMMetadataManager metadataManager,
       OmVolumeArgs omVolumeArgs, OmBucketInfo omBucketInfo, String volumeKey)
       throws IOException {
@@ -310,10 +335,10 @@ public class OMBucketCreateRequest extends OMClientRequest {
     long volumeQuotaInBytes = omVolumeArgs.getQuotaInBytes();
 
     long totalBucketQuota = 0;
-    if (quotaInBytes == OzoneConsts.QUOTA_RESET || quotaInBytes == 0) {
-      return false;
-    } else if (quotaInBytes > OzoneConsts.QUOTA_RESET) {
+    if (quotaInBytes > 0) {
       totalBucketQuota = quotaInBytes;
+    } else {
+      return false;
     }
 
     List<OmBucketInfo>  bucketList = metadataManager.listBuckets(

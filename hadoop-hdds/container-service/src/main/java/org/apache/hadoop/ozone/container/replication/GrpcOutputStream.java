@@ -44,7 +44,7 @@ class GrpcOutputStream extends OutputStream {
 
   private final int bufferSize;
 
-  private int writtenBytes;
+  private long writtenBytes;
 
   GrpcOutputStream(
       StreamObserver<CopyContainerResponseProto> responseObserver,

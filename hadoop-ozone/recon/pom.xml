@@ -118,7 +118,7 @@
               <goal>npx</goal>
             </goals>
             <configuration>
-              <arguments>pnpm install</arguments>
+              <arguments>pnpm install --frozen-lockfile</arguments>
             </configuration>
           </execution>
           <execution>
@@ -261,6 +261,12 @@
     <dependency>
       <groupId>org.glassfish.jersey.inject</groupId>
       <artifactId>jersey-hk2</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-hdds-common</artifactId>
+      <type>test-jar</type>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>junit</groupId>

@@ -22,7 +22,9 @@ import org.slf4j.LoggerFactory;
 
 import static java.net.HttpURLConnection.HTTP_BAD_REQUEST;
 import static java.net.HttpURLConnection.HTTP_CONFLICT;
+import static java.net.HttpURLConnection.HTTP_FORBIDDEN;
 import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
+import static java.net.HttpURLConnection.HTTP_SERVER_ERROR;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_NOT_SATISFIABLE;
 
 /**
@@ -100,6 +102,13 @@ public final class S3ErrorTable {
       "allowed object size. Each part must be at least 5 MB in size, except " +
       "the last part.", HTTP_BAD_REQUEST);
 
+  public static final OS3Exception INTERNAL_ERROR = new OS3Exception(
+      "InternalError", "We encountered an internal error. Please try again.",
+      HTTP_SERVER_ERROR);
+
+  public static final OS3Exception ACCESS_DENIED = new OS3Exception(
+      "AccessDenied", "User doesn't have the right to access this " +
+      "resource.", HTTP_FORBIDDEN);
 
   /**
    * Create a new instance of Error.

@@ -18,32 +18,34 @@
 package org.apache.hadoop.ozone.om.codec;
 
 import java.io.IOException;
-import org.apache.hadoop.ozone.protocol.proto
-    .OzoneManagerProtocolProtos.UserVolumeInfo;
+import org.apache.hadoop.ozone.storage.proto
+    .OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 import org.apache.hadoop.hdds.utils.db.Codec;
 
 import com.google.common.base.Preconditions;
 import com.google.protobuf.InvalidProtocolBufferException;
 
 /**
- * Codec to encode UserVolumeInfo as byte array.
+ * Codec to encode PersistedUserVolumeInfo as byte array.
  */
-public class UserVolumeInfoCodec implements Codec<UserVolumeInfo> {
+public class UserVolumeInfoCodec implements Codec<PersistedUserVolumeInfo> {
 
   @Override
-  public byte[] toPersistedFormat(UserVolumeInfo object) throws IOException {
+  public byte[] toPersistedFormat(
+      PersistedUserVolumeInfo object) throws IOException {
     Preconditions
         .checkNotNull(object, "Null object can't be converted to byte array.");
     return object.toByteArray();
   }
 
   @Override
-  public UserVolumeInfo fromPersistedFormat(byte[] rawData) throws IOException {
+  public PersistedUserVolumeInfo fromPersistedFormat(
+      byte[] rawData) throws IOException {
     Preconditions
         .checkNotNull(rawData,
             "Null byte array can't converted to real object.");
     try {
-      return UserVolumeInfo.parseFrom(rawData);
+      return PersistedUserVolumeInfo.parseFrom(rawData);
     } catch (InvalidProtocolBufferException e) {
       throw new IllegalArgumentException(
           "Can't encode the the raw data from the byte array", e);
@@ -51,7 +53,7 @@ public class UserVolumeInfoCodec implements Codec<UserVolumeInfo> {
   }
 
   @Override
-  public UserVolumeInfo copyObject(UserVolumeInfo object) {
+  public PersistedUserVolumeInfo copyObject(PersistedUserVolumeInfo object) {
     return object;
   }
 }

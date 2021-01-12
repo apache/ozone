@@ -160,6 +160,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
         <artifactId>hadoop-hdds-common</artifactId>
         <version>${hdds.version}</version>
         <type>test-jar</type>
+        <scope>test</scope>
       </dependency>
 
       <dependency>
@@ -167,6 +168,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
         <artifactId>hadoop-hdds-container-service</artifactId>
         <version>${hdds.version}</version>
         <type>test-jar</type>
+        <scope>test</scope>
       </dependency>
 
       <dependency>
@@ -174,6 +176,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
         <artifactId>hadoop-hdds-server-scm</artifactId>
         <type>test-jar</type>
         <version>${hdds.version}</version>
+        <scope>test</scope>
       </dependency>
 
       <dependency>
@@ -285,25 +288,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-dependency-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>add-classpath-descriptor</id>
-            <phase>prepare-package</phase>
-            <goals>
-              <goal>build-classpath</goal>
-            </goals>
-            <configuration>
-              <outputFile>${project.build.outputDirectory}/${project.artifactId}.classpath</outputFile>
-              <prefix>$HDDS_LIB_JARS_DIR</prefix>
-              <outputFilterFile>true</outputFilterFile>
-              <includeScope>runtime</includeScope>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-jar-plugin</artifactId>
         <executions>
           <execution>
@@ -360,6 +344,37 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
                 <test.unique.fork.id>fork-${surefire.forkNumber}</test.unique.fork.id>
               </systemPropertyVariables>
             </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>add-classpath-descriptor</id>
+      <activation>
+        <file>
+          <exists>src/main/java</exists>
+        </file>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-dependency-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>add-classpath-descriptor</id>
+                <phase>prepare-package</phase>
+                <goals>
+                  <goal>build-classpath</goal>
+                </goals>
+                <configuration>
+                  <outputFile>${project.build.outputDirectory}/${project.artifactId}.classpath</outputFile>
+                  <prefix>$HDDS_LIB_JARS_DIR</prefix>
+                  <outputFilterFile>true</outputFilterFile>
+                  <includeScope>runtime</includeScope>
+                </configuration>
+              </execution>
+            </executions>
           </plugin>
         </plugins>
       </build>

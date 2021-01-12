@@ -48,6 +48,7 @@ message SCMSecurityRequest {
     optional SCMGetOMCertRequestProto getOMCertRequest = 4;
     optional SCMGetCertificateRequestProto getCertificateRequest = 5;
     optional SCMGetCACertificateRequestProto getCACertificateRequest = 6;
+    optional SCMListCertificateRequestProto listCertificateRequest = 7;
 
 }
 
@@ -66,6 +67,8 @@ message SCMSecurityResponse {
 
     optional SCMGetCertResponseProto getCertResponseProto = 6;
 
+    optional SCMListCertificateResponseProto listCertificateResponseProto = 7;
+
 }
 
 enum Type {
@@ -73,6 +76,7 @@ enum Type {
     GetOMCertificate = 2;
     GetCertificate = 3;
     GetCACertificate = 4;
+    ListCertificate = 5;
 }
 
 enum Status {
@@ -110,6 +114,16 @@ message SCMGetCACertificateRequestProto {
 }
 
 /**
+* Proto request to list certificates by node type or all.
+*/
+message SCMListCertificateRequestProto {
+    optional NodeType role = 1;
+    optional int64 startCertId = 2;
+    required uint32 count = 3; // Max
+    optional bool isRevoked = 4; // list revoked certs
+}
+
+/**
  * Returns a certificate signed by SCM.
  */
 message SCMGetCertResponseProto {
@@ -121,6 +135,18 @@ message SCMGetCertResponseProto {
     required ResponseCode responseCode = 1;
     required string x509Certificate = 2; // Base64 encoded X509 certificate.
     optional string x509CACertificate = 3; // Base64 encoded CA X509 certificate.
+}
+
+/**
+* Return a list of PEM encoded certificates.
+*/
+message SCMListCertificateResponseProto {
+    enum ResponseCode {
+        success = 1;
+        authenticationFailed = 2;
+    }
+    required ResponseCode responseCode = 1;
+    repeated string certificates = 2;
 }
 
 

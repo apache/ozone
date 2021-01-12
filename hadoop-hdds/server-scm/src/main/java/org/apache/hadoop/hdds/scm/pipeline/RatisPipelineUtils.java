@@ -94,8 +94,8 @@ public final class RatisPipelineUtils {
     try(RaftClient client = RatisHelper
         .newRaftClient(SupportedRpcType.valueOfIgnoreCase(rpcType), p,
             retryPolicy, grpcTlsConfig, ozoneConf)) {
-      client.groupRemove(RaftGroupId.valueOf(pipelineID.getId()),
-          true, false, p.getId());
+      client.getGroupManagementApi(p.getId())
+          .remove(RaftGroupId.valueOf(pipelineID.getId()), true, false);
     }
   }
 

@@ -60,10 +60,18 @@
 <h2>Safemode rules statuses</h2>
 
 <table class="table table-bordered table-striped" class="col-md-6">
+    <thead>
+    <tr>
+        <th>Rule Id</th>
+        <th>Rule definition</th>
+        <th>Passed</th>
+    </tr>
+    </thead>
     <tbody>
-    <tr ng-repeat="typestat in $ctrl.overview.jmx.RuleStatusMetrics">
+    <tr ng-repeat="typestat in $ctrl.overview.jmx.SafeModeRuleStatus">
         <td>{{typestat.key}}</td>
-        <td>{{typestat.value}}</td>
+        <td>{{typestat.value[0]}}</td>
+        <td>{{typestat.value[1]}}</td>
     </tr>
     </tbody>
 </table>

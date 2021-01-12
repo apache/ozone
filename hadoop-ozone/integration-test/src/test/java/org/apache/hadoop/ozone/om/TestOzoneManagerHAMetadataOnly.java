@@ -65,7 +65,7 @@ import java.util.UUID;
 import static org.apache.hadoop.ozone.MiniOzoneHAClusterImpl.NODE_FAILURE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT;
 
-import static org.apache.ratis.server.metrics.RaftLogMetrics.RATIS_APPLICATION_NAME_METRICS;
+import static org.apache.ratis.metrics.RatisMetrics.RATIS_APPLICATION_NAME_METRICS;
 import static org.junit.Assert.fail;
 
 /**
@@ -395,11 +395,16 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
             .setCmdType(OzoneManagerProtocolProtos.Type.CreateVolume).build();
 
     RaftClientReply raftClientReply =
-        raftServer.submitClientRequest(new RaftClientRequest(clientId,
-         raftServer.getId(), ozoneManagerRatisServer.getRaftGroup()
-         .getGroupId(), callId,
-        Message.valueOf(OMRatisHelper.convertRequestToByteString(omRequest)),
-        RaftClientRequest.writeRequestType(), null));
+        raftServer.submitClientRequest(RaftClientRequest.newBuilder()
+            .setClientId(clientId)
+            .setServerId(raftServer.getId())
+            .setGroupId(ozoneManagerRatisServer.getRaftGroup().getGroupId())
+            .setCallId(callId)
+            .setMessage(
+                Message.valueOf(
+                    OMRatisHelper.convertRequestToByteString(omRequest)))
+            .setType(RaftClientRequest.writeRequestType())
+            .build());
 
     Assert.assertTrue(raftClientReply.isSuccess());
 
@@ -409,18 +414,48 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
     logCapturer.clearOutput();
 
     raftClientReply =
-        raftServer.submitClientRequest(new RaftClientRequest(clientId,
-            raftServer.getId(), ozoneManagerRatisServer.getRaftGroup()
-            .getGroupId(), callId, Message.valueOf(
-                OMRatisHelper.convertRequestToByteString(omRequest)),
-            RaftClientRequest.writeRequestType(), null));
+        raftServer.submitClientRequest(RaftClientRequest.newBuilder()
+            .setClientId(clientId)
+            .setServerId(raftServer.getId())
+            .setGroupId(ozoneManagerRatisServer.getRaftGroup().getGroupId())
+            .setCallId(callId)
+            .setMessage(
+                Message.valueOf(
+                    OMRatisHelper.convertRequestToByteString(omRequest)))
+            .setType(RaftClientRequest.writeRequestType())
+            .build());
 
     Assert.assertTrue(raftClientReply.isSuccess());
 
     // As second time with same client id and call id, this request should
     // not be executed ratis server should return from cache.
-    Assert.assertFalse(logCapturer.getOutput().contains("created volume:"
-        + volumeName));
+    // If 2nd time executed, it will fail with Volume creation failed. check
+    // for that.
+    Assert.assertFalse(logCapturer.getOutput().contains(
+        "Volume creation failed"));
+
+    //Sleep for little above retry cache duration to get cache clear.
+    Thread.sleep(getRetryCacheDuration().toMillis() + 5000);
+
+    raftClientReply =
+        raftServer.submitClientRequest(RaftClientRequest.newBuilder()
+            .setClientId(clientId)
+            .setServerId(raftServer.getId())
+            .setGroupId(ozoneManagerRatisServer.getRaftGroup().getGroupId())
+            .setCallId(callId)
+            .setMessage(
+                Message.valueOf(
+                    OMRatisHelper.convertRequestToByteString(omRequest)))
+            .setType(RaftClientRequest.writeRequestType())
+            .build());
+
+    Assert.assertTrue(raftClientReply.isSuccess());
+
+    // As second time with same client id and call id, this request should
+    // be executed by ratis server as we are sending this request after cache
+    // expiry duration.
+    Assert.assertTrue(logCapturer.getOutput().contains(
+        "Volume creation failed"));
 
   }
 

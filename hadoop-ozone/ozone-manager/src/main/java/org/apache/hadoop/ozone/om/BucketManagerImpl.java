@@ -117,10 +117,10 @@ public class BucketManagerImpl implements BucketManager {
     String volumeName = bucketInfo.getVolumeName();
     String bucketName = bucketInfo.getBucketName();
     boolean acquiredBucketLock = false;
-    metadataManager.getLock().acquireLock(VOLUME_LOCK, volumeName);
+    metadataManager.getLock().acquireWriteLock(VOLUME_LOCK, volumeName);
     try {
-      acquiredBucketLock = metadataManager.getLock().acquireLock(BUCKET_LOCK,
-          volumeName, bucketName);
+      acquiredBucketLock = metadataManager.getLock().acquireWriteLock(
+          BUCKET_LOCK, volumeName, bucketName);
       String volumeKey = metadataManager.getVolumeKey(volumeName);
       String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
       OmVolumeArgs volumeArgs = metadataManager.getVolumeTable().get(volumeKey);
@@ -188,10 +188,10 @@ public class BucketManagerImpl implements BucketManager {
       throw ex;
     } finally {
       if (acquiredBucketLock) {
-        metadataManager.getLock().releaseLock(BUCKET_LOCK, volumeName,
+        metadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
             bucketName);
       }
-      metadataManager.getLock().releaseLock(VOLUME_LOCK, volumeName);
+      metadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
     }
   }
 
@@ -282,7 +282,8 @@ public class BucketManagerImpl implements BucketManager {
     Preconditions.checkNotNull(args);
     String volumeName = args.getVolumeName();
     String bucketName = args.getBucketName();
-    metadataManager.getLock().acquireLock(BUCKET_LOCK, volumeName, bucketName);
+    metadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volumeName,
+        bucketName);
     try {
       String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
       OmBucketInfo oldBucketInfo =
@@ -336,7 +337,7 @@ public class BucketManagerImpl implements BucketManager {
       }
       throw ex;
     } finally {
-      metadataManager.getLock().releaseLock(BUCKET_LOCK, volumeName,
+      metadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
           bucketName);
     }
   }
@@ -353,7 +354,8 @@ public class BucketManagerImpl implements BucketManager {
       throws IOException {
     Preconditions.checkNotNull(volumeName);
     Preconditions.checkNotNull(bucketName);
-    metadataManager.getLock().acquireLock(BUCKET_LOCK, volumeName, bucketName);
+    metadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volumeName,
+        bucketName);
     try {
       //Check if bucket exists
       String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
@@ -376,7 +378,7 @@ public class BucketManagerImpl implements BucketManager {
       }
       throw ex;
     } finally {
-      metadataManager.getLock().releaseLock(BUCKET_LOCK, volumeName,
+      metadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
           bucketName);
     }
   }
@@ -418,7 +420,7 @@ public class BucketManagerImpl implements BucketManager {
     String volume = obj.getVolumeName();
     String bucket = obj.getBucketName();
     boolean changed = false;
-    metadataManager.getLock().acquireLock(BUCKET_LOCK, volume, bucket);
+    metadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volume, bucket);
     try {
       String dbBucketKey = metadataManager.getBucketKey(volume, bucket);
       OmBucketInfo bucketInfo =
@@ -440,7 +442,7 @@ public class BucketManagerImpl implements BucketManager {
       }
       throw ex;
     } finally {
-      metadataManager.getLock().releaseLock(BUCKET_LOCK, volume, bucket);
+      metadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volume, bucket);
     }
 
     return changed;
@@ -465,7 +467,7 @@ public class BucketManagerImpl implements BucketManager {
     String volume = obj.getVolumeName();
     String bucket = obj.getBucketName();
     boolean removed = false;
-    metadataManager.getLock().acquireLock(BUCKET_LOCK, volume, bucket);
+    metadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volume, bucket);
     try {
       String dbBucketKey = metadataManager.getBucketKey(volume, bucket);
       OmBucketInfo bucketInfo =
@@ -486,7 +488,7 @@ public class BucketManagerImpl implements BucketManager {
       }
       throw ex;
     } finally {
-      metadataManager.getLock().releaseLock(BUCKET_LOCK, volume, bucket);
+      metadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volume, bucket);
     }
     return removed;
   }
@@ -509,7 +511,7 @@ public class BucketManagerImpl implements BucketManager {
     }
     String volume = obj.getVolumeName();
     String bucket = obj.getBucketName();
-    metadataManager.getLock().acquireLock(BUCKET_LOCK, volume, bucket);
+    metadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volume, bucket);
     try {
       String dbBucketKey = metadataManager.getBucketKey(volume, bucket);
       OmBucketInfo bucketInfo =
@@ -528,7 +530,7 @@ public class BucketManagerImpl implements BucketManager {
       }
       throw ex;
     } finally {
-      metadataManager.getLock().releaseLock(BUCKET_LOCK, volume, bucket);
+      metadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volume, bucket);
     }
     return true;
   }

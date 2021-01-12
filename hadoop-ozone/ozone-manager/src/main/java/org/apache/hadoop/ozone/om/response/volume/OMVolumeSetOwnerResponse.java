@@ -26,8 +26,8 @@ import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .UserVolumeInfo;
+import org.apache.hadoop.ozone.storage.proto.
+    OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -42,13 +42,14 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
 @CleanupTableInfo(cleanupTables = {VOLUME_TABLE})
 public class OMVolumeSetOwnerResponse extends OMClientResponse {
   private String oldOwner;
-  private UserVolumeInfo oldOwnerVolumeList;
-  private UserVolumeInfo newOwnerVolumeList;
+  private PersistedUserVolumeInfo oldOwnerVolumeList;
+  private PersistedUserVolumeInfo newOwnerVolumeList;
   private OmVolumeArgs newOwnerVolumeArgs;
 
   public OMVolumeSetOwnerResponse(@Nonnull OMResponse omResponse,
-      @Nonnull String oldOwner, @Nonnull UserVolumeInfo oldOwnerVolumeList,
-      @Nonnull UserVolumeInfo newOwnerVolumeList,
+      @Nonnull String oldOwner,
+      @Nonnull PersistedUserVolumeInfo oldOwnerVolumeList,
+      @Nonnull PersistedUserVolumeInfo newOwnerVolumeList,
       @Nonnull OmVolumeArgs newOwnerVolumeArgs) {
     super(omResponse);
     this.oldOwner = oldOwner;
