@@ -1005,8 +1005,13 @@ public abstract class TestOzoneRpcClientAbstract {
         store.getVolume(volumeName).getBucket(bucketName).getUsedNamespace());
 
     // Reset bucket quota, the original usedNamespace needs to remain the same
+<<<<<<< HEAD
     bucket.setQuota(OzoneQuota.parseQuota(
         Long.MAX_VALUE + " Bytes", "100"));
+=======
+    bucket.setQuota(
+        OzoneQuota.parseQuota(Long.MAX_VALUE + " Bytes", "100"));
+>>>>>>> rabase master and add more comprehensive UT
     Assert.assertEquals(2L,
         store.getVolume(volumeName).getBucket(bucketName).getUsedNamespace());
 
