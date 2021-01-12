@@ -509,6 +509,8 @@ public class SCMClientProtocolServer implements
   @Override
   public void deactivatePipeline(HddsProtos.PipelineID pipelineID)
       throws IOException {
+    String remoteUser = getRemoteUserName();
+    getScm().checkAdminAccess(remoteUser);
     AUDIT.logReadSuccess(buildAuditMessageForSuccess(
         SCMAction.DEACTIVATE_PIPELINE, null));
     scm.getPipelineManager().deactivatePipeline(
@@ -518,6 +520,8 @@ public class SCMClientProtocolServer implements
   @Override
   public void closePipeline(HddsProtos.PipelineID pipelineID)
       throws IOException {
+    String remoteUser = getRemoteUserName();
+    getScm().checkAdminAccess(remoteUser);
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("pipelineID", pipelineID.getId());
     PipelineManager pipelineManager = scm.getPipelineManager();
@@ -581,6 +585,8 @@ public class SCMClientProtocolServer implements
    */
   @Override
   public boolean forceExitSafeMode() throws IOException {
+    String remoteUser = getRemoteUserName();
+    getScm().checkAdminAccess(remoteUser);
     AUDIT.logWriteSuccess(
         buildAuditMessageForSuccess(SCMAction.FORCE_EXIT_SAFE_MODE, null)
     );
@@ -588,14 +594,18 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
-  public void startReplicationManager() {
+  public void startReplicationManager() throws IOException {
+    String remoteUser = getRemoteUserName();
+    getScm().checkAdminAccess(remoteUser);
     AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
         SCMAction.START_REPLICATION_MANAGER, null));
     scm.getReplicationManager().start();
   }
 
   @Override
-  public void stopReplicationManager() {
+  public void stopReplicationManager() throws IOException {
+    String remoteUser = getRemoteUserName();
+    getScm().checkAdminAccess(remoteUser);
     AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
         SCMAction.STOP_REPLICATION_MANAGER, null));
     scm.getReplicationManager().stop();
