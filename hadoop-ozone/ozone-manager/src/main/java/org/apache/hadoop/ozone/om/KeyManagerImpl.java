@@ -681,7 +681,7 @@ public class KeyManagerImpl implements KeyManager {
         LOG.debug("volume:{} bucket:{} Key:{} not found", volumeName,
                 bucketName, keyName);
       }
-      throw new OMException("Key not found", KEY_NOT_FOUND);
+      throw new OMException("Key:" + keyName + " not found", KEY_NOT_FOUND);
     }
 
     // add block token for read.

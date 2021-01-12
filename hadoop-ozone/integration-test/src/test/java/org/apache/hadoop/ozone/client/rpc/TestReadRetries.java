@@ -209,13 +209,10 @@ public class TestReadRetries {
     readKey(bucket, keyName, value);
 
     // read intermediate directory
-    try {
-      bucket.getKey("/a/b/c/");
-      fail("Should throw exception for directory listing");
-    } catch (OMException ome) {
-      // expected
-      assertEquals(ome.getResult(), OMException.ResultCodes.KEY_NOT_FOUND);
-    }
+    verifyIntermediateDir(bucket, "a/b/c/");
+    verifyIntermediateDir(bucket, "a/b/c");
+    verifyIntermediateDir(bucket, "/a/b/c/");
+    verifyIntermediateDir(bucket, "/a/b/c");
 
     // shutdown the second datanode
     datanodeDetails = datanodes.get(1);
@@ -237,6 +234,17 @@ public class TestReadRetries {
       // are available
     }
     factory.releaseClient(clientSpi, false);
+  }
+
+  private void verifyIntermediateDir(OzoneBucket bucket,
+      String dir) throws IOException {
+    try {
+      bucket.getKey(dir);
+      fail("Should throw exception for directory listing");
+    } catch (OMException ome) {
+      // expected
+      assertEquals(OMException.ResultCodes.KEY_NOT_FOUND, ome.getResult());
+    }
   }
 
   private void readKey(OzoneBucket bucket, String keyName, String data)
