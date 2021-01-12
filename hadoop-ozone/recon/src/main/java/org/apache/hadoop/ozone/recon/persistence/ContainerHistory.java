@@ -22,7 +22,7 @@ import java.io.Serializable;
 
 public class ContainerHistory implements Serializable {
 
-  private long containerID;
+  private long containerId;
   private String datanodeUuid;
   private String datanodeHost;
   private long firstSeenTime;
@@ -30,19 +30,19 @@ public class ContainerHistory implements Serializable {
 
   public ContainerHistory(long containerId, String datanodeUuid,
       String datanodeHost, long firstSeenTime, long lastSeenTime) {
-    this.containerID = containerId;
+    this.containerId = containerId;
     this.datanodeUuid = datanodeUuid;
     this.datanodeHost = datanodeHost;
     this.firstSeenTime = firstSeenTime;
     this.lastSeenTime = lastSeenTime;
   }
 
-  public long getContainerID() {
-    return containerID;
+  public long getContainerId() {
+    return containerId;
   }
 
-  public void setContainerID(long containerID) {
-    this.containerID = containerID;
+  public void setContainerId(long containerId) {
+    this.containerId = containerId;
   }
 
   public String getDatanodeUuid() {
