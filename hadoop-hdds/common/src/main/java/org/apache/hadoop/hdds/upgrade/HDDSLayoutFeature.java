@@ -35,12 +35,8 @@ public enum HDDSLayoutFeature implements LayoutFeature {
 
   private int layoutVersion;
   private String description;
-
-  private Optional<? extends HDDSUpgradeAction> scmUpgradeAction =
-      Optional.empty();
-
-  private Optional<? extends HDDSUpgradeAction> datanodeUpgradeAction =
-      Optional.empty();
+  private HDDSUpgradeAction scmUpgradeAction;
+  private HDDSUpgradeAction datanodeUpgradeAction;
 
   HDDSLayoutFeature(final int layoutVersion, String description) {
     this.layoutVersion = layoutVersion;
@@ -48,14 +44,12 @@ public enum HDDSLayoutFeature implements LayoutFeature {
   }
 
   @SuppressFBWarnings("ME_ENUM_FIELD_SETTER")
-  public void setSCMUpgradeAction(Optional<? extends HDDSUpgradeAction>
-                                      scmAction) {
+  public void setSCMUpgradeAction(HDDSUpgradeAction scmAction) {
     this.scmUpgradeAction = scmAction;
   }
 
   @SuppressFBWarnings("ME_ENUM_FIELD_SETTER")
-  public void setDataNodeUpgradeAction(Optional<? extends HDDSUpgradeAction>
-                                           datanodeAction) {
+  public void setDataNodeUpgradeAction(HDDSUpgradeAction datanodeAction) {
     this.datanodeUpgradeAction = datanodeAction;
   }
 
@@ -70,10 +64,10 @@ public enum HDDSLayoutFeature implements LayoutFeature {
   }
 
   public Optional<? extends HDDSUpgradeAction> onFinalizeSCMAction() {
-    return scmUpgradeAction;
+    return Optional.ofNullable(scmUpgradeAction);
   }
 
   public Optional<? extends HDDSUpgradeAction> onFinalizeDataNodeAction() {
-    return datanodeUpgradeAction;
+    return Optional.ofNullable(datanodeUpgradeAction);
   }
 }

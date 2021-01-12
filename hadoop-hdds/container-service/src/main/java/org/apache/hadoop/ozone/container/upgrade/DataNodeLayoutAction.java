@@ -20,9 +20,9 @@ package org.apache.hadoop.ozone.container.upgrade;
 
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.FIRST_UPGRADE_VERSION;
 
-import java.util.Optional;
-
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
+import org.apache.hadoop.hdds.upgrade.HDDSUpgradeAction;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 
 /**
  * Catalog of HDDS features and their corresponding DataNode action.
@@ -36,13 +36,13 @@ public enum DataNodeLayoutAction {
   //////////////////////////////  //////////////////////////////
 
   private HDDSLayoutFeature hddsFeature;
-  private DataNodeUpgradeAction dataNodeAction;
+  private HDDSUpgradeAction<DatanodeStateMachine> action;
 
   DataNodeLayoutAction(HDDSLayoutFeature feature,
-                       DataNodeUpgradeAction action) {
+                       HDDSUpgradeAction<DatanodeStateMachine> action) {
     this.hddsFeature = feature;
-    this.dataNodeAction = action;
-    this.hddsFeature.setDataNodeUpgradeAction(Optional.of(dataNodeAction));
+    this.action = action;
+    this.hddsFeature.setDataNodeUpgradeAction(action);
   }
 
   public HDDSLayoutFeature getHddsFeature() {

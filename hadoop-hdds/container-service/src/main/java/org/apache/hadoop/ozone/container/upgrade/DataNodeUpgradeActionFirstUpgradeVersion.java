@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.container.upgrade;
 
+import org.apache.hadoop.hdds.upgrade.HDDSUpgradeAction;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,7 +27,7 @@ import org.slf4j.LoggerFactory;
  * Upgrade Action for DataNode for the very first first Upgrade Version.
  */
 public class DataNodeUpgradeActionFirstUpgradeVersion
-    implements DataNodeUpgradeAction {
+    implements HDDSUpgradeAction<DatanodeStateMachine> {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(DataNodeUpgradeActionFirstUpgradeVersion.class);

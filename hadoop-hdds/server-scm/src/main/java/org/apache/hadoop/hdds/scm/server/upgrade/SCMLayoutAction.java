@@ -20,9 +20,9 @@ package org.apache.hadoop.hdds.scm.server.upgrade;
 
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.FIRST_UPGRADE_VERSION;
 
-import java.util.Optional;
-
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
+import org.apache.hadoop.hdds.upgrade.HDDSUpgradeAction;
 
 /**
  * Catalog of HDDS features and their corresponding SCM action.
@@ -36,12 +36,13 @@ public enum SCMLayoutAction {
   //////////////////////////////  //////////////////////////////
 
   private HDDSLayoutFeature hddsFeature;
-  private SCMUpgradeAction scmAction;
+  private HDDSUpgradeAction<StorageContainerManager> action;
 
-  SCMLayoutAction(HDDSLayoutFeature feature, SCMUpgradeAction action) {
+  SCMLayoutAction(HDDSLayoutFeature feature,
+                  HDDSUpgradeAction<StorageContainerManager> action) {
     this.hddsFeature = feature;
-    this.scmAction = action;
-    hddsFeature.setSCMUpgradeAction(Optional.of(scmAction));
+    this.action = action;
+    hddsFeature.setSCMUpgradeAction(action);
   }
 
   public HDDSLayoutFeature getHddsFeature() {
