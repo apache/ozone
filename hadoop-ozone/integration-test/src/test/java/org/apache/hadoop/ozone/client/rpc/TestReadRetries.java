@@ -94,8 +94,8 @@ public class TestReadRetries {
   private static final String SCM_ID = UUID.randomUUID().toString();
   private String layoutVersion;
 
-  public TestReadRetries(String layoutVer) {
-    this.layoutVersion = layoutVer;
+  public TestReadRetries(String layoutVersion) {
+    this.layoutVersion = layoutVersion;
   }
 
   @Parameterized.Parameters
