@@ -1525,7 +1525,7 @@
 
   <property>
     <name>ozone.om.ratis.enable</name>
-    <value>false</value>
+    <value>true</value>
     <tag>OZONE, OM, RATIS, MANAGEMENT</tag>
     <description>Property to enable or disable Ratis server on OM.
     Please note - this is a temporary property to disable OM Ratis server.
