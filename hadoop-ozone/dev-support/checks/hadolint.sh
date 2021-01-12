@@ -17,25 +17,30 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR/../../.." || exit 1
 REPO_DIR="$DIR/../../.."
 
-ERROR=0
-
+REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/hadolint"}
+mkdir -p "$REPORT_DIR"
+REPORT_FILE="$REPORT_DIR/summary.txt"
 
 for Dockerfile in $(find "$REPO_DIR/hadoop-ozone" "$REPO_DIR/hadoop-hdds" -name Dockerfile | sort); do
-  echo "Checking $Dockerfile"
+  echo "Checking $Dockerfile" | tee -a "$REPORT_FILE"
 
   result=$( hadolint $Dockerfile )
   if [ ! -z "$result" ]
   then
-    echo "$result"
-    echo ""
-    ERROR=1
+    echo "$result" | tee -a "$REPORT_FILE"
+    echo "" | tee -a "$REPORT_FILE"
   fi
 done
 
-if [ "$ERROR" = 1 ]
+cat "$REPORT_FILE" |  egrep -v '^$|^Checking' | wc -l | awk '{print $1}'> "$REPORT_DIR/failures"
+
+if [ -s "${REPORT_FILE}" ]
 then
-  echo ""
-  echo ""
-  echo "Hadolint errors were found. Exit code: 1."
-  exit 1
+  echo "" | tee -a "$REPORT_FILE"
+  echo "" | tee -a "$REPORT_FILE"
+  echo "Hadolint errors were found. Exit code: 1." | tee -a "$REPORT_FILE"
+fi
+
+if [[ -s "${REPORT_FILE}" ]]; then
+   exit 1
 fi
