@@ -120,13 +120,13 @@ public class TestPipelineManagerImpl {
 
     PipelineManagerV2Impl pipelineManager2 = createPipelineManager(true);
     // Should be able to load previous pipelines.
-    Assert.assertFalse(pipelineManager.getPipelines().isEmpty());
+    Assert.assertFalse(pipelineManager2.getPipelines().isEmpty());
     Assert.assertEquals(2, pipelineManager.getPipelines().size());
-    pipelineManager.allowPipelineCreation();
-    Pipeline pipeline3 = pipelineManager.createPipeline(
+    pipelineManager2.allowPipelineCreation();
+    Pipeline pipeline3 = pipelineManager2.createPipeline(
         HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.THREE);
-    Assert.assertEquals(3, pipelineManager.getPipelines().size());
-    Assert.assertTrue(pipelineManager.containsPipeline(pipeline3.getId()));
+    Assert.assertEquals(3, pipelineManager2.getPipelines().size());
+    Assert.assertTrue(pipelineManager2.containsPipeline(pipeline3.getId()));
 
     pipelineManager2.close();
   }
