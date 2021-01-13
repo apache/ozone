@@ -88,7 +88,9 @@ public class PipelineStateManagerV2Impl implements StateManager {
     lock.writeLock().lock();
     try {
       Pipeline pipeline = Pipeline.getFromProtobuf(pipelineProto);
-      pipelineStore.put(pipeline.getId(), pipeline);
+      if (pipelineStore != null) {
+        pipelineStore.put(pipeline.getId(), pipeline);
+      }
       pipelineStateMap.addPipeline(pipeline);
       nodeManager.addPipeline(pipeline);
       LOG.info("Created pipeline {}.", pipeline);
@@ -240,34 +242,25 @@ public class PipelineStateManagerV2Impl implements StateManager {
   public void updatePipelineState(
       HddsProtos.PipelineID pipelineIDProto, HddsProtos.PipelineState newState)
       throws IOException {
+    PipelineID pipelineID = PipelineID.getFromProtobuf(pipelineIDProto);
+    Pipeline.PipelineState oldState =
+      getPipeline(pipelineID).getPipelineState();
     lock.writeLock().lock();
     try {
-      PipelineID pipelineID = PipelineID.getFromProtobuf(pipelineIDProto);
-      Pipeline.PipelineState state = getPipeline(pipelineID)
-                                       .getPipelineState();
-      pipelineStateMap.updatePipelineState(
-          PipelineID.getFromProtobuf(pipelineIDProto),
+      // null check is here to prevent the case where SCM store
+      // is closed but the staleNode handlers/pipeline creations
+      // still try to access it.
+      if (pipelineStore != null) {
+        pipelineStateMap.updatePipelineState(pipelineID,
           Pipeline.PipelineState.fromProtobuf(newState));
-      updatePipelineStateInDb(pipelineID, state);
+        pipelineStore.put(pipelineID, getPipeline(pipelineID));
+      }
+    } catch (IOException ex) {
+      LOG.warn("Pipeline {} state update failed", pipelineID);
+      // revert back to old state in memory
+      pipelineStateMap.updatePipelineState(pipelineID, oldState);
     } finally {
       lock.writeLock().unlock();
-    }
-  }
-
-  private void updatePipelineStateInDb(PipelineID pipelineId,
-                                       Pipeline.PipelineState state)
-    throws IOException {
-    // null check is here to prevent the case where SCM store
-    // is closed but the staleNode handlers/pipleine creations
-    // still try to access it.
-    if (pipelineStore != null) {
-      try {
-        pipelineStore.put(pipelineId, getPipeline(pipelineId));
-      } catch (IOException ex) {
-        LOG.info("Pipeline {} state update failed", pipelineId);
-        // revert back to old state in memory
-        updatePipelineState(pipelineId, state);
-      }
     }
   }
 

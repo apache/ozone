@@ -158,8 +158,8 @@ public class TestPipelineManagerImpl {
     Assert.assertEquals(1, pipelineManager.getPipelines().size());
     Assert.assertTrue(pipelineManager.containsPipeline(pipeline.getId()));
     Assert.assertEquals(ALLOCATED, pipeline.getPipelineState());
-    Assert.assertEquals(ALLOCATED,pipelineStore.get(pipeline.getId())
-                                    .getPipelineState());
+    Assert.assertEquals(ALLOCATED, pipelineStore.get(pipeline.getId())
+                                     .getPipelineState());
     PipelineID pipelineID = pipeline.getId();
 
     pipelineManager.openPipeline(pipelineID);
@@ -173,9 +173,9 @@ public class TestPipelineManagerImpl {
     pipelineManager.deactivatePipeline(pipeline.getId());
     Assert.assertEquals(Pipeline.PipelineState.DORMANT,
         pipelineManager.getPipeline(pipelineID).getPipelineState());
-    Assert.assertEquals(Pipeline.PipelineState.DORMANT,pipelineStore
-                                                         .get(pipeline.getId())
-                                                         .getPipelineState());
+    Assert.assertEquals(Pipeline.PipelineState.DORMANT, pipelineStore
+                                                          .get(pipeline.getId())
+                                                          .getPipelineState());
     Assert.assertFalse(pipelineManager
         .getPipelines(HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.THREE,
