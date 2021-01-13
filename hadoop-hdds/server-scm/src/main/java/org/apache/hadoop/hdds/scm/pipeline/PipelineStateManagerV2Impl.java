@@ -51,7 +51,7 @@ public class PipelineStateManagerV2Impl implements StateManager {
 
   private final PipelineStateMap pipelineStateMap;
   private final NodeManager nodeManager;
-  private final Table<PipelineID, Pipeline> pipelineStore;
+  private Table<PipelineID, Pipeline> pipelineStore;
 
   // Protect potential contentions between RaftServer and PipelineManager.
   // See https://issues.apache.org/jira/browse/HDDS-4560
@@ -244,7 +244,7 @@ public class PipelineStateManagerV2Impl implements StateManager {
       throws IOException {
     PipelineID pipelineID = PipelineID.getFromProtobuf(pipelineIDProto);
     Pipeline.PipelineState oldState =
-      getPipeline(pipelineID).getPipelineState();
+        getPipeline(pipelineID).getPipelineState();
     lock.writeLock().lock();
     try {
       // null check is here to prevent the case where SCM store
@@ -252,7 +252,7 @@ public class PipelineStateManagerV2Impl implements StateManager {
       // still try to access it.
       if (pipelineStore != null) {
         pipelineStateMap.updatePipelineState(pipelineID,
-          Pipeline.PipelineState.fromProtobuf(newState));
+            Pipeline.PipelineState.fromProtobuf(newState));
         pipelineStore.put(pipelineID, getPipeline(pipelineID));
       }
     } catch (IOException ex) {
@@ -266,7 +266,15 @@ public class PipelineStateManagerV2Impl implements StateManager {
 
   @Override
   public void close() throws Exception {
-    pipelineStore.close();
+    lock.writeLock().lock();
+    try {
+      pipelineStore.close();
+      pipelineStore = null;
+    } catch (Exception ex) {
+      LOG.error("Pipeline  store close failed", ex);
+    } finally {
+      lock.writeLock().unlock();
+    }
   }
 
   // TODO Remove legacy
