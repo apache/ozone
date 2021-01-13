@@ -241,6 +241,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneManagerService.newReflectiveBlockingService;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
 
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
@@ -472,14 +473,21 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     OMTransactionInfo txnInfo = metadataManager.getTransactionInfoTable()
         .get(TRANSACTION_INFO_KEY);
     prepareState = new OzoneManagerPrepareState(configuration);
+
+    // If we have no transaction info in the DB, then no prepare request
+    // could have been received, since the request would update the txn
+    // index in the DB.
     if (txnInfo != null) {
       // Only puts OM in prepare mode if a marker file matching the txn index
       // is found.
-      prepareState.restorePrepare(txnInfo.getTransactionIndex());
+      PrepareStatus status =
+          prepareState.restorePrepare(txnInfo.getTransactionIndex());
+      if (status == PrepareStatus.PREPARE_COMPLETED) {
+        LOG.info("Ozone Manager {} restarted in prepare mode.",
+            getOMNodeId());
+      }
     } else {
-      // If we have no transaction info in the DB, then no prepare request
-      // could have been received, since the request would update the txn
-      // index in the DB.
+      // Make sure OM prepare state is clean before proceeding.
       prepareState.cancelPrepare();
     }
 
