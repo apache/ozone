@@ -58,7 +58,7 @@ import org.apache.hadoop.ozone.recon.api.types.DatanodesResponse;
 import org.apache.hadoop.ozone.recon.api.types.PipelineMetadata;
 import org.apache.hadoop.ozone.recon.api.types.PipelinesResponse;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
-import org.apache.hadoop.ozone.recon.persistence.ContainerSchemaManager;
+import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
@@ -197,10 +197,11 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
                 mockScmServiceProvider)
             .addBinding(OzoneStorageContainerManager.class,
                 ReconStorageContainerManagerFacade.class)
+            .withContainerDB()
             .addBinding(ClusterStateEndpoint.class)
             .addBinding(NodeEndpoint.class)
             .addBinding(MetricsServiceProviderFactory.class)
-            .addBinding(ContainerSchemaManager.class)
+            .addBinding(ContainerHealthSchemaManager.class)
             .addBinding(UtilizationEndpoint.class)
             .addBinding(ReconUtils.class, reconUtilsMock)
             .addBinding(StorageContainerLocationProtocol.class, mockScmClient)
