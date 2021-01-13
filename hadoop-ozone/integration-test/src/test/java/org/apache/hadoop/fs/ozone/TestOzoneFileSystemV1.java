@@ -325,6 +325,11 @@ public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
    */
   @Test
   public void testRenameWithNonExistentSource() throws Exception {
+    // Skip as this will run only in new layout
+    if (!enabledFileSystemPaths) {
+      return;
+    }
+
     final String root = "/root";
     final String dir1 = root + "/dir1";
     final String dir2 = root + "/dir2";
@@ -350,6 +355,11 @@ public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
    */
   @Test
   public void testRenameDirToItsOwnSubDir() throws Exception {
+    // Skip as this will run only in new layout
+    if (!enabledFileSystemPaths) {
+      return;
+    }
+
     final String root = "/root";
     final String dir1 = root + "/dir1";
     final Path dir1Path = new Path(fs.getUri().toString() + dir1);
@@ -377,6 +387,11 @@ public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
    */
   @Test
   public void testRenameDestinationParentDoesntExist() throws Exception {
+    // Skip as this will run only in new layout
+    if (!enabledFileSystemPaths) {
+      return;
+    }
+
     final String root = "/root_dir";
     final String dir1 = root + "/dir1";
     final String dir2 = dir1 + "/dir2";
