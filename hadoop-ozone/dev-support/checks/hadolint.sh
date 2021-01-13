@@ -21,26 +21,20 @@ REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/hadolint"}
 mkdir -p "$REPORT_DIR"
 REPORT_FILE="$REPORT_DIR/summary.txt"
 
-for Dockerfile in $(find "$REPO_DIR/hadoop-ozone" "$REPO_DIR/hadoop-hdds" -name Dockerfile | sort); do
-  echo "Checking $Dockerfile" | tee -a "$REPORT_FILE"
-
+for Dockerfile in $(find hadoop-ozone hadoop-hdds -name Dockerfile | sort); do
   result=$( hadolint $Dockerfile )
   if [ ! -z "$result" ]
   then
     echo "$result" | tee -a "$REPORT_FILE"
-    echo "" | tee -a "$REPORT_FILE"
   fi
 done
 
-cat "$REPORT_FILE" |  egrep -v '^$|^Checking' | wc -l | awk '{print $1}'> "$REPORT_DIR/failures"
+wc -l "$REPORT_FILE" | awk '{print $1}'> "$REPORT_DIR/failures"
 
 if [ -s "${REPORT_FILE}" ]
 then
   echo "" | tee -a "$REPORT_FILE"
   echo "" | tee -a "$REPORT_FILE"
   echo "Hadolint errors were found. Exit code: 1." | tee -a "$REPORT_FILE"
-fi
-
-if [[ -s "${REPORT_FILE}" ]]; then
-   exit 1
+  exit 1
 fi
