@@ -345,7 +345,7 @@ public class TestOzoneFileSystem {
         OzoneFileSystem.class);
   }
 
-  private void testCreateDoesNotAddParentDirKeys() throws Exception {
+  protected void testCreateDoesNotAddParentDirKeys() throws Exception {
     Path grandparent = new Path("/testCreateDoesNotAddParentDirKeys");
     Path parent = new Path(grandparent, "parent");
     Path child = new Path(parent, "child");
@@ -369,7 +369,7 @@ public class TestOzoneFileSystem {
         fs.getFileStatus(parent).isDirectory());
   }
 
-  private void testDeleteCreatesFakeParentDir() throws Exception {
+  protected void testDeleteCreatesFakeParentDir() throws Exception {
     Path grandparent = new Path("/testDeleteCreatesFakeParentDir");
     Path parent = new Path(grandparent, "parent");
     Path child = new Path(parent, "child");

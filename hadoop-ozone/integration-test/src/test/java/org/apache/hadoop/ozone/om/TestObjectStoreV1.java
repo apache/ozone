@@ -26,8 +26,10 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
@@ -42,6 +44,9 @@ import org.junit.rules.Timeout;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.UUID;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
 
 public class TestObjectStoreV1 {
 
@@ -126,6 +131,84 @@ public class TestObjectStoreV1 {
             true);
 
     ozoneBucket.deleteKey(key);
+
+    // after key delete
+    verifyKeyInFileTable(keyTable, file, dirPathC.getObjectID(), true);
+    verifyKeyInOpenFileTable(openKeyTable, file, dirPathC.getObjectID(),
+            true);
+  }
+
+  @Test
+  public void testLookupKey() throws Exception {
+    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
+    String bucketName = "bucket" + RandomStringUtils.randomNumeric(5);
+    String parent = "a/b/c/";
+    String file = "key" + RandomStringUtils.randomNumeric(5);
+    String key = parent + file;
+
+    OzoneClient client = cluster.getClient();
+
+    ObjectStore objectStore = client.getObjectStore();
+    objectStore.createVolume(volumeName);
+
+    OzoneVolume ozoneVolume = objectStore.getVolume(volumeName);
+    Assert.assertTrue(ozoneVolume.getName().equals(volumeName));
+    ozoneVolume.createBucket(bucketName);
+
+    OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
+    Assert.assertTrue(ozoneBucket.getName().equals(bucketName));
+
+    Table<String, OmKeyInfo> openKeyTable =
+            cluster.getOzoneManager().getMetadataManager().getOpenKeyTable();
+
+    String data = "random data";
+    OzoneOutputStream ozoneOutputStream = ozoneBucket.createKey(key,
+            data.length(), ReplicationType.RATIS, ReplicationFactor.ONE,
+            new HashMap<>());
+
+    OmDirectoryInfo dirPathC = getDirInfo(volumeName, bucketName, parent);
+    Assert.assertNotNull("Failed to find dir path: a/b/c", dirPathC);
+
+    // after file creation
+    verifyKeyInOpenFileTable(openKeyTable, file, dirPathC.getObjectID(),
+            false);
+
+    ozoneOutputStream.write(data.getBytes(), 0, data.length());
+
+    // open key
+    try {
+      ozoneBucket.getKey(key);
+      fail("Should throw exception as file is not visible and its still " +
+              "open for writing!");
+    } catch (OMException ome) {
+      // expected
+      assertEquals(ome.getResult(), OMException.ResultCodes.KEY_NOT_FOUND);
+    }
+
+    ozoneOutputStream.close();
+
+    OzoneKeyDetails keyDetails = ozoneBucket.getKey(key);
+    Assert.assertEquals(key, keyDetails.getName());
+
+    Table<String, OmKeyInfo> keyTable =
+            cluster.getOzoneManager().getMetadataManager().getKeyTable();
+
+    // When closing the key, entry should be removed from openFileTable
+    // and it should be added to fileTable.
+    verifyKeyInFileTable(keyTable, file, dirPathC.getObjectID(), false);
+    verifyKeyInOpenFileTable(openKeyTable, file, dirPathC.getObjectID(),
+            true);
+
+    ozoneBucket.deleteKey(key);
+
+    // get deleted key
+    try {
+      ozoneBucket.getKey(key);
+      fail("Should throw exception as file not exists!");
+    } catch (OMException ome) {
+      // expected
+      assertEquals(ome.getResult(), OMException.ResultCodes.KEY_NOT_FOUND);
+    }
 
     // after key delete
     verifyKeyInFileTable(keyTable, file, dirPathC.getObjectID(), true);
