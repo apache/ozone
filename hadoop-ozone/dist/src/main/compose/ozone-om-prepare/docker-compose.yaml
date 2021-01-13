@@ -37,58 +37,66 @@ x-datanode:
     - 9864
     - 9882
 
+x-om:
+  &om
+  command: ["ozone","om","${OM_HA_ARGS}"]
+  <<: *common-config
+  environment:
+    ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
+    <<: *replication
+  ports:
+    - 9862
+    - 9872
+
 services:
   dn1:
     <<: *datanode
+    networks:
+     net:
+       ipv4_address: 10.9.0.11
     volumes:
       - ${OZONE_VOLUME}/dn1:/data
       - ../..:${OZONE_DIR}
   dn2:
     <<: *datanode
+    networks:
+     net:
+       ipv4_address: 10.9.0.12
     volumes:
       - ${OZONE_VOLUME}/dn2:/data
       - ../..:${OZONE_DIR}
   dn3:
     <<: *datanode
+    networks:
+     net:
+       ipv4_address: 10.9.0.13
     volumes:
       - ${OZONE_VOLUME}/dn3:/data
       - ../..:${OZONE_DIR}
 
   om1:
-    command: ["ozone", "om"]
-    <<: *common-config
-    environment:
-      ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
-      <<: *replication
-    ports:
-      - 9862
-      - 9872
+    <<: *om
+    networks:
+      net:
+        ipv4_address: 10.9.0.14
     volumes:
       - ${OZONE_VOLUME}/om1:/data
       - ../..:${OZONE_DIR}
 
   om2:
-    command: ["ozone", "om"]
-    <<: *common-config
-    environment:
-      ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
-      <<: *replication
-    ports:
-      - 9862
-      - 9872
+    <<: *om
+    networks:
+      net:
+        ipv4_address: 10.9.0.15
     volumes:
       - ${OZONE_VOLUME}/om2:/data
       - ../..:${OZONE_DIR}
 
   om3:
-    command: ["ozone", "om"]
-    <<: *common-config
-    environment:
-      ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
-      <<: *replication
-    ports:
-      - 9862
-      - 9872
+    <<: *om
+    networks:
+      net:
+        ipv4_address: 10.9.0.16
     volumes:
       - ${OZONE_VOLUME}/om3:/data
       - ../..:${OZONE_DIR}
@@ -96,6 +104,9 @@ services:
   scm:
     command: ["ozone","scm"]
     <<: *common-config
+    networks:
+      net:
+        ipv4_address: 10.9.0.17
     environment:
       ENSURE_SCM_INITIALIZED: /data/metadata/scm/current/VERSION
       OZONE-SITE.XML_hdds.scm.safemode.min.datanode: ${OZONE_SAFEMODE_MIN_DATANODES:-1}
@@ -106,3 +117,9 @@ services:
       - ${OZONE_VOLUME}/scm:/data
       - ../..:${OZONE_DIR}
 
+networks:
+  net:
+    driver: bridge
+    ipam:
+      config:
+      - subnet: 10.9.0.0/16

@@ -39,22 +39,17 @@ export OZONE_DIR=/opt/hadoop
 # shellcheck source=/dev/null
 source "${COMPOSE_DIR}/../testlib.sh"
 
-# prepare pre-upgrade cluster
-#export OM_HA_ARGS='--upgrade'
+# Write data and prepare cluster.
 start_docker_env
-docker-compose ps
-echo "Before prepare test"
 execute_robot_test scm omha/om-prepare.robot
-echo "After prepare test"
-#KEEP_RUNNING=false stop_docker_env
-#stop_docker_env
+KEEP_RUNNING=false stop_docker_env
 
 # re-start cluster with --upgrade flag to take it out of prepare.
-#export OM_HA_ARGS='--upgrade'
-#export OZONE_KEEP_RESULTS=true
-#start_docker_env
+export OM_HA_ARGS='--upgrade'
+export OZONE_KEEP_RESULTS=true
+start_docker_env
 # Writes should now succeed.
-#execute_robot_test scm topology/loaddata.robot
+execute_robot_test scm topology/loaddata.robot
 stop_docker_env
 
 generate_report
