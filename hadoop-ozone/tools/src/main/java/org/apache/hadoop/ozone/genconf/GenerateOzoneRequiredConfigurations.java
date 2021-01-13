@@ -26,6 +26,7 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 import picocli.CommandLine.PicocliException;
 
@@ -61,6 +62,9 @@ public final class GenerateOzoneRequiredConfigurations extends GenericCli {
       description = "Directory path where ozone-site file should be generated.")
   private String path;
 
+  @Option(names = "--security", description = "Generate security config.")
+  private boolean genSecurityConf;
+
   /**
    * Entry point for using genconf tool.
    *
@@ -73,7 +77,7 @@ public final class GenerateOzoneRequiredConfigurations extends GenericCli {
 
   @Override
   public Void call() throws Exception {
-    generateConfigurations(path);
+    generateConfigurations(path, genSecurityConf);
     return null;
   }
 
@@ -84,6 +88,19 @@ public final class GenerateOzoneRequiredConfigurations extends GenericCli {
    * @throws JAXBException
    */
   public static void generateConfigurations(String path) throws
+      PicocliException, JAXBException, IOException {
+    generateConfigurations(path, false);
+  }
+
+  /**
+   * Generate ozone-site.xml at specified path.
+   * @param path
+   * @param genSecurityConf
+   * @throws PicocliException
+   * @throws JAXBException
+   */
+  public static void generateConfigurations(String path,
+      boolean genSecurityConf) throws
       PicocliException, JAXBException, IOException {
 
     if (!isValidPath(path)) {
@@ -108,7 +125,8 @@ public final class GenerateOzoneRequiredConfigurations extends GenericCli {
     List<OzoneConfiguration.Property> requiredProperties = new ArrayList<>();
 
     for (OzoneConfiguration.Property p : allProperties) {
-      if (p.getTag() != null && p.getTag().contains("REQUIRED")) {
+      if (p.getTag() != null && (p.getTag().contains("REQUIRED") ||
+          (genSecurityConf && p.getTag().contains("SECURITY")))) {
         if (p.getName().equalsIgnoreCase(
             OzoneConfigKeys.OZONE_METADATA_DIRS)) {
           p.setValue(System.getProperty(OzoneConsts.JAVA_TMP_DIR));
@@ -124,9 +142,9 @@ public final class GenerateOzoneRequiredConfigurations extends GenericCli {
       }
     }
 
-    OzoneConfiguration.XMLConfiguration requiredConfig =
+    OzoneConfiguration.XMLConfiguration generatedConfig =
         new OzoneConfiguration.XMLConfiguration();
-    requiredConfig.setProperties(requiredProperties);
+    generatedConfig.setProperties(requiredProperties);
 
     File output = new File(path, "ozone-site.xml");
     if(output.createNewFile()){
@@ -134,7 +152,7 @@ public final class GenerateOzoneRequiredConfigurations extends GenericCli {
           JAXBContext.newInstance(OzoneConfiguration.XMLConfiguration.class);
       Marshaller m = context.createMarshaller();
       m.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.TRUE);
-      m.marshal(requiredConfig, output);
+      m.marshal(generatedConfig, output);
 
       System.out.println("ozone-site.xml has been generated at " + path);
     } else {
