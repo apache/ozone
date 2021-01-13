@@ -159,9 +159,12 @@ public class TestVolumeOwner {
 
     // admin = true, owner = false, ownerName = testvolumeOwner
     RequestContext nonOwnerContext = getUserRequestContext("om",
-        IAccessAuthorizer.ACLType.CREATE, false, getTestVolOwnerName(0));
+            IAccessAuthorizer.ACLType.CREATE, false, getTestVolOwnerName(0),
+            true);
     Assert.assertTrue("matching admins are allowed to perform admin " +
         "operations", nativeAuthorizer.checkAccess(vol0, nonOwnerContext));
+    Assert.assertTrue("Wrongly sets recursiveAccessCheck flag",
+            nonOwnerContext.isRecursiveAccessCheck());
 
     // admin = true, owner = false, ownerName = null
     Assert.assertTrue("matching admins are allowed to perform admin " +
@@ -169,10 +172,13 @@ public class TestVolumeOwner {
 
     // admin = false, owner = false, ownerName = testvolumeOwner
     RequestContext nonAdminNonOwnerContext = getUserRequestContext("testuser",
-        IAccessAuthorizer.ACLType.CREATE, false, getTestVolOwnerName(0));
+            IAccessAuthorizer.ACLType.CREATE, false, getTestVolOwnerName(0),
+            false);
     Assert.assertFalse("mismatching admins are not allowed to perform admin " +
         "operations", nativeAuthorizer.checkAccess(vol0,
         nonAdminNonOwnerContext));
+    Assert.assertFalse("Wrongly sets recursiveAccessCheck flag",
+            nonAdminNonOwnerContext.isRecursiveAccessCheck());
 
     // admin = false, owner = true
     RequestContext nonAdminOwnerContext = getUserRequestContext(
@@ -181,6 +187,8 @@ public class TestVolumeOwner {
     Assert.assertFalse("mismatching admins are not allowed to perform admin " +
         "operations even for owner", nativeAuthorizer.checkAccess(vol0,
         nonAdminOwnerContext));
+    Assert.assertFalse("Wrongly sets recursiveAccessCheck flag",
+            nonAdminOwnerContext.isRecursiveAccessCheck());
 
     List<IAccessAuthorizer.ACLType> aclsToTest =
         Arrays.stream(IAccessAuthorizer.ACLType.values()).filter(
@@ -241,6 +249,15 @@ public class TestVolumeOwner {
               " not allowed to access key",
           nativeAuthorizer.checkAccess(obj, nonAdminOwnerContext));
     }
+  }
+
+
+  private RequestContext getUserRequestContext(String username,
+      IAccessAuthorizer.ACLType type, boolean isOwner, String ownerName,
+      boolean recursiveAccessCheck) {
+    return RequestContext.getBuilder(
+            UserGroupInformation.createRemoteUser(username), null, null,
+            type, ownerName, recursiveAccessCheck).build();
   }
 
   private RequestContext getUserRequestContext(String username,

@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.test.GenericTestUtils;
+import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -356,6 +357,13 @@ public class TestOzoneNativeAuthorizer {
     RequestContext.Builder builder = new RequestContext.Builder()
         .setClientUgi(testUgi)
         .setAclType(accessType);
+
+    Assert.assertFalse("Wrongly sets recursive flag",
+            builder.build().isRecursiveAccessCheck());
+
+    builder.setRecursiveAccessCheck(true);
+    Assert.assertTrue("Wrongly sets recursive flag",
+            builder.build().isRecursiveAccessCheck());
 
     // Get all acls.
     List<ACLType> allAcls = Arrays.stream(ACLType.values()).
