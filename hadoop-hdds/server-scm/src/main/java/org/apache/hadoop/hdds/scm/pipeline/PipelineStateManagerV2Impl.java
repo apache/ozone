@@ -90,10 +90,10 @@ public class PipelineStateManagerV2Impl implements StateManager {
       Pipeline pipeline = Pipeline.getFromProtobuf(pipelineProto);
       if (pipelineStore != null) {
         pipelineStore.put(pipeline.getId(), pipeline);
+        pipelineStateMap.addPipeline(pipeline);
+        nodeManager.addPipeline(pipeline);
+        LOG.info("Created pipeline {}.", pipeline);
       }
-      pipelineStateMap.addPipeline(pipeline);
-      nodeManager.addPipeline(pipeline);
-      LOG.info("Created pipeline {}.", pipeline);
     } finally {
       lock.writeLock().unlock();
     }
