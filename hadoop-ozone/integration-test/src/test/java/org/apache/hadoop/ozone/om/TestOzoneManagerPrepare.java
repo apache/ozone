@@ -32,6 +32,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
+import org.apache.derby.impl.sql.GenericStorablePreparedStatement;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
@@ -45,8 +46,11 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
 import org.apache.hadoop.test.LambdaTestUtils;
+import org.jooq.False;
 import org.junit.Assert;
 import org.junit.Test;
+import sun.reflect.generics.reflectiveObjects.LazyReflectiveObjectGenerator;
+import sun.util.locale.provider.LocaleServiceProviderPool;
 
 /**
  * Test OM prepare against actual mini cluster.
@@ -150,8 +154,10 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     assertKeysWritten(writtenKeys, runningOms);
   }
 
-  // TODO: This test should be passing after HDDS-4610 and RATIS-1241
-  // @Test
+  // TODO: After HDDS-4610 and RATIS-1241, the NullPointerException when an
+  //  OM receives a snapshot should be fixed and this test should
+  //  consistently pass.
+//   @Test
   public void testPrepareWithRestart() throws Exception {
     setup();
     writeKeysAndWaitForLogs(10);
@@ -356,8 +362,22 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
           if (!om.isRunning()) {
             return false;
           } else {
-            return om.getPrepareState().getState().getStatus() ==
-                PrepareStatus.PREPARE_COMPLETED;
+            boolean preparedAtIndex = false;
+            OzoneManagerPrepareState.State state =
+                om.getPrepareState().getState();
+
+            if (state.getStatus() == PrepareStatus.PREPARE_COMPLETED) {
+              if (state.getIndex() == preparedIndex) {
+                preparedAtIndex = true;
+              } else {
+                // State will not change if we are prepared at the wrong index.
+                // Break out of wait.
+                throw new Exception("OM " + om.getOMNodeId() + " prepared but " +
+                    "prepare index " + state.getIndex() + " does not match " +
+                    "expected prepare index " + preparedIndex);
+              }
+            }
+            return preparedAtIndex;
           }
         });
     }
