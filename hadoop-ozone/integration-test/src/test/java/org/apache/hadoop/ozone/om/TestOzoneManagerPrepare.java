@@ -150,10 +150,8 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     assertKeysWritten(writtenKeys, runningOms);
   }
 
-  // TODO: After HDDS-4610 and RATIS-1241, the NullPointerException when an
-  //  OM receives a snapshot should be fixed and this test should
-  //  consistently pass.
-//   @Test
+  // TODO: This test should be passing after HDDS-4610 and RATIS-1241
+  // @Test
   public void testPrepareWithRestart() throws Exception {
     setup();
     writeKeysAndWaitForLogs(10);

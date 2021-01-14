@@ -128,8 +128,7 @@ public class OMPrepareRequest extends OMClientRequest {
       ozoneManager.getPrepareState().finishPrepare(prepareIndex);
 
       LOG.info("OM {} prepared at log index {}. Returning response {} with " +
-              "log index {}",
-          ozoneManager.getOMNodeId(), prepareIndex, omResponse,
+          "log index {}", ozoneManager.getOMNodeId(), prepareIndex, omResponse,
           omResponse.getTxnID());
     } catch (OMException e) {
       LOG.error("Prepare Request Apply failed in {}. ",

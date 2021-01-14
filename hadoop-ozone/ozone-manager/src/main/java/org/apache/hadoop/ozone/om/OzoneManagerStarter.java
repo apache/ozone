@@ -99,8 +99,6 @@ public class OzoneManagerStarter extends GenericCli {
     }
   }
 
-  // TODO: Convert this flag to bring the OM out of prepare mode with the new
-  //  bits when prepare marker files have been implemented.
   /**
    * This function implements a sub-command to allow the OM to be
    * "prepared for upgrade".
@@ -115,7 +113,8 @@ public class OzoneManagerStarter extends GenericCli {
       commonInit();
       receiver.startAndCancelPrepare(conf);
     } catch (Exception ex) {
-      LOG.error("Starting OM in upgrade mode failed with exception", ex);
+      LOG.error("Cancelling prepare to start OM in upgrade mode failed " +
+          "with exception", ex);
       throw ex;
     }
   }
