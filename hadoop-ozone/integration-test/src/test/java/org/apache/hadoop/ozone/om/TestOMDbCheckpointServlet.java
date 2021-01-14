@@ -44,6 +44,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
 import static org.apache.hadoop.ozone.om.OMDBCheckpointServlet.writeOmDBCheckpointToStream;
+
+import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.After;
 import org.junit.Assert;
 import static org.junit.Assert.assertNotNull;
@@ -88,6 +90,7 @@ public class TestOMDbCheckpointServlet {
     scmId = UUID.randomUUID().toString();
     omId = UUID.randomUUID().toString();
     conf.setBoolean(OZONE_ACL_ENABLED, true);
+//    conf.set(OZONE_ADMINISTRATORS, OZONE_ADMINISTRATORS_WILDCARD);
     conf.setInt(OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS, 2);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setClusterId(clusterId)
@@ -119,6 +122,9 @@ public class TestOMDbCheckpointServlet {
       doCallRealMethod().when(omDbCheckpointServletMock).init();
 
       HttpServletRequest requestMock = mock(HttpServletRequest.class);
+      // Return current user short name when asked
+      when(requestMock.getRemoteUser())
+          .thenReturn(UserGroupInformation.getCurrentUser().getShortUserName());
       HttpServletResponse responseMock = mock(HttpServletResponse.class);
 
       ServletContext servletContextMock = mock(ServletContext.class);

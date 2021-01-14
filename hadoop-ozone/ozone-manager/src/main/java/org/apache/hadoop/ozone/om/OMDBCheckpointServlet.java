@@ -30,6 +30,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -47,7 +48,10 @@ import org.apache.commons.compress.compressors.CompressorOutputStream;
 import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.apache.commons.compress.utils.IOUtils;
 import org.apache.commons.lang3.StringUtils;
+
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -84,8 +88,30 @@ public class OMDBCheckpointServlet extends HttpServlet {
         OMConfigKeys.OZONE_DB_CHECKPOINT_TRANSFER_RATE_KEY,
         OMConfigKeys.OZONE_DB_CHECKPOINT_TRANSFER_RATE_DEFAULT);
 
+    // TODO: Add servlet
+//    getServletContext().addServlet(OMDBCheckpointAuthorizedServlet);
+
     if (transferBandwidth > 0) {
       throttler = new DataTransferThrottler(transferBandwidth);
+    }
+  }
+
+  private boolean checkAcls(String username) {
+    // Check ACL for dbCheckpoint only when global Ozone ACL is enabled
+    if (om.getAclsEnabled()) {
+      // Only Ozone admins are allowed
+      try {
+        Collection<String> admins = om.getOzoneAdmins(om.getConfiguration());
+        if (admins.contains(OZONE_ADMINISTRATORS_WILDCARD) ||
+            admins.contains(username)) {
+          return true;
+        }
+      } catch (IOException e) {
+        LOG.warn("Error checking permission: {}", e.getMessage());
+      }
+      return false;
+    } else {
+      return true;
     }
   }
 
@@ -104,6 +130,17 @@ public class OMDBCheckpointServlet extends HttpServlet {
           "Unable to process metadata snapshot request. DB Store is null");
       response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
       return;
+    }
+
+    final String remoteUser = request.getRemoteUser();
+    // Check ACL for dbCheckpoint only when global Ozone ACL is enable
+    if (om.getAclsEnabled() && !checkAcls(request.getRemoteUser())) {
+      LOG.error("Permission denied. User '{}' doesn't have permission to "
+          + "access endpoint /dbCheckpoint.", remoteUser);
+      response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+      return;
+    } else {
+      LOG.info("Granted user '{}' access to /dbCheckpoint.", remoteUser);
     }
 
     DBCheckpoint checkpoint = null;
