@@ -75,8 +75,10 @@ public class ContainerReader implements Runnable {
   private final File hddsVolumeDir;
   private final MutableVolumeSet volumeSet;
 
-  ContainerReader(MutableVolumeSet volSet, HddsVolume volume, ContainerSet cset,
-      ConfigurationSource conf) {
+  public ContainerReader(
+      MutableVolumeSet volSet, HddsVolume volume, ContainerSet cset,
+      ConfigurationSource conf
+  ) {
     Preconditions.checkNotNull(volume);
     this.hddsVolume = volume;
     this.hddsVolumeDir = hddsVolume.getHddsRootDir();
