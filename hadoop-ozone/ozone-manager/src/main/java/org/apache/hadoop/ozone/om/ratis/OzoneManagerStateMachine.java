@@ -32,6 +32,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -383,10 +384,12 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     OMTransactionInfo build = new OMTransactionInfo.Builder()
         .setTransactionIndex(lastAppliedIndex)
         .setCurrentTerm(lastTermIndex.getTerm()).build();
-    ozoneManager.getMetadataManager().getTransactionInfoTable().put(TRANSACTION_INFO_KEY, build);
+    Table<String, OMTransactionInfo> txnInfoTable =
+        ozoneManager.getMetadataManager().getTransactionInfoTable();
+    txnInfoTable.put(TRANSACTION_INFO_KEY, build);
     ozoneManager.getMetadataManager().getStore().flushDB();
     LOG.info("OM TransactionInfo Table : {}",
-        ozoneManager.getMetadataManager().getTransactionInfoTable().get(TRANSACTION_INFO_KEY).getTermIndex());
+        txnInfoTable.get(TRANSACTION_INFO_KEY).getTermIndex());
     return lastAppliedIndex;
   }
 
