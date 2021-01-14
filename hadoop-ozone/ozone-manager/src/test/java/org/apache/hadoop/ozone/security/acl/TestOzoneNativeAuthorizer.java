@@ -358,13 +358,6 @@ public class TestOzoneNativeAuthorizer {
         .setClientUgi(testUgi)
         .setAclType(accessType);
 
-    Assert.assertFalse("Wrongly sets recursive flag",
-            builder.build().isRecursiveAccessCheck());
-
-    builder.setRecursiveAccessCheck(true);
-    Assert.assertTrue("Wrongly sets recursive flag",
-            builder.build().isRecursiveAccessCheck());
-
     // Get all acls.
     List<ACLType> allAcls = Arrays.stream(ACLType.values()).
         collect(Collectors.toList());

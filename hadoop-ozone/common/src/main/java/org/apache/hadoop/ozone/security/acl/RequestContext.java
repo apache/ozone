@@ -125,8 +125,8 @@ public class RequestContext {
       return this;
     }
 
-    public Builder setRecursiveAccessCheck(boolean recursiveAccessCheck) {
-      this.recursiveAccessCheck = recursiveAccessCheck;
+    public Builder setRecursiveAccessCheck(boolean recursiveAccessCheckFlag) {
+      this.recursiveAccessCheck = recursiveAccessCheckFlag;
       return this;
     }
 
