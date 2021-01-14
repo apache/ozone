@@ -84,17 +84,12 @@ public class CreateBucketHandler extends BucketHandler {
     if (!Strings.isNullOrEmpty(quotaOptions.getQuotaInBytes())) {
       bb.setQuotaInBytes(OzoneQuota.parseSpaceQuota(
           quotaOptions.getQuotaInBytes()).getQuotaInBytes());
-    } else {
-      bb.setQuotaInBytes(OzoneConsts.QUOTA_RESET);
     }
 
     if (!Strings.isNullOrEmpty(quotaOptions.getQuotaInNamespace())) {
       bb.setQuotaInNamespace(OzoneQuota.parseNameSpaceQuota(
           quotaOptions.getQuotaInNamespace()).getQuotaInNamespace());
-    } else {
-      bb.setQuotaInNamespace(OzoneConsts.QUOTA_RESET);
     }
-
     String volumeName = address.getVolumeName();
     String bucketName = address.getBucketName();
 

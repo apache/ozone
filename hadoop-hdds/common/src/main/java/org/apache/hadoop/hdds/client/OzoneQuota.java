@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.client;
 
+import com.google.common.base.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -172,6 +173,11 @@ public final class OzoneQuota {
    */
   public static OzoneQuota parseSpaceQuota(String quotaInBytes) {
 
+    if (Strings.isNullOrEmpty(quotaInBytes)) {
+      throw new IllegalArgumentException(
+          "Quota string cannot be null or empty.");
+    }
+
     String uppercase = quotaInBytes.toUpperCase()
         .replaceAll("\\s+", "");
     String size = "";
@@ -217,6 +223,10 @@ public final class OzoneQuota {
    * @return OzoneQuota object
    */
   public static OzoneQuota parseNameSpaceQuota(String quotaInNamespace) {
+    if (Strings.isNullOrEmpty(quotaInNamespace)) {
+      throw new IllegalArgumentException(
+          "Quota string cannot be null or empty.");
+    }
     long nameSpaceQuota = Long.parseLong(quotaInNamespace);
     if (nameSpaceQuota <= 0) {
       throw new IllegalArgumentException(
