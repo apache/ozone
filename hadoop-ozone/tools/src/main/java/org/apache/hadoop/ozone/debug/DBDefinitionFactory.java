@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.ozone.recon.scm.ReconSCMDBDefinition;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition;
 
+import com.google.common.base.Preconditions;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_CONTAINER_KEY_DB;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OM_SNAPSHOT_DB;
 
@@ -59,6 +60,8 @@ public final class DBDefinitionFactory {
   }
 
   public static DBDefinition getDefinition(Path dbPath) {
+    Preconditions.checkNotNull(dbPath,
+        "Path is required to identify the used db scheme");
     String dbName = dbPath.getFileName().toString();
     if (dbName.endsWith("-container.db")) {
       return new DatanodeSchemaTwoDBDefinition(
