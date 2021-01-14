@@ -20,13 +20,10 @@ REPO_DIR="$DIR/../../.."
 REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/hadolint"}
 mkdir -p "$REPORT_DIR"
 REPORT_FILE="$REPORT_DIR/summary.txt"
+echo -n > "$REPORT_FILE"
 
 for Dockerfile in $(find hadoop-ozone hadoop-hdds -name Dockerfile | sort); do
-  result=$( hadolint $Dockerfile )
-  if [ ! -z "$result" ]
-  then
-    echo "$result" | tee -a "$REPORT_FILE"
-  fi
+  hadolint $Dockerfile | tee -a "$REPORT_FILE"
 done
 
 wc -l "$REPORT_FILE" | awk '{print $1}'> "$REPORT_DIR/failures"
