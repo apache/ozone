@@ -78,7 +78,8 @@ public class PipelineStateManagerV2Impl implements StateManager {
         iterator = pipelineStore.iterator();
     while (iterator.hasNext()) {
       Pipeline pipeline = iterator.next().getValue();
-      addPipeline(pipeline.getProtobufMessage());
+      pipelineStateMap.addPipeline(pipeline);
+      nodeManager.addPipeline(pipeline);
     }
   }
 
