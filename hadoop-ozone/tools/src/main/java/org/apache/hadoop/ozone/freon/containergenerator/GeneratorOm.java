@@ -52,7 +52,10 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
-@Command(name = "crom",
+/**
+ * Container generator for OM metadata.
+ */
+@Command(name = "cgom",
     description = "Offline container metadata generator for Ozone Manager",
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
@@ -238,8 +241,9 @@ public class GeneratorOm extends BaseGenerator implements
 
   }
 
-  private void commitAndResetOMKeyTableBatchOperation(BatchOperation omKeyTableBatchOperation)
-      throws IOException {
+  private void commitAndResetOMKeyTableBatchOperation(
+      BatchOperation omKeyTableBatchOperation
+  ) throws IOException {
     omDb.commitBatchOperation(omKeyTableBatchOperation);
     omKeyTableBatchOperation.close();
   }
