@@ -23,6 +23,9 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.ozone.freon.containergenerator.GeneratorDatanode;
+import org.apache.hadoop.ozone.freon.containergenerator.GeneratorOm;
+import org.apache.hadoop.ozone.freon.containergenerator.GeneratorScm;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,6 +56,9 @@ import picocli.CommandLine.Option;
         FollowerAppendLogEntryGenerator.class,
         ChunkManagerDiskWrite.class,
         LeaderAppendLogEntryGenerator.class,
+        GeneratorOm.class,
+        GeneratorScm.class,
+        GeneratorDatanode.class,
         ClosedContainerReplicator.class},
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true)
