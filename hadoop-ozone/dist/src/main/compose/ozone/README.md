@@ -18,7 +18,7 @@ This directory contains a docker-compose definition for an Ozone cluster with al
 
 There are two optional add-ons:
 
- * monitoring: adds Grafana, Jaeger and Prometheus sercvies, and configures Ozone to work with them
+ * monitoring: adds Grafana, Jaeger and Prometheus services, and configures Ozone to work with them
  * profiling: allows sampling Ozone CPU/memory using [async-profiler](https://github.com/jvm-profiling-tools/async-profiler)
 
 ## How to start
