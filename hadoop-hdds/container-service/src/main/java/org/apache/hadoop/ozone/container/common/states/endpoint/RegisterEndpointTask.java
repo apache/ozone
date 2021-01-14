@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.container.common.statemachine
     .EndpointStateMachine;
 import org.apache.hadoop.hdds.protocol.proto
@@ -37,7 +38,6 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
-import org.apache.hadoop.ozone.container.upgrade.DataNodeLayoutVersionManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,7 +59,7 @@ public final class RegisterEndpointTask implements
   private DatanodeDetails datanodeDetails;
   private final OzoneContainer datanodeContainerManager;
   private StateContext stateContext;
-  private DataNodeLayoutVersionManager layoutVersionManager;
+  private HDDSLayoutVersionManager layoutVersionManager;
 
   /**
    * Creates a register endpoint task.
@@ -90,7 +90,7 @@ public final class RegisterEndpointTask implements
   @VisibleForTesting
   public RegisterEndpointTask(EndpointStateMachine rpcEndPoint,
       ConfigurationSource conf, OzoneContainer ozoneContainer,
-      StateContext context, DataNodeLayoutVersionManager versionManager) {
+      StateContext context, HDDSLayoutVersionManager versionManager) {
     this.rpcEndPoint = rpcEndPoint;
     this.conf = conf;
     this.datanodeContainerManager = ozoneContainer;
@@ -205,7 +205,7 @@ public final class RegisterEndpointTask implements
     private DatanodeDetails datanodeDetails;
     private OzoneContainer container;
     private StateContext context;
-    private DataNodeLayoutVersionManager versionManager;
+    private HDDSLayoutVersionManager versionManager;
 
     /**
      * Constructs the builder class.
@@ -241,9 +241,8 @@ public final class RegisterEndpointTask implements
      * @param versionMgr - config
      * @return Builder.
      */
-    public Builder setLayoutVersionManager(
-        DataNodeLayoutVersionManager versionMgr) {
-      this.versionManager = versionMgr;
+    public Builder setLayoutVersionManager(HDDSLayoutVersionManager lvm) {
+      this.versionManager = lvm;
       return this;
     }
 

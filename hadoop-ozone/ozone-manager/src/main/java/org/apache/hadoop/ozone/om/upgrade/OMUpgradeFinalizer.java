@@ -32,10 +32,10 @@ import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
  * UpgradeFinalizer implementation for the Ozone Manager service.
  */
 public class OMUpgradeFinalizer extends BasicUpgradeFinalizer<OzoneManager,
-    OMLayoutVersionManagerImpl> {
+    OMLayoutVersionManager> {
   private  static final OmUpgradeAction NOOP = a -> {};
 
-  public OMUpgradeFinalizer(OMLayoutVersionManagerImpl versionManager) {
+  public OMUpgradeFinalizer(OMLayoutVersionManager versionManager) {
     super(versionManager);
   }
 

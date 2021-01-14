@@ -33,7 +33,6 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.upgrade.AbstractLayoutVersionManager;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionInstanceFactory;
-import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.ozone.upgrade.VersionFactoryKey;
 import org.reflections.Reflections;
 import org.reflections.scanners.SubTypesScanner;
@@ -47,48 +46,26 @@ import com.google.common.annotations.VisibleForTesting;
 /**
  * Class to manage layout versions and features for Ozone Manager.
  */
-public final class OMLayoutVersionManagerImpl
-    extends AbstractLayoutVersionManager<OMLayoutFeature>
-    implements OmLayoutVersionManager {
+public final class OMLayoutVersionManager
+    extends AbstractLayoutVersionManager<OMLayoutFeature> {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(OMLayoutVersionManagerImpl.class);
+      LoggerFactory.getLogger(OMLayoutVersionManager.class);
 
   private static final String OM_REQUEST_CLASS_PACKAGE =
       "org.apache.hadoop.ozone.om.request";
-  private static OMLayoutVersionManagerImpl omVersionManager;
   private LayoutVersionInstanceFactory<Class<? extends OMClientRequest>>
       requestFactory;
 
-  private OMLayoutVersionManagerImpl() {
+  public OMLayoutVersionManager(OMStorage omStorage) throws OMException {
     requestFactory = new LayoutVersionInstanceFactory<>();
+    init(omStorage);
   }
 
-  /**
-   * Read only instance to OM Version Manager.
-   * @return version manager instance.
-   */
-  public static synchronized LayoutVersionManager getInstance() {
-    if (omVersionManager == null) {
-      throw new RuntimeException("OM Layout Version Manager not yet " +
-          "initialized.");
-    }
-    return omVersionManager;
-  }
-
-
-  /**
-   * Initialize OM version manager from storage.
-   * @return version manager instance.
-   */
-  public static synchronized OMLayoutVersionManagerImpl initialize(
-      OMStorage omStorage)
-      throws OMException {
-    if (omVersionManager == null) {
-      omVersionManager = new OMLayoutVersionManagerImpl();
-      omVersionManager.init(omStorage);
-    }
-    return omVersionManager;
+  public OMLayoutVersionManager() throws IOException {
+    requestFactory = new LayoutVersionInstanceFactory<>();
+    OMLayoutFeature[] features = OMLayoutFeature.values();
+    init(features[features.length - 1].layoutVersion(), features);
   }
 
   /**
@@ -108,14 +85,6 @@ public final class OMLayoutVersionManagerImpl
           NOT_SUPPORTED_OPERATION);
     }
     registerOzoneManagerRequests();
-  }
-
-  @VisibleForTesting
-  protected synchronized static void resetLayoutVersionManager() {
-    if (omVersionManager != null) {
-      omVersionManager.reset();
-      omVersionManager = null;
-    }
   }
 
   public void reset() {
@@ -182,7 +151,7 @@ public final class OMLayoutVersionManagerImpl
    * @return class type.
    */
   @Override
-  public Class<? extends OMClientRequest> getRequestHandler(String type) {
+  public Class<? extends OMClientRequest> getHandler(String type) {
     VersionFactoryKey versionFactoryKey = new VersionFactoryKey.Builder()
         .key(type).build();
     return requestFactory.get(this, versionFactoryKey);

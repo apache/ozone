@@ -47,14 +47,14 @@ import org.reflections.Reflections;
  */
 public class TestOmVersionManagerRequestFactory {
 
-  private static OMLayoutVersionManagerImpl omVersionManager;
+  private static OMLayoutVersionManager omVersionManager;
   private static OzoneManager om;
 
   @BeforeClass
   public static void setup() throws OMException {
     OMStorage omStorage = mock(OMStorage.class);
     when(omStorage.getLayoutVersion()).thenReturn(0);
-    omVersionManager = OMLayoutVersionManagerImpl.initialize(omStorage);
+    omVersionManager = new OMLayoutVersionManager(omStorage);
     om = mock(OzoneManager.class);
     when(om.getOmStorage()).thenReturn(omStorage);
   }
@@ -64,7 +64,7 @@ public class TestOmVersionManagerRequestFactory {
 
     // Try getting v1 of 'CreateKey'.
     Class<? extends OMClientRequest> requestType =
-        omVersionManager.getRequestHandler(CreateKey.name());
+        omVersionManager.getHandler(CreateKey.name());
     Assert.assertEquals(requestType, OMKeyCreateRequest.class);
 
     // Finalize the version manager.
@@ -72,7 +72,7 @@ public class TestOmVersionManagerRequestFactory {
     f.finalize("random", om);
 
     // Try getting 'CreateKey' again. Should return CreateECKey.
-    requestType = omVersionManager.getRequestHandler(CreateKey.name());
+    requestType = omVersionManager.getHandler(CreateKey.name());
     Assert.assertEquals(requestType, OMMockECKeyCreateRequest.class);
   }
 
@@ -102,7 +102,7 @@ public class TestOmVersionManagerRequestFactory {
       }
       String type = (String) getRequestTypeMethod.invoke(null);
       Assert.assertNotNull(String.format("Cannot get handler for %s", type),
-          omVersionManager.getRequestHandler(type));
+          omVersionManager.getHandler(type));
     }
   }
 

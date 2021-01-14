@@ -63,4 +63,14 @@ public interface LayoutVersionManager {
   LayoutFeature getFeature(String name);
 
   Iterable<? extends LayoutFeature> unfinalizedFeatures();
+
+  /**
+   * Generic API for returning a registered handler for a given type.
+   * @param type String type
+   * @return
+   */
+  default Object getHandler(String type) {
+    return null;
+  }
+
 }

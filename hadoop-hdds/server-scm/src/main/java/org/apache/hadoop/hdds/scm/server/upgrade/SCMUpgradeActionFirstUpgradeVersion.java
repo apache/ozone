@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.scm.server.upgrade; 
 
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.upgrade.HDDSUpgradeAction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -26,7 +27,7 @@ import org.slf4j.LoggerFactory;
  * SCM Upgrade Action for the very first Upgrade Version.
  */
 public class SCMUpgradeActionFirstUpgradeVersion implements
-    SCMUpgradeAction {
+    HDDSUpgradeAction<StorageContainerManager> {
   public static final Logger LOG =
       LoggerFactory.getLogger(SCMUpgradeActionFirstUpgradeVersion.class);
   @Override

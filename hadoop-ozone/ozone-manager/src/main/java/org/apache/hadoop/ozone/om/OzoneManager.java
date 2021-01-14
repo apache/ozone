@@ -145,8 +145,7 @@ import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.snapshot.OzoneManagerSnapshotProvider;
-import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManagerImpl;
-import org.apache.hadoop.ozone.om.upgrade.OmLayoutVersionManager;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.om.upgrade.OMUpgradeFinalizer;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
@@ -324,7 +323,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private KeyProviderCryptoExtension kmsProvider = null;
   private static String keyProviderUriKeyName =
       CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH;
-  private final OMLayoutVersionManagerImpl versionManager;
+  private final OMLayoutVersionManager versionManager;
 
   private boolean allowListAllVolumes;
   // Adding parameters needed for VolumeRequests here, so that during request
@@ -369,7 +368,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     omStorage = new OMStorage(conf);
     omId = omStorage.getOmId();
 
-    versionManager = OMLayoutVersionManagerImpl.initialize(omStorage);
+    versionManager = new OMLayoutVersionManager(omStorage);
     upgradeFinalizer = new OMUpgradeFinalizer(versionManager);
 
     // In case of single OM Node Service there will be no OM Node ID
@@ -3827,7 +3826,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return omVolumeArgs.build();
   }
 
-  public OmLayoutVersionManager getVersionManager() {
+  public OMLayoutVersionManager getVersionManager() {
     return versionManager;
   }
 

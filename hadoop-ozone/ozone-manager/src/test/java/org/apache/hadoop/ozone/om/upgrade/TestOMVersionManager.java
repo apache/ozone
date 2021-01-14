@@ -21,7 +21,7 @@ package org.apache.hadoop.ozone.om.upgrade;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.ERASURE_CODING;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.INITIAL_VERSION;
-import static org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManagerImpl.getRequestClasses;
+import static org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager.getRequestClasses;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -40,7 +40,6 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.UnsupportedMockNewOMRequest;
 import org.apache.hadoop.test.GenericTestUtils;
-import org.junit.After;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -49,17 +48,12 @@ import org.junit.Test;
  */
 public class TestOMVersionManager {
 
-  @After
-  public void cleanup() {
-    OMLayoutVersionManagerImpl.resetLayoutVersionManager();
-  }
-
   @Test
   public void testOMLayoutVersionManager() throws IOException {
     OMStorage omStorage = mock(OMStorage.class);
     when(omStorage.getLayoutVersion()).thenReturn(0);
-    OMLayoutVersionManagerImpl omVersionManager =
-        OMLayoutVersionManagerImpl.initialize(omStorage);
+    OMLayoutVersionManager omVersionManager =
+        new OMLayoutVersionManager(omStorage);
     OzoneManager om = mock(OzoneManager.class);
     when(om.getOmStorage()).thenReturn(omStorage);
 
@@ -82,25 +76,12 @@ public class TestOMVersionManager {
         OMLayoutFeature.values()[OMLayoutFeature.values().length - 1]
             .layoutVersion() + 1);
     try {
-      OMLayoutVersionManagerImpl.initialize(omStorage);
+      OMLayoutVersionManager omVersionManager =
+          new OMLayoutVersionManager(omStorage);
       Assert.fail();
     } catch (OMException ex) {
       assertEquals(NOT_SUPPORTED_OPERATION, ex.getResult());
     }
-  }
-
-  @Test
-  public void testOMLayoutVersionManagerReset() throws IOException {
-    OMStorage omStorage = mock(OMStorage.class);
-    when(omStorage.getLayoutVersion()).thenReturn(0);
-    OMLayoutVersionManagerImpl omVersionManager =
-        OMLayoutVersionManagerImpl.initialize(omStorage);
-    int numLayoutVersions = OMLayoutFeature.values().length;
-    assertEquals(
-        OMLayoutFeature.values()[numLayoutVersions - 1].layoutVersion(),
-        omVersionManager.getSoftwareLayoutVersion());
-    OMLayoutVersionManagerImpl.resetLayoutVersionManager();
-    assertEquals(0, omVersionManager.getSoftwareLayoutVersion());
   }
 
   @Test
@@ -148,14 +129,14 @@ public class TestOMVersionManager {
   public void testCannotGetUnsupportedOmRequest() throws OMException {
     OMStorage omStorage = mock(OMStorage.class);
     when(omStorage.getLayoutVersion()).thenReturn(0);
-    OMLayoutVersionManagerImpl omVersionManager =
-        OMLayoutVersionManagerImpl.initialize(omStorage);
+    OMLayoutVersionManager omVersionManager =
+        new OMLayoutVersionManager(omStorage);
     OzoneManager om = mock(OzoneManager.class);
     when(om.getOmStorage()).thenReturn(omStorage);
 
     Class<? extends OMClientRequest> requestHandler;
     try {
-      requestHandler = omVersionManager.getRequestHandler(
+      requestHandler = omVersionManager.getHandler(
               UnsupportedMockNewOMRequest.class.getSimpleName());
       Assert.fail();
     } catch (IllegalArgumentException ex) {
@@ -164,7 +145,7 @@ public class TestOMVersionManager {
     }
 
     omVersionManager.unfinalizedFeatures().forEach(omVersionManager::finalized);
-    requestHandler = omVersionManager.getRequestHandler(
+    requestHandler = omVersionManager.getHandler(
         UnsupportedMockNewOMRequest.class.getSimpleName());
     Assert.assertNotNull(requestHandler);
   }

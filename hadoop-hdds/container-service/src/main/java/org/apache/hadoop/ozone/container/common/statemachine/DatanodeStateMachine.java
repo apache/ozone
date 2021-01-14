@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.ozone.HddsDatanodeStopService;
 import org.apache.hadoop.ozone.container.common.DataNodeStorageConfig;
@@ -56,8 +57,7 @@ import org.apache.hadoop.ozone.container.replication.ContainerReplicator;
 import org.apache.hadoop.ozone.container.replication.DownloadAndImportReplicator;
 import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
 import org.apache.hadoop.ozone.container.replication.SimpleContainerDownloader;
-import org.apache.hadoop.ozone.container.upgrade.DataNodeLayoutActionCatalog.DataNodeLayoutAction;
-import org.apache.hadoop.ozone.container.upgrade.DataNodeLayoutVersionManager;
+import org.apache.hadoop.ozone.container.upgrade.DataNodeLayoutAction;
 import org.apache.hadoop.ozone.container.upgrade.DataNodeUpgradeFinalizer;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
@@ -95,7 +95,7 @@ public class DatanodeStateMachine implements Closeable {
   private CertificateClient dnCertClient;
   private final HddsDatanodeStopService hddsDatanodeStopService;
 
-  private DataNodeLayoutVersionManager dataNodeVersionManager;
+  private HDDSLayoutVersionManager dataNodeVersionManager;
   private DataNodeStorageConfig dataNodeStorageConfig;
   private DataNodeUpgradeFinalizer upgradeFinalizer;
 
@@ -130,8 +130,8 @@ public class DatanodeStateMachine implements Closeable {
     if (dataNodeStorageConfig.getState() != INITIALIZED) {
       dataNodeStorageConfig.initialize();
     }
-    dataNodeVersionManager = DataNodeLayoutVersionManager
-        .initialize(dataNodeStorageConfig);
+    dataNodeVersionManager =
+        new HDDSLayoutVersionManager(dataNodeStorageConfig);
     upgradeFinalizer = new DataNodeUpgradeFinalizer(dataNodeVersionManager);
 
     executorService = Executors.newFixedThreadPool(
@@ -582,7 +582,7 @@ public class DatanodeStateMachine implements Closeable {
   }
 
   @VisibleForTesting
-  public DataNodeLayoutVersionManager getDataNodeVersionManager() {
+  public HDDSLayoutVersionManager getDataNodeVersionManager() {
     return dataNodeVersionManager;
   }
 

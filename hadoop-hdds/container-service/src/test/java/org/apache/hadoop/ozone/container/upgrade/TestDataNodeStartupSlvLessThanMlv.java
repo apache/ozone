@@ -25,7 +25,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeatureCatalog;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 import org.apache.hadoop.ozone.upgrade.TestUpgradeUtils;
@@ -57,8 +57,7 @@ public class TestDataNodeStartupSlvLessThanMlv {
 
     // Set metadata layout version larger then software layout version.
     int largestSlv = 0;
-    for (LayoutFeature f :
-        HDDSLayoutFeatureCatalog.HDDSLayoutFeature.values()) {
+    for (LayoutFeature f : HDDSLayoutFeature.values()) {
       largestSlv = Math.max(largestSlv, f.layoutVersion());
     }
     int mlv = largestSlv + 1;
