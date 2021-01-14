@@ -199,6 +199,7 @@ jobs:
         run: |
           mkdir -p /mnt/ozone/hadoop-ozone/dist/target
           tar xzvf hadoop-ozone*.tar.gz -C /mnt/ozone/hadoop-ozone/dist/target
+          sudo chmod -R a+rwX /mnt/ozone/hadoop-ozone/dist/target
       - name: Install robotframework
         run: sudo pip install robotframework
       - name: Execute tests
