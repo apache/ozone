@@ -556,7 +556,7 @@ public class TestSCMNodeManager {
     when(scmStorageConfig.getClusterID()).thenReturn("xyz111");
     EventPublisher eventPublisher = mock(EventPublisher.class);
     HDDSLayoutVersionManager lvm  =
-        HDDSLayoutVersionManager.initialize(scmStorageConfig);
+        new HDDSLayoutVersionManager(scmStorageConfig);
     SCMNodeManager nodeManager  = new SCMNodeManager(conf,
         scmStorageConfig, eventPublisher, new NetworkTopologyImpl(conf), lvm);
     DatanodeDetails node1 =

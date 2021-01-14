@@ -26,7 +26,8 @@ import java.io.IOException;
 import java.util.Optional;
 import java.util.concurrent.Callable;
 
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeatureCatalog.HDDSLayoutFeature;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
@@ -35,9 +36,9 @@ import org.apache.hadoop.ozone.upgrade.LayoutFeature;
  * UpgradeFinalizer for the DataNode.
  */
 public class DataNodeUpgradeFinalizer extends
-    BasicUpgradeFinalizer<DatanodeStateMachine, DataNodeLayoutVersionManager> {
+    BasicUpgradeFinalizer<DatanodeStateMachine, HDDSLayoutVersionManager> {
 
-  public DataNodeUpgradeFinalizer(DataNodeLayoutVersionManager versionManager) {
+  public DataNodeUpgradeFinalizer(HDDSLayoutVersionManager versionManager) {
     super(versionManager);
   }
 

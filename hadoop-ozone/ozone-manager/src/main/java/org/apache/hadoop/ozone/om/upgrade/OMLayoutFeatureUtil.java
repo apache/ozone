@@ -20,6 +20,14 @@ package org.apache.hadoop.ozone.om.upgrade;
 
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.ERASURE_CODING;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.om.OMStorage;
+import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
+
 /**
  * Test util class. To be removed.
  */
@@ -45,5 +53,15 @@ public class OMLayoutFeatureUtil {
     // Blah Blah Basic Blah....
     return "basic";
   }
+
+  // Needed for the Aspect.
+  public LayoutVersionManager getOmVersionManager() throws IOException {
+    OzoneConfiguration configuration = new OzoneConfiguration();
+    Path tempDirWithPrefix = Files.createTempDirectory("TestAspect");
+    configuration.set("ozone.metadata.dirs",
+        tempDirWithPrefix.toAbsolutePath().toString());
+    return new OMLayoutVersionManager(new OMStorage(configuration));
+  }
+
 }
 

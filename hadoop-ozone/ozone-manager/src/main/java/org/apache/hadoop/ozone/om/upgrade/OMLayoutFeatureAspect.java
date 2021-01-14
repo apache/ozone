@@ -20,7 +20,11 @@ package org.apache.hadoop.ozone.om.upgrade;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
 
+import java.lang.reflect.Method;
+
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.protocolPB.OzoneManagerRequestHandler;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.aspectj.lang.JoinPoint;
@@ -37,12 +41,28 @@ import org.aspectj.lang.reflect.MethodSignature;
 @Aspect
 public class OMLayoutFeatureAspect {
 
+  public static final String GET_VERSION_MANAGER_METHOD_NAME =
+      "getOmVersionManager";
+
   @Before("@annotation(DisallowedUntilLayoutVersion) && execution(* *(..))")
   public void checkLayoutFeature(JoinPoint joinPoint) throws Throwable {
     String featureName = ((MethodSignature) joinPoint.getSignature())
         .getMethod().getAnnotation(DisallowedUntilLayoutVersion.class)
         .value().name();
-    LayoutVersionManager lvm = OMLayoutVersionManagerImpl.getInstance();
+    LayoutVersionManager lvm = null;
+    if (joinPoint.getTarget() instanceof OzoneManagerRequestHandler) {
+      OzoneManager ozoneManager = ((OzoneManagerRequestHandler)
+          joinPoint.getTarget()).getOzoneManager();
+      lvm = ozoneManager.getVersionManager();
+    } else {
+      try {
+        Method method = joinPoint.getTarget().getClass()
+            .getMethod(GET_VERSION_MANAGER_METHOD_NAME);
+        lvm = (LayoutVersionManager) method.invoke(joinPoint.getTarget());
+      } catch (Exception ex) {
+        lvm = new OMLayoutVersionManager();
+      }
+    }
     if (!lvm.isAllowed(featureName)) {
       LayoutFeature layoutFeature = lvm.getFeature(featureName);
       throw new OMException(String.format("Operation %s cannot be invoked " +

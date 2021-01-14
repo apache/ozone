@@ -22,11 +22,7 @@ package org.apache.hadoop.hdds.upgrade;
 import java.io.IOException;
 
 import org.apache.hadoop.ozone.common.Storage;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeatureCatalog.HDDSLayoutFeature;
 import org.apache.hadoop.ozone.upgrade.AbstractLayoutVersionManager;
-import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
-
-import com.google.common.annotations.VisibleForTesting;
 
 /**
  * Class to manage layout versions and features for Storage Container Manager
@@ -36,44 +32,7 @@ import com.google.common.annotations.VisibleForTesting;
 public class HDDSLayoutVersionManager extends
     AbstractLayoutVersionManager<HDDSLayoutFeature> {
 
-  private static HDDSLayoutVersionManager hddsLayoutVersionManager;
-
-  private HDDSLayoutVersionManager() {
-  }
-
-  /**
-   * Read only instance to HDDS Version Manager.
-   * @return version manager instance.
-   */
-  public static synchronized LayoutVersionManager getInstance() {
-    if (hddsLayoutVersionManager == null) {
-      throw new RuntimeException("HDDS Layout Version Manager not yet " +
-          "initialized.");
-    }
-    return hddsLayoutVersionManager;
-  }
-
-
-  /**
-   * Initialize HDDS version manager from scmstorage.
-   * @return version manager instance.
-   */
-  public static synchronized HDDSLayoutVersionManager initialize(
-      Storage hddsStorage)
-      throws IOException {
-    if (hddsLayoutVersionManager == null) {
-      hddsLayoutVersionManager = new HDDSLayoutVersionManager();
-      hddsLayoutVersionManager.init(hddsStorage.getLayoutVersion(),
-          HDDSLayoutFeature.values());
-    }
-    return hddsLayoutVersionManager;
-  }
-
-  @VisibleForTesting
-  protected synchronized static void resetLayoutVersionManager() {
-    if (hddsLayoutVersionManager != null) {
-      hddsLayoutVersionManager.reset();
-      hddsLayoutVersionManager = null;
-    }
+  public HDDSLayoutVersionManager(Storage hddsStorage) throws IOException {
+    init(hddsStorage.getLayoutVersion(), HDDSLayoutFeature.values());
   }
 }
