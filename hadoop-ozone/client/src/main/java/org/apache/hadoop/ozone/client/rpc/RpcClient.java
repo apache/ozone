@@ -594,15 +594,11 @@ public class RpcClient implements ClientProtocol {
     // that it is not recommended to enable quota.
     OmBucketInfo omBucketInfo = ozoneManagerClient.getBucketInfo(
         volumeName, bucketName);
-    if (omBucketInfo.getQuotaInNamespace() == OLD_QUOTA_DEFAULT) {
-      LOG.warn("Bucket {} is created before version 1.1.0, usedNamespace " +
-          "may be inaccurate and it is not recommended to enable quota.",
-          bucketName);
-    }
-    if (omBucketInfo.getUsedBytes() == OLD_QUOTA_DEFAULT) {
-      LOG.warn("Bucket {} is created before version 1.1.0, usedBytes " +
-          "may be inaccurate and it is not recommended to enable quota.",
-          bucketName);
+    if (omBucketInfo.getQuotaInNamespace() == OLD_QUOTA_DEFAULT ||
+        omBucketInfo.getUsedBytes() == OLD_QUOTA_DEFAULT) {
+      LOG.warn("Bucket {} is created before version 1.1.0, usedBytes or " +
+          "usedNamespace may be inaccurate and it is not recommended to " +
+          "enable quota.", bucketName);
     }
     ozoneManagerClient.setBucketProperty(builder.build());
 
