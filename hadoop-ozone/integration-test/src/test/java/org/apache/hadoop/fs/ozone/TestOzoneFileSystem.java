@@ -163,7 +163,7 @@ public class TestOzoneFileSystem {
       for (FileStatus fileStatus : fileStatuses) {
         fs.delete(fileStatus.getPath(), true);
       }
-    }catch (IOException ex){
+    } catch (IOException ex){
       fail("Failed to cleanup files.");
     }
   }
@@ -258,7 +258,7 @@ public class TestOzoneFileSystem {
     try{
       LambdaTestUtils.intercept(InvalidPathException.class, "Invalid path Name",
           () -> fs.create(path, false));
-    }catch (AssertionError e){
+    } catch (AssertionError e){
       fail("testCreateWithInvalidPaths failed for path" + path);
     }
   }
