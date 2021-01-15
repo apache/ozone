@@ -144,7 +144,7 @@ public final class OzoneQuota {
   /**
    * Constructor for Ozone Quota.
    *
-   * @param quotaInNamespace Volume quota in counts
+   * @param quotaInNamespace ozone quota in counts
    * @param rawQuotaInBytes RawQuotaInBytes value
    */
   private OzoneQuota(long quotaInNamespace, RawQuotaInBytes rawQuotaInBytes) {
@@ -167,7 +167,7 @@ public final class OzoneQuota {
    * Parses a user provided string space quota and returns the
    * Quota Object.
    *
-   * @param quotaInBytes Volume quota in bytes
+   * @param quotaInBytes ozone quota in bytes
    *
    * @return OzoneQuota object
    */
@@ -219,7 +219,7 @@ public final class OzoneQuota {
    * Parses a user provided string Namespace quota and returns the
    * Quota Object.
    *
-   * @param quotaInNamespace Volume quota in counts
+   * @param quotaInNamespace ozone quota in counts
    *
    * @return OzoneQuota object
    */
@@ -240,8 +240,8 @@ public final class OzoneQuota {
    * Parses a user provided string and returns the
    * Quota Object.
    *
-   * @param quotaInBytes Volume quota in bytes
-   * @param quotaInNamespace Volume quota in counts
+   * @param quotaInBytes ozone quota in bytes
+   * @param quotaInNamespace ozone quota in counts
    *
    * @return OzoneQuota object
    */

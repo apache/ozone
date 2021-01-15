@@ -349,16 +349,16 @@ public abstract class TestOzoneRpcClientAbstract {
 
     // test bucket set quota 0
     LambdaTestUtils.intercept(IllegalArgumentException.class,
-        "Invalid values for quota",
+        "Invalid values for space quota",
         () -> store.getVolume(volumeName).getBucket(bucketName).setQuota(
             OzoneQuota.parseQuota("0GB", "10")));
     LambdaTestUtils.intercept(IllegalArgumentException.class,
-        "Invalid values for quota",
+        "Invalid values for namespace quota",
         () -> store.getVolume(volumeName).getBucket(bucketName).setQuota(
             OzoneQuota.parseQuota("10GB", "0")));
 
     LambdaTestUtils.intercept(IllegalArgumentException.class,
-        "Invalid values for quota",
+        "Invalid values for namespace quota",
         () -> store.getVolume(volumeName).getBucket(bucketName).setQuota(
             OzoneQuota.parseQuota("1GB", "-100")));
 
@@ -373,7 +373,7 @@ public abstract class TestOzoneRpcClientAbstract {
             OzoneQuota.parseQuota("9223372036854775808 BYTES", "100")));
 
     LambdaTestUtils.intercept(IllegalArgumentException.class,
-        "Invalid values for quota",
+        "Invalid values for space quota",
         () -> store.getVolume(volumeName).getBucket(bucketName).setQuota(
             OzoneQuota.parseQuota("-10GB", "100")));
 
@@ -411,11 +411,11 @@ public abstract class TestOzoneRpcClientAbstract {
 
     // test volume set quota 0
     LambdaTestUtils.intercept(IllegalArgumentException.class,
-        "Invalid values for quota",
+        "Invalid values for space quota",
         () -> store.getVolume(volumeName).setQuota(OzoneQuota.parseQuota(
             "0GB", "10")));
     LambdaTestUtils.intercept(IllegalArgumentException.class,
-        "Invalid values for quota",
+        "Invalid values for namespace quota",
         () -> store.getVolume(volumeName).setQuota(OzoneQuota.parseQuota(
             "10GB", "0")));
 
@@ -433,7 +433,7 @@ public abstract class TestOzoneRpcClientAbstract {
 
     // The value cannot be negative.
     LambdaTestUtils.intercept(IllegalArgumentException.class,
-        "Invalid values for quota",
+        "Invalid values for space quota",
         () -> store.getVolume(volumeName).setQuota(OzoneQuota.parseQuota(
             "-10GB", "1000")));
   }

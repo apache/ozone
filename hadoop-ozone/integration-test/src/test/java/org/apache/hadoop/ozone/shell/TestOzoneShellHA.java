@@ -642,14 +642,14 @@ public class TestOzoneShellHA {
     String[] volumeArgs1 = new String[]{"volume", "setquota", "vol4",
         "--space-quota", "0GB"};
     LambdaTestUtils.intercept(ExecutionException.class,
-        "Invalid values for quota",
+        "Invalid values for space quota",
         () -> execute(ozoneShell, volumeArgs1));
     out.reset();
 
     String[] volumeArgs2 = new String[]{"volume", "setquota", "vol4",
         "--namespace-quota", "0"};
     LambdaTestUtils.intercept(ExecutionException.class,
-        "Invalid values for quota",
+        "Invalid values for namespace quota",
         () -> execute(ozoneShell, volumeArgs2));
     out.reset();
 
@@ -674,14 +674,14 @@ public class TestOzoneShellHA {
     String[] bucketArgs1 = new String[]{"bucket", "setquota", "vol4/buck4",
         "--space-quota", "0GB"};
     LambdaTestUtils.intercept(ExecutionException.class,
-        "Invalid values for quota",
+        "Invalid values for space quota",
         () -> execute(ozoneShell, bucketArgs1));
     out.reset();
 
     String[] bucketArgs2 = new String[]{"bucket", "setquota", "vol4/buck4",
         "--namespace-quota", "0"};
     LambdaTestUtils.intercept(ExecutionException.class,
-        "Invalid values for quota",
+        "Invalid values for namespace quota",
         () -> execute(ozoneShell, bucketArgs2));
     out.reset();
 
