@@ -347,7 +347,6 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    */
   public void unpause(long newLastAppliedSnaphsotIndex,
       long newLastAppliedSnapShotTermIndex) {
-    LOG.info("Unpausing State machine at {}", this.ozoneManager.getOMNodeId());
     getLifeCycle().startAndTransition(() -> {
       this.ozoneManagerDoubleBuffer = buildDoubleBufferForRatis();
       handler.updateDoubleBuffer(ozoneManagerDoubleBuffer);
@@ -388,8 +387,6 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         ozoneManager.getMetadataManager().getTransactionInfoTable();
     txnInfoTable.put(TRANSACTION_INFO_KEY, build);
     ozoneManager.getMetadataManager().getStore().flushDB();
-    LOG.info("OM TransactionInfo Table : {}",
-        txnInfoTable.get(TRANSACTION_INFO_KEY).getTermIndex());
     return lastAppliedIndex;
   }
 

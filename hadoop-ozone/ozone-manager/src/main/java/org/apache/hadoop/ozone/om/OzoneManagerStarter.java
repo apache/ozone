@@ -101,9 +101,10 @@ public class OzoneManagerStarter extends GenericCli {
 
   /**
    * This function implements a sub-command to allow the OM to be
-   * "prepared for upgrade".
+   * Removed from prepare mode after an upgrade or downgrade.
    */
   @CommandLine.Command(name = "--upgrade",
+      aliases = "--downgrade",
       customSynopsis = "ozone om [global options] --upgrade",
       description = "Cancels prepare state in this OM on startup",
       mixinStandardHelpOptions = true,
