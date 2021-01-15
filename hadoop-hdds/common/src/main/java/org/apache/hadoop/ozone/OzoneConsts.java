@@ -343,9 +343,7 @@ public final class OzoneConsts {
 
   // Default OMServiceID for OM Ratis servers to use as RaftGroupId
   public static final String OM_SERVICE_ID_DEFAULT = "omServiceIdDefault";
-
-  // Dummy OMNodeID for OM Clients to use for a non-HA OM setup
-  public static final String OM_NODE_ID_DUMMY = "omNodeIdDummy";
+  public static final String OM_DEFAULT_NODE_ID = "om1";
 
   public static final String JAVA_TMP_DIR = "java.io.tmpdir";
   public static final String LOCALHOST = "localhost";

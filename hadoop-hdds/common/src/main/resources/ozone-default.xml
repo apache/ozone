@@ -449,7 +449,7 @@
       with the configured address.
 
       If node ID is not deterministic from the configuration, then it is set
-      to the OmId from the OM version file.
+      to default node id - om1.
     </description>
   </property>
   <property>
