@@ -66,7 +66,7 @@ public class TestOzoneManagerConfiguration {
   private OzoneManager om;
   private OzoneManagerRatisServer omRatisServer;
 
-  private static final long LEADER_ELECTION_TIMEOUT = 500L;
+  private static final long RATIS_RPC_TIMEOUT = 500L;
 
   @Before
   public void init() throws IOException {
@@ -79,9 +79,8 @@ public class TestOzoneManagerConfiguration {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDirPath.toString());
     conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "127.0.0.1:0");
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, true);
-    conf.setTimeDuration(
-        OMConfigKeys.OZONE_OM_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY,
-        LEADER_ELECTION_TIMEOUT, TimeUnit.MILLISECONDS);
+    conf.setTimeDuration(OMConfigKeys.OZONE_OM_RATIS_MINIMUM_TIMEOUT_KEY,
+        RATIS_RPC_TIMEOUT, TimeUnit.MILLISECONDS);
 
     OMStorage omStore = new OMStorage(conf);
     omStore.setClusterId("testClusterId");

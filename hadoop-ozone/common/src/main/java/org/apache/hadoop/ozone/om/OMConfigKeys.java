@@ -153,15 +153,14 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_RATIS_MINIMUM_TIMEOUT_KEY
       = "ozone.om.ratis.minimum.timeout";
   public static final TimeDuration OZONE_OM_RATIS_MINIMUM_TIMEOUT_DEFAULT
-      = TimeDuration.valueOf(1, TimeUnit.SECONDS);
+      = TimeDuration.valueOf(5, TimeUnit.SECONDS);
 
-  // OM Ratis Leader Election configurations
-  public static final String
-      OZONE_OM_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY =
-      "ozone.om.leader.election.minimum.timeout.duration";
+  public static final String OZONE_OM_RATIS_LEADER_STEP_DOWN_WAIT_TIME_KEY
+      = "ozone.om.ratis.leader.step.down.wait.time";
   public static final TimeDuration
-      OZONE_OM_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_DEFAULT =
-      TimeDuration.valueOf(1, TimeUnit.SECONDS);
+      OZONE_OM_RATIS_LEADER_STEP_DOWN_WAIT_TIME_DEFAULT
+      = TimeDuration.valueOf(30, TimeUnit.SECONDS);
+
   public static final String OZONE_OM_RATIS_SERVER_FAILURE_TIMEOUT_DURATION_KEY
       = "ozone.om.ratis.server.failure.timeout.duration";
   public static final TimeDuration
