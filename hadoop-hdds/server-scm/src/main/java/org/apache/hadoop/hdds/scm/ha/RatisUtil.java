@@ -125,6 +125,7 @@ public final class RatisUtil {
     Log.setPreallocatedSize(properties,
         SizeInBytes.valueOf(conf.getRaftSegmentPreAllocatedSize()));
     Log.Appender.setInstallSnapshotEnabled(properties, false);
+    Log.setPurgeUptoSnapshotIndex(properties, conf.getRaftLogPurgeEnabled());
     Log.setPurgeGap(properties, conf.getRaftLogPurgeGap());
     Log.setSegmentCacheNumMax(properties, 2);
   }
