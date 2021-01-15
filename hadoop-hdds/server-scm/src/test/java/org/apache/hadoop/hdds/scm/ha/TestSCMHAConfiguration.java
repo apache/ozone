@@ -41,4 +41,16 @@ public class TestSCMHAConfiguration {
         SCMHAConfiguration.class);
     Assert.assertEquals("scm-ratis", scmhaConfiguration.getRatisStorageDir());
   }
+
+  @Test
+  public void testRaftLogPurgeEnabled() {
+    SCMHAConfiguration scmhaConfiguration = conf.getObject(
+        SCMHAConfiguration.class);
+    scmhaConfiguration.setRaftLogPurgeEnabled(true);
+    conf.setFromObject(scmhaConfiguration);
+
+    scmhaConfiguration = conf.getObject(
+        SCMHAConfiguration.class);
+    Assert.assertEquals(true, scmhaConfiguration.getRaftLogPurgeEnabled());
+  }
 }
