@@ -17,13 +17,12 @@
 version: "3"
 services:
   kdc:
-    build:
-      context: ../common/docker-image/docker-krb5
-      dockerfile: Dockerfile-krb5
-    image: ozone-insecure-krb5
+    image: elek/ozone-devkrb5
     hostname: kdc
     volumes:
       - ../..:/opt/hadoop
+      - ./keytabs:/etc/security/keytabs
+    command: ["krb5kdc","-n"]
     networks:
       ozone_net:
         ipv4_address: 172.25.0.100
@@ -43,13 +42,14 @@ services:
     image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
     volumes:
       - ../..:/opt/hadoop
+      - ./keytabs:/etc/security/keytabs
+      - ./krb5.conf:/etc/krb5.conf
     ports:
       - 9864:9999
     command: ["/opt/hadoop/bin/ozone","datanode"]
     env_file:
       - docker-config
     environment:
-      KERBEROS_KEYTABS: dn HTTP
       HADOOP_OPTS: ${HADOOP_OPTS}
     networks:
       ozone_net:
@@ -58,13 +58,14 @@ services:
     image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
     volumes:
       - ../..:/opt/hadoop
+      - ./keytabs:/etc/security/keytabs
+      - ./krb5.conf:/etc/krb5.conf
     ports:
       - 9866:9999
     command: ["/opt/hadoop/bin/ozone","datanode"]
     env_file:
       - docker-config
     environment:
-      KERBEROS_KEYTABS: dn HTTP
       HADOOP_OPTS: ${HADOOP_OPTS}
     networks:
       ozone_net:
@@ -73,13 +74,14 @@ services:
     image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
     volumes:
       - ../..:/opt/hadoop
+      - ./keytabs:/etc/security/keytabs
+      - ./krb5.conf:/etc/krb5.conf
     ports:
       - 9868:9999
     command: ["/opt/hadoop/bin/ozone","datanode"]
     env_file:
       - docker-config
     environment:
-      KERBEROS_KEYTABS: dn HTTP
       HADOOP_OPTS: ${HADOOP_OPTS}
     networks:
       ozone_net:
@@ -89,13 +91,14 @@ services:
     hostname: om1
     volumes:
       - ../..:/opt/hadoop
+      - ./keytabs:/etc/security/keytabs
+      - ./krb5.conf:/etc/krb5.conf
     ports:
       - 9880:9874
       - 9890:9872
       #- 18001:18001
     environment:
       ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
-      KERBEROS_KEYTABS: om HTTP
       HADOOP_OPTS: ${HADOOP_OPTS}
     env_file:
       - ./docker-config
@@ -108,13 +111,14 @@ services:
     hostname: om2
     volumes:
       - ../..:/opt/hadoop
+      - ./keytabs:/etc/security/keytabs
+      - ./krb5.conf:/etc/krb5.conf
     ports:
       - 9882:9874
       - 9892:9872
       #- 18002:18002
     environment:
       ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
-      KERBEROS_KEYTABS: om HTTP
       HADOOP_OPTS: ${HADOOP_OPTS}
     env_file:
       - ./docker-config
@@ -127,13 +131,14 @@ services:
     hostname: om3
     volumes:
       - ../..:/opt/hadoop
+      - ./keytabs:/etc/security/keytabs
+      - ./krb5.conf:/etc/krb5.conf
     ports:
       - 9884:9874
       - 9894:9872
       #- 18003:18003
     environment:
       ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
-      KERBEROS_KEYTABS: om HTTP
       HADOOP_OPTS: ${HADOOP_OPTS}
     env_file:
       - ./docker-config
@@ -146,13 +151,14 @@ services:
     hostname: s3g
     volumes:
       - ../..:/opt/hadoop
+      - ./keytabs:/etc/security/keytabs
+      - ./krb5.conf:/etc/krb5.conf
     ports:
       - 9878:9878
     env_file:
       - ./docker-config
     command: ["/opt/hadoop/bin/ozone","s3g"]
     environment:
-      KERBEROS_KEYTABS: s3g HTTP testuser
       HADOOP_OPTS: ${HADOOP_OPTS}
     networks:
       ozone_net:
@@ -162,13 +168,14 @@ services:
     hostname: recon
     volumes:
       - ../..:/opt/hadoop
+      - ./keytabs:/etc/security/keytabs
+      - ./krb5.conf:/etc/krb5.conf
     ports:
       - 9888:9888
       #- 18000:18000
     env_file:
       - ./docker-config
     environment:
-      KERBEROS_KEYTABS: recon HTTP
       HADOOP_OPTS: ${HADOOP_OPTS}
     command: ["/opt/hadoop/bin/ozone","recon"]
     extra_hosts:
@@ -189,7 +196,6 @@ services:
     env_file:
       - docker-config
     environment:
-      KERBEROS_KEYTABS: scm HTTP testuser testuser2
       ENSURE_SCM_INITIALIZED: /data/metadata/scm/current/VERSION
       OZONE-SITE.XML_hdds.scm.safemode.min.datanode: "${OZONE_SAFEMODE_MIN_DATANODES:-3}"
       HADOOP_OPTS: ${HADOOP_OPTS}

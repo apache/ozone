@@ -17,13 +17,12 @@
 version: "3"
 services:
   kdc:
-    build:
-      context: ../common/docker-image/docker-krb5
-      dockerfile: Dockerfile-krb5
-    image: ozone-insecure-krb5
+    image: elek/ozone-devkrb5
     hostname: kdc
     volumes:
       - ../..:/opt/hadoop
+      - ./keytabs:/etc/security/keytabs
+    command: ["krb5kdc","-n"]
   kms:
       image: apache/hadoop:${HADOOP_VERSION}
       ports:
@@ -33,30 +32,31 @@ services:
       environment:
         HADOOP_CONF_DIR: /opt/hadoop/etc/hadoop
       command: ["hadoop", "kms"]
-
   datanode:
     image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
     volumes:
       - ../..:/opt/hadoop
+      - ./keytabs:/etc/security/keytabs
+      - ./krb5.conf:/etc/krb5.conf
     ports:
       - 9864
     command: ["/opt/hadoop/bin/ozone","datanode"]
     env_file:
       - docker-config
     environment:
-      KERBEROS_KEYTABS: dn HTTP
       HADOOP_OPTS: ${HADOOP_OPTS}
   om:
     image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
     hostname: om
     volumes:
       - ../..:/opt/hadoop
+      - ./keytabs:/etc/security/keytabs
+      - ./krb5.conf:/etc/krb5.conf
     ports:
       - 9874:9874
       - 9862:9862
     environment:
       ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
-      KERBEROS_KEYTABS: om HTTP
       HADOOP_OPTS: ${HADOOP_OPTS}
     env_file:
       - docker-config
@@ -67,25 +67,27 @@ services:
     hostname: s3g
     volumes:
       - ../..:/opt/hadoop
+      - ./keytabs:/etc/security/keytabs
+      - ./krb5.conf:/etc/krb5.conf
     ports:
       - 9878:9878
     env_file:
       - ./docker-config
     command: ["/opt/hadoop/bin/ozone","s3g"]
     environment:
-      KERBEROS_KEYTABS: s3g HTTP testuser
       HADOOP_OPTS: ${HADOOP_OPTS}
   recon:
     image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
     hostname: recon
     volumes:
       - ../..:/opt/hadoop
+      - ./keytabs:/etc/security/keytabs
+      - ./krb5.conf:/etc/krb5.conf
     ports:
       - 9888:9888
     env_file:
       - ./docker-config
     environment:
-      KERBEROS_KEYTABS: recon HTTP
       HADOOP_OPTS: ${HADOOP_OPTS}
     command: ["/opt/hadoop/bin/ozone","recon"]
   scm:
@@ -93,13 +95,14 @@ services:
     hostname: scm
     volumes:
       - ../..:/opt/hadoop
+      - ./keytabs:/etc/security/keytabs
+      - ./krb5.conf:/etc/krb5.conf
     ports:
       - 9876:9876
       - 9860:9860
     env_file:
       - docker-config
     environment:
-      KERBEROS_KEYTABS: scm HTTP testuser testuser2
       ENSURE_SCM_INITIALIZED: /data/metadata/scm/current/VERSION
       OZONE-SITE.XML_hdds.scm.safemode.min.datanode: "${OZONE_SAFEMODE_MIN_DATANODES:-1}"
       HADOOP_OPTS: ${HADOOP_OPTS}

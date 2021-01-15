@@ -17,15 +17,12 @@
 version: "3.5"
 services:
   kdc:
-    build:
-      context: ../common/docker-image/docker-krb5
-      dockerfile: Dockerfile-krb5
-    image: ozone-insecure-krb5
+    image: elek/ozone-devkrb5
     hostname: kdc
-    networks:
-      - ozone
     volumes:
       - ../..:/opt/hadoop
+      - ./keytabs:/etc/security/keytabs
+    command: ["krb5kdc","-n"]
   kms:
     image: ${HADOOP_IMAGE}:${HADOOP_VERSION}
     networks:
@@ -41,6 +38,8 @@ services:
       - ozone
     volumes:
       - ../..:/opt/hadoop
+      - ./keytabs:/etc/security/keytabs
+      - ./krb5.conf:/etc/krb5.conf
     ports:
       - 9864
     command: ["/opt/hadoop/bin/ozone","datanode"]
@@ -56,6 +55,8 @@ services:
       - ozone
     volumes:
       - ../..:/opt/hadoop
+      - ./keytabs:/etc/security/keytabs
+      - ./krb5.conf:/etc/krb5.conf
     ports:
       - 9874:9874
       - 9862:9862
@@ -73,6 +74,8 @@ services:
       - ozone
     volumes:
       - ../..:/opt/hadoop
+      - ./keytabs:/etc/security/keytabs
+      - ./krb5.conf:/etc/krb5.conf
     ports:
       - 9878:9878
     env_file:
@@ -88,6 +91,8 @@ services:
       - ozone
     volumes:
       - ../..:/opt/hadoop
+      - ./keytabs:/etc/security/keytabs
+      - ./krb5.conf:/etc/krb5.conf
     ports:
       - 9876:9876
       - 9860:9860
@@ -106,13 +111,14 @@ services:
       - ozone
     volumes:
       - ../..:/opt/ozone
+      - ./keytabs:/etc/security/keytabs
+      - ./krb5.conf:/etc/krb5.conf
     ports:
       - 8088:8088
     env_file:
       - ./docker-config
     environment:
       HADOOP_CLASSPATH: /opt/ozone/share/ozone/lib/hadoop-ozone-filesystem-hadoop3-@project.version@.jar
-      KERBEROS_KEYTABS: rm HTTP hadoop
     command: ["yarn", "resourcemanager"]
   nm:
     image: ${HADOOP_IMAGE}:${HADOOP_VERSION}
@@ -121,12 +127,13 @@ services:
       - ozone
     volumes:
       - ../..:/opt/ozone
+      - ./keytabs:/etc/security/keytabs
+      - ./krb5.conf:/etc/krb5.conf
     env_file:
       - ./docker-config
     environment:
       HADOOP_CLASSPATH: /opt/ozone/share/ozone/lib/hadoop-ozone-filesystem-hadoop3-@project.version@.jar
       WAITFOR: rm:8088
-      KERBEROS_KEYTABS: nm HTTP
     command: ["yarn","nodemanager"]
   jhs:
     image: ${HADOOP_IMAGE}:${HADOOP_VERSION}
@@ -136,12 +143,13 @@ services:
       - ozone
     volumes:
       - ../..:/opt/ozone
+      - ./keytabs:/etc/security/keytabs
+      - ./krb5.conf:/etc/krb5.conf
     ports:
       - 8188:8188
     env_file:
       - ./docker-config
     environment:
-      KERBEROS_KEYTABS: jhs HTTP
       HADOOP_CLASSPATH: /opt/ozone/share/ozone/lib/hadoop-ozone-filesystem-hadoop3-@project.version@.jar
       WAITFOR: rm:8088
     command: ["yarn","timelineserver"]
