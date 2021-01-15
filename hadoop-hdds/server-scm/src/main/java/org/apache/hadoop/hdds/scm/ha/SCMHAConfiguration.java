@@ -105,6 +105,14 @@ public class SCMHAConfiguration {
   )
   private int raftLogAppenderQueueByteLimit = 32 * 1024 * 1024;
 
+  @Config(key = "ratis.log.purge.enabled",
+      type = ConfigType.BOOLEAN,
+      defaultValue = "false",
+      tags = {SCM, OZONE, HA, RATIS},
+      description = "whether enable raft log purge."
+  )
+  private boolean raftLogPurgeEnabled = false;
+
   @Config(key = "ratis.log.purge.gap",
       type = ConfigType.INT,
       defaultValue = "1000000",
@@ -199,6 +207,14 @@ public class SCMHAConfiguration {
 
   public int getRaftLogAppenderQueueByteLimit() {
     return raftLogAppenderQueueByteLimit;
+  }
+
+  public boolean getRaftLogPurgeEnabled() {
+    return raftLogPurgeEnabled;
+  }
+
+  public void setRaftLogPurgeEnabled(boolean enabled) {
+    this.raftLogPurgeEnabled = enabled;
   }
 
   public int getRaftLogPurgeGap() {
