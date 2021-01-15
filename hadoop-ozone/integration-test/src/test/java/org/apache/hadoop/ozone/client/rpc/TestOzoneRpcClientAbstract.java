@@ -892,6 +892,7 @@ public abstract class TestOzoneRpcClientAbstract {
     // blocks will succeed，while the later block will fail.
     bucket.setQuota(OzoneQuota.parseQuota(
         4 * blockSize + " Bytes", 100));
+
     try {
       OzoneOutputStream out = bucket.createKey(UUID.randomUUID().toString(),
           valueLength, STAND_ALONE, ONE, new HashMap<>());
@@ -914,6 +915,15 @@ public abstract class TestOzoneRpcClientAbstract {
         store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
 
     Assert.assertEquals(3, countException);
+
+    // key with 0 bytes, usedBytes should not increase.
+    bucket.setQuota(OzoneQuota.parseQuota(
+        5 * blockSize + " Bytes", 100));
+    OzoneOutputStream out = bucket.createKey(UUID.randomUUID().toString(),
+        valueLength, STAND_ALONE, ONE, new HashMap<>());
+    out.close();
+    Assert.assertEquals(4 * blockSize,
+        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
   }
 
   @Test
