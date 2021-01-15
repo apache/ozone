@@ -208,7 +208,8 @@ public final class OzoneQuota {
     }
 
     if (nSize <= 0) {
-      throw new IllegalArgumentException("Invalid values for quota: " + nSize);
+      throw new IllegalArgumentException("Invalid values for space quota: "
+          + nSize);
     }
 
     return new OzoneQuota(new RawQuotaInBytes(currUnit, nSize));
@@ -230,7 +231,7 @@ public final class OzoneQuota {
     long nameSpaceQuota = Long.parseLong(quotaInNamespace);
     if (nameSpaceQuota <= 0) {
       throw new IllegalArgumentException(
-          "Invalid values for quota: " + nameSpaceQuota);
+          "Invalid values for namespace quota: " + nameSpaceQuota);
     }
     return new OzoneQuota(nameSpaceQuota, new RawQuotaInBytes(Units.BYTES, -1));
   }
