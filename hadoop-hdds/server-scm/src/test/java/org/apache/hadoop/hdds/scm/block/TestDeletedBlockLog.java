@@ -41,10 +41,10 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerBlocksDeletionACKProto
     .DeleteBlockTransactionResult;
-import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -236,6 +236,53 @@ public class TestDeletedBlockLog {
     // If all TXs are failed, getTransactions call will always return nothing.
     blocks = getTransactions(40 * BLOCKS_PER_TXN);
     Assert.assertEquals(blocks.size(), 0);
+  }
+
+  @Test
+  public void testIncrementCountLessFrequentWritingToDB() throws Exception {
+    OzoneConfiguration testConf = OzoneConfiguration.of(conf);
+    testConf.setInt(OZONE_SCM_BLOCK_DELETION_MAX_RETRY, 120);
+
+    deletedBlockLog = new DeletedBlockLogImpl(testConf, containerManager,
+        scm.getScmMetadataStore());
+
+    for (Map.Entry<Long, List<Long>> entry :
+        generateData(1).entrySet()) {
+      deletedBlockLog.addTransaction(entry.getKey(), entry.getValue());
+    }
+
+    List<DeletedBlocksTransaction> blocks =
+        getTransactions(40 * BLOCKS_PER_TXN);
+    List<Long> txIDs = blocks.stream().map(DeletedBlocksTransaction::getTxID)
+        .collect(Collectors.toList());
+
+    for (int i = 0; i < 50; i++) {
+      deletedBlockLog.incrementCount(txIDs);
+    }
+    blocks = getTransactions(40 * BLOCKS_PER_TXN);
+    for (DeletedBlocksTransaction block : blocks) {
+      // block count should not be updated as there are only 50 retries.
+      Assert.assertEquals(0, block.getCount());
+    }
+
+    for (int i = 0; i < 60; i++) {
+      deletedBlockLog.incrementCount(txIDs);
+    }
+    blocks = getTransactions(40 * BLOCKS_PER_TXN);
+    for (DeletedBlocksTransaction block : blocks) {
+      // block count should be updated to 100 as there are already 110 retries.
+      Assert.assertEquals(100, block.getCount());
+    }
+
+    for (int i = 0; i < 50; i++) {
+      deletedBlockLog.incrementCount(txIDs);
+    }
+    blocks = getTransactions(40 * BLOCKS_PER_TXN);
+    for (DeletedBlocksTransaction block : blocks) {
+      // block count should be updated to -1 as retry count exceeds maxRetry
+      // (i.e. 160 > maxRetry which is 120).
+      Assert.assertEquals(-1, block.getCount());
+    }
   }
 
   @Test
