@@ -747,7 +747,7 @@ public final class OMFileRequest {
       return omBucketInfo.getObjectID();
     }
 
-    String toKeyParentDir = OzoneFSUtils.getParentDir(toKeyName);
+    String toKeyParentDir = OzoneFSUtils.getParentDir(toKeyName, false);
 
     OzoneFileStatus toKeyParentDirStatus = getOMKeyInfoIfExists(metaMgr,
             volumeName, bucketName, toKeyParentDir, 0);

@@ -169,12 +169,17 @@ public final class OzoneFSUtils {
    * directory name as 'e'.
    *
    * @param keyName key name
+   * @param nullParent if true return original parent even if it is root.
    * @return parent directory. If not found then return keyName itself.
    */
-  public static String getParentDir(@Nonnull String keyName) {
+  public static String getParentDir(@Nonnull String keyName,
+                                    boolean nullParent) {
     java.nio.file.Path fileName = Paths.get(keyName).getParent();
     if (fileName != null) {
       return fileName.toString();
+    }
+    if (nullParent) {
+      return "";
     }
     // failed to find a parent directory.
     return keyName;

@@ -17,17 +17,24 @@
 package org.apache.hadoop.ozone.om;
 
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.ozone.OzoneFileSystem;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
@@ -42,9 +49,15 @@ import org.junit.Test;
 import org.junit.rules.Timeout;
 
 import java.io.IOException;
+import java.net.URI;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.UUID;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
@@ -72,6 +85,7 @@ public class TestObjectStoreV1 {
     scmId = UUID.randomUUID().toString();
     omId = UUID.randomUUID().toString();
     conf.set(OMConfigKeys.OZONE_OM_LAYOUT_VERSION, "V1");
+    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
     cluster = MiniOzoneCluster.newBuilder(conf)
             .setClusterId(clusterId)
             .setScmId(scmId)
@@ -216,6 +230,116 @@ public class TestObjectStoreV1 {
             true);
   }
 
+  @Test
+  public void testListKeysWithNotNormalizedPath() throws Exception {
+    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
+    String bucketName = "bucket" + RandomStringUtils.randomNumeric(5);
+    OzoneClient client = cluster.getClient();
+
+    ObjectStore objectStore = client.getObjectStore();
+    objectStore.createVolume(volumeName);
+
+    OzoneVolume ozoneVolume = objectStore.getVolume(volumeName);
+    Assert.assertTrue(ozoneVolume.getName().equals(volumeName));
+    ozoneVolume.createBucket(bucketName);
+
+    OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
+    Assert.assertTrue(ozoneBucket.getName().equals(bucketName));
+
+    String key1 = "/dir1///dir2/file1/";
+    String key2 = "/dir1///dir2/file2/";
+    String key3 = "/dir1///dir2/file3/";
+
+    LinkedList<String> keys = new LinkedList<>();
+    keys.add("dir1/");
+    keys.add("dir1/dir2/");
+    keys.add(OmUtils.normalizeKey(key1, false));
+    keys.add(OmUtils.normalizeKey(key2, false));
+    keys.add(OmUtils.normalizeKey(key3, false));
+
+    int length = 10;
+    byte[] input = new byte[length];
+    Arrays.fill(input, (byte)96);
+
+    createKey(ozoneBucket, key1, 10, input, volumeName, bucketName);
+    createKey(ozoneBucket, key2, 10, input, volumeName, bucketName);
+    createKey(ozoneBucket, key3, 10, input, volumeName, bucketName);
+
+    // Iterator with key name as prefix.
+
+    Iterator<? extends OzoneKey> ozoneKeyIterator =
+            ozoneBucket.listKeys("/dir1//");
+
+    checkKeyList(ozoneKeyIterator, keys);
+
+    // Iterator with with normalized key prefix.
+    ozoneKeyIterator =
+            ozoneBucket.listKeys("dir1/");
+
+    checkKeyList(ozoneKeyIterator, keys);
+
+    // Iterator with key name as previous key.
+    ozoneKeyIterator = ozoneBucket.listKeys(null,
+            "/dir1///dir2/file1/");
+
+    // Remove keys before //dir1/dir2/file1
+    keys.remove("dir1/");
+    keys.remove("dir1/dir2/");
+    keys.remove("dir1/dir2/file1");
+
+    checkKeyList(ozoneKeyIterator, keys);
+
+    // Iterator with  normalized key as previous key.
+    ozoneKeyIterator = ozoneBucket.listKeys(null,
+            OmUtils.normalizeKey(key1, false));
+
+    checkKeyList(ozoneKeyIterator, keys);
+  }
+
+  private void checkKeyList(Iterator<? extends OzoneKey > ozoneKeyIterator,
+                            List<String> keys) {
+
+    LinkedList<String> outputKeys = new LinkedList<>();
+    while (ozoneKeyIterator.hasNext()) {
+      OzoneKey ozoneKey = ozoneKeyIterator.next();
+      outputKeys.add(ozoneKey.getName());
+    }
+
+    Assert.assertEquals(keys, outputKeys);
+  }
+
+  private void createKey(OzoneBucket ozoneBucket, String key, int length,
+      byte[] input, String volumeName, String bucketName) throws Exception {
+
+    OzoneOutputStream ozoneOutputStream =
+            ozoneBucket.createKey(key, length);
+
+    ozoneOutputStream.write(input);
+    ozoneOutputStream.write(input, 0, 10);
+    ozoneOutputStream.close();
+
+    // Read the key with given key name.
+    OzoneInputStream ozoneInputStream = ozoneBucket.readKey(key);
+    byte[] read = new byte[length];
+    ozoneInputStream.read(read, 0, length);
+    ozoneInputStream.close();
+
+    String inputString = new String(input);
+    Assert.assertEquals(inputString, new String(read));
+
+    // Read using filesystem.
+    String rootPath = String.format("%s://%s.%s/", OZONE_URI_SCHEME,
+            bucketName, volumeName);
+    OzoneFileSystem o3fs = (OzoneFileSystem) FileSystem.get(new URI(rootPath),
+            conf);
+    FSDataInputStream fsDataInputStream = o3fs.open(new Path(key));
+    read = new byte[length];
+    fsDataInputStream.read(read, 0, length);
+    ozoneInputStream.close();
+
+    Assert.assertEquals(inputString, new String(read));
+  }
+
   private OmDirectoryInfo getDirInfo(String volumeName, String bucketName,
       String parentKey) throws Exception {
     OMMetadataManager omMetadataManager =
@@ -266,7 +390,8 @@ public class TestObjectStoreV1 {
             = openFileTable.iterator();
 
     if (isEmpty) {
-      Assert.assertTrue("Table is not empty!", openFileTable.isEmpty());
+      Assert.assertTrue("Table is not empty!",
+              openFileTable.isEmpty());
     } else {
       Assert.assertFalse("Table is empty!", openFileTable.isEmpty());
       while (iterator.hasNext()) {

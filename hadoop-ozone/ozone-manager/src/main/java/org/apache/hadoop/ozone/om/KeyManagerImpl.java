@@ -145,6 +145,8 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLU
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.KEY;
 import static org.apache.hadoop.util.Time.monotonicNow;
+
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -942,15 +944,157 @@ public class KeyManagerImpl implements KeyManager {
     // snapshot of the data, so we don't need these locks at a higher level
     // when we iterate.
 
+    boolean preserveTrailingSlash = enableFileSystemPaths &&
+                    !OzoneManagerRatisUtils.isOmLayoutVersionV1();
     if (enableFileSystemPaths) {
-      startKey = OmUtils.normalizeKey(startKey, true);
-      keyPrefix = OmUtils.normalizeKey(keyPrefix, true);
+      startKey = OmUtils.normalizeKey(startKey, preserveTrailingSlash);
+      keyPrefix = OmUtils.normalizeKey(keyPrefix, preserveTrailingSlash);
     }
 
-    List<OmKeyInfo> keyList = metadataManager.listKeys(volumeName, bucketName,
-        startKey, keyPrefix, maxKeys);
+    validateListKeyArgs(volumeName, bucketName);
+    List<OmKeyInfo> keyList = new ArrayList<>();
+    if (maxKeys <= 0) {
+      return keyList;
+    }
+
+    if (OzoneManagerRatisUtils.isOmLayoutVersionV1()) {
+      return listKeysV1(volumeName, bucketName, startKey, keyPrefix, maxKeys);
+    }
+
+    keyList = metadataManager.listKeys(volumeName, bucketName, startKey,
+            keyPrefix, maxKeys);
 
     return keyList;
+  }
+
+  private List<OmKeyInfo> listKeysV1(String volumeName, String bucketName,
+      String startKey, String keyPrefix, int maxKeys) throws IOException {
+    List<OmKeyInfo> keyList = new ArrayList<>();
+    if (StringUtils.isBlank(startKey)) {
+      return listKeysRecursivelyFromKeyPrefixV1(volumeName, bucketName,
+              keyPrefix, maxKeys, keyList);
+    } else {
+      return listKeysRecursivelyFromStartKeyV1(volumeName, bucketName, startKey,
+              keyPrefix, maxKeys, keyList);
+    }
+  }
+
+  private List<OmKeyInfo> listKeysRecursivelyFromKeyPrefixV1(String volumeName,
+      String bucketName, String keyPrefix, int maxKeys,
+      List<OmKeyInfo> keyList) throws IOException {
+
+    String startKey = "";
+    int countEntries = keyList.size();
+    List<OzoneFileStatus> keys = listOzoneFileStatusesV1(false,
+            startKey, countEntries, maxKeys, null, volumeName,
+            bucketName, keyPrefix, true, true);
+
+    for (OzoneFileStatus status : keys) {
+      OmKeyInfo omKeyInfo = status.getKeyInfo();
+      keyList.add(omKeyInfo);
+      if (status.isDirectory()) {
+        // add trailing slash to represent directory
+        String dirName = omKeyInfo.getKeyName();
+        if (!dirName.endsWith("/")) {
+          omKeyInfo.setKeyName(dirName + OM_KEY_PREFIX);
+        }
+        if (!StringUtils.equals(dirName, keyPrefix)) {
+          listKeysRecursivelyFromKeyPrefixV1(volumeName, bucketName, dirName,
+                  maxKeys, keyList);
+        }
+      }
+    }
+    return keyList;
+  }
+
+  private List<OmKeyInfo> listKeysRecursivelyFromStartKeyV1(String volumeName,
+      String bucketName, String startKey, String keyPrefix,
+      int maxKeys, List<OmKeyInfo> keyList) throws IOException {
+
+    if (startKey.startsWith(keyPrefix)) {
+      // Back and forth searching method. Here, it needs to move the startKey
+      // & keyprefix pointers one step backward, then list all the keys
+      // forward to these to pointers.
+
+      // For example, startKey="dir1/dir2/dir3/file3" and keyPrefix="dir1/".
+      // Iterate then move startkey and parentKeyPrefixPath positions till the
+      // given keyPrefix and lists all its sup paths...
+
+      // Iteration-1:
+      // startKeyPos="dir1/dir2/dir3/file3", parentKeyPrefix="dir1/dir2/dir3"
+      // Iteration-2:
+      // startKeyPos="dir1/dir2/dir3", parentKeyPrefix="dir1/dir2"
+      // Iteration-3:
+      // startKeyPos="dir1/dir2", parentKeyPrefix="dir1"
+      String parentKeyPrefixPath = OzoneFSUtils.getParentDir(startKey, true);
+      String startKeyPos = startKey;
+
+      while (!StringUtils.equals(parentKeyPrefixPath, keyPrefix)) {
+        forwardSearchAndListKeysFromStartKeyToKeyPrefixV1(volumeName,
+                bucketName, startKeyPos, parentKeyPrefixPath, maxKeys,
+                keyList);
+
+        startKeyPos = parentKeyPrefixPath;
+        parentKeyPrefixPath = OzoneFSUtils.getParentDir(parentKeyPrefixPath,
+                true);
+      }
+    } else {
+      // TODO: Handle startKey not starting with keyPrefix. Should we suport
+      //  this case?
+    }
+    return keyList;
+  }
+
+  // Forward search and list keys
+  private List<OmKeyInfo> forwardSearchAndListKeysFromStartKeyToKeyPrefixV1(
+          String volumeName, String bucketName, String startKey,
+          String parentKeyPrefixPath, int maxKeys, List<OmKeyInfo> keyList)
+          throws IOException {
+
+    int countEntries = keyList.size();
+    List<OzoneFileStatus> keys = listOzoneFileStatusesV1(false,
+            startKey, countEntries, maxKeys, null, volumeName,
+            bucketName, parentKeyPrefixPath, true, true);
+
+    for (OzoneFileStatus status : keys) {
+      OmKeyInfo omKeyInfo = status.getKeyInfo();
+
+      // add to keyList
+      keyList.add(omKeyInfo);
+
+      // add trailing slash to represent directory
+      if (status.isDirectory()) {
+        // add trailing slash to represent directory
+        String dirName = omKeyInfo.getKeyName();
+        if (!dirName.endsWith("/")) {
+          omKeyInfo.setKeyName(dirName + OM_KEY_PREFIX);
+        }
+        forwardSearchAndListKeysFromStartKeyToKeyPrefixV1(volumeName,
+                bucketName, dirName, parentKeyPrefixPath, maxKeys, keyList);
+      }
+    }
+    return keyList;
+  }
+
+  private void validateListKeyArgs(String volumeName, String bucketName)
+          throws IOException {
+
+    if (Strings.isNullOrEmpty(volumeName)) {
+      throw new OMException("Volume name is required.",
+              ResultCodes.VOLUME_NOT_FOUND);
+    }
+
+    if (Strings.isNullOrEmpty(bucketName)) {
+      throw new OMException("Bucket name is required.",
+              ResultCodes.BUCKET_NOT_FOUND);
+    }
+
+    String bucketNameBytes = metadataManager.getBucketKey(volumeName,
+            bucketName);
+    if (metadataManager.getBucketTable().get(bucketNameBytes) == null) {
+      throw new OMException("Bucket " + bucketName + " not found.",
+              ResultCodes.BUCKET_NOT_FOUND);
+    }
   }
 
   @Override
@@ -2317,28 +2461,42 @@ public class KeyManagerImpl implements KeyManager {
           throws IOException {
     Preconditions.checkNotNull(args, "Key args can not be null");
 
+    String volumeName = args.getVolumeName();
+    String bucketName = args.getBucketName();
+    String keyName = args.getKeyName();
+    boolean sortAddress = args.getSortDatanodes();
+    return listOzoneFileStatusesV1(recursive, startKey, 0, numEntries,
+            clientAddress, volumeName, bucketName, keyName, sortAddress,
+            false);
+  }
+
+  @NotNull
+  protected List<OzoneFileStatus> listOzoneFileStatusesV1(boolean recursive,
+      String startKey, int countEntries, long numEntries, String clientAddress,
+      String volumeName, String bucketName, String keyName,
+      boolean sortAddress, boolean listKeys) throws IOException {
     // unsorted OMKeyInfo list contains combine results from TableCache and DB.
     List<OzoneFileStatus> fileStatusFinalList = new ArrayList<>();
     LinkedHashSet<OzoneFileStatus> fileStatusList = new LinkedHashSet<>();
     if (numEntries <= 0) {
       return fileStatusFinalList;
     }
-    String volumeName = args.getVolumeName();
-    String bucketName = args.getBucketName();
-    String keyName = args.getKeyName();
     String seekFileInDB;
     String seekDirInDB;
     long prefixKeyInDB;
     String prefixPath = keyName;
-    int countEntries = 0;
+    boolean skipStartKey = listKeys;
 
     // TODO: recursive flag=true will be handled in HDDS-4360 jira.
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
             bucketName);
     try {
       if (Strings.isNullOrEmpty(startKey)) {
-        OzoneFileStatus fileStatus = getFileStatus(args, clientAddress);
-        if (fileStatus.isFile()) {
+        skipStartKey = false;
+        OzoneFileStatus fileStatus = getOzoneFileStatusV1(volumeName,
+                bucketName, keyName, sortAddress,
+                clientAddress, false);
+        if (fileStatus.isFile() && !listKeys) {
           return Collections.singletonList(fileStatus);
         }
 
@@ -2365,14 +2523,21 @@ public class KeyManagerImpl implements KeyManager {
         seekFileInDB = metadataManager.getOzonePathKey(prefixKeyInDB, "");
         seekDirInDB = metadataManager.getOzonePathKey(prefixKeyInDB, "");
 
+        // For list keys, if startKey is empty then needs to add the search
+        // entry to the key list.
+        if (listKeys && countEntries == 0) {
+          fileStatusList.add(fileStatus);
+        }
+
         // Order of seek -> (1)Seek dirs in dirTable (2)Seek files in fileTable
-        // 1. Seek the given key in key table.
+        // 1. Seek the given key in key table. Get all immediate files.
         countEntries = getFilesFromDirectory(fileStatusList, seekFileInDB,
-                prefixPath, prefixKeyInDB, startKey, countEntries, numEntries);
-        // 2. Seek the given key in dir table.
+                prefixPath, prefixKeyInDB, startKey, countEntries, numEntries,
+                skipStartKey);
+        // 2. Seek the given key in dir table. Get all immediate dirs.
         getDirectories(fileStatusList, seekDirInDB, prefixPath, prefixKeyInDB,
                 startKey, countEntries, numEntries, volumeName, bucketName,
-                recursive);
+                recursive, skipStartKey);
       } else {
         /*
          * startKey will be used in iterator seek and sets the beginning point
@@ -2411,24 +2576,24 @@ public class KeyManagerImpl implements KeyManager {
             // the order of search is, first seek into fileTable and then
             // dirTable. So, its not required to search again in the fileTable.
 
-            // Seek the given key in dirTable.
+            // Seek the given key in dirTable.  Get all immediate dirs.
             getDirectories(fileStatusList, seekDirInDB, prefixPath,
                     prefixKeyInDB, startKey, countEntries, numEntries,
-                    volumeName, bucketName, recursive);
+                    volumeName, bucketName, recursive, skipStartKey);
           } else {
             seekFileInDB = metadataManager.getOzonePathKey(prefixKeyInDB,
                     fileStatusInfo.getKeyInfo().getFileName());
             // begins from the first sub-dir under the parent dir
             seekDirInDB = metadataManager.getOzonePathKey(prefixKeyInDB, "");
 
-            // 1. Seek the given key in key table.
+            // 1. Seek the given key in key table. Get all immediate files.
             countEntries = getFilesFromDirectory(fileStatusList, seekFileInDB,
                     prefixPath, prefixKeyInDB, startKey, countEntries,
-                    numEntries);
-            // 2. Seek the given key in dir table.
+                    numEntries, skipStartKey);
+            // 2. Seek the given key in dir table. Get all immediate dirs.
             getDirectories(fileStatusList, seekDirInDB, prefixPath,
                     prefixKeyInDB, startKey, countEntries, numEntries,
-                    volumeName, bucketName, recursive);
+                    volumeName, bucketName, recursive, skipStartKey);
           }
         } else {
           // TODO: HDDS-4364: startKey can be a non-existed key
@@ -2453,7 +2618,7 @@ public class KeyManagerImpl implements KeyManager {
     // https://issues.apache.org/jira/browse/HDDS-3658.
     // Please refer this jira for more details.
     refreshPipeline(keyInfoList);
-    if (args.getSortDatanodes()) {
+    if (sortAddress) {
       sortDatanodes(clientAddress, keyInfoList.toArray(new OmKeyInfo[0]));
     }
     fileStatusFinalList.addAll(fileStatusList);
@@ -2464,12 +2629,13 @@ public class KeyManagerImpl implements KeyManager {
   protected int getDirectories(Set<OzoneFileStatus> fileStatusList,
       String seekDirInDB, String prefixPath, long prefixKeyInDB,
       String startKey, int countEntries, long numEntries, String volumeName,
-      String bucketName, boolean recursive) throws IOException {
+      String bucketName, boolean recursive, boolean skipStartKey)
+          throws IOException {
 
     Table dirTable = metadataManager.getDirectoryTable();
     countEntries = listStatusFindDirsInTableCache(fileStatusList, dirTable,
             prefixKeyInDB, seekDirInDB, prefixPath, startKey, volumeName,
-            bucketName, countEntries, numEntries);
+            bucketName, countEntries, numEntries, skipStartKey);
     TableIterator<String, ? extends Table.KeyValue<String, OmDirectoryInfo>>
             iterator = dirTable.iterator();
 
@@ -2488,6 +2654,11 @@ public class KeyManagerImpl implements KeyManager {
                 dirInfo.getName());
         OmKeyInfo omKeyInfo = OMFileRequest.getOmKeyInfo(volumeName,
                 bucketName, dirInfo, dirName);
+
+        if (dirName.equals(startKey) && skipStartKey) {
+          iterator.next(); // move to next entry in the table
+          continue;
+        }
         fileStatusList.add(new OzoneFileStatus(omKeyInfo, scmBlockSize,
                 true));
         countEntries++;
@@ -2501,18 +2672,18 @@ public class KeyManagerImpl implements KeyManager {
 
   private int getFilesFromDirectory(Set<OzoneFileStatus> fileStatusList,
       String seekKeyInDB, String prefixKeyPath, long prefixKeyInDB,
-      String startKey, int countEntries, long numEntries) throws IOException {
+      String startKey, int countEntries, long numEntries,
+      boolean skipStartKey) throws IOException {
 
     Table<String, OmKeyInfo> keyTable = metadataManager.getKeyTable();
     countEntries = listStatusFindFilesInTableCache(fileStatusList, keyTable,
             prefixKeyInDB, seekKeyInDB, prefixKeyPath, startKey,
-            countEntries, numEntries);
+            countEntries, numEntries, skipStartKey);
     TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
             iterator = keyTable.iterator();
     iterator.seek(seekKeyInDB);
     while (iterator.hasNext() && numEntries - countEntries > 0) {
       OmKeyInfo keyInfo = iterator.value().getValue();
-
       if (!OMFileRequest.isImmediateChild(keyInfo.getParentObjectID(),
               prefixKeyInDB)) {
         break;
@@ -2521,6 +2692,12 @@ public class KeyManagerImpl implements KeyManager {
       keyInfo.setFileName(keyInfo.getKeyName());
       String fullKeyPath = OMFileRequest.getAbsolutePath(prefixKeyPath,
               keyInfo.getKeyName());
+
+      if (fullKeyPath.equals(startKey) && skipStartKey) {
+        iterator.next(); // move to next entry in the table
+        continue;
+      }
+
       keyInfo.setKeyName(fullKeyPath);
       fileStatusList.add(new OzoneFileStatus(keyInfo, scmBlockSize, false));
       countEntries++;
@@ -2537,7 +2714,7 @@ public class KeyManagerImpl implements KeyManager {
           Set<OzoneFileStatus> fileStatusList, Table<String,
           OmKeyInfo> keyTable, long prefixKeyInDB, String seekKeyInDB,
           String prefixKeyPath, String startKey, int countEntries,
-          long numEntries) {
+          long numEntries, boolean skipStartKey) {
 
     Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>>
             cacheIter = keyTable.cacheIterator();
@@ -2561,6 +2738,12 @@ public class KeyManagerImpl implements KeyManager {
       omKeyInfo.setFileName(omKeyInfo.getKeyName());
       String fullKeyPath = OMFileRequest.getAbsolutePath(prefixKeyPath,
               omKeyInfo.getKeyName());
+
+      if (fullKeyPath.equals(startKey) && skipStartKey) {
+        // move to next entry in the table
+        continue;
+      }
+
       omKeyInfo.setKeyName(fullKeyPath);
 
       countEntries = addKeyInfoToFileStatusList(fileStatusList, prefixKeyInDB,
@@ -2578,7 +2761,8 @@ public class KeyManagerImpl implements KeyManager {
           Set<OzoneFileStatus> fileStatusList, Table<String,
           OmDirectoryInfo> dirTable, long prefixKeyInDB, String seekKeyInDB,
           String prefixKeyPath, String startKey, String volumeName,
-          String bucketName, int countEntries, long numEntries) {
+          String bucketName, int countEntries, long numEntries,
+          boolean skipStartKey) {
 
     Iterator<Map.Entry<CacheKey<String>, CacheValue<OmDirectoryInfo>>>
             cacheIter = dirTable.cacheIterator();
@@ -2598,6 +2782,11 @@ public class KeyManagerImpl implements KeyManager {
               cacheOmDirInfo.getName());
       OmKeyInfo cacheDirKeyInfo = OMFileRequest.getOmKeyInfo(volumeName,
               bucketName, cacheOmDirInfo, fullDirPath);
+
+      if (fullDirPath.equals(startKey) && skipStartKey) {
+        // move to next entry in the table
+        continue;
+      }
 
       countEntries = addKeyInfoToFileStatusList(fileStatusList, prefixKeyInDB,
               seekKeyInDB, startKey, countEntries, cacheKey, cacheDirKeyInfo,
