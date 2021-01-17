@@ -16,7 +16,11 @@
  */
 package org.apache.hadoop.hdds.scm.ha;
 
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+
 import java.util.concurrent.atomic.AtomicLong;
+
+import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.NON_UNIQUE_ID;
 
 /**
  * SequenceIDGenerator uses higher 30 bits to save the term, and lower 34 bits
@@ -30,11 +34,14 @@ public class SequenceIDGenerator {
 
   public SequenceIDGenerator(long term) {
     // move term to higher 30 bits and save it into curTermOnHigher30Bits.
-    curTermOnHigher30Bits = term << 34;
+    curTermOnHigher30Bits = term << 34L;
   }
 
-  public long nextID() {
+  public long nextID() throws SCMException {
     long l = counter.getAndIncrement();
-    return l & 0x3FFFFFFF | curTermOnHigher30Bits;
+    if ((l & 0x3FFFFFFFFL) != l) {
+      throw new SCMException(NON_UNIQUE_ID);
+    }
+    return l & 0x3FFFFFFFFL | curTermOnHigher30Bits;
   }
 }

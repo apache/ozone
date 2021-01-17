@@ -21,7 +21,7 @@ import org.junit.Test;
 
 public class TestSequenceIDGenerator {
   @Test
-  public void testSequenceIDGen() {
+  public void testSequenceIDGen() throws Exception {
     SequenceIDGenerator idGenerator = new SequenceIDGenerator(0);
     Assert.assertEquals(0L, idGenerator.nextID());
     Assert.assertEquals(1L, idGenerator.nextID());
