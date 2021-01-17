@@ -20,8 +20,6 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 
 import java.util.concurrent.atomic.AtomicLong;
 
-import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.NON_UNIQUE_ID;
-
 /**
  * SequenceIDGenerator uses higher 30 bits to save the term, and lower 34 bits
  * to save a count (increase from 0). Each call of nextID() will increase the
@@ -40,9 +38,13 @@ public class SequenceIDGenerator {
 
   public long nextID() throws SCMException {
     long l = counter.getAndIncrement();
-    if ((l & lower34BitsMask) != l) {
-      throw new SCMException(NON_UNIQUE_ID);
+    long countOnLower34Bits = l & lower34BitsMask;
+    if (countOnLower34Bits != l) {
+      throw new SCMException(
+          String.format("ID generator generates a non unique id. " +
+              "term:{}, count:{} ", curTermOnHigher30Bits, countOnLower34Bits),
+          SCMException.ResultCodes.INTERNAL_ERROR);
     }
-    return l & lower34BitsMask | curTermOnHigher30Bits;
+    return countOnLower34Bits | curTermOnHigher30Bits;
   }
 }
