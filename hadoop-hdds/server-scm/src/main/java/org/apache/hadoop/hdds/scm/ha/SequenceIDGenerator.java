@@ -31,6 +31,7 @@ import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.NON
 public class SequenceIDGenerator {
   private final long curTermOnHigher30Bits;
   private final AtomicLong counter = new AtomicLong(0L);
+  private final long lower34BitsMask = 0x3FFFFFFFFL;
 
   public SequenceIDGenerator(long term) {
     // move term to higher 30 bits and save it into curTermOnHigher30Bits.
@@ -39,9 +40,9 @@ public class SequenceIDGenerator {
 
   public long nextID() throws SCMException {
     long l = counter.getAndIncrement();
-    if ((l & 0x3FFFFFFFFL) != l) {
+    if ((l & lower34BitsMask) != l) {
       throw new SCMException(NON_UNIQUE_ID);
     }
-    return l & 0x3FFFFFFFFL | curTermOnHigher30Bits;
+    return l & lower34BitsMask | curTermOnHigher30Bits;
   }
 }
