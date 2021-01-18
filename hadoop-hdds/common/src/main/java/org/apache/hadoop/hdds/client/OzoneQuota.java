@@ -36,14 +36,14 @@ public final class OzoneQuota {
   public static final Logger LOG =
       LoggerFactory.getLogger(OzoneQuota.class);
 
-  public static final String OZONE_QUOTA_BYTES = "BYTES";
+  public static final String OZONE_QUOTA_B = "B";
   public static final String OZONE_QUOTA_KB = "KB";
   public static final String OZONE_QUOTA_MB = "MB";
   public static final String OZONE_QUOTA_GB = "GB";
   public static final String OZONE_QUOTA_TB = "TB";
 
   /** Quota Units.*/
-  public enum Units {BYTES, KB, MB, GB, TB}
+  public enum Units {B, KB, MB, GB, TB}
 
   // Quota to decide how many buckets can be created.
   private long quotaInNamespace;
@@ -60,7 +60,7 @@ public final class OzoneQuota {
     quotaList.addQuotaList(OZONE_QUOTA_GB, Units.GB, GB);
     quotaList.addQuotaList(OZONE_QUOTA_MB, Units.MB, MB);
     quotaList.addQuotaList(OZONE_QUOTA_KB, Units.KB, KB);
-    quotaList.addQuotaList(OZONE_QUOTA_BYTES, Units.BYTES, 1L);
+    quotaList.addQuotaList(OZONE_QUOTA_B, Units.B, 1L);
   }
 
   /**
@@ -183,7 +183,6 @@ public final class OzoneQuota {
     String size = "";
     long nSize = 0;
     Units currUnit = Units.MB;
-    long quotaMultiplyExact = 0;
 
     try {
       for (String quota : quotaList.getOzoneQuotaArray()) {
@@ -191,20 +190,15 @@ public final class OzoneQuota {
           size = uppercase
               .substring(0, uppercase.length() - quota.length());
           currUnit = quotaList.getUnits(quota);
-          quotaMultiplyExact = Math.multiplyExact(Long.parseLong(size),
-              quotaList.getQuotaSize(currUnit));
           break;
         }
       }
       nSize = Long.parseLong(size);
     } catch (NumberFormatException e) {
       throw new IllegalArgumentException("Invalid values for quota, to ensure" +
-          " that the Quota format is legal(supported values are BYTES, " +
-          " KB, MB, GB and TB).");
-    } catch (ArithmeticException e) {
-      LOG.debug("long overflow:\n{}", quotaMultiplyExact);
-      throw new IllegalArgumentException("Invalid values for quota, the quota" +
-          " value cannot be greater than Long.MAX_VALUE BYTES");
+          " that the Quota format is legal(supported values are B," +
+          " KB, MB, GB and TB). And the quota value cannot be greater than " +
+          "Long.MAX_VALUE BYTES");
     }
 
     if (nSize <= 0) {
@@ -233,7 +227,7 @@ public final class OzoneQuota {
       throw new IllegalArgumentException(
           "Invalid values for namespace quota: " + nameSpaceQuota);
     }
-    return new OzoneQuota(nameSpaceQuota, new RawQuotaInBytes(Units.BYTES, -1));
+    return new OzoneQuota(nameSpaceQuota, new RawQuotaInBytes(Units.B, -1));
   }
 
   /**
@@ -262,7 +256,7 @@ public final class OzoneQuota {
   public static OzoneQuota getOzoneQuota(long quotaInBytes,
       long quotaInNamespace) {
     long size = 1L;
-    Units unit = Units.BYTES;
+    Units unit = Units.B;
     for (Long quota : quotaList.getSizeQuotaArray()) {
       if (quotaInBytes % quota == 0) {
         size = quotaInBytes / quota;
