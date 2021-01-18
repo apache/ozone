@@ -42,7 +42,7 @@ public class SequenceIDGenerator {
     if (countOnLower34Bits != l) {
       throw new SCMException(
           String.format("ID generator generates a non unique id, " +
-              "term:{}, count:{} ", curTermOnHigher30Bits >> 34L, l),
+              "term:%s, count:%s ", curTermOnHigher30Bits >> 34L, l),
           SCMException.ResultCodes.INTERNAL_ERROR);
     }
     return countOnLower34Bits | curTermOnHigher30Bits;
