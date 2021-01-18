@@ -123,9 +123,28 @@ public final class OzoneQuota {
   }
 
   /**
+   * Constructor for Ozone Space Quota.
+   *
+   * @param rawQuotaInBytes RawQuotaInBytes value
+   */
+  private OzoneQuota(RawQuotaInBytes rawQuotaInBytes) {
+    this.rawQuotaInBytes = rawQuotaInBytes;
+    this.quotaInBytes = rawQuotaInBytes.sizeInBytes();
+  }
+
+  /**
+   * Constructor for Ozone NameSpace Quota.
+   *
+   * @param quotaInNamespace long value
+   */
+  private OzoneQuota(long quotaInNamespace) {
+    this.quotaInNamespace = quotaInNamespace;
+  }
+
+  /**
    * Constructor for Ozone Quota.
    *
-   * @param quotaInNamespace Volume quota in counts
+   * @param quotaInNamespace ozone quota in counts
    * @param rawQuotaInBytes RawQuotaInBytes value
    */
   private OzoneQuota(long quotaInNamespace, RawQuotaInBytes rawQuotaInBytes) {
@@ -145,16 +164,14 @@ public final class OzoneQuota {
   }
 
   /**
-   * Parses a user provided string and returns the
+   * Parses a user provided string space quota and returns the
    * Quota Object.
    *
-   * @param quotaInBytes Volume quota in bytes
-   * @param quotaInNamespace Volume quota in counts
+   * @param quotaInBytes ozone quota in bytes
    *
    * @return OzoneQuota object
    */
-  public static OzoneQuota parseQuota(String quotaInBytes,
-      long quotaInNamespace) {
+  public static OzoneQuota parseSpaceQuota(String quotaInBytes) {
 
     if (Strings.isNullOrEmpty(quotaInBytes)) {
       throw new IllegalArgumentException(
@@ -190,14 +207,49 @@ public final class OzoneQuota {
           " value cannot be greater than Long.MAX_VALUE BYTES");
     }
 
-    if (nSize < 0) {
-      throw new IllegalArgumentException("Quota cannot be negative.");
+    if (nSize <= 0) {
+      throw new IllegalArgumentException("Invalid values for space quota: "
+          + nSize);
     }
 
-    return new OzoneQuota(quotaInNamespace,
-        new RawQuotaInBytes(currUnit, nSize));
+    return new OzoneQuota(new RawQuotaInBytes(currUnit, nSize));
   }
 
+  /**
+   * Parses a user provided string Namespace quota and returns the
+   * Quota Object.
+   *
+   * @param quotaInNamespace ozone quota in counts
+   *
+   * @return OzoneQuota object
+   */
+  public static OzoneQuota parseNameSpaceQuota(String quotaInNamespace) {
+    if (Strings.isNullOrEmpty(quotaInNamespace)) {
+      throw new IllegalArgumentException(
+          "Quota string cannot be null or empty.");
+    }
+    long nameSpaceQuota = Long.parseLong(quotaInNamespace);
+    if (nameSpaceQuota <= 0) {
+      throw new IllegalArgumentException(
+          "Invalid values for namespace quota: " + nameSpaceQuota);
+    }
+    return new OzoneQuota(nameSpaceQuota, new RawQuotaInBytes(Units.BYTES, -1));
+  }
+
+  /**
+   * Parses a user provided string and returns the
+   * Quota Object.
+   *
+   * @param quotaInBytes ozone quota in bytes
+   * @param quotaInNamespace ozone quota in counts
+   *
+   * @return OzoneQuota object
+   */
+  public static OzoneQuota parseQuota(String quotaInBytes,
+      String quotaInNamespace) {
+    return new OzoneQuota(parseNameSpaceQuota(quotaInNamespace)
+        .quotaInNamespace, parseSpaceQuota(quotaInBytes).rawQuotaInBytes);
+  }
 
   /**
    * Returns OzoneQuota corresponding to size in bytes.

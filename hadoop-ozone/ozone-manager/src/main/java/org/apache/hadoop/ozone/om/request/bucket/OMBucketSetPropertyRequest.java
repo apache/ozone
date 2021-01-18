@@ -239,7 +239,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
           OMException.ResultCodes.QUOTA_ERROR);
     }
 
-    if (quotaInBytes == 0) {
+    if (quotaInBytes < OzoneConsts.QUOTA_RESET || quotaInBytes == 0) {
       return false;
     }
 
@@ -273,8 +273,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       OmBucketArgs omBucketArgs) {
     long quotaInNamespace = omBucketArgs.getQuotaInNamespace();
 
-    if ((quotaInNamespace <= 0
-         && quotaInNamespace != OzoneConsts.QUOTA_RESET)) {
+    if (quotaInNamespace < OzoneConsts.QUOTA_RESET || quotaInNamespace == 0) {
       return false;
     }
     return true;

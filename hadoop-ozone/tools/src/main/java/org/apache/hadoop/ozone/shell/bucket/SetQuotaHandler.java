@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.shell.bucket;
 
+import com.google.common.base.Strings;
 import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -48,15 +49,15 @@ public class SetQuotaHandler extends BucketHandler {
     long spaceQuota = bucket.getQuotaInBytes();
     long namespaceQuota = bucket.getQuotaInNamespace();
 
-    if (quotaOptions.getQuotaInBytes() != null
-        && !quotaOptions.getQuotaInBytes().isEmpty()) {
-      spaceQuota = OzoneQuota.parseQuota(quotaOptions.getQuotaInBytes(),
-          quotaOptions.getQuotaInNamespace()).getQuotaInBytes();
-    }
-    if (quotaOptions.getQuotaInNamespace() >= 0) {
-      namespaceQuota = quotaOptions.getQuotaInNamespace();
+    if (!Strings.isNullOrEmpty(quotaOptions.getQuotaInBytes())) {
+      spaceQuota = OzoneQuota.parseSpaceQuota(
+          quotaOptions.getQuotaInBytes()).getQuotaInBytes();
     }
 
+    if (!Strings.isNullOrEmpty(quotaOptions.getQuotaInNamespace())) {
+      namespaceQuota = OzoneQuota.parseNameSpaceQuota(
+          quotaOptions.getQuotaInNamespace()).getQuotaInNamespace();
+    }
     bucket.setQuota(OzoneQuota.getOzoneQuota(spaceQuota, namespaceQuota));
   }
 }

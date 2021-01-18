@@ -238,8 +238,8 @@ public class RpcClient implements ClientProtocol {
         ugi.getUserName() : volArgs.getAdmin();
     String owner = volArgs.getOwner() == null ?
         ugi.getUserName() : volArgs.getOwner();
-    long quotaInNamespace = getQuotaValue(volArgs.getQuotaInNamespace());
-    long quotaInBytes = getQuotaValue(volArgs.getQuotaInBytes());
+    long quotaInNamespace = volArgs.getQuotaInNamespace();
+    long quotaInBytes = volArgs.getQuotaInBytes();
     List<OzoneAcl> listOfAcls = new ArrayList<>();
     //User ACL
     listOfAcls.add(new OzoneAcl(ACLIdentityType.USER,
@@ -418,8 +418,8 @@ public class RpcClient implements ClientProtocol {
         .setStorageType(storageType)
         .setSourceVolume(bucketArgs.getSourceVolume())
         .setSourceBucket(bucketArgs.getSourceBucket())
-        .setQuotaInBytes(getQuotaValue(bucketArgs.getQuotaInBytes()))
-        .setQuotaInNamespace(getQuotaValue(bucketArgs.getQuotaInNamespace()))
+        .setQuotaInBytes(bucketArgs.getQuotaInBytes())
+        .setQuotaInNamespace(bucketArgs.getQuotaInNamespace())
         .setAcls(listOfAcls.stream().distinct().collect(Collectors.toList()));
 
     if (bek != null) {
@@ -451,24 +451,16 @@ public class RpcClient implements ClientProtocol {
   }
 
   private static void verifyCountsQuota(long quota) throws OMException {
-    if (quota < OzoneConsts.QUOTA_RESET) {
+    if (quota < OzoneConsts.QUOTA_RESET || quota == 0) {
       throw new IllegalArgumentException("Invalid values for quota : " +
           "counts quota is :" + quota + ".");
     }
   }
 
   private static void verifySpaceQuota(long quota) throws OMException {
-    if (quota < OzoneConsts.QUOTA_RESET) {
+    if (quota < OzoneConsts.QUOTA_RESET || quota == 0) {
       throw new IllegalArgumentException("Invalid values for quota : " +
           "space quota is :" + quota + ".");
-    }
-  }
-
-  private static long getQuotaValue(long quota) throws OMException {
-    if (quota == 0) {
-      return OzoneConsts.QUOTA_RESET;
-    } else {
-      return quota;
     }
   }
 
