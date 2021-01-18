@@ -200,7 +200,7 @@ public final class OzoneConsts {
   /**
    * Quota Units.
    */
-  public enum Units {TB, GB, MB, KB, BYTES}
+  public enum Units {TB, GB, MB, KB, B}
 
   /**
    * Max number of keys returned per list buckets operation.

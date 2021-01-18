@@ -845,7 +845,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
         unit = OzoneConsts.Units.KB;
       } else {
         size = value;
-        unit = OzoneConsts.Units.BYTES;
+        unit = OzoneConsts.Units.B;
       }
       return size + " " + unit;
     }
