@@ -217,7 +217,9 @@ public class PipelineStateManagerV2Impl implements StateManager {
     lock.writeLock().lock();
     try {
       PipelineID pipelineID = PipelineID.getFromProtobuf(pipelineIDProto);
-      pipelineStore.delete(pipelineID);
+      if (pipelineStore != null) {
+        pipelineStore.delete(pipelineID);
+      }
       Pipeline pipeline = pipelineStateMap.removePipeline(pipelineID);
       nodeManager.removePipeline(pipeline);
       LOG.info("Pipeline {} removed.", pipeline);
