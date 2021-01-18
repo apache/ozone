@@ -28,6 +28,8 @@ import picocli.CommandLine.Command;
 
 import java.io.IOException;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OLD_QUOTA_DEFAULT;
+
 /**
  * set quota of the bucket.
  */
@@ -57,6 +59,14 @@ public class SetQuotaHandler extends BucketHandler {
     if (!Strings.isNullOrEmpty(quotaOptions.getQuotaInNamespace())) {
       namespaceQuota = OzoneQuota.parseNameSpaceQuota(
           quotaOptions.getQuotaInNamespace()).getQuotaInNamespace();
+    }
+
+    if (bucket.getQuotaInNamespace() == OLD_QUOTA_DEFAULT ||
+        bucket.getUsedBytes() == OLD_QUOTA_DEFAULT) {
+      String msg = "Bucket " + bucketName + " is created before version " +
+          "1.1.0, usedBytes or usedNamespace may be inaccurate and it is not" +
+          " recommended to enable quota.";
+      printMsg(msg);
     }
     bucket.setQuota(OzoneQuota.getOzoneQuota(spaceQuota, namespaceQuota));
   }

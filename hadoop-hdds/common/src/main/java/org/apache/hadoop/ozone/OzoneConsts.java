@@ -196,6 +196,7 @@ public final class OzoneConsts {
    * Quota RESET default is -1, which means quota is not set.
    */
   public static final long QUOTA_RESET = -1;
+  public static final long OLD_QUOTA_DEFAULT = -2;
 
   /**
    * Quota Units.
