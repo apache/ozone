@@ -549,7 +549,7 @@ public class TestOzoneShellHA {
             .getQuotaInNamespace());
 
     // Test --quota option.
-    args = new String[]{"volume", "create", "vol1", "--quota", "100BYTES"};
+    args = new String[]{"volume", "create", "vol1", "--quota", "100B"};
     execute(ozoneShell, args);
     assertEquals(100, objectStore.getVolume("vol1").getQuotaInBytes());
     assertEquals(-1,
@@ -557,7 +557,7 @@ public class TestOzoneShellHA {
     out.reset();
 
     args =
-        new String[]{"bucket", "create", "vol1/buck1", "--quota", "10BYTES"};
+        new String[]{"bucket", "create", "vol1/buck1", "--quota", "10B"};
     execute(ozoneShell, args);
     assertEquals(10,
         objectStore.getVolume("vol1").getBucket("buck1").getQuotaInBytes());
@@ -567,7 +567,7 @@ public class TestOzoneShellHA {
 
     // Test --space-quota option.
     args = new String[]{"volume", "create", "vol2", "--space-quota",
-        "100BYTES"};
+        "100B"};
     execute(ozoneShell, args);
     assertEquals(100, objectStore.getVolume("vol2").getQuotaInBytes());
     assertEquals(-1,
@@ -575,7 +575,7 @@ public class TestOzoneShellHA {
     out.reset();
 
     args = new String[]{"bucket", "create", "vol2/buck2", "--space-quota",
-        "10BYTES"};
+        "10B"};
     execute(ozoneShell, args);
     assertEquals(10,
         objectStore.getVolume("vol2").getBucket("buck2").getQuotaInBytes());
@@ -603,7 +603,7 @@ public class TestOzoneShellHA {
 
     // Test both --space-quota and --namespace-quota option.
     args = new String[]{"volume", "create", "vol4", "--space-quota",
-        "100BYTES", "--namespace-quota", "100"};
+        "100B", "--namespace-quota", "100"};
     execute(ozoneShell, args);
     assertEquals(100, objectStore.getVolume("vol4").getQuotaInBytes());
     assertEquals(100,
@@ -611,7 +611,7 @@ public class TestOzoneShellHA {
     out.reset();
 
     args = new String[]{"bucket", "create", "vol4/buck4",
-        "--space-quota", "10BYTES", "--namespace-quota", "10"};
+        "--space-quota", "10B", "--namespace-quota", "10"};
     execute(ozoneShell, args);
     assertEquals(10,
         objectStore.getVolume("vol4").getBucket("buck4").getQuotaInBytes());
@@ -655,7 +655,7 @@ public class TestOzoneShellHA {
 
     // Test set volume spaceQuota or nameSpaceQuota to normal value.
     String[] volumeArgs3 = new String[]{"volume", "setquota", "vol4",
-        "--space-quota", "1000BYTES"};
+        "--space-quota", "1000B"};
     execute(ozoneShell, volumeArgs3);
     out.reset();
     assertEquals(1000, objectStore.getVolume("vol4").getQuotaInBytes());
@@ -687,7 +687,7 @@ public class TestOzoneShellHA {
 
     // Test set bucket spaceQuota or nameSpaceQuota to normal value.
     String[] bucketArgs3 = new String[]{"bucket", "setquota", "vol4/buck4",
-        "--space-quota", "1000BYTES"};
+        "--space-quota", "1000B"};
     execute(ozoneShell, bucketArgs3);
     out.reset();
     assertEquals(1000, objectStore.getVolume("vol4")
