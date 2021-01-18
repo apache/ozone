@@ -56,7 +56,6 @@ import org.junit.Test;
 import org.mockito.Mockito;
 
 import static org.junit.Assert.fail;
-import static org.mockito.Mockito.after;
 import static org.mockito.Mockito.when;
 
 /**
