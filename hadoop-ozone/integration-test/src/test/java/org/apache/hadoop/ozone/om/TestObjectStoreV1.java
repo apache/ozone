@@ -162,7 +162,7 @@ public class TestObjectStoreV1 {
             (KeyOutputStream) ozoneOutputStream.getOutputStream();
     long clientID = keyOutputStream.getClientID();
 
-    OmDirectoryInfo dirPathC = getDirInfo(volumeName, bucketName, parent);
+    OmDirectoryInfo dirPathC = getDirInfo(parent);
     Assert.assertNotNull("Failed to find dir path: a/b/c", dirPathC);
 
     // after file creation
@@ -214,7 +214,7 @@ public class TestObjectStoreV1 {
             (KeyOutputStream) ozoneOutputStream.getOutputStream();
     long clientID = keyOutputStream.getClientID();
 
-    OmDirectoryInfo dirPathC = getDirInfo(volumeName, bucketName, parent);
+    OmDirectoryInfo dirPathC = getDirInfo(parent);
     Assert.assertNotNull("Failed to find dir path: a/b/c", dirPathC);
 
     // after file creation
@@ -264,8 +264,7 @@ public class TestObjectStoreV1 {
             dirPathC.getObjectID(), true);
   }
 
-  private OmDirectoryInfo getDirInfo(String volumeName, String bucketName,
-      String parentKey) throws Exception {
+  private OmDirectoryInfo getDirInfo(String parentKey) throws Exception {
     OMMetadataManager omMetadataManager =
             cluster.getOzoneManager().getMetadataManager();
     long bucketId = TestOMRequestUtils.getBucketId(volumeName, bucketName,
