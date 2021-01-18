@@ -110,6 +110,8 @@ import org.apache.hadoop.security.token.Token;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
+import static org.apache.hadoop.ozone.OzoneConsts.OLD_QUOTA_DEFAULT;
+
 import org.apache.logging.log4j.util.Strings;
 import org.apache.ratis.protocol.ClientId;
 import org.slf4j.Logger;
@@ -293,6 +295,14 @@ public class RpcClient implements ClientProtocol {
     HddsClientUtils.verifyResourceName(volumeName);
     verifyCountsQuota(quotaInNamespace);
     verifySpaceQuota(quotaInBytes);
+    // If the volume is old, we need to remind the user on the client side
+    // that it is not recommended to enable quota.
+    OmVolumeArgs omVolumeArgs = ozoneManagerClient.getVolumeInfo(volumeName);
+    if (omVolumeArgs.getQuotaInNamespace() == OLD_QUOTA_DEFAULT) {
+      LOG.warn("Volume {} is created before version 1.1.0, usedNamespace " +
+          "may be inaccurate and it is not recommended to enable quota.",
+          volumeName);
+    }
     ozoneManagerClient.setQuota(volumeName, quotaInNamespace, quotaInBytes);
   }
 
@@ -580,6 +590,16 @@ public class RpcClient implements ClientProtocol {
         .setBucketName(bucketName)
         .setQuotaInBytes(quotaInBytes)
         .setQuotaInNamespace(quotaInNamespace);
+    // If the bucket is old, we need to remind the user on the client side
+    // that it is not recommended to enable quota.
+    OmBucketInfo omBucketInfo = ozoneManagerClient.getBucketInfo(
+        volumeName, bucketName);
+    if (omBucketInfo.getQuotaInNamespace() == OLD_QUOTA_DEFAULT ||
+        omBucketInfo.getUsedBytes() == OLD_QUOTA_DEFAULT) {
+      LOG.warn("Bucket {} is created before version 1.1.0, usedBytes or " +
+          "usedNamespace may be inaccurate and it is not recommended to " +
+          "enable quota.", bucketName);
+    }
     ozoneManagerClient.setBucketProperty(builder.build());
 
   }

@@ -29,6 +29,8 @@ import picocli.CommandLine.Command;
 
 import java.io.IOException;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OLD_QUOTA_DEFAULT;
+
 /**
  * Executes set volume quota calls.
  */
@@ -55,6 +57,13 @@ public class SetQuotaHandler extends VolumeHandler {
     if (!Strings.isNullOrEmpty(quotaOptions.getQuotaInNamespace())) {
       namespaceQuota = OzoneQuota.parseNameSpaceQuota(
           quotaOptions.getQuotaInNamespace()).getQuotaInNamespace();
+    }
+
+    if (volume.getQuotaInNamespace() == OLD_QUOTA_DEFAULT) {
+      String msg = "Volume " + volumeName + " is created before version " +
+          "1.1.0, usedNamespace may be inaccurate and it is not recommended" +
+          " to enable quota.";
+      printMsg(msg);
     }
 
     volume.setQuota(OzoneQuota.getOzoneQuota(spaceQuota, namespaceQuota));
