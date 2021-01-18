@@ -2466,10 +2466,13 @@ public class KeyManagerImpl implements KeyManager {
       String startKey, int countEntries, long numEntries, String volumeName,
       String bucketName, boolean recursive) throws IOException {
 
+    // A set to keep track of keys deleted in cache but not flushed to DB.
+    Set<String> deletedKeySet = new TreeSet<>();
+
     Table dirTable = metadataManager.getDirectoryTable();
     countEntries = listStatusFindDirsInTableCache(fileStatusList, dirTable,
             prefixKeyInDB, seekDirInDB, prefixPath, startKey, volumeName,
-            bucketName, countEntries, numEntries);
+            bucketName, countEntries, numEntries, deletedKeySet);
     TableIterator<String, ? extends Table.KeyValue<String, OmDirectoryInfo>>
             iterator = dirTable.iterator();
 
@@ -2477,6 +2480,11 @@ public class KeyManagerImpl implements KeyManager {
 
     while (iterator.hasNext() && numEntries - countEntries > 0) {
       OmDirectoryInfo dirInfo = iterator.value().getValue();
+      if (deletedKeySet.contains(dirInfo.getPath())) {
+        iterator.next(); // move to next entry in the table
+        // entry is actually deleted in cache and can exists in DB
+        continue;
+      }
       if (!OMFileRequest.isImmediateChild(dirInfo.getParentObjectID(),
               prefixKeyInDB)) {
         break;
@@ -2503,16 +2511,23 @@ public class KeyManagerImpl implements KeyManager {
       String seekKeyInDB, String prefixKeyPath, long prefixKeyInDB,
       String startKey, int countEntries, long numEntries) throws IOException {
 
+    // A set to keep track of keys deleted in cache but not flushed to DB.
+    Set<String> deletedKeySet = new TreeSet<>();
+
     Table<String, OmKeyInfo> keyTable = metadataManager.getKeyTable();
     countEntries = listStatusFindFilesInTableCache(fileStatusList, keyTable,
             prefixKeyInDB, seekKeyInDB, prefixKeyPath, startKey,
-            countEntries, numEntries);
+            countEntries, numEntries, deletedKeySet);
     TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
             iterator = keyTable.iterator();
     iterator.seek(seekKeyInDB);
     while (iterator.hasNext() && numEntries - countEntries > 0) {
       OmKeyInfo keyInfo = iterator.value().getValue();
-
+      if (deletedKeySet.contains(keyInfo.getPath())) {
+        iterator.next(); // move to next entry in the table
+        // entry is actually deleted in cache and can exists in DB
+        continue;
+      }
       if (!OMFileRequest.isImmediateChild(keyInfo.getParentObjectID(),
               prefixKeyInDB)) {
         break;
@@ -2537,7 +2552,7 @@ public class KeyManagerImpl implements KeyManager {
           Set<OzoneFileStatus> fileStatusList, Table<String,
           OmKeyInfo> keyTable, long prefixKeyInDB, String seekKeyInDB,
           String prefixKeyPath, String startKey, int countEntries,
-          long numEntries) {
+          long numEntries, Set<String> deletedKeySet) {
 
     Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>>
             cacheIter = keyTable.cacheIterator();
@@ -2550,6 +2565,7 @@ public class KeyManagerImpl implements KeyManager {
       OmKeyInfo cacheOmKeyInfo = entry.getValue().getCacheValue();
       // cacheOmKeyInfo is null if an entry is deleted in cache
       if(cacheOmKeyInfo == null){
+        deletedKeySet.add(cacheKey);
         continue;
       }
 
@@ -2578,7 +2594,8 @@ public class KeyManagerImpl implements KeyManager {
           Set<OzoneFileStatus> fileStatusList, Table<String,
           OmDirectoryInfo> dirTable, long prefixKeyInDB, String seekKeyInDB,
           String prefixKeyPath, String startKey, String volumeName,
-          String bucketName, int countEntries, long numEntries) {
+          String bucketName, int countEntries, long numEntries,
+          Set<String> deletedKeySet) {
 
     Iterator<Map.Entry<CacheKey<String>, CacheValue<OmDirectoryInfo>>>
             cacheIter = dirTable.cacheIterator();
@@ -2591,7 +2608,9 @@ public class KeyManagerImpl implements KeyManager {
               cacheIter.next();
       String cacheKey = entry.getKey().getCacheKey();
       OmDirectoryInfo cacheOmDirInfo = entry.getValue().getCacheValue();
+      // cacheOmKeyInfo is null if an entry is deleted in cache
       if(cacheOmDirInfo == null){
+        deletedKeySet.add(cacheKey);
         continue;
       }
       String fullDirPath = OMFileRequest.getAbsolutePath(prefixKeyPath,
