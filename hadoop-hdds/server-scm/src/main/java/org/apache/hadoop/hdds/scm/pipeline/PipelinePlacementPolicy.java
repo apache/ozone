@@ -347,21 +347,18 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
   }
 
   /**
-   * Find a node from the healthy list and return it after removing it from the
-   * list that we are operating on.
+   * Just chose a node randomly and remove it from the set of nodes we can
+   * chose from.
    *
-   * @param healthyNodes - Set of healthy nodes we can choose from.
-   * @return chosen datanodDetails
+   * @param healthyNodes - all healthy datanodes.
+   * @return one randomly chosen datanode that from two randomly chosen datanode
    */
   @Override
-  public DatanodeDetails chooseNode(
-      List<DatanodeDetails> healthyNodes) {
-    if (healthyNodes == null || healthyNodes.isEmpty()) {
-      return null;
-    }
-    DatanodeDetails datanodeDetails = healthyNodes.get(0);
-    healthyNodes.remove(datanodeDetails);
-    return datanodeDetails;
+  public DatanodeDetails chooseNode(final List<DatanodeDetails> healthyNodes) {
+    DatanodeDetails selectedNode =
+            healthyNodes.get(getRand().nextInt(healthyNodes.size()));
+    healthyNodes.remove(selectedNode);
+    return selectedNode;
   }
 
   /**
