@@ -23,8 +23,6 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
@@ -33,7 +31,6 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.util.StringUtils;
 import org.junit.After;
 import org.junit.Assert;
@@ -49,7 +46,6 @@ import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
-import static org.junit.Assert.fail;
 
 /**
  * Test verifies the entries and operations in directory table.
@@ -94,28 +90,6 @@ public class TestOzoneDirectory {
 
     Assert.assertEquals("Wrong OM numKeys metrics",
             4, cluster.getOzoneManager().getMetrics().getNumKeys());
-
-    // verify entries in directory table
-    TableIterator<String, ? extends
-            Table.KeyValue<String, OmDirectoryInfo>> iterator =
-            omMgr.getDirectoryTable().iterator();
-    iterator.seekToFirst();
-    int count = dirKeys.size();
-    Assert.assertEquals("Unexpected directory table entries!", 4, count);
-    while (iterator.hasNext()) {
-      count--;
-      Table.KeyValue<String, OmDirectoryInfo> value = iterator.next();
-      verifyKeyFormat(value.getKey(), dirKeys);
-    }
-    Assert.assertEquals("Unexpected directory table entries!", 0, count);
-
-    // verify entries in key table
-    TableIterator<String, ? extends
-            Table.KeyValue<String, OmKeyInfo>> keyTableItr =
-            omMgr.getKeyTable().iterator();
-    while (keyTableItr.hasNext()) {
-      fail("Shouldn't add any entries in KeyTable!");
-    }
 
     // create sub-dirs under same parent
     Path subDir5 = new Path("/d1/d2/d3/d4/d5");
