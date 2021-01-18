@@ -89,10 +89,13 @@ import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BU
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.ENTITY_TOO_SMALL;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_UPLOAD;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.PRECOND_FAILED;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.ACCEPT_RANGE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CONTENT_RANGE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER_RANGE;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_IF_MODIFIED_SINCE;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_IF_UNMODIFIED_SINCE;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER_SUPPORTED_UNIT;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
@@ -584,6 +587,18 @@ public class ObjectEndpoint extends EndpointBase {
           String sourceBucket = result.getLeft();
           String sourceKey = result.getRight();
 
+          Long sourceKeyModificationTime = getBucket(sourceBucket).
+              getKey(sourceKey).getModificationTime().toEpochMilli();
+          String copySourceIfModifiedSince =
+              headers.getHeaderString(COPY_SOURCE_IF_MODIFIED_SINCE);
+          String copySourceIfUnmodifiedSince =
+              headers.getHeaderString(COPY_SOURCE_IF_UNMODIFIED_SINCE);
+          if (!checkCopySourceModificationTime(sourceKeyModificationTime,
+              copySourceIfModifiedSince, copySourceIfUnmodifiedSince)) {
+            throw S3ErrorTable.newError(PRECOND_FAILED,
+                sourceBucket + "/" + sourceKey);
+          }
+
           try (OzoneInputStream sourceObject =
                    getBucket(sourceBucket).readKey(sourceKey)) {
 
@@ -833,5 +848,26 @@ public class ObjectEndpoint extends EndpointBase {
       partMarker = Integer.parseInt(partNumberMarker);
     }
     return partMarker;
+  }
+
+  private boolean checkCopySourceModificationTime(Long lastModificationTime,
+      String copySourceIfModifiedSinceStr,
+      String copySourceIfUnmodifiedSinceStr) {
+    Long copySourceIfModifiedSince = Long.MIN_VALUE;
+    Long copySourceIfUnmodifiedSince = Long.MAX_VALUE;
+
+    if (copySourceIfModifiedSinceStr != null) {
+      copySourceIfModifiedSince = Long.valueOf(copySourceIfModifiedSinceStr);
+    }
+    if (copySourceIfUnmodifiedSinceStr != null) {
+      copySourceIfUnmodifiedSince =
+          Long.valueOf(copySourceIfUnmodifiedSinceStr);
+    }
+
+    if ((copySourceIfModifiedSince <= lastModificationTime) &&
+        (lastModificationTime <= copySourceIfUnmodifiedSince)) {
+      return true;
+    }
+    return false;
   }
 }

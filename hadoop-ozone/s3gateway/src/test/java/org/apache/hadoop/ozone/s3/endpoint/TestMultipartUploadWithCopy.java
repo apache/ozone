@@ -43,13 +43,20 @@ import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER_RANGE;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_IF_MODIFIED_SINCE;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_IF_UNMODIFIED_SINCE;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
+
+import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.junit.Assert;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.mockito.Mockito;
+
+import static org.junit.Assert.fail;
+import static org.mockito.Mockito.after;
 import static org.mockito.Mockito.when;
 
 /**
@@ -91,6 +98,12 @@ public class TestMultipartUploadWithCopy {
 
   @Test
   public void testMultipart() throws Exception {
+    Long sourceKeyLastModificationTime = CLIENT.getObjectStore()
+        .getS3Bucket(OzoneConsts.S3_BUCKET)
+        .getKey(EXISTING_KEY)
+        .getModificationTime().toEpochMilli();
+    Long beforeSourceKeyModificationTime = sourceKeyLastModificationTime - 1000;
+    Long afterSourceKeyModificationTime = sourceKeyLastModificationTime + 1000;
 
     // Initiate multipart upload
     String uploadID = initiateMultipartUpload(KEY);
@@ -113,6 +126,14 @@ public class TestMultipartUploadWithCopy {
             OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3");
     partsList.add(part3);
 
+    Part part4 =
+        uploadPartWithCopy(KEY, uploadID, 3,
+            OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
+            beforeSourceKeyModificationTime,
+            afterSourceKeyModificationTime
+            );
+    partsList.add(part4);
+
     // complete multipart upload
     CompleteMultipartUploadRequest completeMultipartUploadRequest = new
         CompleteMultipartUploadRequest();
@@ -128,6 +149,56 @@ public class TestMultipartUploadWithCopy {
       Assert.assertEquals(
           content + EXISTING_KEY_CONTENT + EXISTING_KEY_CONTENT.substring(0, 4),
           keyContent);
+    }
+  }
+
+  @Test
+  public void testMultipartIfModifiedSince() throws Exception {
+    Long sourceKeyLastModificationTime = CLIENT.getObjectStore()
+        .getS3Bucket(OzoneConsts.S3_BUCKET)
+        .getKey(EXISTING_KEY)
+        .getModificationTime().toEpochMilli();
+    Long beforeSourceKeyModificationTime = sourceKeyLastModificationTime - 1000;
+    Long afterSourceKeyModificationTime = sourceKeyLastModificationTime + 1000;
+
+    // Initiate multipart upload
+    String uploadID = initiateMultipartUpload(KEY);
+
+    // ifUnmodifiedSince = beforeSourceKeyModificationTime,
+    // ifModifiedSince = afterSourceKeyModificationTime
+    try {
+      uploadPartWithCopy(KEY, uploadID, 1,
+          OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
+          afterSourceKeyModificationTime,
+          beforeSourceKeyModificationTime
+      );
+      fail("testMultipartIfModifiedSinceError");
+    } catch (OS3Exception ex) {
+      assertEquals(ex.getCode(), S3ErrorTable.PRECOND_FAILED.getCode());
+    }
+
+    // ifUnmodifiedSince = beforeSourceKeyModificationTime,
+    try {
+      uploadPartWithCopy(KEY, uploadID, 1,
+          OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
+          null,
+          beforeSourceKeyModificationTime
+      );
+      fail("testMultipartIfModifiedSinceError");
+    } catch (OS3Exception ex) {
+      assertEquals(ex.getCode(), S3ErrorTable.PRECOND_FAILED.getCode());
+    }
+
+    // ifModifiedSince = afterSourceKeyModificationTime
+    try {
+      uploadPartWithCopy(KEY, uploadID, 1,
+          OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
+          afterSourceKeyModificationTime,
+          null
+      );
+      fail("testMultipartIfModifiedSinceError");
+    } catch (OS3Exception ex) {
+      assertEquals(ex.getCode(), S3ErrorTable.PRECOND_FAILED.getCode());
     }
   }
 
@@ -164,11 +235,25 @@ public class TestMultipartUploadWithCopy {
 
   private Part uploadPartWithCopy(String key, String uploadID, int partNumber,
       String keyOrigin, String range) throws IOException, OS3Exception {
+    return uploadPartWithCopy(key, uploadID, partNumber, keyOrigin,
+        range, null, null);
+  }
+
+  private Part uploadPartWithCopy(String key, String uploadID, int partNumber,
+      String keyOrigin, String range, Long ifModifiedSince,
+      Long ifUnmodifiedSince) throws IOException, OS3Exception {
     Map<String, String> additionalHeaders = new HashMap<>();
     additionalHeaders.put(COPY_SOURCE_HEADER, keyOrigin);
     if (range != null) {
       additionalHeaders.put(COPY_SOURCE_HEADER_RANGE, range);
-
+    }
+    if (ifModifiedSince != null) {
+      additionalHeaders.put(COPY_SOURCE_IF_MODIFIED_SINCE,
+          ifModifiedSince.toString());
+    }
+    if (ifUnmodifiedSince != null) {
+      additionalHeaders.put(COPY_SOURCE_IF_UNMODIFIED_SINCE,
+          ifUnmodifiedSince.toString());
     }
     setHeaders(additionalHeaders);
 
