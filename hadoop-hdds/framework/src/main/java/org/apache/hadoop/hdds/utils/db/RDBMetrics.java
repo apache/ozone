@@ -101,7 +101,7 @@ public class RDBMetrics {
     return numDBKeyMayExistMisses.value();
   }
 
-  public static void unRegister() {
+  public static synchronized void unRegister() {
     instance = null;
     MetricsSystem ms = DefaultMetricsSystem.instance();
     ms.unregisterSource(SOURCE_NAME);
