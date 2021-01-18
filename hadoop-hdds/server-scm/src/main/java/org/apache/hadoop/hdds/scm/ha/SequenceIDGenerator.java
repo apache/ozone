@@ -17,6 +17,9 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.util.ExitUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -27,6 +30,9 @@ import java.util.concurrent.atomic.AtomicLong;
  * unique number within a specific term.
  */
 public class SequenceIDGenerator {
+  private static final Logger LOG =
+      LoggerFactory.getLogger(SequenceIDGenerator.class);
+
   // term on higher 30 bits
   private final long curTermOnHigherBits;
   private final AtomicLong counter = new AtomicLong(0L);
@@ -42,10 +48,14 @@ public class SequenceIDGenerator {
     long l = counter.getAndIncrement();
     long countOnLower34Bits = l & LOWER_BITS_MASK;
     if (countOnLower34Bits != l) {
-      throw new SCMException(
+      Throwable t = new SCMException(
           String.format("ID generator generates a non unique id, " +
               "term:%s, count:%s", curTermOnHigherBits >> 34L, l),
           SCMException.ResultCodes.INTERNAL_ERROR);
+      // When IDs are exhausted for a term, we should terminate SCM to force
+      // a leader re-election.
+      LOG.error("Facing a fatal problem in SequenceIDGenerator", t);
+      ExitUtil.terminate(1, t);
     }
     return countOnLower34Bits | curTermOnHigherBits;
   }
