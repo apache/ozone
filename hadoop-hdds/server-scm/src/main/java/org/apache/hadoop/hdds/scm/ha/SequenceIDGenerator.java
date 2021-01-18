@@ -27,24 +27,26 @@ import java.util.concurrent.atomic.AtomicLong;
  * unique number within a specific term.
  */
 public class SequenceIDGenerator {
-  private final long curTermOnHigher30Bits;
+  // term on higher 30 bits
+  private final long curTermOnHigherBits;
   private final AtomicLong counter = new AtomicLong(0L);
-  private final long lower34BitsMask = 0x3FFFFFFFFL;
+  // lower 34 bits mask
+  private static final long LOWER_BITS_MASK = 0x3FFFFFFFFL;
 
   public SequenceIDGenerator(long term) {
     // move term to higher 30 bits and save it into curTermOnHigher30Bits.
-    curTermOnHigher30Bits = term << 34L;
+    curTermOnHigherBits = term << 34L;
   }
 
   public long nextID() throws SCMException {
     long l = counter.getAndIncrement();
-    long countOnLower34Bits = l & lower34BitsMask;
+    long countOnLower34Bits = l & LOWER_BITS_MASK;
     if (countOnLower34Bits != l) {
       throw new SCMException(
           String.format("ID generator generates a non unique id, " +
-              "term:%s, count:%s", curTermOnHigher30Bits >> 34L, l),
+              "term:%s, count:%s", curTermOnHigherBits >> 34L, l),
           SCMException.ResultCodes.INTERNAL_ERROR);
     }
-    return countOnLower34Bits | curTermOnHigher30Bits;
+    return countOnLower34Bits | curTermOnHigherBits;
   }
 }
