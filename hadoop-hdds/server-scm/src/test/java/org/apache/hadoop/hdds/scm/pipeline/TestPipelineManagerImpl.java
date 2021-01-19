@@ -112,7 +112,8 @@ public class TestPipelineManagerImpl {
         MockSCMHAManager.getInstance(isLeader, buffer),
         new MockNodeManager(true, 20),
         SCMDBDefinition.PIPELINES.getTable(dbStore),
-        new EventQueue());
+        new EventQueue(),
+        SCMContext.emptyContext());
   }
 
   @Test

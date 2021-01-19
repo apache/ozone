@@ -47,12 +47,12 @@ public class SCMHAManagerImpl implements SCMHAManager {
    * Creates SCMHAManager instance.
    */
   public SCMHAManagerImpl(final ConfigurationSource conf,
-      final StorageContainerManager scm, final SCMMetadataStore store)
-      throws IOException {
+      final StorageContainerManager scm) throws IOException {
     this.conf = conf;
-    this.transactionBuffer = new SCMDBTransactionBuffer(store);
+    this.transactionBuffer =
+        new SCMDBTransactionBuffer(scm.getScmMetadataStore());
     this.ratisServer = new SCMRatisServerImpl(
-        conf.getObject(SCMHAConfiguration.class), conf, scm, transactionBuffer);
+        conf.getObject(SCMHAConfiguration.class), conf, scm);
   }
 
   /**

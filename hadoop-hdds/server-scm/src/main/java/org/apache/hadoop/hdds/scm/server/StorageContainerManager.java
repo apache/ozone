@@ -430,7 +430,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (configurator.getSCMHAManager() != null) {
       scmHAManager = configurator.getSCMHAManager();
     } else {
-      scmHAManager = new SCMHAManagerImpl(conf,this,  scmMetadataStore);
+      scmHAManager = new SCMHAManagerImpl(conf,this);
     }
 
     if (configurator.getScmContext() != null) {

@@ -55,16 +55,17 @@ public class SCMStateMachine extends BaseStateMachine {
   private final StorageContainerManager scm;
   private final SCMRatisServer ratisServer;
   private final Map<RequestType, Object> handlers;
-  private final SCMDBTransactionBuffer transactionBuffer;
+  private final DBTransactionBuffer transactionBuffer;
 
   public SCMStateMachine(final StorageContainerManager scm,
-      final SCMRatisServer ratisServer, final SCMDBTransactionBuffer buffer)
+      final SCMRatisServer ratisServer)
       throws SCMException {
     this.scm = scm;
     this.ratisServer = ratisServer;
     this.handlers = new EnumMap<>(RequestType.class);
-    this.transactionBuffer = buffer;
-    SCMTransactionInfo latestTrxInfo = buffer.getLatestTrxInfo();
+    this.transactionBuffer = scm.getScmHAManager().getDBTransactionBuffer();
+    SCMTransactionInfo latestTrxInfo =
+        this.transactionBuffer.getLatestTrxInfo();
     if (!latestTrxInfo.isInitialized()) {
       if (!updateLastAppliedTermIndex(latestTrxInfo.getTerm(),
           latestTrxInfo.getTransactionIndex())) {
