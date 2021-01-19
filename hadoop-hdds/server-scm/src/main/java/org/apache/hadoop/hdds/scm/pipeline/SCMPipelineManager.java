@@ -407,7 +407,7 @@ public class SCMPipelineManager implements PipelineManager {
   }
 
   private void updatePipelineStateInDb(PipelineID pipelineId,
-                                       Pipeline.PipelineState state)
+                                       Pipeline.PipelineState oldState)
           throws IOException {
     // null check is here to prevent the case where SCM store
     // is closed but the staleNode handlers/pipleine creations
@@ -416,9 +416,9 @@ public class SCMPipelineManager implements PipelineManager {
       try {
         pipelineStore.put(pipelineId, getPipeline(pipelineId));
       } catch (IOException ex) {
-        LOG.info("Pipeline {} state update failed", pipelineId);
+        LOG.warn("Pipeline {} state update failed", pipelineId);
         // revert back to old state in memory
-        stateManager.updatePipelineState(pipelineId, state);
+        stateManager.updatePipelineState(pipelineId, oldState);
       }
     }
   }

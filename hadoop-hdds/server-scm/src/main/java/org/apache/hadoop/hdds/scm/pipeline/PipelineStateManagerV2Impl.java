@@ -51,7 +51,7 @@ public class PipelineStateManagerV2Impl implements StateManager {
 
   private final PipelineStateMap pipelineStateMap;
   private final NodeManager nodeManager;
-  private final Table<PipelineID, Pipeline> pipelineStore;
+  private Table<PipelineID, Pipeline> pipelineStore;
 
   // Protect potential contentions between RaftServer and PipelineManager.
   // See https://issues.apache.org/jira/browse/HDDS-4560
@@ -89,10 +89,12 @@ public class PipelineStateManagerV2Impl implements StateManager {
     lock.writeLock().lock();
     try {
       Pipeline pipeline = Pipeline.getFromProtobuf(pipelineProto);
-      pipelineStore.put(pipeline.getId(), pipeline);
-      pipelineStateMap.addPipeline(pipeline);
-      nodeManager.addPipeline(pipeline);
-      LOG.info("Created pipeline {}.", pipeline);
+      if (pipelineStore != null) {
+        pipelineStore.put(pipeline.getId(), pipeline);
+        pipelineStateMap.addPipeline(pipeline);
+        nodeManager.addPipeline(pipeline);
+        LOG.info("Created pipeline {}.", pipeline);
+      }
     } finally {
       lock.writeLock().unlock();
     }
@@ -216,7 +218,9 @@ public class PipelineStateManagerV2Impl implements StateManager {
     lock.writeLock().lock();
     try {
       PipelineID pipelineID = PipelineID.getFromProtobuf(pipelineIDProto);
-      pipelineStore.delete(pipelineID);
+      if (pipelineStore != null) {
+        pipelineStore.delete(pipelineID);
+      }
       Pipeline pipeline = pipelineStateMap.removePipeline(pipelineID);
       nodeManager.removePipeline(pipeline);
       LOG.info("Pipeline {} removed.", pipeline);
@@ -241,11 +245,23 @@ public class PipelineStateManagerV2Impl implements StateManager {
   public void updatePipelineState(
       HddsProtos.PipelineID pipelineIDProto, HddsProtos.PipelineState newState)
       throws IOException {
+    PipelineID pipelineID = PipelineID.getFromProtobuf(pipelineIDProto);
+    Pipeline.PipelineState oldState =
+        getPipeline(pipelineID).getPipelineState();
     lock.writeLock().lock();
     try {
-      pipelineStateMap.updatePipelineState(
-          PipelineID.getFromProtobuf(pipelineIDProto),
-          Pipeline.PipelineState.fromProtobuf(newState));
+      // null check is here to prevent the case where SCM store
+      // is closed but the staleNode handlers/pipeline creations
+      // still try to access it.
+      if (pipelineStore != null) {
+        pipelineStateMap.updatePipelineState(pipelineID,
+            Pipeline.PipelineState.fromProtobuf(newState));
+        pipelineStore.put(pipelineID, getPipeline(pipelineID));
+      }
+    } catch (IOException ex) {
+      LOG.warn("Pipeline {} state update failed", pipelineID);
+      // revert back to old state in memory
+      pipelineStateMap.updatePipelineState(pipelineID, oldState);
     } finally {
       lock.writeLock().unlock();
     }
@@ -253,7 +269,15 @@ public class PipelineStateManagerV2Impl implements StateManager {
 
   @Override
   public void close() throws Exception {
-    pipelineStore.close();
+    lock.writeLock().lock();
+    try {
+      pipelineStore.close();
+      pipelineStore = null;
+    } catch (Exception ex) {
+      LOG.error("Pipeline  store close failed", ex);
+    } finally {
+      lock.writeLock().unlock();
+    }
   }
 
   // TODO Remove legacy
