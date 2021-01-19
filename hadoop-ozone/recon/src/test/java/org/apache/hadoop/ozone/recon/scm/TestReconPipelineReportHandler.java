@@ -29,6 +29,7 @@ import java.io.IOException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -62,7 +63,8 @@ public class TestReconPipelineReportHandler {
 
     ReconPipelineReportHandler handler =
         new ReconPipelineReportHandler(new ReconSafeModeManager(),
-            reconPipelineManagerMock, configuration, scmServiceProviderMock);
+            reconPipelineManagerMock, SCMContext.emptyContext(),
+            configuration, scmServiceProviderMock);
 
     EventPublisher eventPublisherMock = mock(EventPublisher.class);
     PipelineReport report = mock(PipelineReport.class);

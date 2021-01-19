@@ -41,6 +41,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -83,14 +84,14 @@ public class TestReconIncrementalContainerReportHandler
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     EventQueue eventQueue = new EventQueue();
     SCMStorageConfig storageConfig = new SCMStorageConfig(conf);
-    NodeManager nodeManager =
-        new SCMNodeManager(conf, storageConfig, eventQueue, clusterMap);
+    NodeManager nodeManager = new SCMNodeManager(conf, storageConfig,
+        eventQueue, clusterMap, SCMContext.emptyContext());
     nodeManager.register(datanodeDetails, null, null);
 
     ReconContainerManager containerManager = getContainerManager();
     ReconIncrementalContainerReportHandler reconIcr =
         new ReconIncrementalContainerReportHandler(nodeManager,
-            null);
+            null, SCMContext.emptyContext());
     EventPublisher eventPublisherMock = mock(EventPublisher.class);
 
     reconIcr.onMessage(reportMock, eventPublisherMock);
@@ -133,7 +134,7 @@ public class TestReconIncrementalContainerReportHandler
       when(reportMock.getReport()).thenReturn(containerReport);
       ReconIncrementalContainerReportHandler reconIcr =
           new ReconIncrementalContainerReportHandler(nodeManagerMock,
-              null);
+              null, SCMContext.emptyContext());
 
       reconIcr.onMessage(reportMock, mock(EventPublisher.class));
       assertTrue(containerManager.containerExist(containerID));

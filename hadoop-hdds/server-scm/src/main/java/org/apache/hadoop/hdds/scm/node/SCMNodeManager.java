@@ -25,7 +25,6 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.Collections;
@@ -49,7 +48,7 @@ import org.apache.hadoop.hdds.scm.VersionInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
-import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.states.NodeAlreadyExistsException;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -75,6 +74,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import org.apache.hadoop.util.Time;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -111,16 +111,14 @@ public class SCMNodeManager implements NodeManager {
       new ConcurrentHashMap<>();
   private final int numPipelinesPerMetadataVolume;
   private final int heavyNodeCriteria;
-  private final SCMHAManager scmhaManager;
+  private final SCMContext scmContext;
 
   /**
    * Constructs SCM machine Manager.
    */
   public SCMNodeManager(OzoneConfiguration conf,
-                        SCMStorageConfig scmStorageConfig,
-                        EventPublisher eventPublisher,
-                        NetworkTopology networkTopology,
-                        SCMHAManager scmhaManager) {
+      SCMStorageConfig scmStorageConfig, EventPublisher eventPublisher,
+      NetworkTopology networkTopology, SCMContext scmContext) {
     this.nodeStateManager = new NodeStateManager(conf, eventPublisher);
     this.version = VersionInfo.getLatestVersion();
     this.commandQueue = new CommandQueue();
@@ -146,14 +144,7 @@ public class SCMNodeManager implements NodeManager {
             ScmConfigKeys.OZONE_SCM_PIPELINE_PER_METADATA_VOLUME_DEFAULT);
     String dnLimit = conf.get(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT);
     this.heavyNodeCriteria = dnLimit == null ? 0 : Integer.parseInt(dnLimit);
-    this.scmhaManager = scmhaManager;
-  }
-
-  public SCMNodeManager(OzoneConfiguration conf,
-                        SCMStorageConfig scmStorageConfig,
-                        EventPublisher eventPublisher,
-                        NetworkTopology networkTopology) {
-    this(conf, scmStorageConfig, eventPublisher, networkTopology, null);
+    this.scmContext = scmContext;
   }
 
   private void registerMXBean() {
@@ -436,10 +427,19 @@ public class SCMNodeManager implements NodeManager {
           reportedDn.getPersistedOpStateExpiryEpochSec(),
           scmStatus.getOperationalState(),
           scmStatus.getOpStateExpiryEpochSeconds());
-      addDatanodeCommand(reportedDn.getUuid(),
-          new SetNodeOperationalStateCommand(
-              Time.monotonicNow(), scmStatus.getOperationalState(),
-              scmStatus.getOpStateExpiryEpochSeconds()));
+
+      try {
+        SCMCommand<?> command = new SetNodeOperationalStateCommand(
+            Time.monotonicNow(),
+            scmStatus.getOperationalState(),
+            scmStatus.getOpStateExpiryEpochSeconds());
+        command.setTerm(scmContext.getTerm());
+        addDatanodeCommand(reportedDn.getUuid(), command);
+      } catch (NotLeaderException nle) {
+        LOG.warn("Skip sending SetNodeOperationalStateCommand,"
+            + " since current SCM is not leader.", nle);
+        return;
+      }
     }
     DatanodeDetails scmDnd = nodeStateManager.getNode(reportedDn);
     scmDnd.setPersistedOpStateExpiryEpochSec(
@@ -802,18 +802,6 @@ public class SCMNodeManager implements NodeManager {
   // Refactor and remove all the usage of this method and delete this method.
   @Override
   public void addDatanodeCommand(UUID dnId, SCMCommand command) {
-    if (scmhaManager != null && command.getTerm() == 0) {
-      Optional<Long> termOpt = scmhaManager.isLeader();
-
-      if (!termOpt.isPresent()) {
-        LOG.warn("Not leader, drop SCMCommand {}.", command);
-        return;
-      }
-
-      LOG.warn("Help set term {} for SCMCommand {}. It is not an accurate " +
-          "way to set term of SCMCommand.", termOpt.get(), command);
-      command.setTerm(termOpt.get());
-    }
     this.commandQueue.addCommand(dnId, command);
   }
 

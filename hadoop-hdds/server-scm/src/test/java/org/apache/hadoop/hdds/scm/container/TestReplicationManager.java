@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -151,6 +152,7 @@ public class TestReplicationManager {
         containerManager,
         containerPlacementPolicy,
         eventQueue,
+        SCMContext.emptyContext(),
         new LockManager<>(conf),
         nodeManager);
     replicationManager.start();
@@ -164,6 +166,7 @@ public class TestReplicationManager {
         containerManager,
         containerPlacementPolicy,
         eventQueue,
+        SCMContext.emptyContext(),
         new LockManager<ContainerID>(conf),
         nodeManager);
 

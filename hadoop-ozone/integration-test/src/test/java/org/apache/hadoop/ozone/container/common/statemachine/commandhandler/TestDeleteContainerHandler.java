@@ -39,6 +39,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
+import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -132,8 +133,11 @@ public class TestDeleteContainerHandler {
         cluster.getStorageContainerManager().getScmNodeManager();
 
     //send the order to close the container
-    nodeManager.addDatanodeCommand(datanodeDetails.getUuid(),
-            new CloseContainerCommand(containerId.getId(), pipeline.getId()));
+    SCMCommand<?> command = new CloseContainerCommand(
+        containerId.getId(), pipeline.getId());
+    command.setTerm(
+        cluster.getStorageContainerManager().getScmContext().getTerm());
+    nodeManager.addDatanodeCommand(datanodeDetails.getUuid(), command);
 
     GenericTestUtils.waitFor(() ->
             isContainerClosed(hddsDatanodeService, containerId.getId()),
@@ -148,8 +152,10 @@ public class TestDeleteContainerHandler {
         containerId.getId()));
 
     // send delete container to the datanode
-    nodeManager.addDatanodeCommand(datanodeDetails.getUuid(),
-            new DeleteContainerCommand(containerId.getId(), false));
+    command = new DeleteContainerCommand(containerId.getId(), false);
+    command.setTerm(
+        cluster.getStorageContainerManager().getScmContext().getTerm());
+    nodeManager.addDatanodeCommand(datanodeDetails.getUuid(), command);
 
     GenericTestUtils.waitFor(() ->
             isContainerDeleted(hddsDatanodeService, containerId.getId()),
@@ -183,8 +189,11 @@ public class TestDeleteContainerHandler {
         cluster.getStorageContainerManager().getScmNodeManager();
 
     // Send delete container command with force flag set to false.
-    nodeManager.addDatanodeCommand(datanodeDetails.getUuid(),
-        new DeleteContainerCommand(containerId.getId(), false));
+    SCMCommand<?> command = new DeleteContainerCommand(
+        containerId.getId(), false);
+    command.setTerm(
+        cluster.getStorageContainerManager().getScmContext().getTerm());
+    nodeManager.addDatanodeCommand(datanodeDetails.getUuid(), command);
 
     // Here it should not delete it, and the container should exist in the
     // containerset
@@ -205,9 +214,10 @@ public class TestDeleteContainerHandler {
 
     // Now delete container with force flag set to true. now it should delete
     // container
-
-    nodeManager.addDatanodeCommand(datanodeDetails.getUuid(),
-        new DeleteContainerCommand(containerId.getId(), true));
+    command = new DeleteContainerCommand(containerId.getId(), true);
+    command.setTerm(
+        cluster.getStorageContainerManager().getScmContext().getTerm());
+    nodeManager.addDatanodeCommand(datanodeDetails.getUuid(), command);
 
     GenericTestUtils.waitFor(() ->
             isContainerDeleted(hddsDatanodeService, containerId.getId()),

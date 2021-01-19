@@ -39,6 +39,7 @@ import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
 import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
@@ -71,6 +72,7 @@ import org.mockito.Mockito;
 public class TestSCMSafeModeManager {
 
   private static EventQueue queue;
+  private SCMContext scmContext;
   private SCMSafeModeManager scmSafeModeManager;
   private static OzoneConfiguration config;
   private List<ContainerInfo> containers = Collections.emptyList();
@@ -86,6 +88,7 @@ public class TestSCMSafeModeManager {
   @Before
   public void setUp() {
     queue = new EventQueue();
+    scmContext = SCMContext.emptyContext();
     config = new OzoneConfiguration();
     config.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION,
         false);
@@ -307,7 +310,8 @@ public class TestSCMSafeModeManager {
               MockSCMHAManager.getInstance(true),
               mockNodeManager,
               scmMetadataStore.getPipelineTable(),
-              queue);
+              queue,
+              scmContext);
       scmSafeModeManager = new SCMSafeModeManager(
           conf, containers, pipelineManager, queue);
       fail("testFailWithIncorrectValueForHealthyPipelinePercent");
@@ -330,7 +334,8 @@ public class TestSCMSafeModeManager {
               MockSCMHAManager.getInstance(true),
               mockNodeManager,
               scmMetadataStore.getPipelineTable(),
-              queue);
+              queue,
+              scmContext);
       scmSafeModeManager = new SCMSafeModeManager(
           conf, containers, pipelineManager, queue);
       fail("testFailWithIncorrectValueForOneReplicaPipelinePercent");
@@ -352,7 +357,8 @@ public class TestSCMSafeModeManager {
               MockSCMHAManager.getInstance(true),
               mockNodeManager,
               scmMetadataStore.getPipelineTable(),
-              queue);
+              queue,
+              scmContext);
       scmSafeModeManager = new SCMSafeModeManager(
           conf, containers, pipelineManager, queue);
       fail("testFailWithIncorrectValueForSafeModePercent");
@@ -381,7 +387,8 @@ public class TestSCMSafeModeManager {
             MockSCMHAManager.getInstance(true),
             mockNodeManager,
             scmMetadataStore.getPipelineTable(),
-            queue);
+            queue,
+            scmContext);
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(mockNodeManager,
             pipelineManager.getStateManager(), config);
@@ -631,7 +638,8 @@ public class TestSCMSafeModeManager {
               MockSCMHAManager.getInstance(true),
               nodeManager,
               scmMetadataStore.getPipelineTable(),
-              queue);
+              queue,
+              scmContext);
 
       PipelineProvider mockRatisProvider =
           new MockRatisPipelineProvider(nodeManager,
@@ -694,7 +702,8 @@ public class TestSCMSafeModeManager {
             MockSCMHAManager.getInstance(true),
             nodeManager,
             scmMetadataStore.getPipelineTable(),
-            queue);
+            queue,
+            scmContext);
 
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
