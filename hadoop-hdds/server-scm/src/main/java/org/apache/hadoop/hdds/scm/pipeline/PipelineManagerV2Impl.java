@@ -511,6 +511,11 @@ public final class PipelineManagerV2Impl implements PipelineManager {
 
     // shutdown pipeline provider.
     pipelineFactory.shutdown();
+    try {
+      stateManager.close();
+    } catch (Exception ex) {
+      LOG.error("PipelineStateManager close failed", ex);
+    }
   }
 
   @Override
