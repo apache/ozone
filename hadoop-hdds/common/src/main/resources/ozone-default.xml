@@ -1627,15 +1627,6 @@
   </property>
 
   <property>
-    <name>ozone.om.ratis.leader.step.down.wait.time</name>
-    <value>30s</value>
-    <tag>OZONE, OM, RATIS, MANAGEMENT, DEPRECATED</tag>
-    <description>The time OM Ratis Leader waits before stepping down on loosing
-      majority heartbeats from followers.
-    </description>
-  </property>
-
-  <property>
     <name>ozone.om.leader.election.minimum.timeout.duration</name>
     <value>5s</value>
     <tag>OZONE, OM, RATIS, MANAGEMENT, DEPRECATED</tag>

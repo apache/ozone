@@ -487,7 +487,7 @@ public final class OzoneManagerRatisServer {
     long serverMaxTimeoutDuration =
         serverMinTimeout.toLong(TimeUnit.MILLISECONDS) + 200;
     final TimeDuration serverMaxTimeout = TimeDuration.valueOf(
-        serverMaxTimeoutDuration, serverMinTimeoutUnit);
+        serverMaxTimeoutDuration, TimeUnit.MILLISECONDS);
     RaftServerConfigKeys.Rpc.setTimeoutMin(properties,
         serverMinTimeout);
     RaftServerConfigKeys.Rpc.setTimeoutMax(properties,
@@ -497,19 +497,6 @@ public final class OzoneManagerRatisServer {
     RaftServerConfigKeys.Log.setSegmentCacheNumMax(properties, 2);
 
     // TODO: set max write buffer size
-
-    // Set the ratis leader step down time
-    TimeUnit leaderStepDownWaitTimeUnit =
-        OMConfigKeys.OZONE_OM_RATIS_LEADER_STEP_DOWN_WAIT_TIME_DEFAULT
-            .getUnit();
-    long leaderStepDownWaitTimeDuration = conf.getTimeDuration(
-        OMConfigKeys.OZONE_OM_RATIS_LEADER_STEP_DOWN_WAIT_TIME_KEY,
-        OMConfigKeys.OZONE_OM_RATIS_LEADER_STEP_DOWN_WAIT_TIME_DEFAULT
-            .getDuration(), leaderStepDownWaitTimeUnit);
-    final TimeDuration leaderStepDownWaitTime = TimeDuration.valueOf(
-        leaderStepDownWaitTimeDuration, leaderStepDownWaitTimeUnit);
-    RaftServerConfigKeys.LeaderElection.setLeaderStepDownWaitTime(
-        properties, leaderStepDownWaitTime);
 
     TimeUnit nodeFailureTimeoutUnit =
         OMConfigKeys.OZONE_OM_RATIS_SERVER_FAILURE_TIMEOUT_DURATION_DEFAULT
