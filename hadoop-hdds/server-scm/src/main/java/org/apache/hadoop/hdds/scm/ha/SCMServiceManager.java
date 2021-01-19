@@ -33,7 +33,7 @@ public class SCMServiceManager {
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMServiceManager.class);
 
-  // Cached latest raft condition and safe mode condition.
+  // Cached latest raft status and safe mode status.
   private RaftStatus raftStatus;
   private SafeModeStatus safeModeStatus;
 

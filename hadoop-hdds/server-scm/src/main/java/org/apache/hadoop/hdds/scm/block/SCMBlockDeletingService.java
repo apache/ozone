@@ -77,7 +77,7 @@ public class SCMBlockDeletingService extends BackgroundService
   private int blockDeleteLimitSize;
 
   /**
-   * SCMServiceManager.SCMService related variables.
+   * SCMService related variables.
    */
   private final Lock serviceLock = new ReentrantLock();
   private ServiceStatus serviceStatus = ServiceStatus.PAUSING;

@@ -162,7 +162,7 @@ public class ReplicationManager implements MetricsSource, SCMService {
   private int minHealthyForMaintenance;
 
   /**
-   * SCMServiceManager.SCMService related variables.
+   * SCMService related variables.
    * After leaving safe mode, replicationMonitor needs to wait for a while
    * before really take effect.
    */

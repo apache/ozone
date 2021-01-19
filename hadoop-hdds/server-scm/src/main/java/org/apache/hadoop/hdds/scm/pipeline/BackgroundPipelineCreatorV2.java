@@ -55,7 +55,7 @@ class BackgroundPipelineCreatorV2 implements SCMService {
   private final ConfigurationSource conf;
 
   /**
-   * SCMServiceManager.SCMService related variables.
+   * SCMService related variables.
    * 1) after leaving safe mode, BackgroundPipelineCreator needs to
    *    wait for a while before really take effect.
    * 2) NewNodeHandler, NonHealthyToHealthyNodeHandler, PreCheckComplete
