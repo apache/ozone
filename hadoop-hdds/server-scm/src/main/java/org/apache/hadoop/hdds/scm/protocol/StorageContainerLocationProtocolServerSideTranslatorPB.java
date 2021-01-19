@@ -79,7 +79,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
-import org.apache.hadoop.hdds.scm.server.SCMClientProtocolServer;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 
@@ -105,6 +105,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
           StorageContainerLocationProtocolServerSideTranslatorPB.class);
 
   private final StorageContainerLocationProtocol impl;
+  private final StorageContainerManager scm;
 
   private OzoneProtocolMessageDispatcher<ScmContainerLocationRequest,
       ScmContainerLocationResponse, ProtocolMessageEnum>
@@ -119,27 +120,23 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
    */
   public StorageContainerLocationProtocolServerSideTranslatorPB(
       StorageContainerLocationProtocol impl,
+      StorageContainerManager scm,
       ProtocolMessageMetrics<ProtocolMessageEnum> protocolMetrics)
       throws IOException {
     this.impl = impl;
+    this.scm = scm;
     this.dispatcher =
         new OzoneProtocolMessageDispatcher<>("ScmContainerLocation",
             protocolMetrics, LOG);
   }
 
-  private boolean isLeader() throws ServiceException {
-    if (!(impl instanceof SCMClientProtocolServer)) {
-      throw new ServiceException("Should be SCMClientProtocolServer");
-    } else {
-      return ((SCMClientProtocolServer) impl).getScm().checkLeader();
-    }
-  }
-
   @Override
   public ScmContainerLocationResponse submitRequest(RpcController controller,
       ScmContainerLocationRequest request) throws ServiceException {
-    if (!isLeader()) {
-      throw new ServiceException(new IOException("SCM IS NOT LEADER"));
+    if (!scm.getScmContext().isLeader()) {
+      throw new ServiceException(scm.getScmHAManager()
+                                    .getRatisServer()
+                                    .triggerNotLeaderException());
     }
     return dispatcher
         .processRequest(request, this::processRequest, request.getCmdType(),

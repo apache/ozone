@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 
@@ -40,14 +41,15 @@ public class PipelineFactory {
   private Map<ReplicationType, PipelineProvider> providers;
 
   PipelineFactory(NodeManager nodeManager, StateManager stateManager,
-      ConfigurationSource conf, EventPublisher eventPublisher) {
+                  ConfigurationSource conf, EventPublisher eventPublisher,
+                  SCMContext scmContext) {
     providers = new HashMap<>();
     providers.put(ReplicationType.STAND_ALONE,
         new SimplePipelineProvider(nodeManager, stateManager));
     providers.put(ReplicationType.RATIS,
         new RatisPipelineProvider(nodeManager,
             stateManager, conf,
-            eventPublisher));
+            eventPublisher, scmContext));
   }
 
   protected PipelineFactory() {

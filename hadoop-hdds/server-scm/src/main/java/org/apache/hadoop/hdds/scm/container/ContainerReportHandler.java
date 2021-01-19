@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.block.PendingDeleteStatusList;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher
@@ -73,8 +74,9 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
    */
   public ContainerReportHandler(final NodeManager nodeManager,
                                 final ContainerManagerV2 containerManager,
+                                final SCMContext scmContext,
                                 OzoneConfiguration conf) {
-    super(containerManager, LOG);
+    super(containerManager, scmContext, LOG);
     this.nodeManager = nodeManager;
     this.containerManager = containerManager;
 
@@ -88,7 +90,7 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
 
   public ContainerReportHandler(final NodeManager nodeManager,
       final ContainerManagerV2 containerManager) {
-    this(nodeManager, containerManager, null);
+    this(nodeManager, containerManager, SCMContext.emptyContext(), null);
   }
 
   /**

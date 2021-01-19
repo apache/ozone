@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -98,7 +99,8 @@ public class TestSCMContainerManager {
         MockSCMHAManager.getInstance(true),
         nodeManager,
         scmMetadataStore.getPipelineTable(),
-        new EventQueue());
+        new EventQueue(),
+        SCMContext.emptyContext());
     pipelineManager.allowPipelineCreation();
     containerManager = new SCMContainerManager(conf,
         scmMetadataStore.getContainerTable(),

@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
@@ -112,9 +113,12 @@ public final class PipelineManagerV2Impl implements PipelineManager {
   }
 
   public static PipelineManagerV2Impl newPipelineManager(
-      ConfigurationSource conf, SCMHAManager scmhaManager,
-      NodeManager nodeManager, Table<PipelineID, Pipeline> pipelineStore,
-      EventPublisher eventPublisher) throws IOException {
+      ConfigurationSource conf,
+      SCMHAManager scmhaManager,
+      NodeManager nodeManager,
+      Table<PipelineID, Pipeline> pipelineStore,
+      EventPublisher eventPublisher,
+      SCMContext scmContext) throws IOException {
     // Create PipelineStateManager
     StateManager stateManager = PipelineStateManagerV2Impl
         .newBuilder().setPipelineStore(pipelineStore)
@@ -124,7 +128,7 @@ public final class PipelineManagerV2Impl implements PipelineManager {
 
     // Create PipelineFactory
     PipelineFactory pipelineFactory = new PipelineFactory(
-        nodeManager, stateManager, conf, eventPublisher);
+        nodeManager, stateManager, conf, eventPublisher, scmContext);
     // Create PipelineManager
     PipelineManagerV2Impl pipelineManager = new PipelineManagerV2Impl(conf,
         scmhaManager, nodeManager, stateManager, pipelineFactory,

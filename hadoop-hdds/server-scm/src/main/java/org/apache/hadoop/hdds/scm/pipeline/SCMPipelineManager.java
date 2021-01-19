@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -97,7 +98,7 @@ public class SCMPipelineManager implements PipelineManager {
     this(conf, nodeManager, pipelineStore, eventPublisher, null, null);
     this.stateManager = new PipelineStateManager();
     this.pipelineFactory = new PipelineFactory(nodeManager,
-        stateManager, conf, eventPublisher);
+        stateManager, conf, eventPublisher, SCMContext.emptyContext());
     this.pipelineStore = pipelineStore;
     initializePipelineState();
   }

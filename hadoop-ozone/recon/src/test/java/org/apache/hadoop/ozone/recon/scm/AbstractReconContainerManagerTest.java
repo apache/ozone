@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -76,8 +77,8 @@ public class AbstractReconContainerManagerTest {
     scmStorageConfig = new ReconStorageConfig(conf);
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     EventQueue eventQueue = new EventQueue();
-    NodeManager nodeManager =
-        new SCMNodeManager(conf, scmStorageConfig, eventQueue, clusterMap);
+    NodeManager nodeManager = new SCMNodeManager(conf, scmStorageConfig,
+        eventQueue, clusterMap, SCMContext.emptyContext());
     pipelineManager = new ReconPipelineManager(conf, nodeManager,
         ReconSCMDBDefinition.PIPELINES.getTable(store), eventQueue);
     containerManager = new ReconContainerManager(

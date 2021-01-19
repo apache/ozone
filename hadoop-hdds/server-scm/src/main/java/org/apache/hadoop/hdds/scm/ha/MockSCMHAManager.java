@@ -24,7 +24,6 @@ import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
@@ -65,11 +64,10 @@ public final class MockSCMHAManager implements SCMHAManager {
   }
 
   /**
-   * {@inheritDoc}
+   * Informs MockRatisServe to behaviour as a leader SCM or a follower SCM.
    */
-  @Override
-  public Optional<Long> isLeader() {
-    return isLeader ? Optional.of((long)0) : Optional.empty();
+  boolean isLeader() {
+    return isLeader;
   }
 
   public void setIsLeader(boolean isLeader) {
@@ -113,7 +111,7 @@ public final class MockSCMHAManager implements SCMHAManager {
       final RaftGroupMemberId raftId = RaftGroupMemberId.valueOf(
           RaftPeerId.valueOf("peer"), RaftGroupId.randomId());
       RaftClientReply reply;
-      if (isLeader().isPresent()) {
+      if (isLeader()) {
         try {
           final Message result = process(request);
           reply = RaftClientReply.newBuilder()

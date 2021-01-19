@@ -20,26 +20,40 @@ package org.apache.hadoop.hdds.scm.ha;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 import com.google.protobuf.InvalidProtocolBufferException;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.ratis.protocol.Message;
+import org.apache.ratis.protocol.RaftGroupMemberId;
+import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.statemachine.TransactionContext;
 import org.apache.ratis.statemachine.impl.BaseStateMachine;
 
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * TODO.
  */
 public class SCMStateMachine extends BaseStateMachine {
+  private static final Logger LOG =
+      LoggerFactory.getLogger(SCMStateMachine.class);
 
+  private final StorageContainerManager scm;
+  private final SCMRatisServer ratisServer;
   private final Map<RequestType, Object> handlers;
 
-  public SCMStateMachine() {
+
+  public SCMStateMachine(final StorageContainerManager scm,
+                         final SCMRatisServer ratisServer) {
+    this.scm = scm;
+    this.ratisServer = ratisServer;
     this.handlers = new EnumMap<>(RequestType.class);
   }
 
@@ -89,4 +103,27 @@ public class SCMStateMachine extends BaseStateMachine {
     }
   }
 
+  @Override
+  public void notifyNotLeader(Collection<TransactionContext> pendingEntries) {
+    LOG.info("current leader SCM steps down.");
+    scm.getScmContext().updateIsLeaderAndTerm(false, 0);
+  }
+
+  @Override
+  public void notifyLeaderChanged(RaftGroupMemberId groupMemberId,
+                                  RaftPeerId newLeaderId) {
+    if (!groupMemberId.getPeerId().equals(newLeaderId)) {
+      LOG.info("leader changed, yet current SCM is still follower.");
+      return;
+    }
+
+    long term = scm.getScmHAManager()
+        .getRatisServer()
+        .getDivision()
+        .getInfo()
+        .getCurrentTerm();
+
+    LOG.info("current SCM becomes leader of term {}.", term);
+    scm.getScmContext().updateIsLeaderAndTerm(true, term);
+  }
 }

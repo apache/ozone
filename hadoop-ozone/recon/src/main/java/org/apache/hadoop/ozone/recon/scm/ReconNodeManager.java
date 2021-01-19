@@ -28,6 +28,7 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
@@ -66,7 +67,8 @@ public class ReconNodeManager extends SCMNodeManager {
                           EventPublisher eventPublisher,
                           NetworkTopology networkTopology,
                           Table<UUID, DatanodeDetails> nodeDB) {
-    super(conf, scmStorageConfig, eventPublisher, networkTopology);
+    super(conf, scmStorageConfig, eventPublisher, networkTopology,
+        SCMContext.emptyContext());
     this.nodeDB = nodeDB;
     loadExistingNodes();
   }

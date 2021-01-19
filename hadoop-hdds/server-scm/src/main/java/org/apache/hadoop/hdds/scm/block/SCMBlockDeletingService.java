@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -40,10 +41,12 @@ import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult.EmptyTaskResult;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
+import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.util.Time;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,19 +67,22 @@ public class SCMBlockDeletingService extends BackgroundService {
   private final ContainerManagerV2 containerManager;
   private final NodeManager nodeManager;
   private final EventPublisher eventPublisher;
+  private final SCMContext scmContext;
 
   private int blockDeleteLimitSize;
 
+  @SuppressWarnings("parameternumber")
   public SCMBlockDeletingService(DeletedBlockLog deletedBlockLog,
       ContainerManagerV2 containerManager, NodeManager nodeManager,
-      EventPublisher eventPublisher, Duration interval, long serviceTimeout,
-      ConfigurationSource conf) {
+      EventPublisher eventPublisher, SCMContext scmContext,
+      Duration interval, long serviceTimeout, ConfigurationSource conf) {
     super("SCMBlockDeletingService", interval.toMillis(), TimeUnit.MILLISECONDS,
         BLOCK_DELETING_SERVICE_CORE_POOL_SIZE, serviceTimeout);
     this.deletedBlockLog = deletedBlockLog;
     this.containerManager = containerManager;
     this.nodeManager = nodeManager;
     this.eventPublisher = eventPublisher;
+    this.scmContext = scmContext;
 
     blockDeleteLimitSize =
         conf.getObject(ScmConfig.class).getBlockDeletionLimit();
@@ -146,9 +152,10 @@ public class SCMBlockDeletingService extends BackgroundService {
               // We should stop caching new commands if num of un-processed
               // command is bigger than a limit, e.g 50. In case datanode goes
               // offline for sometime, the cached commands be flooded.
+              SCMCommand<?> command = new DeleteBlocksCommand(dnTXs);
+              command.setTerm(scmContext.getTerm());
               eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
-                  new CommandForDatanode<>(dnId,
-                      new DeleteBlocksCommand(dnTXs)));
+                  new CommandForDatanode<>(dnId, command));
               if (LOG.isDebugEnabled()) {
                 LOG.debug(
                     "Added delete block command for datanode {} in the queue,"
@@ -170,6 +177,9 @@ public class SCMBlockDeletingService extends BackgroundService {
               transactions.getBlocksDeleted(),
               transactions.getDatanodeTransactionMap().size(),
               Time.monotonicNow() - startTime);
+        } catch (NotLeaderException nle) {
+          LOG.warn("Skip current run, since not leader any more.", nle);
+          return EmptyTaskResult.newResult();
         } catch (IOException e) {
           // We may tolerate a number of failures for sometime
           // but if it continues to fail, at some point we need to raise

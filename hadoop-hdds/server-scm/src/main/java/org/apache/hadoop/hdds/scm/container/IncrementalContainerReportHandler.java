@@ -23,6 +23,7 @@ import java.io.IOException;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos
     .ContainerReplicaProto;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher
@@ -47,8 +48,9 @@ public class IncrementalContainerReportHandler extends
 
   public IncrementalContainerReportHandler(
       final NodeManager nodeManager,
-      final ContainerManagerV2 containerManager)  {
-    super(containerManager, LOG);
+      final ContainerManagerV2 containerManager,
+      final SCMContext scmContext) {
+    super(containerManager, scmContext, LOG);
     this.nodeManager = nodeManager;
   }
 

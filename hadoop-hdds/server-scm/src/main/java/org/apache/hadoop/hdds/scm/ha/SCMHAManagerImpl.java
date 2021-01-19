@@ -18,12 +18,11 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.ratis.proto.RaftProtos;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.Optional;
 
 /**
  * SCMHAManagerImpl uses Apache Ratis for HA implementation. We will have 2N+1
@@ -44,10 +43,12 @@ public class SCMHAManagerImpl implements SCMHAManager {
   /**
    * Creates SCMHAManager instance.
    */
-  public SCMHAManagerImpl(final ConfigurationSource conf) throws IOException {
+  public SCMHAManagerImpl(final ConfigurationSource conf,
+                          final StorageContainerManager scm)
+      throws IOException {
     this.conf = conf;
     this.ratisServer = new SCMRatisServerImpl(
-        conf.getObject(SCMHAConfiguration.class), conf);
+        conf.getObject(SCMHAConfiguration.class), conf, scm);
   }
 
   /**
@@ -58,27 +59,6 @@ public class SCMHAManagerImpl implements SCMHAManager {
     ratisServer.start();
   }
 
-  /**
-   * {@inheritDoc}
-   */
-  @Override
-  public Optional<Long> isLeader() {
-    if (!SCMHAUtils.isSCMHAEnabled(conf)) {
-      // When SCM HA is not enabled, the current SCM is always the leader.
-      return Optional.of((long)0);
-    }
-    RaftProtos.RoleInfoProto roleInfoProto
-        = ratisServer.getDivision().getInfo().getRoleInfoProto();
-
-    return roleInfoProto.hasLeaderInfo()
-        ? Optional.of(roleInfoProto.getLeaderInfo().getTerm())
-        : Optional.empty();
-  }
-
-  /**
-   * {@inheritDoc}
-   */
-  @Override
   public SCMRatisServer getRatisServer() {
     return ratisServer;
   }

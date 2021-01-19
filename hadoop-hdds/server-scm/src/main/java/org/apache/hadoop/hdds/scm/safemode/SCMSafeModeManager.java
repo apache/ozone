@@ -330,8 +330,8 @@ public class SCMSafeModeManager implements SafeModeManager {
    */
   public static class SafeModeStatus {
 
-    private boolean safeModeStatus;
-    private boolean preCheckPassed;
+    private final boolean safeModeStatus;
+    private final boolean preCheckPassed;
 
     public SafeModeStatus(boolean safeModeState, boolean preCheckPassed) {
       this.safeModeStatus = safeModeState;
@@ -344,6 +344,14 @@ public class SCMSafeModeManager implements SafeModeManager {
 
     public boolean isPreCheckComplete() {
       return preCheckPassed;
+    }
+
+    @Override
+    public String toString() {
+      return "SafeModeStatus{" +
+          "safeModeStatus=" + safeModeStatus +
+          ", preCheckPassed=" + preCheckPassed +
+          '}';
     }
   }
 

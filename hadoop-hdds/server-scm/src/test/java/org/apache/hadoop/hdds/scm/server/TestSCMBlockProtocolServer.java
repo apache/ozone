@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos;
 import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocolServerSideTranslatorPB;
@@ -60,6 +61,7 @@ public class TestSCMBlockProtocolServer {
     config.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.toString());
     SCMConfigurator configurator = new SCMConfigurator();
     configurator.setSCMHAManager(MockSCMHAManager.getInstance(true));
+    configurator.setScmContext(SCMContext.emptyContext());
     scm = TestUtils.getScm(config, configurator);
     scm.start();
     scm.exitSafeMode();
@@ -70,7 +72,7 @@ public class TestSCMBlockProtocolServer {
 
     }
     server = scm.getBlockProtocolServer();
-    service = new ScmBlockLocationProtocolServerSideTranslatorPB(server,
+    service = new ScmBlockLocationProtocolServerSideTranslatorPB(server, scm,
         Mockito.mock(ProtocolMessageMetrics.class));
   }
 

@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.IncrementalContainerReportHandler;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.IncrementalContainerReportFromDatanode;
@@ -44,8 +45,8 @@ public class ReconIncrementalContainerReportHandler
       ReconIncrementalContainerReportHandler.class);
 
   public ReconIncrementalContainerReportHandler(NodeManager nodeManager,
-      ContainerManagerV2 containerManager) {
-    super(nodeManager, containerManager);
+      ContainerManagerV2 containerManager, SCMContext scmContext) {
+    super(nodeManager, containerManager, scmContext);
   }
 
   @Override

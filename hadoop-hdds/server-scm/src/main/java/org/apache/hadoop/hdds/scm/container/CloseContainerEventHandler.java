@@ -23,6 +23,7 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.server.events.EventHandler;
@@ -30,6 +31,7 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
+import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,11 +53,14 @@ public class CloseContainerEventHandler implements EventHandler<ContainerID> {
 
   private final PipelineManager pipelineManager;
   private final ContainerManagerV2 containerManager;
+  private final SCMContext scmContext;
 
   public CloseContainerEventHandler(final PipelineManager pipelineManager,
-      final ContainerManagerV2 containerManager) {
+                                    final ContainerManagerV2 containerManager,
+                                    final SCMContext scmContext) {
     this.pipelineManager = pipelineManager;
     this.containerManager = containerManager;
+    this.scmContext = scmContext;
   }
 
   @Override
@@ -74,19 +79,21 @@ public class CloseContainerEventHandler implements EventHandler<ContainerID> {
           .getContainer(containerID);
       // Send close command to datanodes, if the container is in CLOSING state
       if (container.getState() == LifeCycleState.CLOSING) {
+        SCMCommand<?> command = new CloseContainerCommand(
+            containerID.getId(), container.getPipelineID());
+        command.setTerm(scmContext.getTerm());
 
-        final CloseContainerCommand closeContainerCommand =
-            new CloseContainerCommand(
-                containerID.getId(), container.getPipelineID());
-
-        getNodes(container).forEach(node -> publisher.fireEvent(
-            DATANODE_COMMAND,
-            new CommandForDatanode<>(node.getUuid(), closeContainerCommand)));
+        getNodes(container).forEach(node ->
+            publisher.fireEvent(DATANODE_COMMAND,
+                new CommandForDatanode<>(node.getUuid(), command)));
       } else {
         LOG.warn("Cannot close container {}, which is in {} state.",
             containerID, container.getState());
       }
 
+    } catch (NotLeaderException nle) {
+      LOG.warn("Skip sending close container command,"
+          + " since current SCM is not leader.", nle);
     } catch (IOException | InvalidStateTransitionException ex) {
       LOG.error("Failed to close the container {}.", containerID, ex);
     }

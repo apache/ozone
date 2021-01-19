@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.RaftClientReply;
@@ -55,6 +56,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
       LoggerFactory.getLogger(SCMRatisServerImpl.class);
 
   private final RaftServer.Division division;
+  private final StorageContainerManager scm;
   private final InetSocketAddress address;
   private final ClientId clientId = ClientId.randomId();
   private final AtomicLong callId = new AtomicLong();
@@ -62,8 +64,10 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   // TODO: Refactor and remove ConfigurationSource and use only
   //  SCMHAConfiguration.
   SCMRatisServerImpl(final SCMHAConfiguration haConf,
-                     final ConfigurationSource conf)
+                     final ConfigurationSource conf,
+                     final StorageContainerManager scm)
       throws IOException {
+    this.scm = scm;
     this.address = haConf.getRatisBindAddress();
 
     SCMHAGroupBuilder haGrpBuilder = new SCMHAGroupBuilder(haConf, conf);
@@ -75,7 +79,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
         .setServerId(haGrpBuilder.getPeerId())
         .setGroup(haGrpBuilder.getRaftGroup())
         .setProperties(serverProperties)
-        .setStateMachine(new SCMStateMachine())
+        .setStateMachine(new SCMStateMachine(scm, this))
         .build();
 
     this.division = server.getDivision(haGrpBuilder.getRaftGroupId());
