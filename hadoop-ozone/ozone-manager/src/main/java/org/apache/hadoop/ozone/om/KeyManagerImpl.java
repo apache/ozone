@@ -31,7 +31,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -2312,6 +2311,7 @@ public class KeyManagerImpl implements KeyManager {
     return fileStatusList;
   }
 
+  @SuppressWarnings("methodlength")
   public List<OzoneFileStatus> listStatusV1(OmKeyArgs args, boolean recursive,
       String startKey, long numEntries, String clientAddress)
           throws IOException {
@@ -2319,6 +2319,10 @@ public class KeyManagerImpl implements KeyManager {
 
     // unsorted OMKeyInfo list contains combine results from TableCache and DB.
     List<OzoneFileStatus> fileStatusFinalList = new ArrayList<>();
+
+    if (numEntries <= 0) {
+      return fileStatusFinalList;
+    }
 
     /**
      * A map sorted by OmKey to combine results from TableCache and DB for
@@ -2340,9 +2344,7 @@ public class KeyManagerImpl implements KeyManager {
      */
     TreeMap<String, OzoneFileStatus> cacheFileMap = new TreeMap<>();
     TreeMap<String, OzoneFileStatus> cacheDirMap = new TreeMap<>();
-    if (numEntries <= 0) {
-      return fileStatusFinalList;
-    }
+
     String volumeName = args.getVolumeName();
     String bucketName = args.getBucketName();
     String keyName = args.getKeyName();
