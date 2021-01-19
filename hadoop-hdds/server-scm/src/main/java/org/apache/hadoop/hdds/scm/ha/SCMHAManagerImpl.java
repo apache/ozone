@@ -50,7 +50,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
     this.transactionBuffer =
         new SCMDBTransactionBuffer(scm.getScmMetadataStore());
     this.ratisServer = new SCMRatisServerImpl(
-        conf.getObject(SCMHAConfiguration.class), conf, scm);
+        conf.getObject(SCMHAConfiguration.class), conf, scm, transactionBuffer);
   }
 
   /**
