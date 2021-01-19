@@ -36,10 +36,12 @@ public class MockDBTransactionBuffer implements DBTransactionBuffer {
 
   @Override
   public BatchOperation getCurrentBatchOperation() {
-    if (dbStore != null) {
-      currentBatchOperation = dbStore.initBatchOperation();
-    } else {
-      currentBatchOperation = new RDBBatchOperation();
+    if (currentBatchOperation == null) {
+      if (dbStore != null) {
+        currentBatchOperation = dbStore.initBatchOperation();
+      } else {
+        currentBatchOperation = new RDBBatchOperation();
+      }
     }
     return currentBatchOperation;
   }
@@ -68,6 +70,8 @@ public class MockDBTransactionBuffer implements DBTransactionBuffer {
   public void flush() throws IOException {
     if (dbStore != null) {
       dbStore.commitBatchOperation(currentBatchOperation);
+      currentBatchOperation.close();
+      currentBatchOperation = null;
     }
   }
 

@@ -261,7 +261,8 @@ public class PipelineStateManagerV2Impl implements StateManager {
       if (pipelineStore != null) {
         pipelineStateMap.updatePipelineState(pipelineID,
             Pipeline.PipelineState.fromProtobuf(newState));
-        pipelineStore.put(pipelineID, getPipeline(pipelineID));
+        pipelineStore.putWithBatch(transactionBuffer.getCurrentBatchOperation(),
+            pipelineID, getPipeline(pipelineID));
       }
     } catch (IOException ex) {
       LOG.warn("Pipeline {} state update failed", pipelineID);
