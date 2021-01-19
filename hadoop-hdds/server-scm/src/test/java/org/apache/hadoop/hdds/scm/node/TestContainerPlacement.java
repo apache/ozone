@@ -38,6 +38,7 @@ import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPla
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
@@ -123,7 +124,8 @@ public class TestContainerPlacement {
             scmNodeManager,
             scmMetadataStore.getPipelineTable(),
             eventQueue,
-            SCMContext.emptyContext());
+            SCMContext.emptyContext(),
+            new SCMServiceManager());
 
     return new SCMContainerManager(config, scmMetadataStore.getContainerTable(),
         scmMetadataStore.getStore(),

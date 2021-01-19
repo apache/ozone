@@ -22,7 +22,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.commons.lang3.tuple.Pair;
@@ -30,6 +29,8 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.ha.SCMService.OneTimeEvent;
+import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
@@ -83,7 +84,6 @@ public class SCMSafeModeManager implements SafeModeManager {
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMSafeModeManager.class);
   private final boolean isSafeModeEnabled;
-  private final long waitTime;
   private AtomicBoolean inSafeMode = new AtomicBoolean(true);
   private AtomicBoolean preCheckComplete = new AtomicBoolean(false);
 
@@ -102,24 +102,20 @@ public class SCMSafeModeManager implements SafeModeManager {
 
   private final EventQueue eventPublisher;
   private final PipelineManager pipelineManager;
+  private final SCMServiceManager serviceManager;
 
   private final SafeModeMetrics safeModeMetrics;
 
   public SCMSafeModeManager(ConfigurationSource conf,
       List<ContainerInfo> allContainers, PipelineManager pipelineManager,
-      EventQueue eventQueue) {
+      EventQueue eventQueue, SCMServiceManager serviceManager) {
     this.config = conf;
     this.pipelineManager = pipelineManager;
     this.eventPublisher = eventQueue;
+    this.serviceManager = serviceManager;
     this.isSafeModeEnabled = conf.getBoolean(
         HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED,
         HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED_DEFAULT);
-
-
-    this.waitTime = conf.getTimeDuration(
-        HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
-        HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT_DEFAULT,
-        TimeUnit.MILLISECONDS);
 
     if (isSafeModeEnabled) {
       this.safeModeMetrics = SafeModeMetrics.create();
@@ -147,13 +143,6 @@ public class SCMSafeModeManager implements SafeModeManager {
         exitRules.put(ATLEAST_ONE_DATANODE_REPORTED_PIPELINE_EXIT_RULE,
             oneReplicaPipelineSafeModeRule);
       }
-      boolean createPipelineInSafemode = conf.getBoolean(
-          HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION,
-          HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION_DEFAULT);
-
-      if (createPipelineInSafemode) {
-        pipelineManager.startPipelineCreator();
-      }
     } else {
       this.safeModeMetrics = null;
       exitSafeMode(eventQueue);
@@ -180,25 +169,14 @@ public class SCMSafeModeManager implements SafeModeManager {
     eventPublisher.fireEvent(SCMEvents.SAFE_MODE_STATUS,
         safeModeStatus);
 
-    // Only notify the delayed listeners if safemode remains on, as precheck
-    // may have completed.
-    if (safeModeStatus.isInSafeMode()) {
-      eventPublisher.fireEvent(SCMEvents.DELAYED_SAFE_MODE_STATUS,
-          safeModeStatus);
-    } else {
+    if (!safeModeStatus.isInSafeMode()) {
       // If safemode is off, then notify the delayed listeners with a delay.
-      final Thread safeModeExitThread = new Thread(() -> {
-        try {
-          Thread.sleep(waitTime);
-        } catch (InterruptedException e) {
-          Thread.currentThread().interrupt();
-        }
-        eventPublisher.fireEvent(SCMEvents.DELAYED_SAFE_MODE_STATUS,
-            safeModeStatus);
-      });
-
-      safeModeExitThread.setDaemon(true);
-      safeModeExitThread.start();
+      serviceManager.leavingSafeMode();
+    } else if (safeModeStatus.isPreCheckComplete()) {
+      // Only notify the delayed listeners if safemode remains on, as precheck
+      // may have completed.
+      serviceManager.triggeringOneTimeEvent(
+          OneTimeEvent.PRE_CHECK_COMPLETED);
     }
   }
 

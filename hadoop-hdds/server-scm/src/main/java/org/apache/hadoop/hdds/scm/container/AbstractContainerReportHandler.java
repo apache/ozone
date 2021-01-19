@@ -327,7 +327,7 @@ public class AbstractContainerReportHandler {
     SCMCommand<?> command = new DeleteContainerCommand(
         containerID.getId(), true);
     try {
-      command.setTerm(scmContext.getTerm());
+      command.setTerm(scmContext.getTermOfLeader());
     } catch (NotLeaderException nle) {
       logger.warn("Skip sending delete container command," +
           " since not leader SCM", nle);

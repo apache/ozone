@@ -94,7 +94,7 @@ public class PipelineActionHandler
           "firing close pipeline event.", action, pid);
       SCMCommand<?> command = new ClosePipelineCommand(pid);
       try {
-        command.setTerm(scmContext.getTerm());
+        command.setTerm(scmContext.getTermOfLeader());
       } catch (NotLeaderException nle) {
         LOG.warn("Skip sending ClosePipelineCommand for pipeline {}," +
             " since not leader SCM.", pid);

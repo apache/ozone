@@ -123,7 +123,7 @@ public class TestCloseContainerHandler {
     SCMCommand<?> command = new CloseContainerCommand(
         containerId.getId(), pipeline.getId());
     command.setTerm(
-        cluster.getStorageContainerManager().getScmContext().getTerm());
+        cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
     cluster.getStorageContainerManager().getScmNodeManager()
         .addDatanodeCommand(datanodeDetails.getUuid(), command);
 

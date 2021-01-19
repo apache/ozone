@@ -194,9 +194,6 @@ public final class SCMEvents {
   public static final TypedEvent<SafeModeStatus> SAFE_MODE_STATUS =
       new TypedEvent<>(SafeModeStatus.class, "Safe mode status");
 
-  public static final TypedEvent<SafeModeStatus> DELAYED_SAFE_MODE_STATUS =
-      new TypedEvent<>(SafeModeStatus.class, "Delayed safe mode status");
-
   /**
    * Private Ctor. Never Constructed.
    */

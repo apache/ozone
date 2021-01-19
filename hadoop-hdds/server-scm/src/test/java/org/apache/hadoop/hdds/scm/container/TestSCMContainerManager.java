@@ -44,6 +44,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -100,8 +101,8 @@ public class TestSCMContainerManager {
         nodeManager,
         scmMetadataStore.getPipelineTable(),
         new EventQueue(),
-        SCMContext.emptyContext());
-    pipelineManager.allowPipelineCreation();
+        SCMContext.emptyContext(),
+        new SCMServiceManager());
     containerManager = new SCMContainerManager(conf,
         scmMetadataStore.getContainerTable(),
         scmMetadataStore.getStore(),

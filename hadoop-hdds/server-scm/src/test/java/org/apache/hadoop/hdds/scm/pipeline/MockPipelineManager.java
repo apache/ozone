@@ -22,8 +22,6 @@ import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
-import org.apache.hadoop.hdds.server.events.EventPublisher;
 
 import java.io.IOException;
 import java.util.Collection;
@@ -227,11 +225,5 @@ public final class MockPipelineManager implements PipelineManager {
   @Override
   public Map<String, Integer> getPipelineInfo() {
     return null;
-  }
-
-  @Override
-  public void onMessage(final SCMSafeModeManager.SafeModeStatus safeModeStatus,
-                        final EventPublisher publisher) {
-
   }
 }

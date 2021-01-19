@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
-import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventHandler;
@@ -35,11 +34,11 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  *  - RaftServer related info, e.g., isLeader, term.
  *  - SafeMode related info, e.g., inSafeMode, preCheckComplete.
  */
-public class SCMContext implements EventHandler<SafeModeStatus> {
+public final class SCMContext implements EventHandler<SafeModeStatus> {
   private static final Logger LOG = LoggerFactory.getLogger(SCMContext.class);
 
   private static final SCMContext EMPTY_CONTEXT
-      = new SCMContext(true, 0, new SafeModeStatus(false, true), null);
+      = new SCMContext.Builder().build();
 
   /**
    * Used by non-HA mode SCM, Recon and Unit Tests.
@@ -62,9 +61,9 @@ public class SCMContext implements EventHandler<SafeModeStatus> {
   private final StorageContainerManager scm;
   private final ReadWriteLock lock = new ReentrantReadWriteLock();
 
-  SCMContext(boolean isLeader, long term,
-             final SafeModeStatus safeModeStatus,
-             final StorageContainerManager scm) {
+  private SCMContext(boolean isLeader, long term,
+                     final SafeModeStatus safeModeStatus,
+                     final StorageContainerManager scm) {
     this.isLeader = isLeader;
     this.term = term;
     this.safeModeStatus = safeModeStatus;
@@ -72,25 +71,17 @@ public class SCMContext implements EventHandler<SafeModeStatus> {
   }
 
   /**
-   * Creates SCMContext instance from StorageContainerManager.
-   */
-  public SCMContext(final StorageContainerManager scm) {
-    this(false, 0, new SafeModeStatus(true, false), scm);
-    Preconditions.checkNotNull(scm, "scm is null");
-  }
-
-  /**
    *
-   * @param newIsLeader : is leader or not
+   * @param leader      : is leader or not
    * @param newTerm     : term if current SCM becomes leader
    */
-  public void updateIsLeaderAndTerm(boolean newIsLeader, long newTerm) {
+  public void updateLeaderAndTerm(boolean leader, long newTerm) {
     lock.writeLock().lock();
     try {
       LOG.info("update <isLeader,term> from <{},{}> to <{},{}>",
-          isLeader, term, newIsLeader, newTerm);
+          isLeader, term, leader, newTerm);
 
-      isLeader = newIsLeader;
+      isLeader = leader;
       term = newTerm;
     } finally {
       lock.writeLock().unlock();
@@ -117,7 +108,7 @@ public class SCMContext implements EventHandler<SafeModeStatus> {
    * @return term
    * @throws NotLeaderException if isLeader is false
    */
-  public long getTerm() throws NotLeaderException {
+  public long getTermOfLeader() throws NotLeaderException {
     lock.readLock().lock();
     try {
       if (!isLeader) {
@@ -133,8 +124,7 @@ public class SCMContext implements EventHandler<SafeModeStatus> {
   }
 
   @Override
-  public void onMessage(SafeModeStatus status,
-                        EventPublisher publisher) {
+  public void onMessage(SafeModeStatus status, EventPublisher publisher) {
     lock.writeLock().lock();
     try {
       LOG.info("Update SafeModeStatus from {} to {}.", safeModeStatus, status);
@@ -159,6 +149,60 @@ public class SCMContext implements EventHandler<SafeModeStatus> {
       return safeModeStatus.isPreCheckComplete();
     } finally {
       lock.readLock().unlock();
+    }
+  }
+
+  public static class Builder {
+    /**
+     * As a leader of term 0, out of in safe mode, and has completed preCheck.
+     */
+    private boolean isLeader = true;
+    private long term = 0;
+    private boolean isInSafeMode = false;
+    private boolean isPreCheckComplete = true;
+    private StorageContainerManager scm = null;
+
+    public Builder setLeader(boolean leader) {
+      this.isLeader = leader;
+      return this;
+    }
+
+    public Builder setTerm(long newTerm) {
+      this.term = newTerm;
+      return this;
+    }
+
+    public Builder setIsInSafeMode(boolean inSafeMode) {
+      this.isInSafeMode = inSafeMode;
+      return this;
+    }
+
+    public Builder setIsPreCheckComplete(boolean preCheckComplete) {
+      this.isPreCheckComplete = preCheckComplete;
+      return this;
+    }
+
+    public Builder setSCM(StorageContainerManager storageContainerManager) {
+      this.scm = storageContainerManager;
+      return this;
+    }
+
+    public SCMContext build() {
+      if (scm != null) {
+        // SCMContext for HA mode.
+        return new SCMContext(
+            false,
+            0,
+            new SafeModeStatus(true, false),
+            scm);
+      } else {
+        // SCMContext for Recon and Unit Tests.
+        return new SCMContext(
+            isLeader,
+            term,
+            new SafeModeStatus(isInSafeMode, isPreCheckComplete),
+            null);
+      }
     }
   }
 }
