@@ -356,8 +356,22 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
           if (!om.isRunning()) {
             return false;
           } else {
-            return om.getPrepareState().getState().getStatus() ==
-                PrepareStatus.PREPARE_COMPLETED;
+            boolean preparedAtIndex = false;
+            OzoneManagerPrepareState.State state =
+                om.getPrepareState().getState();
+
+            if (state.getStatus() == PrepareStatus.PREPARE_COMPLETED) {
+              if (state.getIndex() == preparedIndex) {
+                preparedAtIndex = true;
+              } else {
+                // State will not change if we are prepared at the wrong index.
+                // Break out of wait.
+                throw new Exception("OM " + om.getOMNodeId() + " prepared " +
+                    "but prepare index " + state.getIndex() + " does not " +
+                    "match expected prepare index " + preparedIndex);
+              }
+            }
+            return preparedAtIndex;
           }
         });
     }

@@ -115,6 +115,23 @@ public class TestOzoneManagerStarter {
   }
 
   @Test
+  public void testCallsStartAndCancelPrepareWithUpgradeFlag() {
+    executeCommand("--upgrade");
+    assertTrue(mock.startAndCancelPrepareCalled);
+  }
+
+  @Test
+  public void testUnsuccessfulUpgradeThrowsException() {
+    mock.throwOnStartAndCancelPrepare = true;
+    try {
+      executeCommand("--upgrade");
+      fail("Exception show have been thrown");
+    } catch (Exception e) {
+      assertTrue(true);
+    }
+  }
+
+  @Test
   public void testUsagePrintedOnInvalidInput() {
     executeCommand("--invalid");
     Pattern p = Pattern.compile("^Unknown option:.*--invalid.*\nUsage");
@@ -133,9 +150,10 @@ public class TestOzoneManagerStarter {
     private boolean initStatus = true;
     private boolean throwOnStart = false;
     private boolean throwOnInit = false;
-    private boolean prepareUpgradeCalled = false;
-    private boolean throwOnPrepareUpgrade = false;
+    private boolean startAndCancelPrepareCalled = false;
+    private boolean throwOnStartAndCancelPrepare = false;
 
+    @Override
     public void start(OzoneConfiguration conf) throws IOException,
         AuthenticationException {
       startCalled = true;
@@ -144,6 +162,7 @@ public class TestOzoneManagerStarter {
       }
     }
 
+    @Override
     public boolean init(OzoneConfiguration conf) throws IOException,
         AuthenticationException {
       initCalled = true;
@@ -153,13 +172,13 @@ public class TestOzoneManagerStarter {
       return initStatus;
     }
 
-    public boolean prepareForUpgrade(OzoneConfiguration conf)
+    @Override
+    public void startAndCancelPrepare(OzoneConfiguration conf)
         throws IOException, AuthenticationException {
-      prepareUpgradeCalled = true;
-      if (throwOnPrepareUpgrade) {
+      startAndCancelPrepareCalled = true;
+      if (throwOnStartAndCancelPrepare) {
         throw new IOException("Simulated Exception");
       }
-      return true;
     }
   }
 }

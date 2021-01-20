@@ -240,6 +240,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneManagerService.newReflectiveBlockingService;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
 
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
@@ -340,7 +341,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   private ExitManager exitManager;
 
-  private final OzoneManagerPrepareState prepareState;
+  private OzoneManagerPrepareState prepareState;
 
   private enum State {
     INITIALIZED,
@@ -463,25 +464,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     instantiateServices();
 
-    // If the prepare marker file is present and its index matches the last
-    // transaction index in the OM DB, turn on the in memory flag to
-    // put the ozone manager in prepare mode, disallowing write requests.
-    // This must be done after metadataManager is instantiated by
-    // instantiateServices and before the RPC server is started.
-    OMTransactionInfo txnInfo = metadataManager.getTransactionInfoTable()
-        .get(TRANSACTION_INFO_KEY);
-    prepareState = new OzoneManagerPrepareState(configuration);
-    if (txnInfo != null) {
-      // Only puts OM in prepare mode if a marker file matching the txn index
-      // is found.
-      prepareState.restorePrepare(txnInfo.getTransactionIndex());
-    } else {
-      // If we have no transaction info in the DB, then no prepare request
-      // could have been received, since the request would update the txn
-      // index in the DB.
-      prepareState.cancelPrepare();
-    }
-
     // Create special volume s3v which is required for S3G.
     addS3GVolumeToDB();
 
@@ -558,6 +540,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     prefixManager = new PrefixManagerImpl(metadataManager, isRatisEnabled);
     keyManager = new KeyManagerImpl(this, scmClient, configuration,
         omStorage.getOmId());
+
+    // Prepare state depends on the transaction ID of metadataManager after a
+    // restart.
+    instantiatePrepareState();
 
     if (isAclEnabled) {
       accessAuthorizer = getACLAuthorizerInstance(configuration);
@@ -3832,5 +3818,33 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   public OzoneManagerPrepareState getPrepareState() {
     return prepareState;
+  }
+
+  private void instantiatePrepareState() throws IOException {
+    // If the prepare marker file is present and its index matches the last
+    // transaction index in the OM DB, turn on the in memory flag to
+    // put the ozone manager in prepare mode, disallowing write requests.
+    // This must be done after metadataManager is instantiated
+    // and before the RPC server is started.
+    OMTransactionInfo txnInfo = metadataManager.getTransactionInfoTable()
+        .get(TRANSACTION_INFO_KEY);
+    prepareState = new OzoneManagerPrepareState(configuration);
+
+    // If we have no transaction info in the DB, then no prepare request
+    // could have been received, since the request would update the txn
+    // index in the DB.
+    if (txnInfo != null) {
+      // Only puts OM in prepare mode if a marker file matching the txn index
+      // is found.
+      PrepareStatus status =
+          prepareState.restorePrepare(txnInfo.getTransactionIndex());
+      if (status == PrepareStatus.PREPARE_COMPLETED) {
+        LOG.info("Ozone Manager {} restarted in prepare mode.",
+            getOMNodeId());
+      }
+    } else {
+      // Make sure OM prepare state is clean before proceeding.
+      prepareState.cancelPrepare();
+    }
   }
 }

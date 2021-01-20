@@ -108,7 +108,7 @@ public final class OzoneManagerPrepareState {
 
   private void finishPrepare(long index, boolean writeFile) throws IOException {
     // Enabling the prepare gate is idempotent, and may have already been
-    // performed if we are the leader.If we are a follower, we must ensure this
+    // performed if we are the leader. If we are a follower, we must ensure this
     // is run now case we become the leader.
     enablePrepareGate();
 
