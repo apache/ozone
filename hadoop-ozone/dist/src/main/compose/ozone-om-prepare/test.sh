@@ -25,6 +25,7 @@ export OZONE_VOLUME
 
 # Clean up saved internal state from each container's volume for the next run.
 rm -rf "${OZONE_VOLUME}"
+mkdir -p "${OZONE_VOLUME}"/{dn1,dn2,dn3,om1,om2,om3,scm}
 
 if [[ -n "${OZONE_VOLUME_OWNER}" ]]; then
   current_user=$(whoami)
@@ -59,6 +60,7 @@ start_docker_env
 
 # Writes should now succeed.
 execute_robot_test scm topology/loaddata.robot
+execute_robot_test scm topology/readdata.robot
 
 stop_docker_env
 
