@@ -34,6 +34,8 @@ import org.slf4j.LoggerFactory;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
+import java.security.cert.CertificateExpiredException;
+import java.security.cert.CertificateNotYetValidException;
 import java.security.cert.X509Certificate;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type.GetBlock;
@@ -106,6 +108,17 @@ public class BlockTokenVerifier implements TokenVerifier {
           "(OmCertSerialId: " + tokenId.getOmCertSerialId() +
           ") of the block token for user: " + tokenUser);
     }
+
+    try {
+      signerCert.checkValidity();
+    } catch (CertificateExpiredException exExp) {
+      throw new BlockTokenException("Block token can't be verified due to " +
+          "expired certificate " + tokenId.getOmCertSerialId());
+    } catch (CertificateNotYetValidException exNyv) {
+      throw new BlockTokenException("Block token can't be verified due to " +
+          "not yet valid certificate " + tokenId.getOmCertSerialId());
+    }
+
     boolean validToken = caClient.verifySignature(tokenId.getBytes(),
         token.getPassword(), signerCert);
     if (!validToken) {
