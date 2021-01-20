@@ -193,7 +193,8 @@ public class CSMMetrics {
     return applyTransaction;
   }
 
-  public void incPipelineLatency(ContainerProtos.Type type, long latencyMillis) {
+  public void incPipelineLatency(ContainerProtos.Type type,
+      long latencyMillis) {
     opsLatency[type.ordinal()].add(latencyMillis);
     transactionLatency.add(latencyMillis);
   }
