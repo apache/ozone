@@ -87,8 +87,11 @@ public class OMPrepareRequest extends OMClientRequest {
 
     try {
       // Create response.
+      // DB snapshot for prepare will include the transaction to commit it,
+      // making the prepare index one more than this txn's log index.
+      long prepareIndex = transactionLogIndex + 1;
       PrepareResponse omResponse = PrepareResponse.newBuilder()
-              .setTxnID(transactionLogIndex)
+              .setTxnID(prepareIndex)
               .build();
       responseBuilder.setPrepareResponse(omResponse);
       response = new OMPrepareResponse(responseBuilder.build());
@@ -113,19 +116,20 @@ public class OMPrepareRequest extends OMClientRequest {
           ozoneManager.getMetadataManager(), division,
           flushTimeout, flushCheckInterval);
 
-      // TODO: After the snapshot index update fix, the prepare index will
-      //  always be 1 more than the prepare txn index, because the Ratis
-      //  entry to commit the prepare request will be included in the snapshot.
-      long prepareIndex = takeSnapshotAndPurgeLogs(division);
+      long snapshotIndex = takeSnapshotAndPurgeLogs(division);
+      if (snapshotIndex != prepareIndex) {
+        LOG.warn("Snapshot index {} does not " +
+            "match expected prepare index {}.", snapshotIndex, prepareIndex);
+      }
 
       // Save transaction log index to a marker file, so if the OM restarts,
       // it will remain in prepare mode on that index as long as the file
       // exists.
       ozoneManager.getPrepareState().finishPrepare(prepareIndex);
 
-      LOG.info("OM {} prepared at log index {}. Returning response {}",
-          ozoneManager.getOMNodeId(),
-          ozoneManager.getRatisSnapshotIndex(), omResponse);
+      LOG.info("OM {} prepared at log index {}. Returning response {} with " +
+          "log index {}", ozoneManager.getOMNodeId(), prepareIndex, omResponse,
+          omResponse.getTxnID());
     } catch (OMException e) {
       LOG.error("Prepare Request Apply failed in {}. ",
           ozoneManager.getOMNodeId(), e);

@@ -32,6 +32,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -66,6 +67,7 @@ import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.METADATA_ERROR;
+import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 
 /**
  * The OM StateMachine is the state machine for OM Ratis server. It is
@@ -135,6 +137,8 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   @Override
   public void reinitialize() throws IOException {
     loadSnapshotInfoFromDB();
+    this.ozoneManagerDoubleBuffer = buildDoubleBufferForRatis();
+    handler.updateDoubleBuffer(ozoneManagerDoubleBuffer);
   }
 
   @Override
@@ -376,6 +380,12 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     long lastAppliedIndex = lastTermIndex.getIndex();
     snapshotInfo.updateTermIndex(lastTermIndex.getTerm(),
         lastAppliedIndex);
+    OMTransactionInfo build = new OMTransactionInfo.Builder()
+        .setTransactionIndex(lastAppliedIndex)
+        .setCurrentTerm(lastTermIndex.getTerm()).build();
+    Table<String, OMTransactionInfo> txnInfoTable =
+        ozoneManager.getMetadataManager().getTransactionInfoTable();
+    txnInfoTable.put(TRANSACTION_INFO_KEY, build);
     ozoneManager.getMetadataManager().getStore().flushDB();
     return lastAppliedIndex;
   }

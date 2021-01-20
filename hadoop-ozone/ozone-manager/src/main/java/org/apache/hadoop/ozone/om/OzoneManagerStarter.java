@@ -99,29 +99,26 @@ public class OzoneManagerStarter extends GenericCli {
     }
   }
 
-  // TODO: Convert this flag to bring the OM out of prepare mode with the new
-  //  bits when prepare marker files have been implemented.
-//  /**
-//   * This function implements a sub-command to allow the OM to be
-//   * "prepared for upgrade".
-//   */
-//  @CommandLine.Command(name = "--prepareForUpgrade",
-//      aliases = {"--prepareForDowngrade", "--flushTransactions"},
-//      customSynopsis = "ozone om [global options] --prepareForUpgrade",
-//      hidden = false,
-//      description = "Prepare the OM for upgrade/downgrade. (Flush Raft log " +
-//          "transactions.)",
-//      mixinStandardHelpOptions = true,
-//      versionProvider = HddsVersionProvider.class)
-//  @SuppressFBWarnings("DM_EXIT")
-//  public void prepareOmForUpgrade() throws Exception {
-//    commonInit();
-//    boolean result = receiver.prepareForUpgrade(conf);
-//    if (!result) {
-//      throw new Exception("Prepare OM For Upgrade failed.");
-//    }
-//    System.exit(0);
-//  }
+  /**
+   * This function implements a sub-command to allow the OM to be
+   * Removed from prepare mode after an upgrade or downgrade.
+   */
+  @CommandLine.Command(name = "--upgrade",
+      aliases = "--downgrade",
+      customSynopsis = "ozone om [global options] --upgrade",
+      description = "Cancels prepare state in this OM on startup",
+      mixinStandardHelpOptions = true,
+      versionProvider = HddsVersionProvider.class)
+  public void startOmUpgrade() throws Exception {
+    try {
+      commonInit();
+      receiver.startAndCancelPrepare(conf);
+    } catch (Exception ex) {
+      LOG.error("Cancelling prepare to start OM in upgrade mode failed " +
+          "with exception", ex);
+      throw ex;
+    }
+  }
 
   /**
    * This function should be called by each command to ensure the configuration
@@ -156,6 +153,14 @@ public class OzoneManagerStarter extends GenericCli {
         AuthenticationException {
       return OzoneManager.omInit(conf);
     }
-  }
 
+    @Override
+    public void startAndCancelPrepare(OzoneConfiguration conf)
+        throws IOException, AuthenticationException {
+      OzoneManager om = OzoneManager.createOm(conf);
+      om.getPrepareState().cancelPrepare();
+      om.start();
+      om.join();
+    }
+  }
 }

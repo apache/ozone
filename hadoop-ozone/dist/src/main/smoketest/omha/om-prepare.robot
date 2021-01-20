@@ -14,7 +14,7 @@
 # limitations under the License.
 
 *** Settings ***
-Documentation       Smoke test to start cluster with docker-compose environments.
+Documentation       Smoke test to test preparing OMs in an OM HA cluster.
 Library             OperatingSystem
 Library             String
 Library             BuiltIn
@@ -42,3 +42,8 @@ Prepare Ozone Manager
 Checks if the expected data is present in OM
     ${result} =         Execute             ozone sh key info /${volume_name}/${bucket_name}/prepare-key
                         Should contain      ${result}       \"name\" : \"prepare-key\"
+
+Test write operation fails
+    ${result} =        Execute and checkrc    ozone sh key put /${volume_name}/${bucket_name}/prepare-key2 /opt/hadoop/NOTICE.txt    255
+                       Should contain         ${result}       OM is in prepare mode
+                       Execute and checkrc    ozone sh key info /${volume_name}/${bucket_name}/prepare-key2    255
