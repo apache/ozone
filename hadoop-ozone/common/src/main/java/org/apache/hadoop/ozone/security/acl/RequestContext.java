@@ -198,6 +198,12 @@ public class RequestContext {
     return ownerName;
   }
 
+  /**
+   * A true value represents recursive access check required for all the
+   * sub-paths of the given path, false represents non-recursive check.
+   * <p>
+   * If the given path is not a directory, there is no effect for this flag.
+   */
   public boolean isRecursiveAccessCheck() {
     return recursiveAccessCheck;
   }
