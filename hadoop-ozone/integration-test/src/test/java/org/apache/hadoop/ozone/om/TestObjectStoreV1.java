@@ -72,6 +72,7 @@ public class TestObjectStoreV1 {
     scmId = UUID.randomUUID().toString();
     omId = UUID.randomUUID().toString();
     conf.set(OMConfigKeys.OZONE_OM_LAYOUT_VERSION, "V1");
+    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
     cluster = MiniOzoneCluster.newBuilder(conf)
             .setClusterId(clusterId)
             .setScmId(scmId)

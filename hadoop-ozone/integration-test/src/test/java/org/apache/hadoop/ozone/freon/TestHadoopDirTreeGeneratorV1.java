@@ -27,6 +27,7 @@ public class TestHadoopDirTreeGeneratorV1 extends TestHadoopDirTreeGenerator {
   protected OzoneConfiguration getOzoneConfiguration() {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OMConfigKeys.OZONE_OM_LAYOUT_VERSION, "V1");
+    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
     return conf;
   }
 

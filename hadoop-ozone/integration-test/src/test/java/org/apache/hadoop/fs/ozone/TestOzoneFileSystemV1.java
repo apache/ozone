@@ -418,8 +418,7 @@ public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
   protected OzoneConfiguration getOzoneConfig() {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(FS_TRASH_INTERVAL_KEY, 1);
-    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
-        enabledFileSystemPaths);
+    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
     conf.set(OMConfigKeys.OZONE_OM_LAYOUT_VERSION, "V1");
     return conf;
   }

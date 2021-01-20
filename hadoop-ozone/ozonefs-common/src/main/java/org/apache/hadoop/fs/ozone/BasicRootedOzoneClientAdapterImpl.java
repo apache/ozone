@@ -1047,8 +1047,8 @@ public class BasicRootedOzoneClientAdapterImpl
   }
 
   @Override
-  public String getBucketLayoutVersion() {
+  public boolean isFSOptimizedBucket() {
     // TODO: Need to refine this part.
-    return OMConfigKeys.OZONE_OM_LAYOUT_VERSION_DEFAULT;
+    return false;
   }
 }

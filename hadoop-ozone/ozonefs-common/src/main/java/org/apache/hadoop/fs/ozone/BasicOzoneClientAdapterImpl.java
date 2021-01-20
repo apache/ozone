@@ -545,7 +545,17 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   }
 
   @Override
-  public String getBucketLayoutVersion() {
-    return bucket.getMetadata().get(OMConfigKeys.OZONE_OM_LAYOUT_VERSION);
+  public boolean isFSOptimizedBucket() {
+    boolean layoutVersionEnabled =
+            StringUtils.equalsIgnoreCase(bucket.getMetadata()
+                            .get(OMConfigKeys.OZONE_OM_LAYOUT_VERSION_V1),
+                    bucket.getMetadata()
+                            .get(OMConfigKeys.OZONE_OM_LAYOUT_VERSION));
+
+    boolean fsEnabled =
+            Boolean.getBoolean(bucket.getMetadata()
+                    .get(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS));
+
+    return layoutVersionEnabled && fsEnabled;
   }
 }

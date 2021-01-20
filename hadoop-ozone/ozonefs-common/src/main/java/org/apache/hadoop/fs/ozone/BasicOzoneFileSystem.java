@@ -326,9 +326,7 @@ public class BasicOzoneFileSystem extends FileSystem {
       return false;
     }
 
-    String layOutVersion = adapter.getBucketLayoutVersion();
-    if (layOutVersion != null &&
-            OMConfigKeys.OZONE_OM_LAYOUT_VERSION_V1.equals(layOutVersion)) {
+    if (adapter.isFSOptimizedBucket()) {
       return renameV1(srcPath, dstPath);
     }
 
@@ -507,10 +505,7 @@ public class BasicOzoneFileSystem extends FileSystem {
     statistics.incrementWriteOps(1);
     LOG.debug("Delete path {} - recursive {}", f, recursive);
 
-    String layOutVersion = adapter.getBucketLayoutVersion();
-    if (layOutVersion != null &&
-            OMConfigKeys.OZONE_OM_LAYOUT_VERSION_V1.equals(layOutVersion)) {
-
+    if (adapter.isFSOptimizedBucket()) {
       if (f.isRoot()) {
         LOG.warn("Cannot delete root directory.");
         return false;

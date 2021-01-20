@@ -77,5 +77,5 @@ public interface OzoneClientAdapter {
   FileStatusAdapter getFileStatus(String key, URI uri,
       Path qualifiedPath, String userName) throws IOException;
 
-  String getBucketLayoutVersion();
+  boolean isFSOptimizedBucket();
 }
