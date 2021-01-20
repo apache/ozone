@@ -468,7 +468,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     final CompletableFuture<ContainerCommandResponseProto> replyFuture =
         new CompletableFuture<>();
     semaphore.acquire();
-    long requestTime = System.nanoTime();
+    long requestTime = System.currentTimeMillis();
     metrics.incrPendingContainerOpsMetrics(request.getCmdType());
     // create a new grpc stream for each non-async call.
 
@@ -482,7 +482,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
               public void onNext(ContainerCommandResponseProto value) {
                 replyFuture.complete(value);
                 metrics.decrPendingContainerOpsMetrics(request.getCmdType());
-                long cost = System.nanoTime() - requestTime;
+                long cost = System.currentTimeMillis() - requestTime;
                 metrics.addContainerOpsLatency(request.getCmdType(),
                     cost);
                 if (LOG.isDebugEnabled()) {
@@ -497,9 +497,9 @@ public class XceiverClientGrpc extends XceiverClientSpi {
               public void onError(Throwable t) {
                 replyFuture.completeExceptionally(t);
                 metrics.decrPendingContainerOpsMetrics(request.getCmdType());
-                long cost = System.nanoTime() - requestTime;
+                long cost = System.currentTimeMillis() - requestTime;
                 metrics.addContainerOpsLatency(request.getCmdType(),
-                    System.nanoTime() - requestTime);
+                    System.currentTimeMillis() - requestTime);
                 if (LOG.isDebugEnabled()) {
                   LOG.debug("Executed command {} on datanode {}, cost = {}, "
                           + "cmdType = {}", request, dn,
