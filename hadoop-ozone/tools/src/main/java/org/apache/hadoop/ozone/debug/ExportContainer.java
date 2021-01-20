@@ -49,6 +49,7 @@ import org.apache.hadoop.ozone.container.ozoneimpl.ContainerReader;
 import org.apache.hadoop.ozone.container.replication.ContainerReplicationSource;
 import org.apache.hadoop.ozone.container.replication.OnDemandContainerReplicationSource;
 
+import com.google.common.base.Preconditions;
 import org.kohsuke.MetaInfServices;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -150,6 +151,7 @@ public class ExportContainer implements SubcommandWithParent, Callable<Void> {
   }
 
   public String getScmId(String storageDir) throws IOException {
+    Preconditions.checkNotNull(storageDir);
     return Files.list(Paths.get(storageDir, "hdds"))
         .filter(Files::isDirectory)
         .findFirst().get().getFileName().toString();
