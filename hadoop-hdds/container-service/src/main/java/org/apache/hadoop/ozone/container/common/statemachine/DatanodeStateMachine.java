@@ -130,9 +130,11 @@ public class DatanodeStateMachine implements Closeable {
     if (dataNodeStorageConfig.getState() != INITIALIZED) {
       dataNodeStorageConfig.initialize();
     }
+
     dataNodeVersionManager =
         new HDDSLayoutVersionManager(dataNodeStorageConfig);
-    upgradeFinalizer = new DataNodeUpgradeFinalizer(dataNodeVersionManager);
+    upgradeFinalizer = new DataNodeUpgradeFinalizer(dataNodeVersionManager,
+        datanodeDetails.getUuidString());
 
     executorService = Executors.newFixedThreadPool(
         getEndPointTaskThreadPoolSize(),
@@ -634,5 +636,12 @@ public class DatanodeStateMachine implements Closeable {
       LOG.info("Loading datanode action for {}",
           action.getHddsFeature().description());
     }
+  }
+
+  public StatusAndMessages queryUpgradeStatus()
+      throws IOException{
+
+    return upgradeFinalizer.reportStatus(datanodeDetails.getUuidString(),
+        false);
   }
 }
