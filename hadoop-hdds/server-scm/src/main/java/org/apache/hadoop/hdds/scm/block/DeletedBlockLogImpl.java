@@ -18,7 +18,9 @@
 package org.apache.hadoop.hdds.scm.block;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
+import java.util.LinkedList;
 import java.util.UUID;
 import java.util.Set;
 import java.util.Map;
@@ -26,6 +28,7 @@ import java.util.LinkedHashSet;
 import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
@@ -78,9 +81,15 @@ public class DeletedBlockLogImpl
   // Maps txId to set of DNs which are successful in committing the transaction
   private Map<Long, Set<UUID>> transactionToDNsCommitMap;
 
+  private final AtomicLong txID;
+  // largest transactionId is stored by largestTxnIdHolderKey
+  private final long largestTxnIdHolderKey = 0L;
+
+
   public DeletedBlockLogImpl(ConfigurationSource conf,
                              ContainerManager containerManager,
-                             SCMMetadataStore scmMetadataStore) {
+                             SCMMetadataStore scmMetadataStore)
+      throws IOException {
     maxRetry = conf.getInt(OZONE_SCM_BLOCK_DELETION_MAX_RETRY,
         OZONE_SCM_BLOCK_DELETION_MAX_RETRY_DEFAULT);
     this.containerManager = containerManager;
@@ -92,8 +101,29 @@ public class DeletedBlockLogImpl
 
     // maps transaction to dns which have committed it.
     transactionToDNsCommitMap = new ConcurrentHashMap<>();
+
+    this.txID = new AtomicLong(this.getLargestRecordedTXID());
   }
 
+  public Long getNextDeleteBlockTXID() {
+    return this.txID.incrementAndGet();
+  }
+
+  public Long getCurrentTXID() {
+    return this.txID.get();
+  }
+
+  /**
+   * Returns the largest recorded TXID from the DB.
+   *
+   * @return Long
+   * @throws IOException
+   */
+  private Long getLargestRecordedTXID() throws IOException {
+    DeletedBlocksTransaction txn =
+        scmMetadataStore.getDeletedBlocksTXTable().get(largestTxnIdHolderKey);
+    return txn != null ? txn.getTxID() : 0;
+  }
 
   @Override
   public List<DeletedBlocksTransaction> getFailedTransactions()
@@ -103,7 +133,7 @@ public class DeletedBlockLogImpl
       final List<DeletedBlocksTransaction> failedTXs = Lists.newArrayList();
       try (TableIterator<Long,
           ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> iter =
-               scmMetadataStore.getDeletedBlocksTXTable().iterator()) {
+               getIterator()) {
         while (iter.hasNext()) {
           DeletedBlocksTransaction delTX = iter.next().getValue();
           if (delTX.getCount() == -1) {
@@ -270,15 +300,8 @@ public class DeletedBlockLogImpl
   @Override
   public void addTransaction(long containerID, List<Long> blocks)
       throws IOException {
-    lock.lock();
-    try {
-      Long nextTXID = scmMetadataStore.getNextDeleteBlockTXID();
-      DeletedBlocksTransaction tx =
-          constructNewTransaction(nextTXID, containerID, blocks);
-      scmMetadataStore.getDeletedBlocksTXTable().put(nextTXID, tx);
-    } finally {
-      lock.unlock();
-    }
+    Map<Long, List<Long>> map = Collections.singletonMap(containerID, blocks);
+    addTransactions(map);
   }
 
   @Override
@@ -288,7 +311,7 @@ public class DeletedBlockLogImpl
       final AtomicInteger num = new AtomicInteger(0);
       try (TableIterator<Long,
           ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> iter =
-               scmMetadataStore.getDeletedBlocksTXTable().iterator()) {
+               getIterator()) {
         while (iter.hasNext()) {
           DeletedBlocksTransaction delTX = iter.next().getValue();
           if (delTX.getCount() > -1) {
@@ -312,19 +335,19 @@ public class DeletedBlockLogImpl
   public void addTransactions(Map<Long, List<Long>> containerBlocksMap)
       throws IOException {
     lock.lock();
-    try {
-      try(BatchOperation batch =
-          scmMetadataStore.getStore().initBatchOperation()) {
-        for (Map.Entry< Long, List< Long > > entry :
-            containerBlocksMap.entrySet()) {
-          long nextTXID = scmMetadataStore.getNextDeleteBlockTXID();
-          DeletedBlocksTransaction tx = constructNewTransaction(nextTXID,
-              entry.getKey(), entry.getValue());
-          scmMetadataStore.getDeletedBlocksTXTable().putWithBatch(batch,
-              nextTXID, tx);
-        }
-        scmMetadataStore.getStore().commitBatchOperation(batch);
+    try (BatchOperation batch = scmMetadataStore.getStore()
+        .initBatchOperation()) {
+      for (Map.Entry<Long, List<Long>> entry : containerBlocksMap.entrySet()) {
+        long nextTXID = getNextDeleteBlockTXID();
+        scmMetadataStore.getDeletedBlocksTXTable().putWithBatch(batch, nextTXID,
+            constructNewTransaction(nextTXID, entry.getKey(),
+                entry.getValue()));
       }
+      scmMetadataStore.getDeletedBlocksTXTable()
+          .putWithBatch(batch, largestTxnIdHolderKey,
+              DeletedBlocksTransaction.newBuilder().setTxID(getCurrentTXID())
+                  .setContainerID(1).setCount(1).build());
+      scmMetadataStore.getStore().commitBatchOperation(batch);
     } finally {
       lock.unlock();
     }
@@ -364,7 +387,7 @@ public class DeletedBlockLogImpl
           new DatanodeDeletedBlockTransactions();
       try (TableIterator<Long,
           ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> iter =
-               scmMetadataStore.getDeletedBlocksTXTable().iterator()) {
+               getIterator()) {
         int numBlocksAdded = 0;
         List<DeletedBlocksTransaction> txnsToBePurged =
             new ArrayList<>();
@@ -404,6 +427,15 @@ public class DeletedBlockLogImpl
       }
       scmMetadataStore.getBatchHandler().commitBatchOperation(batch);
     }
+  }
+
+  TableIterator<Long,
+      ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> getIterator()
+      throws IOException {
+    TableIterator<Long, ? extends Table.KeyValue<Long, DeletedBlocksTransaction>>
+        iter = scmMetadataStore.getDeletedBlocksTXTable().iterator();
+    iter.seek(largestTxnIdHolderKey + 1);
+    return iter;
   }
 
   @Override

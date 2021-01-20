@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.metadata;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
+import java.util.List;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
@@ -68,20 +69,6 @@ public interface SCMMetadataStore {
    * @return Table
    */
   Table<Long, DeletedBlocksTransaction> getDeletedBlocksTXTable();
-
-  /**
-   * Returns the current TXID for the deleted blocks.
-   *
-   * @return Long
-   */
-  Long getCurrentTXID();
-
-  /**
-   * Returns the next TXID for the Deleted Blocks.
-   *
-   * @return Long.
-   */
-  Long getNextDeleteBlockTXID();
 
   /**
    * A table that maintains all the valid certificates issued by the SCM CA.

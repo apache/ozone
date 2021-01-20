@@ -23,6 +23,7 @@ import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.PIPELINES;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
+import java.util.List;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
@@ -84,6 +85,11 @@ public class TestSCMStoreImplWithOldPipelineIDKeyFormat
   @Override
   public Table<Long, DeletedBlocksTransaction> getDeletedBlocksTXTable() {
     return null;
+  }
+
+  @Override
+  public void addDeleteTransactions(List<DeletedBlocksTransaction> txns) {
+    return;
   }
 
   @Override

@@ -300,7 +300,7 @@ public class TestDeletedBlockLog {
         // verify the number of added and committed.
         try (TableIterator<Long,
             ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> iter =
-            scm.getScmMetadataStore().getDeletedBlocksTXTable().iterator()) {
+            deletedBlockLog.getIterator()) {
           AtomicInteger count = new AtomicInteger();
           iter.forEachRemaining((keyValue) -> count.incrementAndGet());
           Assert.assertEquals(added, count.get() + committed);
