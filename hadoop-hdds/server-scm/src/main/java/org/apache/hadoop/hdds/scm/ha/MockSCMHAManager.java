@@ -16,7 +16,6 @@
  */
 
 package org.apache.hadoop.hdds.scm.ha;
-
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
@@ -45,17 +44,28 @@ public final class MockSCMHAManager implements SCMHAManager {
 
   private final SCMRatisServer ratisServer;
   private boolean isLeader;
+  private DBTransactionBuffer transactionBuffer;
 
   public static SCMHAManager getInstance(boolean isLeader) {
     return new MockSCMHAManager(isLeader);
+  }
+
+  public static SCMHAManager getInstance(boolean isLeader,
+      DBTransactionBuffer buffer) {
+    return new MockSCMHAManager(isLeader, buffer);
   }
 
   /**
    * Creates MockSCMHAManager instance.
    */
   private MockSCMHAManager(boolean isLeader) {
+    this(isLeader, new MockDBTransactionBuffer());
+  }
+
+  private MockSCMHAManager(boolean isLeader, DBTransactionBuffer buffer) {
     this.ratisServer = new MockRatisServer();
     this.isLeader = isLeader;
+    this.transactionBuffer = buffer;
   }
 
   @Override
@@ -80,6 +90,11 @@ public final class MockSCMHAManager implements SCMHAManager {
   @Override
   public SCMRatisServer getRatisServer() {
     return ratisServer;
+  }
+
+  @Override
+  public DBTransactionBuffer getDBTransactionBuffer() {
+    return transactionBuffer;
   }
 
   /**

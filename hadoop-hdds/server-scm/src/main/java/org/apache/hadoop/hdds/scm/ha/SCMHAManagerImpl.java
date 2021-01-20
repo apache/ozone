@@ -39,16 +39,18 @@ public class SCMHAManagerImpl implements SCMHAManager {
 
   private final SCMRatisServer ratisServer;
   private final ConfigurationSource conf;
+  private final SCMDBTransactionBuffer transactionBuffer;
 
   /**
    * Creates SCMHAManager instance.
    */
   public SCMHAManagerImpl(final ConfigurationSource conf,
-                          final StorageContainerManager scm)
-      throws IOException {
+      final StorageContainerManager scm) throws IOException {
     this.conf = conf;
+    this.transactionBuffer =
+        new SCMDBTransactionBuffer(scm.getScmMetadataStore());
     this.ratisServer = new SCMRatisServerImpl(
-        conf.getObject(SCMHAConfiguration.class), conf, scm);
+        conf.getObject(SCMHAConfiguration.class), conf, scm, transactionBuffer);
   }
 
   /**
@@ -61,6 +63,11 @@ public class SCMHAManagerImpl implements SCMHAManager {
 
   public SCMRatisServer getRatisServer() {
     return ratisServer;
+  }
+
+  @Override
+  public DBTransactionBuffer getDBTransactionBuffer() {
+    return transactionBuffer;
   }
 
   /**
