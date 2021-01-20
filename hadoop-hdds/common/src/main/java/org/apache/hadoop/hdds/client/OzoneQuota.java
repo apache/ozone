@@ -196,7 +196,6 @@ public final class OzoneQuota {
       // there might be no unit specified.
       if (size.equals("")) {
         size = uppercase;
-        currUnit = Units.B;
       }
       nSize = Long.parseLong(size);
     } catch (NumberFormatException e) {
