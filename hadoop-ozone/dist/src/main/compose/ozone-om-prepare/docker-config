@@ -33,4 +33,3 @@ OZONE-SITE.XML_ozone.client.failover.max.attempts=6
 OZONE-SITE.XML_hdds.datanode.dir=/data/hdds
 
 no_proxy=om1,om2,om3,scm,s3g,recon,kdc,localhost,127.0.0.1
-

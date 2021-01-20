@@ -25,6 +25,7 @@ export OZONE_VOLUME
 
 # Clean up saved internal state from each container's volume for the next run.
 rm -rf "${OZONE_VOLUME}"
+mkdir -p "${OZONE_VOLUME}"/{dn1,dn2,dn3,om1,om2,om3,scm}
 
 if [[ -n "${OZONE_VOLUME_OWNER}" ]]; then
   current_user=$(whoami)
@@ -48,15 +49,23 @@ execute_robot_test scm omha/om-cancel-prepare.robot
 
 # Prepare cluster again.
 execute_robot_test scm omha/om-prepare.robot
+execute_robot_test scm omha/om-prepared.robot
+
+# re-start cluster and check that it remains prepared.
+KEEP_RUNNING=false stop_docker_env
+export OZONE_KEEP_RESULTS=true
+start_docker_env
+
+execute_robot_test scm omha/om-prepared.robot
 
 # re-start cluster with --upgrade flag to take it out of prepare.
 KEEP_RUNNING=false stop_docker_env
 export OM_HA_ARGS='--upgrade'
-export OZONE_KEEP_RESULTS=true
 start_docker_env
 
 # Writes should now succeed.
 execute_robot_test scm topology/loaddata.robot
+execute_robot_test scm topology/readdata.robot
 
 stop_docker_env
 
