@@ -328,6 +328,15 @@ public class TestDeletedBlockLog {
     blocks = getTransactions(BLOCKS_PER_TXN * 40);
     Assert.assertEquals(40, blocks.size());
     commitTransactions(blocks);
+
+    // close db and reopen it again to make sure
+    // currentTxnID = 50
+    deletedBlockLog.close();
+    deletedBlockLog = new DeletedBlockLogImpl(conf, containerManager,
+        scm.getScmMetadataStore());
+    blocks = getTransactions(BLOCKS_PER_TXN * 40);
+    Assert.assertEquals(0, blocks.size());
+    Assert.assertEquals((long)deletedBlockLog.getCurrentTXID(), 50L);
   }
 
   @Test
