@@ -27,6 +27,8 @@ import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.ha.DBTransactionBuffer;
+import org.apache.hadoop.hdds.scm.ha.MockDBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
@@ -104,9 +106,21 @@ public class TestPipelineManagerImpl {
         SCMContext.emptyContext());
   }
 
+  private PipelineManagerV2Impl createPipelineManager(
+      boolean isLeader, DBTransactionBuffer buffer) throws IOException {
+    return PipelineManagerV2Impl.newPipelineManager(conf,
+        MockSCMHAManager.getInstance(isLeader, buffer),
+        new MockNodeManager(true, 20),
+        SCMDBDefinition.PIPELINES.getTable(dbStore),
+        new EventQueue(),
+        SCMContext.emptyContext());
+  }
+
   @Test
   public void testCreatePipeline() throws Exception {
-    PipelineManagerV2Impl pipelineManager = createPipelineManager(true);
+    DBTransactionBuffer buffer1 = new MockDBTransactionBuffer(dbStore);
+    PipelineManagerV2Impl pipelineManager =
+        createPipelineManager(true, buffer1);
     Assert.assertTrue(pipelineManager.getPipelines().isEmpty());
     pipelineManager.allowPipelineCreation();
     Pipeline pipeline1 = pipelineManager.createPipeline(
@@ -118,15 +132,19 @@ public class TestPipelineManagerImpl {
         HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE);
     Assert.assertEquals(2, pipelineManager.getPipelines().size());
     Assert.assertTrue(pipelineManager.containsPipeline(pipeline2.getId()));
+    buffer1.close();
     pipelineManager.close();
 
-    PipelineManagerV2Impl pipelineManager2 = createPipelineManager(true);
+    DBTransactionBuffer buffer2 = new MockDBTransactionBuffer(dbStore);
+    PipelineManagerV2Impl pipelineManager2 =
+        createPipelineManager(true, buffer2);
     // Should be able to load previous pipelines.
     Assert.assertFalse(pipelineManager2.getPipelines().isEmpty());
     Assert.assertEquals(2, pipelineManager.getPipelines().size());
     pipelineManager2.allowPipelineCreation();
     Pipeline pipeline3 = pipelineManager2.createPipeline(
         HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.THREE);
+    buffer2.close();
     Assert.assertEquals(3, pipelineManager2.getPipelines().size());
     Assert.assertTrue(pipelineManager2.containsPipeline(pipeline3.getId()));
 
@@ -151,7 +169,9 @@ public class TestPipelineManagerImpl {
 
   @Test
   public void testUpdatePipelineStates() throws Exception {
-    PipelineManagerV2Impl pipelineManager = createPipelineManager(true);
+    DBTransactionBuffer buffer = new MockDBTransactionBuffer(dbStore);
+    PipelineManagerV2Impl pipelineManager =
+        createPipelineManager(true, buffer);
     Table<PipelineID, Pipeline> pipelineStore =
         SCMDBDefinition.PIPELINES.getTable(dbStore);
     pipelineManager.allowPipelineCreation();
@@ -160,6 +180,7 @@ public class TestPipelineManagerImpl {
     Assert.assertEquals(1, pipelineManager.getPipelines().size());
     Assert.assertTrue(pipelineManager.containsPipeline(pipeline.getId()));
     Assert.assertEquals(ALLOCATED, pipeline.getPipelineState());
+    buffer.flush();
     Assert.assertEquals(ALLOCATED,
         pipelineStore.get(pipeline.getId()).getPipelineState());
     PipelineID pipelineID = pipeline.getId();
@@ -170,11 +191,13 @@ public class TestPipelineManagerImpl {
         .getPipelines(HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.THREE,
             Pipeline.PipelineState.OPEN).contains(pipeline));
+    buffer.flush();
     Assert.assertTrue(pipelineStore.get(pipeline.getId()).isOpen());
 
     pipelineManager.deactivatePipeline(pipeline.getId());
     Assert.assertEquals(Pipeline.PipelineState.DORMANT,
         pipelineManager.getPipeline(pipelineID).getPipelineState());
+    buffer.flush();
     Assert.assertEquals(Pipeline.PipelineState.DORMANT,
         pipelineStore.get(pipeline.getId()).getPipelineState());
     Assert.assertFalse(pipelineManager
@@ -187,6 +210,7 @@ public class TestPipelineManagerImpl {
         .getPipelines(HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.THREE,
             Pipeline.PipelineState.OPEN).contains(pipeline));
+    buffer.flush();
     Assert.assertTrue(pipelineStore.get(pipeline.getId()).isOpen());
     pipelineManager.close();
   }
@@ -430,7 +454,9 @@ public class TestPipelineManagerImpl {
 
   @Test
   public void testPipelineOpenOnlyWhenLeaderReported() throws Exception {
-    PipelineManagerV2Impl pipelineManager = createPipelineManager(true);
+    DBTransactionBuffer buffer1 = new MockDBTransactionBuffer(dbStore);
+    PipelineManagerV2Impl pipelineManager =
+        createPipelineManager(true, buffer1);
     pipelineManager.allowPipelineCreation();
 
     pipelineManager.onMessage(
@@ -439,6 +465,7 @@ public class TestPipelineManagerImpl {
         .createPipeline(HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.THREE);
     // close manager
+    buffer1.close();
     pipelineManager.close();
     // new pipeline manager loads the pipelines from the db in ALLOCATED state
     pipelineManager = createPipelineManager(true);

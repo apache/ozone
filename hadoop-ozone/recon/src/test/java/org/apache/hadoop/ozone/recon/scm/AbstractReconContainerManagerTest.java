@@ -83,6 +83,7 @@ public class AbstractReconContainerManagerTest {
         ReconSCMDBDefinition.PIPELINES.getTable(store), eventQueue);
     containerManager = new ReconContainerManager(
         conf,
+        store,
         ReconSCMDBDefinition.CONTAINERS.getTable(store),
         pipelineManager,
         getScmServiceProvider(),

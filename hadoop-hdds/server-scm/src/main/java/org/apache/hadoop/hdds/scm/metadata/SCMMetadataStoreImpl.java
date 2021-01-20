@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.ha.SCMTransactionInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
@@ -40,6 +41,7 @@ import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.CONTAINERS;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.DELETED_BLOCKS;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.PIPELINES;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.REVOKED_CERTS;
+import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.TRANSACTIONINFO;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.VALID_CERTS;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -59,6 +61,8 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
   private Table<ContainerID, ContainerInfo> containerTable;
 
   private Table<PipelineID, Pipeline> pipelineTable;
+
+  private Table<String, SCMTransactionInfo> transactionInfoTable;
 
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMMetadataStoreImpl.class);
@@ -107,6 +111,10 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
       containerTable = CONTAINERS.getTable(store);
 
       checkTableStatus(containerTable, CONTAINERS.getName());
+
+      transactionInfoTable = TRANSACTIONINFO.getTable(store);
+
+      checkTableStatus(transactionInfoTable, TRANSACTIONINFO.getName());
     }
   }
 
@@ -159,6 +167,11 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
   @Override
   public Table<PipelineID, Pipeline> getPipelineTable() {
     return pipelineTable;
+  }
+
+  @Override
+  public Table<String, SCMTransactionInfo> getTransactionInfoTable() {
+    return transactionInfoTable;
   }
 
   @Override

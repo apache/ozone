@@ -271,7 +271,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     // Creates the SCM DBs or opens them if it exists.
     // A valid pointer to the store is required by all the other services below.
     initalizeMetadataStore(conf, configurator);
-
     // Authenticate SCM if security is enabled, this initialization can only
     // be done after the metadata store is initialized.
     if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
@@ -868,7 +867,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    * Stop service.
    */
   public void stop() {
-
     try {
       LOG.info("Stopping Replication Manager Service.");
       replicationManager.stop();
@@ -962,6 +960,12 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     IOUtils.cleanupWithLogger(LOG, pipelineManager);
 
     try {
+      scmHAManager.shutdown();
+    } catch (Exception ex) {
+      LOG.error("SCM HA Manager stop failed", ex);
+    }
+
+    try {
       scmMetadataStore.stop();
     } catch (Exception ex) {
       LOG.error("SCM Metadata store stop failed", ex);
@@ -969,12 +973,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     if (ms != null) {
       ms.stop();
-    }
-
-    try {
-      scmHAManager.shutdown();
-    } catch (Exception ex) {
-      LOG.error("SCM HA Manager stop failed", ex);
     }
 
     scmSafeModeManager.stop();

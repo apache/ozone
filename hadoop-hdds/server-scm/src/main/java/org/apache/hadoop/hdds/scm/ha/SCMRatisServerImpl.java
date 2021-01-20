@@ -64,9 +64,8 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   // TODO: Refactor and remove ConfigurationSource and use only
   //  SCMHAConfiguration.
   SCMRatisServerImpl(final SCMHAConfiguration haConf,
-                     final ConfigurationSource conf,
-                     final StorageContainerManager scm)
-      throws IOException {
+      final ConfigurationSource conf, final StorageContainerManager scm,
+      final DBTransactionBuffer buffer) throws IOException {
     this.scm = scm;
     this.address = haConf.getRatisBindAddress();
 
@@ -79,7 +78,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
         .setServerId(haGrpBuilder.getPeerId())
         .setGroup(haGrpBuilder.getRaftGroup())
         .setProperties(serverProperties)
-        .setStateMachine(new SCMStateMachine(scm, this))
+        .setStateMachine(new SCMStateMachine(scm, this, buffer))
         .build();
 
     this.division = server.getDivision(haGrpBuilder.getRaftGroupId());

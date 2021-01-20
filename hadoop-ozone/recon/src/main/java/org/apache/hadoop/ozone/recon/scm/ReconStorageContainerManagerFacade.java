@@ -123,6 +123,7 @@ public class ReconStorageContainerManagerFacade
             ReconSCMDBDefinition.PIPELINES.getTable(dbStore),
             eventQueue);
     this.containerManager = new ReconContainerManager(conf,
+        dbStore,
         ReconSCMDBDefinition.CONTAINERS.getTable(dbStore),
         pipelineManager,
         scmServiceProvider,

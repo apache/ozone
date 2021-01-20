@@ -32,6 +32,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -110,6 +111,7 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
         .setPipelineManager(pipelineManager)
         .setRatisServer(scmHaManager.getRatisServer())
         .setContainerStore(containerStore)
+        .setSCMDBTransactionBuffer(scmHaManager.getDBTransactionBuffer())
         .build();
 
     this.numContainerPerVolume = conf
@@ -117,8 +119,6 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
             ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT_DEFAULT);
 
     this.scmContainerManagerMetrics = SCMContainerManagerMetrics.create();
-
-
   }
 
   @Override
@@ -396,5 +396,10 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
   @Deprecated
   protected ContainerStateManagerV2 getContainerStateManager() {
     return containerStateManager;
+  }
+
+  @VisibleForTesting
+  public SCMHAManager getSCMHAManager() {
+    return haManager;
   }
 }

@@ -14,33 +14,30 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
-
 package org.apache.hadoop.hdds.scm.ha;
 
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.ratis.statemachine.SnapshotInfo;
+
+import java.io.Closeable;
 import java.io.IOException;
 
 /**
- * SCMHAManager provides HA service for SCM.
+ * DB transaction that buffers SCM DB transactions. Call the flush method
+ * to flush a batch into SCM DB. This buffer also maintains a latest transaction
+ * info to indicate the information of the latest transaction in the buffer.
  */
-public interface SCMHAManager {
+public interface DBTransactionBuffer extends Closeable {
 
-  /**
-   * Starts HA service.
-   */
-  void start() throws IOException;
+  BatchOperation getCurrentBatchOperation();
 
-  /**
-   * Returns RatisServer instance associated with the SCM instance.
-   */
-  SCMRatisServer getRatisServer();
+  void updateLatestTrxInfo(SCMTransactionInfo info);
 
-  /**
-   * Returns DB transaction buffer.
-   */
-  DBTransactionBuffer getDBTransactionBuffer();
+  SCMTransactionInfo getLatestTrxInfo();
 
-  /**
-   * Stops the HA service.
-   */
-  void shutdown() throws IOException;
+  SnapshotInfo getLatestSnapshot();
+
+  void setLatestSnapshot(SnapshotInfo latestSnapshot);
+
+  void flush() throws IOException;
 }

@@ -24,11 +24,13 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.ha.SCMTransactionInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
+import org.apache.hadoop.hdds.utils.db.StringCodec;
 
 /**
  * Class defines the structure and types of the scm.db.
@@ -80,6 +82,15 @@ public class SCMDBDefinition implements DBDefinition {
           ContainerInfo.class,
           new ContainerInfoCodec());
 
+  public static final DBColumnFamilyDefinition<String, SCMTransactionInfo>
+      TRANSACTIONINFO =
+      new DBColumnFamilyDefinition<>(
+          "scmTransactionInfos",
+          String.class,
+          new StringCodec(),
+          SCMTransactionInfo.class,
+          new SCMTransactionInfoCodec());
+
   @Override
   public String getName() {
     return "scm.db";
@@ -93,6 +104,6 @@ public class SCMDBDefinition implements DBDefinition {
   @Override
   public DBColumnFamilyDefinition[] getColumnFamilies() {
     return new DBColumnFamilyDefinition[] {DELETED_BLOCKS, VALID_CERTS,
-        REVOKED_CERTS, PIPELINES, CONTAINERS};
+        REVOKED_CERTS, PIPELINES, CONTAINERS, TRANSACTIONINFO};
   }
 }

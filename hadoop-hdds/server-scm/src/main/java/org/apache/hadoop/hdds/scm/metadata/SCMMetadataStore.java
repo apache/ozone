@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.ha.SCMTransactionInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
@@ -109,6 +110,11 @@ public interface SCMMetadataStore {
    * A Table that maintains all the pipeline information.
    */
   Table<PipelineID, Pipeline> getPipelineTable();
+
+  /**
+   * A Table that keeps the latest transaction index of the DB state.
+   */
+  Table <String, SCMTransactionInfo> getTransactionInfoTable();
 
   /**
    * Helper to create and write batch transactions.

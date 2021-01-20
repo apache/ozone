@@ -124,6 +124,7 @@ public final class PipelineManagerV2Impl implements PipelineManager {
         .newBuilder().setPipelineStore(pipelineStore)
         .setRatisServer(scmhaManager.getRatisServer())
         .setNodeManager(nodeManager)
+        .setSCMDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
         .build();
 
     // Create PipelineFactory
