@@ -21,6 +21,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.Properties;
@@ -53,7 +54,6 @@ import org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl;
 import org.apache.hadoop.ozone.container.keyvalue.impl.ChunkManagerFactory;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
-import org.apache.hadoop.ozone.freon.ContentGenerator;
 
 import com.codahale.metrics.Timer;
 import picocli.CommandLine.Command;
@@ -98,8 +98,6 @@ public class GeneratorDatanode extends BaseGenerator {
 
   private Timer timer;
 
-  private ContentGenerator contentGenerator;
-
   //Simulate ratis log index (incremented for each chunk write)
   private int logCounter;
   private String datanodeId;
@@ -131,9 +129,14 @@ public class GeneratorDatanode extends BaseGenerator {
         StorageLocation.parse(storageDirs.iterator().next())
             .getUri().getPath();
 
-    scmId = Files.list(Paths.get(firstStorageDir, "hdds"))
+    final Path scmSpecificDir = Files.list(Paths.get(firstStorageDir, "hdds"))
         .filter(Files::isDirectory)
-        .findFirst().get().getFileName().toString();
+        .findFirst().get().getFileName();
+    if (scmSpecificDir == null) {
+      throw new IllegalArgumentException(
+          "SCM specific datanode directory doesn't exist");
+    }
+    scmId = scmSpecificDir.toString();
 
     final File versionFile = new File(firstStorageDir, "hdds/VERSION");
     Properties props = DatanodeVersionFile.readFrom(versionFile);
