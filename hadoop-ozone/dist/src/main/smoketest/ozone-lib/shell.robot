@@ -51,3 +51,7 @@ Create Random Volume
     ${random} =    Generate Random String  5  [LOWER]
     Execute        ozone sh volume create o3://${OM_SERVICE_ID}/vol-${random}
     [return]       vol-${random}
+
+Find Jars Dir
+    ${dir} =    Execute    ozone envvars | grep 'HDDS_LIB_JARS_DIR' | cut -f2 -d= | sed -e "s/'//g" -e 's/"//g'
+    Set Environment Variable    HDDS_LIB_JARS_DIR    ${dir}

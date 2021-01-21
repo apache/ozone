@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.
@@ -14,6 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-if [[ "${OZONE_SHELL_EXECNAME}" = ozone ]]; then
-   ozone_add_profile ozone
-fi
+*** Settings ***
+Documentation       Test scm compatibility
+Library             BuiltIn
+Resource            ../lib/os.robot
+Test Timeout        5 minutes
+
+*** Test Cases ***
+Picks up command line options
+    Pass Execution If    '%{HDFS_STORAGECONTAINERMANAGER_OPTS}' == ''    Command-line option required for process check
+    ${processes} =    List All Processes
+    Should Contain    ${processes}   %{HDFS_STORAGECONTAINERMANAGER_OPTS}
+    Should Contain    ${processes}   %{HADOOP_OPTS}
