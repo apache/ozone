@@ -21,9 +21,10 @@ package org.apache.hadoop.hdds.upgrade;
 import static java.lang.Thread.sleep;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.OPEN;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.QUASI_CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY_READONLY;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_DONE;
@@ -38,12 +39,15 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
+import org.apache.hadoop.hdds.scm.XceiverClientManager;
+import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -71,7 +75,7 @@ public class TestHDDSUpgrade {
   public Timeout timeout = new Timeout(300000);
   private static final Logger LOG =
       LoggerFactory.getLogger(TestHDDSUpgrade.class);
-  private static final int NUM_DATA_NODES = 4;
+  private static final int NUM_DATA_NODES = 3;
 
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;
@@ -79,8 +83,9 @@ public class TestHDDSUpgrade {
   private static ContainerManager scmContainerManager;
   private static PipelineManager scmPipelineManager;
   private static Pipeline ratisPipeline1;
-  private static Pipeline ratisPipeline2;
+  private static final int CONTAINERS_CREATED_FOR_TESTING = 1;
   private static HDDSLayoutVersionManager scmVersionManager;
+
   /**
    * Create a MiniDFSCluster for testing.
    *
@@ -104,16 +109,20 @@ public class TestHDDSUpgrade {
     scmContainerManager = scm.getContainerManager();
     scmPipelineManager = scm.getPipelineManager();
     scmVersionManager = scm.getLayoutVersionManager();
-    ratisPipeline1 = scmPipelineManager.getPipeline(
-        scmContainerManager.allocateContainer(
-        RATIS, THREE, "Owner1").getPipelineID());
+
+    // we will create CONTAINERS_CREATED_FOR_TESTING number of containers.
+    XceiverClientManager xceiverClientManager = new XceiverClientManager(conf);
+    ContainerInfo ci1 = scmContainerManager.allocateContainer(
+        RATIS, THREE, "Owner1");
+    ratisPipeline1 = scmPipelineManager.getPipeline(ci1.getPipelineID());
     scmPipelineManager.openPipeline(ratisPipeline1.getId());
-    ratisPipeline2 = scmPipelineManager.getPipeline(
-        scmContainerManager.allocateContainer(
-        RATIS, ONE, "Owner2").getPipelineID());
-    scmPipelineManager.openPipeline(ratisPipeline2.getId());
-    // At this stage, there should be 2 pipeline one with 1 open container
+    XceiverClientSpi client1 =
+        xceiverClientManager.acquireClient(ratisPipeline1);
+    ContainerProtocolCalls.createContainer(client1,
+        ci1.getContainerID(), null);
+    // At this stage, there should be 1 pipeline one with 1 open container
     // each.
+    xceiverClientManager.releaseClient(client1, false);
   }
 
   /**
@@ -137,11 +146,15 @@ public class TestHDDSUpgrade {
     Assert.assertEquals(scmVersionManager.getSoftwareLayoutVersion(),
         scmVersionManager.getMetadataLayoutVersion());
     Assert.assertTrue(scmVersionManager.getMetadataLayoutVersion() >= 1);
+    int countContainers = 0;
     for (ContainerInfo ci : scmContainerManager.getContainers()) {
       HddsProtos.LifeCycleState ciState = ci.getState();
       Assert.assertTrue((ciState == HddsProtos.LifeCycleState.CLOSED) ||
-          (ciState == HddsProtos.LifeCycleState.CLOSING));
+          (ciState == HddsProtos.LifeCycleState.CLOSING) ||
+          (ciState == HddsProtos.LifeCycleState.QUASI_CLOSED));
+      countContainers++;
     }
+    Assert.assertEquals(CONTAINERS_CREATED_FOR_TESTING, countContainers);
   }
 
   private void testPreUpgradeConditionsDataNodes() {
@@ -150,7 +163,21 @@ public class TestHDDSUpgrade {
       HDDSLayoutVersionManager dnVersionManager =
           dsm.getDataNodeVersionManager();
       Assert.assertEquals(0, dnVersionManager.getMetadataLayoutVersion());
+
     }
+
+    int countContainers = 0;
+    for (HddsDatanodeService dataNode : cluster.getHddsDatanodes()) {
+      DatanodeStateMachine dsm = dataNode.getDatanodeStateMachine();
+      // Also verify that all the existing containers are open.
+      for (Iterator<Container<?>> it =
+           dsm.getContainer().getController().getContainers(); it.hasNext();) {
+        Container container = it.next();
+        Assert.assertTrue(container.getContainerState() == OPEN);
+        countContainers++;
+      }
+    }
+    Assert.assertTrue(countContainers >= 1);
   }
 
 
@@ -176,6 +203,7 @@ public class TestHDDSUpgrade {
       Assert.fail("Timeout waiting for Upgrade to complete on Data Nodes.");
     }
 
+    int countContainers = 0;
     for (HddsDatanodeService dataNode : cluster.getHddsDatanodes()) {
       DatanodeStateMachine dsm = dataNode.getDatanodeStateMachine();
       HDDSLayoutVersionManager dnVersionManager =
@@ -188,9 +216,12 @@ public class TestHDDSUpgrade {
       for (Iterator<Container<?>> it =
            dsm.getContainer().getController().getContainers(); it.hasNext();) {
         Container container = it.next();
-        Assert.assertTrue(container.getContainerState() == CLOSED);
+        Assert.assertTrue(container.getContainerState() == CLOSED ||
+            container.getContainerState() == QUASI_CLOSED);
+        countContainers++;
       }
     }
+    Assert.assertTrue(countContainers >= 1);
   }
 
   private void testPostUpgradePipelineCreation() throws IOException {
@@ -236,6 +267,7 @@ public class TestHDDSUpgrade {
     testDataNodesStateOnSCM(HEALTHY_READONLY);
 
     // Verify the SCM has driven all the DataNodes through Layout Upgrade.
+    sleep(5000);
     testPostUpgradeConditionsDataNodes();
 
     // Allow some time for heartbeat exchanges.
