@@ -90,7 +90,7 @@ public class TestPipelineManagerImpl {
             OZONE_DATANODE_PIPELINE_LIMIT_DEFAULT) /
         HddsProtos.ReplicationFactor.THREE.getNumber();
     scmContext = SCMContext.emptyContext();
-    serviceManager = new SCMServiceManager();
+    serviceManager = new SCMServiceManager.Builder().build();
   }
 
   @After
@@ -119,7 +119,8 @@ public class TestPipelineManagerImpl {
         new MockNodeManager(true, 20),
         SCMDBDefinition.PIPELINES.getTable(dbStore),
         new EventQueue(),
-        SCMContext.emptyContext());
+        SCMContext.emptyContext(),
+        serviceManager);
   }
 
   @Test
@@ -452,9 +453,6 @@ public class TestPipelineManagerImpl {
     DBTransactionBuffer buffer1 = new MockDBTransactionBuffer(dbStore);
     PipelineManagerV2Impl pipelineManager =
         createPipelineManager(true, buffer1);
-
-    pipelineManager.onMessage(
-        new SCMSafeModeManager.SafeModeStatus(true, true), null);
 
     Pipeline pipeline = pipelineManager
         .createPipeline(HddsProtos.ReplicationType.RATIS,

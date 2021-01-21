@@ -29,11 +29,12 @@ import java.util.List;
  * Manipulate background services in SCM, including ReplicationManager,
  * SCMBlockDeletingService and BackgroundPipelineCreator.
  */
-public class SCMServiceManager {
+public final class SCMServiceManager {
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMServiceManager.class);
 
   // Cached latest raft status and safe mode status.
+  // If raftStatus equals null, it means current SCM is running without Ratis.
   private RaftStatus raftStatus;
   private SafeModeStatus safeModeStatus;
 
@@ -42,9 +43,13 @@ public class SCMServiceManager {
   /**
    * Start as a follower SCM in safe mode.
    */
-  public SCMServiceManager() {
-    raftStatus = RaftStatus.NOT_LEADER;
-    safeModeStatus = SafeModeStatus.IN_SAFE_MODE;
+  private SCMServiceManager(RaftStatus raftStatus,
+                            SafeModeStatus safeModeStatus) {
+    this.raftStatus = raftStatus;
+    this.safeModeStatus = safeModeStatus;
+
+    LOG.info("{} starts with RaftStatus {} and SafeModeStatus {}",
+        SCMServiceManager.class.getSimpleName(), raftStatus, safeModeStatus);
   }
 
   /**
@@ -52,8 +57,12 @@ public class SCMServiceManager {
    */
   public synchronized void register(SCMService service) {
     Preconditions.checkNotNull(service);
-    LOG.info("register Service {}", service.getServiceName());
+    LOG.info("register Service {} notify with RaftStatus {} SafeModeStatus {}",
+        service.getServiceName(), raftStatus, safeModeStatus);
+
     services.add(service);
+    service.notifyRaftStatusOrSafeModeStatusChanged(raftStatus,
+        safeModeStatus);
   }
 
   /**
@@ -112,6 +121,28 @@ public class SCMServiceManager {
           service.getServiceName(), raftStatus, safeModeStatus);
       service.notifyRaftStatusOrSafeModeStatusChanged(
           raftStatus, safeModeStatus);
+    }
+  }
+
+  public static class Builder {
+    /**
+     * Default SCMServiceManager is starting as a non-leader SCM in safe mode.
+     */
+    private RaftStatus raftStatus = RaftStatus.NOT_LEADER;
+    private SafeModeStatus safeModeStatus = SafeModeStatus.IN_SAFE_MODE;
+
+    public Builder setRaftStatus(RaftStatus status) {
+      this.raftStatus = status;
+      return this;
+    }
+
+    public Builder setSafeModeStatus(SafeModeStatus status) {
+      this.safeModeStatus = status;
+      return this;
+    }
+
+    public SCMServiceManager build() {
+      return new SCMServiceManager(raftStatus, safeModeStatus);
     }
   }
 }

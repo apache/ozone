@@ -51,7 +51,7 @@ public class TestSCMServiceManager {
       }
     };
 
-    SCMServiceManager serviceManager = new SCMServiceManager();
+    SCMServiceManager serviceManager = new SCMServiceManager.Builder().build();
     serviceManager.register(serviceRunWhenLeader);
 
     // PAUSING at the beginning.
@@ -102,7 +102,7 @@ public class TestSCMServiceManager {
       }
     };
 
-    SCMServiceManager serviceManager = new SCMServiceManager();
+    SCMServiceManager serviceManager = new SCMServiceManager.Builder().build();
     serviceManager.register(serviceRunWhenLeaderAndOutOfSafeMode);
 
     // PAUSING at the beginning.

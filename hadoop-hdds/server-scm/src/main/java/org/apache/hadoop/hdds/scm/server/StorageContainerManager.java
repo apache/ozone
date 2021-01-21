@@ -286,7 +286,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
 
     eventQueue = new EventQueue();
-    serviceManager = new SCMServiceManager();
+    serviceManager = new SCMServiceManager.Builder().build();
 
     long watcherTimeout =
         conf.getTimeDuration(ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT,
@@ -433,7 +433,14 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (configurator.getScmContext() != null) {
       scmContext = configurator.getScmContext();
     } else {
-      scmContext = new SCMContext.Builder().setSCM(this).build();
+      // non-leader of term 0, in safe mode, preCheck not completed.
+      scmContext = new SCMContext.Builder()
+          .setLeader(false)
+          .setTerm(0)
+          .setIsInSafeMode(true)
+          .setIsPreCheckComplete(false)
+          .setSCM(this)
+          .build();
     }
 
     if(configurator.getScmNodeManager() != null) {

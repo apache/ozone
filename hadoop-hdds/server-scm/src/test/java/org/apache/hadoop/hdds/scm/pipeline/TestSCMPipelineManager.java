@@ -222,7 +222,7 @@ public class TestSCMPipelineManager {
 
     SCMSafeModeManager scmSafeModeManager =
         new SCMSafeModeManager(conf, new ArrayList<>(), pipelineManager,
-            eventQueue, new SCMServiceManager());
+            eventQueue, new SCMServiceManager.Builder().build());
 
     // create a pipeline in allocated state with no dns yet reported
     Pipeline pipeline = pipelineManager
@@ -496,7 +496,8 @@ public class TestSCMPipelineManager {
 
     SCMSafeModeManager scmSafeModeManager =
         new SCMSafeModeManager(new OzoneConfiguration(), new ArrayList<>(),
-            pipelineManager, eventQueue, new SCMServiceManager());
+            pipelineManager, eventQueue,
+            new SCMServiceManager.Builder().build());
     PipelineReportHandler pipelineReportHandler =
         new PipelineReportHandler(scmSafeModeManager, pipelineManager,
             SCMContext.emptyContext(), conf);

@@ -234,10 +234,11 @@ class BackgroundPipelineCreatorV2 implements SCMService {
       RaftStatus raftStatus, SafeModeStatus safeModeStatus) {
     serviceLock.lock();
     try {
-      // 1) leader SCM
+      // 1) leader SCM or running without Ratis.
       // 2) not in safe mode or createPipelineInSafeMode is true
-      if (raftStatus == RaftStatus.LEADER
-          && (safeModeStatus == SafeModeStatus.OUT_OF_SAFE_MODE
+      if ((raftStatus == RaftStatus.LEADER
+              || raftStatus == null) &&
+          (safeModeStatus == SafeModeStatus.OUT_OF_SAFE_MODE
               || createPipelineInSafeMode)) {
         // transition from PAUSING to RUNNING
         if (serviceStatus != ServiceStatus.RUNNING) {
@@ -256,8 +257,8 @@ class BackgroundPipelineCreatorV2 implements SCMService {
   @Override
   public void notifyOneTimeEventTriggered(
       RaftStatus raftStatus, OneTimeEvent condition) {
-    if (raftStatus != RaftStatus.LEADER) {
-      LOG.info("ignore, since not leader SCM.");
+    if (raftStatus != RaftStatus.LEADER && raftStatus != null) {
+      LOG.info("ignore, can not pass RaftStatus check.");
       return;
     }
     if (condition == NEW_NODE_HANDLER_TRIGGERED

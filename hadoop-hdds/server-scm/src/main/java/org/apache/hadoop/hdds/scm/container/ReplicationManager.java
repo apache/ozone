@@ -1270,8 +1270,9 @@ public class ReplicationManager implements MetricsSource, SCMService {
       RaftStatus raftStatus, SafeModeStatus safeModeStatus) {
     serviceLock.lock();
     try {
-      // leader SCM and not in safe mode.
-      if (raftStatus == RaftStatus.LEADER
+      // 1) leader SCM or running without Ratis.
+      // 2) not in safe mode.
+      if ((raftStatus == RaftStatus.LEADER || raftStatus == null)
           && safeModeStatus == SafeModeStatus.OUT_OF_SAFE_MODE) {
         // transition from PAUSING to RUNNING
         if (serviceStatus != ServiceStatus.RUNNING) {

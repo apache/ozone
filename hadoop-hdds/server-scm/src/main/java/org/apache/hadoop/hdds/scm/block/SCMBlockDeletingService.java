@@ -226,8 +226,8 @@ public class SCMBlockDeletingService extends BackgroundService
       RaftStatus raftStatus, SafeModeStatus safeModeStatus) {
     serviceLock.lock();
     try {
-      // leader SCM
-      if (raftStatus == RaftStatus.LEADER) {
+      // leader SCM or running without Ratis.
+      if (raftStatus == RaftStatus.LEADER || raftStatus == null) {
         serviceStatus = ServiceStatus.RUNNING;
       } else {
         serviceStatus = ServiceStatus.PAUSING;

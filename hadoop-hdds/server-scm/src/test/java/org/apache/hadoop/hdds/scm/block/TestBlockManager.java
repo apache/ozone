@@ -123,7 +123,7 @@ public class TestBlockManager {
 
     eventQueue = new EventQueue();
     scmContext = SCMContext.emptyContext();
-    serviceManager = new SCMServiceManager();
+    serviceManager = new SCMServiceManager.Builder().build();
 
     scmMetadataStore = new SCMMetadataStoreImpl(conf);
     scmMetadataStore.start(conf);

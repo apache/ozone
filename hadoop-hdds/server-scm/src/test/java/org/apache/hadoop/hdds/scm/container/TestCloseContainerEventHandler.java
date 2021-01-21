@@ -82,7 +82,8 @@ public class TestCloseContainerEventHandler {
     scmContext = SCMContext.emptyContext();
     scmMetadataStore = new SCMMetadataStoreImpl(configuration);
 
-    SCMServiceManager serviceManager = new SCMServiceManager();
+    SCMServiceManager serviceManager =
+        new SCMServiceManager.Builder().setRaftStatus(null).build();
 
     pipelineManager =
         PipelineManagerV2Impl.newPipelineManager(
@@ -105,7 +106,6 @@ public class TestCloseContainerEventHandler {
         scmMetadataStore.getContainerTable());
 
     // trigger BackgroundPipelineCreator to take effect.
-    serviceManager.becomeLeader();
     serviceManager.triggeringOneTimeEvent(
         OneTimeEvent.PRE_CHECK_COMPLETED);
 

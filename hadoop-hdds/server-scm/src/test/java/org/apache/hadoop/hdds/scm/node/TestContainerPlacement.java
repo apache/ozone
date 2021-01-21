@@ -125,7 +125,7 @@ public class TestContainerPlacement {
             scmMetadataStore.getPipelineTable(),
             eventQueue,
             SCMContext.emptyContext(),
-            new SCMServiceManager());
+            new SCMServiceManager.Builder().build());
 
     return new SCMContainerManager(config, scmMetadataStore.getContainerTable(),
         scmMetadataStore.getStore(),

@@ -56,7 +56,7 @@ public class TestHealthyPipelineSafeModeRule {
   public void testHealthyPipelineSafeModeRuleWithNoPipelines()
       throws Exception {
     EventQueue eventQueue = new EventQueue();
-    SCMServiceManager serviceManager = new SCMServiceManager();
+    SCMServiceManager serviceManager = new SCMServiceManager.Builder().build();
     List<ContainerInfo> containers =
             new ArrayList<>(HddsTestUtils.getContainerInfo(1));
 
@@ -108,7 +108,7 @@ public class TestHealthyPipelineSafeModeRule {
         TestHealthyPipelineSafeModeRule.class.getName() + UUID.randomUUID());
 
     EventQueue eventQueue = new EventQueue();
-    SCMServiceManager serviceManager = new SCMServiceManager();
+    SCMServiceManager serviceManager = new SCMServiceManager.Builder().build();
     List<ContainerInfo> containers =
             new ArrayList<>(HddsTestUtils.getContainerInfo(1));
 
@@ -203,7 +203,7 @@ public class TestHealthyPipelineSafeModeRule {
         TestHealthyPipelineSafeModeRule.class.getName() + UUID.randomUUID());
 
     EventQueue eventQueue = new EventQueue();
-    SCMServiceManager serviceManager = new SCMServiceManager();
+    SCMServiceManager serviceManager = new SCMServiceManager.Builder().build();
     List<ContainerInfo> containers =
             new ArrayList<>(HddsTestUtils.getContainerInfo(1));
 

@@ -31,11 +31,21 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 /**
  * SCMContext is the single source of truth for some key information shared
  * across all components within SCM, including:
- *  - RaftServer related info, e.g., isLeader, term.
- *  - SafeMode related info, e.g., inSafeMode, preCheckComplete.
+ * 1) RaftServer related info, e.g., isLeader, term.
+ * 2) SafeMode related info, e.g., inSafeMode, preCheckComplete.
+ *
+ * If current SCM is not running upon Ratis, the {@link SCMContext#isLeader}
+ * check will always return true, and {@link SCMContext#getTermOfLeader} will
+ * return INVALID_TERM.
  */
 public final class SCMContext implements EventHandler<SafeModeStatus> {
   private static final Logger LOG = LoggerFactory.getLogger(SCMContext.class);
+
+  /**
+   * The initial value of term in raft is 0, and term increases monotonically.
+   * term equals INVALID_TERM indicates current SCM is running without Ratis.
+   */
+  public static final long INVALID_TERM = -1;
 
   private static final SCMContext EMPTY_CONTEXT
       = new SCMContext.Builder().build();
@@ -96,6 +106,10 @@ public final class SCMContext implements EventHandler<SafeModeStatus> {
   public boolean isLeader() {
     lock.readLock().lock();
     try {
+      if (term == INVALID_TERM) {
+        return true;
+      }
+
       return isLeader;
     } finally {
       lock.readLock().unlock();
@@ -111,6 +125,10 @@ public final class SCMContext implements EventHandler<SafeModeStatus> {
   public long getTermOfLeader() throws NotLeaderException {
     lock.readLock().lock();
     try {
+      if (term == INVALID_TERM) {
+        return INVALID_TERM;
+      }
+
       if (!isLeader) {
         LOG.warn("getTerm is invoked when not leader.");
         throw scm.getScmHAManager()
@@ -154,10 +172,11 @@ public final class SCMContext implements EventHandler<SafeModeStatus> {
 
   public static class Builder {
     /**
-     * As a leader of term 0, out of in safe mode, and has completed preCheck.
+     * The default context:
+     * running without Ratis, out of safe mode, and has completed preCheck.
      */
-    private boolean isLeader = true;
-    private long term = 0;
+    private boolean isLeader = false;
+    private long term = INVALID_TERM;
     private boolean isInSafeMode = false;
     private boolean isPreCheckComplete = true;
     private StorageContainerManager scm = null;
@@ -188,21 +207,11 @@ public final class SCMContext implements EventHandler<SafeModeStatus> {
     }
 
     public SCMContext build() {
-      if (scm != null) {
-        // SCMContext for HA mode.
-        return new SCMContext(
-            false,
-            0,
-            new SafeModeStatus(true, false),
-            scm);
-      } else {
-        // SCMContext for Recon and Unit Tests.
-        return new SCMContext(
-            isLeader,
-            term,
-            new SafeModeStatus(isInSafeMode, isPreCheckComplete),
-            null);
-      }
+      return new SCMContext(
+          isLeader,
+          term,
+          new SafeModeStatus(isInSafeMode, isPreCheckComplete),
+          scm);
     }
   }
 }
