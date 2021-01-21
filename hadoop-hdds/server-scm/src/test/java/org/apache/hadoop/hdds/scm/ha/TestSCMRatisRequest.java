@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -19,10 +19,14 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import com.google.protobuf.InvalidProtocolBufferException;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.ratis.protocol.Message;
 import org.junit.Assert;
 import org.junit.Test;
+
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType.PIPELINE;
 
@@ -59,5 +63,31 @@ public class TestSCMRatisRequest {
     Message message = Message.valueOf("randomMessage");
     // Should throw exception there.
     SCMRatisRequest.decode(message);
+  }
+
+  @Test
+  public void testEncodeAndDecodeWithList() throws Exception {
+    List<HddsProtos.PipelineID> pids = new ArrayList<>();
+    pids.add(PipelineID.randomId().getProtobuf());
+    pids.add(PipelineID.randomId().getProtobuf());
+    pids.add(PipelineID.randomId().getProtobuf());
+    Object[] args = new Object[] {pids};
+    String operation = "test";
+    SCMRatisRequest request = SCMRatisRequest.of(PIPELINE, operation, args);
+    Assert.assertEquals(operation,
+        SCMRatisRequest.decode(request.encode()).getOperation());
+    Assert.assertEquals(args[0],
+        SCMRatisRequest.decode(request.encode()).getArguments()[0]);
+  }
+
+  @Test
+  public void testEncodeAndDecodeOfLong() throws Exception {
+    final Long value = 10L;
+    String operation = "test";
+    SCMRatisRequest request = SCMRatisRequest.of(PIPELINE, operation, value);
+    Assert.assertEquals(operation,
+        SCMRatisRequest.decode(request.encode()).getOperation());
+    Assert.assertEquals(value,
+        SCMRatisRequest.decode(request.encode()).getArguments()[0]);
   }
 }
