@@ -704,6 +704,16 @@ public class TestOzoneShellHA {
     assertEquals(100, objectStore.getVolume("vol4")
         .getBucket("buck4").getQuotaInNamespace());
 
+    // test whether supports default quota unit as bytes.
+    String[] bucketArgs5 = new String[]{"bucket", "setquota", "vol4/buck4",
+        "--space-quota", "500"};
+    execute(ozoneShell, bucketArgs5);
+    out.reset();
+    assertEquals(500, objectStore.getVolume("vol4")
+        .getBucket("buck4").getQuotaInBytes());
+    assertEquals(100, objectStore.getVolume("vol4")
+        .getBucket("buck4").getQuotaInNamespace());
+
     objectStore.getVolume("vol").deleteBucket("buck");
     objectStore.deleteVolume("vol");
     objectStore.getVolume("vol1").deleteBucket("buck1");

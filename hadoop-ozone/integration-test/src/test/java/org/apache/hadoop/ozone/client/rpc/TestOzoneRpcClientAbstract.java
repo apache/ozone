@@ -283,6 +283,7 @@ public abstract class TestOzoneRpcClientAbstract {
   public void testSetAndClrQuota() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
+    String bucketName2 = UUID.randomUUID().toString();
     String value = "sample value";
     int valueLength = value.getBytes().length;
     OzoneVolume volume = null;
@@ -305,6 +306,13 @@ public abstract class TestOzoneRpcClientAbstract {
         ozoneBucket.getQuotaInBytes());
     Assert.assertEquals(1000L, ozoneBucket.getQuotaInNamespace());
 
+    store.getVolume(volumeName).createBucket(bucketName2);
+    store.getVolume(volumeName).getBucket(bucketName2).setQuota(
+        OzoneQuota.parseQuota("1024", "1000"));
+    OzoneBucket ozoneBucket2 =
+        store.getVolume(volumeName).getBucket(bucketName2);
+    Assert.assertEquals(1024L, ozoneBucket2.getQuotaInBytes());
+
     LambdaTestUtils.intercept(IOException.class, "Can not clear bucket" +
         " spaceQuota because volume spaceQuota is not cleared.",
         () -> ozoneBucket.clearSpaceQuota());
@@ -314,7 +322,7 @@ public abstract class TestOzoneRpcClientAbstract {
         store.getVolume(volumeName).getBucket(bucketName).getUsedNamespace());
     Assert.assertEquals(valueLength,
         store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
-    Assert.assertEquals(1L,
+    Assert.assertEquals(2L,
         store.getVolume(volumeName).getUsedNamespace());
 
     store.getVolume(volumeName).clearSpaceQuota();
@@ -334,7 +342,7 @@ public abstract class TestOzoneRpcClientAbstract {
         store.getVolume(volumeName).getBucket(bucketName).getUsedNamespace());
     Assert.assertEquals(valueLength,
         store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
-    Assert.assertEquals(1L,
+    Assert.assertEquals(2L,
         store.getVolume(volumeName).getUsedNamespace());
   }
 
