@@ -242,7 +242,7 @@ public class TestGenerateOzoneRequiredConfigurations {
   public void genconfHelp() throws Exception {
     File tempPath = getRandomTempDir();
     String[] args = new String[]{"--help"};
-    execute(args, "Usage: ozone genconf [-hV] [--verbose]");
+    execute(args, "Usage: ozone genconf [-hV] [--security] [--verbose]");
   }
 
   private File getRandomTempDir() throws IOException {
