@@ -178,7 +178,7 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
                   trash.createCheckpoint(trashRoot.getPath(),
                       new Date(Time.now()));
                 } catch (Exception e) {
-                  LOG.info("Unable to checkpoint");
+                  LOG.error("Unable to checkpoint:" + trashRoot.getPath(), e);
                 }
               };
               executor.submit(task);

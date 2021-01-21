@@ -70,7 +70,6 @@ import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
@@ -779,7 +778,6 @@ public class TestOzoneFileSystem {
    * 1.Move a Key to Trash
    * 2.Verify that the key gets deleted by the trash emptier.
    */
-  @Ignore("HDDS-4669 : Fix testTrash to work when OM Ratis is enabled")
   @Test
   public void testTrash() throws Exception {
     String testKeyName = "testKey2";
@@ -818,7 +816,7 @@ public class TestOzoneFileSystem {
       try {
         return o3fs.listStatus(userTrash).length==0;
       } catch (IOException e) {
-        LOG.error("Delete from Trash Failed");
+        LOG.error("Delete from Trash Failed", e);
         Assert.fail("Delete from Trash Failed");
         return false;
       }

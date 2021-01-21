@@ -55,7 +55,6 @@ import org.apache.hadoop.test.LambdaTestUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
@@ -1193,7 +1192,6 @@ public class TestRootedOzoneFileSystem {
    * 2.Verify that the key gets deleted by the trash emptier.
    * @throws Exception
    */
-  @Ignore("HDDS-4669 : Fix testTrash to work when OM Ratis is enabled")
   @Test
   public void testTrash() throws Exception {
     String testKeyName = "keyToBeDeleted";
@@ -1221,7 +1219,7 @@ public class TestRootedOzoneFileSystem {
       try {
         return !ofs.exists(trashPath);
       } catch (IOException e) {
-        LOG.error("Delete from Trash Failed");
+        LOG.error("Delete from Trash Failed", e);
         Assert.fail("Delete from Trash Failed");
         return false;
       }
