@@ -17,17 +17,12 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
-import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.google.common.primitives.Ints;
-import com.google.protobuf.GeneratedMessage;
 import com.google.protobuf.InvalidProtocolBufferException;
 
-import com.google.protobuf.ByteString;
-import com.google.protobuf.ProtocolMessageEnum;
-
+import org.apache.hadoop.hdds.scm.ha.io.CodecFactory;
 import org.apache.ratis.protocol.Message;
 
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.Method;
@@ -94,15 +89,8 @@ public final class SCMRatisRequest {
     for (Object argument : arguments) {
       final MethodArgument.Builder argBuilder = MethodArgument.newBuilder();
       argBuilder.setType(argument.getClass().getName());
-      if (argument instanceof GeneratedMessage) {
-        argBuilder.setValue(((GeneratedMessage) argument).toByteString());
-      } else if (argument instanceof ProtocolMessageEnum) {
-        argBuilder.setValue(ByteString.copyFrom(Ints.toByteArray(
-            ((ProtocolMessageEnum) argument).getNumber())));
-      } else {
-        throw new InvalidProtocolBufferException(argument.getClass() +
-            " is not a protobuf object!");
-      }
+      argBuilder.setValue(CodecFactory.getCodec(argument.getClass())
+          .serialize(argument));
       args.add(argBuilder.build());
     }
     methodBuilder.addAllArgs(args);
@@ -124,19 +112,9 @@ public final class SCMRatisRequest {
     for (MethodArgument argument : method.getArgsList()) {
       try {
         final Class<?> clazz = ReflectionUtil.getClass(argument.getType());
-        if (GeneratedMessage.class.isAssignableFrom(clazz)) {
-          args.add(ReflectionUtil.getMethod(clazz, "parseFrom", byte[].class)
-              .invoke(null, (Object) argument.getValue().toByteArray()));
-        } else if (Enum.class.isAssignableFrom(clazz)) {
-          args.add(ReflectionUtil.getMethod(clazz, "valueOf", int.class)
-              .invoke(null, Ints.fromByteArray(
-                  argument.getValue().toByteArray())));
-        } else {
-          throw new InvalidProtocolBufferException(argument.getType() +
-              " is not a protobuf object!");
-        }
-      } catch (ClassNotFoundException | NoSuchMethodException |
-          IllegalAccessException | InvocationTargetException ex) {
+        args.add(CodecFactory.getCodec(clazz)
+            .deserialize(clazz, argument.getValue()));
+      } catch (ClassNotFoundException ex) {
         throw new InvalidProtocolBufferException(argument.getType() +
             " cannot be decoded!" + ex.getMessage());
       }

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -16,36 +16,8 @@
  * limitations under the License.
  */
 
-option java_package = "org.apache.hadoop.hdds.protocol.proto";
-option java_outer_classname = "SCMRatisProtocol";
-option java_generate_equals_and_hash = true;
+/**
+ * This package contains classes related to SCM HA Serialization.
+ */
+package org.apache.hadoop.hdds.scm.ha.io;
 
-enum RequestType {
-    PIPELINE = 1;
-    CONTAINER = 2;
-}
-
-message Method {
-    required string name = 1;
-    repeated MethodArgument args = 2;
-}
-
-message MethodArgument {
-    required string type = 1;
-    required bytes value = 2;
-}
-
-message ListArgument {
-    required string type = 1;
-    repeated bytes value = 2;
-}
-
-message SCMRatisRequestProto {
-    required RequestType type = 1;
-    required Method method = 2;
-}
-
-message SCMRatisResponseProto {
-    required string type = 2;
-    required bytes value = 3;
-}
