@@ -22,6 +22,7 @@ package org.apache.hadoop.hdds.security.x509.certificate.authority;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.commons.validator.routines.DomainValidator;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.DefaultProfile;
@@ -51,6 +52,7 @@ import java.security.spec.InvalidKeySpecException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
 import java.util.function.Consumer;
@@ -286,6 +288,23 @@ public class DefaultCAServer implements CertificateServer {
       throw new SCMSecurityException(ex);
     }
     return revoked;
+  }
+
+  /**
+   *
+   * @param role            - node type: OM/SCM/DN.
+   * @param startSerialId   - start cert serial id.
+   * @param count           - max number of certificates returned in a batch.
+   * @param isRevoked       - whether return revoked cert only.
+   * @return
+   * @throws IOException
+   */
+  @Override
+  public List<X509Certificate> listCertificate(HddsProtos.NodeType role,
+      long startSerialId, int count, boolean isRevoked) throws IOException {
+    return store.listCertificate(role, BigInteger.valueOf(startSerialId), count,
+        isRevoked? CertificateStore.CertType.REVOKED_CERTS :
+            CertificateStore.CertType.VALID_CERTS);
   }
 
   /**

@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.cli.GenericParentCommand;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import picocli.CommandLine;
@@ -29,6 +30,7 @@ import picocli.CommandLine;
 import java.io.IOException;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClient;
 import static picocli.CommandLine.Spec.Target.MIXEE;
 
 /**
@@ -66,6 +68,17 @@ public class ScmOption {
       throw new IllegalArgumentException(
           ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY
               + " should be set in ozone-site.xml or with the --scm option");
+    }
+  }
+
+  public SCMSecurityProtocol createScmSecurityClient() {
+    try {
+      GenericParentCommand parent = (GenericParentCommand)
+          spec.root().userObject();
+      return getScmSecurityClient(parent.createOzoneConfiguration());
+    } catch (IOException ex) {
+      throw new IllegalArgumentException(
+          "Can't create SCM Security client", ex);
     }
   }
 

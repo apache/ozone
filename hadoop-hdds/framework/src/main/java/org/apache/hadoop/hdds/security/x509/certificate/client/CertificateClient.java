@@ -200,4 +200,16 @@ public interface CertificateClient {
     RECOVER
   }
 
+  /**
+   * Get signature algorithm used by signer.
+   * @return signature algorithm
+   */
+  String getSignatureAlgorithm();
+
+  /**
+   * Get security provider.
+   * @return security provider
+   */
+  String getSecurityProvider();
+
 }

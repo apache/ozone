@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.security.token;
 import com.google.common.base.Strings;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
@@ -33,7 +34,16 @@ import org.slf4j.LoggerFactory;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
+import java.security.cert.CertificateExpiredException;
+import java.security.cert.CertificateNotYetValidException;
 import java.security.cert.X509Certificate;
+
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type.GetBlock;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type.GetSmallFile;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type.PutBlock;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type.PutSmallFile;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type.ReadChunk;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type.WriteChunk;
 
 
 /**
@@ -73,14 +83,13 @@ public class BlockTokenVerifier implements TokenVerifier {
     OzoneBlockTokenIdentifier tokenId = new OzoneBlockTokenIdentifier();
     try {
       token.decodeFromUrlString(tokenStr);
-      if (LOGGER.isDebugEnabled()) {
-        LOGGER.debug("Verifying token:{} for user:{} ", token, user);
-      }
       ByteArrayInputStream buf = new ByteArrayInputStream(
           token.getIdentifier());
       DataInputStream in = new DataInputStream(buf);
       tokenId.readFields(in);
-
+      if (LOGGER.isDebugEnabled()) {
+        LOGGER.debug("Verifying token:{} for user:{} ", tokenId, user);
+      }
     } catch (IOException ex) {
       throw new BlockTokenException("Failed to decode token : " + tokenStr);
     }
@@ -99,6 +108,17 @@ public class BlockTokenVerifier implements TokenVerifier {
           "(OmCertSerialId: " + tokenId.getOmCertSerialId() +
           ") of the block token for user: " + tokenUser);
     }
+
+    try {
+      signerCert.checkValidity();
+    } catch (CertificateExpiredException exExp) {
+      throw new BlockTokenException("Block token can't be verified due to " +
+          "expired certificate " + tokenId.getOmCertSerialId());
+    } catch (CertificateNotYetValidException exNyv) {
+      throw new BlockTokenException("Block token can't be verified due to " +
+          "not yet valid certificate " + tokenId.getOmCertSerialId());
+    }
+
     boolean validToken = caClient.verifySignature(tokenId.getBytes(),
         token.getPassword(), signerCert);
     if (!validToken) {
@@ -118,7 +138,21 @@ public class BlockTokenVerifier implements TokenVerifier {
           " by user: " + tokenUser);
     }
 
-    // TODO: check cmd type and the permissions(AccessMode) in the token
+    if (cmd == ReadChunk || cmd == GetBlock || cmd == GetSmallFile) {
+      if (!tokenId.getAccessModes().contains(
+          HddsProtos.BlockTokenSecretProto.AccessModeProto.READ)) {
+        throw new BlockTokenException("Block token with " + id
+            + " doesn't have READ permission");
+      }
+    } else if (cmd == WriteChunk || cmd == PutBlock || cmd == PutSmallFile) {
+      if (!tokenId.getAccessModes().contains(
+          HddsProtos.BlockTokenSecretProto.AccessModeProto.WRITE)) {
+        throw new BlockTokenException("Block token with " + id
+            + " doesn't have WRITE permission");
+      }
+    } else {
+      throw new BlockTokenException("Block token does not support " + cmd);
+    }
   }
 
   public static boolean isTestStub() {

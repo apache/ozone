@@ -196,11 +196,12 @@ public final class OzoneConsts {
    * Quota RESET default is -1, which means quota is not set.
    */
   public static final long QUOTA_RESET = -1;
+  public static final long OLD_QUOTA_DEFAULT = -2;
 
   /**
    * Quota Units.
    */
-  public enum Units {TB, GB, MB, KB, BYTES}
+  public enum Units {TB, GB, MB, KB, B}
 
   /**
    * Max number of keys returned per list buckets operation.
@@ -254,10 +255,14 @@ public final class OzoneConsts {
   // versions, requiring this property to be tracked on a per container basis.
   // V1: All data in default column family.
   public static final String SCHEMA_V1 = "1";
-  // V2: Metadata, block data, and deleted blocks in their own column families.
+  // V2: Metadata, block data, and delete transactions in their own
+  // column families.
   public static final String SCHEMA_V2 = "2";
   // Most recent schema version that all new containers should be created with.
   public static final String SCHEMA_LATEST = SCHEMA_V2;
+
+  public static final String[] SCHEMA_VERSIONS =
+      new String[] {SCHEMA_V1, SCHEMA_V2};
 
   // Supported store types.
   public static final String OZONE = "ozone";
@@ -339,9 +344,7 @@ public final class OzoneConsts {
 
   // Default OMServiceID for OM Ratis servers to use as RaftGroupId
   public static final String OM_SERVICE_ID_DEFAULT = "omServiceIdDefault";
-
-  // Dummy OMNodeID for OM Clients to use for a non-HA OM setup
-  public static final String OM_NODE_ID_DUMMY = "omNodeIdDummy";
+  public static final String OM_DEFAULT_NODE_ID = "om1";
 
   public static final String JAVA_TMP_DIR = "java.io.tmpdir";
   public static final String LOCALHOST = "localhost";

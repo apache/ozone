@@ -18,17 +18,19 @@
 
 package org.apache.hadoop.hdds.protocol;
 
-import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.net.NetConstants;
 import org.apache.hadoop.hdds.scm.net.NodeImpl;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 
 /**
  * DatanodeDetails class contains details about DataNode like:
@@ -181,6 +183,10 @@ public class DatanodeDetails extends NodeImpl implements
     // new/updated port value.
     ports.remove(port);
     ports.add(port);
+  }
+
+  public void setPort(Name name, int port) {
+    setPort(new Port(name, port));
   }
 
   /**
@@ -678,7 +684,7 @@ public class DatanodeDetails extends NodeImpl implements
      * Ports that are supported in DataNode.
      */
     public enum Name {
-      STANDALONE, RATIS, REST
+      STANDALONE, RATIS, REST, REPLICATION
     }
 
     private Name name;

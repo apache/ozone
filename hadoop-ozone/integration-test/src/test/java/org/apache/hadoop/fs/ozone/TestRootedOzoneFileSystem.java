@@ -33,6 +33,7 @@ import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
@@ -95,17 +96,24 @@ public class TestRootedOzoneFileSystem {
 
   @Parameterized.Parameters
   public static Collection<Object[]> data() {
-    return Arrays.asList(new Object[]{true}, new Object[]{false});
+    return Arrays.asList(
+        new Object[]{true, true},
+        new Object[]{true, false},
+        new Object[]{false, true},
+        new Object[]{false, false});
   }
 
-  public TestRootedOzoneFileSystem(boolean setDefaultFs) {
+  public TestRootedOzoneFileSystem(boolean setDefaultFs,
+      boolean enableOMRatis) {
     enabledFileSystemPaths = setDefaultFs;
+    omRatisEnabled = enableOMRatis;
   }
 
   @Rule
   public Timeout globalTimeout = new Timeout(300_000);
 
   private static boolean enabledFileSystemPaths;
+  private static boolean omRatisEnabled;
 
   private static OzoneConfiguration conf;
   private static MiniOzoneCluster cluster = null;
@@ -126,6 +134,7 @@ public class TestRootedOzoneFileSystem {
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.setInt(FS_TRASH_INTERVAL_KEY, 1);
+    conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
         enabledFileSystemPaths);
     cluster = MiniOzoneCluster.newBuilder(conf)
@@ -1210,7 +1219,7 @@ public class TestRootedOzoneFileSystem {
       try {
         return !ofs.exists(trashPath);
       } catch (IOException e) {
-        LOG.error("Delete from Trash Failed");
+        LOG.error("Delete from Trash Failed", e);
         Assert.fail("Delete from Trash Failed");
         return false;
       }

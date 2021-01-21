@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneIllegalArgumentException;
 import org.apache.hadoop.ozone.om.ha.OMNodeDetails;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
@@ -175,9 +176,10 @@ public class TestOzoneManagerConfiguration {
     Collection<RaftPeer> peers = omRatisServer.getRaftGroup().getPeers();
     Assert.assertEquals(1, peers.size());
 
-    // The RaftPeer id should match the configured omId
+    // The RaftPeer id should match OM_DEFAULT_NODE_ID
     RaftPeer raftPeer = peers.toArray(new RaftPeer[1])[0];
-    Assert.assertEquals(omId, raftPeer.getId().toString());
+    Assert.assertEquals(OzoneConsts.OM_DEFAULT_NODE_ID,
+        raftPeer.getId().toString());
   }
 
   /**

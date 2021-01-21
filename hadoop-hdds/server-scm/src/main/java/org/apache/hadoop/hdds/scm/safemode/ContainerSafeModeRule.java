@@ -23,18 +23,17 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
-import com.google.common.base.Preconditions;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
-import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer
-    .NodeRegistrationContainerReport;
-
-import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer.NodeRegistrationContainerReport;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.server.events.TypedEvent;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 
 /**
  * Class defining Safe mode exit criteria for Containers.
@@ -128,7 +127,11 @@ public class ContainerSafeModeRule extends
 
   @Override
   public String getStatusText() {
-    return "currentContainerThreshold " + getCurrentContainerThreshold()
-        + " >= safeModeCutoff " + this.safeModeCutoff;
+    return String
+        .format(
+            "%% of containers with at least one reported replica (=%1.2f) >= "
+                + "safeModeCutoff (=%1.2f)",
+            getCurrentContainerThreshold(), this.safeModeCutoff);
   }
+
 }
