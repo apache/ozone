@@ -73,6 +73,8 @@ public class DeletedBlockLogImpl
 
   public static final Logger LOG =
       LoggerFactory.getLogger(DeletedBlockLogImpl.class);
+  private static final DeletedBlocksTransaction.Builder DUMMY_TXN_BUILDER =
+      DeletedBlocksTransaction.newBuilder().setContainerID(1).setCount(1);
 
   private final int maxRetry;
   private final ContainerManager containerManager;
@@ -82,7 +84,7 @@ public class DeletedBlockLogImpl
   private Map<Long, Set<UUID>> transactionToDNsCommitMap;
 
   private final AtomicLong txID;
-  // largest transactionId is stored by largestTxnIdHolderKey
+  // largest transactionId is stored at largestTxnIdHolderKey
   private final long largestTxnIdHolderKey = 0L;
 
 
@@ -343,10 +345,11 @@ public class DeletedBlockLogImpl
             constructNewTransaction(nextTXID, entry.getKey(),
                 entry.getValue()));
       }
+      // Add a dummy transaction to store the largestTransactionId at
+      // largestTxnIdHolderKey
       scmMetadataStore.getDeletedBlocksTXTable()
           .putWithBatch(batch, largestTxnIdHolderKey,
-              DeletedBlocksTransaction.newBuilder().setTxID(getCurrentTXID())
-                  .setContainerID(1).setCount(1).build());
+              DUMMY_TXN_BUILDER.setTxID(getCurrentTXID()).build());
       scmMetadataStore.getStore().commitBatchOperation(batch);
     } finally {
       lock.unlock();
