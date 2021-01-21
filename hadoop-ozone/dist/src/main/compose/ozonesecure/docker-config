@@ -114,4 +114,7 @@ JSVC_HOME=/usr/bin
 SLEEP_SECONDS=5
 KERBEROS_ENABLED=true
 
+OZONE_CONF_DIR=/etc/hadoop
+OZONE_LOG_DIR=/var/log/hadoop
+
 no_proxy=om,scm,recon,s3g,kdc,localhost,127.0.0.1

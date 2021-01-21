@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -14,8 +15,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-HDDS_VERSION=${hdds.version}
-HADOOP_IMAGE=flokkr/hadoop
-HADOOP_VERSION=3.2.1
-OZONE_RUNNER_VERSION=${docker.ozone-runner.version}
-OZONE_OPTS=
+COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+export COMPOSE_DIR
+
+export SECURITY_ENABLED=false
+export OZONE_REPLICATION_FACTOR=1
+
+# shellcheck source=/dev/null
+source "$COMPOSE_DIR/../testlib.sh"
+
+start_docker_env ${OZONE_REPLICATION_FACTOR}
+
+execute_robot_test datanode compatibility/dn.robot
+execute_robot_test om compatibility/om.robot
+execute_robot_test recon compatibility/recon.robot
+execute_robot_test scm compatibility/scm.robot
+
+stop_docker_env
+
+generate_report

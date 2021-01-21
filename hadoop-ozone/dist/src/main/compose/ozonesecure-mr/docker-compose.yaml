@@ -34,6 +34,8 @@ services:
       - 9600:9600
     env_file:
       - ./docker-config
+    volumes:
+      - ../../libexec/transformation.py:/opt/transformation.py
     command: ["hadoop", "kms"]
   datanode:
     image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
@@ -48,7 +50,7 @@ services:
       - docker-config
     environment:
       KERBEROS_KEYTABS: dn HTTP
-      HADOOP_OPTS: ${HADOOP_OPTS}
+      OZONE_OPTS:
   om:
     image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
     hostname: om
@@ -62,7 +64,7 @@ services:
     environment:
       ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
       KERBEROS_KEYTABS: om HTTP testuser
-      HADOOP_OPTS: ${HADOOP_OPTS}
+      OZONE_OPTS:
     env_file:
       - docker-config
     command: ["/opt/hadoop/bin/ozone","om"]
@@ -79,7 +81,7 @@ services:
       - ./docker-config
     environment:
       KERBEROS_KEYTABS: s3g HTTP
-      HADOOP_OPTS: ${HADOOP_OPTS}
+      OZONE_OPTS:
     command: ["/opt/hadoop/bin/ozone","s3g"]
   scm:
     image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
@@ -97,7 +99,7 @@ services:
       ENSURE_SCM_INITIALIZED: /data/metadata/scm/current/VERSION
       OZONE-SITE.XML_hdds.scm.safemode.min.datanode: "${OZONE_SAFEMODE_MIN_DATANODES:-1}"
       KERBEROS_KEYTABS: scm HTTP
-      HADOOP_OPTS: ${HADOOP_OPTS}
+      OZONE_OPTS:
     command: ["/opt/hadoop/bin/ozone","scm"]
   rm:
     image: ${HADOOP_IMAGE}:${HADOOP_VERSION}
@@ -106,12 +108,12 @@ services:
       - ozone
     volumes:
       - ../..:/opt/ozone
+      - ../../libexec/transformation.py:/opt/transformation.py
     ports:
       - 8088:8088
     env_file:
       - ./docker-config
     environment:
-      HADOOP_CLASSPATH: /opt/ozone/share/ozone/lib/hadoop-ozone-filesystem-hadoop3-@project.version@.jar
       KERBEROS_KEYTABS: rm HTTP hadoop
     command: ["yarn", "resourcemanager"]
   nm:
@@ -121,10 +123,10 @@ services:
       - ozone
     volumes:
       - ../..:/opt/ozone
+      - ../../libexec/transformation.py:/opt/transformation.py
     env_file:
       - ./docker-config
     environment:
-      HADOOP_CLASSPATH: /opt/ozone/share/ozone/lib/hadoop-ozone-filesystem-hadoop3-@project.version@.jar
       WAITFOR: rm:8088
       KERBEROS_KEYTABS: nm HTTP
     command: ["yarn","nodemanager"]
@@ -136,13 +138,13 @@ services:
       - ozone
     volumes:
       - ../..:/opt/ozone
+      - ../../libexec/transformation.py:/opt/transformation.py
     ports:
       - 8188:8188
     env_file:
       - ./docker-config
     environment:
       KERBEROS_KEYTABS: jhs HTTP
-      HADOOP_CLASSPATH: /opt/ozone/share/ozone/lib/hadoop-ozone-filesystem-hadoop3-@project.version@.jar
       WAITFOR: rm:8088
     command: ["yarn","timelineserver"]
 networks:
