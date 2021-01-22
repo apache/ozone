@@ -36,7 +36,8 @@ public class TestConfigFileGenerator {
   @Test
   public void testGeneratedXml() throws FileNotFoundException {
     String generatedXml =
-        new Scanner(new File("target/test-classes/ozone-default-generated.xml"))
+        new Scanner(new File("target/test-classes/ozone-default-generated.xml"),
+            "UTF-8")
             .useDelimiter("//Z")
             .next();
 

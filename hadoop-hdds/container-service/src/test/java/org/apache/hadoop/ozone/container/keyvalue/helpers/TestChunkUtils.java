@@ -64,7 +64,7 @@ public class TestChunkUtils {
   @Test
   public void concurrentReadOfSameFile() throws Exception {
     String s = "Hello World";
-    byte[] array = s.getBytes();
+    byte[] array = s.getBytes(StandardCharsets.UTF_8);
     ChunkBuffer data = ChunkBuffer.wrap(ByteBuffer.wrap(array));
     Path tempFile = Files.createTempFile(PREFIX, "concurrent");
     try {
@@ -85,7 +85,7 @@ public class TestChunkUtils {
             ByteBuffer readBuffer = ByteBuffer.allocate((int) len);
             ChunkUtils.readData(file, readBuffer, offset, len, stats);
             LOG.info("Read data ({}): {}", threadNumber,
-                new String(readBuffer.array()));
+                new String(readBuffer.array(), StandardCharsets.UTF_8));
             if (!Arrays.equals(array, readBuffer.array())) {
               failed.set(true);
             }
@@ -151,7 +151,7 @@ public class TestChunkUtils {
   @Test
   public void serialRead() throws Exception {
     String s = "Hello World";
-    byte[] array = s.getBytes();
+    byte[] array = s.getBytes(StandardCharsets.UTF_8);
     ChunkBuffer data = ChunkBuffer.wrap(ByteBuffer.wrap(array));
     Path tempFile = Files.createTempFile(PREFIX, "serial");
     try {

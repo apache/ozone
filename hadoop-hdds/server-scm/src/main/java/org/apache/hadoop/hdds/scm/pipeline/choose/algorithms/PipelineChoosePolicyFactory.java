@@ -66,7 +66,6 @@ public final class PipelineChoosePolicyFactory {
     }
   }
 
-  @NotNull
   private static PipelineChoosePolicy createPipelineChoosePolicyFromClass(
       Class<? extends PipelineChoosePolicy> policyClass) throws SCMException {
     Constructor<? extends PipelineChoosePolicy> constructor;

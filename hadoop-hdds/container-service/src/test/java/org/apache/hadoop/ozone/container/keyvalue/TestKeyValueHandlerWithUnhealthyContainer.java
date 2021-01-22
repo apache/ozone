@@ -133,7 +133,6 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
   // -- Helper methods below.
 
   private KeyValueHandler getDummyHandler() throws IOException {
-    OzoneConfiguration conf = new OzoneConfiguration();
     DatanodeDetails dnDetails = DatanodeDetails.newBuilder()
         .setUuid(UUID.fromString(DATANODE_UUID))
         .setHostName("dummyHost")
@@ -141,10 +140,6 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
         .build();
     DatanodeStateMachine stateMachine = mock(DatanodeStateMachine.class);
     when(stateMachine.getDatanodeDetails()).thenReturn(dnDetails);
-
-    StateContext context = new StateContext(
-        conf, DatanodeStateMachine.DatanodeStates.RUNNING,
-        stateMachine);
 
     return new KeyValueHandler(
         new OzoneConfiguration(),
@@ -205,6 +200,7 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
       builder.setGetCommittedBlockLength(
           ContainerProtos.GetCommittedBlockLengthRequestProto.newBuilder()
               .setBlockID(fakeBlockId).build());
+      break;
     case ReadChunk:
       builder.setReadChunk(ContainerProtos.ReadChunkRequestProto.newBuilder()
           .setBlockID(fakeBlockId).setChunkData(fakeChunkInfo).build());

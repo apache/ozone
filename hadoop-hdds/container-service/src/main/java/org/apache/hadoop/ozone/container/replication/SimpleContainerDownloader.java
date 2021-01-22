@@ -113,7 +113,6 @@ public class SimpleContainerDownloader implements ContainerDownloader {
   //There is a chance for the download is successful but import is failed,
   //due to data corruption. We need a random selected datanode to have a
   //chance to succeed next time.
-  @NotNull
   protected List<DatanodeDetails> shuffleDatanodes(
       List<DatanodeDetails> sourceDatanodes
   ) {

@@ -15,26 +15,17 @@
    limitations under the License.
 -->
 <FindBugsFilter>
-  <Match>
-    <Package name="org.apache.hadoop.hdds.protocol.proto"/>
-  </Match>
-  <Match>
-    <Class name="org.apache.hadoop.hdds.cli.GenericCli"></Class>
-    <Bug pattern="DM_EXIT" />
-  </Match>
-  <Match>
-    <Class name="org.apache.hadoop.ozone.common.ChecksumByteBuffer$CrcIntTable" />
-    <Method name="update" />
-    <Bug pattern="SF_SWITCH_FALLTHROUGH,SF_SWITCH_NO_DEFAULT" />
-  </Match>
-
   <!-- Test -->
   <Match>
-    <Class name="org.apache.hadoop.hdds.TestHddsUtils"></Class>
-    <Bug pattern="DMI_HARDCODED_ABSOLUTE_FILENAME" />
+    <Class name="org.apache.hadoop.hdds.scm.storage.TestBufferPool"></Class>
+    <Bug pattern="DLS_DEAD_LOCAL_STORE" />
   </Match>
   <Match>
-    <Class name="~org\.apache\.hadoop\.hdds\.scm\.net\.TestNodeSchemaLoader\$.*"></Class>
-    <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD" />
+    <Class name="org.apache.hadoop.hdds.scm.storage.TestChunkInputStream"></Class>
+    <Bug pattern="RR_NOT_CHECKED" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.hdds.scm.storage.TestBlockInputStream"></Class>
+    <Bug pattern="RR_NOT_CHECKED" />
   </Match>
 </FindBugsFilter>

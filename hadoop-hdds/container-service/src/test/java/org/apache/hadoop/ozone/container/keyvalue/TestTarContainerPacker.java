@@ -23,6 +23,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -167,10 +168,11 @@ public class TestTarContainerPacker {
     }
 
     //THEN: check the result
+    TarArchiveInputStream tarStream = null;
     try (FileInputStream input = new FileInputStream(targetFile.toFile())) {
       CompressorInputStream uncompressed = new CompressorStreamFactory()
           .createCompressorInputStream(GZIP, input);
-      TarArchiveInputStream tarStream = new TarArchiveInputStream(uncompressed);
+      tarStream = new TarArchiveInputStream(uncompressed);
 
       TarArchiveEntry entry;
       Map<String, TarArchiveEntry> entries = new HashMap<>();
@@ -181,6 +183,10 @@ public class TestTarContainerPacker {
       Assert.assertTrue(
           entries.containsKey("container.yaml"));
 
+    } finally {
+      if (tarStream != null) {
+        tarStream.close();
+      }
     }
 
     //read the container descriptor only
@@ -304,7 +310,10 @@ public class TestTarContainerPacker {
   }
 
   private void writeDescriptor(KeyValueContainer container) throws IOException {
-    try (FileWriter writer = new FileWriter(container.getContainerFile())) {
+    FileOutputStream fileStream = new FileOutputStream(
+        container.getContainerFile());
+    try (OutputStreamWriter writer = new OutputStreamWriter(fileStream,
+        StandardCharsets.UTF_8)) {
       IOUtils.write(TEST_DESCRIPTOR_FILE_CONTENT, writer);
     }
   }
@@ -316,7 +325,9 @@ public class TestTarContainerPacker {
         .resolve(chunkFileName);
     Files.createDirectories(path.getParent());
     File file = path.toFile();
-    try (FileWriter writer = new FileWriter(file)) {
+    FileOutputStream fileStream = new FileOutputStream(file);
+    try (OutputStreamWriter writer = new OutputStreamWriter(fileStream,
+        StandardCharsets.UTF_8)) {
       IOUtils.write(TEST_CHUNK_FILE_CONTENT, writer);
     }
     return file;
@@ -329,7 +340,9 @@ public class TestTarContainerPacker {
         .resolve(dbFileName);
     Files.createDirectories(path.getParent());
     File file = path.toFile();
-    try (FileWriter writer = new FileWriter(file)) {
+    FileOutputStream fileStream = new FileOutputStream(file);
+    try (OutputStreamWriter writer = new OutputStreamWriter(fileStream,
+        StandardCharsets.UTF_8)) {
       IOUtils.write(TEST_DB_FILE_CONTENT, writer);
     }
     return file;

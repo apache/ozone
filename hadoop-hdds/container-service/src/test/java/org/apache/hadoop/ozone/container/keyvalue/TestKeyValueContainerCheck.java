@@ -49,6 +49,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.RandomAccessFile;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.ArrayList;
 import java.nio.ByteBuffer;
@@ -208,7 +209,8 @@ import static org.junit.Assert.assertFalse;
     int bytesPerChecksum = 2 * unitLen;
     Checksum checksum = new Checksum(ContainerProtos.ChecksumType.SHA256,
         bytesPerChecksum);
-    byte[] chunkData = RandomStringUtils.randomAscii(chunkLen).getBytes();
+    byte[] chunkData = RandomStringUtils.randomAscii(chunkLen).getBytes(
+        StandardCharsets.UTF_8);
     ChecksumData checksumData = checksum.computeChecksum(chunkData);
     DispatcherContext writeStage = new DispatcherContext.Builder()
         .setStage(DispatcherContext.WriteChunkStage.WRITE_DATA)
@@ -219,7 +221,7 @@ import static org.junit.Assert.assertFalse;
 
     containerData = new KeyValueContainerData(containerId,
         chunkManagerTestInfo.getLayout(),
-        chunksPerBlock * chunkLen * totalBlocks,
+        (long) chunksPerBlock * chunkLen * totalBlocks,
         UUID.randomUUID().toString(), UUID.randomUUID().toString());
     container = new KeyValueContainer(containerData, conf);
     container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(),

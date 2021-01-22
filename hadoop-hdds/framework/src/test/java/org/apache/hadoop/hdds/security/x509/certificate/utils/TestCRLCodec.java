@@ -27,10 +27,13 @@ import static org.junit.Assert.assertTrue;
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.security.KeyPair;
 import java.security.NoSuchAlgorithmException;
@@ -134,7 +137,8 @@ public class TestCRLCodec {
                   this.securityConfig.getCrlName()).toFile();
     assertTrue(crlFile.exists());
 
-    try (BufferedReader reader = new BufferedReader(new FileReader(crlFile))){
+    try (BufferedReader reader = new BufferedReader(new InputStreamReader(
+        new FileInputStream(crlFile), StandardCharsets.UTF_8))){
 
       // Verify contents of the file
       String header = reader.readLine();
@@ -159,7 +163,7 @@ public class TestCRLCodec {
     builder.addCRLEntry(x509CertificateHolder.getSerialNumber(), now,
                         CRLReason.cACompromise);
 
-    byte[] crlBytes = TMP_CRL_ENTRY.getBytes();
+    byte[] crlBytes = TMP_CRL_ENTRY.getBytes(StandardCharsets.UTF_8);
     try (InputStream inStream = new ByteArrayInputStream(crlBytes)) {
       CertificateFactory cf = CertificateFactory.getInstance("X.509");
       X509CRL crl = (X509CRL)cf.generateCRL(inStream);

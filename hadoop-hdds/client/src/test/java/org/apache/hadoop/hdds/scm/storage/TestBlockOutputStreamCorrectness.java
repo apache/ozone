@@ -88,7 +88,6 @@ public class TestBlockOutputStreamCorrectness {
     }
   }
 
-  @NotNull
   private BlockOutputStream createBlockOutputStream(BufferPool bufferPool)
       throws IOException {
 
@@ -119,7 +118,7 @@ public class TestBlockOutputStreamCorrectness {
   /**
    * XCeiverClient which simulates responses.
    */
-  private class MockXceiverClientSpi extends XceiverClientSpi {
+  private static class MockXceiverClientSpi extends XceiverClientSpi {
 
     private final Pipeline pipeline;
 

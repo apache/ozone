@@ -76,7 +76,9 @@ public class TestOzoneBlockTokenIdentifier {
   public static void setUp() throws Exception {
     File base = new File(BASEDIR);
     FileUtil.fullyDelete(base);
-    base.mkdirs();
+    if (base.mkdirs()) {
+      LOG.info("Directory " + base + " created.");
+    }
     expiryTime = Time.monotonicNow() + 60 * 60 * 24;
 
     // Create Ozone Master key pair.
