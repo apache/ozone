@@ -102,7 +102,7 @@ public class TestSCMContainerManager {
         scmMetadataStore.getPipelineTable(),
         new EventQueue(),
         SCMContext.emptyContext(),
-        new SCMServiceManager.Builder().build());
+        new SCMServiceManager());
     containerManager = new SCMContainerManager(conf,
         scmMetadataStore.getContainerTable(),
         scmMetadataStore.getStore(),

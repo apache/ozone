@@ -153,8 +153,7 @@ public class TestReplicationManager {
         Mockito.any(DatanodeDetails.class)))
         .thenReturn(NodeStatus.inServiceHealthy());
 
-    SCMServiceManager serviceManager =
-        new SCMServiceManager.Builder().setRaftStatus(null).build();
+    SCMServiceManager serviceManager = new SCMServiceManager();
 
     replicationManager = new ReplicationManager(
         conf,
@@ -166,9 +165,7 @@ public class TestReplicationManager {
         new LockManager<>(conf),
         nodeManager);
 
-    // run without Ratis and not in safe mode.
-    serviceManager.leavingSafeMode();
-
+    serviceManager.notifyStatusChanged();
     Thread.sleep(100L);
   }
 
@@ -180,8 +177,7 @@ public class TestReplicationManager {
         0, TimeUnit.SECONDS);
     config.setFromObject(rmConf);
 
-    SCMServiceManager serviceManager =
-        new SCMServiceManager.Builder().setRaftStatus(null).build();
+    SCMServiceManager serviceManager = new SCMServiceManager();
 
     replicationManager = new ReplicationManager(
         config,
@@ -193,9 +189,7 @@ public class TestReplicationManager {
         new LockManager<ContainerID>(config),
         nodeManager);
 
-    // run without Ratis and not in safe mode.
-    serviceManager.leavingSafeMode();
-
+    serviceManager.notifyStatusChanged();
     Thread.sleep(100L);
   }
 

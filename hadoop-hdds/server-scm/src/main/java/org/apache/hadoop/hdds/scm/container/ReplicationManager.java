@@ -1266,14 +1266,12 @@ public class ReplicationManager implements MetricsSource, SCMService {
   }
 
   @Override
-  public void notifyRaftStatusOrSafeModeStatusChanged(
-      RaftStatus raftStatus, SafeModeStatus safeModeStatus) {
+  public void notifyStatusChanged() {
     serviceLock.lock();
     try {
-      // 1) leader SCM or running without Ratis.
+      // 1) SCMContext#isLeader returns true.
       // 2) not in safe mode.
-      if ((raftStatus == RaftStatus.LEADER || raftStatus == null)
-          && safeModeStatus == SafeModeStatus.OUT_OF_SAFE_MODE) {
+      if (scmContext.isLeader() && !scmContext.isInSafeMode()) {
         // transition from PAUSING to RUNNING
         if (serviceStatus != ServiceStatus.RUNNING) {
           LOG.info("Service {} transitions to RUNNING.", getServiceName());

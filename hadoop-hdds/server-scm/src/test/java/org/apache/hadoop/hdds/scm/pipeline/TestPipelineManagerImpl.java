@@ -90,7 +90,7 @@ public class TestPipelineManagerImpl {
             OZONE_DATANODE_PIPELINE_LIMIT_DEFAULT) /
         HddsProtos.ReplicationFactor.THREE.getNumber();
     scmContext = SCMContext.emptyContext();
-    serviceManager = new SCMServiceManager.Builder().build();
+    serviceManager = new SCMServiceManager();
   }
 
   @After
@@ -349,7 +349,7 @@ public class TestPipelineManagerImpl {
     PipelineManagerV2Impl pipelineManager = createPipelineManager(true);
     SCMSafeModeManager scmSafeModeManager =
         new SCMSafeModeManager(conf, new ArrayList<>(), pipelineManager,
-            new EventQueue(), serviceManager);
+            new EventQueue(), serviceManager, scmContext);
     Pipeline pipeline = pipelineManager
         .createPipeline(HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.THREE);
@@ -467,7 +467,7 @@ public class TestPipelineManagerImpl {
 
     SCMSafeModeManager scmSafeModeManager =
         new SCMSafeModeManager(new OzoneConfiguration(), new ArrayList<>(),
-            pipelineManager, new EventQueue(), serviceManager);
+            pipelineManager, new EventQueue(), serviceManager, scmContext);
     PipelineReportHandler pipelineReportHandler =
         new PipelineReportHandler(scmSafeModeManager, pipelineManager,
             SCMContext.emptyContext(), conf);
@@ -568,8 +568,8 @@ public class TestPipelineManagerImpl {
         OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT, -1,
         TimeUnit.MILLISECONDS);
 
-    scmContext.onMessage(
-        new SCMSafeModeManager.SafeModeStatus(true, false), null);
+    scmContext.updateSafeModeStatus(
+        new SCMSafeModeManager.SafeModeStatus(true, false));
 
     PipelineManagerV2Impl pipelineManager = createPipelineManager(true);
     try {
@@ -591,8 +591,8 @@ public class TestPipelineManagerImpl {
             HddsProtos.ReplicationFactor.ONE).contains(pipeline));
 
     // Simulate safemode check exiting.
-    scmContext.onMessage(
-        new SCMSafeModeManager.SafeModeStatus(true, true), null);
+    scmContext.updateSafeModeStatus(
+        new SCMSafeModeManager.SafeModeStatus(true, true));
     GenericTestUtils.waitFor(new Supplier<Boolean>() {
       @Override
       public Boolean get() {
@@ -611,21 +611,21 @@ public class TestPipelineManagerImpl {
 
     PipelineManagerV2Impl pipelineManager = createPipelineManager(true);
 
-    scmContext.onMessage(
-        new SCMSafeModeManager.SafeModeStatus(true, false), null);
+    scmContext.updateSafeModeStatus(
+        new SCMSafeModeManager.SafeModeStatus(true, false));
     Assert.assertTrue(pipelineManager.getSafeModeStatus());
     Assert.assertFalse(pipelineManager.isPipelineCreationAllowed());
 
     // First pass pre-check as true, but safemode still on
     // Simulate safemode check exiting.
-    scmContext.onMessage(
-        new SCMSafeModeManager.SafeModeStatus(true, true), null);
+    scmContext.updateSafeModeStatus(
+        new SCMSafeModeManager.SafeModeStatus(true, true));
     Assert.assertTrue(pipelineManager.getSafeModeStatus());
     Assert.assertTrue(pipelineManager.isPipelineCreationAllowed());
 
     // Then also turn safemode off
-    scmContext.onMessage(
-        new SCMSafeModeManager.SafeModeStatus(false, true), null);
+    scmContext.updateSafeModeStatus(
+        new SCMSafeModeManager.SafeModeStatus(false, true));
     Assert.assertFalse(pipelineManager.getSafeModeStatus());
     Assert.assertTrue(pipelineManager.isPipelineCreationAllowed());
     pipelineManager.close();

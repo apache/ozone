@@ -29,7 +29,8 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
-import org.apache.hadoop.hdds.scm.ha.SCMService.OneTimeEvent;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.ha.SCMService.Event;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -103,16 +104,19 @@ public class SCMSafeModeManager implements SafeModeManager {
   private final EventQueue eventPublisher;
   private final PipelineManager pipelineManager;
   private final SCMServiceManager serviceManager;
+  private final SCMContext scmContext;
 
   private final SafeModeMetrics safeModeMetrics;
 
   public SCMSafeModeManager(ConfigurationSource conf,
       List<ContainerInfo> allContainers, PipelineManager pipelineManager,
-      EventQueue eventQueue, SCMServiceManager serviceManager) {
+      EventQueue eventQueue, SCMServiceManager serviceManager,
+      SCMContext scmContext) {
     this.config = conf;
     this.pipelineManager = pipelineManager;
     this.eventPublisher = eventQueue;
     this.serviceManager = serviceManager;
+    this.scmContext = scmContext;
     this.isSafeModeEnabled = conf.getBoolean(
         HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED,
         HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED_DEFAULT);
@@ -166,17 +170,22 @@ public class SCMSafeModeManager implements SafeModeManager {
   public void emitSafeModeStatus() {
     SafeModeStatus safeModeStatus =
         new SafeModeStatus(getInSafeMode(), getPreCheckComplete());
+    // TODO: remove eventPublisher,
+    //  since there will no consumer of SAFE_MODE_STATUS in future.
     eventPublisher.fireEvent(SCMEvents.SAFE_MODE_STATUS,
         safeModeStatus);
 
+    // update SCMContext
+    scmContext.updateSafeModeStatus(safeModeStatus);
+
+    // notify SCMServiceManager
     if (!safeModeStatus.isInSafeMode()) {
       // If safemode is off, then notify the delayed listeners with a delay.
-      serviceManager.leavingSafeMode();
+      serviceManager.notifyStatusChanged();
     } else if (safeModeStatus.isPreCheckComplete()) {
       // Only notify the delayed listeners if safemode remains on, as precheck
       // may have completed.
-      serviceManager.triggeringOneTimeEvent(
-          OneTimeEvent.PRE_CHECK_COMPLETED);
+      serviceManager.notifyEventTriggered(Event.PRE_CHECK_COMPLETED);
     }
   }
 

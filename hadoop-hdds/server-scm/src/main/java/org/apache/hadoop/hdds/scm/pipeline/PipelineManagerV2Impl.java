@@ -129,7 +129,9 @@ public final class PipelineManagerV2Impl implements PipelineManager {
 
     // Create background thread.
     BackgroundPipelineCreatorV2 backgroundPipelineCreator =
-        new BackgroundPipelineCreatorV2(pipelineManager, conf, serviceManager);
+        new BackgroundPipelineCreatorV2(
+            pipelineManager, conf, serviceManager, scmContext);
+
     pipelineManager.setBackgroundPipelineCreator(backgroundPipelineCreator);
 
     return pipelineManager;
@@ -533,6 +535,11 @@ public final class PipelineManagerV2Impl implements PipelineManager {
   private void setBackgroundPipelineCreator(
       BackgroundPipelineCreatorV2 backgroundPipelineCreator) {
     this.backgroundPipelineCreator = backgroundPipelineCreator;
+  }
+
+  @VisibleForTesting
+  public BackgroundPipelineCreatorV2 getBackgroundPipelineCreator() {
+    return this.backgroundPipelineCreator;
   }
 
   private void recordMetricsForPipeline(Pipeline pipeline) {

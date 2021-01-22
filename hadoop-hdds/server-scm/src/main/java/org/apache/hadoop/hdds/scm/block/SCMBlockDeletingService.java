@@ -220,14 +220,11 @@ public class SCMBlockDeletingService extends BackgroundService
     blockDeleteLimitSize = numTXs;
   }
 
-
   @Override
-  public void notifyRaftStatusOrSafeModeStatusChanged(
-      RaftStatus raftStatus, SafeModeStatus safeModeStatus) {
+  public void notifyStatusChanged() {
     serviceLock.lock();
     try {
-      // leader SCM or running without Ratis.
-      if (raftStatus == RaftStatus.LEADER || raftStatus == null) {
+      if (scmContext.isLeader()) {
         serviceStatus = ServiceStatus.RUNNING;
       } else {
         serviceStatus = ServiceStatus.PAUSING;

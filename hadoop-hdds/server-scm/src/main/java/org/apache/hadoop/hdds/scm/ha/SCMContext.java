@@ -17,10 +17,9 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.hdds.server.events.EventHandler;
-import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,7 +37,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  * check will always return true, and {@link SCMContext#getTermOfLeader} will
  * return INVALID_TERM.
  */
-public final class SCMContext implements EventHandler<SafeModeStatus> {
+public final class SCMContext {
   private static final Logger LOG = LoggerFactory.getLogger(SCMContext.class);
 
   /**
@@ -81,9 +80,8 @@ public final class SCMContext implements EventHandler<SafeModeStatus> {
   }
 
   /**
-   *
-   * @param leader      : is leader or not
-   * @param newTerm     : term if current SCM becomes leader
+   * @param leader  : is leader or not
+   * @param newTerm : term if current SCM becomes leader
    */
   public void updateLeaderAndTerm(boolean leader, long newTerm) {
     lock.writeLock().lock();
@@ -126,7 +124,7 @@ public final class SCMContext implements EventHandler<SafeModeStatus> {
     lock.readLock().lock();
     try {
       if (term == INVALID_TERM) {
-        return INVALID_TERM;
+        return term;
       }
 
       if (!isLeader) {
@@ -141,8 +139,10 @@ public final class SCMContext implements EventHandler<SafeModeStatus> {
     }
   }
 
-  @Override
-  public void onMessage(SafeModeStatus status, EventPublisher publisher) {
+  /**
+   * @param status : update SCMContext with latest SafeModeStatus.
+   */
+  public void updateSafeModeStatus(SafeModeStatus status) {
     lock.writeLock().lock();
     try {
       LOG.info("Update SafeModeStatus from {} to {}.", safeModeStatus, status);
@@ -168,6 +168,14 @@ public final class SCMContext implements EventHandler<SafeModeStatus> {
     } finally {
       lock.readLock().unlock();
     }
+  }
+
+  /**
+   * @return StorageContainerManager
+   */
+  public StorageContainerManager getScm() {
+    Preconditions.checkNotNull(scm, "scm == null");
+    return scm;
   }
 
   public static class Builder {

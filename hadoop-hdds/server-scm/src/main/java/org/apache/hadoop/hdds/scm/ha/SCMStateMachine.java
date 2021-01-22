@@ -135,7 +135,7 @@ public class SCMStateMachine extends BaseStateMachine {
     LOG.info("current leader SCM steps down.");
 
     scm.getScmContext().updateLeaderAndTerm(false, 0);
-    scm.getSCMServiceManager().stepDown();
+    scm.getSCMServiceManager().notifyStatusChanged();
   }
 
   @Override
@@ -155,7 +155,7 @@ public class SCMStateMachine extends BaseStateMachine {
     LOG.info("current SCM becomes leader of term {}.", term);
 
     scm.getScmContext().updateLeaderAndTerm(true, term);
-    scm.getSCMServiceManager().becomeLeader();
+    scm.getSCMServiceManager().notifyStatusChanged();
   }
 
   @Override

@@ -30,7 +30,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
-import org.apache.hadoop.hdds.scm.ha.SCMService.OneTimeEvent;
+import org.apache.hadoop.hdds.scm.ha.SCMService.Event;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
@@ -82,8 +82,7 @@ public class TestCloseContainerEventHandler {
     scmContext = SCMContext.emptyContext();
     scmMetadataStore = new SCMMetadataStoreImpl(configuration);
 
-    SCMServiceManager serviceManager =
-        new SCMServiceManager.Builder().setRaftStatus(null).build();
+    SCMServiceManager serviceManager = new SCMServiceManager();
 
     pipelineManager =
         PipelineManagerV2Impl.newPipelineManager(
@@ -106,8 +105,7 @@ public class TestCloseContainerEventHandler {
         scmMetadataStore.getContainerTable());
 
     // trigger BackgroundPipelineCreator to take effect.
-    serviceManager.triggeringOneTimeEvent(
-        OneTimeEvent.PRE_CHECK_COMPLETED);
+    serviceManager.notifyEventTriggered(Event.PRE_CHECK_COMPLETED);
 
     eventQueue.addHandler(CLOSE_CONTAINER,
         new CloseContainerEventHandler(

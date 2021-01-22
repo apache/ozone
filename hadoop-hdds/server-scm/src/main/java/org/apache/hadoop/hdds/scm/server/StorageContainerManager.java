@@ -286,7 +286,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
 
     eventQueue = new EventQueue();
-    serviceManager = new SCMServiceManager.Builder().build();
+    serviceManager = new SCMServiceManager();
 
     long watcherTimeout =
         conf.getTimeDuration(ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT,
@@ -365,7 +365,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         (DeletedBlockLogImpl) scmBlockManager.getDeletedBlockLog());
     eventQueue.addHandler(SCMEvents.PIPELINE_ACTIONS, pipelineActionHandler);
     eventQueue.addHandler(SCMEvents.PIPELINE_REPORT, pipelineReportHandler);
-    eventQueue.addHandler(SCMEvents.SAFE_MODE_STATUS, scmContext);
 
     // Emit initial safe mode status, as now handlers are registered.
     scmSafeModeManager.emitSafeModeStatus();
@@ -500,7 +499,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     } else {
       scmSafeModeManager = new SCMSafeModeManager(conf,
           containerManager.getContainers(),
-          pipelineManager, eventQueue, serviceManager);
+          pipelineManager, eventQueue, serviceManager, scmContext);
     }
     scmDecommissionManager = new NodeDecommissionManager(conf, scmNodeManager,
         containerManager, eventQueue, replicationManager);

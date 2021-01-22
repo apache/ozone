@@ -21,7 +21,7 @@ package org.apache.hadoop.hdds.scm.node;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.ha.SCMService.OneTimeEvent;
+import org.apache.hadoop.hdds.scm.ha.SCMService.Event;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
@@ -56,8 +56,8 @@ public class NewNodeHandler implements EventHandler<DatanodeDetails> {
   public void onMessage(DatanodeDetails datanodeDetails,
       EventPublisher publisher) {
     try {
-      serviceManager.triggeringOneTimeEvent(
-          OneTimeEvent.NEW_NODE_HANDLER_TRIGGERED);
+      serviceManager.notifyEventTriggered(Event.NEW_NODE_HANDLER_TRIGGERED);
+
       if (datanodeDetails.getPersistedOpState()
           != HddsProtos.NodeOperationalState.IN_SERVICE) {
         decommissionManager.continueAdminForNode(datanodeDetails);

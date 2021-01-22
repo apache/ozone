@@ -56,7 +56,8 @@ public class TestHealthyPipelineSafeModeRule {
   public void testHealthyPipelineSafeModeRuleWithNoPipelines()
       throws Exception {
     EventQueue eventQueue = new EventQueue();
-    SCMServiceManager serviceManager = new SCMServiceManager.Builder().build();
+    SCMServiceManager serviceManager = new SCMServiceManager();
+    SCMContext scmContext = SCMContext.emptyContext();
     List<ContainerInfo> containers =
             new ArrayList<>(HddsTestUtils.getContainerInfo(1));
 
@@ -81,7 +82,7 @@ public class TestHealthyPipelineSafeModeRule {
               nodeManager,
               scmMetadataStore.getPipelineTable(),
               eventQueue,
-              SCMContext.emptyContext(),
+              scmContext,
               serviceManager);
       PipelineProvider mockRatisProvider =
           new MockRatisPipelineProvider(nodeManager,
@@ -89,7 +90,8 @@ public class TestHealthyPipelineSafeModeRule {
       pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
           mockRatisProvider);
       SCMSafeModeManager scmSafeModeManager = new SCMSafeModeManager(
-          config, containers, pipelineManager, eventQueue, serviceManager);
+          config, containers, pipelineManager, eventQueue,
+          serviceManager, scmContext);
 
       HealthyPipelineSafeModeRule healthyPipelineSafeModeRule =
           scmSafeModeManager.getHealthyPipelineSafeModeRule();
@@ -108,7 +110,8 @@ public class TestHealthyPipelineSafeModeRule {
         TestHealthyPipelineSafeModeRule.class.getName() + UUID.randomUUID());
 
     EventQueue eventQueue = new EventQueue();
-    SCMServiceManager serviceManager = new SCMServiceManager.Builder().build();
+    SCMServiceManager serviceManager = new SCMServiceManager();
+    SCMContext scmContext = SCMContext.emptyContext();
     List<ContainerInfo> containers =
             new ArrayList<>(HddsTestUtils.getContainerInfo(1));
 
@@ -133,7 +136,7 @@ public class TestHealthyPipelineSafeModeRule {
               nodeManager,
               scmMetadataStore.getPipelineTable(),
               eventQueue,
-              SCMContext.emptyContext(),
+              scmContext,
               serviceManager);
 
       PipelineProvider mockRatisProvider =
@@ -167,7 +170,8 @@ public class TestHealthyPipelineSafeModeRule {
       MockRatisPipelineProvider.markPipelineHealthy(pipeline3);
 
       SCMSafeModeManager scmSafeModeManager = new SCMSafeModeManager(
-          config, containers, pipelineManager, eventQueue, serviceManager);
+          config, containers, pipelineManager, eventQueue,
+          serviceManager, scmContext);
 
       HealthyPipelineSafeModeRule healthyPipelineSafeModeRule =
           scmSafeModeManager.getHealthyPipelineSafeModeRule();
@@ -203,7 +207,8 @@ public class TestHealthyPipelineSafeModeRule {
         TestHealthyPipelineSafeModeRule.class.getName() + UUID.randomUUID());
 
     EventQueue eventQueue = new EventQueue();
-    SCMServiceManager serviceManager = new SCMServiceManager.Builder().build();
+    SCMServiceManager serviceManager = new SCMServiceManager();
+    SCMContext scmContext = SCMContext.emptyContext();
     List<ContainerInfo> containers =
             new ArrayList<>(HddsTestUtils.getContainerInfo(1));
 
@@ -229,7 +234,7 @@ public class TestHealthyPipelineSafeModeRule {
               nodeManager,
               scmMetadataStore.getPipelineTable(),
               eventQueue,
-              SCMContext.emptyContext(),
+              scmContext,
               serviceManager);
 
       PipelineProvider mockRatisProvider =
@@ -263,7 +268,8 @@ public class TestHealthyPipelineSafeModeRule {
       MockRatisPipelineProvider.markPipelineHealthy(pipeline3);
 
       SCMSafeModeManager scmSafeModeManager = new SCMSafeModeManager(
-          config, containers, pipelineManager, eventQueue, serviceManager);
+          config, containers, pipelineManager, eventQueue,
+          serviceManager, scmContext);
 
       HealthyPipelineSafeModeRule healthyPipelineSafeModeRule =
           scmSafeModeManager.getHealthyPipelineSafeModeRule();

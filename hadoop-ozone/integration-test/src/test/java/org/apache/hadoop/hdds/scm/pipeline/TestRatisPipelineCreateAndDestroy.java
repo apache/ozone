@@ -21,7 +21,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.hdds.scm.ha.SCMService.OneTimeEvent;
+import org.apache.hadoop.hdds.scm.ha.SCMService.Event;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.HddsDatanodeService;
@@ -163,7 +163,7 @@ public class TestRatisPipelineCreateAndDestroy {
       // make sure pipelines is created after node start
       cluster.getStorageContainerManager()
           .getSCMServiceManager()
-          .triggeringOneTimeEvent(OneTimeEvent.PRE_CHECK_COMPLETED);
+          .notifyEventTriggered(Event.PRE_CHECK_COMPLETED);
       waitForPipelines(1);
     }
   }

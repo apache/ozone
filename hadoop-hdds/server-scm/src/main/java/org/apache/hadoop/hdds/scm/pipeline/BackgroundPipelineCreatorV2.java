@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMService;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -39,20 +40,21 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-import static org.apache.hadoop.hdds.scm.ha.SCMService.OneTimeEvent.NON_HEALTHY_TO_HEALTHY_NODE_HANDLER_TRIGGERED;
-import static org.apache.hadoop.hdds.scm.ha.SCMService.OneTimeEvent.NEW_NODE_HANDLER_TRIGGERED;
-import static org.apache.hadoop.hdds.scm.ha.SCMService.OneTimeEvent.PRE_CHECK_COMPLETED;
+import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.UNHEALTHY_TO_HEALTHY_NODE_HANDLER_TRIGGERED;
+import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.NEW_NODE_HANDLER_TRIGGERED;
+import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.PRE_CHECK_COMPLETED;
 
 /**
  * Implements api for running background pipeline creation jobs.
  */
-class BackgroundPipelineCreatorV2 implements SCMService {
+public class BackgroundPipelineCreatorV2 implements SCMService {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(BackgroundPipelineCreator.class);
 
   private final PipelineManager pipelineManager;
   private final ConfigurationSource conf;
+  private final SCMContext scmContext;
 
   /**
    * SCMService related variables.
@@ -81,9 +83,12 @@ class BackgroundPipelineCreatorV2 implements SCMService {
 
 
   BackgroundPipelineCreatorV2(PipelineManager pipelineManager,
-      ConfigurationSource conf, SCMServiceManager serviceManager) {
+                              ConfigurationSource conf,
+                              SCMServiceManager serviceManager,
+                              SCMContext scmContext) {
     this.pipelineManager = pipelineManager;
     this.conf = conf;
+    this.scmContext = scmContext;
 
     this.createPipelineInSafeMode = conf.getBoolean(
         HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION,
@@ -121,6 +126,9 @@ class BackgroundPipelineCreatorV2 implements SCMService {
         .setDaemon(false)
         .setNameFormat(THREAD_NAME + " - %d")
         .setUncaughtExceptionHandler((Thread t, Throwable ex) -> {
+          // gracefully shutdown SCM.
+          scmContext.getScm().stop();
+
           String message = "Terminate SCM, encounter uncaught exception"
               + " in RatisPipelineUtilsThread";
           ExitUtils.terminate(1, message, ex, LOG);
@@ -230,16 +238,13 @@ class BackgroundPipelineCreatorV2 implements SCMService {
   }
 
   @Override
-  public void notifyRaftStatusOrSafeModeStatusChanged(
-      RaftStatus raftStatus, SafeModeStatus safeModeStatus) {
+  public void notifyStatusChanged() {
     serviceLock.lock();
     try {
-      // 1) leader SCM or running without Ratis.
+      // 1) SCMContext#isLeader returns true.
       // 2) not in safe mode or createPipelineInSafeMode is true
-      if ((raftStatus == RaftStatus.LEADER
-              || raftStatus == null) &&
-          (safeModeStatus == SafeModeStatus.OUT_OF_SAFE_MODE
-              || createPipelineInSafeMode)) {
+      if (scmContext.isLeader() &&
+          (!scmContext.isInSafeMode() || createPipelineInSafeMode)) {
         // transition from PAUSING to RUNNING
         if (serviceStatus != ServiceStatus.RUNNING) {
           LOG.info("Service {} transitions to RUNNING.", getServiceName());
@@ -255,15 +260,14 @@ class BackgroundPipelineCreatorV2 implements SCMService {
   }
 
   @Override
-  public void notifyOneTimeEventTriggered(
-      RaftStatus raftStatus, OneTimeEvent condition) {
-    if (raftStatus != RaftStatus.LEADER && raftStatus != null) {
-      LOG.info("ignore, can not pass RaftStatus check.");
+  public void notifyEventTriggered(Event event) {
+    if (!scmContext.isLeader()) {
+      LOG.info("ignore, not leader SCM.");
       return;
     }
-    if (condition == NEW_NODE_HANDLER_TRIGGERED
-        || condition == NON_HEALTHY_TO_HEALTHY_NODE_HANDLER_TRIGGERED
-        || condition == PRE_CHECK_COMPLETED) {
+    if (event == NEW_NODE_HANDLER_TRIGGERED
+        || event == UNHEALTHY_TO_HEALTHY_NODE_HANDLER_TRIGGERED
+        || event == PRE_CHECK_COMPLETED) {
       LOG.info("trigger a one-shot run on {}.", THREAD_NAME);
       oneShotRun = true;
 

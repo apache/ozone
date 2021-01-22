@@ -64,6 +64,7 @@ public class TestOneReplicaPipelineSafeModeRule {
   private PipelineManagerV2Impl pipelineManager;
   private EventQueue eventQueue;
   private SCMServiceManager serviceManager;
+  private SCMContext scmContext;
   private MockNodeManager mockNodeManager;
 
   private void setup(int nodes, int pipelineFactorThreeCount,
@@ -81,7 +82,8 @@ public class TestOneReplicaPipelineSafeModeRule {
     mockNodeManager = new MockNodeManager(true, nodes);
 
     eventQueue = new EventQueue();
-    serviceManager = new SCMServiceManager.Builder().build();
+    serviceManager = new SCMServiceManager();
+    scmContext = SCMContext.emptyContext();
 
     SCMMetadataStore scmMetadataStore =
             new SCMMetadataStoreImpl(ozoneConfiguration);
@@ -92,7 +94,7 @@ public class TestOneReplicaPipelineSafeModeRule {
         mockNodeManager,
         scmMetadataStore.getPipelineTable(),
         eventQueue,
-        SCMContext.emptyContext(),
+        scmContext,
         serviceManager);
 
     PipelineProvider mockRatisProvider =
@@ -108,7 +110,7 @@ public class TestOneReplicaPipelineSafeModeRule {
 
     SCMSafeModeManager scmSafeModeManager =
         new SCMSafeModeManager(ozoneConfiguration, containers,
-            pipelineManager, eventQueue, serviceManager);
+            pipelineManager, eventQueue, serviceManager, scmContext);
 
     rule = scmSafeModeManager.getOneReplicaPipelineSafeModeRule();
   }

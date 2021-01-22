@@ -33,116 +33,35 @@ public final class SCMServiceManager {
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMServiceManager.class);
 
-  // Cached latest raft status and safe mode status.
-  // If raftStatus equals null, it means current SCM is running without Ratis.
-  private RaftStatus raftStatus;
-  private SafeModeStatus safeModeStatus;
-
   private final List<SCMService> services = new ArrayList<>();
-
-  /**
-   * Start as a follower SCM in safe mode.
-   */
-  private SCMServiceManager(RaftStatus raftStatus,
-                            SafeModeStatus safeModeStatus) {
-    this.raftStatus = raftStatus;
-    this.safeModeStatus = safeModeStatus;
-
-    LOG.info("{} starts with RaftStatus {} and SafeModeStatus {}",
-        SCMServiceManager.class.getSimpleName(), raftStatus, safeModeStatus);
-  }
 
   /**
    * Register a SCMService to SCMServiceManager.
    */
   public synchronized void register(SCMService service) {
     Preconditions.checkNotNull(service);
-    LOG.info("register Service {} notify with RaftStatus {} SafeModeStatus {}",
-        service.getServiceName(), raftStatus, safeModeStatus);
-
+    LOG.info("register Service {}.", service.getServiceName());
     services.add(service);
-    service.notifyRaftStatusOrSafeModeStatusChanged(raftStatus,
-        safeModeStatus);
   }
 
   /**
-   * Current SCM becomes leader.
+   * Notify raft or safe mode related status changed.
    */
-  public synchronized void becomeLeader() {
-    LOG.info("SCM becomes leader.");
-    raftStatus = RaftStatus.LEADER;
-    notifyRaftStatusOrSafeModeStatusChanged();
-  }
-
-  /**
-   * Current SCM steps down.
-   */
-  public synchronized void stepDown() {
-    LOG.info("SCM steps down.");
-    raftStatus = RaftStatus.NOT_LEADER;
-    notifyRaftStatusOrSafeModeStatusChanged();
-  }
-
-  /**
-   * Current SCM enters into safe mode,
-   * e.g., restart or reload SCMStateMachine.
-   */
-  public synchronized void enteringSafeMode() {
-    LOG.info("SCM enters SafeMode.");
-    safeModeStatus = SafeModeStatus.IN_SAFE_MODE;
-    notifyRaftStatusOrSafeModeStatusChanged();
-  }
-
-  /**
-   * Current SCM leaves safe mode.
-   */
-  public synchronized void leavingSafeMode() {
-    LOG.info("SCM leaves SafeMode.");
-    safeModeStatus = SafeModeStatus.OUT_OF_SAFE_MODE;
-    notifyRaftStatusOrSafeModeStatusChanged();
-  }
-
-  /**
-   * Called when one-time event happens.
-   */
-  public synchronized void triggeringOneTimeEvent(OneTimeEvent event) {
-    LOG.info("OneTimeEvent is triggered with {}.", event);
+  public synchronized void notifyStatusChanged() {
     for (SCMService service : services) {
-      LOG.info("Notify service:{} with raftStatus:{} oneTimeEvent:{}",
-          service.getServiceName(), raftStatus, event);
-      service.notifyOneTimeEventTriggered(raftStatus, event);
+      LOG.info("Notify service:{}.", service.getServiceName());
+      service.notifyStatusChanged();
     }
   }
 
-  // iterate services, update them with the latest status.
-  private void notifyRaftStatusOrSafeModeStatusChanged() {
+  /**
+   * Notify event triggered, which may affect SCMService.
+   */
+  public synchronized void notifyEventTriggered(Event event) {
     for (SCMService service : services) {
-      LOG.info("Notify service:{} with raftStatus:{} safeModeStatus:{}",
-          service.getServiceName(), raftStatus, safeModeStatus);
-      service.notifyRaftStatusOrSafeModeStatusChanged(
-          raftStatus, safeModeStatus);
-    }
-  }
-
-  public static class Builder {
-    /**
-     * Default SCMServiceManager is starting as a non-leader SCM in safe mode.
-     */
-    private RaftStatus raftStatus = RaftStatus.NOT_LEADER;
-    private SafeModeStatus safeModeStatus = SafeModeStatus.IN_SAFE_MODE;
-
-    public Builder setRaftStatus(RaftStatus status) {
-      this.raftStatus = status;
-      return this;
-    }
-
-    public Builder setSafeModeStatus(SafeModeStatus status) {
-      this.safeModeStatus = status;
-      return this;
-    }
-
-    public SCMServiceManager build() {
-      return new SCMServiceManager(raftStatus, safeModeStatus);
+      LOG.info("Notify service:{} with event:{}.",
+          service.getServiceName(), event);
+      service.notifyEventTriggered(event);
     }
   }
 }

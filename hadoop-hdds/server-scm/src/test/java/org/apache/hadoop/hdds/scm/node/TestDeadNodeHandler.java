@@ -135,7 +135,6 @@ public class TestDeadNodeHandler {
     // from getting created. Due to how this test is wired up, safemode will
     // not exit when the DNs are registered directly with the node manager.
     scm.exitSafeMode();
-    scm.getSCMServiceManager().becomeLeader();
     // Standalone pipeline now excludes the nodes which are already used,
     // is the a proper behavior. Adding 9 datanodes for now to make the
     // test case happy.

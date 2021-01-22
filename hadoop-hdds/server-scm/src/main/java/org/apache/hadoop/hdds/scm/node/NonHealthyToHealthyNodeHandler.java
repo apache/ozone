@@ -20,7 +20,7 @@ package org.apache.hadoop.hdds.scm.node;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.scm.ha.SCMService.OneTimeEvent;
+import org.apache.hadoop.hdds.scm.ha.SCMService.Event;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -47,7 +47,7 @@ public class NonHealthyToHealthyNodeHandler
   @Override
   public void onMessage(DatanodeDetails datanodeDetails,
       EventPublisher publisher) {
-    serviceManager.triggeringOneTimeEvent(
-        OneTimeEvent.NON_HEALTHY_TO_HEALTHY_NODE_HANDLER_TRIGGERED);
+    serviceManager.notifyEventTriggered(
+        Event.UNHEALTHY_TO_HEALTHY_NODE_HANDLER_TRIGGERED);
   }
 }

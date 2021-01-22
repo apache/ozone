@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
+import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.junit.Test;
 
 import static org.junit.Assert.assertFalse;
@@ -26,14 +27,20 @@ import static org.junit.Assert.assertTrue;
 public class TestSCMServiceManager {
   @Test
   public void testServiceRunWhenLeader() {
+    SCMContext scmContext = new SCMContext.Builder()
+        .setLeader(false)
+        .setTerm(1)
+        .setIsInSafeMode(true)
+        .setIsPreCheckComplete(false)
+        .build();
+
     // A service runs when it is leader.
     SCMService serviceRunWhenLeader = new SCMService() {
       private ServiceStatus serviceStatus = ServiceStatus.PAUSING;
 
       @Override
-      public void notifyRaftStatusOrSafeModeStatusChanged(
-          RaftStatus raftStatus, SafeModeStatus safeModeStatus) {
-        if (raftStatus == RaftStatus.LEADER) {
+      public void notifyStatusChanged() {
+        if (scmContext.isLeader()) {
           serviceStatus = ServiceStatus.RUNNING;
         } else {
           serviceStatus = ServiceStatus.PAUSING;
@@ -51,40 +58,51 @@ public class TestSCMServiceManager {
       }
     };
 
-    SCMServiceManager serviceManager = new SCMServiceManager.Builder().build();
+    SCMServiceManager serviceManager = new SCMServiceManager();
     serviceManager.register(serviceRunWhenLeader);
 
     // PAUSING at the beginning.
     assertFalse(serviceRunWhenLeader.shouldRun());
 
     // PAUSING when out of safe mode.
-    serviceManager.leavingSafeMode();
+    scmContext.updateSafeModeStatus(
+        new SCMSafeModeManager.SafeModeStatus(false, true));
+    serviceManager.notifyStatusChanged();
     assertFalse(serviceRunWhenLeader.shouldRun());
 
     // RUNNING when becoming leader.
-    serviceManager.becomeLeader();
+    scmContext.updateLeaderAndTerm(true, 2);
+    serviceManager.notifyStatusChanged();
     assertTrue(serviceRunWhenLeader.shouldRun());
 
     // RUNNING when in safe mode.
-    serviceManager.enteringSafeMode();
+    scmContext.updateSafeModeStatus(
+        new SCMSafeModeManager.SafeModeStatus(true, false));
+    serviceManager.notifyStatusChanged();
     assertTrue(serviceRunWhenLeader.shouldRun());
 
     // PAUSING when stepping down.
-    serviceManager.stepDown();
+    scmContext.updateLeaderAndTerm(false, 3);
+    serviceManager.notifyStatusChanged();
     assertFalse(serviceRunWhenLeader.shouldRun());
   }
 
   @Test
   public void setServiceRunWhenLeaderAndOutOfSafeMode() {
+    SCMContext scmContext = new SCMContext.Builder()
+        .setLeader(false)
+        .setTerm(1)
+        .setIsInSafeMode(true)
+        .setIsPreCheckComplete(false)
+        .build();
+
     // A service runs when it is leader and out of safe mode.
     SCMService serviceRunWhenLeaderAndOutOfSafeMode = new SCMService() {
       private ServiceStatus serviceStatus = ServiceStatus.PAUSING;
 
       @Override
-      public void notifyRaftStatusOrSafeModeStatusChanged(
-          RaftStatus raftStatus, SafeModeStatus safeModeStatus) {
-        if (raftStatus == RaftStatus.LEADER
-            && safeModeStatus == SafeModeStatus.OUT_OF_SAFE_MODE) {
+      public void notifyStatusChanged() {
+        if (scmContext.isLeader() && !scmContext.isInSafeMode()) {
           serviceStatus = ServiceStatus.RUNNING;
         } else {
           serviceStatus = ServiceStatus.PAUSING;
@@ -102,26 +120,32 @@ public class TestSCMServiceManager {
       }
     };
 
-    SCMServiceManager serviceManager = new SCMServiceManager.Builder().build();
+    SCMServiceManager serviceManager = new SCMServiceManager();
     serviceManager.register(serviceRunWhenLeaderAndOutOfSafeMode);
 
     // PAUSING at the beginning.
     assertFalse(serviceRunWhenLeaderAndOutOfSafeMode.shouldRun());
 
     // PAUSING when out of safe mode.
-    serviceManager.leavingSafeMode();
+    scmContext.updateSafeModeStatus(
+        new SCMSafeModeManager.SafeModeStatus(false, true));
+    serviceManager.notifyStatusChanged();
     assertFalse(serviceRunWhenLeaderAndOutOfSafeMode.shouldRun());
 
     // RUNNING when becoming leader.
-    serviceManager.becomeLeader();
+    scmContext.updateLeaderAndTerm(true, 2);
+    serviceManager.notifyStatusChanged();
     assertTrue(serviceRunWhenLeaderAndOutOfSafeMode.shouldRun());
 
     // PAUSING when in safe mode.
-    serviceManager.enteringSafeMode();
+    scmContext.updateSafeModeStatus(
+        new SCMSafeModeManager.SafeModeStatus(true, false));
+    serviceManager.notifyStatusChanged();
     assertFalse(serviceRunWhenLeaderAndOutOfSafeMode.shouldRun());
 
     // PAUSING when stepping down.
-    serviceManager.stepDown();
+    scmContext.updateLeaderAndTerm(false, 3);
+    serviceManager.notifyStatusChanged();
     assertFalse(serviceRunWhenLeaderAndOutOfSafeMode.shouldRun());
   }
 }

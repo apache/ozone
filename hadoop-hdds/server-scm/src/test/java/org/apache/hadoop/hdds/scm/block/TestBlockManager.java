@@ -123,7 +123,7 @@ public class TestBlockManager {
 
     eventQueue = new EventQueue();
     scmContext = SCMContext.emptyContext();
-    serviceManager = new SCMServiceManager.Builder().build();
+    serviceManager = new SCMServiceManager();
 
     scmMetadataStore = new SCMMetadataStoreImpl(conf);
     scmMetadataStore.start(conf);
@@ -149,7 +149,7 @@ public class TestBlockManager {
             scmMetadataStore.getContainerTable());
     SCMSafeModeManager safeModeManager = new SCMSafeModeManager(conf,
         containerManager.getContainers(),
-        pipelineManager, eventQueue, serviceManager) {
+        pipelineManager, eventQueue, serviceManager, scmContext) {
       @Override
       public void emitSafeModeStatus() {
         // skip
@@ -176,8 +176,7 @@ public class TestBlockManager {
     factor = HddsProtos.ReplicationFactor.THREE;
     type = HddsProtos.ReplicationType.RATIS;
 
-    scm.getScmContext().onMessage(
-        new SafeModeStatus(false, true), null);
+    scm.getScmContext().updateSafeModeStatus(new SafeModeStatus(false, true));
   }
 
   @After
@@ -463,8 +462,8 @@ public class TestBlockManager {
 
   @Test
   public void testAllocateBlockFailureInSafeMode() throws Exception {
-    scm.getScmContext().onMessage(
-        new SCMSafeModeManager.SafeModeStatus(true, true), null);
+    scm.getScmContext().updateSafeModeStatus(
+        new SCMSafeModeManager.SafeModeStatus(true, true));
     // Test1: In safe mode expect an SCMException.
     thrown.expectMessage("SafeModePrecheck failed for "
         + "allocateBlock");

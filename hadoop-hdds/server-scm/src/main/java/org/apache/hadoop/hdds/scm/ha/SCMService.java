@@ -25,18 +25,14 @@ package org.apache.hadoop.hdds.scm.ha;
  */
 public interface SCMService {
   /**
-   * @param raftStatus latest raft status
-   * @param safeModeStatus latest safe mode status
+   * Notify raft or safe mode related status changed.
    */
-  void notifyRaftStatusOrSafeModeStatusChanged(
-      RaftStatus raftStatus, SafeModeStatus safeModeStatus);
+  void notifyStatusChanged();
 
   /**
-   * @param raftStatus latest raft status
-   * @param event latest triggered one time event.
+   * @param event latest triggered event.
    */
-  default void notifyOneTimeEventTriggered(
-      RaftStatus raftStatus, OneTimeEvent event) {
+  default void notifyEventTriggered(Event event) {
   }
 
   /**
@@ -59,27 +55,11 @@ public interface SCMService {
   }
 
   /**
-   * Raft related status.
-   */
-  enum RaftStatus {
-    LEADER,
-    NOT_LEADER
-  }
-
-  /**
-   * Safe mode related status.
-   */
-  enum SafeModeStatus {
-    IN_SAFE_MODE,
-    OUT_OF_SAFE_MODE
-  }
-
-  /**
    * One time event.
    */
-  enum OneTimeEvent {
+  enum Event {
     PRE_CHECK_COMPLETED,
     NEW_NODE_HANDLER_TRIGGERED,
-    NON_HEALTHY_TO_HEALTHY_NODE_HANDLER_TRIGGERED
+    UNHEALTHY_TO_HEALTHY_NODE_HANDLER_TRIGGERED
   }
 }
