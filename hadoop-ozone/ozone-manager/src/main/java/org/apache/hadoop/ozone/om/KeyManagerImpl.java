@@ -31,7 +31,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -2320,6 +2319,7 @@ public class KeyManagerImpl implements KeyManager {
     return fileStatusList;
   }
 
+  @SuppressWarnings("methodlength")
   public List<OzoneFileStatus> listStatusV1(OmKeyArgs args, boolean recursive,
       String startKey, long numEntries, String clientAddress)
           throws IOException {
@@ -2327,10 +2327,32 @@ public class KeyManagerImpl implements KeyManager {
 
     // unsorted OMKeyInfo list contains combine results from TableCache and DB.
     List<OzoneFileStatus> fileStatusFinalList = new ArrayList<>();
-    LinkedHashSet<OzoneFileStatus> fileStatusList = new LinkedHashSet<>();
+
     if (numEntries <= 0) {
       return fileStatusFinalList;
     }
+
+    /**
+     * A map sorted by OmKey to combine results from TableCache and DB for
+     * each entity - Dir & File.
+     *
+     * Two separate maps are required because the order of seek -> (1)Seek
+     * files in fileTable (2)Seek dirs in dirTable.
+     *
+     * StartKey should be added to the final listStatuses, so if we combine
+     * files and dirs into a single map then directory with lower precedence
+     * will appear at the top of the list even if the startKey is given as
+     * fileName.
+     *
+     * For example, startKey="a/file1". As per the seek order, first fetches
+     * all the files and then it will start seeking all the directories.
+     * Assume a directory name exists "a/b". With one map, the sorted list will
+     * be ["a/b", "a/file1"]. But the expected list is: ["a/file1", "a/b"],
+     * startKey element should always be at the top of the listStatuses.
+     */
+    TreeMap<String, OzoneFileStatus> cacheFileMap = new TreeMap<>();
+    TreeMap<String, OzoneFileStatus> cacheDirMap = new TreeMap<>();
+
     String volumeName = args.getVolumeName();
     String bucketName = args.getBucketName();
     String keyName = args.getKeyName();
@@ -2373,12 +2395,12 @@ public class KeyManagerImpl implements KeyManager {
         seekFileInDB = metadataManager.getOzonePathKey(prefixKeyInDB, "");
         seekDirInDB = metadataManager.getOzonePathKey(prefixKeyInDB, "");
 
-        // Order of seek -> (1)Seek dirs in dirTable (2)Seek files in fileTable
+        // Order of seek -> (1)Seek files in fileTable (2)Seek dirs in dirTable
         // 1. Seek the given key in key table.
-        countEntries = getFilesFromDirectory(fileStatusList, seekFileInDB,
+        countEntries = getFilesFromDirectory(cacheFileMap, seekFileInDB,
                 prefixPath, prefixKeyInDB, startKey, countEntries, numEntries);
         // 2. Seek the given key in dir table.
-        getDirectories(fileStatusList, seekDirInDB, prefixPath, prefixKeyInDB,
+        getDirectories(cacheDirMap, seekDirInDB, prefixPath, prefixKeyInDB,
                 startKey, countEntries, numEntries, volumeName, bucketName,
                 recursive);
       } else {
@@ -2420,7 +2442,7 @@ public class KeyManagerImpl implements KeyManager {
             // dirTable. So, its not required to search again in the fileTable.
 
             // Seek the given key in dirTable.
-            getDirectories(fileStatusList, seekDirInDB, prefixPath,
+            getDirectories(cacheDirMap, seekDirInDB, prefixPath,
                     prefixKeyInDB, startKey, countEntries, numEntries,
                     volumeName, bucketName, recursive);
           } else {
@@ -2430,11 +2452,11 @@ public class KeyManagerImpl implements KeyManager {
             seekDirInDB = metadataManager.getOzonePathKey(prefixKeyInDB, "");
 
             // 1. Seek the given key in key table.
-            countEntries = getFilesFromDirectory(fileStatusList, seekFileInDB,
+            countEntries = getFilesFromDirectory(cacheFileMap, seekFileInDB,
                     prefixPath, prefixKeyInDB, startKey, countEntries,
                     numEntries);
             // 2. Seek the given key in dir table.
-            getDirectories(fileStatusList, seekDirInDB, prefixPath,
+            getDirectories(cacheDirMap, seekDirInDB, prefixPath,
                     prefixKeyInDB, startKey, countEntries, numEntries,
                     volumeName, bucketName, recursive);
           }
@@ -2451,12 +2473,16 @@ public class KeyManagerImpl implements KeyManager {
       metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
               bucketName);
     }
-    List<OmKeyInfo> keyInfoList = new ArrayList<>(fileStatusList.size());
-    for (OzoneFileStatus fileStatus : fileStatusList) {
-      if (fileStatus.isFile()) {
-        keyInfoList.add(fileStatus.getKeyInfo());
-      }
+
+    List<OmKeyInfo> keyInfoList = new ArrayList<>();
+    for (OzoneFileStatus fileStatus : cacheFileMap.values()) {
+      fileStatusFinalList.add(fileStatus);
+      keyInfoList.add(fileStatus.getKeyInfo());
     }
+    for (OzoneFileStatus fileStatus : cacheDirMap.values()) {
+      fileStatusFinalList.add(fileStatus);
+    }
+
     // refreshPipeline flag check has been removed as part of
     // https://issues.apache.org/jira/browse/HDDS-3658.
     // Please refer this jira for more details.
@@ -2464,20 +2490,23 @@ public class KeyManagerImpl implements KeyManager {
     if (args.getSortDatanodes()) {
       sortDatanodes(clientAddress, keyInfoList.toArray(new OmKeyInfo[0]));
     }
-    fileStatusFinalList.addAll(fileStatusList);
     return fileStatusFinalList;
   }
 
   @SuppressWarnings("parameternumber")
-  protected int getDirectories(Set<OzoneFileStatus> fileStatusList,
+  protected int getDirectories(
+      TreeMap<String, OzoneFileStatus> cacheKeyMap,
       String seekDirInDB, String prefixPath, long prefixKeyInDB,
       String startKey, int countEntries, long numEntries, String volumeName,
       String bucketName, boolean recursive) throws IOException {
 
+    // A set to keep track of keys deleted in cache but not flushed to DB.
+    Set<String> deletedKeySet = new TreeSet<>();
+
     Table dirTable = metadataManager.getDirectoryTable();
-    countEntries = listStatusFindDirsInTableCache(fileStatusList, dirTable,
+    countEntries = listStatusFindDirsInTableCache(cacheKeyMap, dirTable,
             prefixKeyInDB, seekDirInDB, prefixPath, startKey, volumeName,
-            bucketName, countEntries, numEntries);
+            bucketName, countEntries, numEntries, deletedKeySet);
     TableIterator<String, ? extends Table.KeyValue<String, OmDirectoryInfo>>
             iterator = dirTable.iterator();
 
@@ -2485,6 +2514,11 @@ public class KeyManagerImpl implements KeyManager {
 
     while (iterator.hasNext() && numEntries - countEntries > 0) {
       OmDirectoryInfo dirInfo = iterator.value().getValue();
+      if (deletedKeySet.contains(dirInfo.getPath())) {
+        iterator.next(); // move to next entry in the table
+        // entry is actually deleted in cache and can exists in DB
+        continue;
+      }
       if (!OMFileRequest.isImmediateChild(dirInfo.getParentObjectID(),
               prefixKeyInDB)) {
         break;
@@ -2496,7 +2530,7 @@ public class KeyManagerImpl implements KeyManager {
                 dirInfo.getName());
         OmKeyInfo omKeyInfo = OMFileRequest.getOmKeyInfo(volumeName,
                 bucketName, dirInfo, dirName);
-        fileStatusList.add(new OzoneFileStatus(omKeyInfo, scmBlockSize,
+        cacheKeyMap.put(dirName, new OzoneFileStatus(omKeyInfo, scmBlockSize,
                 true));
         countEntries++;
       }
@@ -2507,20 +2541,28 @@ public class KeyManagerImpl implements KeyManager {
     return countEntries;
   }
 
-  private int getFilesFromDirectory(Set<OzoneFileStatus> fileStatusList,
+  private int getFilesFromDirectory(
+      TreeMap<String, OzoneFileStatus> cacheKeyMap,
       String seekKeyInDB, String prefixKeyPath, long prefixKeyInDB,
       String startKey, int countEntries, long numEntries) throws IOException {
 
+    // A set to keep track of keys deleted in cache but not flushed to DB.
+    Set<String> deletedKeySet = new TreeSet<>();
+
     Table<String, OmKeyInfo> keyTable = metadataManager.getKeyTable();
-    countEntries = listStatusFindFilesInTableCache(fileStatusList, keyTable,
+    countEntries = listStatusFindFilesInTableCache(cacheKeyMap, keyTable,
             prefixKeyInDB, seekKeyInDB, prefixKeyPath, startKey,
-            countEntries, numEntries);
+            countEntries, numEntries, deletedKeySet);
     TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
             iterator = keyTable.iterator();
     iterator.seek(seekKeyInDB);
     while (iterator.hasNext() && numEntries - countEntries > 0) {
       OmKeyInfo keyInfo = iterator.value().getValue();
-
+      if (deletedKeySet.contains(keyInfo.getPath())) {
+        iterator.next(); // move to next entry in the table
+        // entry is actually deleted in cache and can exists in DB
+        continue;
+      }
       if (!OMFileRequest.isImmediateChild(keyInfo.getParentObjectID(),
               prefixKeyInDB)) {
         break;
@@ -2530,7 +2572,8 @@ public class KeyManagerImpl implements KeyManager {
       String fullKeyPath = OMFileRequest.getAbsolutePath(prefixKeyPath,
               keyInfo.getKeyName());
       keyInfo.setKeyName(fullKeyPath);
-      fileStatusList.add(new OzoneFileStatus(keyInfo, scmBlockSize, false));
+      cacheKeyMap.put(fullKeyPath,
+              new OzoneFileStatus(keyInfo, scmBlockSize, false));
       countEntries++;
       iterator.next(); // move to next entry in the table
     }
@@ -2542,10 +2585,10 @@ public class KeyManagerImpl implements KeyManager {
    */
   @SuppressWarnings("parameternumber")
   private int listStatusFindFilesInTableCache(
-          Set<OzoneFileStatus> fileStatusList, Table<String,
+          TreeMap<String, OzoneFileStatus> cacheKeyMap, Table<String,
           OmKeyInfo> keyTable, long prefixKeyInDB, String seekKeyInDB,
           String prefixKeyPath, String startKey, int countEntries,
-          long numEntries) {
+          long numEntries, Set<String> deletedKeySet) {
 
     Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>>
             cacheIter = keyTable.cacheIterator();
@@ -2558,6 +2601,7 @@ public class KeyManagerImpl implements KeyManager {
       OmKeyInfo cacheOmKeyInfo = entry.getValue().getCacheValue();
       // cacheOmKeyInfo is null if an entry is deleted in cache
       if(cacheOmKeyInfo == null){
+        deletedKeySet.add(cacheKey);
         continue;
       }
 
@@ -2571,7 +2615,7 @@ public class KeyManagerImpl implements KeyManager {
               omKeyInfo.getKeyName());
       omKeyInfo.setKeyName(fullKeyPath);
 
-      countEntries = addKeyInfoToFileStatusList(fileStatusList, prefixKeyInDB,
+      countEntries = addKeyInfoToFileStatusList(cacheKeyMap, prefixKeyInDB,
               seekKeyInDB, startKey, countEntries, cacheKey, omKeyInfo,
               false);
     }
@@ -2583,10 +2627,11 @@ public class KeyManagerImpl implements KeyManager {
    */
   @SuppressWarnings("parameternumber")
   private int listStatusFindDirsInTableCache(
-          Set<OzoneFileStatus> fileStatusList, Table<String,
+          TreeMap<String, OzoneFileStatus> cacheKeyMap, Table<String,
           OmDirectoryInfo> dirTable, long prefixKeyInDB, String seekKeyInDB,
           String prefixKeyPath, String startKey, String volumeName,
-          String bucketName, int countEntries, long numEntries) {
+          String bucketName, int countEntries, long numEntries,
+          Set<String> deletedKeySet) {
 
     Iterator<Map.Entry<CacheKey<String>, CacheValue<OmDirectoryInfo>>>
             cacheIter = dirTable.cacheIterator();
@@ -2599,7 +2644,9 @@ public class KeyManagerImpl implements KeyManager {
               cacheIter.next();
       String cacheKey = entry.getKey().getCacheKey();
       OmDirectoryInfo cacheOmDirInfo = entry.getValue().getCacheValue();
+      // cacheOmKeyInfo is null if an entry is deleted in cache
       if(cacheOmDirInfo == null){
+        deletedKeySet.add(cacheKey);
         continue;
       }
       String fullDirPath = OMFileRequest.getAbsolutePath(prefixKeyPath,
@@ -2607,7 +2654,7 @@ public class KeyManagerImpl implements KeyManager {
       OmKeyInfo cacheDirKeyInfo = OMFileRequest.getOmKeyInfo(volumeName,
               bucketName, cacheOmDirInfo, fullDirPath);
 
-      countEntries = addKeyInfoToFileStatusList(fileStatusList, prefixKeyInDB,
+      countEntries = addKeyInfoToFileStatusList(cacheKeyMap, prefixKeyInDB,
               seekKeyInDB, startKey, countEntries, cacheKey, cacheDirKeyInfo,
               true);
     }
@@ -2615,7 +2662,8 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   @SuppressWarnings("parameternumber")
-  private int addKeyInfoToFileStatusList(Set<OzoneFileStatus> fileStatusList,
+  private int addKeyInfoToFileStatusList(
+      TreeMap<String, OzoneFileStatus> cacheKeyMap,
       long prefixKeyInDB, String seekKeyInDB, String startKey,
       int countEntries, String cacheKey, OmKeyInfo cacheOmKeyInfo,
       boolean isDirectory) {
@@ -2627,7 +2675,7 @@ public class KeyManagerImpl implements KeyManager {
       if (cacheKey.startsWith(seekKeyInDB)) {
         OzoneFileStatus fileStatus = new OzoneFileStatus(cacheOmKeyInfo,
                 scmBlockSize, isDirectory);
-        fileStatusList.add(fileStatus);
+        cacheKeyMap.put(cacheOmKeyInfo.getKeyName(), fileStatus);
         countEntries++;
       }
     } else {
@@ -2641,7 +2689,7 @@ public class KeyManagerImpl implements KeyManager {
               cacheKey.compareTo(seekKeyInDB) >= 0) {
         OzoneFileStatus fileStatus = new OzoneFileStatus(cacheOmKeyInfo,
                 scmBlockSize, isDirectory);
-        fileStatusList.add(fileStatus);
+        cacheKeyMap.put(cacheOmKeyInfo.getKeyName(), fileStatus);
         countEntries++;
       }
     }
