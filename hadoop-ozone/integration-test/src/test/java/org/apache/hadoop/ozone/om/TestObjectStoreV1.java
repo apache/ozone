@@ -17,17 +17,23 @@
 package org.apache.hadoop.ozone.om;
 
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
@@ -36,6 +42,7 @@ import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.util.StringUtils;
 import org.junit.Assert;
 import org.junit.AfterClass;
+import org.junit.After;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
@@ -45,6 +52,8 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.UUID;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
@@ -55,6 +64,9 @@ public class TestObjectStoreV1 {
   private static String clusterId;
   private static String scmId;
   private static String omId;
+  private static String volumeName;
+  private static String bucketName;
+  private static FileSystem fs;
 
   @Rule
   public Timeout timeout = new Timeout(240000);
@@ -78,12 +90,51 @@ public class TestObjectStoreV1 {
             .setOmId(omId)
             .build();
     cluster.waitForClusterToBeReady();
+    // create a volume and a bucket to be used by OzoneFileSystem
+    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster);
+    volumeName = bucket.getVolumeName();
+    bucketName = bucket.getName();
+
+    String rootPath = String.format("%s://%s.%s/",
+            OzoneConsts.OZONE_URI_SCHEME, bucket.getName(),
+            bucket.getVolumeName());
+    // Set the fs.defaultFS and start the filesystem
+    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+    // Set the number of keys to be processed during batch operate.
+    conf.setInt(OZONE_FS_ITERATE_BATCH_SIZE, 5);
+    fs = FileSystem.get(conf);
+  }
+
+  @After
+  public void tearDown() throws Exception {
+    deleteRootDir();
+  }
+
+  /**
+   * Cleanup files and directories.
+   *
+   * @throws IOException DB failure
+   */
+  private void deleteRootDir() throws IOException {
+    Path root = new Path("/");
+    FileStatus[] fileStatuses = fs.listStatus(root);
+
+    if (fileStatuses == null) {
+      return;
+    }
+
+    for (FileStatus fStatus : fileStatuses) {
+      fs.delete(fStatus.getPath(), true);
+    }
+
+    fileStatuses = fs.listStatus(root);
+    if (fileStatuses != null) {
+      Assert.assertEquals("Delete root failed!", 0, fileStatuses.length);
+    }
   }
 
   @Test
   public void testCreateKey() throws Exception {
-    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
-    String bucketName = "bucket" + RandomStringUtils.randomNumeric(5);
     String parent = "a/b/c/";
     String file = "key" + RandomStringUtils.randomNumeric(5);
     String key = parent + file;
@@ -91,74 +142,67 @@ public class TestObjectStoreV1 {
     OzoneClient client = cluster.getClient();
 
     ObjectStore objectStore = client.getObjectStore();
-    objectStore.createVolume(volumeName);
-
     OzoneVolume ozoneVolume = objectStore.getVolume(volumeName);
     Assert.assertTrue(ozoneVolume.getName().equals(volumeName));
-    ozoneVolume.createBucket(bucketName);
-
     OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
     Assert.assertTrue(ozoneBucket.getName().equals(bucketName));
 
-    Table<String, OmKeyInfo> openKeyTable =
+    Table<String, OmKeyInfo> openFileTable =
             cluster.getOzoneManager().getMetadataManager().getOpenKeyTable();
 
     // before file creation
-    verifyKeyInFileTable(openKeyTable, file, 0, true);
+    verifyKeyInFileTable(openFileTable, file, 0, true);
 
     String data = "random data";
     OzoneOutputStream ozoneOutputStream = ozoneBucket.createKey(key,
             data.length(), ReplicationType.RATIS, ReplicationFactor.ONE,
             new HashMap<>());
 
-    OmDirectoryInfo dirPathC = getDirInfo(volumeName, bucketName, parent);
+    KeyOutputStream keyOutputStream =
+            (KeyOutputStream) ozoneOutputStream.getOutputStream();
+    long clientID = keyOutputStream.getClientID();
+
+    OmDirectoryInfo dirPathC = getDirInfo(parent);
     Assert.assertNotNull("Failed to find dir path: a/b/c", dirPathC);
 
     // after file creation
-    verifyKeyInOpenFileTable(openKeyTable, file, dirPathC.getObjectID(),
-            false);
+    verifyKeyInOpenFileTable(openFileTable, clientID, file,
+            dirPathC.getObjectID(), false);
 
     ozoneOutputStream.write(data.getBytes(), 0, data.length());
     ozoneOutputStream.close();
 
-    Table<String, OmKeyInfo> keyTable =
+    Table<String, OmKeyInfo> fileTable =
             cluster.getOzoneManager().getMetadataManager().getKeyTable();
-
     // After closing the file. File entry should be removed from openFileTable
     // and it should be added to fileTable.
-    verifyKeyInFileTable(keyTable, file, dirPathC.getObjectID(), false);
-    verifyKeyInOpenFileTable(openKeyTable, file, dirPathC.getObjectID(),
-            true);
+    verifyKeyInFileTable(fileTable, file, dirPathC.getObjectID(), false);
+    verifyKeyInOpenFileTable(openFileTable, clientID, file,
+            dirPathC.getObjectID(), true);
 
     ozoneBucket.deleteKey(key);
 
     // after key delete
-    verifyKeyInFileTable(keyTable, file, dirPathC.getObjectID(), true);
-    verifyKeyInOpenFileTable(openKeyTable, file, dirPathC.getObjectID(),
-            true);
+    verifyKeyInFileTable(fileTable, file, dirPathC.getObjectID(), true);
+    verifyKeyInOpenFileTable(openFileTable, clientID, file,
+            dirPathC.getObjectID(), true);
   }
 
   @Test
   public void testLookupKey() throws Exception {
-    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
-    String bucketName = "bucket" + RandomStringUtils.randomNumeric(5);
     String parent = "a/b/c/";
-    String file = "key" + RandomStringUtils.randomNumeric(5);
-    String key = parent + file;
+    String fileName = "key" + RandomStringUtils.randomNumeric(5);
+    String key = parent + fileName;
 
     OzoneClient client = cluster.getClient();
 
     ObjectStore objectStore = client.getObjectStore();
-    objectStore.createVolume(volumeName);
-
     OzoneVolume ozoneVolume = objectStore.getVolume(volumeName);
     Assert.assertTrue(ozoneVolume.getName().equals(volumeName));
-    ozoneVolume.createBucket(bucketName);
-
     OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
     Assert.assertTrue(ozoneBucket.getName().equals(bucketName));
 
-    Table<String, OmKeyInfo> openKeyTable =
+    Table<String, OmKeyInfo> openFileTable =
             cluster.getOzoneManager().getMetadataManager().getOpenKeyTable();
 
     String data = "random data";
@@ -166,19 +210,23 @@ public class TestObjectStoreV1 {
             data.length(), ReplicationType.RATIS, ReplicationFactor.ONE,
             new HashMap<>());
 
-    OmDirectoryInfo dirPathC = getDirInfo(volumeName, bucketName, parent);
+    KeyOutputStream keyOutputStream =
+            (KeyOutputStream) ozoneOutputStream.getOutputStream();
+    long clientID = keyOutputStream.getClientID();
+
+    OmDirectoryInfo dirPathC = getDirInfo(parent);
     Assert.assertNotNull("Failed to find dir path: a/b/c", dirPathC);
 
     // after file creation
-    verifyKeyInOpenFileTable(openKeyTable, file, dirPathC.getObjectID(),
-            false);
+    verifyKeyInOpenFileTable(openFileTable, clientID, fileName,
+            dirPathC.getObjectID(), false);
 
     ozoneOutputStream.write(data.getBytes(), 0, data.length());
 
     // open key
     try {
       ozoneBucket.getKey(key);
-      fail("Should throw exception as file is not visible and its still " +
+      fail("Should throw exception as fileName is not visible and its still " +
               "open for writing!");
     } catch (OMException ome) {
       // expected
@@ -190,34 +238,33 @@ public class TestObjectStoreV1 {
     OzoneKeyDetails keyDetails = ozoneBucket.getKey(key);
     Assert.assertEquals(key, keyDetails.getName());
 
-    Table<String, OmKeyInfo> keyTable =
+    Table<String, OmKeyInfo> fileTable =
             cluster.getOzoneManager().getMetadataManager().getKeyTable();
 
     // When closing the key, entry should be removed from openFileTable
     // and it should be added to fileTable.
-    verifyKeyInFileTable(keyTable, file, dirPathC.getObjectID(), false);
-    verifyKeyInOpenFileTable(openKeyTable, file, dirPathC.getObjectID(),
-            true);
+    verifyKeyInFileTable(fileTable, fileName, dirPathC.getObjectID(), false);
+    verifyKeyInOpenFileTable(openFileTable, clientID, fileName,
+            dirPathC.getObjectID(), true);
 
     ozoneBucket.deleteKey(key);
 
     // get deleted key
     try {
       ozoneBucket.getKey(key);
-      fail("Should throw exception as file not exists!");
+      fail("Should throw exception as fileName not exists!");
     } catch (OMException ome) {
       // expected
       assertEquals(ome.getResult(), OMException.ResultCodes.KEY_NOT_FOUND);
     }
 
     // after key delete
-    verifyKeyInFileTable(keyTable, file, dirPathC.getObjectID(), true);
-    verifyKeyInOpenFileTable(openKeyTable, file, dirPathC.getObjectID(),
-            true);
+    verifyKeyInFileTable(fileTable, fileName, dirPathC.getObjectID(), true);
+    verifyKeyInOpenFileTable(openFileTable, clientID, fileName,
+            dirPathC.getObjectID(), true);
   }
 
-  private OmDirectoryInfo getDirInfo(String volumeName, String bucketName,
-      String parentKey) throws Exception {
+  private OmDirectoryInfo getDirInfo(String parentKey) throws Exception {
     OMMetadataManager omMetadataManager =
             cluster.getOzoneManager().getMetadataManager();
     long bucketId = TestOMRequestUtils.getBucketId(volumeName, bucketName,
@@ -238,51 +285,38 @@ public class TestObjectStoreV1 {
 
   private void verifyKeyInFileTable(Table<String, OmKeyInfo> fileTable,
       String fileName, long parentID, boolean isEmpty) throws IOException {
-    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> iterator
-            = fileTable.iterator();
 
+    String dbFileKey = parentID + OM_KEY_PREFIX + fileName;
+    OmKeyInfo omKeyInfo = fileTable.get(dbFileKey);
     if (isEmpty) {
-      Assert.assertTrue("Table is not empty!", fileTable.isEmpty());
+      Assert.assertNull("Table is not empty!", omKeyInfo);
     } else {
-      Assert.assertFalse("Table is empty!", fileTable.isEmpty());
-      while (iterator.hasNext()) {
-        Table.KeyValue<String, OmKeyInfo> next = iterator.next();
-        Assert.assertEquals("Invalid Key: " + next.getKey(),
-                parentID + "/" + fileName, next.getKey());
-        OmKeyInfo omKeyInfo = next.getValue();
-        Assert.assertEquals("Invalid Key", fileName,
-                omKeyInfo.getFileName());
-        Assert.assertEquals("Invalid Key", fileName,
-                omKeyInfo.getKeyName());
-        Assert.assertEquals("Invalid Key", parentID,
-                omKeyInfo.getParentObjectID());
-      }
+      Assert.assertNotNull("Table is empty!", omKeyInfo);
+      // used startsWith because the key format is,
+      // <parentID>/fileName/<clientID> and clientID is not visible.
+      Assert.assertEquals("Invalid Key: " + omKeyInfo.getObjectInfo(),
+              omKeyInfo.getKeyName(), fileName);
+      Assert.assertEquals("Invalid Key", parentID,
+              omKeyInfo.getParentObjectID());
     }
   }
 
   private void verifyKeyInOpenFileTable(Table<String, OmKeyInfo> openFileTable,
-      String fileName, long parentID, boolean isEmpty) throws IOException {
-    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> iterator
-            = openFileTable.iterator();
-
+      long clientID, String fileName, long parentID, boolean isEmpty)
+          throws IOException {
+    String dbOpenFileKey =
+            parentID + OM_KEY_PREFIX + fileName + OM_KEY_PREFIX + clientID;
+    OmKeyInfo omKeyInfo = openFileTable.get(dbOpenFileKey);
     if (isEmpty) {
-      Assert.assertTrue("Table is not empty!", openFileTable.isEmpty());
+      Assert.assertNull("Table is not empty!", omKeyInfo);
     } else {
-      Assert.assertFalse("Table is empty!", openFileTable.isEmpty());
-      while (iterator.hasNext()) {
-        Table.KeyValue<String, OmKeyInfo> next = iterator.next();
-        // used startsWith because the key format is,
-        // <parentID>/fileName/<clientID> and clientID is not visible.
-        Assert.assertTrue("Invalid Key: " + next.getKey(),
-                next.getKey().startsWith(parentID + "/" + fileName));
-        OmKeyInfo omKeyInfo = next.getValue();
-        Assert.assertEquals("Invalid Key", fileName,
-                omKeyInfo.getFileName());
-        Assert.assertEquals("Invalid Key", fileName,
-                omKeyInfo.getKeyName());
-        Assert.assertEquals("Invalid Key", parentID,
-                omKeyInfo.getParentObjectID());
-      }
+      Assert.assertNotNull("Table is empty!", omKeyInfo);
+      // used startsWith because the key format is,
+      // <parentID>/fileName/<clientID> and clientID is not visible.
+      Assert.assertEquals("Invalid Key: " + omKeyInfo.getObjectInfo(),
+              omKeyInfo.getKeyName(), fileName);
+      Assert.assertEquals("Invalid Key", parentID,
+              omKeyInfo.getParentObjectID());
     }
   }
 
