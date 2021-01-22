@@ -55,7 +55,7 @@ public class TestContainerPlacementFactory {
   // datanodes array list
   private List<DatanodeDetails> datanodes = new ArrayList<>();
   // node storage capacity
-  private final long storageCapacity = 100L;
+  private static final long storageCapacity = 100L;
   // configuration
   private OzoneConfiguration conf;
   // node manager

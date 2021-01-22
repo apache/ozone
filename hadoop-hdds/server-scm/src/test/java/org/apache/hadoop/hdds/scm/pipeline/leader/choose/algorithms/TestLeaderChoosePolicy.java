@@ -36,13 +36,10 @@ import static org.mockito.Mockito.mock;
 public class TestLeaderChoosePolicy {
   private OzoneConfiguration conf;
 
-  private ScmConfig scmConfig;
-
   @Before
   public void setup() {
     //initialize network topology instance
     conf = new OzoneConfiguration();
-    scmConfig = conf.getObject(ScmConfig.class);
   }
 
   @Test

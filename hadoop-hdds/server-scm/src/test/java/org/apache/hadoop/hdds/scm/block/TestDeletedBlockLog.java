@@ -78,7 +78,7 @@ import static org.mockito.Mockito.when;
  */
 public class TestDeletedBlockLog {
 
-  private static DeletedBlockLogImpl deletedBlockLog;
+  private DeletedBlockLogImpl deletedBlockLog;
   private static final int BLOCKS_PER_TXN = 5;
   private OzoneConfiguration conf;
   private File testDir;
@@ -271,11 +271,7 @@ public class TestDeletedBlockLog {
     Random random = new Random();
     int added = 0, committed = 0;
     List<DeletedBlocksTransaction> blocks = new ArrayList<>();
-    List<Long> txIDs = new ArrayList<>();
-    byte[] latestTxid = StringUtils.string2Bytes("#LATEST_TXID#");
-    MetadataKeyFilters.MetadataKeyFilter avoidLatestTxid =
-        (preKey, currentKey, nextKey) ->
-            !Arrays.equals(latestTxid, currentKey);
+    List<Long> txIDs;
     // Randomly add/get/commit/increase transactions.
     for (int i = 0; i < 100; i++) {
       int state = random.nextInt(4);

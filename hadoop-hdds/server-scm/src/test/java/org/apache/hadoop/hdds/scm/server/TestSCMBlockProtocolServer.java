@@ -50,7 +50,7 @@ public class TestSCMBlockProtocolServer {
   private StorageContainerManager scm;
   private NodeManager nodeManager;
   private ScmBlockLocationProtocolServerSideTranslatorPB service;
-  private final int nodeCount = 10;
+  private static final int nodeCount = 10;
 
   @Before
   public void setUp() throws Exception {
