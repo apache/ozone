@@ -43,6 +43,12 @@ start_docker_env
 
 # Write data and prepare cluster.
 execute_robot_test scm omha/om-prepare.robot
+
+# Cancel preparation.
+execute_robot_test scm omha/om-cancel-prepare.robot
+
+# Prepare cluster again.
+execute_robot_test scm omha/om-prepare.robot
 execute_robot_test scm omha/om-prepared.robot
 
 # re-start cluster and check that it remains prepared.
@@ -55,7 +61,6 @@ execute_robot_test scm omha/om-prepared.robot
 # re-start cluster with --upgrade flag to take it out of prepare.
 KEEP_RUNNING=false stop_docker_env
 export OM_HA_ARGS='--upgrade'
-export OZONE_KEEP_RESULTS=true
 start_docker_env
 
 # Writes should now succeed.
