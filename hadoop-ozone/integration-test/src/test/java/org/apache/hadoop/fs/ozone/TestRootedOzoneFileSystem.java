@@ -44,6 +44,7 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.TrashPolicyOzone;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
@@ -172,6 +173,10 @@ public class TestRootedOzoneFileSystem {
       cluster.shutdown();
     }
     IOUtils.closeQuietly(fs);
+  }
+
+  private OMMetrics getOMMetrics() {
+    return cluster.getOzoneManager().getMetrics();
   }
 
   @Test
@@ -1203,6 +1208,12 @@ public class TestRootedOzoneFileSystem {
         "fs.trash.classname", TrashPolicy.class).
         isAssignableFrom(TrashPolicyOzone.class));
 
+    long prevNumTrashDeletes = getOMMetrics().getNumTrashDeletes();
+    long prevNumTrashFileDeletes = getOMMetrics().getNumTrashFilesDeletes();
+
+    long prevNumTrashRenames = getOMMetrics().getNumTrashRenames();
+    long prevNumTrashFileRenames = getOMMetrics().getNumTrashFilesRenames();
+
     // Call moveToTrash. We can't call protected fs.rename() directly
     trash.moveToTrash(path);
 
@@ -1224,6 +1235,15 @@ public class TestRootedOzoneFileSystem {
         return false;
       }
     }, 1000, 180000);
+
+    Assert.assertTrue(getOMMetrics()
+        .getNumTrashDeletes() >= prevNumTrashDeletes);
+    Assert.assertTrue(getOMMetrics()
+        .getNumTrashRenames() > prevNumTrashRenames);
+    Assert.assertTrue(getOMMetrics()
+        .getNumTrashFilesDeletes() >= prevNumTrashFileDeletes);
+    Assert.assertTrue(getOMMetrics()
+        .getNumTrashFilesRenames() > prevNumTrashFileRenames);
 
     // Cleanup
     ofs.delete(trashRoot, true);
