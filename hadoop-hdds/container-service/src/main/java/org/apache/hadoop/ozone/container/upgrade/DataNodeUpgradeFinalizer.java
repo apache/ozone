@@ -38,8 +38,10 @@ import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 public class DataNodeUpgradeFinalizer extends
     BasicUpgradeFinalizer<DatanodeStateMachine, HDDSLayoutVersionManager> {
 
-  public DataNodeUpgradeFinalizer(HDDSLayoutVersionManager versionManager) {
+  public DataNodeUpgradeFinalizer(HDDSLayoutVersionManager versionManager,
+                                  String optionalClientID) {
     super(versionManager);
+    clientID = optionalClientID;
   }
 
   @Override
