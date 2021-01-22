@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -119,6 +120,11 @@ public class OMKeyDeleteRequestV1 extends OMKeyDeleteRequest {
       }
 
       OmKeyInfo omKeyInfo = keyStatus.getKeyInfo();
+      // New key format for the fileTable & dirTable.
+      // For example, the user given key path is '/a/b/c/d/e/file1', then in DB
+      // keyName field stores only the leaf node name, which is 'file1'.
+      String fileName = OzoneFSUtils.getFileName(keyName);
+      omKeyInfo.setKeyName(fileName);
 
       // Set the UpdateID to current transactionLogIndex
       omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
