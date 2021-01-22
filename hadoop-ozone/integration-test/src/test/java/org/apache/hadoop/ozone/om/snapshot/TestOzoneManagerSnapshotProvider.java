@@ -33,7 +33,7 @@ import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OmFailoverProxyUtil;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
+import org.apache.hadoop.ozone.om.ratis.TransactionInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 
 import org.junit.After;
@@ -136,7 +136,7 @@ public class TestOzoneManagerSnapshotProvider {
   private long getDownloadedSnapshotIndex(DBCheckpoint dbCheckpoint)
       throws Exception {
 
-    OMTransactionInfo trxnInfoFromCheckpoint =
+    TransactionInfo trxnInfoFromCheckpoint =
         OzoneManagerRatisUtils.getTrxnInfoFromCheckpoint(conf,
             dbCheckpoint.getCheckpointLocation());
 

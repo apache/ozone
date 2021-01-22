@@ -140,7 +140,7 @@ public class TestOzoneManagerRatisServer {
         snapshotInfo.getTerm(), snapshotInfo.getIndex() + 100);
 
     omMetadataManager.getTransactionInfoTable().put(TRANSACTION_INFO_KEY,
-        new OMTransactionInfo.Builder()
+        new TransactionInfo.Builder()
             .setCurrentTerm(snapshotInfo.getTerm())
             .setTransactionIndex(snapshotInfo.getIndex() + 100)
             .build());

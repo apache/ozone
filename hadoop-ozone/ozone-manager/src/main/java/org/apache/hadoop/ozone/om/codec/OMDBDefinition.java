@@ -33,7 +33,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 
-import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
+import org.apache.hadoop.ozone.om.ratis.TransactionInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos;
 
@@ -133,14 +133,14 @@ public class OMDBDefinition implements DBDefinition {
                     S3SecretValue.class,
                     new S3SecretValueCodec());
 
-  public static final DBColumnFamilyDefinition<String, OMTransactionInfo>
+  public static final DBColumnFamilyDefinition<String, TransactionInfo>
             TRANSACTION_INFO_TABLE =
             new DBColumnFamilyDefinition<>(
                     OmMetadataManagerImpl.TRANSACTION_INFO_TABLE,
                     String.class,
                     new StringCodec(),
-                    OMTransactionInfo.class,
-                    new OMTransactionInfoCodec());
+                    TransactionInfo.class,
+                    new TransactionInfoCodec());
 
   @Override
   public String getName() {

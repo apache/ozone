@@ -35,7 +35,7 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
-import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
+import org.apache.hadoop.ozone.om.ratis.TransactionInfo;
 import org.apache.hadoop.ozone.storage.proto.
     OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
@@ -343,7 +343,7 @@ public interface OMMetadataManager {
    */
   Table<String, S3SecretValue> getS3SecretTable();
 
-  Table<String, OMTransactionInfo> getTransactionInfoTable();
+  Table<String, TransactionInfo> getTransactionInfoTable();
 
   /**
    * Returns number of rows in a table.  This should not be used for very

@@ -32,7 +32,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_SPLIT_KEY;
 /**
  * TransactionInfo which is persisted to OM DB.
  */
-public final class OMTransactionInfo {
+public final class TransactionInfo {
 
   // Term associated with Ratis Log index in Ratis enabled cluster. In
   // non-Ratis cluster, term is set to -1.
@@ -42,7 +42,7 @@ public final class OMTransactionInfo {
   // non-Ratis cluster
   private long transactionIndex;
 
-  private OMTransactionInfo(String transactionInfo) {
+  private TransactionInfo(String transactionInfo) {
     String[] tInfo =
         transactionInfo.split(TRANSACTION_INFO_SPLIT_KEY);
     Preconditions.checkState(tInfo.length==2,
@@ -52,9 +52,21 @@ public final class OMTransactionInfo {
     transactionIndex = Long.parseLong(tInfo[1]);
   }
 
-  private OMTransactionInfo(long currentTerm, long transactionIndex) {
+  private TransactionInfo(long currentTerm, long transactionIndex) {
     this.term = currentTerm;
     this.transactionIndex = transactionIndex;
+  }
+
+  public boolean isInitialized() {
+    return transactionIndex == -1 && term == 0;
+  }
+
+  public int compareTo(TransactionInfo info) {
+    if (info.getTerm() == this.getTerm()) {
+      return this.getTransactionIndex() <= info.getTransactionIndex() ? -1 : 1;
+    } else {
+      return this.getTerm() < info.getTerm() ? -1 : 1;
+    }
   }
 
   /**
@@ -104,9 +116,9 @@ public final class OMTransactionInfo {
    * @param bytes
    * @return OMTransactionInfo
    */
-  public static OMTransactionInfo getFromByteArray(byte[] bytes) {
+  public static TransactionInfo getFromByteArray(byte[] bytes) {
     String tInfo = StringUtils.bytes2String(bytes);
-    return new OMTransactionInfo(tInfo);
+    return new TransactionInfo(tInfo);
   }
 
   @Override
@@ -117,9 +129,14 @@ public final class OMTransactionInfo {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    OMTransactionInfo that = (OMTransactionInfo) o;
+    TransactionInfo that = (TransactionInfo) o;
     return term == that.term &&
         transactionIndex == that.transactionIndex;
+  }
+
+  public static TransactionInfo fromTermIndex(TermIndex termIndex) {
+    return new Builder().setCurrentTerm(termIndex.getTerm())
+        .setTransactionIndex(termIndex.getIndex()).build();
   }
 
   @Override
@@ -138,12 +155,12 @@ public final class OMTransactionInfo {
    * @return
    * @throws IOException
    */
-  public static OMTransactionInfo readTransactionInfo(
+  public static TransactionInfo readTransactionInfo(
       OMMetadataManager metadataManager) throws IOException {
     return metadataManager.getTransactionInfoTable().get(TRANSACTION_INFO_KEY);
   }
   /**
-   * Builder to build {@link OMTransactionInfo}.
+   * Builder to build {@link TransactionInfo}.
    */
   public static class Builder {
     private long currentTerm = 0;
@@ -159,8 +176,8 @@ public final class OMTransactionInfo {
       return this;
     }
 
-    public OMTransactionInfo build() {
-      return new OMTransactionInfo(currentTerm, transactionIndex);
+    public TransactionInfo build() {
+      return new TransactionInfo(currentTerm, transactionIndex);
     }
 
   }

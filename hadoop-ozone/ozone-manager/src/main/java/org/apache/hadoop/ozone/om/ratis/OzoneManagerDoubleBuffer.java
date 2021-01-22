@@ -215,7 +215,7 @@ public final class OzoneManagerDoubleBuffer {
   }
 
   /**
-   * Add to writeBatch {@link OMTransactionInfo}.
+   * Add to writeBatch {@link TransactionInfo}.
    */
   private Void addToBatchTransactionInfoWithTrace(String parentName,
       long transactionIndex, SupplierWithIOException<Void> supplier)
@@ -277,7 +277,7 @@ public final class OzoneManagerDoubleBuffer {
                 (SupplierWithIOException<Void>) () -> {
                   omMetadataManager.getTransactionInfoTable().putWithBatch(
                       batchOperation, TRANSACTION_INFO_KEY,
-                      new OMTransactionInfo.Builder()
+                      new TransactionInfo.Builder()
                           .setTransactionIndex(lastRatisTransactionIndex)
                           .setCurrentTerm(term).build());
                   return null;
