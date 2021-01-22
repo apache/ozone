@@ -599,10 +599,17 @@ public class TestOzoneFileSystem {
     ArrayList<String> actualPathList = new ArrayList<>();
     if (rootItemCount != fileStatuses.length) {
       for (int i = 0; i < fileStatuses.length; i++) {
-        actualPaths.add(fileStatuses[i].getPath().getName());
+        boolean duplicate =
+                actualPaths.add(fileStatuses[i].getPath().getName());
+        if (!duplicate) {
+          LOG.info("Duplicate path:{} in FileStatusList",
+                  fileStatuses[i].getPath().getName());
+        }
         actualPathList.add(fileStatuses[i].getPath().getName());
       }
       if (rootItemCount != actualPathList.size()) {
+        LOG.info("actualPathsSize: {}", actualPaths.size());
+        LOG.info("actualPathListSize: {}", actualPathList.size());
         actualPaths.removeAll(paths);
         actualPathList.removeAll(paths);
         LOG.info("actualPaths: {}", actualPaths);
