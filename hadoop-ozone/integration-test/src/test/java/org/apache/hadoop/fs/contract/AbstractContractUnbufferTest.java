@@ -84,7 +84,9 @@ public abstract class AbstractContractUnbufferTest
     FSDataInputStream stream = null;
     try {
       stream = getFileSystem().open(file);
-      validateFullFileContents(stream);
+      if (stream != null) {
+        validateFullFileContents(stream);
+      }
     } finally {
       if (stream != null) {
         stream.close();

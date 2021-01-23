@@ -46,7 +46,7 @@ public class TestDnRatisLogParser {
   @Rule
   public Timeout timeout = new Timeout(300000);
 
-  private static MiniOzoneCluster cluster = null;
+  private MiniOzoneCluster cluster = null;
   private final ByteArrayOutputStream out = new ByteArrayOutputStream();
   private final ByteArrayOutputStream err = new ByteArrayOutputStream();
 
@@ -56,8 +56,8 @@ public class TestDnRatisLogParser {
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(1).setTotalPipelineNumLimit(2).build();
     cluster.waitForClusterToBeReady();
-    System.setOut(new PrintStream(out));
-    System.setErr(new PrintStream(err));
+    System.setOut(new PrintStream(out, false, "UTF-8"));
+    System.setErr(new PrintStream(err, false, "UTF-8"));
   }
 
   @After
@@ -89,6 +89,6 @@ public class TestDnRatisLogParser {
     datanodeRatisLogParser.setSegmentFile(logFile);
     datanodeRatisLogParser.parseRatisLogs(
         DatanodeRatisLogParser::smToContainerLogString);
-    Assert.assertTrue(out.toString().contains("Num Total Entries:"));
+    Assert.assertTrue(out.toString("UTF-8").contains("Num Total Entries:"));
   }
 }

@@ -21,6 +21,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.PrintStream;
+import java.io.UnsupportedEncodingException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
@@ -149,9 +150,9 @@ public class TestOzoneShellHA {
   }
 
   @Before
-  public void setup() {
-    System.setOut(new PrintStream(out));
-    System.setErr(new PrintStream(err));
+  public void setup() throws UnsupportedEncodingException {
+    System.setOut(new PrintStream(out, false, "UTF-8"));
+    System.setErr(new PrintStream(err, false, "UTF-8"));
   }
 
   @After
@@ -316,8 +317,8 @@ public class TestOzoneShellHA {
   /**
    * Helper function to get nums of keys from info of listing command.
    */
-  private int getNumOfKeys() {
-    return out.toString().split("key").length - 1;
+  private int getNumOfKeys() throws UnsupportedEncodingException {
+    return out.toString("UTF-8").split("key").length - 1;
   }
 
   /**
@@ -339,8 +340,9 @@ public class TestOzoneShellHA {
   /**
    * Helper function to get nums of buckets from info of listing command.
    */
-  private int getNumOfBuckets(String bucketPrefix) {
-    return out.toString().split(bucketPrefix).length - 1;
+  private int getNumOfBuckets(String bucketPrefix)
+      throws UnsupportedEncodingException {
+    return out.toString("UTF-8").split(bucketPrefix).length - 1;
   }
 
 
@@ -366,9 +368,9 @@ public class TestOzoneShellHA {
     // TODO: Fix this behavior, then uncomment the execute() below.
     String setOmAddress = "--set=" + OMConfigKeys.OZONE_OM_ADDRESS_KEY + "="
         + omLeaderNodeAddr;
-    String[] args = new String[] {setOmAddress,
-        "volume", "create", "o3://" + omLeaderNodeAddrWithoutPort + "/volume2"};
-    //execute(ozoneShell, args);
+    String[] args = new String[] {setOmAddress, "volume", "create",
+        "o3://" + omLeaderNodeAddrWithoutPort + "/volume2"};
+    execute(ozoneShell, args);
 
     // Test case 3: ozone sh volume create o3://om1:port/volume3
     // Expectation: Success.
@@ -403,7 +405,7 @@ public class TestOzoneShellHA {
    * Test ozone shell list command.
    */
   @Test
-  public void testOzoneShCmdList() {
+  public void testOzoneShCmdList() throws UnsupportedEncodingException {
     // Part of listing keys test.
     generateKeys("/volume4", "/bucket");
     final String destinationBucket = "o3://" + omServiceId + "/volume4/bucket";

@@ -42,6 +42,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.io.IOException;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
@@ -103,7 +104,7 @@ public class TestHybridPipelineOnDatanode {
     String bucketName = UUID.randomUUID().toString();
 
     String value = UUID.randomUUID().toString();
-    byte[] data = value.getBytes();
+    byte[] data = value.getBytes(UTF_8);
     objectStore.createVolume(volumeName);
     OzoneVolume volume = objectStore.getVolume(volumeName);
     volume.createBucket(bucketName);
@@ -114,7 +115,7 @@ public class TestHybridPipelineOnDatanode {
     OzoneOutputStream out = bucket
         .createKey(keyName1, data.length, ReplicationType.RATIS,
             ReplicationFactor.ONE, new HashMap<>());
-    out.write(value.getBytes());
+    out.write(value.getBytes(UTF_8));
     out.close();
 
     String keyName2 = UUID.randomUUID().toString();
@@ -123,7 +124,7 @@ public class TestHybridPipelineOnDatanode {
     out = bucket
         .createKey(keyName2, data.length, ReplicationType.RATIS,
             ReplicationFactor.THREE, new HashMap<>());
-    out.write(value.getBytes());
+    out.write(value.getBytes(UTF_8));
     out.close();
 
     // We need to find the location of the chunk file corresponding to the

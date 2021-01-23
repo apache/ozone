@@ -250,7 +250,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
    */
   public static class Builder extends MiniOzoneClusterImpl.Builder {
 
-    private final String nodeIdBaseStr = "omNode-";
+    private static final String NODEIDBASESTR = "omNode-";
     private List<OzoneManager> activeOMs = new ArrayList<>();
     private List<OzoneManager> inactiveOMs = new ArrayList<>();
 
@@ -354,7 +354,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
           for (int i = 1; i<= numOfOMs; i++) {
             // Set nodeId
-            String nodeId = nodeIdBaseStr + i;
+            String nodeId = NODEIDBASESTR + i;
             OzoneConfiguration config = new OzoneConfiguration(conf);
             config.set(OMConfigKeys.OZONE_OM_NODE_ID_KEY, nodeId);
             // Set the OM http(s) address to null so that the cluster picks
@@ -425,7 +425,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       int port = basePort;
 
       for (int i = 1; i <= numOfOMs; i++, port+=6) {
-        String omNodeId = nodeIdBaseStr + i;
+        String omNodeId = NODEIDBASESTR + i;
         omNodesKeyValue.append(",").append(omNodeId);
         String omAddrKey = OmUtils.addKeySuffixes(
             OMConfigKeys.OZONE_OM_ADDRESS_KEY, omServiceId, omNodeId);

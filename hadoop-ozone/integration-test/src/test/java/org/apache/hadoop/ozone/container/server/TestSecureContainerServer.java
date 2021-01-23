@@ -131,9 +131,6 @@ public class TestSecureContainerServer {
   @Test
   public void testClientServer() throws Exception {
     DatanodeDetails dd = MockDatanodeDetails.randomDatanodeDetails();
-    ContainerSet containerSet = new ContainerSet();
-    ContainerController controller = new ContainerController(
-        containerSet, null);
     HddsDispatcher hddsDispatcher = createDispatcher(dd,
         UUID.randomUUID(), CONF);
     runTestClientServer(1, (pipeline, conf) -> conf

@@ -20,6 +20,7 @@ package org.apache.hadoop.fs.ozone;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -106,18 +107,18 @@ public class TestOzoneFileSystem {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOzoneFileSystem.class);
 
-  private static boolean enabledFileSystemPaths;
-  private static boolean omRatisEnabled;
+  private boolean enabledFileSystemPaths;
+  private boolean omRatisEnabled;
 
-  private static MiniOzoneCluster cluster;
-  private static FileSystem fs;
-  private static OzoneFileSystem o3fs;
-  private static String volumeName;
-  private static String bucketName;
-  private static Trash trash;
+  private MiniOzoneCluster cluster;
+  private FileSystem fs;
+  private OzoneFileSystem o3fs;
+  private String volumeName;
+  private String bucketName;
+  private Trash trash;
 
   @BeforeClass
-  public static void init() throws Exception {
+  public void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(FS_TRASH_INTERVAL_KEY, 1);
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
@@ -147,7 +148,7 @@ public class TestOzoneFileSystem {
   }
 
   @AfterClass
-  public static void teardown() {
+  public void teardown() {
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -577,7 +578,8 @@ public class TestOzoneFileSystem {
   @Test
   public void testSeekOnFileLength() throws IOException {
     Path file = new Path("/file");
-    ContractTestUtils.createFile(fs, file, true, "a".getBytes());
+    ContractTestUtils.createFile(fs, file, true, "a".getBytes(
+        StandardCharsets.UTF_8));
     try (FSDataInputStream stream = fs.open(file)) {
       long fileLength = fs.getFileStatus(file).getLen();
       stream.seek(fileLength);

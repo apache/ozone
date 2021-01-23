@@ -267,7 +267,6 @@ public class TestOMRatisSnapshots {
       followerNodeId = leaderOM.getPeerNodes().get(1).getOMNodeId();
     }
     OzoneManager followerOM = cluster.getOzoneManager(followerNodeId);
-    OzoneManagerRatisServer followerRatisServer = followerOM.getOmRatisServer();
 
     // Do some transactions so that the log index increases
     writeKeysToIncreaseLogIndex(leaderRatisServer, 100);
@@ -318,7 +317,7 @@ public class TestOMRatisSnapshots {
     return keys;
   }
 
-  private class DummyExitManager extends ExitManager {
+  private static class DummyExitManager extends ExitManager {
     @Override
     public void exitSystem(int status, String message, Throwable throwable,
         Logger log) {

@@ -50,6 +50,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
@@ -147,7 +148,7 @@ public class TestContainerReplicationEndToEnd {
         objectStore.getVolume(volumeName).getBucket(bucketName)
             .createKey(keyName, 0, ReplicationType.RATIS,
                 ReplicationFactor.THREE, new HashMap<>());
-    byte[] testData = "ratis".getBytes();
+    byte[] testData = "ratis".getBytes(StandardCharsets.UTF_8);
     // First write and flush creates a container in the datanode
     key.write(testData);
     key.flush();

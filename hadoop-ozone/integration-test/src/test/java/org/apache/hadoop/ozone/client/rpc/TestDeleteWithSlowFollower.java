@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.client.rpc;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
@@ -77,14 +78,14 @@ import org.junit.Test;
  */
 public class TestDeleteWithSlowFollower {
 
-  private static MiniOzoneCluster cluster;
-  private static OzoneConfiguration conf;
-  private static OzoneClient client;
-  private static ObjectStore objectStore;
-  private static String volumeName;
-  private static String bucketName;
-  private static String path;
-  private static XceiverClientManager xceiverClientManager;
+  private MiniOzoneCluster cluster;
+  private OzoneConfiguration conf;
+  private OzoneClient client;
+  private ObjectStore objectStore;
+  private String volumeName;
+  private String bucketName;
+  private String path;
+  private XceiverClientManager xceiverClientManager;
   private static final int FACTOR_THREE_PIPELINE_COUNT = 1;
 
   /**
@@ -93,7 +94,7 @@ public class TestDeleteWithSlowFollower {
    * @throws IOException
    */
   @BeforeClass
-  public static void init() throws Exception {
+  public void init() throws Exception {
     conf = new OzoneConfiguration();
     path = GenericTestUtils
         .getTempPath(TestContainerStateMachineFailures.class.getSimpleName());
@@ -172,7 +173,7 @@ public class TestDeleteWithSlowFollower {
    * Shutdown MiniDFSCluster.
    */
   @AfterClass
-  public static void shutdown() {
+  public void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -197,7 +198,7 @@ public class TestDeleteWithSlowFollower {
         objectStore.getVolume(volumeName).getBucket(bucketName)
             .createKey(keyName, 0, ReplicationType.RATIS,
                 ReplicationFactor.THREE, new HashMap<>());
-    byte[] testData = "ratis".getBytes();
+    byte[] testData = "ratis".getBytes(StandardCharsets.UTF_8);
     // First write and flush creates a container in the datanode
     key.write(testData);
     key.flush();

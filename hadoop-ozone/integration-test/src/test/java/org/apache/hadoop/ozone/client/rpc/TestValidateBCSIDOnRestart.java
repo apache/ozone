@@ -53,12 +53,12 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
-import org.apache.ratis.server.storage.FileInfo;
 import org.apache.ratis.statemachine.impl.SimpleStateMachineStorage;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -152,9 +152,9 @@ public class TestValidateBCSIDOnRestart {
                     .createKey("ratis", 1024, ReplicationType.RATIS,
                             ReplicationFactor.ONE, new HashMap<>());
     // First write and flush creates a container in the datanode
-    key.write("ratis".getBytes());
+    key.write("ratis".getBytes(UTF_8));
     key.flush();
-    key.write("ratis".getBytes());
+    key.write("ratis".getBytes(UTF_8));
     KeyOutputStream groupOutputStream = (KeyOutputStream) key.getOutputStream();
     List<OmKeyLocationInfo> locationInfoList =
             groupOutputStream.getLocationInfoList();
@@ -195,7 +195,6 @@ public class TestValidateBCSIDOnRestart {
     // Since the snapshot threshold is set to 1, since there are
     // applyTransactions, we should see snapshots
     Assert.assertTrue(parentPath.getParent().toFile().listFiles().length > 0);
-    FileInfo snapshot = storage.findLatestSnapshot().getFile();
 
     // make sure the missing containerSet is not empty
     HddsDispatcher dispatcher = (HddsDispatcher) ozoneContainer.getDispatcher();
@@ -208,7 +207,7 @@ public class TestValidateBCSIDOnRestart {
             .createKey("ratis", 1024, ReplicationType.RATIS,
                     ReplicationFactor.ONE, new HashMap<>());
     // First write and flush creates a container in the datanode
-    key.write("ratis1".getBytes());
+    key.write("ratis1".getBytes(UTF_8));
     key.flush();
     groupOutputStream = (KeyOutputStream) key.getOutputStream();
     locationInfoList = groupOutputStream.getLocationInfoList();

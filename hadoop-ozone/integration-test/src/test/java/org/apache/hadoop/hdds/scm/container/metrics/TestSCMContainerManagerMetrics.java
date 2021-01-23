@@ -37,6 +37,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
@@ -164,7 +165,8 @@ public class TestSCMContainerManagerMetrics {
             new HashMap<>());
 
     String data = "file data";
-    ozoneOutputStream.write(data.getBytes(), 0, data.length());
+    ozoneOutputStream.write(data.getBytes(StandardCharsets.UTF_8),
+        0, data.length());
     ozoneOutputStream.close();
 
 

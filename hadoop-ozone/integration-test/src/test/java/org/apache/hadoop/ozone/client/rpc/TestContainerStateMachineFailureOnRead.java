@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.client.rpc;
 
 import java.io.File;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
@@ -169,7 +170,7 @@ public class TestContainerStateMachineFailureOnRead {
         .createKey("ratis", 1024, ReplicationType.RATIS,
             ReplicationFactor.THREE, new HashMap<>());
     // First write and flush creates a container in the datanode
-    key.write("ratis".getBytes());
+    key.write("ratis".getBytes(StandardCharsets.UTF_8));
     key.flush();
     
     // get the name of a valid container

@@ -37,6 +37,7 @@ import org.junit.Test;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -121,7 +122,7 @@ public class TestBCSID {
         objectStore.getVolume(volumeName).getBucket(bucketName)
             .createKey("ratis", 1024, ReplicationType.RATIS,
                 ReplicationFactor.ONE, new HashMap<>());
-    key.write("ratis".getBytes());
+    key.write("ratis".getBytes(StandardCharsets.UTF_8));
     key.close();
 
     // get the name of a valid container.

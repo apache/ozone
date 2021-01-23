@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.client.rpc;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
@@ -141,9 +142,9 @@ public class TestContainerStateMachine {
             .createKey("ratis", 1024, ReplicationType.RATIS,
                 ReplicationFactor.ONE, new HashMap<>());
     // First write and flush creates a container in the datanode
-    key.write("ratis".getBytes());
+    key.write("ratis".getBytes(StandardCharsets.UTF_8));
     key.flush();
-    key.write("ratis".getBytes());
+    key.write("ratis".getBytes(StandardCharsets.UTF_8));
 
     //get the name of a valid container
     KeyOutputStream groupOutputStream =
@@ -187,9 +188,9 @@ public class TestContainerStateMachine {
               .createKey(("ratis" + i), 1024, ReplicationType.RATIS,
                   ReplicationFactor.ONE, new HashMap<>());
       // First write and flush creates a container in the datanode
-      key.write(("ratis" + i).getBytes());
+      key.write(("ratis" + i).getBytes(StandardCharsets.UTF_8));
       key.flush();
-      key.write(("ratis" + i).getBytes());
+      key.write(("ratis" + i).getBytes(StandardCharsets.UTF_8));
       key.close();
     }
 
@@ -211,9 +212,9 @@ public class TestContainerStateMachine {
               .createKey(("ratis" + i), 1024, ReplicationType.RATIS,
                   ReplicationFactor.ONE, new HashMap<>());
       // First write and flush creates a container in the datanode
-      key.write(("ratis" + i).getBytes());
+      key.write(("ratis" + i).getBytes(StandardCharsets.UTF_8));
       key.flush();
-      key.write(("ratis" + i).getBytes());
+      key.write(("ratis" + i).getBytes(StandardCharsets.UTF_8));
       key.close();
     }
     stateMachine =

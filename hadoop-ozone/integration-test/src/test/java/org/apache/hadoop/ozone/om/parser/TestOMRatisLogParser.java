@@ -50,7 +50,7 @@ public class TestOMRatisLogParser {
   @Rule
   public Timeout timeout = new Timeout(300000);
 
-  private static MiniOzoneHAClusterImpl cluster = null;
+  private MiniOzoneHAClusterImpl cluster = null;
   private final ByteArrayOutputStream out = new ByteArrayOutputStream();
   private final ByteArrayOutputStream err = new ByteArrayOutputStream();
 
@@ -70,8 +70,8 @@ public class TestOMRatisLogParser {
     ObjectStore objectStore = OzoneClientFactory.getRpcClient(omServiceId, conf)
         .getObjectStore();
     performFewRequests(objectStore);
-    System.setOut(new PrintStream(out));
-    System.setErr(new PrintStream(err));
+    System.setOut(new PrintStream(out, false, "UTF-8"));
+    System.setErr(new PrintStream(err, false, "UTF-8"));
   }
 
   private void performFewRequests(ObjectStore objectStore) throws Exception {
@@ -122,6 +122,6 @@ public class TestOMRatisLogParser {
 
     // Not checking total entry count, because of not sure of exact count of
     // metadata entry changes.
-    Assert.assertTrue(out.toString().contains("Num Total Entries:"));
+    Assert.assertTrue(out.toString("UTF-8").contains("Num Total Entries:"));
   }
 }

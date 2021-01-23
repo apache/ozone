@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Scanner;
 
@@ -83,14 +84,14 @@ public final class TestDataUtil {
     try (OutputStream stream = bucket
         .createKey(keyName, content.length(), repType, repFactor,
             new HashMap<>())) {
-      stream.write(content.getBytes());
+      stream.write(content.getBytes(StandardCharsets.UTF_8));
     }
   }
 
   public static String getKey(OzoneBucket bucket, String keyName)
       throws IOException {
     try (InputStream stream = bucket.readKey(keyName)) {
-      return new Scanner(stream).useDelimiter("\\A").next();
+      return new Scanner(stream, "UTF-8").useDelimiter("\\A").next();
     }
   }
 

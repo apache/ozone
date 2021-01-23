@@ -112,26 +112,26 @@ public class TestRootedOzoneFileSystem {
   @Rule
   public Timeout globalTimeout = new Timeout(300_000);
 
-  private static boolean enabledFileSystemPaths;
-  private static boolean omRatisEnabled;
+  private boolean enabledFileSystemPaths;
+  private boolean omRatisEnabled;
 
-  private static OzoneConfiguration conf;
-  private static MiniOzoneCluster cluster = null;
-  private static FileSystem fs;
-  private static RootedOzoneFileSystem ofs;
-  private static ObjectStore objectStore;
-  private static BasicRootedOzoneClientAdapterImpl adapter;
-  private static Trash trash;
+  private OzoneConfiguration conf;
+  private MiniOzoneCluster cluster = null;
+  private FileSystem fs;
+  private RootedOzoneFileSystem ofs;
+  private ObjectStore objectStore;
+  private BasicRootedOzoneClientAdapterImpl adapter;
+  private Trash trash;
 
-  private static String volumeName;
-  private static Path volumePath;
-  private static String bucketName;
+  private String volumeName;
+  private Path volumePath;
+  private String bucketName;
   // Store path commonly used by tests that test functionality within a bucket
-  private static Path bucketPath;
-  private static String rootPath;
+  private Path bucketPath;
+  private String rootPath;
 
   @BeforeClass
-  public static void init() throws Exception {
+  public void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.setInt(FS_TRASH_INTERVAL_KEY, 1);
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
@@ -167,7 +167,7 @@ public class TestRootedOzoneFileSystem {
   }
 
   @AfterClass
-  public static void teardown() {
+  public void teardown() {
     if (cluster != null) {
       cluster.shutdown();
     }
