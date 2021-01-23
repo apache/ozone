@@ -78,14 +78,14 @@ import org.junit.Test;
  */
 public class TestDeleteWithSlowFollower {
 
-  private MiniOzoneCluster cluster;
-  private OzoneConfiguration conf;
-  private OzoneClient client;
-  private ObjectStore objectStore;
-  private String volumeName;
-  private String bucketName;
-  private String path;
-  private XceiverClientManager xceiverClientManager;
+  private static MiniOzoneCluster cluster;
+  private static OzoneConfiguration conf;
+  private static OzoneClient client;
+  private static ObjectStore objectStore;
+  private static String volumeName;
+  private static String bucketName;
+  private static String path;
+  private static XceiverClientManager xceiverClientManager;
   private static final int FACTOR_THREE_PIPELINE_COUNT = 1;
 
   /**
@@ -94,7 +94,7 @@ public class TestDeleteWithSlowFollower {
    * @throws IOException
    */
   @BeforeClass
-  public void init() throws Exception {
+  public static void init() throws Exception {
     conf = new OzoneConfiguration();
     path = GenericTestUtils
         .getTempPath(TestContainerStateMachineFailures.class.getSimpleName());
@@ -173,7 +173,7 @@ public class TestDeleteWithSlowFollower {
    * Shutdown MiniDFSCluster.
    */
   @AfterClass
-  public void shutdown() {
+  public static void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
     }

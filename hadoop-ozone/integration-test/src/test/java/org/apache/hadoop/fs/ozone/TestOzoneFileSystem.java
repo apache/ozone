@@ -107,18 +107,18 @@ public class TestOzoneFileSystem {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOzoneFileSystem.class);
 
-  private boolean enabledFileSystemPaths;
-  private boolean omRatisEnabled;
+  private static boolean enabledFileSystemPaths;
+  private static boolean omRatisEnabled;
 
-  private MiniOzoneCluster cluster;
-  private FileSystem fs;
-  private OzoneFileSystem o3fs;
-  private String volumeName;
-  private String bucketName;
-  private Trash trash;
+  private static MiniOzoneCluster cluster;
+  private static FileSystem fs;
+  private static OzoneFileSystem o3fs;
+  private static String volumeName;
+  private static String bucketName;
+  private static Trash trash;
 
   @BeforeClass
-  public void init() throws Exception {
+  public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(FS_TRASH_INTERVAL_KEY, 1);
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
@@ -148,7 +148,7 @@ public class TestOzoneFileSystem {
   }
 
   @AfterClass
-  public void teardown() {
+  public static void teardown() {
     if (cluster != null) {
       cluster.shutdown();
     }

@@ -39,6 +39,7 @@ import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.Timeout;
 
 import static org.apache.hadoop.hdds.StringUtils.string2Bytes;
 
@@ -51,6 +52,7 @@ public class TestOzoneFSInputStream {
     * Set a timeout for each test.
     */
   @Rule
+  public Timeout timeout = new Timeout(300000);
   private static MiniOzoneCluster cluster = null;
   private static FileSystem fs;
   private static Path filePath = null;

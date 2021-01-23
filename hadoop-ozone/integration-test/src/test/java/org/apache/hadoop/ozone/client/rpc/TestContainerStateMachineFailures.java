@@ -88,14 +88,14 @@ import org.junit.Test;
 
 public class TestContainerStateMachineFailures {
 
-  private MiniOzoneCluster cluster;
-  private OzoneConfiguration conf;
-  private OzoneClient client;
-  private ObjectStore objectStore;
-  private String volumeName;
-  private String bucketName;
-  private XceiverClientManager xceiverClientManager;
-  private Random random;
+  private static MiniOzoneCluster cluster;
+  private static OzoneConfiguration conf;
+  private static OzoneClient client;
+  private static ObjectStore objectStore;
+  private static String volumeName;
+  private static String bucketName;
+  private static XceiverClientManager xceiverClientManager;
+  private static Random random;
 
   /**
    * Create a MiniDFSCluster for testing.
@@ -103,7 +103,7 @@ public class TestContainerStateMachineFailures {
    * @throws IOException
    */
   @BeforeClass
-  public void init() throws Exception {
+  public static void init() throws Exception {
     conf = new OzoneConfiguration();
 
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
@@ -160,7 +160,7 @@ public class TestContainerStateMachineFailures {
    * Shutdown MiniDFSCluster.
    */
   @AfterClass
-  public void shutdown() {
+  public static void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
     }
