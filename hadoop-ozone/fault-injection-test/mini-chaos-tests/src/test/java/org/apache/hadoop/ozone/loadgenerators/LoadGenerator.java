@@ -50,14 +50,14 @@ public abstract class LoadGenerator {
    * }
    */
 
-  private final String keyNameDelimiter = "_";
+  private static final String KEY_NAME_DELIMITER = "_";
 
   public abstract void initialize() throws Exception;
 
   public abstract void generateLoad() throws Exception;
 
   String getKeyName(int keyIndex) {
-    return toString() + keyNameDelimiter + keyIndex;
+    return toString() + KEY_NAME_DELIMITER + keyIndex;
   }
 
   @Override
