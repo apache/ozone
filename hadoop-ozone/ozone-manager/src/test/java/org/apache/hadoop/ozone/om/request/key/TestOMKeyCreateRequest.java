@@ -293,10 +293,10 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
           keyArgs.getKeyLocationsList();
       // KeyLocation should be set.
       Assert.assertTrue(keyLocations.size() == 1);
-      Assert.assertEquals(containerID,
+      Assert.assertEquals(CONTAINERID,
           keyLocations.get(0).getBlockID().getContainerBlockID()
               .getContainerID());
-      Assert.assertEquals(localID,
+      Assert.assertEquals(LOCALID,
           keyLocations.get(0).getBlockID().getContainerBlockID()
               .getLocalID());
       Assert.assertTrue(keyLocations.get(0).hasPipeline());

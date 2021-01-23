@@ -79,8 +79,8 @@ public class TestOMKeyRequest {
   protected OzoneBlockTokenSecretManager ozoneBlockTokenSecretManager;
   protected ScmBlockLocationProtocol scmBlockLocationProtocol;
 
-  protected static final long containerID = 1000L;
-  protected static final long localID = 100L;
+  protected static final long CONTAINERID = 1000L;
+  protected static final long LOCALID = 100L;
 
   protected String volumeName;
   protected String bucketName;
@@ -141,7 +141,7 @@ public class TestOMKeyRequest {
 
     AllocatedBlock allocatedBlock =
         new AllocatedBlock.Builder()
-            .setContainerBlockID(new ContainerBlockID(containerID, localID))
+            .setContainerBlockID(new ContainerBlockID(CONTAINERID, LOCALID))
             .setPipeline(pipeline).build();
 
     List<AllocatedBlock> allocatedBlocks = new ArrayList<>();
