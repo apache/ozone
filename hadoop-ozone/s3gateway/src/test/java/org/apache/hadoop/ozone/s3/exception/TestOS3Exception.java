@@ -25,7 +25,7 @@ import org.junit.Test;
 /**
  * This class tests OS3Exception class.
  */
-public class TestOS3Exception {
+public class TestOS3Exception extends Exception {
 
   @Test
   public void testOS3Exception() {
@@ -35,13 +35,13 @@ public class TestOS3Exception {
     ex = S3ErrorTable.newError(ex, "bucket");
     ex.setRequestId(requestId);
     String val = ex.toXml();
-    String formatString = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
-        "<Error>\n" +
-        "  <Code>%s</Code>\n" +
-        "  <Message>%s</Message>\n" +
-        "  <Resource>%s</Resource>\n" +
-        "  <RequestId>%s</RequestId>\n" +
-        "</Error>\n";
+    String formatString = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>%n" +
+        "<Error>%n" +
+        "  <Code>%s</Code>%n" +
+        "  <Message>%s</Message>%n" +
+        "  <Resource>%s</Resource>%n" +
+        "  <RequestId>%s</RequestId>%n" +
+        "</Error>%n";
     String expected = String.format(formatString, ex.getCode(),
         ex.getErrorMessage(), ex.getResource(),
         ex.getRequestId());

@@ -64,7 +64,8 @@ public class TestSignedChunksInputStream {
         + "\n1234567890\r\n");
     byte[] bytes = new byte[10];
     IOUtils.read(is, bytes, 0, 10);
-    Assert.assertEquals("1234567890", new String(bytes));
+    Assert.assertEquals("1234567890",
+        new String(bytes, StandardCharsets.UTF_8));
   }
 
   @Test
@@ -84,7 +85,8 @@ public class TestSignedChunksInputStream {
         + "\n1234567890");
     byte[] bytes = new byte[10];
     IOUtils.read(is, bytes, 0, 10);
-    Assert.assertEquals("1234567890", new String(bytes));
+    Assert.assertEquals("1234567890",
+        new String(bytes, StandardCharsets.UTF_8));
   }
 
   @Test
@@ -104,11 +106,12 @@ public class TestSignedChunksInputStream {
         + "abcde\r\n");
     byte[] bytes = new byte[15];
     IOUtils.read(is, bytes, 0, 15);
-    Assert.assertEquals("1234567890abcde", new String(bytes));
+    Assert.assertEquals("1234567890abcde",
+        new String(bytes, StandardCharsets.UTF_8));
   }
 
   private InputStream fileContent(String content) {
     return new SignedChunksInputStream(
-        new ByteArrayInputStream(content.getBytes()));
+        new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8)));
   }
 }

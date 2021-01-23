@@ -48,7 +48,7 @@ public class TestListInfoSubcommand {
   private final ByteArrayOutputStream errContent = new ByteArrayOutputStream();
   private final PrintStream originalOut = System.out;
   private final PrintStream originalErr = System.err;
-  private final String DEFAULT_ENCODING = "UTF-8";
+  private static final String DEFAULT_ENCODING = "UTF-8";
 
   @Before
   public void setup() throws UnsupportedEncodingException {
