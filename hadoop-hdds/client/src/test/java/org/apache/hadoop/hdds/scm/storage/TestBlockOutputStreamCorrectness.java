@@ -44,7 +44,6 @@ import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.jetbrains.annotations.NotNull;
 import org.junit.Assert;
 import org.junit.Test;
 import org.mockito.Mockito;

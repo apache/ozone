@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.om.response.key;
 
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.util.Time;
 import org.junit.Assert;
 import org.junit.Test;

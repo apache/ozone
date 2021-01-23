@@ -43,7 +43,7 @@ import org.junit.rules.TemporaryFolder;
 public class TestContainerDBServiceProviderImpl {
 
   @ClassRule
-  public static final TemporaryFolder tempFolder = new TemporaryFolder();
+  public static final TemporaryFolder TEMPFOLDER = new TemporaryFolder();
   private static ContainerDBServiceProvider containerDbServiceProvider;
 
   private String keyPrefix1 = "V3/B1/K1";
@@ -53,7 +53,7 @@ public class TestContainerDBServiceProviderImpl {
   @BeforeClass
   public static void setupOnce() throws Exception {
     ReconTestInjector reconTestInjector =
-        new ReconTestInjector.Builder(tempFolder)
+        new ReconTestInjector.Builder(TEMPFOLDER)
             .withReconSqlDb()
             .withContainerDB()
             .build();

@@ -56,7 +56,7 @@ public class TestOMGetDelegationTokenRequest extends
   private OMRequest originalRequest;
   private OMRequest modifiedRequest;
   private OMGetDelegationTokenRequest omGetDelegationTokenRequest;
-  private static final String checkResponse = "";
+  private static final String CHECKRESPONSE = "";
 
   @Before
   public void setupGetDelegationToken() {
@@ -138,7 +138,7 @@ public class TestOMGetDelegationTokenRequest extends
 
     /* In preExecute(), if the token is nonNull
      we set GetDelegationTokenResponse with response. */
-    Assert.assertNotEquals(checkResponse,
+    Assert.assertNotEquals(CHECKRESPONSE,
         modifiedRequest.getUpdateGetDelegationTokenRequest()
             .getGetDelegationTokenResponse()
             .toString());
@@ -157,7 +157,7 @@ public class TestOMGetDelegationTokenRequest extends
 
     /* In preExecute(), if the token is null
      we do not set GetDelegationTokenResponse with response. */
-    Assert.assertEquals(checkResponse,
+    Assert.assertEquals(CHECKRESPONSE,
         modifiedRequest.getUpdateGetDelegationTokenRequest()
             .getGetDelegationTokenResponse()
             .toString());

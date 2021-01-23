@@ -22,7 +22,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
-import java.util.Random;
 
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -79,19 +78,19 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
    */
   @Test
   public void testDeleteSubsetOfOpenKeys() throws Exception {
-    final String volume1 = "volume1";
-    final String volume2 = "bucket1";
-    final String bucket1 = "volume2";
-    final String bucket2 = "bucket2";
+    final String VOLUME1 = "volume1";
+    final String VOLUME2 = "bucket1";
+    final String BUCKET1 = "volume2";
+    final String BUCKET2 = "bucket2";
 
-    OpenKeyBucket v1b1KeysToDelete = makeOpenKeys(volume1, bucket1, 3);
-    OpenKeyBucket v1b1KeysToKeep = makeOpenKeys(volume1, bucket1, 3);
+    OpenKeyBucket v1b1KeysToDelete = makeOpenKeys(VOLUME1, BUCKET1, 3);
+    OpenKeyBucket v1b1KeysToKeep = makeOpenKeys(VOLUME1, BUCKET1, 3);
 
-    OpenKeyBucket v1b2KeysToDelete = makeOpenKeys(volume1, bucket2, 3);
-    OpenKeyBucket v1b2KeysToKeep = makeOpenKeys(volume1, bucket2, 3);
+    OpenKeyBucket v1b2KeysToDelete = makeOpenKeys(VOLUME1, BUCKET2, 3);
+    OpenKeyBucket v1b2KeysToKeep = makeOpenKeys(VOLUME1, BUCKET2, 3);
 
-    OpenKeyBucket v2b2KeysToDelete = makeOpenKeys(volume2, bucket2, 3);
-    OpenKeyBucket v2b2KeysToKeep = makeOpenKeys(volume2, bucket2, 3);
+    OpenKeyBucket v2b2KeysToDelete = makeOpenKeys(VOLUME2, BUCKET2, 3);
+    OpenKeyBucket v2b2KeysToKeep = makeOpenKeys(VOLUME2, BUCKET2, 3);
 
     addToOpenKeyTableDB(
         v1b1KeysToKeep,

@@ -19,9 +19,7 @@
 package org.apache.hadoop.ozone.om.lock;
 
 import java.util.ArrayList;
-import java.util.LinkedList;
 import java.util.List;
-import java.util.Queue;
 import java.util.Stack;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;

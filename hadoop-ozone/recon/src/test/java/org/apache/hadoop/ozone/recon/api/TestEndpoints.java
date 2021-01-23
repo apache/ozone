@@ -75,9 +75,7 @@ import org.jooq.Configuration;
 import org.jooq.DSLContext;
 import org.junit.Assert;
 import org.junit.Before;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
@@ -133,11 +131,11 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   private Pipeline pipeline;
   private FileCountBySizeDao fileCountBySizeDao;
   private DSLContext dslContext;
-  private final static String host1 = "host1.datanode";
-  private final static String host2 = "host2.datanode";
-  private final static String ip1 = "1.1.1.1";
-  private final static String ip2 = "2.2.2.2";
-  private final static String prometheusTestResponseFile =
+  private final static String HOST1 = "host1.datanode";
+  private final static String HOST2 = "host2.datanode";
+  private final static String IP1 = "1.1.1.1";
+  private final static String IP2 = "2.2.2.2";
+  private final static String PROMETHEUSTESTRESPONSEFILE =
       "prometheus-test-response.txt";
   private ReconUtils reconUtilsMock;
 
@@ -147,10 +145,10 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         temporaryFolder.newFolder());
     datanodeDetails = randomDatanodeDetails();
     datanodeDetails2 = randomDatanodeDetails();
-    datanodeDetails.setHostName(host1);
-    datanodeDetails.setIpAddress(ip1);
-    datanodeDetails2.setHostName(host2);
-    datanodeDetails2.setIpAddress(ip2);
+    datanodeDetails.setHostName(HOST1);
+    datanodeDetails.setIpAddress(IP1);
+    datanodeDetails2.setHostName(HOST2);
+    datanodeDetails2.setIpAddress(IP2);
     pipeline = getRandomPipeline(datanodeDetails);
     pipelineId = pipeline.getId().getId().toString();
 
@@ -176,7 +174,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
 
     InputStream inputStream =
         Thread.currentThread().getContextClassLoader().getResourceAsStream(
-            prometheusTestResponseFile);
+            PROMETHEUSTESTRESPONSEFILE);
     reconUtilsMock = mock(ReconUtils.class);
     HttpURLConnection urlConnectionMock = mock(HttpURLConnection.class);
     when(urlConnectionMock.getResponseCode())
@@ -265,9 +263,9 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .addPipelineReport(pipelineReport).build();
     DatanodeDetailsProto datanodeDetailsProto =
         DatanodeDetailsProto.newBuilder()
-            .setHostName(host1)
+            .setHostName(HOST1)
             .setUuid(datanodeId)
-            .setIpAddress(ip1)
+            .setIpAddress(IP1)
             .build();
     extendedDatanodeDetailsProto =
         HddsProtos.ExtendedDatanodeDetailsProto.newBuilder()
@@ -296,9 +294,9 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
 
     DatanodeDetailsProto datanodeDetailsProto2 =
         DatanodeDetailsProto.newBuilder()
-            .setHostName(host2)
+            .setHostName(HOST2)
             .setUuid(datanodeId2)
-            .setIpAddress(ip2)
+            .setIpAddress(IP2)
             .build();
     ExtendedDatanodeDetailsProto extendedDatanodeDetailsProto2 =
         ExtendedDatanodeDetailsProto.newBuilder()
@@ -380,7 +378,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
       throws IOException {
     String hostname = datanodeMetadata.getHostname();
     switch (hostname) {
-    case host1:
+    case HOST1:
       Assert.assertEquals(75000,
           datanodeMetadata.getDatanodeStorageReport().getCapacity());
       Assert.assertEquals(15400,
@@ -399,7 +397,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
           datanodeMetadata.getPipelines().get(0).getLeaderNode());
       Assert.assertEquals(1, datanodeMetadata.getLeaderCount());
       break;
-    case host2:
+    case HOST2:
       Assert.assertEquals(130000,
           datanodeMetadata.getDatanodeStorageReport().getCapacity());
       Assert.assertEquals(17800,
@@ -491,7 +489,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     // when the prometheus endpoint is queried.
     ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
     InputStream inputStream = classLoader
-        .getResourceAsStream(prometheusTestResponseFile);
+        .getResourceAsStream(PROMETHEUSTESTRESPONSEFILE);
     HttpURLConnection urlConnectionMock = mock(HttpURLConnection.class);
     when(urlConnectionMock.getResponseCode())
         .thenReturn(HttpServletResponse.SC_OK);
@@ -503,7 +501,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         uriInfoMock, responseMock);
 
     byte[] fileBytes = FileUtils.readFileToByteArray(
-        new File(classLoader.getResource(prometheusTestResponseFile).getFile())
+        new File(classLoader.getResource(PROMETHEUSTESTRESPONSEFILE).getFile())
         );
     verify(outputStreamMock).write(fileBytes, 0, fileBytes.length);
   }
