@@ -162,7 +162,6 @@ public class TestOzoneManagerLock {
         OzoneManagerLock.Resource.values()) {
       Stack<ResourceInfo> stack = new Stack<>();
       List<String> currentLocks = new ArrayList<>();
-      Queue<ResourceInfo> queue = new LinkedList<>();
       for (OzoneManagerLock.Resource higherResource :
           OzoneManagerLock.Resource.values()) {
         if (higherResource.getMask() > resource.getMask()) {
@@ -170,7 +169,6 @@ public class TestOzoneManagerLock {
           lock.acquireWriteLock(higherResource, resourceName);
           stack.push(new ResourceInfo(resourceName, higherResource));
           currentLocks.add(higherResource.getName());
-          queue.add(new ResourceInfo(resourceName, higherResource));
           // try to acquire lower level lock
           try {
             resourceName = generateResourceName(resource);
@@ -221,7 +219,7 @@ public class TestOzoneManagerLock {
   /**
    * Class used to store locked resource info.
    */
-  public class ResourceInfo {
+  public static class ResourceInfo {
     private String[] lockName;
     private OzoneManagerLock.Resource resource;
 
@@ -231,7 +229,7 @@ public class TestOzoneManagerLock {
     }
 
     public String[] getLockName() {
-      return lockName;
+      return lockName.clone();
     }
 
     public OzoneManagerLock.Resource getResource() {

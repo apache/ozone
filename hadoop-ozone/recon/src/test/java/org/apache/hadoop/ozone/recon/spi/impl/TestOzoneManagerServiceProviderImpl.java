@@ -43,10 +43,13 @@ import static org.mockito.Mockito.when;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -151,17 +154,27 @@ public class TestOzoneManagerServiceProviderImpl {
     File file1 = Paths.get(checkpointDir.getAbsolutePath(), "file1")
         .toFile();
     String str = "File1 Contents";
-    BufferedWriter writer = new BufferedWriter(new FileWriter(
-        file1.getAbsolutePath()));
-    writer.write(str);
-    writer.close();
+    BufferedWriter writer = null;
+    try {
+      writer = new BufferedWriter(new OutputStreamWriter(
+          new FileOutputStream(file1), StandardCharsets.UTF_8));
+      writer.write(str);
+    } finally {
+      if (writer != null) {
+        writer.close();
+      }
+    }
 
     File file2 = Paths.get(checkpointDir.getAbsolutePath(), "file2")
         .toFile();
     str = "File2 Contents";
-    writer = new BufferedWriter(new FileWriter(file2.getAbsolutePath()));
-    writer.write(str);
-    writer.close();
+    try {
+      writer = new BufferedWriter(new OutputStreamWriter(
+          new FileOutputStream(file2), StandardCharsets.UTF_8));
+      writer.write(str);
+    } finally {
+      writer.close();
+    }
 
     //Create test tar file.
     File tarFile = createTarFile(checkpointDir.toPath());

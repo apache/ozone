@@ -158,7 +158,7 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
     for (int i = 0; i < numKeys; i++) {
       String bucket = UUID.randomUUID().toString();
       String key = UUID.randomUUID().toString();
-      long clientID = new Random().nextLong();
+      long clientID = random.nextLong();
 
       OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo(volume,
           bucket, key, replicationType, replicationFactor);

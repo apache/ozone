@@ -63,9 +63,6 @@ public class TestTableCountTask extends AbstractReconSqlDBTest {
   private DSLContext dslContext;
   private boolean isSetupDone = false;
 
-  @Rule
-  public TemporaryFolder temporaryFolder = new TemporaryFolder();
-
   private void initializeInjector() throws IOException {
     ReconOMMetadataManager omMetadataManager = getTestReconOmMetadataManager(
         initializeNewOmMetadataManager(temporaryFolder.newFolder()),

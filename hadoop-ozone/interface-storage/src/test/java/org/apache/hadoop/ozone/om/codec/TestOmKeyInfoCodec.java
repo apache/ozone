@@ -41,9 +41,10 @@ import static org.junit.Assert.fail;
  * This class tests OmKeyInfoCodec.
  */
 public class TestOmKeyInfoCodec {
-  private final String volume = "hadoop";
-  private final String bucket = "ozone";
-  private final String keyName = "user/root/terasort/10G-input-6/part-m-00037";
+  private static final String volume = "hadoop";
+  private static final String bucket = "ozone";
+  private static final String keyName =
+      "user/root/terasort/10G-input-6/part-m-00037";
 
 
   private OmKeyInfo getKeyInfo(int chunkNum) {

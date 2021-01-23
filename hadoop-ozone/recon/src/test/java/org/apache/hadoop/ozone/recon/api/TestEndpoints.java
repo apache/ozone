@@ -133,16 +133,13 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   private Pipeline pipeline;
   private FileCountBySizeDao fileCountBySizeDao;
   private DSLContext dslContext;
-  private final String host1 = "host1.datanode";
-  private final String host2 = "host2.datanode";
-  private final String ip1 = "1.1.1.1";
-  private final String ip2 = "2.2.2.2";
-  private final String prometheusTestResponseFile =
+  private final static String host1 = "host1.datanode";
+  private final static String host2 = "host2.datanode";
+  private final static String ip1 = "1.1.1.1";
+  private final static String ip2 = "2.2.2.2";
+  private final static String prometheusTestResponseFile =
       "prometheus-test-response.txt";
   private ReconUtils reconUtilsMock;
-
-  @Rule
-  public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
   private void initializeInjector() throws Exception {
     reconOMMetadataManager = getTestReconOmMetadataManager(

@@ -25,6 +25,7 @@ import org.junit.Test;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
+import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -47,12 +48,13 @@ public class TestListInfoSubcommand {
   private final ByteArrayOutputStream errContent = new ByteArrayOutputStream();
   private final PrintStream originalOut = System.out;
   private final PrintStream originalErr = System.err;
+  private final String DEFAULT_ENCODING = "UTF-8";
 
   @Before
-  public void setup() {
+  public void setup() throws UnsupportedEncodingException {
     cmd = new ListInfoSubcommand();
-    System.setOut(new PrintStream(outContent));
-    System.setErr(new PrintStream(errContent));
+    System.setOut(new PrintStream(outContent, false, DEFAULT_ENCODING));
+    System.setErr(new PrintStream(errContent, false, DEFAULT_ENCODING));
   }
 
   @After
@@ -79,12 +81,12 @@ public class TestListInfoSubcommand {
     // <other lines>
     Pattern p = Pattern.compile(
         "^Operational State:\\s+IN_SERVICE$", Pattern.MULTILINE);
-    Matcher m = p.matcher(outContent.toString());
+    Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
     // Should also have a node with the state DECOMMISSIONING
     p = Pattern.compile(
         "^Operational State:\\s+DECOMMISSIONING$", Pattern.MULTILINE);
-    m = p.matcher(outContent.toString());
+    m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
   }
 

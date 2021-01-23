@@ -40,13 +40,14 @@ public class TestStorageContainerManagerStarter {
   private final ByteArrayOutputStream errContent = new ByteArrayOutputStream();
   private final PrintStream originalOut = System.out;
   private final PrintStream originalErr = System.err;
+  private final String DEFAULT_ENCODING = "UTF-8";
 
   private MockSCMStarter mock;
 
   @Before
   public void setUpStreams() throws UnsupportedEncodingException {
-    System.setOut(new PrintStream(outContent, false, "UTF-8"));
-    System.setErr(new PrintStream(errContent, false, "UTF-8"));
+    System.setOut(new PrintStream(outContent, false, DEFAULT_ENCODING));
+    System.setErr(new PrintStream(errContent, false, DEFAULT_ENCODING));
     mock = new MockSCMStarter();
   }
 
@@ -125,7 +126,7 @@ public class TestStorageContainerManagerStarter {
       throws UnsupportedEncodingException {
     executeCommand("--invalid");
     Pattern p = Pattern.compile("^Unknown option:.*--invalid.*\nUsage");
-    Matcher m = p.matcher(errContent.toString("UTF-8"));
+    Matcher m = p.matcher(errContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
   }
 

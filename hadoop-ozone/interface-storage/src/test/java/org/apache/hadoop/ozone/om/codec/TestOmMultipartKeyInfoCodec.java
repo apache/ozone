@@ -25,6 +25,7 @@ import org.apache.hadoop.util.Time;
 import org.junit.Assert;
 import org.junit.Test;
 
+import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
 /**
@@ -60,7 +61,7 @@ public class TestOmMultipartKeyInfoCodec {
 
     // When random byte data passed returns null.
     try {
-      codec.fromPersistedFormat("random".getBytes());
+      codec.fromPersistedFormat("random".getBytes(StandardCharsets.UTF_8));
     } catch (IllegalArgumentException ex) {
       GenericTestUtils.assertExceptionContains("Can't encode the the raw " +
           "data from the byte array", ex);
