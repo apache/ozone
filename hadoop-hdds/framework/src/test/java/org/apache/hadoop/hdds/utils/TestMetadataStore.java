@@ -176,7 +176,7 @@ public class TestMetadataStore {
         + "-" + storeImpl.toLowerCase() + "-test");
     MetadataStore dbStore = MetadataStoreBuilder.newBuilder().setConf(conf)
         .setCreateIfMissing(true).setDbFile(dbDir).setDBType(storeImpl).build();
-    assertTrue(logCapturer.getOutput().contains("Using dbType " + storeImpl + "" +
+    assertTrue(logCapturer.getOutput().contains("Using dbType " + storeImpl +
         " for metastore"));
     dbStore.close();
     dbStore.destroy();
