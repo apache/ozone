@@ -31,11 +31,10 @@ import com.google.common.annotations.VisibleForTesting;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF;
-import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE_LEVELDB;
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE_ROCKSDB;
 
-import org.iq80.leveldb.Options;
 import org.rocksdb.BlockBasedTableConfig;
+import org.rocksdb.Options;
 import org.rocksdb.Statistics;
 import org.rocksdb.StatsLevel;
 import org.slf4j.Logger;
@@ -54,7 +53,7 @@ public class MetadataStoreBuilder {
   private Optional<ConfigurationSource> optionalConf = Optional.empty();
   private String dbType;
   @VisibleForTesting
-  public static final Map<ConfigurationSource, org.rocksdb.Options>
+  public static final Map<ConfigurationSource, Options>
       CACHED_OPTS = new ConcurrentHashMap<>();
   @VisibleForTesting
   public static final OzoneConfiguration DEFAULT_CONF =
@@ -109,20 +108,13 @@ public class MetadataStoreBuilder {
     } else {
       LOG.debug("Using dbType {} for metastore", dbType);
     }
-    if (CONTAINER_DB_TYPE_LEVELDB.equals(dbType)) {
-      Options options = new Options();
-      options.createIfMissing(createIfMissing);
-      if (cacheSize > 0) {
-        options.cacheSize(cacheSize);
-      }
-      return new LevelDBStore(dbFile, options);
-    } else if (CONTAINER_DB_TYPE_ROCKSDB.equals(dbType)) {
-      org.rocksdb.Options opts;
+    if (CONTAINER_DB_TYPE_ROCKSDB.equals(dbType)) {
+      Options opts;
       // Used cached options if config object passed down is the same
       if (CACHED_OPTS.containsKey(conf)) {
         opts = CACHED_OPTS.get(conf);
       } else {
-        opts = new org.rocksdb.Options();
+        opts = new Options();
         if (cacheSize > 0) {
           BlockBasedTableConfig tableConfig = new BlockBasedTableConfig();
           tableConfig.setBlockCacheSize(cacheSize);
@@ -145,7 +137,6 @@ public class MetadataStoreBuilder {
     }
     
     throw new IllegalArgumentException("Invalid Container DB type. Expecting "
-        + CONTAINER_DB_TYPE_LEVELDB + " or "
         + CONTAINER_DB_TYPE_ROCKSDB + ", but met " + dbType);
   }
 }

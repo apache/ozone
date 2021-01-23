@@ -69,7 +69,7 @@ public class BenchMarkRocksDbStore {
   public void initialize() throws IOException {
     data = RandomStringUtils.randomAlphanumeric(DATA_LEN)
         .getBytes(StandardCharsets.UTF_8);
-    org.rocksdb.Options opts = new org.rocksdb.Options();
+    Options opts = new Options();
     File dbFile = Paths.get(System.getProperty(TMP_DIR))
         .resolve(RandomStringUtils.randomNumeric(DB_FILE_LEN))
         .toFile();

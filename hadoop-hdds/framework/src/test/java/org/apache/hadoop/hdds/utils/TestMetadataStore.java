@@ -47,7 +47,6 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.slf4j.event.Level;
 
-import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE_LEVELDB;
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE_ROCKSDB;
 import static org.apache.hadoop.test.PlatformAssumptions.assumeNotWindows;
 import static org.junit.Assert.assertEquals;
@@ -76,7 +75,6 @@ public class TestMetadataStore {
   @Parameters
   public static Collection<Object[]> data() {
     return Arrays.asList(new Object[][] {
-        {CONTAINER_DB_TYPE_LEVELDB},
         {CONTAINER_DB_TYPE_ROCKSDB}
     });
   }
@@ -170,21 +168,15 @@ public class TestMetadataStore {
 
     OzoneConfiguration conf = new OzoneConfiguration();
 
-    String dbType;
     GenericTestUtils.setLogLevel(MetadataStoreBuilder.LOG, Level.DEBUG);
     GenericTestUtils.LogCapturer logCapturer =
         GenericTestUtils.LogCapturer.captureLogs(MetadataStoreBuilder.LOG);
-    if (storeImpl.equals(CONTAINER_DB_TYPE_LEVELDB)) {
-      dbType = "LevelDB";
-    } else {
-      dbType = "RocksDB";
-    }
 
     File dbDir = GenericTestUtils.getTestDir(getClass().getSimpleName()
-        + "-" + dbType.toLowerCase() + "-test");
+        + "-" + storeImpl.toLowerCase() + "-test");
     MetadataStore dbStore = MetadataStoreBuilder.newBuilder().setConf(conf)
-        .setCreateIfMissing(true).setDbFile(dbDir).setDBType(dbType).build();
-    assertTrue(logCapturer.getOutput().contains("Using dbType " + dbType + "" +
+        .setCreateIfMissing(true).setDbFile(dbDir).setDBType(storeImpl).build();
+    assertTrue(logCapturer.getOutput().contains("Using dbType " + storeImpl + "" +
         " for metastore"));
     dbStore.close();
     dbStore.destroy();
