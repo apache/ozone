@@ -67,7 +67,7 @@ public class TestOzoneDelegationTokenSecretManager {
   private long expiryTime;
   private Text serviceRpcAdd;
   private OzoneConfiguration conf;
-  private final static Text TEST_USER = new Text("testUser");
+  private static final Text TEST_USER = new Text("testUser");
   private long tokenMaxLifetime = 1000 * 20;
   private long tokenRemoverScanInterval = 1000 * 20;
   private S3SecretManager s3SecretManager;

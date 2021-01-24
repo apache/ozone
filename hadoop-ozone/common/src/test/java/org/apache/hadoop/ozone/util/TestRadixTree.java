@@ -30,7 +30,7 @@ import static org.junit.Assert.assertEquals;
  */
 public class TestRadixTree {
 
-  final static RadixTree<Integer> ROOT = new RadixTree<>();
+  static final RadixTree<Integer> ROOT = new RadixTree<>();
 
   @BeforeClass
   public static void setupRadixTree() {

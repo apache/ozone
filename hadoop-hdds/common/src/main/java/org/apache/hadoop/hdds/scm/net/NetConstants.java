@@ -26,21 +26,21 @@ public final class NetConstants {
   private NetConstants() {
     // Prevent instantiation
   }
-  public final static char PATH_SEPARATOR = '/';
+  public static final char PATH_SEPARATOR = '/';
   /** Path separator as a string. */
-  public final static String PATH_SEPARATOR_STR = "/";
-  public final static String SCOPE_REVERSE_STR = "~";
+  public static final String PATH_SEPARATOR_STR = "/";
+  public static final String SCOPE_REVERSE_STR = "~";
   /** string representation of root. */
-  public final static String ROOT = "";
-  public final static int INNER_NODE_COST_DEFAULT = 1;
-  public final static int NODE_COST_DEFAULT = 0;
-  public final static int ANCESTOR_GENERATION_DEFAULT = 0;
-  public final static int ROOT_LEVEL = 1;
-  public final static String NODE_COST_PREFIX = "$";
-  public final static String DEFAULT_RACK = "/default-rack";
-  public final static String DEFAULT_NODEGROUP = "/default-nodegroup";
-  public final static String DEFAULT_DATACENTER = "/default-datacenter";
-  public final static String DEFAULT_REGION = "/default-dataregion";
+  public static final String ROOT = "";
+  public static final int INNER_NODE_COST_DEFAULT = 1;
+  public static final int NODE_COST_DEFAULT = 0;
+  public static final int ANCESTOR_GENERATION_DEFAULT = 0;
+  public static final int ROOT_LEVEL = 1;
+  public static final String NODE_COST_PREFIX = "$";
+  public static final String DEFAULT_RACK = "/default-rack";
+  public static final String DEFAULT_NODEGROUP = "/default-nodegroup";
+  public static final String DEFAULT_DATACENTER = "/default-datacenter";
+  public static final String DEFAULT_REGION = "/default-dataregion";
 
   // Build-in network topology node schema
   public static final NodeSchema ROOT_SCHEMA =

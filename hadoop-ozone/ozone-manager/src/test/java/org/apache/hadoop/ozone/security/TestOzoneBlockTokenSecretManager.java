@@ -80,7 +80,7 @@ public class TestOzoneBlockTokenSecretManager {
   private static final String BASEDIR = GenericTestUtils
       .getTempPath(TestOzoneBlockTokenSecretManager.class.getSimpleName());
   private BlockTokenVerifier tokenVerifier;
-  private final static String ALGORITHM = "SHA256withRSA";
+  private static final String ALGORITHM = "SHA256withRSA";
 
   @Rule
   public ExpectedException exception = ExpectedException.none();

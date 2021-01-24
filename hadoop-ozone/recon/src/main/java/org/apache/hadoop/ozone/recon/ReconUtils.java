@@ -62,7 +62,7 @@ import org.slf4j.LoggerFactory;
 @Singleton
 public class ReconUtils {
 
-  private final static int WRITE_BUFFER = 1048576; //1MB
+  private static final int WRITE_BUFFER = 1048576; //1MB
 
   public ReconUtils() {
   }
