@@ -158,7 +158,7 @@ message NodePool {
 
 /**
  * LifeCycleState for SCM object creation state machine:
- *    ->Allocated: allocated on SCM but clean has not started creating it yet.
+ *    ->Allocated: allocated on SCM but client has not started creating it yet.
  *    ->Creating: allocated and assigned to client to create but not ack-ed yet.
  *    ->Open: allocated on SCM and created on datanodes and ack-ed by a client.
  *    ->Close: container closed due to space all used or error?
