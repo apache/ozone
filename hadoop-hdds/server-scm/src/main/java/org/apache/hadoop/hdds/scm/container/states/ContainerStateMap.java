@@ -290,6 +290,12 @@ public class ContainerStateMap {
       LifeCycleState newState) throws SCMException, ContainerNotFoundException {
     Preconditions.checkNotNull(currentState);
     Preconditions.checkNotNull(newState);
+    // Return if updating state not changed
+    if (currentState == newState) {
+      LOG.debug("CurrentState and NewState are the same, return from " +
+          "updateState directly.");
+      return;
+    }
     lock.writeLock().lock();
     try {
       checkIfContainerExist(containerID);
