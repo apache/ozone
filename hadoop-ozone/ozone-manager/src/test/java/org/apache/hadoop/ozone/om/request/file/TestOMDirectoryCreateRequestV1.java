@@ -89,6 +89,8 @@ public class TestOMDirectoryCreateRequestV1 {
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
             folder.newFolder().getAbsolutePath());
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_LAYOUT_VERSION, "V1");
+    ozoneConfiguration.setBoolean(
+            OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration);
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);

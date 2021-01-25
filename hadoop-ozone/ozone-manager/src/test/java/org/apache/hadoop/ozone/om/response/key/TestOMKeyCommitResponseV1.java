@@ -99,7 +99,7 @@ public class TestOMKeyCommitResponseV1 extends TestOMKeyCommitResponse {
     // omLayoutVersionV1 flag will be set while invoking OzoneManager#start()
     // and its not invoked in this test. Hence it is explicitly setting
     // this configuration to populate prefix tables.
-    OzoneManagerRatisUtils.setOmLayoutVersionV1(true);
+    OzoneManagerRatisUtils.setFSOptimizedEnabled(true);
     return config;
   }
 }

@@ -92,18 +92,19 @@ public final class OzoneManagerRatisUtils {
 
   // TODO: Temporary workaround for OM upgrade path and will be replaced once
   //  upgrade HDDS-3698 story reaches consensus.
-  private static boolean omLayoutVersionV1 = false;
+  private static boolean fsOptimizedEnabled = false;
 
   private OzoneManagerRatisUtils() {
   }
 
   /**
-   * Sets layout version.
+   * Sets enabled/disabled file system optimized property. A true value
+   * represents enabled, false represents disabled.
    *
-   * @param layoutVersionV1 om layout version
+   * @param enabledFSO enabled/disabled file system optimized
    */
-  public static void setOmLayoutVersionV1(boolean layoutVersionV1) {
-    OzoneManagerRatisUtils.omLayoutVersionV1 = layoutVersionV1;
+  public static void setFSOptimizedEnabled(boolean enabledFSO) {
+    OzoneManagerRatisUtils.fsOptimizedEnabled = enabledFSO;
   }
 
   /**
@@ -140,41 +141,41 @@ public final class OzoneManagerRatisUtils {
     case SetBucketProperty:
       return new OMBucketSetPropertyRequest(omRequest);
     case AllocateBlock:
-      if (omLayoutVersionV1) {
+      if (isFsOptimizedEnabled()) {
         return new OMAllocateBlockRequestV1(omRequest);
       }
       return new OMAllocateBlockRequest(omRequest);
     case CreateKey:
-      if (omLayoutVersionV1) {
+      if (isFsOptimizedEnabled()) {
         return new OMKeyCreateRequestV1(omRequest);
       }
       return new OMKeyCreateRequest(omRequest);
     case CommitKey:
-      if (omLayoutVersionV1) {
+      if (isFsOptimizedEnabled()) {
         return new OMKeyCommitRequestV1(omRequest);
       }
       return new OMKeyCommitRequest(omRequest);
     case DeleteKey:
-      if (omLayoutVersionV1) {
+      if (isFsOptimizedEnabled()) {
         return new OMKeyDeleteRequestV1(omRequest);
       }
       return new OMKeyDeleteRequest(omRequest);
     case DeleteKeys:
       return new OMKeysDeleteRequest(omRequest);
     case RenameKey:
-      if (omLayoutVersionV1) {
+      if (isFsOptimizedEnabled()) {
         return new OMKeyRenameRequestV1(omRequest);
       }
       return new OMKeyRenameRequest(omRequest);
     case RenameKeys:
       return new OMKeysRenameRequest(omRequest);
     case CreateDirectory:
-      if (omLayoutVersionV1) {
+      if (isFsOptimizedEnabled()) {
         return new OMDirectoryCreateRequestV1(omRequest);
       }
       return new OMDirectoryCreateRequest(omRequest);
     case CreateFile:
-      if (omLayoutVersionV1) {
+      if (isFsOptimizedEnabled()) {
         return new OMFileCreateRequestV1(omRequest);
       }
       return new OMFileCreateRequest(omRequest);
@@ -355,8 +356,8 @@ public final class OzoneManagerRatisUtils {
    * Returns layout version flag represents V1.
    * @return
    */
-  public static boolean isOmLayoutVersionV1() {
-    return omLayoutVersionV1;
+  public static boolean isFsOptimizedEnabled() {
+    return fsOptimizedEnabled;
   }
 
 }
