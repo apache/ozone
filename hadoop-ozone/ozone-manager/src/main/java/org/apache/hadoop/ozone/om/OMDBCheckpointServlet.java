@@ -132,15 +132,26 @@ public class OMDBCheckpointServlet extends HttpServlet {
       return;
     }
 
-    final String remoteUser = request.getRemoteUser();
     // Check ACL for dbCheckpoint only when global Ozone ACL is enable
-    if (om.getAclsEnabled() && !checkAcls(request.getRemoteUser())) {
-      LOG.error("Permission denied. User '{}' doesn't have permission to "
-          + "access endpoint /dbCheckpoint.", remoteUser);
-      response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-      return;
-    } else {
-      LOG.info("Granted user '{}' access to /dbCheckpoint.", remoteUser);
+    if (om.getAclsEnabled()) {
+      final String remoteUser = request.getRemoteUser();
+      final java.security.Principal userPrincipal = request.getUserPrincipal();
+      if (userPrincipal == null) {
+        LOG.error("Permission denied. Current login user '{}' has not been "
+            + "authenticated to access /dbCheckpoint.", remoteUser);
+        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+        return;
+      }
+      final String userPrincipalName = userPrincipal.getName();
+      if (!checkAcls(userPrincipalName)) {
+        LOG.error("Permission denied. User principal '{}' doesn't have the "
+            + "permission to access /dbCheckpoint.", userPrincipalName);
+        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+        return;
+      }
+
+      LOG.info("Granted user principal '{}' access to /dbCheckpoint.",
+          userPrincipalName);
     }
 
     DBCheckpoint checkpoint = null;
