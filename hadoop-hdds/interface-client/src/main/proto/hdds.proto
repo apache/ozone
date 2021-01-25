@@ -161,9 +161,9 @@ message NodePool {
  *    ->Allocated: allocated on SCM but client has not started creating it yet.
  *    ->Creating: allocated and assigned to client to create but not ack-ed yet.
  *    ->Open: allocated on SCM and created on datanodes and ack-ed by a client.
- *    ->Close: container closed due to space all used or error?
+ *    ->Close: container closed due to space all used or error.
  *    ->Timeout -> container failed to create on datanodes or ack-ed by client.
- *    ->Deleting(TBD) -> container will be deleted after timeout
+ *    ->Deleting(TBD) -> container will be deleted after timeout.
  * 1. ALLOCATE-ed containers on SCM can't serve key/block related operation
  *    until ACK-ed explicitly which changes the state to OPEN.
  * 2. Only OPEN/CLOSED containers can serve key/block related operation.
