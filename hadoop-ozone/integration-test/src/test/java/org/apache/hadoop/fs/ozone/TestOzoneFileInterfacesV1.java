@@ -44,9 +44,7 @@ public class TestOzoneFileInterfacesV1 extends TestOzoneFileInterfaces {
   @Override
   protected OzoneConfiguration getOzoneConfiguration() {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
-            enableFileSystemPaths);
-    conf.set(OMConfigKeys.OZONE_OM_LAYOUT_VERSION, "V1");
+
     return conf;
   }
 

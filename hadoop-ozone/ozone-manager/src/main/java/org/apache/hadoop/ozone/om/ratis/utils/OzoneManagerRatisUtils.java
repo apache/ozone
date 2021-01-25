@@ -92,19 +92,19 @@ public final class OzoneManagerRatisUtils {
 
   // TODO: Temporary workaround for OM upgrade path and will be replaced once
   //  upgrade HDDS-3698 story reaches consensus.
-  private static boolean fsOptimizedEnabled = false;
+  private static boolean isBucketFSOptimized = false;
 
   private OzoneManagerRatisUtils() {
   }
 
   /**
-   * Sets enabled/disabled file system optimized property. A true value
+   * Sets enabled/disabled file system optimized path property. A true value
    * represents enabled, false represents disabled.
    *
    * @param enabledFSO enabled/disabled file system optimized
    */
-  public static void setFSOptimizedEnabled(boolean enabledFSO) {
-    OzoneManagerRatisUtils.fsOptimizedEnabled = enabledFSO;
+  public static void setBucketFSOptimized(boolean enabledFSO) {
+    OzoneManagerRatisUtils.isBucketFSOptimized = enabledFSO;
   }
 
   /**
@@ -141,41 +141,41 @@ public final class OzoneManagerRatisUtils {
     case SetBucketProperty:
       return new OMBucketSetPropertyRequest(omRequest);
     case AllocateBlock:
-      if (isFsOptimizedEnabled()) {
+      if (isBucketFSOptimized()) {
         return new OMAllocateBlockRequestV1(omRequest);
       }
       return new OMAllocateBlockRequest(omRequest);
     case CreateKey:
-      if (isFsOptimizedEnabled()) {
+      if (isBucketFSOptimized()) {
         return new OMKeyCreateRequestV1(omRequest);
       }
       return new OMKeyCreateRequest(omRequest);
     case CommitKey:
-      if (isFsOptimizedEnabled()) {
+      if (isBucketFSOptimized()) {
         return new OMKeyCommitRequestV1(omRequest);
       }
       return new OMKeyCommitRequest(omRequest);
     case DeleteKey:
-      if (isFsOptimizedEnabled()) {
+      if (isBucketFSOptimized()) {
         return new OMKeyDeleteRequestV1(omRequest);
       }
       return new OMKeyDeleteRequest(omRequest);
     case DeleteKeys:
       return new OMKeysDeleteRequest(omRequest);
     case RenameKey:
-      if (isFsOptimizedEnabled()) {
+      if (isBucketFSOptimized()) {
         return new OMKeyRenameRequestV1(omRequest);
       }
       return new OMKeyRenameRequest(omRequest);
     case RenameKeys:
       return new OMKeysRenameRequest(omRequest);
     case CreateDirectory:
-      if (isFsOptimizedEnabled()) {
+      if (isBucketFSOptimized()) {
         return new OMDirectoryCreateRequestV1(omRequest);
       }
       return new OMDirectoryCreateRequest(omRequest);
     case CreateFile:
-      if (isFsOptimizedEnabled()) {
+      if (isBucketFSOptimized()) {
         return new OMFileCreateRequestV1(omRequest);
       }
       return new OMFileCreateRequest(omRequest);
@@ -353,11 +353,13 @@ public final class OzoneManagerRatisUtils {
   }
 
   /**
-   * Returns layout version flag represents V1.
-   * @return
+   * Returns enabled/disabled file system optimized path property. A true value
+   * represents FSO path is enabled, false represents disabled.
+   *
+   * @return true or false.
    */
-  public static boolean isFsOptimizedEnabled() {
-    return fsOptimizedEnabled;
+  public static boolean isBucketFSOptimized() {
+    return isBucketFSOptimized;
   }
 
 }

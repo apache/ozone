@@ -3690,8 +3690,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     LOG.info("Configured {}={} and enabled:{} optimized OM FS operations",
             OZONE_OM_LAYOUT_VERSION, version, omLayoutVersionV1);
 
-    boolean enabledFSO = omLayoutVersionV1 && getEnableFileSystemPaths();
-    OzoneManagerRatisUtils.setFSOptimizedEnabled(enabledFSO);
+    boolean isBucketFSOptimized =
+            omLayoutVersionV1 && getEnableFileSystemPaths();
+    OzoneManagerRatisUtils.setBucketFSOptimized(isBucketFSOptimized);
 
     return version;
   }

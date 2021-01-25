@@ -51,6 +51,8 @@ import org.slf4j.LoggerFactory;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
@@ -66,47 +68,22 @@ import static org.junit.Assert.fail;
 @RunWith(Parameterized.class)
 public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
 
-  @Ignore("TODO:HDDS-2939")
-  @BeforeClass
-  public static void init() throws Exception {
+  @Parameterized.Parameters
+  public static Collection<Object[]> data() {
+    return Arrays.asList(
+            new Object[]{true, true},
+            new Object[]{true, false},
+            new Object[]{false, true},
+            new Object[]{false, false});
+  }
 
+  @BeforeClass
+  public static void init() {
+    isBucketFSOptimized = true;
   }
 
   public TestOzoneFileSystemV1(boolean setDefaultFs, boolean enableOMRatis) {
     super(setDefaultFs, enableOMRatis);
-  }
-
-  @Before
-  public void setup() throws Exception {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setInt(FS_TRASH_INTERVAL_KEY, 1);
-    conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
-    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
-            enabledFileSystemPaths);
-    if (enabledFileSystemPaths) {
-      conf.set(OMConfigKeys.OZONE_OM_LAYOUT_VERSION, "V1");
-    }
-    cluster = MiniOzoneCluster.newBuilder(conf)
-            .setNumDatanodes(3)
-            .build();
-    cluster.waitForClusterToBeReady();
-
-    // create a volume and a bucket to be used by OzoneFileSystem
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster);
-    volumeName = bucket.getVolumeName();
-    bucketName = bucket.getName();
-
-    String rootPath = String.format("%s://%s.%s/",
-            OzoneConsts.OZONE_URI_SCHEME, bucketName, volumeName);
-
-    // Set the fs.defaultFS and start the filesystem
-    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
-    // Set the number of keys to be processed during batch operate.
-    conf.setInt(OZONE_FS_ITERATE_BATCH_SIZE, 5);
-
-    fs = FileSystem.get(conf);
-    trash = new Trash(conf);
-    o3fs = (OzoneFileSystem) fs;
   }
 
   @After
@@ -119,10 +96,6 @@ public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
       LOG.info("Failed to cleanup DB tables.", e);
       fail("Failed to cleanup DB tables." + e.getMessage());
     }
-    if (cluster != null) {
-      cluster.shutdown();
-    }
-    IOUtils.closeQuietly(fs);
   }
 
   /**

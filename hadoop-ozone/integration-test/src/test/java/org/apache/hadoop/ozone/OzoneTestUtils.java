@@ -20,12 +20,14 @@ package org.apache.hadoop.ozone;
 import java.io.IOException;
 import java.util.List;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -126,5 +128,12 @@ public final class OzoneTestUtils {
     } catch (OMException ex) {
       Assert.assertEquals(code, ex.getResult());
     }
+  }
+
+  public static void configureFSOptimizedPaths(Configuration conf,
+      boolean enableFileSystemPaths, String version) {
+    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
+            enableFileSystemPaths);
+    conf.set(OMConfigKeys.OZONE_OM_LAYOUT_VERSION, version);
   }
 }

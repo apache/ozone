@@ -27,6 +27,7 @@ import java.util.stream.Collectors;
 
 import com.google.common.base.Optional;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -384,11 +385,13 @@ public class OMBucketCreateRequest extends OMClientRequest {
     }
     // TODO: Many unit test cases has null config and done a simple null
     //  check now. It can be done later, to avoid massive test code changes.
-    String layOutVersion = ozoneManager.getOMLayoutVersion();
-    metadata.put(OMConfigKeys.OZONE_OM_LAYOUT_VERSION, layOutVersion);
-    boolean fsPathsEnabled = ozoneManager.getEnableFileSystemPaths();
-    metadata.put(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
-            Boolean.toString(fsPathsEnabled));
-    omBucketInfo.setMetadata(metadata);
+    if(StringUtils.isNotBlank(ozoneManager.getOMLayoutVersion())){
+      String layOutVersion = ozoneManager.getOMLayoutVersion();
+      metadata.put(OMConfigKeys.OZONE_OM_LAYOUT_VERSION, layOutVersion);
+      boolean fsPathsEnabled = ozoneManager.getEnableFileSystemPaths();
+      metadata.put(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
+              Boolean.toString(fsPathsEnabled));
+      omBucketInfo.setMetadata(metadata);
+    }
   }
 }

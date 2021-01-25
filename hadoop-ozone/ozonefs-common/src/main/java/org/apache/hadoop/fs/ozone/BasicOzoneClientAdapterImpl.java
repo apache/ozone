@@ -546,6 +546,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
 
   @Override
   public boolean isFSOptimizedBucket() {
+    // layout version V1 represents optimized FS path
     boolean layoutVersionEnabled =
             StringUtils.equalsIgnoreCase(
                     OMConfigKeys.OZONE_OM_LAYOUT_VERSION_V1,
