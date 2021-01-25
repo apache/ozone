@@ -31,6 +31,7 @@ import java.util.Map;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -89,6 +90,8 @@ import static org.apache.hadoop.util.Time.monotonicNow;
 public abstract class OMKeyRequest extends OMClientRequest {
 
   private static final Logger LOG = LoggerFactory.getLogger(OMKeyRequest.class);
+
+  public static final String TRASH_PREFIX = ".Trash";
 
   public OMKeyRequest(OMRequest omRequest) {
     super(omRequest);
@@ -647,5 +650,17 @@ public abstract class OMKeyRequest extends OMClientRequest {
     return omMetadataManager.getBucketTable().getCacheValue(
         new CacheKey<>(omMetadataManager.getBucketKey(volume, bucket)))
         .getCacheValue();
+  }
+
+  public boolean pathIsChildOfTrashDir(Path dstPath) {
+    Path p = dstPath;
+    while (p != null){
+      String n = p.getParent().getName();
+      if (n.equals(TRASH_PREFIX)){
+        return true;
+      }
+      p = p.getParent();
+    }
+    return false;
   }
 }

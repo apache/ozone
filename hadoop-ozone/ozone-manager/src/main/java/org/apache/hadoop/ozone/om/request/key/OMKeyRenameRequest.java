@@ -23,6 +23,7 @@ import java.util.Map;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -156,7 +157,7 @@ public class OMKeyRenameRequest extends OMKeyRequest {
           fromKeyName);
       toKey = omMetadataManager.getOzoneKey(volumeName, bucketName, toKeyName);
       OmKeyInfo toKeyValue = omMetadataManager.getKeyTable().get(toKey);
-
+      Path dstPath = new Path(toKey);
       if (toKeyValue != null) {
         throw new OMException("Key already exists " + toKeyName,
               OMException.ResultCodes.KEY_ALREADY_EXISTS);
@@ -183,9 +184,11 @@ public class OMKeyRenameRequest extends OMKeyRequest {
 
       keyTable.addCacheEntry(new CacheKey<>(fromKey),
           new CacheValue<>(Optional.absent(), trxnLogIndex));
-
-      keyTable.addCacheEntry(new CacheKey<>(toKey),
-          new CacheValue<>(Optional.of(fromKeyValue), trxnLogIndex));
+      // if the destination key is in trash ,do not cache it .
+      if (!pathIsChildOfTrashDir(dstPath)) {
+        keyTable.addCacheEntry(new CacheKey<>(toKey),
+            new CacheValue<>(Optional.of(fromKeyValue), trxnLogIndex));
+      }
 
       omClientResponse = new OMKeyRenameResponse(omResponse
           .setRenameKeyResponse(RenameKeyResponse.newBuilder()).build(),

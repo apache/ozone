@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.Map;
 
 import com.google.common.base.Optional;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -136,10 +137,15 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
       // Update table cache.
-      omMetadataManager.getKeyTable().addCacheEntry(
-          new CacheKey<>(omMetadataManager.getOzoneKey(volumeName, bucketName,
-              keyName)),
-          new CacheValue<>(Optional.absent(), trxnLogIndex));
+      Path keyPath = new Path(objectKey);
+
+      // do not update cache if key is trash.
+      if(!pathIsChildOfTrashDir(keyPath)) {
+        omMetadataManager.getKeyTable().addCacheEntry(
+            new CacheKey<>(omMetadataManager.getOzoneKey(volumeName, bucketName,
+                keyName)),
+            new CacheValue<>(Optional.absent(), trxnLogIndex));
+      }
 
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
 
