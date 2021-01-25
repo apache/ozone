@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm.block;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
-import java.util.LinkedList;
 import java.util.UUID;
 import java.util.Set;
 import java.util.Map;
@@ -83,7 +82,7 @@ public class DeletedBlockLogImpl
   // Maps txId to set of DNs which are successful in committing the transaction
   private Map<Long, Set<UUID>> transactionToDNsCommitMap;
 
-  private final AtomicLong txID;
+  private final AtomicLong largestTxnId;
   // largest transactionId is stored at largestTxnIdHolderKey
   private final long largestTxnIdHolderKey = 0L;
 
@@ -104,15 +103,15 @@ public class DeletedBlockLogImpl
     // maps transaction to dns which have committed it.
     transactionToDNsCommitMap = new ConcurrentHashMap<>();
 
-    this.txID = new AtomicLong(this.getLargestRecordedTXID());
+    this.largestTxnId = new AtomicLong(this.getLargestRecordedTXID());
   }
 
   public Long getNextDeleteBlockTXID() {
-    return this.txID.incrementAndGet();
+    return this.largestTxnId.incrementAndGet();
   }
 
   public Long getCurrentTXID() {
-    return this.txID.get();
+    return this.largestTxnId.get();
   }
 
   /**
@@ -121,10 +120,19 @@ public class DeletedBlockLogImpl
    * @return Long
    * @throws IOException
    */
-  private Long getLargestRecordedTXID() throws IOException {
+  private long getLargestRecordedTXID() throws IOException {
     DeletedBlocksTransaction txn =
         scmMetadataStore.getDeletedBlocksTXTable().get(largestTxnIdHolderKey);
-    return txn != null ? txn.getTxID() : 0;
+    long txnId = txn != null ? txn.getTxID() : 0L;
+    if (txn == null) {
+      try (TableIterator<Long,
+              ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> txIter =
+              getIterator()) {
+        txIter.seekToLast();
+        txnId = txIter.key() != null ? txIter.key() : 0L;
+      }
+    }
+    return txnId;
   }
 
   @Override
@@ -435,7 +443,8 @@ public class DeletedBlockLogImpl
   TableIterator<Long,
       ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> getIterator()
       throws IOException {
-    TableIterator<Long, ? extends Table.KeyValue<Long, DeletedBlocksTransaction>>
+    TableIterator<Long,
+        ? extends Table.KeyValue<Long, DeletedBlocksTransaction>>
         iter = scmMetadataStore.getDeletedBlocksTXTable().iterator();
     iter.seek(largestTxnIdHolderKey + 1);
     return iter;

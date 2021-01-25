@@ -23,7 +23,6 @@ import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.PIPELINES;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
-import java.util.List;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
