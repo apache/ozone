@@ -255,12 +255,11 @@ public class DatanodeDetails extends NodeImpl implements
   }
 
   /**
-   * Returns a DatanodeDetails from the protocol buffers.
+   * Starts building a new DatanodeDetails from the protobuf input.
    *
-   * @param datanodeDetailsProto - protoBuf Message
-   * @return DatanodeDetails
+   * @param datanodeDetailsProto protobuf message
    */
-  public static DatanodeDetails getFromProtoBuf(
+  public static DatanodeDetails.Builder newBuilder(
       HddsProtos.DatanodeDetailsProto datanodeDetailsProto) {
     DatanodeDetails.Builder builder = newBuilder();
     if (datanodeDetailsProto.hasUuid128()) {
@@ -296,7 +295,18 @@ public class DatanodeDetails extends NodeImpl implements
       builder.setPersistedOpStateExpiry(
           datanodeDetailsProto.getPersistedOpStateExpiry());
     }
-    return builder.build();
+    return builder;
+  }
+
+  /**
+   * Returns a DatanodeDetails from the protocol buffers.
+   *
+   * @param datanodeDetailsProto - protoBuf Message
+   * @return DatanodeDetails
+   */
+  public static DatanodeDetails getFromProtoBuf(
+      HddsProtos.DatanodeDetailsProto datanodeDetailsProto) {
+    return newBuilder(datanodeDetailsProto).build();
   }
 
   /**
@@ -307,11 +317,11 @@ public class DatanodeDetails extends NodeImpl implements
    */
   public static DatanodeDetails getFromProtoBuf(
       HddsProtos.ExtendedDatanodeDetailsProto extendedDetailsProto) {
-    DatanodeDetails.Builder builder = newBuilder();
+    DatanodeDetails.Builder builder;
     if (extendedDetailsProto.hasDatanodeDetails()) {
-      DatanodeDetails datanodeDetails = getFromProtoBuf(
-          extendedDetailsProto.getDatanodeDetails());
-      builder.setDatanodeDetails(datanodeDetails);
+      builder = newBuilder(extendedDetailsProto.getDatanodeDetails());
+    } else {
+      builder = newBuilder();
     }
     if (extendedDetailsProto.hasVersion()) {
       builder.setVersion(extendedDetailsProto.getVersion());
