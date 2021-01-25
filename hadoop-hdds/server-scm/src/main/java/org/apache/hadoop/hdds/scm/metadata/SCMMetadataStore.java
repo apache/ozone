@@ -70,20 +70,6 @@ public interface SCMMetadataStore {
   Table<Long, DeletedBlocksTransaction> getDeletedBlocksTXTable();
 
   /**
-   * Returns the current TXID for the deleted blocks.
-   *
-   * @return Long
-   */
-  Long getCurrentTXID();
-
-  /**
-   * Returns the next TXID for the Deleted Blocks.
-   *
-   * @return Long.
-   */
-  Long getNextDeleteBlockTXID();
-
-  /**
    * A table that maintains all the valid certificates issued by the SCM CA.
    *
    * @return Table
