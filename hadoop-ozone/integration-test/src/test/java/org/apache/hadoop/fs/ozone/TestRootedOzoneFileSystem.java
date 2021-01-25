@@ -1236,15 +1236,17 @@ public class TestRootedOzoneFileSystem {
       }
     }, 1000, 180000);
 
-    Assert.assertTrue(getOMMetrics()
-        .getNumTrashDeletes() >= prevNumTrashDeletes);
+    // This condition should pass after the checkpoint
     Assert.assertTrue(getOMMetrics()
         .getNumTrashRenames() > prevNumTrashRenames);
     Assert.assertTrue(getOMMetrics()
-        .getNumTrashFilesDeletes() >= prevNumTrashFileDeletes);
-    Assert.assertTrue(getOMMetrics()
         .getNumTrashFilesRenames() > prevNumTrashFileRenames);
 
+    // This condition should succeed once the checkpoint directory is deleted
+    GenericTestUtils.waitFor(
+        () -> getOMMetrics().getNumTrashDeletes() > prevNumTrashDeletes
+            && getOMMetrics().getNumTrashFilesDeletes()
+            > prevNumTrashFileDeletes, 100, 180000);
     // Cleanup
     ofs.delete(trashRoot, true);
 

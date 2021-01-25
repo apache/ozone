@@ -76,7 +76,7 @@ public class TrashOzoneFileSystem extends FileSystem {
 
   private final AtomicLong runCount;
 
-  private final static ClientId clientId = ClientId.randomId();
+  private final static ClientId CLIENT_ID = ClientId.randomId();
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TrashOzoneFileSystem.class);
@@ -91,7 +91,7 @@ public class TrashOzoneFileSystem extends FileSystem {
   private RaftClientRequest getRatisRequest(
       OzoneManagerProtocolProtos.OMRequest omRequest) {
     return RaftClientRequest.newBuilder()
-        .setClientId(clientId)
+        .setClientId(CLIENT_ID)
         .setServerId(ozoneManager.getOmRatisServer().getRaftPeerId())
         .setGroupId(ozoneManager.getOmRatisServer().getRaftGroupId())
         .setCallId(runCount.getAndIncrement())
@@ -424,7 +424,7 @@ public class TrashOzoneFileSystem extends FileSystem {
               .build();
       OzoneManagerProtocolProtos.OMRequest omRequest =
           OzoneManagerProtocolProtos.OMRequest.newBuilder()
-              .setClientId(clientId.toString())
+              .setClientId(CLIENT_ID.toString())
               .setRenameKeyRequest(renameKeyRequest)
               .setCmdType(OzoneManagerProtocolProtos.Type.RenameKey)
               .build();
@@ -483,7 +483,7 @@ public class TrashOzoneFileSystem extends FileSystem {
               .build();
       OzoneManagerProtocolProtos.OMRequest omRequest =
           OzoneManagerProtocolProtos.OMRequest.newBuilder()
-              .setClientId(clientId.toString())
+              .setClientId(CLIENT_ID.toString())
               .setDeleteKeyRequest(deleteKeyRequest)
               .setCmdType(OzoneManagerProtocolProtos.Type.DeleteKey)
               .build();
