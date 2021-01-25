@@ -19,8 +19,8 @@ COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
 
 : "${OZONE_REPLICATION_FACTOR:=3}"
-: "${OZONE_UPGRADE_FROM:="0.5.0"}"
-: "${OZONE_UPGRADE_TO:="1.0.0"}"
+: "${OZONE_UPGRADE_FROM:="1.0.0"}"
+: "${OZONE_UPGRADE_TO:="1.1.0"}"
 : "${OZONE_VOLUME:="${COMPOSE_DIR}/data"}"
 
 export OZONE_VOLUME
