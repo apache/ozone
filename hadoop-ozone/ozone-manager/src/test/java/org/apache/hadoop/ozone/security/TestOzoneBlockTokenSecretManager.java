@@ -328,8 +328,8 @@ public class TestOzoneBlockTokenSecretManager {
   private X509Certificate generateExpiredCert(String dn,
       KeyPair pair, String algorithm) throws CertificateException,
       IllegalStateException, IOException, OperatorCreationException {
-    Date from = new Date(Instant.now().toEpochMilli() - 100L);
-    Date to = new Date(from.getTime() + 100L);
+    Date from = new Date();
+    Date to = from;
     return generateTestCert(dn, pair, algorithm, from, to);
   }
 
