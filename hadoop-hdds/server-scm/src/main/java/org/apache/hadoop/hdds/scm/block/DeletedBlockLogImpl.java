@@ -125,11 +125,19 @@ public class DeletedBlockLogImpl
         scmMetadataStore.getDeletedBlocksTXTable().get(largestTxnIdHolderKey);
     long txnId = txn != null ? txn.getTxID() : 0L;
     if (txn == null) {
+      // HDDS-4477 adds largestTxnIdHolderKey to table for storing largest
+      // transactionId. In case the key does not exist, fetch largest
+      // transactionId from existing transactions and update
+      // largestTxnIdHolderKey with same.
       try (TableIterator<Long,
               ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> txIter =
               getIterator()) {
         txIter.seekToLast();
         txnId = txIter.key() != null ? txIter.key() : 0L;
+        if (txnId > 0) {
+          scmMetadataStore.getDeletedBlocksTXTable().put(largestTxnIdHolderKey,
+              DUMMY_TXN_BUILDER.setTxID(txnId).build());
+        }
       }
     }
     return txnId;
