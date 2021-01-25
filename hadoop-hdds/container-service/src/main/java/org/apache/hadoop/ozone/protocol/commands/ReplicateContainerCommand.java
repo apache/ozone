@@ -17,10 +17,14 @@
  */
 package org.apache.hadoop.ozone.protocol.commands;
 
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
+import com.google.common.collect.ImmutableSet;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ReplicateContainerCommandProto;
 import org.apache.hadoop.hdds.protocol.proto
@@ -41,6 +45,8 @@ public class ReplicateContainerCommand
 
   private final long containerID;
   private final List<DatanodeDetails> sourceDatanodes;
+  private static final Set<Port.Name> REPLICATION_PORT =
+      ImmutableSet.copyOf(EnumSet.of(Port.Name.REPLICATION));
 
   public ReplicateContainerCommand(long containerID,
       List<DatanodeDetails> sourceDatanodes) {
@@ -68,7 +74,7 @@ public class ReplicateContainerCommand
         .setCmdId(getId())
         .setContainerID(containerID);
     for (DatanodeDetails dd : sourceDatanodes) {
-      builder.addSources(dd.getProtoBufMessage());
+      builder.addSources(dd.toProtoBuilder(REPLICATION_PORT));
     }
     return builder.build();
   }

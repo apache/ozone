@@ -19,9 +19,12 @@
 package org.apache.hadoop.hdds.protocol;
 
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
+import com.google.common.collect.ImmutableSet;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
@@ -31,6 +34,8 @@ import org.apache.hadoop.hdds.scm.net.NodeImpl;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * DatanodeDetails class contains details about DataNode like:
@@ -45,6 +50,10 @@ import com.google.common.base.Strings;
 @InterfaceStability.Evolving
 public class DatanodeDetails extends NodeImpl implements
     Comparable<DatanodeDetails> {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(DatanodeDetails.class);
+
   /**
    * DataNode's unique identifier in the cluster.
    */
@@ -280,8 +289,7 @@ public class DatanodeDetails extends NodeImpl implements
     }
     for (HddsProtos.Port port : datanodeDetailsProto.getPortsList()) {
       try {
-        Port.Name name = Port.Name.valueOf(port.getName().toUpperCase());
-        builder.addPort(newPort(name, port.getValue()));
+        builder.addPort(Port.fromProto(port));
       } catch (IllegalArgumentException ignored) {
         // ignore unknown port type
       }
@@ -347,6 +355,16 @@ public class DatanodeDetails extends NodeImpl implements
    * @return HddsProtos.DatanodeDetailsProto
    */
   public HddsProtos.DatanodeDetailsProto getProtoBufMessage() {
+    return toProto(Name.PUBLIC_PORTS);
+  }
+
+  public HddsProtos.DatanodeDetailsProto toProto(Set<Name> exposedPorts) {
+    return toProtoBuilder(exposedPorts).build();
+  }
+
+  public HddsProtos.DatanodeDetailsProto.Builder toProtoBuilder(
+      Set<Name> exposedPorts) {
+
     HddsProtos.UUID uuid128 = HddsProtos.UUID.newBuilder()
         .setMostSigBits(uuid.getMostSignificantBits())
         .setLeastSigBits(uuid.getLeastSignificantBits())
@@ -379,13 +397,17 @@ public class DatanodeDetails extends NodeImpl implements
     builder.setPersistedOpStateExpiry(persistedOpStateExpiryEpochSec);
 
     for (Port port : ports) {
-      builder.addPorts(HddsProtos.Port.newBuilder()
-          .setName(port.getName().toString())
-          .setValue(port.getValue())
-          .build());
+      if (exposedPorts.contains(port.getName())) {
+        builder.addPorts(port.toProto());
+      } else {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Skip adding {} port {} to proto message",
+              port.getName(), port.getValue());
+        }
+      }
     }
 
-    return builder.build();
+    return builder;
   }
 
   /**
@@ -393,7 +415,8 @@ public class DatanodeDetails extends NodeImpl implements
    * @return HddsProtos.ExtendedDatanodeDetailsProto
    */
   public HddsProtos.ExtendedDatanodeDetailsProto getExtendedProtoBufMessage() {
-    HddsProtos.DatanodeDetailsProto datanodeDetailsProto = getProtoBufMessage();
+    HddsProtos.DatanodeDetailsProto datanodeDetailsProto =
+        toProto(Name.ALL_PORTS);
 
     HddsProtos.ExtendedDatanodeDetailsProto.Builder extendedBuilder =
         HddsProtos.ExtendedDatanodeDetailsProto.newBuilder()
@@ -698,11 +721,16 @@ public class DatanodeDetails extends NodeImpl implements
      * Ports that are supported in DataNode.
      */
     public enum Name {
-      STANDALONE, RATIS, REST, REPLICATION
+      STANDALONE, RATIS, REST, REPLICATION;
+
+      public static final Set<Name> ALL_PORTS = ImmutableSet.copyOf(
+          Name.values());
+      public static final Set<Name> PUBLIC_PORTS = ImmutableSet.copyOf(
+          EnumSet.of(STANDALONE, RATIS, REST));
     }
 
-    private Name name;
-    private Integer value;
+    private final Name name;
+    private final Integer value;
 
     /**
      * Private constructor for constructing Port object. Use
@@ -756,6 +784,18 @@ public class DatanodeDetails extends NodeImpl implements
         return name.equals(((Port) anObject).name);
       }
       return false;
+    }
+
+    public HddsProtos.Port toProto() {
+      return HddsProtos.Port.newBuilder()
+          .setName(name.name())
+          .setValue(value)
+          .build();
+    }
+
+    public static Port fromProto(HddsProtos.Port proto) {
+      Port.Name name = Port.Name.valueOf(proto.getName().toUpperCase());
+      return new Port(name, proto.getValue());
     }
   }
 
