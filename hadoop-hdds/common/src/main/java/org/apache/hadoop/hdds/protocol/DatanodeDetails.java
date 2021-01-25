@@ -279,8 +279,12 @@ public class DatanodeDetails extends NodeImpl implements
       builder.setCertSerialId(datanodeDetailsProto.getCertSerialId());
     }
     for (HddsProtos.Port port : datanodeDetailsProto.getPortsList()) {
-      builder.addPort(newPort(
-          Port.Name.valueOf(port.getName().toUpperCase()), port.getValue()));
+      try {
+        Port.Name name = Port.Name.valueOf(port.getName().toUpperCase());
+        builder.addPort(newPort(name, port.getValue()));
+      } catch (IllegalArgumentException ignored) {
+        // ignore unknown port type
+      }
     }
     if (datanodeDetailsProto.hasNetworkName()) {
       builder.setNetworkName(datanodeDetailsProto.getNetworkName());
