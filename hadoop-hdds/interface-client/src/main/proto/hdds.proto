@@ -19,7 +19,7 @@
 /**
  * These .proto interfaces are private and unstable.
  * Please see http://wiki.apache.org/hadoop/Compatibility
- * for what changes are allowed for a *unstable* .proto interface.
+ * for what changes are allowed for an *unstable* .proto interface.
  */
 
 option java_package = "org.apache.hadoop.hdds.protocol.proto";
@@ -51,7 +51,7 @@ message DatanodeDetailsProto {
 
 /**
  The DatanodeDetailsProto is a basic type that will be shared by many Proto,
- to reduce the number of fields transfered by ProtoBuf, only need to extend
+ to reduce the number of fields transferred by ProtoBuf, only need to extend
  DatanodeDetailsProto for registering DataNode with SCM and Recon.
 */
 message ExtendedDatanodeDetailsProto {
