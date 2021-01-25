@@ -33,6 +33,7 @@ old_client() {
 new_client() {
   OZONE_DIR=/opt/hadoop
   container=new_client
+  client_version=${current_version}
   "$@"
 }
 
@@ -67,8 +68,8 @@ test_cross_compatibility() {
     old_client _write
     old_client _read ${client_version}
 
-    new_client _read ${client_version}
     old_client _read ${current_version}
+    new_client _read ${client_version}
   done
 
   KEEP_RUNNING=false stop_docker_env
@@ -77,7 +78,7 @@ test_cross_compatibility() {
 create_results_dir
 
 # current cluster with various clients
-COMPOSE_FILE=new-cluster.yaml:clients.yaml cluster_version=${current_version} client_version=${current_version} test_cross_compatibility
+COMPOSE_FILE=new-cluster.yaml:clients.yaml cluster_version=${current_version} test_cross_compatibility
 
 for cluster_version in 1.0.0 0.5.0; do
   # shellcheck source=/dev/null
