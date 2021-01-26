@@ -27,8 +27,9 @@ icon: user
 
 
 Apache Ranger™ is a framework to enable, monitor and manage comprehensive data
-security across the Hadoop platform. Any version of Apache Ranger which is greater
-than 1.20 is aware of Ozone, and can manage an Ozone cluster.
+security across the Hadoop platform. Apache Ranger has supported Ozone authentication 
+since version 2.0. However, due to some bugs in 2.0, Apache Ranger 
+2.1 and later versions are recommended.
 
 
 To use Apache Ranger, you must have Apache Ranger installed in your Hadoop
@@ -44,3 +45,19 @@ Property|Value
 --------|------------------------------------------------------------
 ozone.acl.enabled         | true
 ozone.acl.authorizer.class| org.apache.ranger.authorization.ozone.authorizer.RangerOzoneAuthorizer
+
+The Ranger permissions corresponding to the Ozone operations are as follows:
+
+| operation&permission | Volume  permission | Bucket permission | Key permission |
+| :--- | :--- | :--- | :--- |
+| Create  volume | CREATE | | |
+| List volume | LIST | | |
+| Get volume Info | READ | | |
+| Delete volume | DELETE | | |
+| Create  bucket | READ | CREATE | |
+| List bucket | LIST, READ | | |
+| Get bucket info | READ | READ | |
+| Delete bucket | READ | DELETE | |
+| List key | READ | LIST, READ | |
+| Write key | READ | READ | CREATE, WRITE |
+| Read key | READ | READ | READ |

@@ -423,7 +423,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         request.getPrefix(),
         request.getCount());
     for (OmKeyInfo key : keys) {
-      resp.addKeyInfo(key.getProtobuf());
+      resp.addKeyInfo(key.getProtobuf(true));
     }
 
     return resp.build();

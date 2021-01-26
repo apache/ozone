@@ -325,19 +325,21 @@ public class TestOmMetadataManager {
     String volumeNameB = "volumeB";
     String ozoneBucket = "ozoneBucket";
     String hadoopBucket = "hadoopBucket";
-
+    String ozoneTestBucket = "ozoneBucket-Test";
 
     // Create volumes and buckets.
     TestOMRequestUtils.addVolumeToDB(volumeNameA, omMetadataManager);
     TestOMRequestUtils.addVolumeToDB(volumeNameB, omMetadataManager);
     addBucketsToCache(volumeNameA, ozoneBucket);
     addBucketsToCache(volumeNameB, hadoopBucket);
-
+    addBucketsToCache(volumeNameA, ozoneTestBucket);
 
     String prefixKeyA = "key-a";
     String prefixKeyB = "key-b";
+    String prefixKeyC = "key-c";
     TreeSet<String> keysASet = new TreeSet<>();
     TreeSet<String> keysBSet = new TreeSet<>();
+    TreeSet<String> keysCSet = new TreeSet<>();
     for (int i=1; i<= 100; i++) {
       if (i % 2 == 0) {
         keysASet.add(
@@ -349,7 +351,8 @@ public class TestOmMetadataManager {
         addKeysToOM(volumeNameA, hadoopBucket, prefixKeyB + i, i);
       }
     }
-
+    keysCSet.add(prefixKeyC + 1);
+    addKeysToOM(volumeNameA, ozoneTestBucket, prefixKeyC + 0, 0);
 
     TreeSet<String> keysAVolumeBSet = new TreeSet<>();
     TreeSet<String> keysBVolumeBSet = new TreeSet<>();
@@ -443,6 +446,14 @@ public class TestOmMetadataManager {
 
     Assert.assertEquals(omKeyInfoList.size(), 0);
 
+    // List all keys with empty prefix
+    omKeyInfoList = omMetadataManager.listKeys(volumeNameA, ozoneBucket,
+        null, null, 100);
+    Assert.assertEquals(50, omKeyInfoList.size());
+    for (OmKeyInfo omKeyInfo : omKeyInfoList) {
+      Assert.assertTrue(omKeyInfo.getKeyName().startsWith(
+          prefixKeyA));
+    }
   }
 
   @Test

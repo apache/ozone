@@ -21,7 +21,7 @@ weight: -10
   limitations under the License.
 -->
 
-# Apache Hadoop Ozone
+# Apache Ozone
 
 {{<figure class="ozone-usage" src="/ozone-usage.png" width="60%">}}
 

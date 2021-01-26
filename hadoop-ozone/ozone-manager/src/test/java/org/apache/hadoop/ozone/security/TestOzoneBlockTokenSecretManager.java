@@ -37,7 +37,9 @@ import org.apache.hadoop.util.Time;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
@@ -63,6 +65,8 @@ public class TestOzoneBlockTokenSecretManager {
       .getTempPath(TestOzoneBlockTokenSecretManager.class.getSimpleName());
   private BlockTokenVerifier tokenVerifier;
 
+  @Rule
+  public ExpectedException exception = ExpectedException.none();
 
   @Before
   public void setUp() throws Exception {
@@ -230,5 +234,39 @@ public class TestOzoneBlockTokenSecretManager {
     // Non block operations are not checked by block token verifier
     tokenVerifier.verify(null, null,
         ContainerProtos.Type.CloseContainer, null);
+  }
+
+  @Test
+  public void testBlockTokenReadAccessMode() throws Exception {
+    final String testUser1 = "testUser1";
+    final String testBlockId1 = "101";
+    Token<OzoneBlockTokenIdentifier> readToken =
+        secretManager.generateToken(testUser1, testBlockId1,
+            EnumSet.of(AccessModeProto.READ), 100);
+
+    exception.expect(BlockTokenException.class);
+    exception.expectMessage("doesn't have WRITE permission");
+    tokenVerifier.verify(testUser1, readToken.encodeToUrlString(),
+        ContainerProtos.Type.PutBlock, testBlockId1);
+
+    tokenVerifier.verify(testUser1, readToken.encodeToUrlString(),
+        ContainerProtos.Type.GetBlock, testBlockId1);
+  }
+
+  @Test
+  public void testBlockTokenWriteAccessMode() throws Exception {
+    final String testUser2 = "testUser2";
+    final String testBlockId2 = "102";
+    Token<OzoneBlockTokenIdentifier> writeToken =
+        secretManager.generateToken("testUser2", testBlockId2,
+            EnumSet.of(AccessModeProto.WRITE), 100);
+
+    tokenVerifier.verify(testUser2, writeToken.encodeToUrlString(),
+        ContainerProtos.Type.WriteChunk, testBlockId2);
+
+    exception.expect(BlockTokenException.class);
+    exception.expectMessage("doesn't have READ permission");
+    tokenVerifier.verify(testUser2, writeToken.encodeToUrlString(),
+        ContainerProtos.Type.ReadChunk, testBlockId2);
   }
 }

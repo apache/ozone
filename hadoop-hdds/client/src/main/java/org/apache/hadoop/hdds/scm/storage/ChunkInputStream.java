@@ -20,14 +20,17 @@ package org.apache.hadoop.hdds.scm.storage;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.fs.CanUnbuffer;
 import org.apache.hadoop.fs.Seekable;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadChunkResponseProto;
+import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
@@ -40,18 +43,22 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.function.Supplier;
 
 /**
  * An {@link InputStream} called from BlockInputStream to read a chunk from the
  * container. Each chunk may contain multiple underlying {@link ByteBuffer}
  * instances.
  */
-public class ChunkInputStream extends InputStream implements Seekable {
+public class ChunkInputStream extends InputStream
+    implements Seekable, CanUnbuffer {
 
   private ChunkInfo chunkInfo;
   private final long length;
   private final BlockID blockID;
+  private final XceiverClientFactory xceiverClientFactory;
   private XceiverClientSpi xceiverClient;
+  private final Supplier<Pipeline> pipelineSupplier;
   private boolean verifyChecksum;
   private boolean allocated = false;
   // Buffer to store the chunk data read from the DN container
@@ -69,9 +76,8 @@ public class ChunkInputStream extends InputStream implements Seekable {
 
   // Position of the ChunkInputStream is maintained by this variable (if a
   // seek is performed. This position is w.r.t to the chunk only and not the
-  // block or key. This variable is set only if either the buffers are not
-  // yet allocated or the if the allocated buffers do not cover the seeked
-  // position. Once the chunk is read, this variable is reset.
+  // block or key. This variable is also set before attempting a read to enable
+  // retry.  Once the chunk is read, this variable is reset.
   private long chunkPosition = -1;
 
   private final Token<? extends TokenIdentifier> token;
@@ -79,17 +85,19 @@ public class ChunkInputStream extends InputStream implements Seekable {
   private static final int EOF = -1;
 
   ChunkInputStream(ChunkInfo chunkInfo, BlockID blockId,
-      XceiverClientSpi xceiverClient, boolean verifyChecksum,
-      Token<? extends TokenIdentifier> token) {
+      XceiverClientFactory xceiverClientFactory,
+      Supplier<Pipeline> pipelineSupplier,
+      boolean verifyChecksum, Token<? extends TokenIdentifier> token) {
     this.chunkInfo = chunkInfo;
     this.length = chunkInfo.getLen();
     this.blockID = blockId;
-    this.xceiverClient = xceiverClient;
+    this.xceiverClientFactory = xceiverClientFactory;
+    this.pipelineSupplier = pipelineSupplier;
     this.verifyChecksum = verifyChecksum;
     this.token = token;
   }
 
-  public synchronized long getRemaining() throws IOException {
+  public synchronized long getRemaining() {
     return length - getPos();
   }
 
@@ -98,7 +106,7 @@ public class ChunkInputStream extends InputStream implements Seekable {
    */
   @Override
   public synchronized int read() throws IOException {
-    checkOpen();
+    acquireClient();
     int available = prepareRead(1);
     int dataout = EOF;
 
@@ -143,7 +151,7 @@ public class ChunkInputStream extends InputStream implements Seekable {
     if (len == 0) {
       return 0;
     }
-    checkOpen();
+    acquireClient();
     int total = 0;
     while (len > 0) {
       int available = prepareRead(len);
@@ -196,7 +204,7 @@ public class ChunkInputStream extends InputStream implements Seekable {
   }
 
   @Override
-  public synchronized long getPos() throws IOException {
+  public synchronized long getPos() {
     if (chunkPosition >= 0) {
       return chunkPosition;
     }
@@ -219,19 +227,23 @@ public class ChunkInputStream extends InputStream implements Seekable {
 
   @Override
   public synchronized void close() {
-    if (xceiverClient != null) {
+    releaseClient();
+  }
+
+  protected synchronized void releaseClient() {
+    if (xceiverClientFactory != null && xceiverClient != null) {
+      xceiverClientFactory.releaseClient(xceiverClient, false);
       xceiverClient = null;
     }
   }
 
   /**
-   * Checks if the stream is open.  If not, throw an exception.
-   *
-   * @throws IOException if stream is closed
+   * Acquire new client if previous one was released.
    */
-  protected synchronized void checkOpen() throws IOException {
-    if (xceiverClient == null) {
-      throw new IOException("BlockInputStream has been closed.");
+  protected synchronized void acquireClient() throws IOException {
+    if (xceiverClientFactory != null && xceiverClient == null) {
+      xceiverClient = xceiverClientFactory.acquireClientForReadData(
+          pipelineSupplier.get());
     }
   }
 
@@ -291,6 +303,11 @@ public class ChunkInputStream extends InputStream implements Seekable {
       // Start reading the chunk from the last chunkPosition onwards.
       startByteIndex = bufferOffset + bufferLength;
     }
+
+    // bufferOffset and bufferLength are updated below, but if read fails
+    // and is retried, we need the previous position.  Position is reset after
+    // successful read in adjustBufferPosition()
+    storePosition();
 
     if (verifyChecksum) {
       // Update the bufferOffset and bufferLength as per the checksum
@@ -437,7 +454,8 @@ public class ChunkInputStream extends InputStream implements Seekable {
   /**
    * Check if the buffers have been allocated data and false otherwise.
    */
-  private boolean buffersAllocated() {
+  @VisibleForTesting
+  protected boolean buffersAllocated() {
     return buffers != null && !buffers.isEmpty();
   }
 
@@ -538,6 +556,10 @@ public class ChunkInputStream extends InputStream implements Seekable {
     this.chunkPosition = -1;
   }
 
+  private void storePosition() {
+    chunkPosition = getPos();
+  }
+
   String getChunkName() {
     return chunkInfo.getChunkName();
   }
@@ -549,5 +571,12 @@ public class ChunkInputStream extends InputStream implements Seekable {
   @VisibleForTesting
   protected long getChunkPosition() {
     return chunkPosition;
+  }
+
+  @Override
+  public synchronized void unbuffer() {
+    storePosition();
+    releaseBuffers();
+    releaseClient();
   }
 }

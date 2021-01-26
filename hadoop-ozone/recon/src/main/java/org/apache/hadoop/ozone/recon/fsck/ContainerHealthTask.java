@@ -28,7 +28,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.ozone.recon.persistence.ContainerSchemaManager;
+import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.scm.ReconScmTask;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
 import org.apache.hadoop.util.Time;
@@ -50,7 +50,7 @@ public class ContainerHealthTask extends ReconScmTask {
       LoggerFactory.getLogger(ContainerHealthTask.class);
 
   private ContainerManager containerManager;
-  private ContainerSchemaManager containerSchemaManager;
+  private ContainerHealthSchemaManager containerHealthSchemaManager;
   private PlacementPolicy placementPolicy;
   private final long interval;
   private Set<ContainerInfo> processedContainers = new HashSet<>();
@@ -58,11 +58,11 @@ public class ContainerHealthTask extends ReconScmTask {
   public ContainerHealthTask(
       ContainerManager containerManager,
       ReconTaskStatusDao reconTaskStatusDao,
-      ContainerSchemaManager containerSchemaManager,
+      ContainerHealthSchemaManager containerHealthSchemaManager,
       PlacementPolicy placementPolicy,
       ReconTaskConfig reconTaskConfig) {
     super(reconTaskStatusDao);
-    this.containerSchemaManager = containerSchemaManager;
+    this.containerHealthSchemaManager = containerHealthSchemaManager;
     this.placementPolicy = placementPolicy;
     this.containerManager = containerManager;
     interval = reconTaskConfig.getMissingContainerTaskInterval().toMillis();
@@ -105,7 +105,7 @@ public class ContainerHealthTask extends ReconScmTask {
 
   private void completeProcessingContainer(ContainerHealthStatus container,
       Set<String> existingRecords, long currentTime) {
-    containerSchemaManager.insertUnhealthyContainerRecords(
+    containerHealthSchemaManager.insertUnhealthyContainerRecords(
         ContainerHealthRecords.generateUnhealthyRecords(
             container, existingRecords, currentTime));
     processedContainers.add(container.getContainer());
@@ -128,7 +128,7 @@ public class ContainerHealthTask extends ReconScmTask {
   private long processExistingDBRecords(long currentTime) {
     long recordCount = 0;
     try (Cursor<UnhealthyContainersRecord> cursor =
-             containerSchemaManager.getAllUnhealthyRecordsCursor()) {
+             containerHealthSchemaManager.getAllUnhealthyRecordsCursor()) {
       ContainerHealthStatus currentContainer = null;
       Set<String> existingRecords = new HashSet<>();
       while(cursor.hasNext()) {
@@ -176,7 +176,7 @@ public class ContainerHealthTask extends ReconScmTask {
       if (h.isHealthy()) {
         return;
       }
-      containerSchemaManager.insertUnhealthyContainerRecords(
+      containerHealthSchemaManager.insertUnhealthyContainerRecords(
           ContainerHealthRecords.generateUnhealthyRecords(h, currentTime));
     } catch (ContainerNotFoundException e) {
       LOG.error("Container not found while processing container in Container " +

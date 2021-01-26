@@ -46,8 +46,8 @@ public class ClearQuotaHandler extends VolumeHandler {
     if (clrSpaceQuota.getClrSpaceQuota()) {
       volume.clearSpaceQuota();
     }
-    if (clrSpaceQuota.getClrCountQuota()) {
-      volume.clearCountQuota();
+    if (clrSpaceQuota.getClrNamespaceQuota()) {
+      volume.clearNamespaceQuota();
     }
   }
 }

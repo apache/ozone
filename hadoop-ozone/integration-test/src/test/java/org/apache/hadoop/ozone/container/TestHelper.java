@@ -24,10 +24,13 @@ import java.util.*;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
@@ -46,15 +49,21 @@ import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverSe
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.test.GenericTestUtils;
-import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.statemachine.StateMachine;
 import org.junit.Assert;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import static java.util.stream.Collectors.toList;
 
 /**
  * Helpers for container tests.
  */
 public final class TestHelper {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TestHelper.class);
 
   /**
    * Never constructed.
@@ -92,6 +101,19 @@ public final class TestHelper {
       }
     }
     return false;
+  }
+
+  public static int countReplicas(long containerID,
+      Set<HddsDatanodeService> datanodes) {
+    int count = 0;
+    for (HddsDatanodeService datanodeService : datanodes) {
+      Container<?> container = datanodeService.getDatanodeStateMachine()
+          .getContainer().getContainerSet().getContainer(containerID);
+      if (container != null) {
+        count++;
+      }
+    }
+    return count;
   }
 
   public static OzoneOutputStream createKey(String keyName,
@@ -211,12 +233,14 @@ public final class TestHelper {
 
     // wait for the pipeline to get destroyed in the datanodes
     for (Pipeline pipeline : pipelineList) {
+      HddsProtos.PipelineID pipelineId = pipeline.getId().getProtobuf();
       for (DatanodeDetails dn : pipeline.getNodes()) {
         XceiverServerSpi server =
             cluster.getHddsDatanodes().get(cluster.getHddsDatanodeIndex(dn))
                 .getDatanodeStateMachine().getContainer().getWriteChannel();
         Assert.assertTrue(server instanceof XceiverServerRatis);
-        server.removeGroup(pipeline.getId().getProtobuf());
+        GenericTestUtils.waitFor(() -> !server.isExist(pipelineId),
+            100, 30_000);
       }
     }
   }
@@ -300,13 +324,12 @@ public final class TestHelper {
 
   private static RaftServer.Division getRaftServerDivision(
       HddsDatanodeService dn, Pipeline pipeline) throws Exception {
-    XceiverServerSpi serverSpi = dn.getDatanodeStateMachine().
-        getContainer().getWriteChannel();
-    RaftServer server = (((XceiverServerRatis) serverSpi).getServer());
-    RaftGroupId groupId =
-        pipeline == null ? server.getGroupIds().iterator().next() :
-            RatisHelper.newRaftGroup(pipeline).getGroupId();
-    return server.getDivision(groupId);
+    XceiverServerRatis server =
+        (XceiverServerRatis) (dn.getDatanodeStateMachine().
+            getContainer().getWriteChannel());
+    return pipeline == null ? server.getServerDivision() :
+        server.getServerDivision(
+            RatisHelper.newRaftGroup(pipeline).getGroupId());
   }
 
   public static StateMachine getStateMachine(HddsDatanodeService dn,
@@ -317,8 +340,48 @@ public final class TestHelper {
   public static HddsDatanodeService getDatanodeService(OmKeyLocationInfo info,
       MiniOzoneCluster cluster) throws IOException {
     DatanodeDetails dnDetails =  info.getPipeline().
-            getFirstNode();
+        getFirstNode();
     return cluster.getHddsDatanodes().get(cluster.
-            getHddsDatanodeIndex(dnDetails));
+        getHddsDatanodeIndex(dnDetails));
+  }
+
+  public static Set<HddsDatanodeService> getDatanodeServices(
+      MiniOzoneCluster cluster, Pipeline pipeline) {
+    Set<HddsDatanodeService> services = new HashSet<>();
+    Set<DatanodeDetails> pipelineNodes = pipeline.getNodeSet();
+    for (HddsDatanodeService service : cluster.getHddsDatanodes()) {
+      if (pipelineNodes.contains(service.getDatanodeDetails())) {
+        services.add(service);
+      }
+    }
+    Assert.assertEquals(pipelineNodes.size(), services.size());
+    return services;
+  }
+
+  public static int countReplicas(long containerID, MiniOzoneCluster cluster) {
+    ContainerManager containerManager = cluster.getStorageContainerManager()
+        .getContainerManager();
+    try {
+      Set<ContainerReplica> replicas = containerManager
+          .getContainerReplicas(ContainerID.valueof(containerID));
+      LOG.info("Container {} has {} replicas on {}", containerID,
+          replicas.size(),
+          replicas.stream()
+              .map(ContainerReplica::getDatanodeDetails)
+              .map(DatanodeDetails::getUuidString)
+              .sorted()
+              .collect(toList())
+      );
+      return replicas.size();
+    } catch (ContainerNotFoundException e) {
+      LOG.warn("Container {} not found", containerID);
+      return 0;
+    }
+  }
+
+  public static void waitForReplicaCount(long containerID, int count,
+      MiniOzoneCluster cluster) throws TimeoutException, InterruptedException {
+    GenericTestUtils.waitFor(() -> countReplicas(containerID, cluster) == count,
+        1000, 30_000);
   }
 }

@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.container.replication;
 
+import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -40,6 +41,7 @@ import org.apache.ratis.thirdparty.io.grpc.ManagedChannel;
 import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
 import org.apache.ratis.thirdparty.io.grpc.netty.NettyChannelBuilder;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
+import org.apache.ratis.thirdparty.io.netty.handler.ssl.ClientAuth;
 import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslContextBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,20 +60,27 @@ public class GrpcReplicationClient implements AutoCloseable{
 
   private final Path workingDirectory;
 
-  public GrpcReplicationClient(String host, int port, Path workingDir,
-      SecurityConfig secConfig, X509Certificate caCert) throws IOException {
+  public GrpcReplicationClient(
+      String host, int port, Path workingDir,
+      SecurityConfig secConfig, X509Certificate caCert
+  ) throws IOException {
     NettyChannelBuilder channelBuilder =
         NettyChannelBuilder.forAddress(host, port)
             .usePlaintext()
             .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE);
 
-    if (secConfig.isGrpcTlsEnabled()) {
+    if (secConfig.isSecurityEnabled()) {
       channelBuilder.useTransportSecurity();
 
       SslContextBuilder sslContextBuilder = GrpcSslContexts.forClient();
       if (caCert != null) {
         sslContextBuilder.trustManager(caCert);
       }
+
+      sslContextBuilder.clientAuth(ClientAuth.REQUIRE);
+      sslContextBuilder.keyManager(
+          new File(secConfig.getCertificateFileName()),
+          new File(secConfig.getPrivateKeyFileName()));
       if (secConfig.useTestCert()) {
         channelBuilder.overrideAuthority("localhost");
       }

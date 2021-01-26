@@ -104,7 +104,6 @@ public class ContainerKeyMapperTask implements ReconOmTask {
     return "ContainerKeyMapperTask";
   }
 
-  @Override
   public Collection<String> getTaskTables() {
     return Collections.singletonList(KEY_TABLE);
   }
@@ -113,8 +112,14 @@ public class ContainerKeyMapperTask implements ReconOmTask {
   public Pair<String, Boolean> process(OMUpdateEventBatch events) {
     Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
     int eventCount = 0;
+    final Collection<String> taskTables = getTaskTables();
+
     while (eventIterator.hasNext()) {
       OMDBUpdateEvent<String, OmKeyInfo> omdbUpdateEvent = eventIterator.next();
+      // Filter event inside process method to avoid duping
+      if (!taskTables.contains(omdbUpdateEvent.getTable())) {
+        continue;
+      }
       String updatedKey = omdbUpdateEvent.getKey();
       OmKeyInfo updatedKeyValue = omdbUpdateEvent.getValue();
       try {

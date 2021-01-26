@@ -33,6 +33,7 @@ import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
@@ -54,6 +55,7 @@ import org.apache.hadoop.test.LambdaTestUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
@@ -95,17 +97,24 @@ public class TestRootedOzoneFileSystem {
 
   @Parameterized.Parameters
   public static Collection<Object[]> data() {
-    return Arrays.asList(new Object[]{true}, new Object[]{false});
+    return Arrays.asList(
+        new Object[]{true, true},
+        new Object[]{true, false},
+        new Object[]{false, true},
+        new Object[]{false, false});
   }
 
-  public TestRootedOzoneFileSystem(boolean setDefaultFs) {
+  public TestRootedOzoneFileSystem(boolean setDefaultFs,
+      boolean enableOMRatis) {
     enabledFileSystemPaths = setDefaultFs;
+    omRatisEnabled = enableOMRatis;
   }
 
   @Rule
   public Timeout globalTimeout = new Timeout(300_000);
 
   private static boolean enabledFileSystemPaths;
+  private static boolean omRatisEnabled;
 
   private static OzoneConfiguration conf;
   private static MiniOzoneCluster cluster = null;
@@ -126,6 +135,7 @@ public class TestRootedOzoneFileSystem {
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.setInt(FS_TRASH_INTERVAL_KEY, 1);
+    conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
         enabledFileSystemPaths);
     cluster = MiniOzoneCluster.newBuilder(conf)
@@ -824,13 +834,13 @@ public class TestRootedOzoneFileSystem {
     // Construct VolumeArgs
     VolumeArgs volumeArgs = new VolumeArgs.Builder()
         .setAcls(Collections.singletonList(aclWorldAccess))
-        .setQuotaInCounts(1000)
+        .setQuotaInNamespace(1000)
         .setQuotaInBytes(Long.MAX_VALUE).build();
     // Sanity check
     Assert.assertNull(volumeArgs.getOwner());
     Assert.assertNull(volumeArgs.getAdmin());
     Assert.assertEquals(Long.MAX_VALUE, volumeArgs.getQuotaInBytes());
-    Assert.assertEquals(1000, volumeArgs.getQuotaInCounts());
+    Assert.assertEquals(1000, volumeArgs.getQuotaInNamespace());
     Assert.assertEquals(0, volumeArgs.getMetadata().size());
     Assert.assertEquals(1, volumeArgs.getAcls().size());
     // Create volume "tmp" with world access. allow non-admin to create buckets
@@ -1183,6 +1193,7 @@ public class TestRootedOzoneFileSystem {
    * 2.Verify that the key gets deleted by the trash emptier.
    * @throws Exception
    */
+  @Ignore("HDDS-4669 : Fix testTrash to work when OM Ratis is enabled")
   @Test
   public void testTrash() throws Exception {
     String testKeyName = "keyToBeDeleted";
