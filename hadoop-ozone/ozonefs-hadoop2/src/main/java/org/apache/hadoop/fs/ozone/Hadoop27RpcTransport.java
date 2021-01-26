@@ -28,6 +28,7 @@ import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -48,6 +49,11 @@ public class Hadoop27RpcTransport implements OmTransport {
 
   public Hadoop27RpcTransport(
       ConfigurationSource conf) throws IOException {
+    // Hadoop27 doesn't support HA-OM
+    if (isHAOMConfig(conf)) {
+      throw new IOException("HA-OM config detected. Hadoop2 Filesystem jar " +
+          "doesn't support HA-OM, please use Hadoop3 Filesystem jar.");
+    }
     InetSocketAddress socket = OmUtils.getOmAddressForClients(conf);
     long version = RPC.getProtocolVersion(OzoneManagerProtocolPB.class);
     OzoneConfiguration ozoneConfiguration = OzoneConfiguration.of(conf);
@@ -83,5 +89,10 @@ public class Hadoop27RpcTransport implements OmTransport {
   private int getRpcTimeout(OzoneConfiguration conf) {
     return conf.getInt(CommonConfigurationKeys.IPC_CLIENT_RPC_TIMEOUT_KEY,
         CommonConfigurationKeys.IPC_CLIENT_RPC_TIMEOUT_DEFAULT);
+  }
+
+  private boolean isHAOMConfig(ConfigurationSource confSource) {
+    return OmUtils.isServiceIdsDefined(confSource) &&
+        confSource.getTrimmed(OMConfigKeys.OZONE_OM_ADDRESS_KEY) == null;
   }
 }
