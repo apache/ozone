@@ -445,6 +445,7 @@ public class DatanodeDetails extends NodeImpl implements
         ipAddress +
         ", host: " +
         hostName +
+        ", ports: " + ports +
         ", networkLocation: " +
         getNetworkLocation() +
         ", certSerialId: " + certSerialId +
@@ -784,6 +785,11 @@ public class DatanodeDetails extends NodeImpl implements
         return name.equals(((Port) anObject).name);
       }
       return false;
+    }
+
+    @Override
+    public String toString() {
+      return name + "=" + value;
     }
 
     public HddsProtos.Port toProto() {
