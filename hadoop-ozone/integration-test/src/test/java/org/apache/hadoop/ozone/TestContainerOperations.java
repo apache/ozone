@@ -25,6 +25,8 @@ import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPla
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.ipc.RemoteException;
+import org.apache.hadoop.test.LambdaTestUtils;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -71,13 +73,22 @@ public class TestContainerOperations {
    * @throws Exception
    */
   @Test
-  public void testCreate() throws Exception {
+  public void testCreateAndDelete() throws Exception {
     ContainerWithPipeline container = storageClient.createContainer(HddsProtos
         .ReplicationType.STAND_ALONE, HddsProtos.ReplicationFactor
         .ONE, OzoneConsts.OZONE);
-    assertEquals(container.getContainerInfo().getContainerID(), storageClient
-        .getContainer(container.getContainerInfo().getContainerID())
+    long containerID = container.getContainerInfo().getContainerID();
+    assertEquals(containerID, storageClient.getContainer(containerID)
         .getContainerID());
+
+    storageClient.deleteContainer(
+        container.getContainerInfo().getContainerID(), true);
+    //Make sure that the Container has been deleted.
+    LambdaTestUtils.intercept(RemoteException.class,
+        "Container with id "
+            + container.getContainerInfo().getContainerID() + " not found",
+        () -> storageClient.getContainer(containerID));
+
   }
 
 }
