@@ -355,7 +355,7 @@ public class DatanodeDetails extends NodeImpl implements
    * @return HddsProtos.DatanodeDetailsProto
    */
   public HddsProtos.DatanodeDetailsProto getProtoBufMessage() {
-    return toProto(Name.PUBLIC_PORTS);
+    return toProto(Name.ALL_PORTS);
   }
 
   public HddsProtos.DatanodeDetailsProto toProto(Set<Name> exposedPorts) {
@@ -415,12 +415,9 @@ public class DatanodeDetails extends NodeImpl implements
    * @return HddsProtos.ExtendedDatanodeDetailsProto
    */
   public HddsProtos.ExtendedDatanodeDetailsProto getExtendedProtoBufMessage() {
-    HddsProtos.DatanodeDetailsProto datanodeDetailsProto =
-        toProto(Name.ALL_PORTS);
-
     HddsProtos.ExtendedDatanodeDetailsProto.Builder extendedBuilder =
         HddsProtos.ExtendedDatanodeDetailsProto.newBuilder()
-            .setDatanodeDetails(datanodeDetailsProto);
+            .setDatanodeDetails(toProto(Port.Name.ALL_PORTS));
 
     if (!Strings.isNullOrEmpty(getVersion())) {
       extendedBuilder.setVersion(getVersion());

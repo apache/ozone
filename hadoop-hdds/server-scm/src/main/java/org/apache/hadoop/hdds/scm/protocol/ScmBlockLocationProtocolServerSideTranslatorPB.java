@@ -53,6 +53,8 @@ import com.google.protobuf.ServiceException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.PUBLIC_PORTS;
+
 /**
  * This class is the server-side translator that forwards requests received on
  * {@link StorageContainerLocationProtocolPB} to the
@@ -220,7 +222,7 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
       final List<DatanodeDetails> results =
           impl.sortDatanodes(nodeList, request.getClient());
       if (results != null && results.size() > 0) {
-        results.stream().forEach(dn -> resp.addNode(dn.getProtoBufMessage()));
+        results.stream().forEach(dn -> resp.addNode(dn.toProto(PUBLIC_PORTS)));
       }
       return resp.build();
     } catch (IOException ex) {

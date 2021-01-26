@@ -43,6 +43,8 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
 
+import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.PUBLIC_PORTS;
+
 /**
  * Represents a group of datanodes which store a container.
  */
@@ -271,7 +273,7 @@ public final class Pipeline {
       throws UnknownPipelineStateException {
     List<HddsProtos.DatanodeDetailsProto> members = new ArrayList<>();
     for (DatanodeDetails dn : nodeStatus.keySet()) {
-      members.add(dn.getProtoBufMessage());
+      members.add(dn.toProto(PUBLIC_PORTS));
     }
 
     HddsProtos.Pipeline.Builder builder = HddsProtos.Pipeline.newBuilder()
