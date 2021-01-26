@@ -69,13 +69,13 @@ public final class OzoneConfigKeys {
    */
   public static final String DFS_CONTAINER_RATIS_ADMIN_PORT =
       "dfs.container.ratis.admin.port";
-  public static final int DFS_CONTAINER_RATIS_ADMIN_PORT_DEFAULT = 9858;
+  public static final int DFS_CONTAINER_RATIS_ADMIN_PORT_DEFAULT = 9857;
   /**
    * Ratis Port where containers listen to server-to-server requests.
    */
   public static final String DFS_CONTAINER_RATIS_SERVER_PORT =
       "dfs.container.ratis.server.port";
-  public static final int DFS_CONTAINER_RATIS_SERVER_PORT_DEFAULT = 9858;
+  public static final int DFS_CONTAINER_RATIS_SERVER_PORT_DEFAULT = 9856;
 
   /**
    * When set to true, allocate a random free port for ozone container, so that

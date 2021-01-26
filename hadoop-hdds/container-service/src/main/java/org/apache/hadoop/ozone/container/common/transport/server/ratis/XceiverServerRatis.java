@@ -161,15 +161,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     this.conf = conf;
     Objects.requireNonNull(dd, "id == null");
     datanodeDetails = dd;
-    serverPort = getServerPort(conf,
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_SERVER_PORT,
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_SERVER_PORT_DEFAULT);
-    clientPort = getServerPort(conf,
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_PORT,
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_PORT_DEFAULT);
-    adminPort = getServerPort(conf,
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_ADMIN_PORT,
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_ADMIN_PORT_DEFAULT);
+    assignPorts();
     RaftProperties serverProperties = newRaftProperties();
     this.context = context;
     this.dispatcher = dispatcher;
@@ -194,6 +186,39 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         HddsConfigKeys.HDDS_DATANODE_RATIS_SERVER_REQUEST_TIMEOUT_DEFAULT,
         TimeUnit.MILLISECONDS);
     initializeRatisVolumeMap();
+  }
+
+  private void assignPorts() {
+    final boolean randomPort = conf.getBoolean(
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT,
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT_DEFAULT);
+
+    clientPort = determinePort(Port.Name.RATIS, randomPort,
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_PORT,
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_PORT_DEFAULT);
+    adminPort = determinePort(Port.Name.RATIS_ADMIN, randomPort,
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_ADMIN_PORT,
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_ADMIN_PORT_DEFAULT);
+    serverPort = determinePort(Port.Name.RATIS_SERVER, randomPort,
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_SERVER_PORT,
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_SERVER_PORT_DEFAULT);
+  }
+
+  private int determinePort(Port.Name name, boolean randomPort,
+      String key, int defaultValue) {
+    Port persistedPort = datanodeDetails.getPort(name);
+    if (persistedPort == null &&
+        (name == Port.Name.RATIS_ADMIN || name == Port.Name.RATIS_SERVER)) {
+      // also try persisted "single" port for admin/server for compatibility
+      persistedPort = datanodeDetails.getPort(Port.Name.RATIS);
+    }
+    if (persistedPort != null) {
+      return persistedPort.getValue();
+    }
+    if (randomPort) {
+      return 0;
+    }
+    return conf.getInt(key, defaultValue);
   }
 
   private ContainerStateMachine getStateMachine(RaftGroupId gid) {
@@ -431,16 +456,6 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
     return new XceiverServerRatis(datanodeDetails, dispatcher,
         containerController, context, ozoneConf, parameters);
-  }
-
-  private static int getServerPort(ConfigurationSource conf,
-      String key, int defaultValue) {
-    // Get an available port on current node and
-    // use that as the container port
-    boolean randomPort = conf.getBoolean(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT,
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT_DEFAULT);
-    return !randomPort ? conf.getInt(key, defaultValue) : 0;
   }
 
   // For gRPC server running DN container service with gPRC TLS
