@@ -19,6 +19,8 @@
 package org.apache.hadoop.fs.ozone;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.jetbrains.annotations.NotNull;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -43,7 +45,8 @@ public class TestOzoneFileInterfacesV1 extends TestOzoneFileInterfaces {
   @Override
   protected OzoneConfiguration getOzoneConfiguration() {
     OzoneConfiguration conf = new OzoneConfiguration();
-
+    TestOMRequestUtils.configureFSOptimizedPaths(conf,
+            true, OMConfigKeys.OZONE_OM_LAYOUT_VERSION_V1);
     return conf;
   }
 
