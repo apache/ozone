@@ -46,7 +46,7 @@ public class TestOzoneFileInterfacesV1 extends TestOzoneFileInterfaces {
   protected OzoneConfiguration getOzoneConfiguration() {
     OzoneConfiguration conf = new OzoneConfiguration();
     TestOMRequestUtils.configureFSOptimizedPaths(conf,
-            true, OMConfigKeys.OZONE_OM_LAYOUT_VERSION_V1);
+            enableFileSystemPaths, OMConfigKeys.OZONE_OM_LAYOUT_VERSION_V1);
     return conf;
   }
 
