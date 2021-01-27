@@ -41,6 +41,7 @@ import javax.ws.rs.core.StreamingOutput;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.text.ParseException;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -54,6 +55,7 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
@@ -850,24 +852,34 @@ public class ObjectEndpoint extends EndpointBase {
     return partMarker;
   }
 
+  private static long parseOzoneDate(String ozoneDateStr) throws OS3Exception {
+    long ozoneDateInMs;
+    try {
+      ozoneDateInMs = OzoneUtils.formatDate(ozoneDateStr);
+    } catch (ParseException e) {
+      throw S3ErrorTable.newError(S3ErrorTable
+          .INVALID_ARGUMENT, ozoneDateStr);
+    }
+    return ozoneDateInMs;
+  }
+
   private boolean checkCopySourceModificationTime(Long lastModificationTime,
       String copySourceIfModifiedSinceStr,
-      String copySourceIfUnmodifiedSinceStr) {
-    Long copySourceIfModifiedSince = Long.MIN_VALUE;
-    Long copySourceIfUnmodifiedSince = Long.MAX_VALUE;
+      String copySourceIfUnmodifiedSinceStr) throws OS3Exception {
+    long copySourceIfModifiedSince = Long.MIN_VALUE;
+    long copySourceIfUnmodifiedSince = Long.MAX_VALUE;
 
     if (copySourceIfModifiedSinceStr != null) {
-      copySourceIfModifiedSince = Long.valueOf(copySourceIfModifiedSinceStr);
-    }
-    if (copySourceIfUnmodifiedSinceStr != null) {
-      copySourceIfUnmodifiedSince =
-          Long.valueOf(copySourceIfUnmodifiedSinceStr);
+      copySourceIfModifiedSince =
+          parseOzoneDate(copySourceIfModifiedSinceStr);
     }
 
-    if ((copySourceIfModifiedSince <= lastModificationTime) &&
-        (lastModificationTime <= copySourceIfUnmodifiedSince)) {
-      return true;
+    if (copySourceIfUnmodifiedSinceStr != null) {
+      copySourceIfUnmodifiedSince =
+          parseOzoneDate(copySourceIfUnmodifiedSinceStr);
     }
-    return false;
+
+    return (copySourceIfModifiedSince <= lastModificationTime) &&
+        (lastModificationTime <= copySourceIfUnmodifiedSince);
   }
 }
