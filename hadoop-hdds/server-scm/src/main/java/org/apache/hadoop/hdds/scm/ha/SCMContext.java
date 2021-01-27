@@ -71,8 +71,7 @@ public final class SCMContext {
   private final ReadWriteLock lock = new ReentrantReadWriteLock();
 
   private SCMContext(boolean isLeader, long term,
-                     final SafeModeStatus safeModeStatus,
-                     final StorageContainerManager scm) {
+      final SafeModeStatus safeModeStatus, final StorageContainerManager scm) {
     this.isLeader = isLeader;
     this.term = term;
     this.safeModeStatus = safeModeStatus;

@@ -40,7 +40,7 @@ public final class SCMServiceManager {
    */
   public synchronized void register(SCMService service) {
     Preconditions.checkNotNull(service);
-    LOG.info("register Service {}.", service.getServiceName());
+    LOG.info("Registering service {}.", service.getServiceName());
     services.add(service);
   }
 
@@ -49,7 +49,7 @@ public final class SCMServiceManager {
    */
   public synchronized void notifyStatusChanged() {
     for (SCMService service : services) {
-      LOG.info("Notify service:{}.", service.getServiceName());
+      LOG.debug("Notify service:{}.", service.getServiceName());
       service.notifyStatusChanged();
     }
   }
@@ -59,7 +59,7 @@ public final class SCMServiceManager {
    */
   public synchronized void notifyEventTriggered(Event event) {
     for (SCMService service : services) {
-      LOG.info("Notify service:{} with event:{}.",
+      LOG.debug("Notify service:{} with event:{.",
           service.getServiceName(), event);
       service.notifyEventTriggered(event);
     }
