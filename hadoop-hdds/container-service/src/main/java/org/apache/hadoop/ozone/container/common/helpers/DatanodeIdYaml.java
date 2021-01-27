@@ -61,9 +61,7 @@ public final class DatanodeIdYaml {
 
     try (Writer writer = new OutputStreamWriter(
         new FileOutputStream(path), StandardCharsets.UTF_8)) {
-      DatanodeDetailsYaml struct = getDatanodeDetailsYaml(datanodeDetails);
-      System.out.println("ZZZ features:" + struct.getFeatures());
-      yaml.dump(struct, writer);
+      yaml.dump(getDatanodeDetailsYaml(datanodeDetails), writer);
     }
   }
 
