@@ -264,6 +264,10 @@ public class DatanodeDetails extends NodeImpl implements
         return port;
       }
     }
+    // if no separate admin/server port, return single Ratis one for compat
+    if (name == Name.RATIS_ADMIN || name == Name.RATIS_SERVER) {
+      return getPort(Name.RATIS);
+    }
     return null;
   }
 
