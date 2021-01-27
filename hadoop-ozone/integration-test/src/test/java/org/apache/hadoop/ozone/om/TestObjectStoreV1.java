@@ -57,6 +57,7 @@ import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationType.STAND_ALONE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
@@ -280,16 +281,14 @@ public class TestObjectStoreV1 {
     createTestKey(bucket, fromKeyName, value);
 
     // Rename to empty string should fail.
-    OMException oe = null;
     String toKeyName = "";
     try {
       bucket.renameKey(fromKeyName, toKeyName);
       fail("Rename to empty string should fail!");
-    } catch (OMException e) {
-      oe = e;
+    } catch (OMException ome) {
+      Assert.assertEquals(OMException.ResultCodes.INVALID_KEY_NAME,
+              ome.getResult());
     }
-    Assert.assertEquals(OMException.ResultCodes.INVALID_KEY_NAME,
-            oe.getResult());
 
     toKeyName = UUID.randomUUID().toString();
     bucket.renameKey(fromKeyName, toKeyName);
@@ -298,10 +297,9 @@ public class TestObjectStoreV1 {
     try {
       bucket.getKey(fromKeyName);
       fail("Lookup for old from key name should fail!");
-    } catch (OMException e) {
-      oe = e;
+    } catch (OMException ome) {
+      Assert.assertEquals(KEY_NOT_FOUND, ome.getResult());
     }
-    Assert.assertEquals(KEY_NOT_FOUND, oe.getResult());
 
     OzoneKey key = bucket.getKey(toKeyName);
     Assert.assertEquals(toKeyName, key.getName());
@@ -333,6 +331,27 @@ public class TestObjectStoreV1 {
     // old key should not exist
     assertKeyRenamedEx(bucket, keyName1);
     assertKeyRenamedEx(bucket, keyName2);
+  }
+
+  @Test
+  public void testRenameToAnExistingKey() throws Exception {
+    String keyName1 = "dir1/dir2/file1";
+    String keyName2 = "dir1/dir2/file2";
+
+    String value = "sample value";
+    OzoneClient client = cluster.getClient();
+    ObjectStore objectStore = client.getObjectStore();
+    OzoneVolume volume = objectStore.getVolume(volumeName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+    createTestKey(bucket, keyName1, value);
+    createTestKey(bucket, keyName2, value);
+
+    try {
+      bucket.renameKey(keyName1, keyName2);
+      fail("Should throw exception as destin key already exists!");
+    } catch (OMException e) {
+      Assert.assertEquals(KEY_ALREADY_EXISTS, e.getResult());
+    }
   }
 
   private void assertKeyRenamedEx(OzoneBucket bucket, String keyName)
