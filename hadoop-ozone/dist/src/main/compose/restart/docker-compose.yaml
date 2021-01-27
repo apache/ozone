@@ -1,0 +1,134 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+version: "3.4"
+
+# reusable fragments (see https://docs.docker.com/compose/compose-file/#extension-fields)
+x-common-config:
+  &common-config
+  env_file:
+    - docker-config
+  image: ${OZONE_IMAGE}
+
+x-replication:
+  &replication
+  OZONE-SITE.XML_ozone.replication: ${OZONE_REPLICATION_FACTOR:-1}
+
+x-datanode:
+  &datanode
+  command: ["ozone","datanode"]
+  <<: *common-config
+  environment:
+    <<: *replication
+  ports:
+    - 9864
+    - 9882
+
+services:
+  dn1:
+    <<: *datanode
+    networks:
+      net:
+        ipv4_address: 10.9.0.11
+    volumes:
+      - ${OZONE_VOLUME}/dn1:/data
+      - ../..:${OZONE_DIR}
+      - ../../libexec/transformation.py:/opt/hadoop/libexec/transformation.py
+  dn2:
+    <<: *datanode
+    networks:
+      net:
+        ipv4_address: 10.9.0.12
+    volumes:
+      - ${OZONE_VOLUME}/dn2:/data
+      - ../..:${OZONE_DIR}
+      - ../../libexec/transformation.py:/opt/hadoop/libexec/transformation.py
+  dn3:
+    <<: *datanode
+    networks:
+      net:
+        ipv4_address: 10.9.0.13
+    volumes:
+      - ${OZONE_VOLUME}/dn3:/data
+      - ../..:${OZONE_DIR}
+      - ../../libexec/transformation.py:/opt/hadoop/libexec/transformation.py
+  om:
+    command: ["ozone","om"]
+    <<: *common-config
+    environment:
+      ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
+      <<: *replication
+    networks:
+      net:
+        ipv4_address: 10.9.0.14
+    ports:
+      - 9874:9874
+      - 9862:9862
+    volumes:
+      - ${OZONE_VOLUME}/om:/data
+      - ../..:${OZONE_DIR}
+      - ../../libexec/transformation.py:/opt/hadoop/libexec/transformation.py
+  recon:
+    command: ["ozone","recon"]
+    <<: *common-config
+    environment:
+      <<: *replication
+    networks:
+      net:
+        ipv4_address: 10.9.0.15
+    ports:
+      - 9888:9888
+    volumes:
+      - ${OZONE_VOLUME}/recon:/data
+      - ../..:${OZONE_DIR}
+      - ../../libexec/transformation.py:/opt/hadoop/libexec/transformation.py
+  s3g:
+    command: ["ozone","s3g"]
+    <<: *common-config
+    environment:
+      <<: *replication
+    networks:
+      net:
+        ipv4_address: 10.9.0.16
+    ports:
+      - 9878:9878
+    volumes:
+      - ${OZONE_VOLUME}/s3g:/data
+      - ../..:${OZONE_DIR}
+      - ../../libexec/transformation.py:/opt/hadoop/libexec/transformation.py
+  scm:
+    command: ["ozone","scm"]
+    <<: *common-config
+    environment:
+      ENSURE_SCM_INITIALIZED: /data/metadata/scm/current/VERSION
+      OZONE-SITE.XML_hdds.scm.safemode.min.datanode: ${OZONE_SAFEMODE_MIN_DATANODES:-1}
+      <<: *replication
+    networks:
+      net:
+        ipv4_address: 10.9.0.17
+    ports:
+      - 9876:9876
+    volumes:
+      - ${OZONE_VOLUME}/scm:/data
+      - ../..:${OZONE_DIR}
+      - ../../libexec/transformation.py:/opt/hadoop/libexec/transformation.py
+
+networks:
+  net:
+    driver: bridge
+    ipam:
+      config:
+      - subnet: 10.9.0.0/16

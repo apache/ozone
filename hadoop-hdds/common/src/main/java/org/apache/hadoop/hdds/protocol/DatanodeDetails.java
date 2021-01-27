@@ -37,6 +37,7 @@ import com.google.common.base.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static java.util.Collections.unmodifiableList;
 import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
 import static org.apache.hadoop.ozone.ClientVersions.VERSION_HANDLES_UNKNOWN_DN_PORTS;
 
@@ -73,7 +74,7 @@ public class DatanodeDetails extends NodeImpl implements
   private String buildDate;
   private HddsProtos.NodeOperationalState persistedOpState;
   private long persistedOpStateExpiryEpochSec = 0;
-  private boolean separateRatisPorts;
+  private final List<String> features = new ArrayList<>();
 
   /**
    * Constructs DatanodeDetails instance. DatanodeDetails.Builder is used
@@ -445,6 +446,18 @@ public class DatanodeDetails extends NodeImpl implements
     return extendedBuilder.build();
   }
 
+  public List<String> getFeatures() {
+    return unmodifiableList(features);
+  }
+
+  public boolean hasFeature(String feature) {
+    return features.contains(feature);
+  }
+
+  public void addFeature(String feature) {
+    features.add(feature);
+  }
+
   @Override
   public String toString() {
     return uuid.toString() + "{" +
@@ -706,14 +719,6 @@ public class DatanodeDetails extends NodeImpl implements
       }
       return dn;
     }
-  }
-
-  public boolean isSeparateRatisPorts() {
-    return separateRatisPorts;
-  }
-
-  public void setSeparateRatisPorts() {
-    separateRatisPorts = true;
   }
 
   /**

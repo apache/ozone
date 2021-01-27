@@ -150,6 +150,8 @@ public final class ContainerUtils {
         throw new IOException("Unable to create datanode ID directories.");
       }
     }
+    LOG.info("ZZZ writing datanode.id features:{}",
+        datanodeDetails.getFeatures(), new Exception());
     DatanodeIdYaml.createDatanodeIdFile(datanodeDetails, path);
   }
 
@@ -166,7 +168,10 @@ public final class ContainerUtils {
       throw new IOException("Datanode ID file not found.");
     }
     try {
-      return DatanodeIdYaml.readDatanodeIdFile(path);
+      DatanodeDetails details = DatanodeIdYaml.readDatanodeIdFile(path);
+      LOG.info("ZZZ read datanode.id features:{}", details.getFeatures(),
+          new Exception());
+      return details;
     } catch (IOException e) {
       LOG.warn("Error loading DatanodeDetails yaml from {}",
           path.getAbsolutePath(), e);

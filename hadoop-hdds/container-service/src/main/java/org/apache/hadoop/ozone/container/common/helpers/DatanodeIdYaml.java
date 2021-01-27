@@ -25,6 +25,7 @@ import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -60,7 +61,9 @@ public final class DatanodeIdYaml {
 
     try (Writer writer = new OutputStreamWriter(
         new FileOutputStream(path), StandardCharsets.UTF_8)) {
-      yaml.dump(getDatanodeDetailsYaml(datanodeDetails), writer);
+      DatanodeDetailsYaml struct = getDatanodeDetailsYaml(datanodeDetails);
+      System.out.println("ZZZ features:" + struct.getFeatures());
+      yaml.dump(struct, writer);
     }
   }
 
@@ -101,9 +104,10 @@ public final class DatanodeIdYaml {
         }
       }
       datanodeDetails = builder.build();
-
-      if (datanodeDetailsYaml.hasSeparateRatisPortsMarker()) {
-        datanodeDetails.setSeparateRatisPorts();
+      if (datanodeDetailsYaml.getFeatures() != null) {
+        for (String feature : datanodeDetailsYaml.getFeatures()) {
+          datanodeDetails.addFeature(feature);
+        }
       }
     }
 
@@ -121,17 +125,17 @@ public final class DatanodeIdYaml {
     private String persistedOpState;
     private long persistedOpStateExpiryEpochSec = 0;
     private Map<String, Integer> portDetails;
-    private String separateRatisPortsMarker;
+    private List<String> features;
 
     public DatanodeDetailsYaml() {
       // Needed for snake-yaml introspection.
     }
 
+    @SuppressWarnings({"parameternumber", "java:S107"}) // required for yaml
     private DatanodeDetailsYaml(String uuid, String ipAddress,
-                                String hostName, String certSerialId,
-                                String persistedOpState,
-                                long persistedOpStateExpiryEpochSec,
-                                Map<String, Integer> portDetails) {
+        String hostName, String certSerialId,
+        String persistedOpState, long persistedOpStateExpiryEpochSec,
+        Map<String, Integer> portDetails, List<String> features) {
       this.uuid = uuid;
       this.ipAddress = ipAddress;
       this.hostName = hostName;
@@ -139,6 +143,7 @@ public final class DatanodeIdYaml {
       this.persistedOpState = persistedOpState;
       this.persistedOpStateExpiryEpochSec = persistedOpStateExpiryEpochSec;
       this.portDetails = portDetails;
+      this.features = features;
     }
 
     public String getUuid() {
@@ -197,12 +202,12 @@ public final class DatanodeIdYaml {
       this.portDetails = portDetails;
     }
 
-    public boolean hasSeparateRatisPortsMarker() {
-      return separateRatisPortsMarker != null;
+    public void setFeatures(List<String> features) {
+      this.features = features;
     }
 
-    public void setSeparateRatisPortsMarker() {
-      separateRatisPortsMarker = "yes";
+    public List<String> getFeatures() {
+      return features;
     }
   }
 
@@ -220,17 +225,15 @@ public final class DatanodeIdYaml {
     if (datanodeDetails.getPersistedOpState() != null) {
       persistedOpString = datanodeDetails.getPersistedOpState().name();
     }
-    DatanodeDetailsYaml yaml = new DatanodeDetailsYaml(
+
+    return new DatanodeDetailsYaml(
         datanodeDetails.getUuid().toString(),
         datanodeDetails.getIpAddress(),
         datanodeDetails.getHostName(),
         datanodeDetails.getCertSerialId(),
         persistedOpString,
         datanodeDetails.getPersistedOpStateExpiryEpochSec(),
-        portDetails);
-    if (datanodeDetails.isSeparateRatisPorts()) {
-      yaml.setSeparateRatisPortsMarker();
-    }
-    return yaml;
+        portDetails,
+        datanodeDetails.getFeatures());
   }
 }

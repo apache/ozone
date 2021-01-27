@@ -109,6 +109,8 @@ import org.apache.ratis.util.TimeDuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.ozone.OzoneConsts.SEPARATE_RATIS_PORTS_AVAILABLE;
+
 /**
  * Creates a ratis server endpoint that acts as the communication layer for
  * Ozone containers.
@@ -192,7 +194,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_PORT,
         OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_PORT_DEFAULT);
 
-    if (datanodeDetails.isSeparateRatisPorts()) {
+    if (datanodeDetails.hasFeature(SEPARATE_RATIS_PORTS_AVAILABLE)) {
       adminPort = determinePort(
           OzoneConfigKeys.DFS_CONTAINER_RATIS_ADMIN_PORT,
           OzoneConfigKeys.DFS_CONTAINER_RATIS_ADMIN_PORT_DEFAULT);

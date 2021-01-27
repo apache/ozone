@@ -137,15 +137,15 @@ public class TestMiniOzoneCluster {
   public void testDatanodeIDPersistent() throws Exception {
     // Generate IDs for testing
     DatanodeDetails id1 = randomDatanodeDetails();
-    DatanodeDetails id2 = randomDatanodeDetails();
-    DatanodeDetails id3 = randomDatanodeDetails();
     id1.setPort(DatanodeDetails.newPort(Port.Name.STANDALONE, 1));
-    id2.setPort(DatanodeDetails.newPort(Port.Name.STANDALONE, 2));
-    id3.setPort(DatanodeDetails.newPort(Port.Name.STANDALONE, 3));
 
     // Add certificate serial  id.
     String certSerialId = "" + RandomUtils.nextLong();
     id1.setCertSerialId(certSerialId);
+
+    // add a feature
+    String feature = "x";
+    id1.addFeature(feature);
 
     // Write a single ID to the file and read it out
     File validIdsFile = new File(WRITE_TMP, "valid-values.id");
@@ -164,6 +164,7 @@ public class TestMiniOzoneCluster {
     assertEquals(validId.getCertSerialId(), certSerialId);
     assertEquals(id1, validId);
     assertEquals(id1.getProtoBufMessage(), validId.getProtoBufMessage());
+    assertTrue(validId.hasFeature(feature));
 
     // Read should return an empty value if file doesn't exist
     File nonExistFile = new File(READ_TMP, "non_exist.id");
