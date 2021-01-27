@@ -44,6 +44,7 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.TrashPolicyOzone;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
@@ -172,6 +173,10 @@ public class TestRootedOzoneFileSystem {
       cluster.shutdown();
     }
     IOUtils.closeQuietly(fs);
+  }
+
+  private OMMetrics getOMMetrics() {
+    return cluster.getOzoneManager().getMetrics();
   }
 
   @Test
@@ -1203,6 +1208,12 @@ public class TestRootedOzoneFileSystem {
         "fs.trash.classname", TrashPolicy.class).
         isAssignableFrom(TrashPolicyOzone.class));
 
+    long prevNumTrashDeletes = getOMMetrics().getNumTrashDeletes();
+    long prevNumTrashFileDeletes = getOMMetrics().getNumTrashFilesDeletes();
+
+    long prevNumTrashRenames = getOMMetrics().getNumTrashRenames();
+    long prevNumTrashFileRenames = getOMMetrics().getNumTrashFilesRenames();
+
     // Call moveToTrash. We can't call protected fs.rename() directly
     trash.moveToTrash(path);
 
@@ -1225,6 +1236,17 @@ public class TestRootedOzoneFileSystem {
       }
     }, 1000, 180000);
 
+    // This condition should pass after the checkpoint
+    Assert.assertTrue(getOMMetrics()
+        .getNumTrashRenames() > prevNumTrashRenames);
+    Assert.assertTrue(getOMMetrics()
+        .getNumTrashFilesRenames() > prevNumTrashFileRenames);
+
+    // This condition should succeed once the checkpoint directory is deleted
+    GenericTestUtils.waitFor(
+        () -> getOMMetrics().getNumTrashDeletes() > prevNumTrashDeletes
+            && getOMMetrics().getNumTrashFilesDeletes()
+            > prevNumTrashFileDeletes, 100, 180000);
     // Cleanup
     ofs.delete(trashRoot, true);
 

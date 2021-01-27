@@ -68,15 +68,15 @@ public class TrashOzoneFileSystem extends FileSystem {
 
   private static final int OZONE_FS_ITERATE_BATCH_SIZE = 100;
 
-  private OzoneManager ozoneManager;
+  private final OzoneManager ozoneManager;
 
-  private String userName;
+  private final String userName;
 
   private String ofsPathPrefix;
 
   private final AtomicLong runCount;
 
-  private static ClientId clientId = ClientId.randomId();
+  private final static ClientId CLIENT_ID = ClientId.randomId();
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TrashOzoneFileSystem.class);
@@ -91,7 +91,7 @@ public class TrashOzoneFileSystem extends FileSystem {
   private RaftClientRequest getRatisRequest(
       OzoneManagerProtocolProtos.OMRequest omRequest) {
     return RaftClientRequest.newBuilder()
-        .setClientId(clientId)
+        .setClientId(CLIENT_ID)
         .setServerId(ozoneManager.getOmRatisServer().getRaftPeerId())
         .setGroupId(ozoneManager.getOmRatisServer().getRaftGroupId())
         .setCallId(runCount.getAndIncrement())
@@ -105,6 +105,7 @@ public class TrashOzoneFileSystem extends FileSystem {
 
   private void submitRequest(OzoneManagerProtocolProtos.OMRequest omRequest)
       throws Exception {
+    ozoneManager.getMetrics().incNumTrashWriteRequests();
     if (ozoneManager.isRatisEnabled()) {
       RaftClientRequest req = getRatisRequest(omRequest);
       ozoneManager.getOmRatisServer().submitRequest(omRequest, req);
@@ -144,6 +145,7 @@ public class TrashOzoneFileSystem extends FileSystem {
 
   @Override
   public boolean rename(Path src, Path dst) throws IOException {
+    ozoneManager.getMetrics().incNumTrashRenames();
     LOG.trace("Src:" + src + "Dst:" + dst);
     // check whether the src and dst belong to the same bucket & trashroot.
     OFSPath srcPath = new OFSPath(src);
@@ -159,6 +161,7 @@ public class TrashOzoneFileSystem extends FileSystem {
 
   @Override
   public boolean delete(Path path, boolean b) throws IOException {
+    ozoneManager.getMetrics().incNumTrashDeletes();
     DeleteIterator iterator = new DeleteIterator(path, true);
     iterator.iterate();
     return true;
@@ -166,6 +169,7 @@ public class TrashOzoneFileSystem extends FileSystem {
 
   @Override
   public FileStatus[] listStatus(Path path) throws  IOException {
+    ozoneManager.getMetrics().incNumTrashListStatus();
     List<FileStatus> fileStatuses = new ArrayList<>();
     OmKeyArgs keyArgs = constructOmKeyArgs(path);
     List<OzoneFileStatus> list = ozoneManager.
@@ -216,6 +220,7 @@ public class TrashOzoneFileSystem extends FileSystem {
 
   @Override
   public FileStatus getFileStatus(Path path) throws IOException {
+    ozoneManager.getMetrics().incNumGetFileStatus();
     OmKeyArgs keyArgs = constructOmKeyArgs(path);
     OzoneFileStatus ofs = ozoneManager.getKeyManager().getFileStatus(keyArgs);
     FileStatus fileStatus = convertToFileStatus(ofs);
@@ -240,6 +245,7 @@ public class TrashOzoneFileSystem extends FileSystem {
   @Override
   public Collection<FileStatus> getTrashRoots(boolean allUsers) {
     Preconditions.checkArgument(allUsers);
+    ozoneManager.getMetrics().incNumTrashGetTrashRoots();
     Iterator<Map.Entry<CacheKey<String>,
         CacheValue<OmBucketInfo>>> bucketIterator =
         ozoneManager.getMetadataManager().getBucketIterator();
@@ -271,6 +277,7 @@ public class TrashOzoneFileSystem extends FileSystem {
 
   @Override
   public boolean exists(Path f) throws IOException {
+    ozoneManager.getMetrics().incNumTrashExists();
     try {
       this.getFileStatus(f);
       return true;
@@ -386,6 +393,7 @@ public class TrashOzoneFileSystem extends FileSystem {
         OzoneManagerProtocolProtos.OMRequest omRequest =
             getRenameKeyRequest(src, dst);
         try {
+          ozoneManager.getMetrics().incNumTrashFilesRenames();
           submitRequest(omRequest);
         } catch (Throwable e) {
           LOG.error("Couldn't send rename request.", e);
@@ -416,7 +424,7 @@ public class TrashOzoneFileSystem extends FileSystem {
               .build();
       OzoneManagerProtocolProtos.OMRequest omRequest =
           OzoneManagerProtocolProtos.OMRequest.newBuilder()
-              .setClientId(clientId.toString())
+              .setClientId(CLIENT_ID.toString())
               .setRenameKeyRequest(renameKeyRequest)
               .setCmdType(OzoneManagerProtocolProtos.Type.RenameKey)
               .build();
@@ -447,6 +455,7 @@ public class TrashOzoneFileSystem extends FileSystem {
         OzoneManagerProtocolProtos.OMRequest omRequest =
             getDeleteKeyRequest(path);
         try {
+          ozoneManager.getMetrics().incNumTrashFilesDeletes();
           submitRequest(omRequest);
         } catch (Throwable e) {
           LOG.error("Couldn't send rename request.", e);
@@ -474,7 +483,7 @@ public class TrashOzoneFileSystem extends FileSystem {
               .build();
       OzoneManagerProtocolProtos.OMRequest omRequest =
           OzoneManagerProtocolProtos.OMRequest.newBuilder()
-              .setClientId(clientId.toString())
+              .setClientId(CLIENT_ID.toString())
               .setDeleteKeyRequest(deleteKeyRequest)
               .setCmdType(OzoneManagerProtocolProtos.Type.DeleteKey)
               .build();
