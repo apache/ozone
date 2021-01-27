@@ -109,7 +109,6 @@ import org.apache.ratis.util.TimeDuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 /**
  * Creates a ratis server endpoint that acts as the communication layer for
  * Ozone containers.
@@ -189,36 +188,27 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   }
 
   private void assignPorts() {
-    final boolean randomPort = conf.getBoolean(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT,
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT_DEFAULT);
-
-    clientPort = determinePort(Port.Name.RATIS, randomPort,
+    clientPort = determinePort(
         OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_PORT,
         OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_PORT_DEFAULT);
-    adminPort = determinePort(Port.Name.RATIS_ADMIN, randomPort,
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_ADMIN_PORT,
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_ADMIN_PORT_DEFAULT);
-    serverPort = determinePort(Port.Name.RATIS_SERVER, randomPort,
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_SERVER_PORT,
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_SERVER_PORT_DEFAULT);
+
+    if (datanodeDetails.isSeparateRatisPorts()) {
+      adminPort = determinePort(
+          OzoneConfigKeys.DFS_CONTAINER_RATIS_ADMIN_PORT,
+          OzoneConfigKeys.DFS_CONTAINER_RATIS_ADMIN_PORT_DEFAULT);
+      serverPort = determinePort(
+          OzoneConfigKeys.DFS_CONTAINER_RATIS_SERVER_PORT,
+          OzoneConfigKeys.DFS_CONTAINER_RATIS_SERVER_PORT_DEFAULT);
+    } else {
+      adminPort = serverPort = clientPort;
+    }
   }
 
-  private int determinePort(Port.Name name, boolean randomPort,
-      String key, int defaultValue) {
-    Port persistedPort = datanodeDetails.getPort(name);
-    if (persistedPort == null &&
-        (name == Port.Name.RATIS_ADMIN || name == Port.Name.RATIS_SERVER)) {
-      // also try persisted "single" port for admin/server for compatibility
-      persistedPort = datanodeDetails.getPort(Port.Name.RATIS);
-    }
-    if (persistedPort != null) {
-      return persistedPort.getValue();
-    }
-    if (randomPort) {
-      return 0;
-    }
-    return conf.getInt(key, defaultValue);
+  private int determinePort(String key, int defaultValue) {
+    boolean randomPort = conf.getBoolean(
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT,
+        OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT_DEFAULT);
+    return randomPort ? 0 : conf.getInt(key, defaultValue);
   }
 
   private ContainerStateMachine getStateMachine(RaftGroupId gid) {
@@ -487,8 +477,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   @Override
   public void start() throws IOException {
     if (!isStarted) {
-      LOG.info("Starting {} {} at port {}", getClass().getSimpleName(),
-          server.getId(), getIPCPort());
+      LOG.info("Starting {} {}", getClass().getSimpleName(), server.getId());
       for (ThreadPoolExecutor executor : chunkExecutors) {
         executor.prestartAllCoreThreads();
       }
@@ -496,23 +485,21 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
       RaftServerRpc serverRpc = server.getServerRpc();
       clientPort = getRealPort(serverRpc.getClientServerAddress(),
-          Port.Name.RATIS, clientPort);
+          Port.Name.RATIS);
       adminPort = getRealPort(serverRpc.getAdminServerAddress(),
-          Port.Name.RATIS_ADMIN, adminPort);
+          Port.Name.RATIS_ADMIN);
       serverPort = getRealPort(serverRpc.getInetSocketAddress(),
-          Port.Name.RATIS_SERVER, serverPort);
+          Port.Name.RATIS_SERVER);
 
       isStarted = true;
     }
   }
 
-  private int getRealPort(InetSocketAddress address, Port.Name name, int configuredPort) {
+  private int getRealPort(InetSocketAddress address, Port.Name name) {
     int realPort = address.getPort();
     datanodeDetails.setPort(DatanodeDetails.newPort(name, realPort));
-    if (configuredPort == 0) {
-      LOG.info("{} {} is started using port {} for {}", getClass().getSimpleName(),
-          server.getId(), realPort, name);
-    }
+    LOG.info("{} {} is started using port {} for {}",
+        getClass().getSimpleName(), server.getId(), realPort, name);
     return realPort;
   }
 

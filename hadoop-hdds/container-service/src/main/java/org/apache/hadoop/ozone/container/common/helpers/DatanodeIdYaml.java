@@ -101,6 +101,10 @@ public final class DatanodeIdYaml {
         }
       }
       datanodeDetails = builder.build();
+
+      if (datanodeDetailsYaml.hasSeparateRatisPortsMarker()) {
+        datanodeDetails.setSeparateRatisPorts();
+      }
     }
 
     return datanodeDetails;
@@ -117,6 +121,7 @@ public final class DatanodeIdYaml {
     private String persistedOpState;
     private long persistedOpStateExpiryEpochSec = 0;
     private Map<String, Integer> portDetails;
+    private String separateRatisPortsMarker;
 
     public DatanodeDetailsYaml() {
       // Needed for snake-yaml introspection.
@@ -191,6 +196,14 @@ public final class DatanodeIdYaml {
     public void setPortDetails(Map<String, Integer> portDetails) {
       this.portDetails = portDetails;
     }
+
+    public boolean hasSeparateRatisPortsMarker() {
+      return separateRatisPortsMarker != null;
+    }
+
+    public void setSeparateRatisPortsMarker() {
+      separateRatisPortsMarker = "yes";
+    }
   }
 
   private static DatanodeDetailsYaml getDatanodeDetailsYaml(
@@ -207,7 +220,7 @@ public final class DatanodeIdYaml {
     if (datanodeDetails.getPersistedOpState() != null) {
       persistedOpString = datanodeDetails.getPersistedOpState().name();
     }
-    return new DatanodeDetailsYaml(
+    DatanodeDetailsYaml yaml = new DatanodeDetailsYaml(
         datanodeDetails.getUuid().toString(),
         datanodeDetails.getIpAddress(),
         datanodeDetails.getHostName(),
@@ -215,5 +228,9 @@ public final class DatanodeIdYaml {
         persistedOpString,
         datanodeDetails.getPersistedOpStateExpiryEpochSec(),
         portDetails);
+    if (datanodeDetails.isSeparateRatisPorts()) {
+      yaml.setSeparateRatisPortsMarker();
+    }
+    return yaml;
   }
 }

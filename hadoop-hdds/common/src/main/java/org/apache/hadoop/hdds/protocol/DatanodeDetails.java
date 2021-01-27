@@ -73,6 +73,7 @@ public class DatanodeDetails extends NodeImpl implements
   private String buildDate;
   private HddsProtos.NodeOperationalState persistedOpState;
   private long persistedOpStateExpiryEpochSec = 0;
+  private boolean separateRatisPorts;
 
   /**
    * Constructs DatanodeDetails instance. DatanodeDetails.Builder is used
@@ -701,6 +702,14 @@ public class DatanodeDetails extends NodeImpl implements
       }
       return dn;
     }
+  }
+
+  public boolean isSeparateRatisPorts() {
+    return separateRatisPorts;
+  }
+
+  public void setSeparateRatisPorts() {
+    separateRatisPorts = true;
   }
 
   /**

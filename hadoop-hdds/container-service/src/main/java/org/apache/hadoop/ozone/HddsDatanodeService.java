@@ -68,6 +68,10 @@ import com.google.common.base.Preconditions;
 import com.sun.jmx.mbeanserver.Introspector;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec.getX509Certificate;
 import static org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest.getEncodedString;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_ADMIN_PORT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_ADMIN_PORT_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_SERVER_PORT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_SERVER_PORT_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_PLUGINS_KEY;
 import static org.apache.hadoop.util.ExitUtil.terminate;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
@@ -434,7 +438,10 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     } else {
       // There is no datanode.id file, this might be the first time datanode
       // is started.
-      return DatanodeDetails.newBuilder().setUuid(UUID.randomUUID()).build();
+      DatanodeDetails details = DatanodeDetails.newBuilder()
+          .setUuid(UUID.randomUUID()).build();
+      details.setSeparateRatisPorts();
+      return details;
     }
   }
 
