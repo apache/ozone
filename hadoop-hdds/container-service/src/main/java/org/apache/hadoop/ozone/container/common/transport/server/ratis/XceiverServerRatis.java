@@ -200,7 +200,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
           OzoneConfigKeys.DFS_CONTAINER_RATIS_SERVER_PORT,
           OzoneConfigKeys.DFS_CONTAINER_RATIS_SERVER_PORT_DEFAULT);
     } else {
-      adminPort = serverPort = clientPort;
+      adminPort = clientPort;
+      serverPort = clientPort;
     }
   }
 
