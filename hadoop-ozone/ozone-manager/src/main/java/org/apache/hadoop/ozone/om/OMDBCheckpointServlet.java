@@ -57,6 +57,11 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Provides the current checkpoint Snapshot of the OM DB. (tar.gz)
+ *
+ * When Ozone ACL is enabled (`ozone.acl.enabled`=`true`), only users/principals
+ * configured in `ozone.administrator` (along with the user that starts OM,
+ * which automatically becomes an Ozone administrator but not necessarily in
+ * the config) are allowed to access this endpoint.
  */
 public class OMDBCheckpointServlet extends HttpServlet {
 
@@ -133,9 +138,9 @@ public class OMDBCheckpointServlet extends HttpServlet {
     if (om.getAclsEnabled()) {
       final java.security.Principal userPrincipal = request.getUserPrincipal();
       if (userPrincipal == null) {
-        // Fallback to checking login user if userPrincipal is null.
+        // Fallback to checking login user if getUserPrincipal returns null.
         // Note: In prod, a secure cluster with Kerberos should not hit this
-        // check. This is mostly here for UT and dev testing.
+        // branch. This is mostly here for UT and dev testing.
         final String remoteUser = request.getRemoteUser();
         if (!hasPermission(remoteUser)) {
           LOG.error("Permission denied: Current login user '{}' does not have"
