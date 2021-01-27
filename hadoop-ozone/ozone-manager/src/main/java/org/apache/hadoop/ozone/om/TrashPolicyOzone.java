@@ -161,30 +161,35 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
         }
 
         try {
+          om.getMetrics().incNumTrashActiveCycles();
           now = Time.now();
           if (now >= end) {
             Collection<FileStatus> trashRoots;
             trashRoots = fs.getTrashRoots(true); // list all trash dirs
             LOG.debug("Trash root Size: " + trashRoots.size());
             for (FileStatus trashRoot : trashRoots) {  // dump each trash
-              LOG.info("Trashroot:" + trashRoot.getPath().toString());
+              LOG.debug("Trashroot:" + trashRoot.getPath().toString());
               if (!trashRoot.isDirectory()) {
                 continue;
               }
               TrashPolicyOzone trash = new TrashPolicyOzone(fs, conf, om);
               Runnable task = ()->{
                 try {
+                  om.getMetrics().incNumTrashRootsProcessed();
                   trash.deleteCheckpoint(trashRoot.getPath(), false);
                   trash.createCheckpoint(trashRoot.getPath(),
                       new Date(Time.now()));
                 } catch (Exception e) {
+                  om.getMetrics().incNumTrashFails();
                   LOG.error("Unable to checkpoint:" + trashRoot.getPath(), e);
                 }
               };
+              om.getMetrics().incNumTrashRootsEnqueued();
               executor.submit(task);
             }
           }
         } catch (Exception e) {
+          om.getMetrics().incNumTrashFails();
           LOG.warn("RuntimeException during Trash.Emptier.run(): ", e);
         }
       }
@@ -197,7 +202,7 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
         try {
           executor.awaitTermination(60, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
-          LOG.error("Error attempting to shutdown");
+          LOG.error("Error attempting to shutdown", e);
         }
       }
     }
@@ -226,10 +231,11 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
     while (true) {
       try {
         fs.rename(current, checkpoint);
-        LOG.info("Created trash checkpoint: " + checkpoint.toUri().getPath());
+        LOG.debug("Created trash checkpoint: " + checkpoint.toUri().getPath());
         break;
       } catch (FileAlreadyExistsException e) {
         if (++attempt > 1000) {
+          om.getMetrics().incNumTrashFails();
           throw new IOException("Failed to checkpoint trash: " + checkpoint);
         }
         checkpoint = checkpointBase.suffix("-" + attempt);
@@ -239,7 +245,7 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
 
   private void deleteCheckpoint(Path trashRoot, boolean deleteImmediately)
       throws IOException {
-    LOG.info("TrashPolicyOzone#deleteCheckpoint for trashRoot: " + trashRoot);
+    LOG.debug("TrashPolicyOzone#deleteCheckpoint for trashRoot: " + trashRoot);
 
     FileStatus[] dirs = null;
     try {
@@ -261,14 +267,16 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
       try {
         time = getTimeFromCheckpoint(name);
       } catch (ParseException e) {
+        om.getMetrics().incNumTrashFails();
         LOG.warn("Unexpected item in trash: "+dir+". Ignoring.");
         continue;
       }
 
       if (((now - deletionInterval) > time) || deleteImmediately) {
         if (fs.delete(path, true)) {
-          LOG.info("Deleted trash checkpoint: "+dir);
+          LOG.debug("Deleted trash checkpoint:{} ", dir);
         } else {
+          om.getMetrics().incNumTrashFails();
           LOG.warn("Couldn't delete checkpoint: " + dir + " Ignoring.");
         }
       }
