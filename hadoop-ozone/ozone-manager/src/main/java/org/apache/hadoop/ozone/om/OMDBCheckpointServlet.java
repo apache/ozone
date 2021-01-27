@@ -137,21 +137,30 @@ public class OMDBCheckpointServlet extends HttpServlet {
       final String remoteUser = request.getRemoteUser();
       final java.security.Principal userPrincipal = request.getUserPrincipal();
       if (userPrincipal == null) {
-        LOG.error("Permission denied. Current login user '{}' has not been "
-            + "authenticated to access /dbCheckpoint.", remoteUser);
-        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-        return;
+        // Fallback to checking login user if userPrincipal is null.
+        // Note: In prod, a secure cluster would deploy Kerberos so this case
+        // shouldn't be hit. This is here for UT and dev testing.
+        if (!checkAcls(remoteUser)) {
+          LOG.error("Permission denied: Current login user '{}' has not been "
+              + "authenticated to access /dbCheckpoint.", remoteUser);
+          response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+          return;
+        } else {
+          LOG.info("Granted login user '{}' access to /dbCheckpoint.",
+              remoteUser);
+        }
+      } else {
+        final String userPrincipalName = userPrincipal.getName();
+        if (!checkAcls(userPrincipalName)) {
+          LOG.error("Permission denied: User principal '{}' doesn't have the "
+              + "permission to access /dbCheckpoint.", userPrincipalName);
+          response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+          return;
+        } else {
+          LOG.info("Granted user principal '{}' access to /dbCheckpoint.",
+              userPrincipalName);
+        }
       }
-      final String userPrincipalName = userPrincipal.getName();
-      if (!checkAcls(userPrincipalName)) {
-        LOG.error("Permission denied. User principal '{}' doesn't have the "
-            + "permission to access /dbCheckpoint.", userPrincipalName);
-        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-        return;
-      }
-
-      LOG.info("Granted user principal '{}' access to /dbCheckpoint.",
-          userPrincipalName);
     }
 
     DBCheckpoint checkpoint = null;
