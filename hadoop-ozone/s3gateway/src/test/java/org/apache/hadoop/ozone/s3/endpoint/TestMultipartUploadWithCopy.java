@@ -48,6 +48,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_IF_UNMODIFIED
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
+import org.apache.hadoop.ozone.web.utils.OzoneUtils;
 import org.junit.Assert;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -101,8 +102,10 @@ public class TestMultipartUploadWithCopy {
         .getS3Bucket(OzoneConsts.S3_BUCKET)
         .getKey(EXISTING_KEY)
         .getModificationTime().toEpochMilli();
-    Long beforeSourceKeyModificationTime = sourceKeyLastModificationTime - 1000;
-    Long afterSourceKeyModificationTime = sourceKeyLastModificationTime + 1000;
+    String beforeSourceKeyModificationTimeStr =
+        OzoneUtils.formatTime(sourceKeyLastModificationTime - 1000);
+    String afterSourceKeyModificationTimeStr =
+        OzoneUtils.formatTime(sourceKeyLastModificationTime + 1000);
 
     // Initiate multipart upload
     String uploadID = initiateMultipartUpload(KEY);
@@ -128,8 +131,8 @@ public class TestMultipartUploadWithCopy {
     Part part4 =
         uploadPartWithCopy(KEY, uploadID, 3,
             OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
-            beforeSourceKeyModificationTime,
-            afterSourceKeyModificationTime
+            beforeSourceKeyModificationTimeStr,
+            afterSourceKeyModificationTimeStr
             );
     partsList.add(part4);
 
@@ -157,8 +160,10 @@ public class TestMultipartUploadWithCopy {
         .getS3Bucket(OzoneConsts.S3_BUCKET)
         .getKey(EXISTING_KEY)
         .getModificationTime().toEpochMilli();
-    Long beforeSourceKeyModificationTime = sourceKeyLastModificationTime - 1000;
-    Long afterSourceKeyModificationTime = sourceKeyLastModificationTime + 1000;
+    String beforeSourceKeyModificationTimeStr =
+        OzoneUtils.formatTime(sourceKeyLastModificationTime - 1000);
+    String afterSourceKeyModificationTimeStr =
+        OzoneUtils.formatTime(sourceKeyLastModificationTime + 1000);
 
     // Initiate multipart upload
     String uploadID = initiateMultipartUpload(KEY);
@@ -168,8 +173,8 @@ public class TestMultipartUploadWithCopy {
     try {
       uploadPartWithCopy(KEY, uploadID, 1,
           OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
-          afterSourceKeyModificationTime,
-          beforeSourceKeyModificationTime
+          afterSourceKeyModificationTimeStr,
+          beforeSourceKeyModificationTimeStr
       );
       fail("testMultipartIfModifiedSinceError");
     } catch (OS3Exception ex) {
@@ -181,7 +186,7 @@ public class TestMultipartUploadWithCopy {
       uploadPartWithCopy(KEY, uploadID, 1,
           OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
           null,
-          beforeSourceKeyModificationTime
+          beforeSourceKeyModificationTimeStr
       );
       fail("testMultipartIfModifiedSinceError");
     } catch (OS3Exception ex) {
@@ -192,7 +197,7 @@ public class TestMultipartUploadWithCopy {
     try {
       uploadPartWithCopy(KEY, uploadID, 1,
           OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
-          afterSourceKeyModificationTime,
+          afterSourceKeyModificationTimeStr,
           null
       );
       fail("testMultipartIfModifiedSinceError");
@@ -239,20 +244,19 @@ public class TestMultipartUploadWithCopy {
   }
 
   private Part uploadPartWithCopy(String key, String uploadID, int partNumber,
-      String keyOrigin, String range, Long ifModifiedSince,
-      Long ifUnmodifiedSince) throws IOException, OS3Exception {
+      String keyOrigin, String range, String ifModifiedSinceStr,
+      String ifUnmodifiedSinceStr) throws IOException, OS3Exception {
     Map<String, String> additionalHeaders = new HashMap<>();
     additionalHeaders.put(COPY_SOURCE_HEADER, keyOrigin);
     if (range != null) {
       additionalHeaders.put(COPY_SOURCE_HEADER_RANGE, range);
     }
-    if (ifModifiedSince != null) {
-      additionalHeaders.put(COPY_SOURCE_IF_MODIFIED_SINCE,
-          ifModifiedSince.toString());
+    if (ifModifiedSinceStr != null) {
+      additionalHeaders.put(COPY_SOURCE_IF_MODIFIED_SINCE, ifModifiedSinceStr);
     }
-    if (ifUnmodifiedSince != null) {
+    if (ifUnmodifiedSinceStr != null) {
       additionalHeaders.put(COPY_SOURCE_IF_UNMODIFIED_SINCE,
-          ifUnmodifiedSince.toString());
+          ifUnmodifiedSinceStr);
     }
     setHeaders(additionalHeaders);
 
