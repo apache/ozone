@@ -62,6 +62,11 @@ import org.slf4j.LoggerFactory;
  * configured in `ozone.administrator` (along with the user that starts OM,
  * which automatically becomes an Ozone administrator but not necessarily in
  * the config) are allowed to access this endpoint.
+ *
+ * If Kerberos is enabled, the principal should be appended to
+ * `ozone.administrator`, e.g. `testuser/scm@EXAMPLE.COM`
+ * If Kerberos is not enabled, simply append the login user name to
+ * `ozone.administrator`, e.g. `testuser`
  */
 public class OMDBCheckpointServlet extends HttpServlet {
 
