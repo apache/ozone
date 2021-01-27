@@ -81,6 +81,8 @@ public class DeletedBlockLogImpl
   private final Lock lock;
   // Maps txId to set of DNs which are successful in committing the transaction
   private Map<Long, Set<UUID>> transactionToDNsCommitMap;
+  // Maps txId to its retry counts;
+  private Map<Long, Integer> transactionRetryCountMap;
 
   private final AtomicLong largestTxnId;
   // largest transactionId is stored at largestTxnIdHolderKey
@@ -102,7 +104,7 @@ public class DeletedBlockLogImpl
 
     // maps transaction to dns which have committed it.
     transactionToDNsCommitMap = new ConcurrentHashMap<>();
-
+    transactionRetryCountMap = new ConcurrentHashMap<>();
     this.largestTxnId = new AtomicLong(this.getLargestRecordedTXID());
   }
 
@@ -187,19 +189,30 @@ public class DeletedBlockLogImpl
           }
           continue;
         }
-        DeletedBlocksTransaction.Builder builder = block.toBuilder();
-        int currentCount = block.getCount();
+
+        int currentCount =
+            transactionRetryCountMap.getOrDefault(txID, block.getCount());
         if (currentCount > -1) {
-          builder.setCount(++currentCount);
+          int nextCount = currentCount + 1;
+          DeletedBlocksTransaction.Builder builder = block.toBuilder();
+          if (nextCount > maxRetry) {
+            // if the retry time exceeds the maxRetry value
+            // then set the retry value to -1, stop retrying, admins can
+            // analyze those blocks and purge them manually by SCMCli.
+            builder.setCount(-1);
+            scmMetadataStore.getDeletedBlocksTXTable().put(txID,
+                builder.build());
+            transactionRetryCountMap.remove(txID);
+          } else if (nextCount % 100 == 0) {
+            // write retry count after every 100 retries into DB.
+            builder.setCount(nextCount);
+            scmMetadataStore.getDeletedBlocksTXTable().put(txID,
+                builder.build());
+            transactionRetryCountMap.put(txID, nextCount);
+          } else {
+            transactionRetryCountMap.put(txID, nextCount);
+          }
         }
-        // if the retry time exceeds the maxRetry value
-        // then set the retry value to -1, stop retrying, admins can
-        // analyze those blocks and purge them manually by SCMCli.
-        if (currentCount > maxRetry) {
-          builder.setCount(-1);
-        }
-        scmMetadataStore.getDeletedBlocksTXTable().put(txID,
-            builder.build());
       } catch (IOException ex) {
         LOG.warn("Cannot increase count for txID " + txID, ex);
         // We do not throw error here, since we don't want to abort the loop.
@@ -274,6 +287,7 @@ public class DeletedBlockLogImpl
                 .collect(Collectors.toList());
             if (dnsWithCommittedTxn.containsAll(containerDns)) {
               transactionToDNsCommitMap.remove(txID);
+              transactionRetryCountMap.remove(txID);
               if (LOG.isDebugEnabled()) {
                 LOG.debug("Purging txId={} from block deletion log", txID);
               }
@@ -429,6 +443,10 @@ public class DeletedBlockLogImpl
           }
         }
         purgeTransactions(txnsToBePurged);
+        for (DeletedBlocksTransaction trx : txnsToBePurged) {
+          transactionRetryCountMap.remove(trx.getTxID());
+          transactionToDNsCommitMap.remove(trx.getTxID());
+        }
       }
       return transactions;
     } finally {
