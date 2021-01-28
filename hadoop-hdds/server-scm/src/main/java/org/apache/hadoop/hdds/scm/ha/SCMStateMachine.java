@@ -26,7 +26,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
+import com.google.common.base.Preconditions;
 import com.google.protobuf.InvalidProtocolBufferException;
+import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
+import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImplV2;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftGroupMemberId;
@@ -156,6 +159,13 @@ public class SCMStateMachine extends BaseStateMachine {
 
     scm.getScmContext().updateLeaderAndTerm(true, term);
     scm.getSCMServiceManager().notifyStatusChanged();
+
+    DeletedBlockLog deletedBlockLog = scm.getScmBlockManager()
+        .getDeletedBlockLog();
+    Preconditions.checkArgument(
+        deletedBlockLog instanceof DeletedBlockLogImplV2);
+    ((DeletedBlockLogImplV2) deletedBlockLog)
+          .clearTransactionToDNsCommitMap();
   }
 
   @Override

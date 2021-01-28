@@ -23,6 +23,7 @@ option java_generate_equals_and_hash = true;
 enum RequestType {
     PIPELINE = 1;
     CONTAINER = 2;
+    BLOCK = 3;
 }
 
 message Method {

@@ -280,9 +280,15 @@ public class TestDeleteWithSlowFollower {
     client.getObjectStore().getVolume(volumeName).getBucket(bucketName).
             deleteKey("ratis");
     GenericTestUtils.waitFor(() -> {
-      return
-          dnStateMachine.getCommandDispatcher().getDeleteBlocksCommandHandler()
-              .getInvocationCount() >= 1;
+      try {
+        cluster.getStorageContainerManager().getScmHAManager()
+            .getDBTransactionBuffer().flush();
+        return
+            dnStateMachine.getCommandDispatcher()
+                .getDeleteBlocksCommandHandler().getInvocationCount() >= 1;
+      } catch (IOException e) {
+        return false;
+      }
     }, 500, 100000);
     Assert.assertTrue(containerData.getDeleteTransactionId() > delTrxId);
     Assert.assertTrue(
