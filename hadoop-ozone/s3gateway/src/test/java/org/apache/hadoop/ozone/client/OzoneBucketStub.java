@@ -311,6 +311,12 @@ public class OzoneBucketStub extends OzoneBucket {
     return aclList.add(addAcl);
   }
 
+  @Override
+  public boolean setAcl(List<OzoneAcl> acls) throws IOException {
+    aclList.clear();
+    return aclList.addAll(acls);
+  }
+
   /**
    * Class used to hold part information in a upload part request.
    */

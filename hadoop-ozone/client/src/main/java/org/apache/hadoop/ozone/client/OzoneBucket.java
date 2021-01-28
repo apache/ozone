@@ -401,6 +401,17 @@ public class OzoneBucket extends WithMetadata {
   }
 
   /**
+   * Acls to be set for given Ozone object. This operations reset ACL for
+   * given object to list of ACLs provided in argument.
+   * @param acls List of acls.
+   *
+   * @throws IOException if there is error.
+   * */
+  public boolean setAcl(List<OzoneAcl> acls) throws IOException {
+    return proxy.setAcl(ozoneObj, acls);
+  }
+
+  /**
    * Sets/Changes the storage type of the bucket.
    * @param newStorageType Storage type to be set
    * @throws IOException

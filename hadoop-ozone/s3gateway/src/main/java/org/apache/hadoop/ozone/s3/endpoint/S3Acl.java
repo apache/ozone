@@ -179,7 +179,6 @@ public final class S3Acl {
       grant.setGrantee(grantee);
       grant.setPermission(ACLType.FULL_CONTROL.toString());
       grantList.add(grant);
-      return grantList;
     } else if (acls.contains(IAccessAuthorizer.ACLType.WRITE_ACL)) {
       Grant grant = new Grant();
       grant.setGrantee(grantee);

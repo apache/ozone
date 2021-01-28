@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 
+import org.apache.commons.collections.ListUtils;
 import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
@@ -270,7 +271,7 @@ public class OzoneVolume extends WithMetadata {
    * @return aclMap
    */
   public List<OzoneAcl> getAcls() {
-    return (ArrayList)((ArrayList)acls).clone();
+    return ListUtils.unmodifiableList(acls);
   }
 
    /**
@@ -301,6 +302,22 @@ public class OzoneVolume extends WithMetadata {
       acls.remove(acl);
     }
     return removed;
+  }
+
+  /**
+   * Acls to be set for given Ozone object. This operations reset ACL for
+   * given object to list of ACLs provided in argument.
+   * @param acls List of acls.
+   *
+   * @throws IOException if there is error.
+   * */
+  public boolean setAcl(List<OzoneAcl> acls) throws IOException {
+    boolean reset = proxy.setAcl(ozoneObj, acls);
+    if (reset) {
+      acls.clear();
+      acls.addAll(acls);
+    }
+    return reset;
   }
 
   /**

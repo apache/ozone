@@ -17,6 +17,30 @@
  */
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneKey;
+import org.apache.hadoop.ozone.client.OzoneMultipartUploadList;
+import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
+import org.apache.hadoop.ozone.s3.commontypes.KeyMetadata;
+import org.apache.hadoop.ozone.s3.endpoint.MultiDeleteRequest.DeleteObject;
+import org.apache.hadoop.ozone.s3.endpoint.MultiDeleteResponse.DeletedObject;
+import org.apache.hadoop.ozone.s3.endpoint.MultiDeleteResponse.Error;
+import org.apache.hadoop.ozone.s3.endpoint.S3BucketAcl.Grant;
+import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
+import org.apache.hadoop.ozone.s3.util.ContinueToken;
+import org.apache.hadoop.ozone.s3.util.S3StorageType;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.apache.http.HttpStatus;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
@@ -40,34 +64,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
-import org.apache.hadoop.hdds.client.ReplicationType;
-import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.client.OzoneBucket;
-import org.apache.hadoop.ozone.client.OzoneKey;
-import org.apache.hadoop.ozone.client.OzoneMultipartUploadList;
-import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
-import org.apache.hadoop.ozone.s3.commontypes.KeyMetadata;
-import org.apache.hadoop.ozone.s3.endpoint.MultiDeleteRequest.DeleteObject;
-import org.apache.hadoop.ozone.s3.endpoint.MultiDeleteResponse.DeletedObject;
-import org.apache.hadoop.ozone.s3.endpoint.MultiDeleteResponse.Error;
-import org.apache.hadoop.ozone.s3.exception.OS3Exception;
-import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
-import org.apache.hadoop.ozone.s3.util.ContinueToken;
-import org.apache.hadoop.ozone.s3.util.S3StorageType;
-import org.apache.hadoop.ozone.s3.endpoint.S3BucketAcl.Grant;
-
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
-import org.apache.commons.lang3.StringUtils;
-
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NOT_IMPLEMENTED;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.ENCODING_TYPE;
-
-import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
-import org.apache.http.HttpStatus;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Bucket level rest endpoints.
@@ -386,8 +384,13 @@ public class BucketEndpoint extends EndpointBase {
     try {
       OzoneBucket bucket = getBucket(bucketName);
       OzoneVolume volume = getVolume();
+      // TODO: use bucket owner instead of volume owner here once bucket owner
+      // TODO: is supported.
       S3Owner owner = new S3Owner(volume.getOwner(), volume.getOwner());
       result.setOwner(owner);
+
+      // TODO: remove this duplication avoid logic when ACCESS and DEFAULT scope
+      // TODO: are merged.
       // Use set to remove ACLs with different scopes(ACCESS and DEFAULT)
       Set<Grant> grantSet = new HashSet<>();
       // Return ACL list
@@ -479,25 +482,9 @@ public class BucketEndpoint extends EndpointBase {
         }
       }
 
-      List<OzoneAcl> oldBucketAcls = bucket.getAcls();
-      List<OzoneAcl> oldVolumeAcls =
-          S3Acl.getVolumeAclFromBucketAcl(oldBucketAcls);
-
-      // Add new ACLs
-      for (OzoneAcl addAcl : ozoneAclListOnBucket) {
-        bucket.addAcl(addAcl);
-      }
-      for (OzoneAcl addAcl : ozoneAclListOnVolume) {
-        volume.addAcl(addAcl);
-      }
-
       // A put request will reset all previous ACLs
-      for (OzoneAcl removeAcl : oldBucketAcls) {
-        bucket.removeAcl(removeAcl);
-      }
-      for (OzoneAcl removeAcl : oldVolumeAcls) {
-        volume.removeAcl(removeAcl);
-      }
+      bucket.setAcl(ozoneAclListOnBucket);
+      volume.setAcl(ozoneAclListOnVolume);
     } catch (OMException exception) {
       LOG.error("Error in set ACL Request for bucket: {}", bucketName,
           exception);
@@ -569,7 +556,7 @@ public class BucketEndpoint extends EndpointBase {
         LOG.warn("S3 grantee {} is null or not supported", part[0]);
         throw S3ErrorTable.newError(NOT_IMPLEMENTED, part[0]);
       }
-      // Build ACL on Bucket
+      // Build ACL on Volume
       BitSet aclsOnVolume =
           S3Acl.getOzoneAclOnVolumeFromS3Permission(permission);
       OzoneAcl defaultOzoneAcl = new OzoneAcl(

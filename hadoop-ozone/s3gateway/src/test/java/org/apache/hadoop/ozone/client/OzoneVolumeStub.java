@@ -125,4 +125,10 @@ public class OzoneVolumeStub extends OzoneVolume {
   public boolean removeAcl(OzoneAcl acl) throws IOException {
     return aclList.add(acl);
   }
+
+  @Override
+  public boolean setAcl(List<OzoneAcl> acls) throws IOException {
+    aclList.clear();
+    return aclList.addAll(acls);
+  }
 }
