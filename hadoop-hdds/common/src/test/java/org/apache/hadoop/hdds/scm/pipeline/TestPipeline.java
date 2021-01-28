@@ -22,8 +22,11 @@ import org.junit.Test;
 
 import java.io.IOException;
 
-import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.PUBLIC_PORTS;
+import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.ALL_PORTS;
+import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.V0_PORTS;
 import static org.apache.hadoop.hdds.protocol.TestDatanodeDetails.assertPorts;
+import static org.apache.hadoop.ozone.ClientVersions.DEFAULT_VERSION;
+import static org.apache.hadoop.ozone.ClientVersions.VERSION_HANDLES_UNKNOWN_DN_PORTS;
 
 /**
  * Test for {@link Pipeline}.
@@ -31,13 +34,18 @@ import static org.apache.hadoop.hdds.protocol.TestDatanodeDetails.assertPorts;
 public class TestPipeline {
 
   @Test
-  public void protoOnlyIncludesPublicPorts() throws IOException {
+  public void protoIncludesNewPortsOnlyForV1() throws IOException {
     Pipeline subject = MockPipeline.createPipeline(3);
 
-    HddsProtos.Pipeline proto = subject.getProtobufMessage();
-
+    HddsProtos.Pipeline proto = subject.getProtobufMessage(DEFAULT_VERSION);
     for (HddsProtos.DatanodeDetailsProto dn : proto.getMembersList()) {
-      assertPorts(dn, PUBLIC_PORTS);
+      assertPorts(dn, V0_PORTS);
+    }
+
+    HddsProtos.Pipeline protoV1 = subject.getProtobufMessage(
+        VERSION_HANDLES_UNKNOWN_DN_PORTS);
+    for (HddsProtos.DatanodeDetailsProto dn : protoV1.getMembersList()) {
+      assertPorts(dn, ALL_PORTS);
     }
   }
 }

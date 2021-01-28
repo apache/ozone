@@ -37,6 +37,8 @@ import java.io.File;
 import java.util.List;
 import java.util.ArrayList;
 
+import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
+
 
 /**
  * This class tests the Debug LDB CLI that reads from an om.db file.
@@ -86,7 +88,8 @@ public class TestOmLDBCli {
           HddsProtos.ReplicationFactor.ONE);
       String key = "key"+ (i);
       Table<byte[], byte[]> keyTable = dbStore.getTable("keyTable");
-      keyTable.put(key.getBytes(), value.getProtobuf().toByteArray());
+      byte[] arr = value.getProtobuf(CURRENT_VERSION).toByteArray();
+      keyTable.put(key.getBytes(), arr);
     }
     rdbParser.setDbPath(dbStore.getDbLocation().getAbsolutePath());
     dbScanner.setParent(rdbParser);

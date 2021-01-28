@@ -40,7 +40,6 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -344,7 +343,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
           HddsServerUtil.getScmSecurityClient(config);
       SCMGetCertResponseProto response = secureScmClient.
           getDataNodeCertificateChain(
-              datanodeDetails.toProto(Port.Name.ALL_PORTS),
+              datanodeDetails.getProtoBufMessage(),
               getEncodedString(csr));
       // Persist certificates.
       if(response.hasX509CACertificate()) {

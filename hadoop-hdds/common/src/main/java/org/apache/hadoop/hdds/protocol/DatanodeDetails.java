@@ -37,6 +37,9 @@ import com.google.common.base.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
+import static org.apache.hadoop.ozone.ClientVersions.VERSION_HANDLES_UNKNOWN_DN_PORTS;
+
 /**
  * DatanodeDetails class contains details about DataNode like:
  * - UUID of the DataNode.
@@ -355,15 +358,15 @@ public class DatanodeDetails extends NodeImpl implements
    * @return HddsProtos.DatanodeDetailsProto
    */
   public HddsProtos.DatanodeDetailsProto getProtoBufMessage() {
-    return toProto(Name.ALL_PORTS);
+    return toProto(CURRENT_VERSION);
   }
 
-  public HddsProtos.DatanodeDetailsProto toProto(Set<Name> exposedPorts) {
-    return toProtoBuilder(exposedPorts).build();
+  public HddsProtos.DatanodeDetailsProto toProto(int clientVersion) {
+    return toProtoBuilder(clientVersion).build();
   }
 
   public HddsProtos.DatanodeDetailsProto.Builder toProtoBuilder(
-      Set<Name> exposedPorts) {
+      int clientVersion) {
 
     HddsProtos.UUID uuid128 = HddsProtos.UUID.newBuilder()
         .setMostSigBits(uuid.getMostSignificantBits())
@@ -396,13 +399,15 @@ public class DatanodeDetails extends NodeImpl implements
     }
     builder.setPersistedOpStateExpiry(persistedOpStateExpiryEpochSec);
 
+    final boolean handlesUnknownPorts =
+        clientVersion >= VERSION_HANDLES_UNKNOWN_DN_PORTS;
     for (Port port : ports) {
-      if (exposedPorts.contains(port.getName())) {
+      if (handlesUnknownPorts || Name.V0_PORTS.contains(port.getName())) {
         builder.addPorts(port.toProto());
       } else {
         if (LOG.isDebugEnabled()) {
-          LOG.debug("Skip adding {} port {} to proto message",
-              port.getName(), port.getValue());
+          LOG.debug("Skip adding {} port {} to proto message for client v{}",
+              port.getName(), port.getValue(), clientVersion);
         }
       }
     }
@@ -417,7 +422,7 @@ public class DatanodeDetails extends NodeImpl implements
   public HddsProtos.ExtendedDatanodeDetailsProto getExtendedProtoBufMessage() {
     HddsProtos.ExtendedDatanodeDetailsProto.Builder extendedBuilder =
         HddsProtos.ExtendedDatanodeDetailsProto.newBuilder()
-            .setDatanodeDetails(toProto(Port.Name.ALL_PORTS));
+            .setDatanodeDetails(getProtoBufMessage());
 
     if (!Strings.isNullOrEmpty(getVersion())) {
       extendedBuilder.setVersion(getVersion());
@@ -723,7 +728,7 @@ public class DatanodeDetails extends NodeImpl implements
 
       public static final Set<Name> ALL_PORTS = ImmutableSet.copyOf(
           Name.values());
-      public static final Set<Name> PUBLIC_PORTS = ImmutableSet.copyOf(
+      public static final Set<Name> V0_PORTS = ImmutableSet.copyOf(
           EnumSet.of(STANDALONE, RATIS, REST));
     }
 

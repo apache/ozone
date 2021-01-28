@@ -43,8 +43,6 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
 
-import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.PUBLIC_PORTS;
-
 /**
  * Represents a group of datanodes which store a container.
  */
@@ -140,8 +138,6 @@ public final class Pipeline {
 
   /**
    * Set the creation timestamp. Only for protobuf now.
-   *
-   * @param creationTimestamp
    */
   public void setCreationTimestamp(Instant creationTimestamp) {
     this.creationTimestamp = creationTimestamp;
@@ -174,6 +170,7 @@ public final class Pipeline {
 
   /**
    * Return an immutable set of nodes which form this pipeline.
+   *
    * @return Set of DatanodeDetails
    */
   public Set<DatanodeDetails> getNodeSet() {
@@ -182,7 +179,7 @@ public final class Pipeline {
 
   /**
    * Check if the input pipeline share the same set of datanodes.
-   * @param pipeline
+   *
    * @return true if the input pipeline shares the same set of datanodes.
    */
   public boolean sameDatanodes(Pipeline pipeline) {
@@ -269,11 +266,11 @@ public final class Pipeline {
     return nodeStatus.isEmpty();
   }
 
-  public HddsProtos.Pipeline getProtobufMessage()
+  public HddsProtos.Pipeline getProtobufMessage(int clientVersion)
       throws UnknownPipelineStateException {
     List<HddsProtos.DatanodeDetailsProto> members = new ArrayList<>();
     for (DatanodeDetails dn : nodeStatus.keySet()) {
-      members.add(dn.toProto(PUBLIC_PORTS));
+      members.add(dn.toProto(clientVersion));
     }
 
     HddsProtos.Pipeline.Builder builder = HddsProtos.Pipeline.newBuilder()

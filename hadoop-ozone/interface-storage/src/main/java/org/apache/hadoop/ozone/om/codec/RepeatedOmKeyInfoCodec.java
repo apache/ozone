@@ -27,6 +27,8 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
+import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
+
 /**
  * Codec to encode RepeatedOmKeyInfo as byte array.
  */
@@ -37,7 +39,7 @@ public class RepeatedOmKeyInfoCodec implements Codec<RepeatedOmKeyInfo> {
   private final boolean ignorePipeline;
   public RepeatedOmKeyInfoCodec(boolean ignorePipeline) {
     this.ignorePipeline = ignorePipeline;
-    LOG.info("RepeatedOmKeyInfoCodec ignorePipeline = " + ignorePipeline);
+    LOG.info("RepeatedOmKeyInfoCodec ignorePipeline = {}", ignorePipeline);
   }
 
   @Override
@@ -45,7 +47,7 @@ public class RepeatedOmKeyInfoCodec implements Codec<RepeatedOmKeyInfo> {
       throws IOException {
     Preconditions.checkNotNull(object,
         "Null object can't be converted to byte array.");
-    return object.getProto(ignorePipeline).toByteArray();
+    return object.getProto(ignorePipeline, CURRENT_VERSION).toByteArray();
   }
 
   @Override

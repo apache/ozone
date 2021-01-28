@@ -53,8 +53,6 @@ import com.google.protobuf.ServiceException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.PUBLIC_PORTS;
-
 /**
  * This class is the server-side translator that forwards requests received on
  * {@link StorageContainerLocationProtocolPB} to the
@@ -117,8 +115,8 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
     try {
       switch (request.getCmdType()) {
       case AllocateScmBlock:
-        response.setAllocateScmBlockResponse(
-            allocateScmBlock(request.getAllocateScmBlockRequest()));
+        response.setAllocateScmBlockResponse(allocateScmBlock(
+            request.getAllocateScmBlockRequest(), request.getVersion()));
         break;
       case DeleteScmKeyBlocks:
         response.setDeleteScmKeyBlocksResponse(
@@ -129,8 +127,9 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
             getScmInfo(request.getGetScmInfoRequest()));
         break;
       case SortDatanodes:
-        response.setSortDatanodesResponse(
-            sortDatanodes(request.getSortDatanodesRequest()));
+        response.setSortDatanodesResponse(sortDatanodes(
+            request.getSortDatanodesRequest(), request.getVersion()
+        ));
         break;
       default:
         // Should never happen
@@ -157,7 +156,7 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
   }
 
   public AllocateScmBlockResponseProto allocateScmBlock(
-      AllocateScmBlockRequestProto request)
+      AllocateScmBlockRequestProto request, int clientVersion)
       throws IOException {
     List<AllocatedBlock> allocatedBlocks =
         impl.allocateBlock(request.getSize(),
@@ -176,7 +175,7 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
     for (AllocatedBlock block : allocatedBlocks) {
       builder.addBlocks(AllocateBlockResponse.newBuilder()
           .setContainerBlockID(block.getBlockID().getProtobuf())
-          .setPipeline(block.getPipeline().getProtobufMessage()));
+          .setPipeline(block.getPipeline().getProtobufMessage(clientVersion)));
     }
 
     return builder.build();
@@ -214,15 +213,18 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
   }
 
   public SortDatanodesResponseProto sortDatanodes(
-      SortDatanodesRequestProto request) throws ServiceException {
+      SortDatanodesRequestProto request, int clientVersion)
+      throws ServiceException {
     SortDatanodesResponseProto.Builder resp =
         SortDatanodesResponseProto.newBuilder();
     try {
       List<String> nodeList = request.getNodeNetworkNameList();
       final List<DatanodeDetails> results =
           impl.sortDatanodes(nodeList, request.getClient());
-      if (results != null && results.size() > 0) {
-        results.stream().forEach(dn -> resp.addNode(dn.toProto(PUBLIC_PORTS)));
+      if (results != null) {
+        for (DatanodeDetails dn : results) {
+          resp.addNode(dn.toProto(clientVersion));
+        }
       }
       return resp.build();
     } catch (IOException ex) {
