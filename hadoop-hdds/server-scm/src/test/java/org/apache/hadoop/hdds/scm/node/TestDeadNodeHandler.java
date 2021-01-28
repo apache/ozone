@@ -162,7 +162,6 @@ public class TestDeadNodeHandler {
 
     LambdaTestUtils.await(120000, 1000,
         () -> {
-          pipelineManager.triggerPipelineCreation();
           System.out.println(pipelineManager.getPipelines(RATIS, THREE).size());
           System.out.println(pipelineManager.getPipelines(RATIS, ONE).size());
           return pipelineManager.getPipelines(RATIS, THREE).size() > 3;

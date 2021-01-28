@@ -45,6 +45,7 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
+import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.Scheduler;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -64,7 +65,8 @@ import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.FAI
  * for pipelines must come via PipelineManager. It synchronises all write
  * and read operations via a ReadWriteLock.
  */
-public class SCMPipelineManager implements PipelineManager {
+public class SCMPipelineManager implements
+    PipelineManager, EventHandler<SafeModeStatus> {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMPipelineManager.class);

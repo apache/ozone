@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.TestUtils;
+import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.container.CloseContainerEventHandler;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -91,6 +92,7 @@ public class TestBlockManager {
   private static HddsProtos.ReplicationType type;
   private EventQueue eventQueue;
   private SCMContext scmContext;
+  private SCMServiceManager serviceManager;
   private int numContainerPerOwnerInPipeline;
   private OzoneConfiguration conf;
 
@@ -121,6 +123,7 @@ public class TestBlockManager {
 
     eventQueue = new EventQueue();
     scmContext = SCMContext.emptyContext();
+    serviceManager = new SCMServiceManager();
 
     scmMetadataStore = new SCMMetadataStoreImpl(conf);
     scmMetadataStore.start(conf);
@@ -131,8 +134,8 @@ public class TestBlockManager {
             nodeManager,
             scmMetadataStore.getPipelineTable(),
             eventQueue,
-            scmContext);
-    pipelineManager.allowPipelineCreation();
+            scmContext,
+            serviceManager);
 
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
@@ -146,7 +149,7 @@ public class TestBlockManager {
             scmMetadataStore.getContainerTable());
     SCMSafeModeManager safeModeManager = new SCMSafeModeManager(conf,
         containerManager.getContainers(),
-        pipelineManager, eventQueue) {
+        pipelineManager, eventQueue, serviceManager, scmContext) {
       @Override
       public void emitSafeModeStatus() {
         // skip
@@ -173,8 +176,7 @@ public class TestBlockManager {
     factor = HddsProtos.ReplicationFactor.THREE;
     type = HddsProtos.ReplicationType.RATIS;
 
-    scm.getScmContext().onMessage(
-        new SafeModeStatus(false, true), null);
+    scm.getScmContext().updateSafeModeStatus(new SafeModeStatus(false, true));
   }
 
   @After
@@ -460,8 +462,8 @@ public class TestBlockManager {
 
   @Test
   public void testAllocateBlockFailureInSafeMode() throws Exception {
-    scm.getScmContext().onMessage(
-        new SCMSafeModeManager.SafeModeStatus(true, true), null);
+    scm.getScmContext().updateSafeModeStatus(
+        new SCMSafeModeManager.SafeModeStatus(true, true));
     // Test1: In safe mode expect an SCMException.
     thrown.expectMessage("SafeModePrecheck failed for "
         + "allocateBlock");

@@ -141,7 +141,7 @@ public class TestContainerReplication {
     SCMCommand<?> command = new ReplicateContainerCommand(containerId,
         sourcePipelines.getNodes());
     command.setTerm(
-        cluster.getStorageContainerManager().getScmContext().getTerm());
+        cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
     cluster.getStorageContainerManager().getScmNodeManager()
         .addDatanodeCommand(destinationDatanode.getDatanodeDetails().getUuid(),
             command);

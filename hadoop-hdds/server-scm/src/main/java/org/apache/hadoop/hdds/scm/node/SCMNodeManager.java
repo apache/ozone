@@ -433,7 +433,7 @@ public class SCMNodeManager implements NodeManager {
             Time.monotonicNow(),
             scmStatus.getOperationalState(),
             scmStatus.getOpStateExpiryEpochSeconds());
-        command.setTerm(scmContext.getTerm());
+        command.setTerm(scmContext.getTermOfLeader());
         addDatanodeCommand(reportedDn.getUuid(), command);
       } catch (NotLeaderException nle) {
         LOG.warn("Skip sending SetNodeOperationalStateCommand,"
