@@ -26,7 +26,7 @@ import java.util.Map;
 
 import com.google.common.base.Optional;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -159,7 +159,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
     OmBucketInfo omBucketInfo = OmBucketInfo.getFromProtobuf(bucketInfo);
 
     // Add layout version V1 to bucket info
-    addLayoutVersionToBucket(ozoneManager, omBucketInfo);
+    addFSOptimizedBucketDetails(ozoneManager, omBucketInfo);
 
     AuditLogger auditLogger = ozoneManager.getAuditLogger();
     OzoneManagerProtocolProtos.UserInfo userInfo = getOmRequest().getUserInfo();
@@ -364,20 +364,30 @@ public class OMBucketCreateRequest extends OMClientRequest {
 
   }
 
-  private void addLayoutVersionToBucket(OzoneManager ozoneManager,
-                                        OmBucketInfo omBucketInfo) {
+  /**
+   * OM can support FS optimization only if both are flags are TRUE
+   * (enableFSOptimized=true && enableFSPaths=true) and will write table key
+   * entries in NEW_FORMAT(prefix separated format using objectID). All the
+   * other cases, it will
+   * write table key entries in OLD_FORMAT(existing format).
+   *
+   * @param ozoneManager ozone manager
+   * @param omBucketInfo bucket information
+   */
+  private void addFSOptimizedBucketDetails(OzoneManager ozoneManager,
+                                           OmBucketInfo omBucketInfo) {
     Map<String, String> metadata = omBucketInfo.getMetadata();
     if (metadata == null) {
       metadata = new HashMap<>();
     }
-    OzoneConfiguration configuration = ozoneManager.getConfiguration();
     // TODO: Many unit test cases has null config and done a simple null
     //  check now. It can be done later, to avoid massive test code changes.
-    if (configuration != null) {
-      String layOutVersion = configuration
-              .get(OMConfigKeys.OZONE_OM_LAYOUT_VERSION,
-                      OMConfigKeys.OZONE_OM_LAYOUT_VERSION_DEFAULT);
+    if(StringUtils.isNotBlank(ozoneManager.getOMLayoutVersion())){
+      String layOutVersion = ozoneManager.getOMLayoutVersion();
       metadata.put(OMConfigKeys.OZONE_OM_LAYOUT_VERSION, layOutVersion);
+      boolean fsPathsEnabled = ozoneManager.getEnableFileSystemPaths();
+      metadata.put(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
+              Boolean.toString(fsPathsEnabled));
       omBucketInfo.setMetadata(metadata);
     }
   }

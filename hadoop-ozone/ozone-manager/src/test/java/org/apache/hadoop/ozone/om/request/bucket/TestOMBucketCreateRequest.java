@@ -186,7 +186,7 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
 
   }
 
-  private void verifyRequest(OMRequest modifiedOmRequest,
+  protected void verifyRequest(OMRequest modifiedOmRequest,
       OMRequest originalRequest) {
     OzoneManagerProtocolProtos.BucketInfo original =
         originalRequest.getCreateBucketRequest().getBucketInfo();

@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.UUID;
 
 import com.google.common.base.Optional;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -33,6 +34,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -430,6 +432,25 @@ public final class TestOMRequestUtils {
         .setClientId(UUID.randomUUID().toString()).build();
   }
 
+  public static OzoneManagerProtocolProtos.OMRequest createBucketRequestV1(
+          String bucketName, String volumeName, boolean isVersionEnabled,
+          OzoneManagerProtocolProtos.StorageTypeProto storageTypeProto) {
+    OzoneManagerProtocolProtos.BucketInfo bucketInfo =
+            OzoneManagerProtocolProtos.BucketInfo.newBuilder()
+                    .setBucketName(bucketName)
+                    .setVolumeName(volumeName)
+                    .setIsVersionEnabled(isVersionEnabled)
+                    .setStorageType(storageTypeProto)
+                    .addAllMetadata(getMetadataListV1()).build();
+    OzoneManagerProtocolProtos.CreateBucketRequest.Builder req =
+            OzoneManagerProtocolProtos.CreateBucketRequest.newBuilder();
+    req.setBucketInfo(bucketInfo);
+    return OzoneManagerProtocolProtos.OMRequest.newBuilder()
+            .setCreateBucketRequest(req)
+            .setCmdType(OzoneManagerProtocolProtos.Type.CreateBucket)
+            .setClientId(UUID.randomUUID().toString()).build();
+  }
+
   public static List< HddsProtos.KeyValue> getMetadataList() {
     List<HddsProtos.KeyValue> metadataList = new ArrayList<>();
     metadataList.add(HddsProtos.KeyValue.newBuilder().setKey("key1").setValue(
@@ -439,6 +460,20 @@ public final class TestOMRequestUtils {
     return metadataList;
   }
 
+  public static List< HddsProtos.KeyValue> getMetadataListV1() {
+    List<HddsProtos.KeyValue> metadataList = new ArrayList<>();
+    metadataList.add(HddsProtos.KeyValue.newBuilder().setKey("key1").setValue(
+            "value1").build());
+    metadataList.add(HddsProtos.KeyValue.newBuilder().setKey("key2").setValue(
+            "value2").build());
+    metadataList.add(HddsProtos.KeyValue.newBuilder().setKey(
+            OMConfigKeys.OZONE_OM_LAYOUT_VERSION).setValue(
+            OMConfigKeys.OZONE_OM_LAYOUT_VERSION_V1).build());
+    metadataList.add(HddsProtos.KeyValue.newBuilder().setKey(
+            OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS).setValue(
+            "false").build());
+    return metadataList;
+  }
 
   /**
    * Add user to user table.
@@ -926,5 +961,12 @@ public final class TestOMRequestUtils {
       parentId = omDirInfo.getObjectID();
     }
     return parentId;
+  }
+
+  public static void configureFSOptimizedPaths(Configuration conf,
+      boolean enableFileSystemPaths, String version) {
+    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
+            enableFileSystemPaths);
+    conf.set(OMConfigKeys.OZONE_OM_LAYOUT_VERSION, version);
   }
 }

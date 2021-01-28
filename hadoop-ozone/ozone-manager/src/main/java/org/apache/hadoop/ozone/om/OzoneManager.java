@@ -218,6 +218,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_F
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_LAYOUT_VERSION;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_LAYOUT_VERSION_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_LAYOUT_VERSION_V1;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METRICS_SAVE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METRICS_SAVE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_USER_MAX_VOLUME;
@@ -1109,7 +1110,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     // TODO: Temporary workaround for OM upgrade path and will be replaced once
-    //  upgrade HDDS-3698 story reaches consensus.
+    //  upgrade HDDS-3698 story reaches consensus. Instead of cluster level
+    //  configuration, OM needs to check this property on every bucket level.
     getOMLayoutVersion();
 
     metadataManager.start(configuration);
@@ -3670,14 +3672,19 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT);
   }
 
-  private void getOMLayoutVersion() {
+  public String getOMLayoutVersion() {
     String version = configuration.getTrimmed(OZONE_OM_LAYOUT_VERSION,
             OZONE_OM_LAYOUT_VERSION_DEFAULT);
-    boolean omLayoutVersionV1 =
-            StringUtils.equalsIgnoreCase(version, "V1");
-    OzoneManagerRatisUtils.setOmLayoutVersionV1(omLayoutVersionV1);
+    boolean omLayoutVersionV1 = StringUtils.equalsIgnoreCase(version,
+            OZONE_OM_LAYOUT_VERSION_V1);
     LOG.info("Configured {}={} and enabled:{} optimized OM FS operations",
             OZONE_OM_LAYOUT_VERSION, version, omLayoutVersionV1);
+
+    boolean isBucketFSOptimized =
+            omLayoutVersionV1 && getEnableFileSystemPaths();
+    OzoneManagerRatisUtils.setBucketFSOptimized(isBucketFSOptimized);
+
+    return version;
   }
 
   /**
