@@ -42,7 +42,6 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -327,9 +326,7 @@ public class BasicOzoneFileSystem extends FileSystem {
       return false;
     }
 
-    String layOutVersion = adapter.getBucketLayoutVersion();
-    if (layOutVersion != null &&
-            OMConfigKeys.OZONE_OM_LAYOUT_VERSION_V1.equals(layOutVersion)) {
+    if (adapter.isFSOptimizedBucket()) {
       return renameV1(srcPath, dstPath);
     }
 
@@ -509,10 +506,7 @@ public class BasicOzoneFileSystem extends FileSystem {
     statistics.incrementWriteOps(1);
     LOG.debug("Delete path {} - recursive {}", f, recursive);
 
-    String layOutVersion = adapter.getBucketLayoutVersion();
-    if (layOutVersion != null &&
-            OMConfigKeys.OZONE_OM_LAYOUT_VERSION_V1.equals(layOutVersion)) {
-
+    if (adapter.isFSOptimizedBucket()) {
       if (f.isRoot()) {
         LOG.warn("Cannot delete root directory.");
         return false;
