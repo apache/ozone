@@ -118,7 +118,7 @@ public class TestNodeStateMap {
         map.getNodeCount(NodeOperationalState.DECOMMISSIONING,
             NodeState.STALE));
     assertEquals(5, map.getNodeCount(null, NodeState.HEALTHY));
-    assertEquals(3,
+    assertEquals(4,
         map.getNodeCount(NodeOperationalState.DECOMMISSIONING, null));
   }
 

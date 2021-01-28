@@ -43,7 +43,6 @@ import java.util.List;
 import java.util.UUID;
 
 import static junit.framework.TestCase.assertEquals;
-import static junit.framework.TestCase.assertNull;
 
 /**
  * Class to test the NodeStateManager, which is an internal class used by
@@ -99,7 +98,7 @@ public class TestNodeStateManager {
     assertEquals(dn.getUuid(), nsm.getNode(dn).getUuid());
     // Now get the status of the newly added node and it should be
     // IN_SERVICE and HEALTHY
-    NodeStatus expectedState = NodeStatus.inServiceHealthy();
+    NodeStatus expectedState = NodeStatus.inServiceHealthyReadOnly();
     assertEquals(expectedState, nsm.getNodeStatus(dn));
   }
 
@@ -119,7 +118,7 @@ public class TestNodeStateManager {
       throws NodeAlreadyExistsException {
     DatanodeDetails dn = generateDatanode();
     nsm.addNode(dn, null);
-    assertEquals(1, nsm.getNodes(NodeStatus.inServiceHealthy()).size());
+    assertEquals(1, nsm.getNodes(NodeStatus.inServiceHealthyReadOnly()).size());
     assertEquals(0, nsm.getNodes(NodeStatus.inServiceStale()).size());
   }
 
@@ -127,7 +126,8 @@ public class TestNodeStateManager {
   public void testGetNodeCount() throws NodeAlreadyExistsException {
     DatanodeDetails dn = generateDatanode();
     nsm.addNode(dn, null);
-    assertEquals(1, nsm.getNodeCount(NodeStatus.inServiceHealthy()));
+    assertEquals(1, nsm.getNodeCount(
+        NodeStatus.inServiceHealthyReadOnly()));
     assertEquals(0, nsm.getNodeCount(NodeStatus.inServiceStale()));
   }
 
@@ -183,7 +183,8 @@ public class TestNodeStateManager {
     eventPublisher.clearEvents();
     nsm.checkNodesHealth();
     assertEquals(NodeState.HEALTHY, nsm.getNodeStatus(dn).getHealth());
-    assertNull(eventPublisher.getLastEvent());
+    assertEquals(SCMEvents.READ_ONLY_HEALTHY_TO_HEALTHY_NODE,
+        eventPublisher.getLastEvent());
 
     // Set the heartbeat old enough to make it stale
     dni.updateLastHeartbeatTime(now - staleLimit);
@@ -228,7 +229,7 @@ public class TestNodeStateManager {
     NodeStatus newStatus = nsm.getNodeStatus(dn);
     assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONED,
         newStatus.getOperationalState());
-    assertEquals(NodeState.HEALTHY,
+    assertEquals(NodeState.HEALTHY_READONLY,
         newStatus.getHealth());
   }
 

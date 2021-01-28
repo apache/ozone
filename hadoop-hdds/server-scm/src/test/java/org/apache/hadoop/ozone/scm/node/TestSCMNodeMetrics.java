@@ -197,9 +197,9 @@ public class TestSCMNodeMetrics {
 
     MetricsRecordBuilder metricsSource = getMetrics(SCMNodeMetrics.SOURCE_NAME);
 
-    assertGauge("InServiceHealthyNodes", 1,
+    assertGauge("InServiceHealthyNodes", 0,
         getMetrics(SCMNodeMetrics.class.getSimpleName()));
-    assertGauge("InServiceHealthyReadOnlyNodes", 0,
+    assertGauge("InServiceHealthyReadonlyNodes", 1,
         getMetrics(SCMNodeMetrics.class.getSimpleName()));
     assertGauge("InServiceStaleNodes", 0,
         getMetrics(SCMNodeMetrics.class.getSimpleName()));
@@ -228,18 +228,6 @@ public class TestSCMNodeMetrics {
     assertGauge("InMaintenanceStaleNodes", 0,
         getMetrics(SCMNodeMetrics.class.getSimpleName()));
     assertGauge("InMaintenanceDeadNodes", 0,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
-    assertGauge("DiskCapacity", 100L,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
-    assertGauge("DiskUsed", 10L,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
-    assertGauge("DiskRemaining", 90L,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
-    assertGauge("SSDCapacity", 0L,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
-    assertGauge("SSDUsed", 0L,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
-    assertGauge("SSDRemaining", 0L,
         getMetrics(SCMNodeMetrics.class.getSimpleName()));
     assertGauge("MaintenanceDiskCapacity", 0L,
         getMetrics(SCMNodeMetrics.class.getSimpleName()));
@@ -274,8 +262,8 @@ public class TestSCMNodeMetrics {
     nodeManager.processHeartbeat(registeredDatanode, layoutInfo);
     sleep(4000);
     metricsSource = getMetrics(SCMNodeMetrics.SOURCE_NAME);
-    assertGauge("HealthyReadOnlyNodes", 0, metricsSource);
-    assertGauge("HealthyNodes", 1, metricsSource);
+    assertGauge("InServiceHealthyReadonlyNodes", 0, metricsSource);
+    assertGauge("InServiceHealthyNodes", 1, metricsSource);
 
   }
 
