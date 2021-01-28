@@ -208,7 +208,7 @@ function ozonecmd_case
     ;;
     version)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.util.OzoneVersionInfo
-      OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-common"
+      OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-tools"
     ;;
     genconf)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.genconf.GenerateOzoneRequiredConfigurations
