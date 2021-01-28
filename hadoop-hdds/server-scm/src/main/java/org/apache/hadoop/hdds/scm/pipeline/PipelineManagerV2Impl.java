@@ -30,10 +30,9 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.apache.hadoop.hdds.utils.Scheduler;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.util.Time;
@@ -52,7 +51,6 @@ import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -69,27 +67,24 @@ public final class PipelineManagerV2Impl implements PipelineManager {
   private final Lock lock;
   private PipelineFactory pipelineFactory;
   private StateManager stateManager;
-  private Scheduler scheduler;
-  private BackgroundPipelineCreator backgroundPipelineCreator;
+  private BackgroundPipelineCreatorV2 backgroundPipelineCreator;
   private final ConfigurationSource conf;
   private final EventPublisher eventPublisher;
   // Pipeline Manager MXBean
   private ObjectName pmInfoBean;
   private final SCMPipelineMetrics metrics;
-  private long pipelineWaitDefaultTimeout;
-  private final AtomicBoolean isInSafeMode;
-  private SCMHAManager scmhaManager;
-  private NodeManager nodeManager;
-  // Used to track if the safemode pre-checks have completed. This is designed
-  // to prevent pipelines being created until sufficient nodes have registered.
-  private final AtomicBoolean pipelineCreationAllowed;
+  private final long pipelineWaitDefaultTimeout;
+  private final SCMHAManager scmhaManager;
+  private final SCMContext scmContext;
+  private final NodeManager nodeManager;
 
   private PipelineManagerV2Impl(ConfigurationSource conf,
                                 SCMHAManager scmhaManager,
                                 NodeManager nodeManager,
                                 StateManager pipelineStateManager,
                                 PipelineFactory pipelineFactory,
-                                EventPublisher eventPublisher) {
+                                EventPublisher eventPublisher,
+                                SCMContext scmContext) {
     this.lock = new ReentrantLock();
     this.pipelineFactory = pipelineFactory;
     this.stateManager = pipelineStateManager;
@@ -97,6 +92,7 @@ public final class PipelineManagerV2Impl implements PipelineManager {
     this.scmhaManager = scmhaManager;
     this.nodeManager = nodeManager;
     this.eventPublisher = eventPublisher;
+    this.scmContext = scmContext;
     this.pmInfoBean = MBeans.register("SCMPipelineManager",
         "SCMPipelineManagerInfo", this);
     this.metrics = SCMPipelineMetrics.create();
@@ -104,12 +100,6 @@ public final class PipelineManagerV2Impl implements PipelineManager {
         HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL,
         HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS);
-    this.isInSafeMode = new AtomicBoolean(conf.getBoolean(
-        HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED,
-        HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED_DEFAULT));
-    // Pipeline creation is only allowed after the safemode prechecks have
-    // passed, eg sufficient nodes have registered.
-    this.pipelineCreationAllowed = new AtomicBoolean(!this.isInSafeMode.get());
   }
 
   public static PipelineManagerV2Impl newPipelineManager(
@@ -118,7 +108,8 @@ public final class PipelineManagerV2Impl implements PipelineManager {
       NodeManager nodeManager,
       Table<PipelineID, Pipeline> pipelineStore,
       EventPublisher eventPublisher,
-      SCMContext scmContext) throws IOException {
+      SCMContext scmContext,
+      SCMServiceManager serviceManager) throws IOException {
     // Create PipelineStateManager
     StateManager stateManager = PipelineStateManagerV2Impl
         .newBuilder().setPipelineStore(pipelineStore)
@@ -130,18 +121,18 @@ public final class PipelineManagerV2Impl implements PipelineManager {
     // Create PipelineFactory
     PipelineFactory pipelineFactory = new PipelineFactory(
         nodeManager, stateManager, conf, eventPublisher, scmContext);
+
     // Create PipelineManager
     PipelineManagerV2Impl pipelineManager = new PipelineManagerV2Impl(conf,
         scmhaManager, nodeManager, stateManager, pipelineFactory,
-        eventPublisher);
+        eventPublisher, scmContext);
 
     // Create background thread.
-    Scheduler scheduler = new Scheduler(
-        "RatisPipelineUtilsThread", false, 1);
-    BackgroundPipelineCreator backgroundPipelineCreator =
-        new BackgroundPipelineCreator(pipelineManager, scheduler, conf);
+    BackgroundPipelineCreatorV2 backgroundPipelineCreator =
+        new BackgroundPipelineCreatorV2(
+            pipelineManager, conf, serviceManager, scmContext);
+
     pipelineManager.setBackgroundPipelineCreator(backgroundPipelineCreator);
-    pipelineManager.setScheduler(scheduler);
 
     return pipelineManager;
   }
@@ -385,17 +376,15 @@ public final class PipelineManagerV2Impl implements PipelineManager {
    */
   @Override
   public void startPipelineCreator() {
-    backgroundPipelineCreator.startFixedIntervalPipelineCreator();
+    throw new RuntimeException("Not supported in HA code.");
   }
 
   /**
    * Triggers pipeline creation after the specified time.
    */
   @Override
-  public void triggerPipelineCreation() throws NotLeaderException {
-    // TODO add checkLeader once follower validates safemode
-    // before it becomes leader.
-    backgroundPipelineCreator.triggerPipelineCreation();
+  public void triggerPipelineCreation() {
+    throw new RuntimeException("Not supported in HA code.");
   }
 
   @Override
@@ -497,14 +486,13 @@ public final class PipelineManagerV2Impl implements PipelineManager {
    */
   @Override
   public boolean getSafeModeStatus() {
-    return this.isInSafeMode.get();
+    return scmContext.isInSafeMode();
   }
 
   @Override
   public void close() throws IOException {
-    if (scheduler != null) {
-      scheduler.close();
-      scheduler = null;
+    if (backgroundPipelineCreator != null) {
+      backgroundPipelineCreator.stop();
     }
 
     if(pmInfoBean != null) {
@@ -523,40 +511,9 @@ public final class PipelineManagerV2Impl implements PipelineManager {
     }
   }
 
-  @Override
-  public void onMessage(SCMSafeModeManager.SafeModeStatus status,
-                        EventPublisher publisher) {
-    // TODO: #CLUTIL - handle safemode getting re-enabled
-    boolean currentAllowPipelines =
-        pipelineCreationAllowed.getAndSet(status.isPreCheckComplete());
-    boolean currentlyInSafeMode =
-        isInSafeMode.getAndSet(status.isInSafeMode());
-
-    // Trigger pipeline creation only if the preCheck status has changed to
-    // complete.
-
-    try {
-      if (isPipelineCreationAllowed() && !currentAllowPipelines) {
-        triggerPipelineCreation();
-      }
-      // Start the pipeline creation thread only when safemode switches off
-      if (!getSafeModeStatus() && currentlyInSafeMode) {
-        startPipelineCreator();
-      }
-    } catch (NotLeaderException ex) {
-      LOG.warn("Not leader SCM, cannot process pipeline creation.");
-    }
-
-  }
-
   @VisibleForTesting
   public boolean isPipelineCreationAllowed() {
-    return pipelineCreationAllowed.get();
-  }
-
-  @VisibleForTesting
-  public void allowPipelineCreation() {
-    this.pipelineCreationAllowed.set(true);
+    return scmContext.isLeader() && scmContext.isPreCheckComplete();
   }
 
   @VisibleForTesting
@@ -576,12 +533,13 @@ public final class PipelineManagerV2Impl implements PipelineManager {
   }
 
   private void setBackgroundPipelineCreator(
-      BackgroundPipelineCreator backgroundPipelineCreator) {
+      BackgroundPipelineCreatorV2 backgroundPipelineCreator) {
     this.backgroundPipelineCreator = backgroundPipelineCreator;
   }
 
-  private void setScheduler(Scheduler scheduler) {
-    this.scheduler = scheduler;
+  @VisibleForTesting
+  public BackgroundPipelineCreatorV2 getBackgroundPipelineCreator() {
+    return this.backgroundPipelineCreator;
   }
 
   private void recordMetricsForPipeline(Pipeline pipeline) {

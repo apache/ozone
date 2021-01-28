@@ -81,7 +81,7 @@ public class CloseContainerEventHandler implements EventHandler<ContainerID> {
       if (container.getState() == LifeCycleState.CLOSING) {
         SCMCommand<?> command = new CloseContainerCommand(
             containerID.getId(), container.getPipelineID());
-        command.setTerm(scmContext.getTerm());
+        command.setTerm(scmContext.getTermOfLeader());
 
         getNodes(container).forEach(node ->
             publisher.fireEvent(DATANODE_COMMAND,

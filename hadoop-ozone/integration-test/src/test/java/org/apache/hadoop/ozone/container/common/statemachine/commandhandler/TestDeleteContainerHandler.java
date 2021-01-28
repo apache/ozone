@@ -136,7 +136,7 @@ public class TestDeleteContainerHandler {
     SCMCommand<?> command = new CloseContainerCommand(
         containerId.getId(), pipeline.getId());
     command.setTerm(
-        cluster.getStorageContainerManager().getScmContext().getTerm());
+        cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
     nodeManager.addDatanodeCommand(datanodeDetails.getUuid(), command);
 
     GenericTestUtils.waitFor(() ->
@@ -154,7 +154,7 @@ public class TestDeleteContainerHandler {
     // send delete container to the datanode
     command = new DeleteContainerCommand(containerId.getId(), false);
     command.setTerm(
-        cluster.getStorageContainerManager().getScmContext().getTerm());
+        cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
     nodeManager.addDatanodeCommand(datanodeDetails.getUuid(), command);
 
     GenericTestUtils.waitFor(() ->
@@ -192,7 +192,7 @@ public class TestDeleteContainerHandler {
     SCMCommand<?> command = new DeleteContainerCommand(
         containerId.getId(), false);
     command.setTerm(
-        cluster.getStorageContainerManager().getScmContext().getTerm());
+        cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
     nodeManager.addDatanodeCommand(datanodeDetails.getUuid(), command);
 
     // Here it should not delete it, and the container should exist in the
@@ -216,7 +216,7 @@ public class TestDeleteContainerHandler {
     // container
     command = new DeleteContainerCommand(containerId.getId(), true);
     command.setTerm(
-        cluster.getStorageContainerManager().getScmContext().getTerm());
+        cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
     nodeManager.addDatanodeCommand(datanodeDetails.getUuid(), command);
 
     GenericTestUtils.waitFor(() ->

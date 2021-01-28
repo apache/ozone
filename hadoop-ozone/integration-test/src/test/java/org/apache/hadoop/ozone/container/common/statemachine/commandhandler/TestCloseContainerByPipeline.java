@@ -147,7 +147,7 @@ public class TestCloseContainerByPipeline {
     SCMCommand<?> command = new CloseContainerCommand(
         containerID, pipeline.getId());
     command.setTerm(
-        cluster.getStorageContainerManager().getScmContext().getTerm());
+        cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
     cluster.getStorageContainerManager().getScmNodeManager()
         .addDatanodeCommand(datanodeDetails.getUuid(), command);
     GenericTestUtils
@@ -198,7 +198,7 @@ public class TestCloseContainerByPipeline {
     SCMCommand<?> command = new CloseContainerCommand(
         containerID, pipeline.getId());
     command.setTerm(
-        cluster.getStorageContainerManager().getScmContext().getTerm());
+        cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
     cluster.getStorageContainerManager().getScmNodeManager()
         .addDatanodeCommand(datanodeDetails.getUuid(), command);
 
@@ -251,8 +251,8 @@ public class TestCloseContainerByPipeline {
       //send the order to close the container
       SCMCommand<?> command = new CloseContainerCommand(
           containerID, pipeline.getId());
-      command.setTerm(
-          cluster.getStorageContainerManager().getScmContext().getTerm());
+      command.setTerm(cluster.getStorageContainerManager()
+          .getScmContext().getTermOfLeader());
       cluster.getStorageContainerManager().getScmNodeManager()
           .addDatanodeCommand(details.getUuid(), command);
       int index = cluster.getHddsDatanodeIndex(details);
@@ -332,7 +332,7 @@ public class TestCloseContainerByPipeline {
     SCMCommand<?> command = new CloseContainerCommand(
         containerID, pipeline.getId(), true);
     command.setTerm(
-        cluster.getStorageContainerManager().getScmContext().getTerm());
+        cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
     cluster.getStorageContainerManager().getScmNodeManager()
         .addDatanodeCommand(datanodeDetails.getUuid(), command);
     GenericTestUtils

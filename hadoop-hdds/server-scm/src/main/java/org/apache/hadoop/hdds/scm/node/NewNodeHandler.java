@@ -21,11 +21,12 @@ package org.apache.hadoop.hdds.scm.node;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.ha.SCMService.Event;
+import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,32 +40,33 @@ public class NewNodeHandler implements EventHandler<DatanodeDetails> {
   private final PipelineManager pipelineManager;
   private final NodeDecommissionManager decommissionManager;
   private final ConfigurationSource conf;
+  private final SCMServiceManager serviceManager;
 
   public NewNodeHandler(PipelineManager pipelineManager,
       NodeDecommissionManager decommissionManager,
-      ConfigurationSource conf) {
+      ConfigurationSource conf,
+      SCMServiceManager serviceManager) {
     this.pipelineManager = pipelineManager;
     this.decommissionManager = decommissionManager;
     this.conf = conf;
+    this.serviceManager = serviceManager;
   }
 
   @Override
   public void onMessage(DatanodeDetails datanodeDetails,
       EventPublisher publisher) {
     try {
-      pipelineManager.triggerPipelineCreation();
+      serviceManager.notifyEventTriggered(Event.NEW_NODE_HANDLER_TRIGGERED);
+
       if (datanodeDetails.getPersistedOpState()
           != HddsProtos.NodeOperationalState.IN_SERVICE) {
         decommissionManager.continueAdminForNode(datanodeDetails);
       }
-    }catch (NodeNotFoundException  e) {
+    } catch (NodeNotFoundException e) {
       // Should not happen, as the node has just registered to call this event
       // handler.
       LOG.warn("NodeNotFound when adding the node to the decommissionManager",
           e);
-    } catch (NotLeaderException nle) {
-      LOG.debug("Not the current leader SCM and cannot start pipeline" +
-          " creation.");
     }
   }
 }

@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
 import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
@@ -62,6 +63,8 @@ public class TestOneReplicaPipelineSafeModeRule {
   private OneReplicaPipelineSafeModeRule rule;
   private PipelineManagerV2Impl pipelineManager;
   private EventQueue eventQueue;
+  private SCMServiceManager serviceManager;
+  private SCMContext scmContext;
   private MockNodeManager mockNodeManager;
 
   private void setup(int nodes, int pipelineFactorThreeCount,
@@ -79,6 +82,8 @@ public class TestOneReplicaPipelineSafeModeRule {
     mockNodeManager = new MockNodeManager(true, nodes);
 
     eventQueue = new EventQueue();
+    serviceManager = new SCMServiceManager();
+    scmContext = SCMContext.emptyContext();
 
     SCMMetadataStore scmMetadataStore =
             new SCMMetadataStoreImpl(ozoneConfiguration);
@@ -89,8 +94,8 @@ public class TestOneReplicaPipelineSafeModeRule {
         mockNodeManager,
         scmMetadataStore.getPipelineTable(),
         eventQueue,
-        SCMContext.emptyContext());
-    pipelineManager.allowPipelineCreation();
+        scmContext,
+        serviceManager);
 
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(mockNodeManager,
@@ -105,7 +110,7 @@ public class TestOneReplicaPipelineSafeModeRule {
 
     SCMSafeModeManager scmSafeModeManager =
         new SCMSafeModeManager(ozoneConfiguration, containers,
-            pipelineManager, eventQueue);
+            pipelineManager, eventQueue, serviceManager, scmContext);
 
     rule = scmSafeModeManager.getOneReplicaPipelineSafeModeRule();
   }

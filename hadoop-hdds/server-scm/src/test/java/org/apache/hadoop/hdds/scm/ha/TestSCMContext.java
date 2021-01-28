@@ -34,33 +34,43 @@ public class TestSCMContext {
   @Test
   public void testRaftOperations() {
     // start as follower
-    SCMContext scmContext = new SCMContext(false, 0, null, null);
+    SCMContext scmContext =
+        new SCMContext.Builder().setLeader(false).setTerm(0).build();
+
     assertFalse(scmContext.isLeader());
 
     // become leader
-    scmContext.updateIsLeaderAndTerm(true, 10);
+    scmContext.updateLeaderAndTerm(true, 10);
     assertTrue(scmContext.isLeader());
     try {
-      assertEquals(scmContext.getTerm(), 10);
+      assertEquals(scmContext.getTermOfLeader(), 10);
     } catch (NotLeaderException e) {
       fail("Should not throw nle.");
     }
 
     // step down
-    scmContext.updateIsLeaderAndTerm(false, 0);
+    scmContext.updateLeaderAndTerm(false, 0);
     assertFalse(scmContext.isLeader());
   }
 
   @Test
   public void testSafeModeOperations() {
     // in safe mode
-    SCMContext scmContext = new SCMContext(
-        true, 0, new SafeModeStatus(true, false), null);
+    SCMContext scmContext = new SCMContext.Builder()
+        .setIsInSafeMode(true)
+        .setIsPreCheckComplete(false)
+        .build();
+
     assertTrue(scmContext.isInSafeMode());
     assertFalse(scmContext.isPreCheckComplete());
 
+    // in safe mode, pass preCheck
+    scmContext.updateSafeModeStatus(new SafeModeStatus(true, true));
+    assertTrue(scmContext.isInSafeMode());
+    assertTrue(scmContext.isPreCheckComplete());
+
     // out of safe mode
-    scmContext.onMessage(new SafeModeStatus(false, true), null);
+    scmContext.updateSafeModeStatus(new SafeModeStatus(false, true));
     assertFalse(scmContext.isInSafeMode());
     assertTrue(scmContext.isPreCheckComplete());
   }

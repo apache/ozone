@@ -73,6 +73,7 @@ import org.apache.hadoop.hdds.scm.container.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
@@ -647,10 +648,16 @@ public class TestStorageContainerManager {
           dnUuid, closeContainerCommand);
 
       GenericTestUtils.waitFor(() -> {
-        return replicationManager.isRunning();
+        SCMContext scmContext
+            = cluster.getStorageContainerManager().getScmContext();
+        return !scmContext.isInSafeMode() && scmContext.isLeader();
       }, 1000, 25000);
 
+      // After safe mode is off, ReplicationManager starts to run with a delay.
+      Thread.sleep(5000);
       // Give ReplicationManager some time to process the containers.
+      cluster.getStorageContainerManager()
+          .getReplicationManager().processContainersNow();
       Thread.sleep(5000);
 
       verify(publisher).fireEvent(eq(SCMEvents.DATANODE_COMMAND), argThat(new

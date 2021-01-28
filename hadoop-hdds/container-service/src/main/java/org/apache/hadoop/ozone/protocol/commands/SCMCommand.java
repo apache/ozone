@@ -32,11 +32,9 @@ public abstract class SCMCommand<T extends GeneratedMessage> implements
     IdentifiableEventPayload {
   private final long id;
 
-  // Under HA mode, holds term of underlying RaftServer iff current
-  // SCM is a leader, otherwise, holds term 0.
-  // Notes that, the first elected leader is from term 1, term 0,
-  // as the initial value of currentTerm, is never used under HA mode.
-  private long term = 0;
+  // If running upon Ratis, holds term of underlying RaftServer iff current
+  // SCM is a leader. If running without Ratis, holds SCMContext.INVALID_TERM.
+  private long term;
 
   SCMCommand() {
     this.id = HddsIdFactory.getLongId();

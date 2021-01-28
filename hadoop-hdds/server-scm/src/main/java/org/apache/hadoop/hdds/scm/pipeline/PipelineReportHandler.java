@@ -103,7 +103,7 @@ public class PipelineReportHandler implements
       pipeline = pipelineManager.getPipeline(pipelineID);
     } catch (PipelineNotFoundException e) {
       SCMCommand<?> command = new ClosePipelineCommand(pipelineID);
-      command.setTerm(scmContext.getTerm());
+      command.setTerm(scmContext.getTermOfLeader());
       publisher.fireEvent(SCMEvents.DATANODE_COMMAND,
           new CommandForDatanode<>(dn.getUuid(), command));
       return;

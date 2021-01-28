@@ -30,6 +30,8 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.ha.SCMService.Event;
+import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
 import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
@@ -80,6 +82,8 @@ public class TestCloseContainerEventHandler {
     scmContext = SCMContext.emptyContext();
     scmMetadataStore = new SCMMetadataStoreImpl(configuration);
 
+    SCMServiceManager serviceManager = new SCMServiceManager();
+
     pipelineManager =
         PipelineManagerV2Impl.newPipelineManager(
             configuration,
@@ -87,9 +91,9 @@ public class TestCloseContainerEventHandler {
             nodeManager,
             scmMetadataStore.getPipelineTable(),
             eventQueue,
-            scmContext);
+            scmContext,
+            serviceManager);
 
-    pipelineManager.allowPipelineCreation();
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
             pipelineManager.getStateManager(), configuration, eventQueue);
@@ -99,7 +103,10 @@ public class TestCloseContainerEventHandler {
         MockSCMHAManager.getInstance(true),
         pipelineManager,
         scmMetadataStore.getContainerTable());
-    pipelineManager.triggerPipelineCreation();
+
+    // trigger BackgroundPipelineCreator to take effect.
+    serviceManager.notifyEventTriggered(Event.PRE_CHECK_COMPLETED);
+
     eventQueue.addHandler(CLOSE_CONTAINER,
         new CloseContainerEventHandler(
             pipelineManager, containerManager, scmContext));

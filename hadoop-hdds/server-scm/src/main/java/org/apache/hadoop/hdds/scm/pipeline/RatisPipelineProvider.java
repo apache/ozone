@@ -163,7 +163,7 @@ public class RatisPipelineProvider extends PipelineProvider {
         new CreatePipelineCommand(pipeline.getId(), pipeline.getType(),
             factor, dns);
 
-    createCommand.setTerm(scmContext.getTerm());
+    createCommand.setTerm(scmContext.getTermOfLeader());
 
     dns.forEach(node -> {
       LOG.info("Sending CreatePipelineCommand for pipeline:{} to datanode:{}",
@@ -201,7 +201,7 @@ public class RatisPipelineProvider extends PipelineProvider {
   public void close(Pipeline pipeline) throws NotLeaderException {
     final ClosePipelineCommand closeCommand =
         new ClosePipelineCommand(pipeline.getId());
-    closeCommand.setTerm(scmContext.getTerm());
+    closeCommand.setTerm(scmContext.getTermOfLeader());
     pipeline.getNodes().forEach(node -> {
       final CommandForDatanode<?> datanodeCommand =
           new CommandForDatanode<>(node.getUuid(), closeCommand);

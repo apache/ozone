@@ -133,7 +133,9 @@ public class SCMStateMachine extends BaseStateMachine {
   @Override
   public void notifyNotLeader(Collection<TransactionContext> pendingEntries) {
     LOG.info("current leader SCM steps down.");
-    scm.getScmContext().updateIsLeaderAndTerm(false, 0);
+
+    scm.getScmContext().updateLeaderAndTerm(false, 0);
+    scm.getSCMServiceManager().notifyStatusChanged();
   }
 
   @Override
@@ -151,7 +153,9 @@ public class SCMStateMachine extends BaseStateMachine {
         .getCurrentTerm();
 
     LOG.info("current SCM becomes leader of term {}.", term);
-    scm.getScmContext().updateIsLeaderAndTerm(true, term);
+
+    scm.getScmContext().updateLeaderAndTerm(true, term);
+    scm.getSCMServiceManager().notifyStatusChanged();
   }
 
   @Override

@@ -20,10 +20,10 @@ package org.apache.hadoop.hdds.scm.node;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.scm.ha.SCMService.Event;
+import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,23 +35,19 @@ public class NonHealthyToHealthyNodeHandler
   private static final Logger LOG =
       LoggerFactory.getLogger(NonHealthyToHealthyNodeHandler.class);
 
-  private final PipelineManager pipelineManager;
   private final ConfigurationSource conf;
+  private final SCMServiceManager serviceManager;
 
   public NonHealthyToHealthyNodeHandler(
-      PipelineManager pipelineManager, OzoneConfiguration conf) {
-    this.pipelineManager = pipelineManager;
+      OzoneConfiguration conf,  SCMServiceManager serviceManager) {
     this.conf = conf;
+    this.serviceManager = serviceManager;
   }
 
   @Override
   public void onMessage(DatanodeDetails datanodeDetails,
       EventPublisher publisher) {
-    try {
-      pipelineManager.triggerPipelineCreation();
-    } catch (NotLeaderException ex) {
-      LOG.debug("Not the current leader SCM and cannot start pipeline" +
-          " creation.");
-    }
+    serviceManager.notifyEventTriggered(
+        Event.UNHEALTHY_TO_HEALTHY_NODE_HANDLER_TRIGGERED);
   }
 }
