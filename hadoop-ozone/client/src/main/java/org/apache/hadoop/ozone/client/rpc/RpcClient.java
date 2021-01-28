@@ -22,7 +22,6 @@ import javax.crypto.Cipher;
 import javax.crypto.CipherInputStream;
 import javax.crypto.CipherOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URI;
 import java.security.InvalidKeyException;
 import java.security.SecureRandom;
@@ -68,7 +67,8 @@ import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.LengthInputStream;
-import org.apache.hadoop.ozone.client.io.MpuKeyInputStream;
+import org.apache.hadoop.ozone.client.io.MultipartCryptoKeyInputStream;
+import org.apache.hadoop.ozone.client.io.OzoneCryptoInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
@@ -1207,51 +1207,54 @@ public class RpcClient implements ClientProtocol {
     // When Key is not MPU or when Key is MPU and encryption is not enabled
     // Need to revisit for GDP.
     FileEncryptionInfo feInfo = keyInfo.getFileEncryptionInfo();
-    if (!keyInfo.getLatestVersionLocations().isMultipartKey() ||
-        (keyInfo.getLatestVersionLocations().isMultipartKey() && feInfo == null)) {
+
+    if (feInfo == null) {
       LengthInputStream lengthInputStream = KeyInputStream
           .getFromOmKeyInfo(keyInfo, xceiverClientManager,
               clientConfig.isChecksumVerify(), retryFunction);
-      if (feInfo != null) {
-        final KeyProvider.KeyVersion decrypted = getDEK(feInfo);
-        final CryptoInputStream cryptoIn =
-            new CryptoInputStream(lengthInputStream.getWrappedStream(),
-                OzoneKMSUtil.getCryptoCodec(conf, feInfo),
-                decrypted.getMaterial(), feInfo.getIV());
-        return new OzoneInputStream(cryptoIn);
-      } else {
-        try {
-          GDPRSymmetricKey gk;
-          Map< String, String > keyInfoMetadata = keyInfo.getMetadata();
-          if (Boolean.valueOf(keyInfoMetadata.get(OzoneConsts.GDPR_FLAG))) {
-            gk = new GDPRSymmetricKey(
-                keyInfoMetadata.get(OzoneConsts.GDPR_SECRET),
-                keyInfoMetadata.get(OzoneConsts.GDPR_ALGORITHM)
-            );
-            gk.getCipher().init(Cipher.DECRYPT_MODE, gk.getSecretKey());
-            return new OzoneInputStream(
-                new CipherInputStream(lengthInputStream, gk.getCipher()));
-          }
-        } catch (Exception ex) {
-          throw new IOException(ex);
+      try {
+        Map< String, String > keyInfoMetadata = keyInfo.getMetadata();
+        if (Boolean.valueOf(keyInfoMetadata.get(OzoneConsts.GDPR_FLAG))) {
+          GDPRSymmetricKey gk = new GDPRSymmetricKey(
+              keyInfoMetadata.get(OzoneConsts.GDPR_SECRET),
+              keyInfoMetadata.get(OzoneConsts.GDPR_ALGORITHM)
+          );
+          gk.getCipher().init(Cipher.DECRYPT_MODE, gk.getSecretKey());
+          return new OzoneInputStream(
+              new CipherInputStream(lengthInputStream, gk.getCipher()));
         }
-        return new OzoneInputStream(lengthInputStream.getWrappedStream());
+      } catch (Exception ex) {
+        throw new IOException(ex);
       }
+      return new OzoneInputStream(lengthInputStream.getWrappedStream());
+    } else if (!keyInfo.getLatestVersionLocations().isMultipartKey()) {
+      // Regular Key with FileEncryptionInfo
+      LengthInputStream lengthInputStream = KeyInputStream
+          .getFromOmKeyInfo(keyInfo, xceiverClientManager,
+              clientConfig.isChecksumVerify(), retryFunction);
+      final KeyProvider.KeyVersion decrypted = getDEK(feInfo);
+      final CryptoInputStream cryptoIn =
+          new CryptoInputStream(lengthInputStream.getWrappedStream(),
+              OzoneKMSUtil.getCryptoCodec(conf, feInfo),
+              decrypted.getMaterial(), feInfo.getIV());
+      return new OzoneInputStream(cryptoIn);
     } else {
+      // Multipart Key with FileEncryptionInfo
       List<LengthInputStream> lengthInputStreams = KeyInputStream
           .getStreamsFromKeyInfo(keyInfo, xceiverClientManager,
               clientConfig.isChecksumVerify(), retryFunction);
       final KeyProvider.KeyVersion decrypted = getDEK(feInfo);
 
-      List<CryptoInputStream> cryptoInputStreams = new ArrayList<>();
-      for(InputStream lengthInputStream : lengthInputStreams) {
-        final CryptoInputStream cryptoIn =
-            new CryptoInputStream(((LengthInputStream) lengthInputStream).getWrappedStream(),
+      List<OzoneCryptoInputStream> cryptoInputStreams = new ArrayList<>();
+      for(LengthInputStream lengthInputStream : lengthInputStreams) {
+        final OzoneCryptoInputStream ozoneCryptoInputStream =
+            new OzoneCryptoInputStream(lengthInputStream,
                 OzoneKMSUtil.getCryptoCodec(conf, feInfo),
                 decrypted.getMaterial(), feInfo.getIV());
-        cryptoInputStreams.add(cryptoIn);
+        cryptoInputStreams.add(ozoneCryptoInputStream);
       }
-      return new MpuKeyInputStream(cryptoInputStreams, lengthInputStreams);
+      return new MultipartCryptoKeyInputStream(keyInfo.getKeyName(),
+          cryptoInputStreams);
     }
   }
 

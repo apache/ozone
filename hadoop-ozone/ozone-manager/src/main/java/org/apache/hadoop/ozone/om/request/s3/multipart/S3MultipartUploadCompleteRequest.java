@@ -217,12 +217,12 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
 
           // Except for last part all parts should have minimum size.
           if (currentPartCount != partsListSize) {
-            if (currentPartKeyInfo.getDataSize() < OM_MULTIPART_MIN_SIZE) {
-              LOG.error("MultipartUpload: {} Part number: {} size {}  is less "
-                              + "than minimum part size {}", ozoneKey,
-                      partKeyInfo.getPartNumber(),
-                      currentPartKeyInfo.getDataSize(),
-                      OzoneConsts.OM_MULTIPART_MIN_SIZE);
+            if (currentPartKeyInfo.getDataSize() <
+                ozoneManager.getMinMultipartUploadPartSize()) {
+              LOG.error("MultipartUpload: {} Part number: {} size {}  is less" +
+                      " than minimum part size {}", ozoneKey,
+                  partKeyInfo.getPartNumber(), currentPartKeyInfo.getDataSize(),
+                  ozoneManager.getMinMultipartUploadPartSize());
               throw new OMException(
                   failureMessage(requestedVolume, requestedBucket, keyName) +
                   ". Entity too small.",

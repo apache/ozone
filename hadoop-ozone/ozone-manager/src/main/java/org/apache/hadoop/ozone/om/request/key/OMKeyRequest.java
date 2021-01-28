@@ -563,7 +563,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
 
         OmKeyInfo omKeyInfo =
-            omMetadataManager.getKeyTable().get(
+            omMetadataManager.getOpenKeyTable().get(
                 omMetadataManager.getMultipartKey(volumeName, bucketName,
                     keyArgs.getKeyName(), keyArgs.getMultipartUploadID()));
 
