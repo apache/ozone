@@ -54,6 +54,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 
 import org.junit.After;
 import org.junit.Assert;
@@ -102,7 +103,9 @@ public class TestReadRetries {
 
   @Parameterized.Parameters
   public static Collection<Object[]> data() {
-    return Arrays.asList(new Object[]{"V0"}, new Object[]{"V1"});
+    return Arrays.asList(
+            new Object[]{OMConfigKeys.OZONE_OM_LAYOUT_VERSION_DEFAULT},
+            new Object[]{OMConfigKeys.OZONE_OM_LAYOUT_VERSION_V1});
   }
 
   /**
@@ -113,8 +116,8 @@ public class TestReadRetries {
   public void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 1);
-    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
-    conf.set(OMConfigKeys.OZONE_OM_LAYOUT_VERSION, layoutVersion);
+    TestOMRequestUtils.configureFSOptimizedPaths(conf,
+            true, layoutVersion);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
         .setScmId(SCM_ID)
