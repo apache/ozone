@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.client.rpc;
 
-import com.google.common.base.Supplier;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -76,10 +75,7 @@ import static org.apache.hadoop.hdds.client.ReplicationType.STAND_ALONE;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.Timeout;
 
 /**
  * This class is to test all the public facing APIs of Ozone Client.

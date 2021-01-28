@@ -145,8 +145,8 @@ public final class OmKeyInfo extends WithObjectID {
    *
    * @param locationInfoList list of locationInfo
    */
-  public void updateLocationInfoList(List<OmKeyLocationInfo> locationInfoList
-      , boolean isMpu) {
+  public void updateLocationInfoList(List<OmKeyLocationInfo> locationInfoList,
+      boolean isMpu) {
     long latestVersion = getLatestVersionLocations().getVersion();
     OmKeyLocationInfoGroup keyLocationInfoGroup = getLatestVersionLocations();
 

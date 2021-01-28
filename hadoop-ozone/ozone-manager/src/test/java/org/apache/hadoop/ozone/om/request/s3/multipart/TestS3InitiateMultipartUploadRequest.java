@@ -132,7 +132,6 @@ public class TestS3InitiateMultipartUploadRequest
     Assert.assertNull(omMetadataManager.getOpenKeyTable().get(multipartKey));
     Assert.assertNull(omMetadataManager.getMultipartInfoTable()
         .get(multipartKey));
-
   }
 
   @Test
@@ -140,7 +139,6 @@ public class TestS3InitiateMultipartUploadRequest
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     String keyName = UUID.randomUUID().toString();
-
 
     OMRequest modifiedRequest = doPreExecuteInitiateMPU(volumeName, bucketName,
         keyName);
@@ -162,49 +160,5 @@ public class TestS3InitiateMultipartUploadRequest
     Assert.assertNull(omMetadataManager.getOpenKeyTable().get(multipartKey));
     Assert.assertNull(omMetadataManager.getMultipartInfoTable()
         .get(multipartKey));
-
-  }
-
-  @Test
-  public void testMPUNotSupported() throws Exception {
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
-    String keyName = UUID.randomUUID().toString();
-
-    when(ozoneManager.getKmsProvider())
-        .thenReturn(Mockito.mock(KeyProviderCryptoExtension.class));
-
-    TestOMRequestUtils.addVolumeToDB(volumeName, omMetadataManager);
-
-    // Set encryption info and create bucket
-    OmBucketInfo omBucketInfo =
-        OmBucketInfo.newBuilder().setVolumeName(volumeName)
-            .setBucketName(bucketName).setCreationTime(Time.now())
-            .setBucketEncryptionKey(new BucketEncryptionKeyInfo.Builder()
-                .setKeyName("dummy").setSuite(AES_CTR_NOPADDING)
-                .setVersion(ENCRYPTION_ZONES).build())
-            .build();
-
-    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
-
-    omMetadataManager.getBucketTable().put(bucketKey, omBucketInfo);
-
-    omMetadataManager.getBucketTable().addCacheEntry(new CacheKey<>(bucketKey),
-        new CacheValue<>(Optional.of(omBucketInfo), 100L));
-
-    OMRequest modifiedRequest = doPreExecuteInitiateMPU(volumeName, bucketName,
-        keyName);
-
-    OMClientRequest omClientRequest =
-        new S3InitiateMultipartUploadRequest(modifiedRequest);
-
-    OMClientResponse omClientResponse =
-        omClientRequest.validateAndUpdateCache(ozoneManager, 1L,
-        ozoneManagerDoubleBufferHelper);
-
-    Assert.assertNotNull(omClientResponse.getOMResponse());
-    Assert.assertEquals(NOT_SUPPORTED_OPERATION,
-        omClientResponse.getOMResponse().getStatus());
-
   }
 }

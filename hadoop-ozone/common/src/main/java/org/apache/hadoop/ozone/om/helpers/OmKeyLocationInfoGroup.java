@@ -122,7 +122,8 @@ public class OmKeyLocationInfoGroup {
         keyLocationList.getVersion(),
         keyLocationList.getKeyLocationsList().stream()
             .map(OmKeyLocationInfo::getFromProtobuf)
-            .collect(Collectors.groupingBy(OmKeyLocationInfo::getCreateVersion)),
+            .collect(Collectors.groupingBy(
+                OmKeyLocationInfo::getCreateVersion)),
         keyLocationList.getIsMultipartKey()
     );
   }

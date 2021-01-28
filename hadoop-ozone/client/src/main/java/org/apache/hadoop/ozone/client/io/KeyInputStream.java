@@ -22,7 +22,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -97,46 +99,40 @@ public class KeyInputStream extends InputStream
   }
 
   public static List<LengthInputStream> getStreamsFromKeyInfo(OmKeyInfo keyInfo,
-      XceiverClientFactory xceiverClientFactory,boolean verifyChecksum,
+      XceiverClientFactory xceiverClientFactory, boolean verifyChecksum,
       Function<OmKeyInfo, OmKeyInfo> retryFunction) {
     List<OmKeyLocationInfo> keyLocationInfos = keyInfo
         .getLatestVersionLocations().getBlocksLatestVersionOnly();
 
     List<LengthInputStream> lengthInputStreams = new ArrayList<>();
 
-    int partNumber = keyLocationInfos.get(0).getPartNumber();
+    // Iterate through each block info in keyLocationInfos and assign it the
+    // corresponding part in the partsToBlockMap. Also increment each part's
+    // length accordingly.
+    Map<Integer, List<OmKeyLocationInfo>> partsToBlocksMap = new HashMap<>();
+    Map<Integer, Long> partsLengthMap = new HashMap<>();
 
-    List<OmKeyLocationInfo> blocksInMpuPart = new ArrayList<>();
-    long partLength = 0;
     for (OmKeyLocationInfo omKeyLocationInfo: keyLocationInfos) {
-      if (partNumber == omKeyLocationInfo.getPartNumber()) {
-        blocksInMpuPart.add(omKeyLocationInfo);
-        partLength += omKeyLocationInfo.getLength();
-      } else {
-        // Create new stream for the part
-        KeyInputStream keyInputStream = new KeyInputStream();
-        keyInputStream.initialize(keyInfo, blocksInMpuPart,
-            xceiverClientFactory, verifyChecksum, retryFunction);
+      int partNumber = omKeyLocationInfo.getPartNumber();
 
-        lengthInputStreams.add(new LengthInputStream(keyInputStream,
-            partLength));
-
-        blocksInMpuPart = new ArrayList<>();
-        blocksInMpuPart.add(omKeyLocationInfo);
-        partNumber = omKeyLocationInfo.getPartNumber();
-
-        partLength = omKeyLocationInfo.getLength();
+      if (!partsToBlocksMap.containsKey(partNumber)) {
+        partsToBlocksMap.put(partNumber, new ArrayList<>());
+        partsLengthMap.put(partNumber, 0L);
       }
+      // Add Block to corresponding partNumber in partsToBlocksMap
+      partsToBlocksMap.get(partNumber).add(omKeyLocationInfo);
+      // Update the part length
+      partsLengthMap.put(partNumber,
+          partsLengthMap.get(partNumber) + omKeyLocationInfo.getLength());
     }
 
-    //Finally add last block
-    if (blocksInMpuPart != null) {
+    // Create a KeyInputStream for each part.
+    for ( int partNum : partsToBlocksMap.keySet()) {
       KeyInputStream keyInputStream = new KeyInputStream();
-      keyInputStream.initialize(keyInfo, blocksInMpuPart,
+      keyInputStream.initialize(keyInfo, partsToBlocksMap.get(partNum),
           xceiverClientFactory, verifyChecksum, retryFunction);
-
       lengthInputStreams.add(new LengthInputStream(keyInputStream,
-          partLength));
+          partsLengthMap.get(partNum)));
     }
 
     return lengthInputStreams;

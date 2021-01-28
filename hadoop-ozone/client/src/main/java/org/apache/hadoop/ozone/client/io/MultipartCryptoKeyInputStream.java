@@ -34,8 +34,8 @@ import java.util.List;
 public class MultipartCryptoKeyInputStream extends OzoneInputStream
     implements Seekable, CanUnbuffer {
 
-  private static Logger LOG = LoggerFactory.getLogger(
-      MultipartCryptoKeyInputStream.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(MultipartCryptoKeyInputStream.class);
 
   private static final int EOF = -1;
 

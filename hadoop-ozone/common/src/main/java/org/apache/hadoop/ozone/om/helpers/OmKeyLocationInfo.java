@@ -121,7 +121,7 @@ public final class OmKeyLocationInfo {
   }
 
   public int getPartNumber() {
-   return partNumber;
+    return partNumber;
   }
 
   /**
@@ -161,13 +161,14 @@ public final class OmKeyLocationInfo {
       return this;
     }
 
-    public Builder setPartNumber(int partNumber) {
-      this.partNumber = partNumber;
+    public Builder setPartNumber(int partNum) {
+      this.partNumber = partNum;
       return this;
     }
 
     public OmKeyLocationInfo build() {
-      return new OmKeyLocationInfo(blockID, pipeline, length, offset, token, partNumber);
+      return new OmKeyLocationInfo(blockID, pipeline, length, offset, token,
+          partNumber);
     }
   }
 
