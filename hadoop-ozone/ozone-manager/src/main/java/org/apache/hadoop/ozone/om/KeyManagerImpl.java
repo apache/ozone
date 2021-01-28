@@ -656,7 +656,7 @@ public class KeyManagerImpl implements KeyManager {
         bucketName);
     OmKeyInfo value = null;
     try {
-      if (OzoneManagerRatisUtils.isOmLayoutVersionV1()) {
+      if (OzoneManagerRatisUtils.isBucketFSOptimized()) {
         value = getOmKeyInfoV1(volumeName, bucketName, keyName);
       } else {
         value = getOmKeyInfo(volumeName, bucketName, keyName);
@@ -1798,7 +1798,7 @@ public class KeyManagerImpl implements KeyManager {
     String bucketName = args.getBucketName();
     String keyName = args.getKeyName();
 
-    if (OzoneManagerRatisUtils.isOmLayoutVersionV1()) {
+    if (OzoneManagerRatisUtils.isBucketFSOptimized()) {
       return getOzoneFileStatusV1(volumeName, bucketName, keyName,
               args.getSortDatanodes(), clientAddress, false);
     }
@@ -2067,7 +2067,7 @@ public class KeyManagerImpl implements KeyManager {
     String bucketName = args.getBucketName();
     String keyName = args.getKeyName();
     OzoneFileStatus fileStatus;
-    if (OzoneManagerRatisUtils.isOmLayoutVersionV1()) {
+    if (OzoneManagerRatisUtils.isBucketFSOptimized()) {
       fileStatus = getOzoneFileStatusV1(volumeName, bucketName, keyName,
               args.getSortDatanodes(), clientAddress, false);
     } else {
@@ -2172,7 +2172,7 @@ public class KeyManagerImpl implements KeyManager {
       return fileStatusList;
     }
 
-    if (OzoneManagerRatisUtils.isOmLayoutVersionV1()) {
+    if (OzoneManagerRatisUtils.isBucketFSOptimized()) {
       return listStatusV1(args, recursive, startKey, numEntries, clientAddress);
     }
 

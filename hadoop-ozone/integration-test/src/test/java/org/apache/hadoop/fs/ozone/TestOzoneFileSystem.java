@@ -50,6 +50,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.TrashPolicyOzone;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
+import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.test.GenericTestUtils;
 
@@ -96,9 +97,20 @@ public class TestOzoneFileSystem {
   }
 
   public TestOzoneFileSystem(boolean setDefaultFs, boolean enableOMRatis) {
-    this.enabledFileSystemPaths = setDefaultFs;
-    this.omRatisEnabled = enableOMRatis;
+    if (enabledFileSystemPaths != setDefaultFs ||
+            omRatisEnabled != enableOMRatis) {
+      enabledFileSystemPaths = setDefaultFs;
+      omRatisEnabled = enableOMRatis;
+      try {
+        teardown();
+        init();
+      } catch (Exception e) {
+        LOG.info("Unexpected exception", e);
+        fail("Unexpected exception:" + e.getMessage());
+      }
+    }
   }
+
   /**
    * Set a timeout for each test.
    */
@@ -108,6 +120,8 @@ public class TestOzoneFileSystem {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOzoneFileSystem.class);
 
+  @SuppressWarnings("checkstyle:VisibilityModifier")
+  protected static boolean isBucketFSOptimized = false;
   @SuppressWarnings("checkstyle:VisibilityModifier")
   protected static boolean enabledFileSystemPaths;
   @SuppressWarnings("checkstyle:VisibilityModifier")
@@ -132,8 +146,13 @@ public class TestOzoneFileSystem {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(FS_TRASH_INTERVAL_KEY, 1);
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
-    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
-            enabledFileSystemPaths);
+    if (isBucketFSOptimized) {
+      TestOMRequestUtils.configureFSOptimizedPaths(conf,
+              enabledFileSystemPaths, OMConfigKeys.OZONE_OM_LAYOUT_VERSION_V1);
+    } else {
+      conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
+              enabledFileSystemPaths);
+    }
     cluster = MiniOzoneCluster.newBuilder(conf)
             .setNumDatanodes(3)
             .build();
