@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
+import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.util.StringUtils;
 import org.junit.After;
 import org.junit.Assert;
@@ -149,7 +150,8 @@ public class TestOzoneDirectory {
           throws IOException, TimeoutException, InterruptedException {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(FS_TRASH_INTERVAL_KEY, 1);
-    conf.set(OMConfigKeys.OZONE_OM_LAYOUT_VERSION, "V1");
+    TestOMRequestUtils.configureFSOptimizedPaths(conf,
+            true, OMConfigKeys.OZONE_OM_LAYOUT_VERSION_V1);
     cluster = MiniOzoneCluster.newBuilder(conf)
             .setNumDatanodes(3)
             .build();
