@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.client;
 
 import java.io.IOException;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -307,15 +306,15 @@ public class OzoneVolume extends WithMetadata {
   /**
    * Acls to be set for given Ozone object. This operations reset ACL for
    * given object to list of ACLs provided in argument.
-   * @param acls List of acls.
+   * @param aclList List of acls.
    *
    * @throws IOException if there is error.
    * */
-  public boolean setAcl(List<OzoneAcl> acls) throws IOException {
-    boolean reset = proxy.setAcl(ozoneObj, acls);
+  public boolean setAcl(List<OzoneAcl> aclList) throws IOException {
+    boolean reset = proxy.setAcl(ozoneObj, aclList);
     if (reset) {
       acls.clear();
-      acls.addAll(acls);
+      acls.addAll(aclList);
     }
     return reset;
   }
