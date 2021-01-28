@@ -17,6 +17,7 @@
 Documentation       S3 gateway test with aws cli
 Library             OperatingSystem
 Library             String
+Library             DateTime
 Resource            ../commonlib.robot
 Resource            commonawslib.robot
 Test Timeout        5 minutes
@@ -274,13 +275,13 @@ Test Multipart Upload Put With Copy and range
 
                         Compare files           /tmp/part1        /tmp/part-result
 
-Test Multipart Upload Put With Copy and IfModifiedSince
+Test Multipart Upload Put With Copy and range with IfModifiedSince
     Run Keyword         Create Random file      10
-    ${beforeCreate} =   Execute and checkrc     date 0
+    ${curDate} =        Get Current Date
+    ${beforeCreate} =   Subtract Time From Date     ${curDate}  1 day
+    ${afterCreate} =    Add Time To Date        ${curDate}  1 day
 
     ${result} =         Execute AWSS3APICli     put-object --bucket ${BUCKET} --key ${PREFIX}/copyrange/source --body /tmp/part1
-
-    ${afterCreate} =    Execute and checkrc     date 0
 
     ${result} =         Execute AWSS3APICli     create-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/copyrange/destination
 
@@ -288,19 +289,19 @@ Test Multipart Upload Put With Copy and IfModifiedSince
                         Should contain           ${result}    ${BUCKET}
                         Should contain           ${result}    UploadId
 
-    ${result} =         Execute AWSS3APICli and checkrc     upload-part-copy --bucket ${BUCKET} --key ${PREFIX}/copyrange/destination --upload-id ${uploadID} --part-number 1 --copy-source ${BUCKET}/${PREFIX}/copyrange/source --copy-source-range bytes=0-10485757 --copy-source-if-modified-since ${afterCreate} 255
+    ${result} =         Execute AWSS3APICli and checkrc     upload-part-copy --bucket ${BUCKET} --key ${PREFIX}/copyrange/destination --upload-id ${uploadID} --part-number 1 --copy-source ${BUCKET}/${PREFIX}/copyrange/source --copy-source-range bytes=0-10485757 --copy-source-if-modified-since '${afterCreate}'    254
                         Should contain           ${result}    PreconditionFailed
 
-    ${result} =         Execute AWSS3APICli and checkrc     upload-part-copy --bucket ${BUCKET} --key ${PREFIX}/copyrange/destination --upload-id ${uploadID} --part-number 2 --copy-source ${BUCKET}/${PREFIX}/copyrange/source --copy-source-range bytes=10485758-10485759 --copy-source-if-unmodified-since ${beforeCreate} 255
+    ${result} =         Execute AWSS3APICli and checkrc     upload-part-copy --bucket ${BUCKET} --key ${PREFIX}/copyrange/destination --upload-id ${uploadID} --part-number 2 --copy-source ${BUCKET}/${PREFIX}/copyrange/source --copy-source-range bytes=10485758-10485759 --copy-source-if-unmodified-since '${beforeCreate}'  254
                         Should contain           ${result}    PreconditionFailed
 
-    ${result} =         Execute AWSS3APICli and checkrc     upload-part-copy --bucket ${BUCKET} --key ${PREFIX}/copyrange/destination --upload-id ${uploadID} --part-number 1 --copy-source ${BUCKET}/${PREFIX}/copyrange/source --copy-source-range bytes=0-10485757 --copy-source-if-modified-since ${beforeCreate} 0
+    ${result} =         Execute AWSS3APICli and checkrc     upload-part-copy --bucket ${BUCKET} --key ${PREFIX}/copyrange/destination --upload-id ${uploadID} --part-number 1 --copy-source ${BUCKET}/${PREFIX}/copyrange/source --copy-source-range bytes=0-10485757 --copy-source-if-modified-since '${beforeCreate}'   0
                         Should contain           ${result}    ETag
                         Should contain           ${result}    LastModified
 
     ${eTag1} =          Execute and checkrc      echo '${result}' | jq -r '.CopyPartResult.ETag'   0
 
-    ${result} =         Execute AWSS3APICli and checkrc     upload-part-copy --bucket ${BUCKET} --key ${PREFIX}/copyrange/destination --upload-id ${uploadID} --part-number 2 --copy-source ${BUCKET}/${PREFIX}/copyrange/source --copy-source-range bytes=10485758-10485759 --copy-source-if-unmodified-since ${afterCreate} 0
+    ${result} =         Execute AWSS3APICli and checkrc     upload-part-copy --bucket ${BUCKET} --key ${PREFIX}/copyrange/destination --upload-id ${uploadID} --part-number 2 --copy-source ${BUCKET}/${PREFIX}/copyrange/source --copy-source-range bytes=10485758-10485759 --copy-source-if-unmodified-since '${afterCreate}'   0
                         Should contain           ${result}    ETag
                         Should contain           ${result}    LastModified
 
