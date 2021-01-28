@@ -196,8 +196,9 @@ public class OMKeyCreateRequestV1 extends OMKeyCreateRequest {
 
       // Prepare response. Sets user given full key name in the 'keyName'
       // attribute in response object.
+      int clientVersion = getOmRequest().getVersion();
       omResponse.setCreateKeyResponse(CreateKeyResponse.newBuilder()
-              .setKeyInfo(omFileInfo.getProtobuf(keyName))
+              .setKeyInfo(omFileInfo.getProtobuf(keyName, clientVersion))
               .setID(clientID)
               .setOpenVersion(openVersion).build())
               .setCmdType(Type.CreateKey);

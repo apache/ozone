@@ -239,7 +239,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
 
   @Override
   public Table<String, OmKeyInfo> getKeyTable() {
-    if (OzoneManagerRatisUtils.isOmLayoutVersionV1()) {
+    if (OzoneManagerRatisUtils.isBucketFSOptimized()) {
       return fileTable;
     }
     return keyTable;
@@ -252,7 +252,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
 
   @Override
   public Table<String, OmKeyInfo> getOpenKeyTable() {
-    if (OzoneManagerRatisUtils.isOmLayoutVersionV1()) {
+    if (OzoneManagerRatisUtils.isBucketFSOptimized()) {
       return openFileTable;
     }
     return openKeyTable;
