@@ -41,10 +41,12 @@ import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
+import org.apache.hadoop.hdds.scm.ha.DBTransactionBuffer;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.UniqueId;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 
@@ -52,6 +54,7 @@ import com.google.common.collect.Lists;
 import static java.lang.Math.min;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_MAX_RETRY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_MAX_RETRY_DEFAULT;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,7 +68,7 @@ import org.slf4j.LoggerFactory;
  * equally same chance to be retrieved which only depends on the nature
  * order of the transaction ID.
  */
-public class DeletedBlockLogImpl
+public class DeletedBlockLogImplV2
     implements DeletedBlockLog, EventHandler<DeleteBlockStatus> {
 
   public static final Logger LOG =
@@ -73,18 +76,23 @@ public class DeletedBlockLogImpl
 
   private final int maxRetry;
   private final ContainerManagerV2 containerManager;
-  private final SCMMetadataStore scmMetadataStore;
   private final Lock lock;
   // Maps txId to set of DNs which are successful in committing the transaction
   private Map<Long, Set<UUID>> transactionToDNsCommitMap;
+  // The access to DeletedBlocksTXTable is protected by
+  // DeletedBlockLogStateManager.
+  private final DeletedBlockLogStateManager deletedBlockLogStateManager;
+  private final SCMContext scmContext;
 
-  public DeletedBlockLogImpl(ConfigurationSource conf,
-                             ContainerManagerV2 containerManager,
-                             SCMMetadataStore scmMetadataStore) {
+  public DeletedBlockLogImplV2(ConfigurationSource conf,
+      ContainerManagerV2 containerManager,
+      SCMRatisServer ratisServer,
+      Table<Long, DeletedBlocksTransaction> deletedBlocksTXTable,
+      DBTransactionBuffer dbTxBuffer,
+      SCMContext scmContext) {
     maxRetry = conf.getInt(OZONE_SCM_BLOCK_DELETION_MAX_RETRY,
         OZONE_SCM_BLOCK_DELETION_MAX_RETRY_DEFAULT);
     this.containerManager = containerManager;
-    this.scmMetadataStore = scmMetadataStore;
     this.lock = new ReentrantLock();
 
     // transactionToDNsCommitMap is updated only when
@@ -92,6 +100,14 @@ public class DeletedBlockLogImpl
 
     // maps transaction to dns which have committed it.
     transactionToDNsCommitMap = new ConcurrentHashMap<>();
+    this.deletedBlockLogStateManager = DeletedBlockLogStateManagerImpl
+        .newBuilder()
+        .setConfiguration(conf)
+        .setDeletedBlocksTable(deletedBlocksTXTable)
+        .setRatisServer(ratisServer)
+        .setSCMDBTransactionBuffer(dbTxBuffer)
+        .build();
+    this.scmContext = scmContext;
   }
 
 
@@ -103,7 +119,7 @@ public class DeletedBlockLogImpl
       final List<DeletedBlocksTransaction> failedTXs = Lists.newArrayList();
       try (TableIterator<Long,
           ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> iter =
-               scmMetadataStore.getDeletedBlocksTXTable().iterator()) {
+               deletedBlockLogStateManager.getReadOnlyIterator()) {
         while (iter.hasNext()) {
           DeletedBlocksTransaction delTX = iter.next().getValue();
           if (delTX.getCount() == -1) {
@@ -125,47 +141,18 @@ public class DeletedBlockLogImpl
    */
   @Override
   public void incrementCount(List<Long> txIDs) throws IOException {
-    for (Long txID : txIDs) {
-      lock.lock();
-      try {
-        DeletedBlocksTransaction block =
-            scmMetadataStore.getDeletedBlocksTXTable().get(txID);
-        if (block == null) {
-          if (LOG.isDebugEnabled()) {
-            // This can occur due to race condition between retry and old
-            // service task where old task removes the transaction and the new
-            // task is resending
-            LOG.debug("Deleted TXID {} not found.", txID);
-          }
-          continue;
-        }
-        DeletedBlocksTransaction.Builder builder = block.toBuilder();
-        int currentCount = block.getCount();
-        if (currentCount > -1) {
-          builder.setCount(++currentCount);
-        }
-        // if the retry time exceeds the maxRetry value
-        // then set the retry value to -1, stop retrying, admins can
-        // analyze those blocks and purge them manually by SCMCli.
-        if (currentCount > maxRetry) {
-          builder.setCount(-1);
-        }
-        scmMetadataStore.getDeletedBlocksTXTable().put(txID,
-            builder.build());
-      } catch (IOException ex) {
-        LOG.warn("Cannot increase count for txID " + txID, ex);
-        // We do not throw error here, since we don't want to abort the loop.
-        // Just log and continue processing the rest of txids.
-      } finally {
-        lock.unlock();
-      }
+    lock.lock();
+    try {
+      deletedBlockLogStateManager
+          .increaseRetryCountOfTransactionInDB(new ArrayList<>(txIDs));
+    } finally {
+      lock.unlock();
     }
   }
 
 
-  private DeletedBlocksTransaction constructNewTransaction(long txID,
-                                                           long containerID,
-                                                           List<Long> blocks) {
+  private DeletedBlocksTransaction constructNewTransaction(
+      long txID, long containerID, List<Long> blocks) {
     return DeletedBlocksTransaction.newBuilder()
         .setTxID(txID)
         .setContainerID(containerID)
@@ -187,6 +174,7 @@ public class DeletedBlockLogImpl
       List<DeleteBlockTransactionResult> transactionResults, UUID dnID) {
     lock.lock();
     try {
+      ArrayList<Long> txIDsToBeDeleted = new ArrayList<>();
       Set<UUID> dnsWithCommittedTxn;
       for (DeleteBlockTransactionResult transactionResult :
           transactionResults) {
@@ -229,7 +217,7 @@ public class DeletedBlockLogImpl
               if (LOG.isDebugEnabled()) {
                 LOG.debug("Purging txId={} from block deletion log", txID);
               }
-              scmMetadataStore.getDeletedBlocksTXTable().delete(txID);
+              txIDsToBeDeleted.add(txID);
             }
           }
           if (LOG.isDebugEnabled()) {
@@ -240,6 +228,12 @@ public class DeletedBlockLogImpl
           LOG.warn("Could not commit delete block transaction: " +
               transactionResult.getTxID(), e);
         }
+      }
+      try {
+        deletedBlockLogStateManager.removeTransactionsFromDB(txIDsToBeDeleted);
+      } catch (IOException e) {
+        LOG.warn("Could not commit delete block transactions: "
+            + txIDsToBeDeleted, e);
       }
     } finally {
       lock.unlock();
@@ -267,7 +261,7 @@ public class DeletedBlockLogImpl
       final AtomicInteger num = new AtomicInteger(0);
       try (TableIterator<Long,
           ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> iter =
-               scmMetadataStore.getDeletedBlocksTXTable().iterator()) {
+               deletedBlockLogStateManager.getReadOnlyIterator()) {
         while (iter.hasNext()) {
           DeletedBlocksTransaction delTX = iter.next().getValue();
           if (delTX.getCount() > -1) {
@@ -282,6 +276,22 @@ public class DeletedBlockLogImpl
   }
 
   /**
+   * Called in SCMStateMachine#notifyLeaderChanged when current SCM becomes
+   *  leader.
+   */
+  public void clearTransactionToDNsCommitMap() {
+    transactionToDNsCommitMap.clear();
+  }
+
+  /**
+   * Called in SCMDBTransactionBuffer#flush when the cached deleting operations
+   * are flushed.
+   */
+  public void onFlush() {
+    deletedBlockLogStateManager.onFlush();
+  }
+
+  /**
    * {@inheritDoc}
    *
    * @param containerBlocksMap a map of containerBlocks.
@@ -292,18 +302,17 @@ public class DeletedBlockLogImpl
       throws IOException {
     lock.lock();
     try {
-      try(BatchOperation batch =
-          scmMetadataStore.getStore().initBatchOperation()) {
-        for (Map.Entry< Long, List< Long > > entry :
-            containerBlocksMap.entrySet()) {
-          long nextTXID = scmMetadataStore.getNextDeleteBlockTXID();
-          DeletedBlocksTransaction tx = constructNewTransaction(nextTXID,
-              entry.getKey(), entry.getValue());
-          scmMetadataStore.getDeletedBlocksTXTable().putWithBatch(batch,
-              nextTXID, tx);
-        }
-        scmMetadataStore.getStore().commitBatchOperation(batch);
+      ArrayList<DeletedBlocksTransaction> txsToBeAdded = new ArrayList<>();
+      for (Map.Entry< Long, List< Long > > entry :
+          containerBlocksMap.entrySet()) {
+        // TODO(runzhiwang): Should use distributed sequence id generator
+        long nextTXID = UniqueId.next();
+        DeletedBlocksTransaction tx = constructNewTransaction(nextTXID,
+            entry.getKey(), entry.getValue());
+        txsToBeAdded.add(tx);
       }
+
+      deletedBlockLogStateManager.addTransactionsToDB(txsToBeAdded);
     } finally {
       lock.unlock();
     }
@@ -343,10 +352,9 @@ public class DeletedBlockLogImpl
           new DatanodeDeletedBlockTransactions();
       try (TableIterator<Long,
           ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> iter =
-               scmMetadataStore.getDeletedBlocksTXTable().iterator()) {
+               deletedBlockLogStateManager.getReadOnlyIterator()) {
         int numBlocksAdded = 0;
-        List<DeletedBlocksTransaction> txnsToBePurged =
-            new ArrayList<>();
+        ArrayList<Long> txIDs = new ArrayList<>();
         while (iter.hasNext() && numBlocksAdded < blockDeletionLimit) {
           Table.KeyValue<Long, DeletedBlocksTransaction> keyValue = iter.next();
           DeletedBlocksTransaction txn = keyValue.getValue();
@@ -362,10 +370,11 @@ public class DeletedBlockLogImpl
           } catch (ContainerNotFoundException ex) {
             LOG.warn("Container: " + id + " was not found for the transaction: "
                 + txn);
-            txnsToBePurged.add(txn);
+            txIDs.add(txn.getTxID());
           }
         }
-        purgeTransactions(txnsToBePurged);
+
+        deletedBlockLogStateManager.removeTransactionsFromDB(txIDs);
       }
       return transactions;
     } finally {
@@ -373,21 +382,14 @@ public class DeletedBlockLogImpl
     }
   }
 
-  public void purgeTransactions(List<DeletedBlocksTransaction> txnsToBePurged)
-      throws IOException {
-    try (BatchOperation batch = scmMetadataStore.getBatchHandler()
-        .initBatchOperation()) {
-      for (int i = 0; i < txnsToBePurged.size(); i++) {
-        scmMetadataStore.getDeletedBlocksTXTable()
-            .deleteWithBatch(batch, txnsToBePurged.get(i).getTxID());
-      }
-      scmMetadataStore.getBatchHandler().commitBatchOperation(batch);
-    }
-  }
-
   @Override
-  public void onMessage(DeleteBlockStatus deleteBlockStatus,
-                        EventPublisher publisher) {
+  public void onMessage(
+      DeleteBlockStatus deleteBlockStatus, EventPublisher publisher) {
+    if (!scmContext.isLeader()) {
+      LOG.warn("Skip commit transactions since current SCM is not leader.");
+      return;
+    }
+
     ContainerBlocksDeletionACKProto ackProto =
         deleteBlockStatus.getCmdStatus().getBlockDeletionAck();
     commitTransactions(ackProto.getResultsList(),

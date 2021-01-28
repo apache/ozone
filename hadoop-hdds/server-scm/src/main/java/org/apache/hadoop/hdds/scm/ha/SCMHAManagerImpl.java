@@ -48,7 +48,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
       final StorageContainerManager scm) throws IOException {
     this.conf = conf;
     this.transactionBuffer =
-        new SCMDBTransactionBuffer(scm.getScmMetadataStore());
+        new SCMDBTransactionBuffer(scm);
     this.ratisServer = new SCMRatisServerImpl(
         conf.getObject(SCMHAConfiguration.class), conf, scm, transactionBuffer);
   }

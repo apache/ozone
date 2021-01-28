@@ -28,6 +28,10 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.ha.DBTransactionBuffer;
+import org.apache.hadoop.hdds.scm.ha.MockDBTransactionBuffer;
+import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -77,13 +81,14 @@ import static org.mockito.Mockito.when;
  */
 public class TestDeletedBlockLog {
 
-  private static DeletedBlockLogImpl deletedBlockLog;
+  private static DeletedBlockLogImplV2 deletedBlockLog;
   private static final int BLOCKS_PER_TXN = 5;
   private OzoneConfiguration conf;
   private File testDir;
   private ContainerManagerV2 containerManager;
   private StorageContainerManager scm;
   private List<DatanodeDetails> dnList;
+  private DBTransactionBuffer dbTransactionBuffer;
 
   @Before
   public void setup() throws Exception {
@@ -94,8 +99,12 @@ public class TestDeletedBlockLog {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     scm = TestUtils.getScm(conf);
     containerManager = Mockito.mock(ContainerManagerV2.class);
-    deletedBlockLog = new DeletedBlockLogImpl(conf, containerManager,
-        scm.getScmMetadataStore());
+    dbTransactionBuffer =
+        new MockDBTransactionBuffer(scm.getScmMetadataStore().getStore());
+    deletedBlockLog = new DeletedBlockLogImplV2(conf, containerManager,
+        MockSCMHAManager.getInstance(true).getRatisServer(),
+        scm.getScmMetadataStore().getDeletedBlocksTXTable(),
+        dbTransactionBuffer, SCMContext.emptyContext());
     dnList = new ArrayList<>(3);
     setupContainerManager();
   }
@@ -155,31 +164,48 @@ public class TestDeletedBlockLog {
     return blockMap;
   }
 
+  private void addTransactions(Map<Long, List<Long>> containerBlocksMap)
+      throws IOException {
+    dbTransactionBuffer.getCurrentBatchOperation();
+    deletedBlockLog.addTransactions(containerBlocksMap);
+    dbTransactionBuffer.flush();
+  }
+
+  private void incrementCount(List<Long> txIDs) throws IOException {
+    dbTransactionBuffer.getCurrentBatchOperation();
+    deletedBlockLog.incrementCount(txIDs);
+    dbTransactionBuffer.flush();
+  }
+
   private void commitTransactions(
       List<DeleteBlockTransactionResult> transactionResults,
-      DatanodeDetails... dns) {
+      DatanodeDetails... dns) throws IOException {
+    dbTransactionBuffer.getCurrentBatchOperation();
     for (DatanodeDetails dnDetails : dns) {
       deletedBlockLog
           .commitTransactions(transactionResults, dnDetails.getUuid());
     }
+    dbTransactionBuffer.flush();
   }
 
   private void commitTransactions(
-      List<DeleteBlockTransactionResult> transactionResults) {
+      List<DeleteBlockTransactionResult> transactionResults)
+      throws IOException {
     commitTransactions(transactionResults,
         dnList.toArray(new DatanodeDetails[3]));
   }
 
   private void commitTransactions(
       Collection<DeletedBlocksTransaction> deletedBlocksTransactions,
-      DatanodeDetails... dns) {
+      DatanodeDetails... dns) throws IOException {
     commitTransactions(deletedBlocksTransactions.stream()
         .map(this::createDeleteBlockTransactionResult)
         .collect(Collectors.toList()), dns);
   }
 
   private void commitTransactions(
-      Collection<DeletedBlocksTransaction> deletedBlocksTransactions) {
+      Collection<DeletedBlocksTransaction> deletedBlocksTransactions)
+      throws IOException {
     commitTransactions(deletedBlocksTransactions.stream()
         .map(this::createDeleteBlockTransactionResult)
         .collect(Collectors.toList()));
@@ -210,9 +236,7 @@ public class TestDeletedBlockLog {
     int maxRetry = conf.getInt(OZONE_SCM_BLOCK_DELETION_MAX_RETRY, 20);
 
     // Create 30 TXs in the log.
-    for (Map.Entry<Long, List<Long>> entry : generateData(30).entrySet()){
-      deletedBlockLog.addTransaction(entry.getKey(), entry.getValue());
-    }
+    addTransactions(generateData(30));
 
     // This will return all TXs, total num 30.
     List<DeletedBlocksTransaction> blocks =
@@ -221,12 +245,12 @@ public class TestDeletedBlockLog {
         .collect(Collectors.toList());
 
     for (int i = 0; i < maxRetry; i++) {
-      deletedBlockLog.incrementCount(txIDs);
+      incrementCount(txIDs);
     }
 
     // Increment another time so it exceed the maxRetry.
     // On this call, count will be set to -1 which means TX eventually fails.
-    deletedBlockLog.incrementCount(txIDs);
+    incrementCount(txIDs);
     blocks = getTransactions(40 * BLOCKS_PER_TXN);
     for (DeletedBlocksTransaction block : blocks) {
       Assert.assertEquals(-1, block.getCount());
@@ -239,9 +263,7 @@ public class TestDeletedBlockLog {
 
   @Test
   public void testCommitTransactions() throws Exception {
-    for (Map.Entry<Long, List<Long>> entry : generateData(50).entrySet()){
-      deletedBlockLog.addTransaction(entry.getKey(), entry.getValue());
-    }
+    addTransactions(generateData(50));
     List<DeletedBlocksTransaction> blocks =
         getTransactions(20 * BLOCKS_PER_TXN);
     // Add an invalid txn.
@@ -279,10 +301,7 @@ public class TestDeletedBlockLog {
     for (int i = 0; i < 100; i++) {
       int state = random.nextInt(4);
       if (state == 0) {
-        for (Map.Entry<Long, List<Long>> entry :
-            generateData(10).entrySet()){
-          deletedBlockLog.addTransaction(entry.getKey(), entry.getValue());
-        }
+        addTransactions(generateData(10));
         added += 10;
       } else if (state == 1) {
         blocks = getTransactions(20);
@@ -290,7 +309,7 @@ public class TestDeletedBlockLog {
         for (DeletedBlocksTransaction block : blocks) {
           txIDs.add(block.getTxID());
         }
-        deletedBlockLog.incrementCount(txIDs);
+        incrementCount(txIDs);
       } else if (state == 2) {
         commitTransactions(blocks);
         committed += blocks.size();
@@ -312,14 +331,14 @@ public class TestDeletedBlockLog {
 
   @Test
   public void testPersistence() throws Exception {
-    for (Map.Entry<Long, List<Long>> entry : generateData(50).entrySet()){
-      deletedBlockLog.addTransaction(entry.getKey(), entry.getValue());
-    }
+    addTransactions(generateData(50));
     // close db and reopen it again to make sure
     // transactions are stored persistently.
     deletedBlockLog.close();
-    deletedBlockLog = new DeletedBlockLogImpl(conf, containerManager,
-        scm.getScmMetadataStore());
+    deletedBlockLog = new DeletedBlockLogImplV2(conf, containerManager,
+        MockSCMHAManager.getInstance(true).getRatisServer(),
+        scm.getScmMetadataStore().getDeletedBlocksTXTable(),
+        dbTransactionBuffer, SCMContext.emptyContext());
     List<DeletedBlocksTransaction> blocks =
         getTransactions(BLOCKS_PER_TXN * 10);
     Assert.assertEquals(10, blocks.size());
@@ -339,10 +358,11 @@ public class TestDeletedBlockLog {
     long containerID;
 
     // Creates {TXNum} TX in the log.
-    for (Map.Entry<Long, List<Long>> entry : generateData(txNum).entrySet()) {
+    Map<Long, List<Long>> deletedBlocks = generateData(txNum);
+    addTransactions(deletedBlocks);
+    for (Map.Entry<Long, List<Long>> entry :deletedBlocks.entrySet()) {
       count++;
       containerID = entry.getKey();
-      deletedBlockLog.addTransaction(containerID, entry.getValue());
 
       if (count % 2 == 0) {
         mockContainerInfo(containerID, dnId1);
@@ -365,7 +385,9 @@ public class TestDeletedBlockLog {
     builder.setTxID(11);
     builder.setContainerID(containerID);
     builder.setCount(0);
-    deletedBlockLog.addTransaction(containerID, new LinkedList<>());
+    Map<Long, List<Long>> deletedBlocksMap = new HashMap<>();
+    deletedBlocksMap.put(containerID, new LinkedList<>());
+    addTransactions(deletedBlocksMap);
 
     // get should return two transactions for the same container
     blocks = getTransactions(txNum);
