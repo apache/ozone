@@ -411,8 +411,13 @@ public final class PipelineManagerV2Impl implements PipelineManager {
   @Override
   public void activatePipeline(PipelineID pipelineID)
       throws IOException {
-    stateManager.updatePipelineState(pipelineID.getProtobuf(),
-        HddsProtos.PipelineState.PIPELINE_OPEN);
+    lock.lock();
+    try{
+      stateManager.updatePipelineState(pipelineID.getProtobuf(),
+              HddsProtos.PipelineState.PIPELINE_OPEN);
+    }finally {
+      lock.unlock();
+    }
   }
 
   /**
@@ -424,8 +429,13 @@ public final class PipelineManagerV2Impl implements PipelineManager {
   @Override
   public void deactivatePipeline(PipelineID pipelineID)
       throws IOException {
-    stateManager.updatePipelineState(pipelineID.getProtobuf(),
-        HddsProtos.PipelineState.PIPELINE_DORMANT);
+    lock.lock();
+    try{
+      stateManager.updatePipelineState(pipelineID.getProtobuf(),
+          HddsProtos.PipelineState.PIPELINE_DORMANT);
+    }finally {
+      lock.unlock();
+    }
   }
 
   /**
