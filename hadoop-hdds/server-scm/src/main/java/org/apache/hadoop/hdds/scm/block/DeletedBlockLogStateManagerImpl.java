@@ -33,6 +33,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -50,6 +51,8 @@ public class DeletedBlockLogStateManagerImpl
   private final DBTransactionBuffer transactionBuffer;
   private final int maxRetry;
   private Set<Long> deletingTxIDs;
+  // Maps txId to its retry counts;
+  private Map<Long, Integer> transactionRetryCountMap;
 
   public DeletedBlockLogStateManagerImpl(
       ConfigurationSource conf,
@@ -60,6 +63,7 @@ public class DeletedBlockLogStateManagerImpl
     this.deletedTable = deletedTable;
     this.transactionBuffer = txBuffer;
     this.deletingTxIDs = ConcurrentHashMap.newKeySet();
+    this.transactionRetryCountMap = new ConcurrentHashMap<>();
   }
 
   public TableIterator<Long, TypedTable.KeyValue<Long,
@@ -168,6 +172,7 @@ public class DeletedBlockLogStateManagerImpl
     for (Long txID : txIDs) {
       deletedTable.deleteWithBatch(
           transactionBuffer.getCurrentBatchOperation(), txID);
+      transactionRetryCountMap.remove(txID);
     }
   }
 
@@ -186,19 +191,28 @@ public class DeletedBlockLogStateManagerImpl
         }
         continue;
       }
-      DeletedBlocksTransaction.Builder builder = block.toBuilder();
-      int currentCount = block.getCount();
+      int currentCount =
+          transactionRetryCountMap.getOrDefault(txID, block.getCount());
       if (currentCount > -1) {
-        builder.setCount(++currentCount);
+        int nextCount = currentCount + 1;
+        DeletedBlocksTransaction.Builder builder = block.toBuilder();
+        if (nextCount > maxRetry) {
+          // if the retry time exceeds the maxRetry value
+          // then set the retry value to -1, stop retrying, admins can
+          // analyze those blocks and purge them manually by SCMCli.
+          builder.setCount(-1);
+          deletedTable.putWithBatch(
+              transactionBuffer.getCurrentBatchOperation(),
+              txID, builder.build());
+        } else if (nextCount % 100 == 0) {
+          // write retry count after every 100 retries into DB.
+          builder.setCount(nextCount);
+          deletedTable.putWithBatch(
+              transactionBuffer.getCurrentBatchOperation(),
+              txID, builder.build());
+        }
+        transactionRetryCountMap.put(txID, nextCount);
       }
-      // if the retry time exceeds the maxRetry value
-      // then set the retry value to -1, stop retrying, admins can
-      // analyze those blocks and purge them manually by SCMCli.
-      if (currentCount > maxRetry) {
-        builder.setCount(-1);
-      }
-      deletedTable.putWithBatch(
-          transactionBuffer.getCurrentBatchOperation(), txID, builder.build());
     }
   }
 
