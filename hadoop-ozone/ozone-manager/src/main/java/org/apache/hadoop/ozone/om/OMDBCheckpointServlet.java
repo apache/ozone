@@ -153,7 +153,11 @@ public class OMDBCheckpointServlet extends HttpServlet {
         final String userPrincipalName = userPrincipal.getName();
         if (!hasPermission(userPrincipalName)) {
           LOG.error("Permission denied: User principal '{}' does not have"
-              + " access to /dbCheckpoint.", userPrincipalName);
+              + " access to /dbCheckpoint.\nThis can happen when Ozone Manager"
+              + " is started with a different user.\nPlease append '{}' to OM"
+              + " 'ozone.administrators' config and restart OM to grant current"
+              + " user access to this endpoint.",
+              userPrincipalName, userPrincipalName);
           response.setStatus(HttpServletResponse.SC_FORBIDDEN);
           return;
         }
