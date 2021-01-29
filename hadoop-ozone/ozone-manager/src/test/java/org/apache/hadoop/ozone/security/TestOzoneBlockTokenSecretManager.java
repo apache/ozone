@@ -329,8 +329,8 @@ public class TestOzoneBlockTokenSecretManager {
       KeyPair pair, String algorithm) throws CertificateException,
       IllegalStateException, IOException, OperatorCreationException {
     Date from = new Date();
-    Date to = new Date(from.getTime() + 100L);
-    return generateTestCert(dn, pair, algorithm, from, to);
+    // Set end date same as start date to make sure the cert is expired.
+    return generateTestCert(dn, pair, algorithm, from, from);
   }
 
   private X509Certificate generateNotValidYetCert(String dn,
