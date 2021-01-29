@@ -99,6 +99,9 @@ public class TestOzoneAtRestEncryption extends TestOzoneRpcClient {
   private static final int MPU_PART_MIN_SIZE = 256 * 1024; // 256KB
   private static final int BLOCK_SIZE = 64 * 1024; // 64KB
   private static final int CHUNK_SIZE = 16 * 1024; // 16KB
+  private static final int DEFAULT_CRYPTO_BUFFER_SIZE = 8 * 1024; // 8KB
+  // (this is the default Crypto Buffer size as determined by the config
+  // hadoop.security.crypto.buffer.size)
 
   @BeforeClass
   public static void init() throws Exception {
@@ -373,7 +376,12 @@ public class TestOzoneAtRestEncryption extends TestOzoneRpcClient {
     List<byte[]> partsData = new ArrayList<>();
     int keySize = 0;
     for (int i = 1; i <= numParts; i++) {
-      byte[] data = generateRandomData(MPU_PART_MIN_SIZE * i);
+      // Generate random data with different sizes for each part.
+      // Adding a random int with a cap at 8K (the default crypto buffer
+      // size) to get parts whose last byte does not coincide with crypto
+      // buffer boundary.
+      byte[] data = generateRandomData((MPU_PART_MIN_SIZE * i) +
+          RANDOM.nextInt(DEFAULT_CRYPTO_BUFFER_SIZE));
       String partName = uploadPart(bucket, keyName, uploadID, i, data);
       partsMap.put(i, partName);
       partsData.add(data);
@@ -396,10 +404,14 @@ public class TestOzoneAtRestEncryption extends TestOzoneRpcClient {
     // verify the data matches.
     int[] readDataSizes = {keySize, keySize / 2, keySize / 3, keySize - 1,
         keySize / 3 + 1, BLOCK_SIZE, BLOCK_SIZE * 2 + 1, CHUNK_SIZE,
-        CHUNK_SIZE / 2, CHUNK_SIZE / 4, CHUNK_SIZE / 4 - 1, 1};
+        CHUNK_SIZE / 2, CHUNK_SIZE / 4, CHUNK_SIZE / 4 - 1,
+        DEFAULT_CRYPTO_BUFFER_SIZE, DEFAULT_CRYPTO_BUFFER_SIZE - 1,
+        DEFAULT_CRYPTO_BUFFER_SIZE / 2, 1};
 
-    int[] readFromPositions = {0, CHUNK_SIZE, BLOCK_SIZE,
-        BLOCK_SIZE * 2 + 1, keySize / 3, keySize / 2, keySize - 1};
+    int[] readFromPositions = {0, DEFAULT_CRYPTO_BUFFER_SIZE + 10, CHUNK_SIZE,
+        BLOCK_SIZE - DEFAULT_CRYPTO_BUFFER_SIZE + 1, BLOCK_SIZE,
+        BLOCK_SIZE + DEFAULT_CRYPTO_BUFFER_SIZE / 2, BLOCK_SIZE * 2 + 1,
+        keySize / 3, keySize / 2, keySize - 1};
 
     // Create an input stream to read the data
     OzoneInputStream inputStream = bucket.readKey(keyName);

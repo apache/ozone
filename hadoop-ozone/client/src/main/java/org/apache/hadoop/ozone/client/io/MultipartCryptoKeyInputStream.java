@@ -209,7 +209,7 @@ public class MultipartCryptoKeyInputStream extends OzoneInputStream
     Preconditions.checkArgument(readLengthAdjustedBy == 0);
 
     // Check and adjust position if required
-    adjustReadPosition(getPos(), cryptoBufferSize);
+    adjustReadPosition(cryptoBufferSize);
     remaining += readPositionAdjustedBy;
     lenToRead += readPositionAdjustedBy;
 
@@ -223,16 +223,20 @@ public class MultipartCryptoKeyInputStream extends OzoneInputStream
    * to read more data than requested. The extra data will be filtered out
    * before returning to the client.
    */
-  private void adjustReadPosition(long currentPos, long cryptoBufferSize)
-      throws IOException {
-    if (currentPos % cryptoBufferSize != 0) {
+  private void adjustReadPosition(long cryptoBufferSize) throws IOException {
+    // Position of the buffer in current stream
+    long currentPosOfStream = partStreams.get(partIndex).getPos();
+    if (currentPosOfStream % cryptoBufferSize != 0) {
       // Adjustment required.
       // Update readPositionAdjustedBy and seek to the adjusted position
-      readPositionAdjustedBy = (int) (currentPos % cryptoBufferSize);
-      seek(currentPos - readPositionAdjustedBy);
+      readPositionAdjustedBy = (int) (currentPosOfStream % cryptoBufferSize);
+      // Seek current partStream to adjusted position. We do not need to
+      // reset the seeked positions of other streams.
+      partStreams.get(partIndex)
+          .seek(currentPosOfStream - readPositionAdjustedBy);
       LOG.debug("OzoneCryptoInputStream for key: {} part: {} adjusted " +
-              "position by -{} to account for Crypto buffer boundary",
-          key, partIndex, readPositionAdjustedBy);
+              "position {} by -{} to account for Crypto buffer boundary",
+          key, partIndex, currentPosOfStream, readPositionAdjustedBy);
     }
   }
 
