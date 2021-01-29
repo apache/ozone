@@ -44,6 +44,7 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.TrashPolicyOzone;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
@@ -55,7 +56,6 @@ import org.apache.hadoop.test.LambdaTestUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
@@ -173,6 +173,10 @@ public class TestRootedOzoneFileSystem {
       cluster.shutdown();
     }
     IOUtils.closeQuietly(fs);
+  }
+
+  private OMMetrics getOMMetrics() {
+    return cluster.getOzoneManager().getMetrics();
   }
 
   @Test
@@ -1193,7 +1197,6 @@ public class TestRootedOzoneFileSystem {
    * 2.Verify that the key gets deleted by the trash emptier.
    * @throws Exception
    */
-  @Ignore("HDDS-4669 : Fix testTrash to work when OM Ratis is enabled")
   @Test
   public void testTrash() throws Exception {
     String testKeyName = "keyToBeDeleted";
@@ -1204,6 +1207,12 @@ public class TestRootedOzoneFileSystem {
     Assert.assertTrue(trash.getConf().getClass(
         "fs.trash.classname", TrashPolicy.class).
         isAssignableFrom(TrashPolicyOzone.class));
+
+    long prevNumTrashDeletes = getOMMetrics().getNumTrashDeletes();
+    long prevNumTrashFileDeletes = getOMMetrics().getNumTrashFilesDeletes();
+
+    long prevNumTrashRenames = getOMMetrics().getNumTrashRenames();
+    long prevNumTrashFileRenames = getOMMetrics().getNumTrashFilesRenames();
 
     // Call moveToTrash. We can't call protected fs.rename() directly
     trash.moveToTrash(path);
@@ -1221,12 +1230,23 @@ public class TestRootedOzoneFileSystem {
       try {
         return !ofs.exists(trashPath);
       } catch (IOException e) {
-        LOG.error("Delete from Trash Failed");
+        LOG.error("Delete from Trash Failed", e);
         Assert.fail("Delete from Trash Failed");
         return false;
       }
     }, 1000, 180000);
 
+    // This condition should pass after the checkpoint
+    Assert.assertTrue(getOMMetrics()
+        .getNumTrashRenames() > prevNumTrashRenames);
+    Assert.assertTrue(getOMMetrics()
+        .getNumTrashFilesRenames() > prevNumTrashFileRenames);
+
+    // This condition should succeed once the checkpoint directory is deleted
+    GenericTestUtils.waitFor(
+        () -> getOMMetrics().getNumTrashDeletes() > prevNumTrashDeletes
+            && getOMMetrics().getNumTrashFilesDeletes()
+            > prevNumTrashFileDeletes, 100, 180000);
     // Cleanup
     ofs.delete(trashRoot, true);
 
