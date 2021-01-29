@@ -64,9 +64,9 @@ import org.slf4j.LoggerFactory;
  * the config) are allowed to access this endpoint.
  *
  * If Kerberos is enabled, the principal should be appended to
- * `ozone.administrator`, e.g. `testuser/scm@EXAMPLE.COM`
+ * `ozone.administrator`, e.g. `scm/scm@EXAMPLE.COM`
  * If Kerberos is not enabled, simply append the login user name to
- * `ozone.administrator`, e.g. `testuser`
+ * `ozone.administrator`, e.g. `scm`
  */
 public class OMDBCheckpointServlet extends HttpServlet {
 
@@ -143,9 +143,10 @@ public class OMDBCheckpointServlet extends HttpServlet {
     if (om.getAclsEnabled()) {
       final java.security.Principal userPrincipal = request.getUserPrincipal();
       if (userPrincipal == null) {
-        LOG.error("Permission denied: Unauthorized access to /dbCheckpoint."
-            + " Current login user is '{}', but no user principal found.",
-            request.getRemoteUser());
+        final String remoteUser = request.getRemoteUser();
+        LOG.error("Permission denied: Unauthorized access to /dbCheckpoint,"
+            + " no user principal found. Current login user is {}.",
+            remoteUser != null ? "'" + remoteUser + "'" : "UNKNOWN");
         response.setStatus(HttpServletResponse.SC_FORBIDDEN);
         return;
       } else {
