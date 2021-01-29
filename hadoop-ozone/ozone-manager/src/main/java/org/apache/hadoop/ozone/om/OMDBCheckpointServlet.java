@@ -143,18 +143,11 @@ public class OMDBCheckpointServlet extends HttpServlet {
     if (om.getAclsEnabled()) {
       final java.security.Principal userPrincipal = request.getUserPrincipal();
       if (userPrincipal == null) {
-        // Fallback to checking login user if getUserPrincipal returns null.
-        // Note: In prod, a secure cluster with Kerberos should not hit this
-        // branch. This is mostly here for UT and dev testing.
-        final String remoteUser = request.getRemoteUser();
-        if (!hasPermission(remoteUser)) {
-          LOG.error("Permission denied: Current login user '{}' does not have"
-              + " access to /dbCheckpoint.", remoteUser);
-          response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-          return;
-        }
-        LOG.debug("Granted login user '{}' access to /dbCheckpoint.",
-            remoteUser);
+        LOG.error("Permission denied: Unauthorized access to /dbCheckpoint."
+            + " Current login user is '{}', but no user principal found.",
+            request.getRemoteUser());
+        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+        return;
       } else {
         final String userPrincipalName = userPrincipal.getName();
         if (!hasPermission(userPrincipalName)) {
