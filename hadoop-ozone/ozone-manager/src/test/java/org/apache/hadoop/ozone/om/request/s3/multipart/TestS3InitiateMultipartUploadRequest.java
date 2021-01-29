@@ -21,14 +21,6 @@ package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import java.util.UUID;
 
-import com.google.common.base.Optional;
-import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
-import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
-import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
-import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.request.OMClientRequest;
-import org.apache.hadoop.util.Time;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -36,12 +28,6 @@ import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
-import org.mockito.Mockito;
-
-import static org.apache.hadoop.crypto.CipherSuite.AES_CTR_NOPADDING;
-import static org.apache.hadoop.crypto.CryptoProtocolVersion.ENCRYPTION_ZONES;
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.NOT_SUPPORTED_OPERATION;
-import static org.mockito.Mockito.when;
 
 /**
  * Tests S3 Initiate Multipart Upload request.

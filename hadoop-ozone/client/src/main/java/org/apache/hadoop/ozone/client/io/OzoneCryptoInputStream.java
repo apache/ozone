@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.client.io;
 
 import java.io.IOException;
-import java.io.InputStream;
 import org.apache.hadoop.crypto.CryptoCodec;
 import org.apache.hadoop.crypto.CryptoInputStream;
 import org.apache.hadoop.crypto.CryptoStreamUtils;

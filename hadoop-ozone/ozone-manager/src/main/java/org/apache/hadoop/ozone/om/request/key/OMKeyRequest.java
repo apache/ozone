@@ -561,13 +561,11 @@ public abstract class OMKeyRequest extends OMClientRequest {
         acquireLock = omMetadataManager.getLock().acquireReadLock(
             BUCKET_LOCK, volumeName, bucketName);
 
+        OmKeyInfo omKeyInfo = omMetadataManager.getOpenKeyTable().get(
+            omMetadataManager.getMultipartKey(volumeName, bucketName,
+                keyArgs.getKeyName(), keyArgs.getMultipartUploadID()));
 
-        OmKeyInfo omKeyInfo =
-            omMetadataManager.getOpenKeyTable().get(
-                omMetadataManager.getMultipartKey(volumeName, bucketName,
-                    keyArgs.getKeyName(), keyArgs.getMultipartUploadID()));
-
-        if (omKeyInfo != null) {
+        if (omKeyInfo != null && omKeyInfo.getFileEncryptionInfo() != null) {
           newKeyArgs.setFileEncryptionInfo(
               OMPBHelper.convert(omKeyInfo.getFileEncryptionInfo()));
 

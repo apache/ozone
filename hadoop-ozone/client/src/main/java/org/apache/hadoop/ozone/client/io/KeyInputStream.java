@@ -127,12 +127,13 @@ public class KeyInputStream extends InputStream
     }
 
     // Create a KeyInputStream for each part.
-    for ( int partNum : partsToBlocksMap.keySet()) {
+    for (Map.Entry<Integer, List<OmKeyLocationInfo>> entry :
+        partsToBlocksMap.entrySet()) {
       KeyInputStream keyInputStream = new KeyInputStream();
-      keyInputStream.initialize(keyInfo, partsToBlocksMap.get(partNum),
+      keyInputStream.initialize(keyInfo, entry.getValue(),
           xceiverClientFactory, verifyChecksum, retryFunction);
       lengthInputStreams.add(new LengthInputStream(keyInputStream,
-          partsLengthMap.get(partNum)));
+          partsLengthMap.get(entry.getKey())));
     }
 
     return lengthInputStreams;
