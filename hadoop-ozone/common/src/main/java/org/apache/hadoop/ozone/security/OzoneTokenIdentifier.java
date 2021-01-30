@@ -46,7 +46,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 public class OzoneTokenIdentifier extends
     AbstractDelegationTokenIdentifier {
 
-  public final static Text KIND_NAME = new Text("OzoneToken");
+  public static final Text KIND_NAME = new Text("OzoneToken");
   private String omCertSerialId;
   private Type tokenType;
   private String awsAccessId;

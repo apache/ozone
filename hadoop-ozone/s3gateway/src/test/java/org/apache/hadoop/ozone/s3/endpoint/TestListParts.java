@@ -44,7 +44,7 @@ import static org.mockito.Mockito.when;
 public class TestListParts {
 
 
-  private final static ObjectEndpoint REST = new ObjectEndpoint();
+  private static final ObjectEndpoint REST = new ObjectEndpoint();
   private static String uploadID;
 
   @BeforeClass

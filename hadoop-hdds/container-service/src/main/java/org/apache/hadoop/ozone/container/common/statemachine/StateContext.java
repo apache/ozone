@@ -73,22 +73,22 @@ import org.slf4j.LoggerFactory;
 public class StateContext {
 
   @VisibleForTesting
-  final static String CONTAINER_REPORTS_PROTO_NAME =
+  static final String CONTAINER_REPORTS_PROTO_NAME =
       ContainerReportsProto.getDescriptor().getFullName();
   @VisibleForTesting
-  final static String NODE_REPORT_PROTO_NAME =
+  static final String NODE_REPORT_PROTO_NAME =
       NodeReportProto.getDescriptor().getFullName();
   @VisibleForTesting
-  final static String PIPELINE_REPORTS_PROTO_NAME =
+  static final String PIPELINE_REPORTS_PROTO_NAME =
       PipelineReportsProto.getDescriptor().getFullName();
   @VisibleForTesting
-  final static String COMMAND_STATUS_REPORTS_PROTO_NAME =
+  static final String COMMAND_STATUS_REPORTS_PROTO_NAME =
       CommandStatusReportsProto.getDescriptor().getFullName();
   @VisibleForTesting
-  final static String INCREMENTAL_CONTAINER_REPORT_PROTO_NAME =
+  static final String INCREMENTAL_CONTAINER_REPORT_PROTO_NAME =
       IncrementalContainerReportProto.getDescriptor().getFullName();
   // Accepted types of reports that can be queued to incrementalReportsQueue
-  private final static Set<String> ACCEPTED_INCREMENTAL_REPORT_TYPE_SET =
+  private static final Set<String> ACCEPTED_INCREMENTAL_REPORT_TYPE_SET =
       Sets.newHashSet(COMMAND_STATUS_REPORTS_PROTO_NAME,
           INCREMENTAL_CONTAINER_REPORT_PROTO_NAME);
 

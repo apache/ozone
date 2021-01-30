@@ -51,8 +51,8 @@ import static org.mockito.Mockito.when;
 
 public class TestMultipartUploadComplete {
 
-  private final static ObjectEndpoint REST = new ObjectEndpoint();
-  private final static OzoneClient CLIENT = new OzoneClientStub();
+  private static final ObjectEndpoint REST = new ObjectEndpoint();
+  private static final OzoneClient CLIENT = new OzoneClientStub();
 
   @BeforeClass
   public static void setUp() throws Exception {

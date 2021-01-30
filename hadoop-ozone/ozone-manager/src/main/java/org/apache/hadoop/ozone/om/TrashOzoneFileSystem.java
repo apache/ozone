@@ -78,7 +78,7 @@ public class TrashOzoneFileSystem extends FileSystem {
 
   private final AtomicLong runCount;
 
-  private final static ClientId CLIENT_ID = ClientId.randomId();
+  private static final ClientId CLIENT_ID = ClientId.randomId();
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TrashOzoneFileSystem.class);
@@ -438,7 +438,7 @@ public class TrashOzoneFileSystem extends FileSystem {
   }
 
   private class DeleteIterator extends OzoneListingIterator {
-    final private boolean recursive;
+    private final boolean recursive;
     private List<String> keysList;
 
 
