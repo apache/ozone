@@ -36,7 +36,7 @@ import com.google.common.primitives.Longs;
  */
 public class ContainerKeyPrefixCodec implements Codec<ContainerKeyPrefix>{
 
-  private final static String KEY_DELIMITER = "_";
+  private static final String KEY_DELIMITER = "_";
 
   @Override
   public byte[] toPersistedFormat(ContainerKeyPrefix containerKeyPrefix)
