@@ -3542,7 +3542,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   /**
    * Return list of OzoneAdministrators.
    */
-  private Collection<String> getOzoneAdmins(OzoneConfiguration conf)
+  Collection<String> getOzoneAdmins(OzoneConfiguration conf)
       throws IOException {
     Collection<String> ozAdmins =
         conf.getTrimmedStringCollection(OZONE_ADMINISTRATORS);
