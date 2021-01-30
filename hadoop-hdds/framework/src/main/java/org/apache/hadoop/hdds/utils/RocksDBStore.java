@@ -97,22 +97,13 @@ public class RocksDBStore implements MetadataStore {
     }
   }
 
-  public static IOException toIOException(String msg, RocksDBException e) {
-    String statusCode = e.getStatus() == null ? "N/A" :
-        e.getStatus().getCodeString();
-    String errMessage = e.getMessage() == null ? "Unknown error" :
-        e.getMessage();
-    String output = msg + "; status : " + statusCode
-        + "; message : " + errMessage;
-    return new IOException(output, e);
-  }
-
   @Override
   public void put(byte[] key, byte[] value) throws IOException {
     try {
       db.put(writeOptions, key, value);
     } catch (RocksDBException e) {
-      throw toIOException("Failed to put key-value to metadata store", e);
+      throw HddsServerUtil.toIOException(
+          "Failed to put key-value to metadata store", e);
     }
   }
 
@@ -135,7 +126,8 @@ public class RocksDBStore implements MetadataStore {
     try {
       return db.get(key);
     } catch (RocksDBException e) {
-      throw toIOException("Failed to get the value for the given key", e);
+      throw HddsServerUtil.toIOException(
+          "Failed to get the value for the given key", e);
     }
   }
 
@@ -144,7 +136,7 @@ public class RocksDBStore implements MetadataStore {
     try {
       db.delete(key);
     } catch (RocksDBException e) {
-      throw toIOException("Failed to delete the given key", e);
+      throw HddsServerUtil.toIOException("Failed to delete the given key", e);
     }
   }
 
@@ -262,7 +254,7 @@ public class RocksDBStore implements MetadataStore {
         }
         db.write(writeOptions, writeBatch);
       } catch (RocksDBException e) {
-        throw toIOException("Batch write operation failed", e);
+        throw HddsServerUtil.toIOException("Batch write operation failed", e);
       }
     }
   }
@@ -273,7 +265,7 @@ public class RocksDBStore implements MetadataStore {
       try {
         db.compactRange();
       } catch (RocksDBException e) {
-        throw toIOException("Failed to compact db", e);
+        throw HddsServerUtil.toIOException("Failed to compact db", e);
       }
     }
   }
@@ -286,7 +278,7 @@ public class RocksDBStore implements MetadataStore {
         // be reconstructed using it.
         db.flushWal(sync);
       } catch (RocksDBException e) {
-        throw toIOException("Failed to flush db", e);
+        throw HddsServerUtil.toIOException("Failed to flush db", e);
       }
     }
   }

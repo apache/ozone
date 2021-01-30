@@ -32,6 +32,7 @@ import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.StringUtils;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.RocksDBStoreMBean;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache;
 import org.apache.hadoop.metrics2.util.MBeans;
@@ -158,7 +159,7 @@ public class RDBStore implements DBStore {
           e.getCause().getClass().getCanonicalName() + " " +
               e.getCause().getMessage());
 
-      throw toIOException(msg, e);
+      throw HddsServerUtil.toIOException(msg, e);
     }
 
     if (LOG.isDebugEnabled()) {
@@ -189,23 +190,13 @@ public class RDBStore implements DBStore {
     return columnFamiliesInDb;
   }
 
-  public static IOException toIOException(String msg, RocksDBException e) {
-    String statusCode = e.getStatus() == null ? "N/A" :
-        e.getStatus().getCodeString();
-    String errMessage = e.getMessage() == null ? "Unknown error" :
-        e.getMessage();
-    String output = msg + "; status : " + statusCode
-        + "; message : " + errMessage;
-    return new IOException(output, e);
-  }
-
   @Override
   public void compactDB() throws IOException {
     if (db != null) {
       try {
         db.compactRange();
       } catch (RocksDBException e) {
-        throw toIOException("Failed to compact db", e);
+        throw HddsServerUtil.toIOException("Failed to compact db", e);
       }
     }
   }
@@ -270,7 +261,8 @@ public class RDBStore implements DBStore {
     try {
       return db.getLongProperty("rocksdb.estimate-num-keys");
     } catch (RocksDBException e) {
-      throw toIOException("Unable to get the estimated count.", e);
+      throw HddsServerUtil.toIOException(
+          "Unable to get the estimated count.", e);
     }
   }
 
@@ -330,7 +322,7 @@ public class RDBStore implements DBStore {
       flushOptions.setWaitForFlush(true);
       db.flush(flushOptions);
     } catch (RocksDBException e) {
-      throw toIOException("Unable to Flush RocksDB data", e);
+      throw HddsServerUtil.toIOException("Unable to Flush RocksDB data", e);
     }
   }
 
@@ -342,7 +334,7 @@ public class RDBStore implements DBStore {
         // be reconstructed using it.
         db.flushWal(sync);
       } catch (RocksDBException e) {
-        throw toIOException("Failed to flush db", e);
+        throw HddsServerUtil.toIOException("Failed to flush db", e);
       }
     }
   }

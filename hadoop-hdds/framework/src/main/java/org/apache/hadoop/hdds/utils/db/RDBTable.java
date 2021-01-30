@@ -28,6 +28,7 @@ import java.util.Arrays;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.StringUtils;
 
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.Holder;
 import org.rocksdb.ReadOptions;
@@ -72,22 +73,6 @@ class RDBTable implements Table<byte[], byte[]> {
   }
 
   /**
-   * Converts RocksDB exception to IOE.
-   * @param msg  - Message to add to exception.
-   * @param e - Original Exception.
-   * @return  IOE.
-   */
-  public static IOException toIOException(String msg, RocksDBException e) {
-    String statusCode = e.getStatus() == null ? "N/A" :
-        e.getStatus().getCodeString();
-    String errMessage = e.getMessage() == null ? "Unknown error" :
-        e.getMessage();
-    String output = msg + "; status : " + statusCode
-        + "; message : " + errMessage;
-    return new IOException(output, e);
-  }
-
-  /**
    * Returns the Column family Handle.
    *
    * @return ColumnFamilyHandle.
@@ -103,7 +88,7 @@ class RDBTable implements Table<byte[], byte[]> {
     } catch (RocksDBException e) {
       LOG.error("Failed to write to DB. Key: {}", new String(key,
           StandardCharsets.UTF_8));
-      throw toIOException("Failed to put key-value to metadata "
+      throw HddsServerUtil.toIOException("Failed to put key-value to metadata "
           + "store", e);
     }
   }
@@ -147,8 +132,7 @@ class RDBTable implements Table<byte[], byte[]> {
       }
       return false;
     } catch (RocksDBException e) {
-      throw toIOException(
-          "Error in accessing DB. ", e);
+      throw HddsServerUtil.toIOException("Error in accessing DB. ", e);
     }
   }
 
@@ -157,7 +141,7 @@ class RDBTable implements Table<byte[], byte[]> {
     try {
       return db.get(handle, key);
     } catch (RocksDBException e) {
-      throw toIOException(
+      throw HddsServerUtil.toIOException(
           "Failed to get the value for the given key", e);
     }
   }
@@ -196,7 +180,7 @@ class RDBTable implements Table<byte[], byte[]> {
       }
       return null;
     } catch (RocksDBException e) {
-      throw toIOException("Error in accessing DB. ", e);
+      throw HddsServerUtil.toIOException("Error in accessing DB. ", e);
     }
   }
 
@@ -205,7 +189,7 @@ class RDBTable implements Table<byte[], byte[]> {
     try {
       db.delete(handle, key);
     } catch (RocksDBException e) {
-      throw toIOException("Failed to delete the given key", e);
+      throw HddsServerUtil.toIOException("Failed to delete the given key", e);
     }
   }
 
@@ -232,7 +216,8 @@ class RDBTable implements Table<byte[], byte[]> {
     try {
       return StringUtils.bytes2String(this.getHandle().getName());
     } catch (RocksDBException rdbEx) {
-      throw toIOException("Unable to get the table name.", rdbEx);
+      throw HddsServerUtil.toIOException(
+          "Unable to get the table name.", rdbEx);
     }
   }
 
@@ -246,7 +231,7 @@ class RDBTable implements Table<byte[], byte[]> {
     try {
       return db.getLongProperty(handle, "rocksdb.estimate-num-keys");
     } catch (RocksDBException e) {
-      throw toIOException(
+      throw HddsServerUtil.toIOException(
           "Failed to get estimated key count of table " + getName(), e);
     }
   }
