@@ -173,7 +173,7 @@ You can use the installed Run configurations in the following order:
 3. OzoneManagerInit (to initialize OM, it requires SCM)
 4. OzoneManager
 5. Recon (required by datanode)
-6. Datanode1
+6. Datanode1, Datanode2, Datanode3
 
 
 ### Setting up Checkstyle
