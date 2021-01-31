@@ -89,13 +89,11 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
  * <p>
  * For full featured version use RootedOzoneClientAdapterImpl.
  */
-public class BasicRootedOzoneClientAdapterImpl
-    implements OzoneClientAdapter {
+public class BasicRootedOzoneClientAdapterImpl {
 
   static final Logger LOG =
       LoggerFactory.getLogger(BasicRootedOzoneClientAdapterImpl.class);
 
-  private OzoneClient ozoneClient;
   private ObjectStore objectStore;
   private ClientProtocol proxy;
   private ReplicationType replicationType;
@@ -174,17 +172,15 @@ public class BasicRootedOzoneClientAdapterImpl
       int replicationCountConf = conf.getInt(OzoneConfigKeys.OZONE_REPLICATION,
           OzoneConfigKeys.OZONE_REPLICATION_DEFAULT);
 
+      OzoneClient ozoneClient;
       if (OmUtils.isOmHAServiceId(conf, omHost)) {
         // omHost is listed as one of the service ids in the config,
         // thus we should treat omHost as omServiceId
-        this.ozoneClient =
-            OzoneClientFactory.getRpcClient(omHost, conf);
+        ozoneClient = OzoneClientFactory.getRpcClient(omHost, conf);
       } else if (StringUtils.isNotEmpty(omHost) && omPort != -1) {
-        this.ozoneClient =
-            OzoneClientFactory.getRpcClient(omHost, omPort, conf);
+        ozoneClient = OzoneClientFactory.getRpcClient(omHost, omPort, conf);
       } else {
-        this.ozoneClient =
-            OzoneClientFactory.getRpcClient(conf);
+        ozoneClient = OzoneClientFactory.getRpcClient(conf);
       }
       objectStore = ozoneClient.getObjectStore();
       proxy = objectStore.getClientProxy();
@@ -241,7 +237,7 @@ public class BasicRootedOzoneClientAdapterImpl
             if (getVolEx.getResult().equals(VOLUME_NOT_FOUND)) {
               // Volume doesn't exist. Create it
               try {
-                objectStore.createVolume(volumeStr);
+                proxy.createVolume(volumeStr);
               } catch (OMException newVolEx) {
                 // Ignore the case where another client created the volume
                 if (!newVolEx.getResult().equals(VOLUME_ALREADY_EXISTS)) {
@@ -274,17 +270,14 @@ public class BasicRootedOzoneClientAdapterImpl
     return bucket;
   }
 
-  @Override
   public short getDefaultReplication() {
     return (short) replicationFactor.getValue();
   }
 
-  @Override
   public void close() throws IOException {
-    ozoneClient.close();
+    proxy.close();
   }
 
-  @Override
   public InputStream readFile(String pathStr) throws IOException {
     incrementCounter(Statistic.OBJECTS_READ, 1);
     OFSPath ofsPath = new OFSPath(pathStr);
@@ -307,7 +300,6 @@ public class BasicRootedOzoneClientAdapterImpl
     //noop: Use RootedOzoneClientAdapterImpl which supports statistics.
   }
 
-  @Override
   public OzoneFSOutputStream createFile(String pathStr, short replication,
       boolean overWrite, boolean recursive) throws IOException {
     incrementCounter(Statistic.OBJECTS_CREATED, 1);
@@ -342,11 +334,6 @@ public class BasicRootedOzoneClientAdapterImpl
     }
   }
 
-  @Override
-  public void renameKey(String key, String newKeyName) throws IOException {
-    throw new IOException("OFS doesn't support renameKey, use rename instead.");
-  }
-
   /**
    * Rename a path into another.
    *
@@ -358,7 +345,6 @@ public class BasicRootedOzoneClientAdapterImpl
    * @param newPath Target path
    * @throws IOException
    */
-  @Override
   public void rename(String path, String newPath) throws IOException {
     incrementCounter(Statistic.OBJECTS_RENAMED, 1);
     OFSPath ofsPath = new OFSPath(path);
@@ -401,7 +387,6 @@ public class BasicRootedOzoneClientAdapterImpl
    * @param pathStr path to be created as directory
    * @return true if the key is created, false otherwise
    */
-  @Override
   public boolean createDirectory(String pathStr) throws IOException {
     LOG.trace("creating dir for path: {}", pathStr);
     incrementCounter(Statistic.OBJECTS_CREATED, 1);
@@ -412,7 +397,7 @@ public class BasicRootedOzoneClientAdapterImpl
     }
     if (ofsPath.getBucketName().isEmpty()) {
       // Create volume only
-      objectStore.createVolume(ofsPath.getVolumeName());
+      proxy.createVolume(ofsPath.getVolumeName());
       return true;
     }
     String keyStr = ofsPath.getKeyName();
@@ -440,7 +425,6 @@ public class BasicRootedOzoneClientAdapterImpl
    * @param path path to a key to be deleted
    * @return true if the key is deleted, false otherwise
    */
-  @Override
   public boolean deleteObject(String path) {
     LOG.trace("issuing delete for path to key: {}", path);
     incrementCounter(Statistic.OBJECTS_DELETED, 1);
@@ -486,7 +470,6 @@ public class BasicRootedOzoneClientAdapterImpl
    * @param keyNameList key name list to be deleted
    * @return true if the key deletion is successful, false otherwise
    */
-  @Override
   public boolean deleteObjects(List<String> keyNameList) {
     if (keyNameList.size() == 0) {
       return true;
@@ -540,7 +523,7 @@ public class BasicRootedOzoneClientAdapterImpl
       return getFileStatusAdapterForRoot(uri);
     }
     if (ofsPath.isVolume()) {
-      OzoneVolume volume = objectStore.getVolume(ofsPath.getVolumeName());
+      OzoneVolume volume = proxy.getVolumeDetails(ofsPath.getVolumeName());
       return getFileStatusAdapterForVolume(volume, uri);
     }
     try {
@@ -615,7 +598,6 @@ public class BasicRootedOzoneClientAdapterImpl
     return ret;
   }
 
-  @Override
   public Iterator<BasicKeyInfo> listKeys(String pathStr) throws IOException {
     incrementCounter(Statistic.OBJECTS_LIST, 1);
     OFSPath ofsPath = new OFSPath(pathStr);
@@ -638,12 +620,11 @@ public class BasicRootedOzoneClientAdapterImpl
       URI uri, Path workingDir, String username) throws IOException {
 
     OFSPath ofsStartPath = new OFSPath(startPath);
-    // list volumes
-    Iterator<? extends OzoneVolume> iter = objectStore.listVolumesByUser(
-        username, null, ofsStartPath.getVolumeName());
     List<FileStatusAdapter> res = new ArrayList<>();
-    while (iter.hasNext() && res.size() < numEntries) {
-      OzoneVolume volume = iter.next();
+    // list volumes
+    List<OzoneVolume> listVolumes = proxy.listVolumes(
+        username, null, ofsStartPath.getVolumeName(), (int)numEntries);
+    for (OzoneVolume volume : listVolumes) {
       res.add(getFileStatusAdapterForVolume(volume, uri));
       if (recursive) {
         String pathStrNextVolume = volume.getName();
@@ -663,7 +644,7 @@ public class BasicRootedOzoneClientAdapterImpl
 
     OFSPath ofsStartPath = new OFSPath(startPath);
     // list buckets in the volume
-    OzoneVolume volume = objectStore.getVolume(volumeStr);
+    OzoneVolume volume = proxy.getVolumeDetails(volumeStr);
     UserGroupInformation ugi =
         UserGroupInformation.createRemoteUser(volume.getOwner());
     String owner = ugi.getShortUserName();
@@ -761,36 +742,36 @@ public class BasicRootedOzoneClientAdapterImpl
     }
   }
 
-  @Override
   public Token<OzoneTokenIdentifier> getDelegationToken(String renewer)
       throws IOException {
     if (!securityEnabled) {
       return null;
     }
-    Token<OzoneTokenIdentifier> token = ozoneClient.getObjectStore()
-        .getDelegationToken(renewer == null ? null : new Text(renewer));
+    Token<OzoneTokenIdentifier> token = proxy.getDelegationToken(
+        renewer == null ? null : new Text(renewer));
     token.setKind(OzoneTokenIdentifier.KIND_NAME);
     return token;
 
   }
 
-  public ObjectStore getObjectStore() {
-    return objectStore;
-  }
-
-  @Override
   public KeyProvider getKeyProvider() throws IOException {
-    return objectStore.getKeyProvider();
+    return proxy.getKeyProvider();
   }
 
-  @Override
   public URI getKeyProviderUri() throws IOException {
-    return objectStore.getKeyProviderUri();
+    return proxy.getKeyProviderUri();
   }
 
-  @Override
   public String getCanonicalServiceName() {
-    return objectStore.getCanonicalServiceName();
+    return proxy.getCanonicalServiceName();
+  }
+
+  public OzoneVolume getVolumeDetails(String volumeName) throws IOException {
+    return proxy.getVolumeDetails(volumeName);
+  }
+
+  public void deleteVolume(String volumeName) throws IOException {
+    proxy.deleteVolume(volumeName);
   }
 
   /**

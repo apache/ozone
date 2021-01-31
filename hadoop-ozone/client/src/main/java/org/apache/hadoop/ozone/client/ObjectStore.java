@@ -81,7 +81,9 @@ public class ObjectStore {
     proxy = null;
   }
 
-  @VisibleForTesting
+  /**
+   * Returns the ClientProtocol of the ObjectStore.
+   */
   public ClientProtocol getClientProxy() {
     return proxy;
   }
