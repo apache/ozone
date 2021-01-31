@@ -37,8 +37,7 @@ find "." -not -path '*/iteration*' \
     \( -name "*.hprof" \
     -or -name "*.dump" \
     -or -name "*.dumpstream" \
-    -or -name "hs_err_*.log" \
-    -or -name "*-output.txt" \) \
+    -or -name "hs_err_*.log" \) \
   -exec mv {} "$REPORT_DIR/" \;
 
 ## Add the tests where the JVM is crashed
