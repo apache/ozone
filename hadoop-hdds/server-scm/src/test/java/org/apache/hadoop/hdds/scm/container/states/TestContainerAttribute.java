@@ -27,7 +27,6 @@ import org.junit.rules.ExpectedException;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.NavigableSet;
 
 /**
  * Test ContainerAttribute management.
