@@ -168,6 +168,7 @@ To start Ozone from IntelliJ:
 4. New runner definitions are available from the Run menu.
 
 You can use the installed Run configurations in the following order:
+
 1. StorageContainerManagerInit (to initialize the SCM dir)
 2. StorageContainerManger (to start SCM)
 3. OzoneManagerInit (to initialize OM, it requires SCM)
