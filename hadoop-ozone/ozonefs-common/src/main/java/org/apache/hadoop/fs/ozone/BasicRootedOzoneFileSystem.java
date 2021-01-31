@@ -99,7 +99,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   private String userName;
   private Path workingDir;
   // Using impl directly rather than OzoneClientAdapter in OFS.
-  private BasicRootedOzoneClientAdapterImpl impl;
+  private BasicRootedOzoneFileSystemHelper helper;
 
   private static final String URI_EXCEPTION_TEXT =
       "URL should be one of the following formats: " +
@@ -145,7 +145,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       LOG.trace("Ozone URI for OFS initialization is " + uri);
 
       ConfigurationSource source = getConfSource();
-      this.impl = new BasicRootedOzoneClientAdapterImpl(
+      this.helper = new BasicRootedOzoneFileSystemHelper(
           omHostOrServiceId, omPort, source);
 
       try {
@@ -166,7 +166,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   @Override
   public void close() throws IOException {
     try {
-      impl.close();
+      helper.close();
     } finally {
       super.close();
     }
@@ -189,7 +189,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     LOG.trace("open() path: {}", path);
     final String key = pathToKey(path);
     return new FSDataInputStream(
-        new OzoneFSInputStream(impl.readFile(key), statistics));
+        new OzoneFSInputStream(helper.readFile(key), statistics));
   }
 
   protected void incrementCounter(Statistic statistic) {
@@ -229,7 +229,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
 
   private FSDataOutputStream createOutputStream(String key, short replication,
       boolean overwrite, boolean recursive) throws IOException {
-    return new FSDataOutputStream(impl.createFile(key,
+    return new FSDataOutputStream(helper.createFile(key,
         replication, overwrite, recursive), statistics);
   }
 
@@ -253,14 +253,14 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       LOG.trace("rename from:{} to:{}", this.srcPath, this.dstPath);
       // Initialize bucket here to reduce number of RPC calls
       OFSPath ofsPath = new OFSPath(srcPath);
-      this.bucket = impl.getBucket(ofsPath, false);
+      this.bucket = helper.getBucket(ofsPath, false);
     }
 
     @Override
     boolean processKeyPath(List<String> keyPathList) throws IOException {
       for (String keyPath : keyPathList) {
         String newPath = dstPath.concat(keyPath.substring(srcPath.length()));
-        impl.rename(this.bucket, keyPath, newPath);
+        helper.rename(this.bucket, keyPath, newPath);
       }
       return true;
     }
@@ -415,13 +415,13 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       }
       // Initialize bucket here to reduce number of RPC calls
       OFSPath ofsPath = new OFSPath(f);
-      this.bucket = impl.getBucket(ofsPath, false);
+      this.bucket = helper.getBucket(ofsPath, false);
     }
 
     @Override
     boolean processKeyPath(List<String> keyPathList) {
       LOG.trace("Deleting keys: {}", keyPathList);
-      boolean succeed = impl.deleteObjects(this.bucket, keyPathList);
+      boolean succeed = helper.deleteObjects(this.bucket, keyPathList);
       // if recursive delete is requested ignore the return value of
       // deleteObject and issue deletes for other keys.
       return recursive || succeed;
@@ -494,7 +494,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
         String volumeName = ofsPath.getVolumeName();
         if (recursive) {
           // Delete all buckets first
-          OzoneVolume volume = impl.getVolumeDetails(volumeName);
+          OzoneVolume volume = helper.getVolumeDetails(volumeName);
           Iterator<? extends OzoneBucket> it = volume.listBuckets("");
           String prefixVolumePathStr = addTrailingSlashIfNeeded(f.toString());
           while (it.hasNext()) {
@@ -504,7 +504,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
           }
         }
         try {
-          impl.deleteVolume(volumeName);
+          helper.deleteVolume(volumeName);
           return true;
         } catch (OMException ex) {
           // volume is not empty
@@ -520,7 +520,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
 
       // Handle delete bucket
       if (ofsPath.isBucket()) {
-        OzoneVolume volume = impl.getVolumeDetails(ofsPath.getVolumeName());
+        OzoneVolume volume = helper.getVolumeDetails(ofsPath.getVolumeName());
         try {
           volume.deleteBucket(ofsPath.getBucketName());
           return result;
@@ -536,7 +536,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
 
     } else {
       LOG.debug("delete: Path is a file: {}", f);
-      result = impl.deleteObject(key);
+      result = helper.deleteObject(key);
     }
 
     if (result) {
@@ -573,7 +573,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     if (!key.isEmpty() && !o3Exists(f)) {
       LOG.debug("Creating new fake directory at {}", f);
       String dirKey = addTrailingSlashIfNeeded(key);
-      impl.createDirectory(dirKey);
+      helper.createDirectory(dirKey);
     }
   }
 
@@ -606,7 +606,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
 
     do {
       tmpStatusList =
-          impl.listStatus(pathToKey(f), false, startPath,
+          helper.listStatus(pathToKey(f), false, startPath,
               numEntries, uri, workingDir, getUsername())
               .stream()
               .map(this::convertFileStatus)
@@ -640,7 +640,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
 
   @Override
   public Token<?> getDelegationToken(String renewer) throws IOException {
-    return impl.getDelegationToken(renewer);
+    return helper.getDelegationToken(renewer);
   }
 
   /**
@@ -651,7 +651,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
    */
   @Override
   public String getCanonicalServiceName() {
-    return impl.getCanonicalServiceName();
+    return helper.getCanonicalServiceName();
   }
 
   /**
@@ -684,7 +684,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   public Collection<FileStatus> getTrashRoots(boolean allUsers) {
     // Since get all trash roots for one or more users requires listing all
     // volumes and buckets, we will let adapter impl handle it.
-    return impl.getTrashRoots(allUsers, this);
+    return helper.getTrashRoots(allUsers, this);
   }
 
   /**
@@ -695,7 +695,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
    * @throws IOException
    */
   private boolean mkdir(Path path) throws IOException {
-    return impl.createDirectory(pathToKey(path));
+    return helper.createDirectory(pathToKey(path));
   }
 
   @Override
@@ -729,7 +729,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     FileStatus fileStatus = null;
     try {
       fileStatus = convertFileStatus(
-          impl.getFileStatus(key, uri, qualifiedPath, getUsername()));
+          helper.getFileStatus(key, uri, qualifiedPath, getUsername()));
     } catch (OMException ex) {
       if (ex.getResult().equals(OMException.ResultCodes.KEY_NOT_FOUND) ||
           ex.getResult().equals(OMException.ResultCodes.BUCKET_NOT_FOUND) ||
@@ -753,7 +753,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
 
   @Override
   public short getDefaultReplication() {
-    return impl.getDefaultReplication();
+    return helper.getDefaultReplication();
   }
 
   @Override
@@ -899,7 +899,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       if (status.isDirectory()) {
         this.pathKey = addTrailingSlashIfNeeded(pathKey);
       }
-      keyIterator = impl.listKeys(pathKey);
+      keyIterator = helper.listKeys(pathKey);
     }
 
     /**
@@ -976,8 +976,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     }
   }
 
-  public BasicRootedOzoneClientAdapterImpl getImpl() {
-    return impl;
+  public BasicRootedOzoneFileSystemHelper getHelper() {
+    return helper;
   }
 
   public boolean isEmpty(CharSequence cs) {

@@ -50,12 +50,12 @@ public class RootedOzoneFileSystem extends BasicRootedOzoneFileSystem
 
   @Override
   public KeyProvider getKeyProvider() throws IOException {
-    return getImpl().getKeyProvider();
+    return getHelper().getKeyProvider();
   }
 
   @Override
   public URI getKeyProviderUri() throws IOException {
-    return getImpl().getKeyProviderUri();
+    return getHelper().getKeyProviderUri();
   }
 
   @Override

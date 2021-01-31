@@ -121,7 +121,7 @@ public class TestRootedOzoneFileSystem {
   private static FileSystem fs;
   private static RootedOzoneFileSystem ofs;
   private static ObjectStore objectStore;
-  private static BasicRootedOzoneClientAdapterImpl impl;
+  private static BasicRootedOzoneFileSystemHelper helper;
   private static Trash trash;
 
   private static String volumeName;
@@ -164,7 +164,7 @@ public class TestRootedOzoneFileSystem {
         TrashPolicy.class);
     trash = new Trash(conf);
     ofs = (RootedOzoneFileSystem) fs;
-    impl = ofs.getImpl();
+    helper = ofs.getHelper();
   }
 
   @AfterClass
@@ -696,7 +696,7 @@ public class TestRootedOzoneFileSystem {
    */
   private List<FileStatus> callAdapterListStatus(String pathStr,
       boolean recursive, String startPath, long numEntries) throws IOException {
-    return impl.listStatus(pathStr, recursive, startPath, numEntries,
+    return helper.listStatus(pathStr, recursive, startPath, numEntries,
         ofs.getUri(), ofs.getWorkingDirectory(), ofs.getUsername())
         .stream().map(ofs::convertFileStatus).collect(Collectors.toList());
   }

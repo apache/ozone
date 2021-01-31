@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -40,6 +40,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -83,16 +84,21 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
     .BUCKET_NOT_FOUND;
 
 /**
- * Basic Implementation of the RootedOzoneFileSystem calls.
- * <p>
+ * Helper implementation of RootedOzoneFileSystem (OFS) calls.
+ *
+ * Previously BasicRootedOzoneClientAdapterImpl. Might be merged with
+ * BasicRootedOzoneFileSystem in the future.
+ *
  * This is the minimal version which doesn't include any statistics.
- * <p>
+ *
  * For full featured version use RootedOzoneClientAdapterImpl.
  */
-public class BasicRootedOzoneClientAdapterImpl {
+@InterfaceAudience.Private
+@InterfaceStability.Evolving
+public class BasicRootedOzoneFileSystemHelper {
 
   static final Logger LOG =
-      LoggerFactory.getLogger(BasicRootedOzoneClientAdapterImpl.class);
+      LoggerFactory.getLogger(BasicRootedOzoneFileSystemHelper.class);
 
   private ObjectStore objectStore;
   private ClientProtocol proxy;
@@ -106,7 +112,7 @@ public class BasicRootedOzoneClientAdapterImpl {
    *
    * @throws IOException In case of a problem.
    */
-  public BasicRootedOzoneClientAdapterImpl() throws IOException {
+  public BasicRootedOzoneFileSystemHelper() throws IOException {
     this(createConf());
   }
 
@@ -121,12 +127,12 @@ public class BasicRootedOzoneClientAdapterImpl {
     }
   }
 
-  public BasicRootedOzoneClientAdapterImpl(OzoneConfiguration conf)
+  public BasicRootedOzoneFileSystemHelper(OzoneConfiguration conf)
       throws IOException {
     this(null, -1, conf);
   }
 
-  public BasicRootedOzoneClientAdapterImpl(String omHost, int omPort,
+  public BasicRootedOzoneFileSystemHelper(String omHost, int omPort,
       ConfigurationSource hadoopConf) throws IOException {
 
     ClassLoader contextClassLoader =

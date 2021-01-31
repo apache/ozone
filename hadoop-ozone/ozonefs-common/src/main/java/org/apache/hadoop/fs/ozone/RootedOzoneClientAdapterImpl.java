@@ -26,7 +26,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
  * Implementation of the RootedOzoneFileSystem calls.
  */
 public class RootedOzoneClientAdapterImpl
-    extends BasicRootedOzoneClientAdapterImpl {
+    extends BasicRootedOzoneFileSystemHelper {
 
   private OzoneFSStorageStatistics storageStatistics;
 
