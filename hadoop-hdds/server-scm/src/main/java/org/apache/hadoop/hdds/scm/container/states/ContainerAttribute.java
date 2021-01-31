@@ -84,7 +84,8 @@ public class ContainerAttribute<T> {
   }
 
   /**
-   * Insert or update the value in the Attribute map.
+   * Insert the value in the Attribute map, keep the original value if it exists
+   * already.
    *
    * @param key - The key to the set where the ContainerID should exist.
    * @param value - Actual Container ID.
@@ -97,14 +98,11 @@ public class ContainerAttribute<T> {
     if (attributeMap.containsKey(key)) {
       if (attributeMap.get(key).add(value)) {
         return true; //we inserted the value as it doesn’t exist in the set.
-      } else { // Failure indicates that this ContainerID exists in the Set
-        if (!attributeMap.get(key).remove(value)) {
-          LOG.error("Failure to remove the object from the Map.Key:{}, " +
-              "ContainerID: {}", key, value);
-          throw new SCMException("Failure to remove the object from the Map",
-              FAILED_TO_CHANGE_CONTAINER_STATE);
-        }
-        attributeMap.get(key).add(value);
+      } else {
+        // Failure indicates that this ContainerID exists in the Set, since
+        // ContainerID contains no information other than id, we keep the the
+        // old value.
+        LOG.debug("ContainerID: {} already exists in Map.Key :{}.", value, key);
         return true;
       }
     } else {

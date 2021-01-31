@@ -27,6 +27,7 @@ import org.junit.rules.ExpectedException;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.NavigableSet;
 
 /**
  * Test ContainerAttribute management.
@@ -45,7 +46,7 @@ public class TestContainerAttribute {
         containerAttribute.getCollection(1).size());
     Assert.assertTrue(containerAttribute.getCollection(1).contains(id));
 
-    // Insert again and verify that it overwrites an existing value.
+    // Insert again and verify that the new ContainerId is inserted.
     ContainerID newId =
         new ContainerID(42);
     containerAttribute.insert(1, newId);
