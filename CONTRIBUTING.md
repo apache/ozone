@@ -175,7 +175,6 @@ You can use the installed Run configurations in the following order:
 5. Recon (required by datanode)
 6. Datanode1, Datanode2, Datanode3
 
-
 ### Setting up Checkstyle
 
 Checkstyle plugin may help to detect violations directly from the IDE.
