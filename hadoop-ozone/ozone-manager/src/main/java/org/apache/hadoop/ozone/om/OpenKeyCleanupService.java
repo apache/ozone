@@ -66,7 +66,7 @@ public class OpenKeyCleanupService extends BackgroundService {
   // Use only a single thread for open key deletion. Multiple threads would read
   // from the same table and can send deletion requests for same key multiple
   // times.
-  private final static int OPEN_KEY_CLEANUP_CORE_POOL_SIZE = 1;
+  private static final int OPEN_KEY_CLEANUP_CORE_POOL_SIZE = 1;
 
   private final OzoneManager ozoneManager;
   private final KeyManager keyManager;
@@ -230,14 +230,16 @@ public class OpenKeyCleanupService extends BackgroundService {
     private void submitRatisRequest(OzoneManager om, OMRequest omRequest) {
       try {
         OzoneManagerRatisServer server = om.getOmRatisServer();
-        RaftClientRequest raftClientRequest = new RaftClientRequest(
-            ClientId.randomId(),
-            server.getRaftPeerId(),
-            server.getRaftGroupId(),
-            0,
-            Message.valueOf(
-                OMRatisHelper.convertRequestToByteString(omRequest)),
-            RaftClientRequest.writeRequestType(), null);
+        RaftClientRequest raftClientRequest = RaftClientRequest.newBuilder()
+            .setClientId(ClientId.randomId())
+            .setServerId(server.getRaftPeerId())
+            .setGroupId(server.getRaftGroupId())
+            .setCallId(0)
+            .setMessage(
+                Message.valueOf(
+                    OMRatisHelper.convertRequestToByteString(omRequest)))
+            .setType(RaftClientRequest.writeRequestType())
+            .build();
 
         server.submitRequest(omRequest, raftClientRequest);
       } catch (ServiceException ex) {
