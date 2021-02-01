@@ -118,6 +118,11 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <groupId>org.apache.ratis</groupId>
     </dependency>
     <dependency>
+      <groupId>org.apache.ratis</groupId>
+      <artifactId>ratis-thirdparty-misc</artifactId>
+      <version>${ratis.thirdparty.version}</version>
+    </dependency>
+    <dependency>
       <groupId>com.google.errorprone</groupId>
       <artifactId>error_prone_annotations</artifactId>
       <optional>true</optional>
