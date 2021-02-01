@@ -69,7 +69,7 @@ public class TestOzoneManagerRatisServer {
   private OzoneManagerRatisServer omRatisServer;
   private String omID;
   private String clientId = UUID.randomUUID().toString();
-  private static final long LEADER_ELECTION_TIMEOUT = 500L;
+  private static final long RATIS_RPC_TIMEOUT = 500L;
   private OMMetadataManager omMetadataManager;
   private OzoneManager ozoneManager;
   private OMNodeDetails omNodeDetails;
@@ -82,9 +82,8 @@ public class TestOzoneManagerRatisServer {
     final String path = GenericTestUtils.getTempPath(omID);
     Path metaDirPath = Paths.get(path, "om-meta");
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDirPath.toString());
-    conf.setTimeDuration(
-        OMConfigKeys.OZONE_OM_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY,
-        LEADER_ELECTION_TIMEOUT, TimeUnit.MILLISECONDS);
+    conf.setTimeDuration(OMConfigKeys.OZONE_OM_RATIS_MINIMUM_TIMEOUT_KEY,
+        RATIS_RPC_TIMEOUT, TimeUnit.MILLISECONDS);
     int ratisPort = conf.getInt(
         OMConfigKeys.OZONE_OM_RATIS_PORT_KEY,
         OMConfigKeys.OZONE_OM_RATIS_PORT_DEFAULT);
@@ -103,7 +102,7 @@ public class TestOzoneManagerRatisServer {
         folder.newFolder().getAbsolutePath());
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
-    initialTermIndex = TermIndex.newTermIndex(0, 0);
+    initialTermIndex = TermIndex.valueOf(0, 0);
     OMRatisSnapshotInfo omRatisSnapshotInfo = new OMRatisSnapshotInfo();
     when(ozoneManager.getSnapshotInfo()).thenReturn(omRatisSnapshotInfo);
     omRatisServer = OzoneManagerRatisServer.newOMRatisServer(conf, ozoneManager,
@@ -136,7 +135,7 @@ public class TestOzoneManagerRatisServer {
     SnapshotInfo snapshotInfo =
         omRatisServer.getOmStateMachine().getLatestSnapshot();
 
-    TermIndex newSnapshotIndex = TermIndex.newTermIndex(
+    TermIndex newSnapshotIndex = TermIndex.valueOf(
         snapshotInfo.getTerm(), snapshotInfo.getIndex() + 100);
 
     omMetadataManager.getTransactionInfoTable().put(TRANSACTION_INFO_KEY,
@@ -202,9 +201,8 @@ public class TestOzoneManagerRatisServer {
     String path = GenericTestUtils.getTempPath(newOmId);
     Path metaDirPath = Paths.get(path, "om-meta");
     newConf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDirPath.toString());
-    newConf.setTimeDuration(
-        OMConfigKeys.OZONE_OM_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY,
-        LEADER_ELECTION_TIMEOUT, TimeUnit.MILLISECONDS);
+    newConf.setTimeDuration(OMConfigKeys.OZONE_OM_RATIS_MINIMUM_TIMEOUT_KEY,
+        RATIS_RPC_TIMEOUT, TimeUnit.MILLISECONDS);
     int ratisPort = 9873;
     InetSocketAddress rpcAddress = new InetSocketAddress(
         InetAddress.getLocalHost(), 0);

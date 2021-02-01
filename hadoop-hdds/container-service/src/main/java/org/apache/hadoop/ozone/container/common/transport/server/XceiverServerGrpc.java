@@ -45,9 +45,7 @@ import com.google.common.base.Preconditions;
 import io.opentracing.Scope;
 import io.opentracing.Span;
 import io.opentracing.util.GlobalTracer;
-import org.apache.ratis.thirdparty.io.grpc.BindableService;
 import org.apache.ratis.thirdparty.io.grpc.Server;
-import org.apache.ratis.thirdparty.io.grpc.ServerBuilder;
 import org.apache.ratis.thirdparty.io.grpc.ServerInterceptors;
 import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
 import org.apache.ratis.thirdparty.io.grpc.netty.NettyServerBuilder;
@@ -78,8 +76,7 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
    */
   public XceiverServerGrpc(DatanodeDetails datanodeDetails,
       ConfigurationSource conf,
-      ContainerDispatcher dispatcher, CertificateClient caClient,
-      BindableService... additionalServices) {
+      ContainerDispatcher dispatcher, CertificateClient caClient) {
     Preconditions.checkNotNull(conf);
 
     this.id = datanodeDetails.getUuid();
@@ -92,17 +89,10 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
       this.port = 0;
     }
 
-    NettyServerBuilder nettyServerBuilder =
-        ((NettyServerBuilder) ServerBuilder.forPort(port))
-            .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE);
-
-    GrpcServerInterceptor tracingInterceptor = new GrpcServerInterceptor();
-    nettyServerBuilder.addService(ServerInterceptors.intercept(
-        new GrpcXceiverService(dispatcher), tracingInterceptor));
-
-    for (BindableService service : additionalServices) {
-      nettyServerBuilder.addService(service);
-    }
+    NettyServerBuilder nettyServerBuilder = NettyServerBuilder.forPort(port)
+        .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE)
+        .addService(ServerInterceptors.intercept(
+            new GrpcXceiverService(dispatcher), new GrpcServerInterceptor()));
 
     SecurityConfig secConf = new SecurityConfig(conf);
     if (secConf.isGrpcTlsEnabled()) {

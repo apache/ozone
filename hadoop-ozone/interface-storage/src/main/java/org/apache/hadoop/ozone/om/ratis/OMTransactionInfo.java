@@ -74,7 +74,7 @@ public final class OMTransactionInfo {
   }
 
   public TermIndex getTermIndex() {
-    return TermIndex.newTermIndex(term, transactionIndex);
+    return TermIndex.valueOf(term, transactionIndex);
   }
 
   /**

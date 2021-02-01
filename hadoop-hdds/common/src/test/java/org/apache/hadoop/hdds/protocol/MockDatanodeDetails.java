@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.hdds.protocol;
 
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.util.Random;
@@ -101,6 +103,8 @@ public final class MockDatanodeDetails {
         .addPort(ratisPort)
         .addPort(restPort)
         .setNetworkLocation(networkLocation)
+        .setPersistedOpState(HddsProtos.NodeOperationalState.IN_SERVICE)
+        .setPersistedOpStateExpiry(0)
         .build();
   }
 

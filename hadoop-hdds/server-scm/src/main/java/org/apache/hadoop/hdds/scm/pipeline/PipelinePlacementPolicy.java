@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -96,9 +97,12 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
         continue;
       }
       if (pipeline != null &&
+            // single node pipeline are not accounted for while determining
+            // the pipeline limit for dn
+            pipeline.getType() == HddsProtos.ReplicationType.RATIS &&
+            (pipeline.getFactor() == HddsProtos.ReplicationFactor.ONE ||
           pipeline.getFactor().getNumber() == nodesRequired &&
-          pipeline.getType() == HddsProtos.ReplicationType.RATIS &&
-          pipeline.getPipelineState() == Pipeline.PipelineState.CLOSED) {
+          pipeline.getPipelineState() == Pipeline.PipelineState.CLOSED)) {
         pipelineNumDeductable++;
       }
     }
@@ -123,7 +127,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
       throws SCMException {
     // get nodes in HEALTHY state
     List<DatanodeDetails> healthyNodes =
-        nodeManager.getNodes(HddsProtos.NodeState.HEALTHY);
+        nodeManager.getNodes(NodeStatus.inServiceHealthy());
     boolean multipleRacks = multipleRacksAvailable(healthyNodes);
     if (excludedNodes != null) {
       healthyNodes.removeAll(excludedNodes);
@@ -350,17 +354,17 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
    * list that we are operating on.
    *
    * @param healthyNodes - Set of healthy nodes we can choose from.
-   * @return chosen datanodDetails
+   * @return chosen datanodeDetails
    */
   @Override
-  public DatanodeDetails chooseNode(
-      List<DatanodeDetails> healthyNodes) {
+  public DatanodeDetails chooseNode(final List<DatanodeDetails> healthyNodes) {
     if (healthyNodes == null || healthyNodes.isEmpty()) {
       return null;
     }
-    DatanodeDetails datanodeDetails = healthyNodes.get(0);
-    healthyNodes.remove(datanodeDetails);
-    return datanodeDetails;
+    DatanodeDetails selectedNode =
+            healthyNodes.get(getRand().nextInt(healthyNodes.size()));
+    healthyNodes.remove(selectedNode);
+    return selectedNode;
   }
 
   /**

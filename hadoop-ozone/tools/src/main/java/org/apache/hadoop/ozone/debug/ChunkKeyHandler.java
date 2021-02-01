@@ -52,7 +52,6 @@ import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.keys.KeyHandler;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.Parameters;
 
 /**
  * Class that gives chunk location given a specific key.
@@ -63,9 +62,6 @@ import picocli.CommandLine.Parameters;
 @MetaInfServices(SubcommandWithParent.class)
 public class ChunkKeyHandler extends KeyHandler implements
     SubcommandWithParent {
-
-  @Parameters(arity = "1..1", description = "key to be located")
-    private String uri;
 
   private ContainerOperationClient containerOperationClient;
   private  XceiverClientManager xceiverClientManager;

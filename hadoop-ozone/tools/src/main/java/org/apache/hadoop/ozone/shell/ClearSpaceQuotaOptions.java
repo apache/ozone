@@ -28,16 +28,16 @@ public class ClearSpaceQuotaOptions {
       description = "clear space quota")
   private boolean clrSpaceQuota;
 
-  @CommandLine.Option(names = {"--count-quota"},
-      description = "clear count quota")
-  private boolean clrCountQuota;
+  @CommandLine.Option(names = {"--namespace-quota"},
+      description = "clear namespace quota")
+  private boolean clrNamespaceQuota;
 
   public boolean getClrSpaceQuota() {
     return clrSpaceQuota;
   }
 
-  public boolean getClrCountQuota() {
-    return clrCountQuota;
+  public boolean getClrNamespaceQuota() {
+    return clrNamespaceQuota;
   }
 
 }

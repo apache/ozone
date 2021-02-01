@@ -147,6 +147,22 @@ public class OMMetrics {
   private @Metric MutableCounterLong numListMultipartUploadFails;
   private @Metric MutableCounterLong numListMultipartUploads;
 
+  // Metrics related to OM Trash.
+  private @Metric MutableCounterLong numTrashRenames;
+  private @Metric MutableCounterLong numTrashDeletes;
+  private @Metric MutableCounterLong numTrashListStatus;
+  private @Metric MutableCounterLong numTrashGetFileStatus;
+  private @Metric MutableCounterLong numTrashGetTrashRoots;
+  private @Metric MutableCounterLong numTrashExists;
+  private @Metric MutableCounterLong numTrashWriteRequests;
+  private @Metric MutableCounterLong numTrashFilesRenames;
+  private @Metric MutableCounterLong numTrashFilesDeletes;
+  private @Metric MutableCounterLong numTrashActiveCycles;
+  private @Metric MutableCounterLong numTrashCheckpointsProcessed;
+  private @Metric MutableCounterLong numTrashFails;
+  private @Metric MutableCounterLong numTrashRootsEnqueued;
+  private @Metric MutableCounterLong numTrashRootsProcessed;
+
   public OMMetrics() {
   }
 
@@ -203,6 +219,10 @@ public class OMMetrics {
 
   public void incNumKeys() {
     numKeys.incr();
+  }
+
+  public void incNumKeys(int count) {
+    numKeys.incr(count);
   }
 
   public void decNumKeys() {
@@ -867,6 +887,75 @@ public class OMMetrics {
 
   public long getNumRemoveAcl() {
     return numRemoveAcl.value();
+  }
+
+  public void incNumTrashRenames() {
+    numTrashRenames.incr();
+  }
+
+  public long getNumTrashRenames() {
+    return numTrashRenames.value();
+  }
+
+  public void incNumTrashDeletes() {
+    numTrashDeletes.incr();
+  }
+
+  public long getNumTrashDeletes() {
+    return numTrashDeletes.value();
+  }
+
+  public void incNumTrashListStatus() {
+    numTrashListStatus.incr();
+  }
+
+  public void incNumTrashGetFileStatus() {
+    numTrashGetFileStatus.incr();
+  }
+
+  public void incNumTrashGetTrashRoots() {
+    numTrashGetTrashRoots.incr();
+  }
+
+  public void incNumTrashExists() {
+    numTrashExists.incr();
+  }
+
+  public void incNumTrashWriteRequests() {
+    numTrashWriteRequests.incr();
+  }
+
+  public void incNumTrashFilesRenames() {
+    numTrashFilesRenames.incr();
+  }
+
+  public long getNumTrashFilesRenames() {
+    return numTrashFilesRenames.value();
+  }
+
+  public void incNumTrashFilesDeletes() {
+    numTrashFilesDeletes.incr();
+  }
+
+  public long getNumTrashFilesDeletes() {
+    return numTrashFilesDeletes.value();
+  }
+
+
+  public void incNumTrashActiveCycles() {
+    numTrashActiveCycles.incr();
+  }
+
+  public void incNumTrashRootsEnqueued() {
+    numTrashRootsEnqueued.incr();
+  }
+
+  public void incNumTrashRootsProcessed() {
+    numTrashRootsProcessed.incr();
+  }
+
+  public void incNumTrashFails() {
+    numTrashFails.incr();
   }
 
   public void unRegister() {

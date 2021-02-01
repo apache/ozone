@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.web.utils;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Locale;
@@ -42,8 +43,7 @@ import org.apache.ratis.util.TimeDuration;
 @InterfaceAudience.Private
 public final class OzoneUtils {
 
-  public static final String ENCODING_NAME = "UTF-8";
-  public static final Charset ENCODING = Charset.forName(ENCODING_NAME);
+  public static final Charset ENCODING = StandardCharsets.UTF_8;
 
   private OzoneUtils() {
     // Never constructed

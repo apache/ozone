@@ -56,7 +56,7 @@ public class TestOMGetDelegationTokenRequest extends
   private OMRequest originalRequest;
   private OMRequest modifiedRequest;
   private OMGetDelegationTokenRequest omGetDelegationTokenRequest;
-  final private String checkResponse = "";
+  private final String checkResponse = "";
 
   @Before
   public void setupGetDelegationToken() {

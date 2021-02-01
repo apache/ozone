@@ -48,7 +48,6 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
@@ -115,6 +114,8 @@ import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.READ;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.WRITE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_ENABLED_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
@@ -401,7 +402,7 @@ public class KeyManagerImpl implements KeyManager {
       if (grpcBlockTokenEnabled) {
         builder.setToken(secretManager
             .generateToken(remoteUser, allocatedBlock.getBlockID().toString(),
-                getAclForUser(remoteUser), scmBlockSize));
+                EnumSet.of(READ, WRITE), scmBlockSize));
       }
       locationInfos.add(builder.build());
     }
@@ -414,16 +415,6 @@ public class KeyManagerImpl implements KeyManager {
   public static UserGroupInformation getRemoteUser() throws IOException {
     UserGroupInformation ugi = Server.getRemoteUser();
     return (ugi != null) ? ugi : UserGroupInformation.getCurrentUser();
-  }
-
-  /**
-   * Return acl for user.
-   * @param user
-   *
-   * */
-  private EnumSet<AccessModeProto> getAclForUser(String user) {
-    // TODO: Return correct acl for user.
-    return EnumSet.allOf(AccessModeProto.class);
   }
 
   private EncryptedKeyVersion generateEDEK(
@@ -708,21 +699,14 @@ public class KeyManagerImpl implements KeyManager {
       }
       throw new OMException("Key not found", KEY_NOT_FOUND);
     }
-    if (grpcBlockTokenEnabled) {
-      String remoteUser = getRemoteUser().getShortUserName();
-      for (OmKeyLocationInfoGroup key : value.getKeyLocationVersions()) {
-        key.getLocationList().forEach(k -> {
-          k.setToken(secretManager.generateToken(remoteUser,
-                  k.getBlockID().getContainerBlockID().toString(),
-                  getAclForUser(remoteUser), k.getLength()));
-        });
-      }
-    }
+
+    // add block token for read.
+    addBlockToken4Read(value);
 
     // Refresh container pipeline info from SCM
     // based on OmKeyArgs.refreshPipeline flag
     // value won't be null as the check is done inside try/catch block.
-    refreshPipeline(value);
+    refresh(value);
 
     if (args.getSortDatanodes()) {
       sortDatanodes(clientAddress, value);
@@ -730,16 +714,19 @@ public class KeyManagerImpl implements KeyManager {
     return value;
   }
 
-  /**
-   * Refresh pipeline info in OM by asking SCM.
-   * @param value OmKeyInfo
-   */
-  @VisibleForTesting
-  protected void refreshPipeline(OmKeyInfo value) throws IOException {
+  private void addBlockToken4Read(OmKeyInfo value) throws IOException {
     Preconditions.checkNotNull(value, "OMKeyInfo cannot be null");
-    refreshPipeline(Arrays.asList(value));
+    if (grpcBlockTokenEnabled) {
+      String remoteUser = getRemoteUser().getShortUserName();
+      for (OmKeyLocationInfoGroup key : value.getKeyLocationVersions()) {
+        key.getLocationList().forEach(k -> {
+          k.setToken(secretManager.generateToken(remoteUser,
+              k.getBlockID().getContainerBlockID().toString(),
+              EnumSet.of(READ), k.getLength()));
+        });
+      }
+    }
   }
-
   /**
    * Refresh pipeline info in OM by asking SCM.
    * @param keyList a list of OmKeyInfo
@@ -956,7 +943,7 @@ public class KeyManagerImpl implements KeyManager {
 
     List<OmKeyInfo> keyList = metadataManager.listKeys(volumeName, bucketName,
         startKey, keyPrefix, maxKeys);
-    refreshPipeline(keyList);
+
     return keyList;
   }
 
@@ -1851,7 +1838,7 @@ public class KeyManagerImpl implements KeyManager {
         // refreshPipeline flag check has been removed as part of
         // https://issues.apache.org/jira/browse/HDDS-3658.
         // Please refer this jira for more details.
-        refreshPipeline(fileKeyInfo);
+        refresh(fileKeyInfo);
         if (sortDatanodes) {
           sortDatanodes(clientAddress, fileKeyInfo);
         }
@@ -2016,6 +2003,8 @@ public class KeyManagerImpl implements KeyManager {
             clientAddress);
       //if key is not of type file or if key is not found we throw an exception
     if (fileStatus.isFile()) {
+      // add block token for read.
+      addBlockToken4Read(fileStatus.getKeyInfo());
       return fileStatus.getKeyInfo();
     }
     throw new OMException("Can not write to directory: " + keyName,

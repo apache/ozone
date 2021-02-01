@@ -26,6 +26,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -69,8 +70,6 @@ import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.RaftServerConfigKeys;
-import org.apache.ratis.server.impl.RaftServerImpl;
-import org.apache.ratis.server.impl.RaftServerProxy;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.util.LifeCycle;
 import org.apache.ratis.util.SizeInBytes;
@@ -79,8 +78,12 @@ import org.apache.ratis.util.TimeDuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ipc.RpcConstants.DUMMY_CLIENT_ID;
 import static org.apache.hadoop.ipc.RpcConstants.INVALID_CALL_ID;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_RATIS_SNAPSHOT_DIR;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HA_PREFIX;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_DIR;
 
 /**
  * Creates a Ratis server endpoint for OM.
@@ -145,11 +148,17 @@ public final class OzoneManagerRatisServer {
   private RaftClientRequest createWriteRaftClientRequest(OMRequest omRequest) {
     Preconditions.checkArgument(Server.getClientId() != DUMMY_CLIENT_ID);
     Preconditions.checkArgument(Server.getCallId() != INVALID_CALL_ID);
-    return new RaftClientRequest(
-        ClientId.valueOf(UUID.nameUUIDFromBytes(Server.getClientId())),
-        server.getId(), raftGroupId, Server.getCallId(),
-        Message.valueOf(OMRatisHelper.convertRequestToByteString(omRequest)),
-        RaftClientRequest.writeRequestType(), null);
+    return RaftClientRequest.newBuilder()
+        .setClientId(
+            ClientId.valueOf(UUID.nameUUIDFromBytes(Server.getClientId())))
+        .setServerId(server.getId())
+        .setGroupId(raftGroupId)
+        .setCallId(Server.getCallId())
+        .setMessage(
+            Message.valueOf(
+                OMRatisHelper.convertRequestToByteString(omRequest)))
+        .setType(RaftClientRequest.writeRequestType())
+        .build();
   }
 
   /**
@@ -478,7 +487,7 @@ public final class OzoneManagerRatisServer {
     long serverMaxTimeoutDuration =
         serverMinTimeout.toLong(TimeUnit.MILLISECONDS) + 200;
     final TimeDuration serverMaxTimeout = TimeDuration.valueOf(
-        serverMaxTimeoutDuration, serverMinTimeoutUnit);
+        serverMaxTimeoutDuration, TimeUnit.MILLISECONDS);
     RaftServerConfigKeys.Rpc.setTimeoutMin(properties,
         serverMinTimeout);
     RaftServerConfigKeys.Rpc.setTimeoutMax(properties,
@@ -488,23 +497,6 @@ public final class OzoneManagerRatisServer {
     RaftServerConfigKeys.Log.setSegmentCacheNumMax(properties, 2);
 
     // TODO: set max write buffer size
-
-    // Set the ratis leader election timeout
-    TimeUnit leaderElectionMinTimeoutUnit =
-        OMConfigKeys.OZONE_OM_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_DEFAULT
-            .getUnit();
-    long leaderElectionMinTimeoutduration = conf.getTimeDuration(
-        OMConfigKeys.OZONE_OM_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY,
-        OMConfigKeys.OZONE_OM_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_DEFAULT
-            .getDuration(), leaderElectionMinTimeoutUnit);
-    final TimeDuration leaderElectionMinTimeout = TimeDuration.valueOf(
-        leaderElectionMinTimeoutduration, leaderElectionMinTimeoutUnit);
-    RaftServerConfigKeys.Rpc.setTimeoutMin(properties,
-        leaderElectionMinTimeout);
-    long leaderElectionMaxTimeout = leaderElectionMinTimeout.toLong(
-        TimeUnit.MILLISECONDS) + 200;
-    RaftServerConfigKeys.Rpc.setTimeoutMax(properties,
-        TimeDuration.valueOf(leaderElectionMaxTimeout, TimeUnit.MILLISECONDS));
 
     TimeUnit nodeFailureTimeoutUnit =
         OMConfigKeys.OZONE_OM_RATIS_SERVER_FAILURE_TIMEOUT_DURATION_DEFAULT
@@ -538,7 +530,23 @@ public final class OzoneManagerRatisServer {
 
     RaftServerConfigKeys.Snapshot.setAutoTriggerThreshold(properties,
         snapshotAutoTriggerThreshold);
+
+    createRaftServerProperties(conf, properties);
     return properties;
+  }
+
+  private void createRaftServerProperties(ConfigurationSource ozoneConf,
+      RaftProperties raftProperties) {
+    Map<String, String> ratisServerConf =
+        getOMHAConfigs(ozoneConf);
+    ratisServerConf.forEach((key, val) -> {
+      raftProperties.set(key, val);
+    });
+  }
+
+  private static Map<String, String> getOMHAConfigs(
+      ConfigurationSource configuration) {
+    return configuration.getPropsWithPrefix(OZONE_OM_HA_PREFIX + ".");
   }
 
   /**
@@ -556,14 +564,12 @@ public final class OzoneManagerRatisServer {
    * @return RaftServerStatus.
    */
   public RaftServerStatus checkLeaderStatus() {
-    Preconditions.checkState(server instanceof RaftServerProxy);
-    RaftServerImpl serverImpl;
     try {
-      serverImpl = ((RaftServerProxy) server).getImpl(raftGroupId);
-      if (serverImpl != null) {
-        if (!serverImpl.isLeader()) {
+      RaftServer.Division division = server.getDivision(raftGroupId);
+      if (division != null) {
+        if (!division.getInfo().isLeader()) {
           return RaftServerStatus.NOT_LEADER;
-        } else if (serverImpl.isLeaderReady()) {
+        } else if (division.getInfo().isLeaderReady()) {
           return RaftServerStatus.LEADER_AND_READY;
         } else {
           return RaftServerStatus.LEADER_AND_NOT_READY;
@@ -608,11 +614,15 @@ public final class OzoneManagerRatisServer {
   }
 
   public static String getOMRatisSnapshotDirectory(ConfigurationSource conf) {
-    String snapshotDir = conf.get(OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_DIR);
+    String snapshotDir = conf.get(OZONE_OM_RATIS_SNAPSHOT_DIR);
 
+    // If ratis snapshot directory is not set, fall back to ozone.metadata.dir.
     if (Strings.isNullOrEmpty(snapshotDir)) {
-      snapshotDir = Paths.get(getOMRatisDirectory(conf),
-          "snapshot").toString();
+      LOG.warn("{} is not configured. Falling back to {} config",
+          OZONE_OM_RATIS_SNAPSHOT_DIR, OZONE_METADATA_DIRS);
+      File metaDirPath = ServerUtils.getOzoneMetaDirPath(conf);
+      snapshotDir = Paths.get(metaDirPath.getPath(),
+          OM_RATIS_SNAPSHOT_DIR).toString();
     }
     return snapshotDir;
   }
