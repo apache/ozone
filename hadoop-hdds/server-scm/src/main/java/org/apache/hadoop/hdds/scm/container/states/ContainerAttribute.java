@@ -98,12 +98,8 @@ public class ContainerAttribute<T> {
     if (attributeMap.containsKey(key)) {
       if (attributeMap.get(key).add(value)) {
         return true; //we inserted the value as it doesn’t exist in the set.
-      } else {
-        // Failure indicates that this ContainerID exists in the Set, since
-        // ContainerID contains no information other than id, we keep the the
-        // old value.
-        LOG.debug("ContainerID: {} already exists in Map.Key :{}.", value, key);
-        return true;
+      } else { // Failure indicates that this ContainerID exists in the Set
+        return updateContainerID(key, value);
       }
     } else {
       // This key does not exist, we need to allocate this key in the map.
@@ -249,5 +245,20 @@ public class ContainerAttribute<T> {
       }
       throw ex;
     }
+  }
+
+  /**
+   * Update the ContainerID for the specified key.
+   *
+   * @param key - Key to update.
+   * @param value - ContainerID.
+   * @return true or false
+   */
+  private boolean updateContainerID(T key, ContainerID value) {
+    // Since ContainerID contains no information other than id, we keep the the
+    // old value.
+    LOG.debug("Updating ContainerID: {} in Map.Key :{} by keeping old value.",
+        value, key);
+    return true;
   }
 }
