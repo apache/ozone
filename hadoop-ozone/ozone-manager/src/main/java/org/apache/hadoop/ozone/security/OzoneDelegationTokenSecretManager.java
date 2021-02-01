@@ -472,6 +472,15 @@ public class OzoneDelegationTokenSecretManager
   private byte[] validateS3AuthInfo(OzoneTokenIdentifier identifier)
       throws InvalidToken {
     LOG.trace("Validating S3AuthInfo for identifier:{}", identifier);
+    if (!identifier.getOwner().equals(identifier.getAwsAccessId())) {
+      LOG.error(
+          "Owner and AWSAccessId is different in the S3 token. Possible "
+              + " security attack: {}",
+          identifier);
+      throw new InvalidToken(
+          "Invalid S3 identifier: owner=" + identifier.getOwner()
+              + ", awsAccessId=" + identifier.getAwsAccessId());
+    }
     String awsSecret;
     try {
       awsSecret = s3SecretManager.getS3UserSecretString(identifier
