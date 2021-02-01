@@ -29,7 +29,7 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
  */
 public class AuthorizationHeaderV2 {
 
-  public final static String IDENTIFIER = "AWS";
+  public static final String IDENTIFIER = "AWS";
   private String authHeader;
   private String identifier;
   private String accessKeyID;

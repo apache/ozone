@@ -85,7 +85,7 @@ public class TestContainerServer {
   private static CertificateClient caClient;
 
   @BeforeClass
-  static public void setup() {
+  public static void setup() {
     CONF.set(HddsConfigKeys.HDDS_METADATA_DIR_NAME, TEST_DIR);
     caClient = new DNCertificateClient(new SecurityConfig(CONF));
   }

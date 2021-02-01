@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.client;
 
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.OzoneConsts;
 
 import java.util.HashMap;
 import java.util.List;
@@ -178,6 +179,8 @@ public final class BucketArgs {
 
     public Builder() {
       metadata = new HashMap<>();
+      quotaInBytes = OzoneConsts.QUOTA_RESET;
+      quotaInNamespace = OzoneConsts.QUOTA_RESET;
     }
 
     public BucketArgs.Builder setVersioning(Boolean versionFlag) {

@@ -69,8 +69,8 @@ public class TestCertificateClientInit {
   private KeyCodec dnKeyCodec;
   private KeyCodec omKeyCodec;
   private X509Certificate x509Certificate;
-  private final static String DN_COMPONENT = DNCertificateClient.COMPONENT_NAME;
-  private final static String OM_COMPONENT = OMCertificateClient.COMPONENT_NAME;
+  private static final String DN_COMPONENT = DNCertificateClient.COMPONENT_NAME;
+  private static final String OM_COMPONENT = OMCertificateClient.COMPONENT_NAME;
 
   @Parameter
   public boolean pvtKeyPresent;

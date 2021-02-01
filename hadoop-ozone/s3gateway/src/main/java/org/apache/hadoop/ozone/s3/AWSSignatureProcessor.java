@@ -64,7 +64,7 @@ import org.slf4j.LoggerFactory;
 @RequestScoped
 public class AWSSignatureProcessor implements SignatureProcessor {
 
-  private final static Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(AWSSignatureProcessor.class);
 
   @Context

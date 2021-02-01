@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -15,23 +15,36 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.client;
 
-import java.util.concurrent.TimeUnit;
+package org.apache.hadoop.ozone.recon.scm;
 
-import org.apache.hadoop.io.retry.RetryPolicies;
-import org.apache.hadoop.io.retry.RetryPolicy;
+import java.util.Collections;
+import java.util.List;
 
-/** A utility class for OzoneClient. */
-public final class OzoneClientUtils {
+/**
+ * A list of ContainerReplicaHistory.
+ *
+ * For Recon DB table definition.
+ */
+public class ContainerReplicaHistoryList {
 
-  private OzoneClientUtils() {}
+  private List<ContainerReplicaHistory> tsList;
 
-  public static RetryPolicy createRetryPolicy(int maxRetryCount,
-      long retryInterval) {
-    // retry with fixed sleep between retries
-    return RetryPolicies.retryUpToMaximumCountWithFixedSleep(
-        maxRetryCount, retryInterval, TimeUnit.MILLISECONDS);
+  public ContainerReplicaHistoryList(
+      List<ContainerReplicaHistory> tsList) {
+    this.tsList = tsList;
+  }
+
+  public List<ContainerReplicaHistory> asList() {
+    return Collections.unmodifiableList(tsList);
+  }
+
+  public List<ContainerReplicaHistory> getList() {
+    return tsList;
+  }
+
+  public void setList(List<ContainerReplicaHistory> list) {
+    this.tsList = list;
   }
 
 }

@@ -14,8 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-if [[ "${HADOOP_SHELL_EXECNAME}" = ozone ]]; then
-   hadoop_add_profile ozone
+if [[ "${OZONE_SHELL_EXECNAME}" = ozone ]]; then
+   ozone_add_profile ozone
 fi
-
-

@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.ozone.recon.api.types;
 
-import org.hadoop.ozone.recon.schema.tables.pojos.ContainerHistory;
+import org.apache.hadoop.ozone.recon.persistence.ContainerHistory;
 import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
 
 import javax.xml.bind.annotation.XmlAccessType;

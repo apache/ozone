@@ -32,13 +32,17 @@ public class TestJsonUtils {
 
   @Test
   public void printObjectAsJson() throws IOException {
-    OzoneQuota quota = OzoneQuota.parseQuota("123MB", 1000L);
+    OzoneQuota spaceQuota = OzoneQuota.parseSpaceQuota("123MB");
 
-    String result = JsonUtils.toJsonStringWithDefaultPrettyPrinter(quota);
+    String spaceStr =
+        JsonUtils.toJsonStringWithDefaultPrettyPrinter(spaceQuota);
+    assertContains(spaceStr, "\"rawSize\" : 123");
+    assertContains(spaceStr, "\"unit\" : \"MB\"");
 
-    assertContains(result, "\"rawSize\" : 123");
-    assertContains(result, "\"unit\" : \"MB\"");
-    assertContains(result, "\"quotaInNamespace\" : 1000");
+    OzoneQuota nameSpace = OzoneQuota.parseNameSpaceQuota("1000");
+    String nameSpaceStr =
+        JsonUtils.toJsonStringWithDefaultPrettyPrinter(nameSpace);
+    assertContains(nameSpaceStr, "\"quotaInNamespace\" : 1000");
   }
 
   private static void assertContains(String str, String part) {

@@ -193,7 +193,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
 
     ContainerType containerType;
     ContainerCommandResponseProto responseProto = null;
-    long startTime = System.nanoTime();
+    long startTime = System.currentTimeMillis();
     Type cmdType = msg.getCmdType();
     long containerID = msg.getContainerID();
     metrics.incContainerOpsMetrics(cmdType);
@@ -308,7 +308,8 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     }
     responseProto = handler.handle(msg, container, dispatcherContext);
     if (responseProto != null) {
-      metrics.incContainerOpsLatencies(cmdType, System.nanoTime() - startTime);
+      metrics.incContainerOpsLatencies(cmdType,
+          System.currentTimeMillis() - startTime);
 
       // If the request is of Write Type and the container operation
       // is unsuccessful, it implies the applyTransaction on the container
