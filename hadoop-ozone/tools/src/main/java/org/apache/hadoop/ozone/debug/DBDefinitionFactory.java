@@ -62,7 +62,10 @@ public final class DBDefinitionFactory {
   public static DBDefinition getDefinition(Path dbPath) {
     Preconditions.checkNotNull(dbPath,
         "Path is required to identify the used db scheme");
-    String dbName = dbPath.getFileName().toString();
+    final Path fileName = dbPath.getFileName();
+    Preconditions.checkNotNull(fileName,
+        "Path is required to identify the used db scheme");
+    String dbName = fileName.toString();
     if (dbName.endsWith("-container.db")) {
       return new DatanodeSchemaTwoDBDefinition(
           dbPath.toAbsolutePath().toString());
