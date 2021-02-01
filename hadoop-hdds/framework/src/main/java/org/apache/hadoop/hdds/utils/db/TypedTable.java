@@ -58,7 +58,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
   private final TableCache<CacheKey<KEY>, CacheValue<VALUE>> cache;
 
-  private final static long EPOCH_DEFAULT = -1L;
+  private static final long EPOCH_DEFAULT = -1L;
 
   /**
    * Create an TypedTable from the raw table.

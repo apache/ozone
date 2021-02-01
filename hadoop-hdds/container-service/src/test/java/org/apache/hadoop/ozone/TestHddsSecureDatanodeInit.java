@@ -65,7 +65,7 @@ public class TestHddsSecureDatanodeInit {
   private static KeyCodec keyCodec;
   private static CertificateCodec certCodec;
   private static X509CertificateHolder certHolder;
-  private final static String DN_COMPONENT = DNCertificateClient.COMPONENT_NAME;
+  private static final String DN_COMPONENT = DNCertificateClient.COMPONENT_NAME;
 
   private CertificateClient client;
 

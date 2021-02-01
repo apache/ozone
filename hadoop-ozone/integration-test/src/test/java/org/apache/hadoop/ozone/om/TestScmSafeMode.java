@@ -71,7 +71,7 @@ import static org.junit.Assert.fail;
 @Ignore
 public class TestScmSafeMode {
 
-  private final static Logger LOG = LoggerFactory
+  private static final Logger LOG = LoggerFactory
       .getLogger(TestScmSafeMode.class);
   private MiniOzoneCluster cluster = null;
   private MiniOzoneCluster.Builder builder = null;
