@@ -75,7 +75,8 @@ class SCMGrpcOutputStream extends OutputStream {
   }
 
   @Override public void write(@Nonnull byte[] data, int offset, int length) {
-    if ((offset < 0) || (offset > data.length) || (length < 0) || ((offset + length) > data.length) || ((offset + length) < 0)) {
+    if ((offset < 0) || (offset > data.length) || (length < 0) || (
+        (offset + length) > data.length) || ((offset + length) < 0)) {
       throw new IndexOutOfBoundsException();
     } else if (length == 0) {
       return;
@@ -115,7 +116,8 @@ class SCMGrpcOutputStream extends OutputStream {
     int length = buffer.size();
     if (length > 0) {
       ByteString data = buffer.toByteString();
-      LOG.debug("Sending {} bytes (of type {})", length, data.getClass().getSimpleName());
+      LOG.debug("Sending {} bytes (of type {})", length,
+          data.getClass().getSimpleName());
       InterSCMProtocolProtos.CopyDBCheckpointResponseProto response =
           InterSCMProtocolProtos.CopyDBCheckpointResponseProto.newBuilder()
               .setClusterId(clusterId).setData(data).setEof(eof)

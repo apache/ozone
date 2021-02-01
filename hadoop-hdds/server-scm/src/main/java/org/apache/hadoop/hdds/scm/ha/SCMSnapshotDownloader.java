@@ -16,7 +16,6 @@ package org.apache.hadoop.hdds.scm.ha;/*
  */
 
 import java.io.IOException;
-import java.io.OutputStream;
 import java.nio.file.Path;
 import java.util.concurrent.CompletableFuture;
 

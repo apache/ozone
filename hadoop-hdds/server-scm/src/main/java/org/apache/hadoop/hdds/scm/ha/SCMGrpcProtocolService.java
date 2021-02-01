@@ -38,9 +38,9 @@ public class SCMGrpcProtocolService  {
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMGrpcService.class);
 
-  final int port;
+  private final int port;
   private Server server;
-  boolean isStarted = false;
+  private boolean isStarted = false;
 
   public SCMGrpcProtocolService(final ConfigurationSource conf,
       final StorageContainerManager scm) {

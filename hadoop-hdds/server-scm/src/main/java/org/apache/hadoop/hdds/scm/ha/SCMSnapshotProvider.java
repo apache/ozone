@@ -19,11 +19,13 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.fs.FileUtil;
@@ -92,21 +94,28 @@ public class SCMSnapshotProvider {
    * @return the DB checkpoint (including the ratis snapshot index)
    */
   public DBCheckpoint getSCMDBSnapshot(String leaderSCMNodeID)
-      throws Exception {
+      throws IOException {
     String snapshotTime = Long.toString(System.currentTimeMillis());
-    String snapshotFileName = OzoneConsts.SCM_DB_NAME + "-" + leaderSCMNodeID
-        + "-" + snapshotTime;
-    String snapshotFilePath = Paths.get(scmSnapshotDir.getAbsolutePath(),
-        snapshotFileName).toFile().getAbsolutePath();
+    String snapshotFileName =
+        OzoneConsts.SCM_DB_NAME + "-" + leaderSCMNodeID + "-" + snapshotTime;
+    String snapshotFilePath =
+        Paths.get(scmSnapshotDir.getAbsolutePath(), snapshotFileName).toFile().getAbsolutePath();
     File targetFile = new File(snapshotFileName + ".tar.gz");
 
     // the client instance will be initialized only when first install snapshot
     // notification from ratis leader will be received.
     if (client == null) {
       client = new SCMGrpcClient(
-          peerNodesMap.get(leaderSCMNodeID).getAddress().getHostAddress(), conf);
+          peerNodesMap.get(leaderSCMNodeID).getAddress().getHostAddress(),
+          conf);
     }
-    client.download(targetFile.toPath()).get();
+    try {
+      client.download(targetFile.toPath()).get();
+    } catch (InterruptedException | ExecutionException e) {
+      LOG.error("Rocks DB checkpoint downloading failed", e);
+      throw new IOException(e);
+    }
+
 
     // Untar the checkpoint file.
     Path untarredDbDir = Paths.get(snapshotFilePath);
