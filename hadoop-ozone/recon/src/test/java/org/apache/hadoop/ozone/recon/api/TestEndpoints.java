@@ -131,11 +131,11 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   private Pipeline pipeline;
   private FileCountBySizeDao fileCountBySizeDao;
   private DSLContext dslContext;
-  private final static String HOST1 = "host1.datanode";
-  private final static String HOST2 = "host2.datanode";
-  private final static String IP1 = "1.1.1.1";
-  private final static String IP2 = "2.2.2.2";
-  private final static String PROMETHEUSTESTRESPONSEFILE =
+  private static final String HOST1 = "host1.datanode";
+  private static final String HOST2 = "host2.datanode";
+  private static final String IP1 = "1.1.1.1";
+  private static final String IP2 = "2.2.2.2";
+  private static final String PROMETHEUSTESTRESPONSEFILE =
       "prometheus-test-response.txt";
   private ReconUtils reconUtilsMock;
 

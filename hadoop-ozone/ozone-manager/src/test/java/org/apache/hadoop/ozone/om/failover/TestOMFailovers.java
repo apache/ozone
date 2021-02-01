@@ -93,7 +93,7 @@ public class TestOMFailovers {
         "Permission denied.";
   }
 
-  private final static class MockOzoneManagerProtocol
+  private static final class MockOzoneManagerProtocol
       implements OzoneManagerProtocolPB {
 
     private final String omNodeId;
