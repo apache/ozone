@@ -37,7 +37,7 @@ public class DatanodeSchemaTwoDBDefinition extends
   public static final DBColumnFamilyDefinition<String, BlockData>
           BLOCK_DATA =
           new DBColumnFamilyDefinition<>(
-                  "blockData",
+                  "block_data",
                   String.class,
                   new StringCodec(),
                   BlockData.class,
@@ -55,7 +55,7 @@ public class DatanodeSchemaTwoDBDefinition extends
   public static final DBColumnFamilyDefinition<String, ChunkInfoList>
           DELETED_BLOCKS =
           new DBColumnFamilyDefinition<>(
-                  "deletedBlocks",
+                  "deleted_blocks",
                   String.class,
                   new StringCodec(),
                   ChunkInfoList.class,
@@ -64,7 +64,7 @@ public class DatanodeSchemaTwoDBDefinition extends
   public static final DBColumnFamilyDefinition<Long, DeletedBlocksTransaction>
       DELETE_TRANSACTION =
       new DBColumnFamilyDefinition<>(
-          "deleteTxns",
+          "delete_txns",
           Long.class,
           new LongCodec(),
           StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction.class,

@@ -111,10 +111,10 @@ public class ContainerMetrics {
   }
 
   public void incContainerOpsLatencies(ContainerProtos.Type type,
-                                       long latencyNanos) {
-    opsLatency[type.ordinal()].add(latencyNanos);
+                                       long latencyMillis) {
+    opsLatency[type.ordinal()].add(latencyMillis);
     for (MutableQuantiles q: opsLatQuantiles[type.ordinal()]) {
-      q.add(latencyNanos);
+      q.add(latencyMillis);
     }
   }
 

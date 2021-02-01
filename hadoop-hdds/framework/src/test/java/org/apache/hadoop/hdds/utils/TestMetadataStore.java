@@ -62,7 +62,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 @RunWith(Parameterized.class)
 public class TestMetadataStore {
 
-  private final static int MAX_GETRANGE_LENGTH = 100;
+  private static final int MAX_GETRANGE_LENGTH = 100;
   private final String storeImpl;
   @Rule
   public ExpectedException expectedException = ExpectedException.none();

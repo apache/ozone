@@ -19,8 +19,10 @@
 package org.apache.hadoop.ozone.om.request.key.acl;
 
 import java.io.IOException;
+import java.util.Map;
 
 import com.google.common.base.Optional;
+import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -130,7 +132,10 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
       }
     }
 
-    onComplete(result, operationResult, exception, trxnLogIndex);
+    OzoneObj obj = getObject();
+    Map<String, String> auditMap = obj.toAuditMap();
+    onComplete(result, operationResult, exception, trxnLogIndex,
+        ozoneManager.getAuditLogger(), auditMap);
 
     return omClientResponse;
   }
@@ -140,6 +145,12 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
    * @return path name
    */
   abstract String getPath();
+
+  /**
+   * Get Key object Info from the request.
+   * @return OzoneObjInfo
+   */
+  abstract OzoneObj getObject();
 
   // TODO: Finer grain metrics can be moved to these callbacks. They can also
   // be abstracted into separate interfaces in future.
@@ -178,7 +189,8 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
    * @param exception
    */
   abstract void onComplete(Result result, boolean operationResult,
-      IOException exception, long trxnLogIndex);
+      IOException exception, long trxnLogIndex, AuditLogger auditLogger,
+      Map<String, String> auditMap);
 
   /**
    * Apply the acl operation, if successfully completed returns true,

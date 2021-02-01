@@ -143,7 +143,6 @@ public class SCMContainerManager implements ContainerManager {
   }
 
   @VisibleForTesting
-  // TODO: remove this later.
   public ContainerStateManager getContainerStateManager() {
     return containerStateManager;
   }
@@ -637,5 +636,10 @@ public class SCMContainerManager implements ContainerManager {
 
   public Lock getLock() {
     return lock;
+  }
+
+  @VisibleForTesting
+  public Table<ContainerID, ContainerInfo> getContainerStore() {
+    return this.containerStore;
   }
 }

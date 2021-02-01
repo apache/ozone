@@ -487,7 +487,7 @@ public final class OzoneManagerRatisServer {
     long serverMaxTimeoutDuration =
         serverMinTimeout.toLong(TimeUnit.MILLISECONDS) + 200;
     final TimeDuration serverMaxTimeout = TimeDuration.valueOf(
-        serverMaxTimeoutDuration, serverMinTimeoutUnit);
+        serverMaxTimeoutDuration, TimeUnit.MILLISECONDS);
     RaftServerConfigKeys.Rpc.setTimeoutMin(properties,
         serverMinTimeout);
     RaftServerConfigKeys.Rpc.setTimeoutMax(properties,
@@ -497,23 +497,6 @@ public final class OzoneManagerRatisServer {
     RaftServerConfigKeys.Log.setSegmentCacheNumMax(properties, 2);
 
     // TODO: set max write buffer size
-
-    // Set the ratis leader election timeout
-    TimeUnit leaderElectionMinTimeoutUnit =
-        OMConfigKeys.OZONE_OM_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_DEFAULT
-            .getUnit();
-    long leaderElectionMinTimeoutduration = conf.getTimeDuration(
-        OMConfigKeys.OZONE_OM_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY,
-        OMConfigKeys.OZONE_OM_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_DEFAULT
-            .getDuration(), leaderElectionMinTimeoutUnit);
-    final TimeDuration leaderElectionMinTimeout = TimeDuration.valueOf(
-        leaderElectionMinTimeoutduration, leaderElectionMinTimeoutUnit);
-    RaftServerConfigKeys.Rpc.setTimeoutMin(properties,
-        leaderElectionMinTimeout);
-    long leaderElectionMaxTimeout = leaderElectionMinTimeout.toLong(
-        TimeUnit.MILLISECONDS) + 200;
-    RaftServerConfigKeys.Rpc.setTimeoutMax(properties,
-        TimeDuration.valueOf(leaderElectionMaxTimeout, TimeUnit.MILLISECONDS));
 
     TimeUnit nodeFailureTimeoutUnit =
         OMConfigKeys.OZONE_OM_RATIS_SERVER_FAILURE_TIMEOUT_DURATION_DEFAULT

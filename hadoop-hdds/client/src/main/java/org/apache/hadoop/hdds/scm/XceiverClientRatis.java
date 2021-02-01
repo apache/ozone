@@ -301,7 +301,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
   public XceiverClientReply sendCommandAsync(
       ContainerCommandRequestProto request) {
     XceiverClientReply asyncReply = new XceiverClientReply(null);
-    long requestTime = System.nanoTime();
+    long requestTime = System.currentTimeMillis();
     CompletableFuture<RaftClientReply> raftClientReply =
         sendRequestAsync(request);
     metrics.incrPendingContainerOpsMetrics(request.getCmdType());
@@ -315,7 +315,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
           }
           metrics.decrPendingContainerOpsMetrics(request.getCmdType());
           metrics.addContainerOpsLatency(request.getCmdType(),
-              System.nanoTime() - requestTime);
+              System.currentTimeMillis() - requestTime);
         }).thenApply(reply -> {
           try {
             if (!reply.isSuccess()) {

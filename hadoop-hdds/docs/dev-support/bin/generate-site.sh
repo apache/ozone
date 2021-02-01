@@ -24,7 +24,7 @@ if [ ! "$(which hugo)" ]; then
    exit 0
 fi
 
-export OZONE_VERSION=$(grep "<ozone.version>" "${DOCDIR}/../../pom.xml" | sed 's/<[^>]*>//g'|  sed 's/^[ \t]*//')
+export OZONE_VERSION=$(mvn help:evaluate -Dexpression=ozone.version -q -DforceStdout)
 
 ENABLE_GIT_INFO=
 if git -C $(pwd) status >& /dev/null; then

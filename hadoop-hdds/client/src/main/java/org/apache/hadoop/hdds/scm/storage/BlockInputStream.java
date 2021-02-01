@@ -24,6 +24,7 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
 import org.apache.hadoop.fs.CanUnbuffer;
@@ -35,9 +36,12 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetBlockRe
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
+import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
+import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.security.token.Token;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -66,6 +70,9 @@ public class BlockInputStream extends InputStream
   private XceiverClientFactory xceiverClientFactory;
   private XceiverClientSpi xceiverClient;
   private boolean initialized = false;
+  private final RetryPolicy retryPolicy =
+      HddsClientUtils.createRetryPolicy(3, TimeUnit.SECONDS.toMillis(1));
+  private int retries;
 
   // List of ChunkInputStreams, one for each chunk in the block
   private List<ChunkInputStream> chunkStreams;
@@ -168,7 +175,7 @@ public class BlockInputStream extends InputStream
     if (refreshPipelineFunction != null) {
       LOG.debug("Re-fetching pipeline for block {}", blockID);
       Pipeline newPipeline = refreshPipelineFunction.apply(blockID);
-      if (newPipeline == null || newPipeline.equals(pipeline)) {
+      if (newPipeline == null || newPipeline.sameDatanodes(pipeline)) {
         LOG.warn("No new pipeline for block {}", blockID);
         throw cause;
       } else {
@@ -286,9 +293,14 @@ public class BlockInputStream extends InputStream
       int numBytesRead;
       try {
         numBytesRead = current.read(b, off, numBytesToRead);
-      } catch (IOException e) {
-        handleReadError(e);
-        continue;
+        retries = 0; // reset retries after successful read
+      } catch (StorageContainerException e) {
+        if (shouldRetryRead(e)) {
+          handleReadError(e);
+          continue;
+        } else {
+          throw e;
+        }
       }
 
       if (numBytesRead != numBytesToRead) {
@@ -458,6 +470,18 @@ public class BlockInputStream extends InputStream
 
   private synchronized void storePosition() {
     blockPosition = getPos();
+  }
+
+  private boolean shouldRetryRead(IOException cause) throws IOException {
+    RetryPolicy.RetryAction retryAction;
+    try {
+      retryAction = retryPolicy.shouldRetry(cause, ++retries, 0, true);
+    } catch (IOException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new IOException(e);
+    }
+    return retryAction.action == RetryPolicy.RetryAction.RetryDecision.RETRY;
   }
 
   private void handleReadError(IOException cause) throws IOException {

@@ -764,7 +764,7 @@ public class ContainerStateMachine extends BaseStateMachine {
             && trx.getStateMachineContext() != null) {
           long startTime = (long) trx.getStateMachineContext();
           metrics.incPipelineLatency(cmdType,
-              Time.monotonicNowNanos() - startTime);
+              (Time.monotonicNowNanos() - startTime) / 1000000L);
         }
         // ignore close container exception while marking the stateMachine
         // unhealthy
