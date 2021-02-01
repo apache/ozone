@@ -24,7 +24,7 @@ cd "$DIR/../../.." || exit 1
 
 export MAVEN_OPTS="-Xmx4096m"
 MAVEN_OPTIONS='-B -Dskip.npx -Dskip.installnpx'
-mvn ${MAVEN_OPTIONS} -DskipTests clean install
+mvn ${MAVEN_OPTIONS} -DskipTests "$@" clean install
 
 REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/${CHECK}"}
 mkdir -p "$REPORT_DIR"
@@ -45,6 +45,7 @@ for i in $(seq 1 ${ITERATIONS}); do
   source "${DIR}/_mvn_unit_report.sh"
   if [[ ${irc} == 0 ]] && [[ -s "${REPORT_DIR}/summary.txt" ]]; then
     irc=1
+    break
   fi
 
   if [[ ${ITERATIONS} -gt 1 ]]; then

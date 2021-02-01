@@ -283,6 +283,7 @@ public final class OzoneManagerDoubleBuffer {
                   return null;
                 });
 
+            long start = System.nanoTime();
             long startTime = Time.monotonicNow();
             flushBatchWithTrace(lastTraceId.get(), readyBuffer.size(),
                 (SupplierWithIOException<Void>) () -> {
@@ -290,8 +291,11 @@ public final class OzoneManagerDoubleBuffer {
                       batchOperation);
                   return null;
                 });
-            ozoneManagerDoubleBufferMetrics.updateFlushTime(
-                Time.monotonicNow() - startTime);
+            long end = System.nanoTime();
+            long time = Time.monotonicNow() - startTime;
+            long elapsed = end - start;
+            LOG.info("flush time {}, nanos {}, count {}", time, elapsed, readyBuffer.size());
+            ozoneManagerDoubleBufferMetrics.updateFlushTime(time);
           }
 
           // Complete futures first and then do other things. So, that

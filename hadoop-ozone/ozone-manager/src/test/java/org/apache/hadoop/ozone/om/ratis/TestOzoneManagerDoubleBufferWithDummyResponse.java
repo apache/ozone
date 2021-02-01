@@ -121,7 +121,7 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
     assertEquals(bucketCount, omMetadataManager.countRowsInTable(
         omMetadataManager.getBucketTable()));
     assertTrue(doubleBuffer.getFlushIterations() > 0);
-    assertTrue(metrics.getFlushTime().lastStat().mean() > 0);
+    assertTrue(metrics.getFlushTime().lastStat().numSamples() > 0);
     assertTrue(metrics.getAvgFlushTransactionsInOneIteration() > 0);
 
     // Assert there is only instance of OM Double Metrics.
