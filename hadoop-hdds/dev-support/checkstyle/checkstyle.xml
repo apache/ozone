@@ -200,5 +200,7 @@
         <!--<module name="TodoComment"/>-->
         <module name="UpperEll"/>
 
+        <module name="ModifierOrder"/>
+
     </module>
 </module>

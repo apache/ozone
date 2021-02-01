@@ -51,7 +51,7 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
   public static final Logger LOG = LoggerFactory.getLogger(
       TestKeyValueHandlerWithUnhealthyContainer.class);
 
-  private final static String DATANODE_UUID = UUID.randomUUID().toString();
+  private static final String DATANODE_UUID = UUID.randomUUID().toString();
   private static final long DUMMY_CONTAINER_ID = 9999;
 
   @Test

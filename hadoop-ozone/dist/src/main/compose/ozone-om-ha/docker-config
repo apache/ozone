@@ -85,4 +85,7 @@ LOG4J2.PROPERTIES_rootLogger.level=INFO
 LOG4J2.PROPERTIES_rootLogger.appenderRefs=stdout
 LOG4J2.PROPERTIES_rootLogger.appenderRef.stdout.ref=STDOUT
 
+OZONE_CONF_DIR=/etc/hadoop
+OZONE_LOG_DIR=/var/log/hadoop
+
 no_proxy=om,scm,s3g,recon,kdc,localhost,127.0.0.1

@@ -28,7 +28,7 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
  */
 public class AuthorizationV2HeaderParser implements SignatureParser {
 
-  public final static String IDENTIFIER = "AWS";
+  public static final String IDENTIFIER = "AWS";
 
   private final String authHeader;
 

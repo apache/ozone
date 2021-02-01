@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -76,14 +77,15 @@ public class TestMiniOzoneCluster {
   private MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;
 
-  private final static File TEST_ROOT = TestGenericTestUtils.getTestDir();
-  private final static File WRITE_TMP = new File(TEST_ROOT, "write");
-  private final static File READ_TMP = new File(TEST_ROOT, "read");
+  private static final File TEST_ROOT = TestGenericTestUtils.getTestDir();
+  private static final File WRITE_TMP = new File(TEST_ROOT, "write");
+  private static final File READ_TMP = new File(TEST_ROOT, "read");
 
   @BeforeClass
   public static void setup() {
     conf = new OzoneConfiguration();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, TEST_ROOT.toString());
+    conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 1);
     conf.setBoolean(DFS_CONTAINER_RATIS_IPC_RANDOM_PORT, true);
     WRITE_TMP.mkdirs();
     READ_TMP.mkdirs();

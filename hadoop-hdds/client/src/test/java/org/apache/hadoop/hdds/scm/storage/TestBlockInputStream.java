@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.scm.storage;
 import com.google.common.primitives.Bytes;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
@@ -30,6 +31,8 @@ import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.common.Checksum;
 
+import org.apache.hadoop.ozone.common.OzoneChecksumException;
+import org.apache.hadoop.test.LambdaTestUtils;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -40,6 +43,7 @@ import org.mockito.junit.MockitoJUnitRunner;
 import java.io.EOFException;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -48,10 +52,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_NOT_FOUND;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_UNHEALTHY;
 import static org.apache.hadoop.hdds.scm.storage.TestChunkInputStream.generateRandomData;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -266,6 +272,77 @@ public class TestBlockInputStream {
     // THEN
     Assert.assertEquals(len, bytesRead);
     verify(refreshPipeline).apply(blockID);
+  }
+
+  @Test
+  public void testRefreshExitsIfPipelineHasSameNodes() throws Exception {
+    // GIVEN
+    BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
+    Pipeline pipeline = MockPipeline.createSingleNodePipeline();
+
+    final int len = 200;
+    final ChunkInputStream stream = mock(ChunkInputStream.class);
+    when(stream.read(any(), anyInt(), anyInt()))
+        .thenThrow(new StorageContainerException("test", CONTAINER_UNHEALTHY));
+    when(stream.getRemaining())
+        .thenReturn((long) len);
+
+    when(refreshPipeline.apply(blockID))
+        .thenAnswer(invocation -> samePipelineWithNewId(pipeline));
+
+    BlockInputStream subject = new DummyBlockInputStream(blockID, blockSize,
+        pipeline, null, false, null, refreshPipeline, chunks, null) {
+      @Override
+      protected ChunkInputStream createChunkInputStream(ChunkInfo chunkInfo) {
+        return stream;
+      }
+    };
+    subject.initialize();
+
+    // WHEN
+    byte[] b = new byte[len];
+    LambdaTestUtils.intercept(StorageContainerException.class,
+        () -> subject.read(b, 0, len));
+
+    // THEN
+    verify(refreshPipeline).apply(blockID);
+  }
+
+  @Test
+  public void testReadNotRetriedOnOtherException() throws Exception {
+    // GIVEN
+    BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
+    Pipeline pipeline = MockPipeline.createSingleNodePipeline();
+
+    final int len = 200;
+    final ChunkInputStream stream = mock(ChunkInputStream.class);
+    when(stream.read(any(), anyInt(), anyInt()))
+        .thenThrow(new OzoneChecksumException("checksum missing"));
+    when(stream.getRemaining())
+        .thenReturn((long) len);
+
+    BlockInputStream subject = new DummyBlockInputStream(blockID, blockSize,
+        pipeline, null, false, null, refreshPipeline, chunks, null) {
+      @Override
+      protected ChunkInputStream createChunkInputStream(ChunkInfo chunkInfo) {
+        return stream;
+      }
+    };
+    subject.initialize();
+
+    // WHEN
+    byte[] b = new byte[len];
+    LambdaTestUtils.intercept(OzoneChecksumException.class,
+        () -> subject.read(b, 0, len));
+
+    // THEN
+    verify(refreshPipeline, never()).apply(blockID);
+  }
+
+  private Pipeline samePipelineWithNewId(Pipeline pipeline) {
+    List<DatanodeDetails> reverseOrder = new ArrayList<>(pipeline.getNodes());
+    Collections.reverse(reverseOrder);
+    return MockPipeline.createPipeline(reverseOrder);
   }
 
   @Test

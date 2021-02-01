@@ -76,8 +76,8 @@ public class TestDefaultCertificateClient {
   private Path dnMetaDirPath;
   private SecurityConfig omSecurityConfig;
   private SecurityConfig dnSecurityConfig;
-  private final static String DN_COMPONENT = DNCertificateClient.COMPONENT_NAME;
-  private final static String OM_COMPONENT = OMCertificateClient.COMPONENT_NAME;
+  private static final String DN_COMPONENT = DNCertificateClient.COMPONENT_NAME;
+  private static final String OM_COMPONENT = OMCertificateClient.COMPONENT_NAME;
   private KeyCodec omKeyCodec;
   private KeyCodec dnKeyCodec;
 

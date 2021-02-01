@@ -60,7 +60,7 @@ public class RocksDBStoreMBean implements DynamicMBean, MetricsSource {
   private static final Logger LOG =
       LoggerFactory.getLogger(RocksDBStoreMBean.class);
 
-  public final static String ROCKSDB_CONTEXT_PREFIX = "Rocksdb_";
+  public static final String ROCKSDB_CONTEXT_PREFIX = "Rocksdb_";
 
   public RocksDBStoreMBean(Statistics statistics, String dbName) {
     this.contextName = ROCKSDB_CONTEXT_PREFIX + dbName;

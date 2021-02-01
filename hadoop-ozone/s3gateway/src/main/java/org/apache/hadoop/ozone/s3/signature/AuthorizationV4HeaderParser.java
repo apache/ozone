@@ -45,9 +45,9 @@ public class AuthorizationV4HeaderParser implements SignatureParser {
   private static final Logger LOG =
       LoggerFactory.getLogger(AuthorizationV4HeaderParser.class);
 
-  private final static String CREDENTIAL = "Credential=";
-  private final static String SIGNEDHEADERS = "SignedHeaders=";
-  private final static String SIGNATURE = "Signature=";
+  private static final String CREDENTIAL = "Credential=";
+  private static final String SIGNEDHEADERS = "SignedHeaders=";
+  private static final String SIGNATURE = "Signature=";
 
   private String authHeader;
 
