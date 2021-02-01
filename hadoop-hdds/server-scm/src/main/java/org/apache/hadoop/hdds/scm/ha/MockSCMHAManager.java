@@ -97,6 +97,11 @@ public final class MockSCMHAManager implements SCMHAManager {
     return transactionBuffer;
   }
 
+  @Override
+  public SCMSnapshotProvider getSCMSnapshotProvider() {
+    return null;
+  }
+
   /**
    * {@inheritDoc}
    */

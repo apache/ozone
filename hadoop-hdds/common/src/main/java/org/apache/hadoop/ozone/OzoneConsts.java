@@ -125,6 +125,7 @@ public final class OzoneConsts {
   public static final String PIPELINE_DB_SUFFIX = "pipeline.db";
   public static final String DN_CONTAINER_DB = "-dn-"+ CONTAINER_DB_SUFFIX;
   public static final String OM_DB_NAME = "om.db";
+  public static final String SCM_DB_NAME = "scm.db";
   public static final String OM_DB_BACKUP_PREFIX = "om.db.backup.";
 
   public static final String STORAGE_DIR_CHUNKS = "chunks";
@@ -398,7 +399,10 @@ public final class OzoneConsts {
   public static final String DB_TRANSIENT_MARKER = "dbInconsistentMarker";
 
 
+  // TODO : rename this to OZONE_RATIS_SNAPSHOT_DIR and use it in both
+  // SCM and OM
   public static final String OM_RATIS_SNAPSHOT_DIR = "snapshot";
+  public static final String SCM_RATIS_SNAPSHOT_DIR = "snapshot";
 
   public static final long DEFAULT_OM_UPDATE_ID = -1L;  
 }

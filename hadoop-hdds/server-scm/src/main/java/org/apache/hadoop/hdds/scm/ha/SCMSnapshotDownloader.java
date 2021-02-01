@@ -1,4 +1,4 @@
-/*
+package org.apache.hadoop.hdds.scm.ha;/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements. See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership. The ASF
@@ -15,37 +15,22 @@
  * the License.
  */
 
-package org.apache.hadoop.hdds.scm.ha;
-
 import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.file.Path;
+import java.util.concurrent.CompletableFuture;
 
 /**
- * SCMHAManager provides HA service for SCM.
+ * Contract to download a SCM Snapshot from remote server..
+ * <p>
+ *
+ * The underlying implementation is supposed to download SCM snapshot via
+ * any chosen protoclol(for now its Grpc).
+ * images.
  */
-public interface SCMHAManager {
+public interface SCMSnapshotDownloader {
 
-  /**
-   * Starts HA service.
-   */
-  void start() throws IOException;
+  CompletableFuture<Path> download(final Path destination) throws IOException;
 
-  /**
-   * Returns RatisServer instance associated with the SCM instance.
-   */
-  SCMRatisServer getRatisServer();
-
-  /**
-   * Returns SCM snapshot provider.
-   */
-  SCMSnapshotProvider getSCMSnapshotProvider();
-
-  /**
-   * Returns DB transaction buffer.
-   */
-  DBTransactionBuffer getDBTransactionBuffer();
-
-  /**
-   * Stops the HA service.
-   */
-  void shutdown() throws IOException;
+  void close() throws Exception;
 }

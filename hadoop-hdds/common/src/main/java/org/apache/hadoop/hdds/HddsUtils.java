@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds;
 
 import javax.management.ObjectName;
+import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -488,6 +489,14 @@ public final class HddsUtils {
     Preconditions.checkArgument(
         path.normalize().startsWith(ancestor.normalize()),
         "Path should be a descendant of %s", ancestor);
+  }
+
+  public static File createDir(String dirPath) {
+    File dirFile = new File(dirPath);
+    if (!dirFile.mkdirs() && !dirFile.exists()) {
+      throw new IllegalArgumentException("Unable to create path: " + dirFile);
+    }
+    return dirFile;
   }
 
   /**
