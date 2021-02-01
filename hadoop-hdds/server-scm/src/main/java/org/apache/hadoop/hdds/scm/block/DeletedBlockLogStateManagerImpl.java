@@ -165,6 +165,7 @@ public class DeletedBlockLogStateManagerImpl
   @Override
   public void removeTransactionsFromDB(ArrayList<Long> txIDs)
       throws IOException {
+    deletingTxIDs.addAll(txIDs);
     for (Long txID : txIDs) {
       deletedTable.deleteWithBatch(
           transactionBuffer.getCurrentBatchOperation(), txID);
