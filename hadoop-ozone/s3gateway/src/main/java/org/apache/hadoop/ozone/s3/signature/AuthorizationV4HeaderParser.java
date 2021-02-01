@@ -95,7 +95,8 @@ public class AuthorizationV4HeaderParser implements SignatureParser {
         signature,
         signedHeaders,
         credentialObj.createScope(),
-        algorithm
+        algorithm,
+        true
     );
   }
 

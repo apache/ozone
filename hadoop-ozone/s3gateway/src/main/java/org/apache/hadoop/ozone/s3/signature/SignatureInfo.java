@@ -38,6 +38,8 @@ public class SignatureInfo {
 
   private String algorithm;
 
+  private boolean signPayload = true;
+
   public SignatureInfo(
       Version version,
       String date,
@@ -45,7 +47,8 @@ public class SignatureInfo {
       String signature,
       String signedHeaders,
       String credentialScope,
-      String algorithm
+      String algorithm,
+      boolean signPayload
   ) {
     this.version = version;
     this.date = date;
@@ -54,6 +57,7 @@ public class SignatureInfo {
     this.signedHeaders = signedHeaders;
     this.credentialScope = credentialScope;
     this.algorithm = algorithm;
+    this.signPayload = signPayload;
   }
 
   public String getAwsAccessId() {
@@ -82,6 +86,10 @@ public class SignatureInfo {
 
   public Version getVersion() {
     return version;
+  }
+
+  public boolean isSignPayload() {
+    return signPayload;
   }
 
   public enum Version {

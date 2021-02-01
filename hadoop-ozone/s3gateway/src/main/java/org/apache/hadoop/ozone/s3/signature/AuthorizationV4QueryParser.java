@@ -18,10 +18,12 @@
 package org.apache.hadoop.ozone.s3.signature;
 
 import javax.ws.rs.core.MultivaluedMap;
+import java.time.ZonedDateTime;
 
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.signature.SignatureInfo.Version;
 
+import static java.time.temporal.ChronoUnit.SECONDS;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,17 +53,30 @@ public class AuthorizationV4QueryParser implements SignatureParser {
       return null;
     }
 
+    final String dateString = queryParameters.getFirst("X-Amz-Date");
+    final String expiresString = queryParameters.getFirst("X-Amz-Expires");
+    if (expiresString != null && expiresString.length() > 0) {
+      final Long expires =
+          Long.valueOf(expiresString);
+
+      if (ZonedDateTime.parse(dateString, StringToSignProducer.TIME_FORMATTER)
+          .plus(expires, SECONDS).isBefore(ZonedDateTime.now())) {
+        throw new IllegalArgumentException("Pre-signed S3 url is expired");
+      }
+    }
+
     Credential credential =
         new Credential(queryParameters.getFirst("X-Amz-Credential"));
 
     return new SignatureInfo(
         Version.V4,
-        queryParameters.getFirst("X-Amz-Date"),
+        dateString,
         credential.getAccessKeyID(),
         queryParameters.getFirst("X-Amz-Signature"),
         queryParameters.getFirst("X-Amz-SignedHeaders"),
         credential.createScope(),
-        queryParameters.getFirst("X-Amz-Algorithm")
+        queryParameters.getFirst("X-Amz-Algorithm"),
+        false
     );
   }
 }

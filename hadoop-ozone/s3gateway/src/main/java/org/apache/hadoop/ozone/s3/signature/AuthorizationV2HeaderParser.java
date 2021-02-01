@@ -75,7 +75,8 @@ public class AuthorizationV2HeaderParser implements SignatureParser {
         signature,
         "",
         "",
-        ""
+        "",
+        false
     );
   }
 }

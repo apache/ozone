@@ -68,7 +68,7 @@ public final class StringToSignProducer {
    */
   private static final long PRESIGN_URL_MAX_EXPIRATION_SECONDS =
       60 * 60 * 24 * 7;
-  private static final DateTimeFormatter TIME_FORMATTER =
+  public static final DateTimeFormatter TIME_FORMATTER =
       DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'")
           .withZone(ZoneOffset.UTC);
 
@@ -108,8 +108,7 @@ public final class StringToSignProducer {
     //    RequestDateTime + \n +
     //    CredentialScope + \n +
     //    HashedCanonicalRequest
-    String credentialScope, canonicalRequest;
-    credentialScope = signatureInfo.getCredentialScope();
+    String credentialScope = signatureInfo.getCredentialScope();
 
     // If the absolute path is empty, use a forward slash (/)
     uri = (uri.trim().length() > 0) ? uri : "/";
@@ -118,19 +117,20 @@ public final class StringToSignProducer {
     strToSign.append(headers.get(X_AMAZ_DATE) + NEWLINE);
     strToSign.append(credentialScope + NEWLINE);
 
-    canonicalRequest = buildCanonicalRequest(
+    String canonicalRequest = buildCanonicalRequest(
         scheme,
         method,
         uri,
         signatureInfo.getSignedHeaders(),
         headers,
-        queryParams);
+        queryParams,
+        !signatureInfo.isSignPayload());
+
     strToSign.append(hash(canonicalRequest));
     if (LOG.isDebugEnabled()) {
       LOG.debug("canonicalRequest:[{}]", canonicalRequest);
       LOG.debug("StringToSign:[{}]", strToSign);
     }
-
 
     return strToSign.toString();
   }
@@ -148,7 +148,8 @@ public final class StringToSignProducer {
       String uri,
       String signedHeaders,
       Map<String, String> headers,
-      MultivaluedMap<String, String> queryParams
+      MultivaluedMap<String, String> queryParams,
+      boolean unsignedPayload
   ) throws OS3Exception {
 
     Iterable<String> parts = split("/", uri);
@@ -181,7 +182,7 @@ public final class StringToSignProducer {
 
     String payloadHash;
     if (UNSIGNED_PAYLOAD.equals(
-        headers.get(X_AMZ_CONTENT_SHA256))) {
+        headers.get(X_AMZ_CONTENT_SHA256)) || unsignedPayload) {
       payloadHash = UNSIGNED_PAYLOAD;
     } else {
       payloadHash = headers.get(X_AMZ_CONTENT_SHA256);

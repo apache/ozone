@@ -73,7 +73,7 @@ public class AWSSignatureProcessor implements SignatureProcessor {
     if (signatureInfo == null) {
       signatureInfo = new SignatureInfo(
           Version.NONE,
-          "", "", "", "", "", ""
+          "", "", "", "", "", "", false
       );
     }
     return signatureInfo;
