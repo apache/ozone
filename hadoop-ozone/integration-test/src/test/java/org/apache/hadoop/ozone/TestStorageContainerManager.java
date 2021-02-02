@@ -305,8 +305,7 @@ public class TestStorageContainerManager {
           return false;
         }
       }, 1000, 10000);
-      Assert.assertTrue(helper.getAllBlocks(containerIDs).isEmpty());
-
+      Assert.assertTrue(helper.verifyBlocksWithTxnTable(containerBlocks));
       // Continue the work, add some TXs that with known container names,
       // but unknown block IDs.
       for (Long containerID : containerBlocks.keySet()) {

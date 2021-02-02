@@ -516,22 +516,38 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   @Override
   public void exportContainerData(OutputStream destination,
       ContainerPacker<KeyValueContainerData> packer) throws IOException {
-    // Closed/ Quasi closed containers are considered for replication by
-    // replication manager if they are under-replicated.
-    ContainerProtos.ContainerDataProto.State state =
-        getContainerData().getState();
-    if (!(state == ContainerProtos.ContainerDataProto.State.CLOSED ||
-        state == ContainerDataProto.State.QUASI_CLOSED)) {
-      throw new IllegalStateException(
-          "Only closed/quasi closed containers could be exported: " +
-              "Where as ContainerId="
-              + getContainerData().getContainerID() + " is in state " + state);
+    writeLock();
+    try {
+      // Closed/ Quasi closed containers are considered for replication by
+      // replication manager if they are under-replicated.
+      ContainerProtos.ContainerDataProto.State state =
+          getContainerData().getState();
+      if (!(state == ContainerProtos.ContainerDataProto.State.CLOSED ||
+          state == ContainerDataProto.State.QUASI_CLOSED)) {
+        throw new IllegalStateException(
+            "Only (quasi)closed containers can be exported, but " +
+                "ContainerId=" + getContainerData().getContainerID() +
+                " is in state " + state);
+      }
+
+      try {
+        compactDB();
+        // Close DB (and remove from cache) to avoid concurrent modification
+        // while packing it.
+        BlockUtils.removeDB(containerData, config);
+      } finally {
+        readLock();
+        writeUnlock();
+      }
+
+      packer.pack(this, destination);
+    } finally {
+      if (lock.isWriteLockedByCurrentThread()) {
+        writeUnlock();
+      } else {
+        readUnlock();
+      }
     }
-    compactDB();
-    // Close DB (and remove from cache) to avoid concurrent modification while
-    // packing it.
-    BlockUtils.removeDB(containerData, config);
-    packer.pack(this, destination);
   }
 
   /**

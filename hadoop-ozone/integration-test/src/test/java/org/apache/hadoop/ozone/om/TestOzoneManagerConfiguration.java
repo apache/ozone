@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneIllegalArgumentException;
 import org.apache.hadoop.ozone.om.ha.OMNodeDetails;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
@@ -65,7 +66,7 @@ public class TestOzoneManagerConfiguration {
   private OzoneManager om;
   private OzoneManagerRatisServer omRatisServer;
 
-  private static final long LEADER_ELECTION_TIMEOUT = 500L;
+  private static final long RATIS_RPC_TIMEOUT = 500L;
 
   @Before
   public void init() throws IOException {
@@ -78,9 +79,8 @@ public class TestOzoneManagerConfiguration {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDirPath.toString());
     conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "127.0.0.1:0");
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, true);
-    conf.setTimeDuration(
-        OMConfigKeys.OZONE_OM_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY,
-        LEADER_ELECTION_TIMEOUT, TimeUnit.MILLISECONDS);
+    conf.setTimeDuration(OMConfigKeys.OZONE_OM_RATIS_MINIMUM_TIMEOUT_KEY,
+        RATIS_RPC_TIMEOUT, TimeUnit.MILLISECONDS);
 
     OMStorage omStore = new OMStorage(conf);
     omStore.setClusterId("testClusterId");
@@ -175,9 +175,10 @@ public class TestOzoneManagerConfiguration {
     Collection<RaftPeer> peers = omRatisServer.getRaftGroup().getPeers();
     Assert.assertEquals(1, peers.size());
 
-    // The RaftPeer id should match the configured omId
+    // The RaftPeer id should match OM_DEFAULT_NODE_ID
     RaftPeer raftPeer = peers.toArray(new RaftPeer[1])[0];
-    Assert.assertEquals(omId, raftPeer.getId().toString());
+    Assert.assertEquals(OzoneConsts.OM_DEFAULT_NODE_ID,
+        raftPeer.getId().toString());
   }
 
   /**

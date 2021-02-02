@@ -199,6 +199,7 @@ jobs:
         run: |
           mkdir -p /mnt/ozone/hadoop-ozone/dist/target
           tar xzvf hadoop-ozone*.tar.gz -C /mnt/ozone/hadoop-ozone/dist/target
+          sudo chmod -R a+rwX /mnt/ozone/hadoop-ozone/dist/target
       - name: Install robotframework
         run: sudo pip install robotframework
       - name: Execute tests
@@ -272,21 +273,17 @@ jobs:
           path: target/artifacts
       - name: Calculate combined coverage
         run: ./hadoop-ozone/dev-support/checks/coverage.sh
-      - name: Upload coverage to Sonar
-        uses: ./.github/buildenv
+      - name: Setup java 11
+        uses: actions/setup-java@v1
         if: github.repository == 'apache/ozone' && github.event_name != 'pull_request'
         with:
-          args: ./hadoop-ozone/dev-support/checks/sonar.sh
+          java-version: 11
+      - name: Upload coverage to Sonar
+        run: ./hadoop-ozone/dev-support/checks/sonar.sh
+        if: github.repository == 'apache/ozone' && github.event_name != 'pull_request'
         env:
           SONAR_TOKEN: ${{ secrets.SONARCLOUD_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v1
-        if: github.repository == 'apache/ozone' && github.event_name != 'pull_request'
-        with:
-          file: ./target/coverage/all.xml
-          name: codecov-umbrella
-          fail_ci_if_error: false
       - name: Archive build results
         uses: actions/upload-artifact@v2
         with:

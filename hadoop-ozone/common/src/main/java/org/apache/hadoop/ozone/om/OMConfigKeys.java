@@ -97,7 +97,7 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_RATIS_ENABLE_KEY
       = "ozone.om.ratis.enable";
   public static final boolean OZONE_OM_RATIS_ENABLE_DEFAULT
-      = false;
+      = true;
   public static final String OZONE_OM_RATIS_PORT_KEY
       = "ozone.om.ratis.port";
   public static final int OZONE_OM_RATIS_PORT_DEFAULT
@@ -153,15 +153,8 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_RATIS_MINIMUM_TIMEOUT_KEY
       = "ozone.om.ratis.minimum.timeout";
   public static final TimeDuration OZONE_OM_RATIS_MINIMUM_TIMEOUT_DEFAULT
-      = TimeDuration.valueOf(1, TimeUnit.SECONDS);
+      = TimeDuration.valueOf(5, TimeUnit.SECONDS);
 
-  // OM Ratis Leader Election configurations
-  public static final String
-      OZONE_OM_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY =
-      "ozone.om.leader.election.minimum.timeout.duration";
-  public static final TimeDuration
-      OZONE_OM_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_DEFAULT =
-      TimeDuration.valueOf(1, TimeUnit.SECONDS);
   public static final String OZONE_OM_RATIS_SERVER_FAILURE_TIMEOUT_DURATION_KEY
       = "ozone.om.ratis.server.failure.timeout.duration";
   public static final TimeDuration

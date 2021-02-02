@@ -376,6 +376,10 @@ public class TestSCMPipelineManager {
         metrics);
     Assert.assertEquals(0, numPipelineAllocated);
 
+    // one node pipeline creation will not be accounted for
+    // pipeline limit determination
+    pipelineManager.createPipeline(HddsProtos.ReplicationType.RATIS,
+        HddsProtos.ReplicationFactor.ONE);
     // max limit on no of pipelines is 4
     for (int i = 0; i < pipelinePerDn; i++) {
       Pipeline pipeline = pipelineManager
@@ -387,7 +391,7 @@ public class TestSCMPipelineManager {
     metrics = getMetrics(
         SCMPipelineMetrics.class.getSimpleName());
     numPipelineAllocated = getLongCounter("NumPipelineAllocated", metrics);
-    Assert.assertEquals(4, numPipelineAllocated);
+    Assert.assertEquals(5, numPipelineAllocated);
 
     long numPipelineCreateFailed = getLongCounter(
         "NumPipelineCreationFailed", metrics);
@@ -406,7 +410,7 @@ public class TestSCMPipelineManager {
     metrics = getMetrics(
         SCMPipelineMetrics.class.getSimpleName());
     numPipelineAllocated = getLongCounter("NumPipelineAllocated", metrics);
-    Assert.assertEquals(4, numPipelineAllocated);
+    Assert.assertEquals(5, numPipelineAllocated);
 
     numPipelineCreateFailed = getLongCounter(
         "NumPipelineCreationFailed", metrics);

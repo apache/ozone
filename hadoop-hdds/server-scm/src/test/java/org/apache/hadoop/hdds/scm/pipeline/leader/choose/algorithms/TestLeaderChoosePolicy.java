@@ -56,7 +56,7 @@ public class TestLeaderChoosePolicy {
         SCMContext.emptyContext());
     Assert.assertSame(
         ratisPipelineProvider.getLeaderChoosePolicy().getClass(),
-        DefaultLeaderChoosePolicy.class);
+        MinLeaderCountChoosePolicy.class);
   }
 
   @Test(expected = RuntimeException.class)

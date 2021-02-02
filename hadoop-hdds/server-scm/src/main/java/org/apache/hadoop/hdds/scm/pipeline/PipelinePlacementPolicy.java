@@ -98,9 +98,12 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
         continue;
       }
       if (pipeline != null &&
+            // single node pipeline are not accounted for while determining
+            // the pipeline limit for dn
+            pipeline.getType() == HddsProtos.ReplicationType.RATIS &&
+            (pipeline.getFactor() == HddsProtos.ReplicationFactor.ONE ||
           pipeline.getFactor().getNumber() == nodesRequired &&
-          pipeline.getType() == HddsProtos.ReplicationType.RATIS &&
-          pipeline.getPipelineState() == Pipeline.PipelineState.CLOSED) {
+          pipeline.getPipelineState() == Pipeline.PipelineState.CLOSED)) {
         pipelineNumDeductable++;
       }
     }
@@ -352,17 +355,17 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
    * list that we are operating on.
    *
    * @param healthyNodes - Set of healthy nodes we can choose from.
-   * @return chosen datanodDetails
+   * @return chosen datanodeDetails
    */
   @Override
-  public DatanodeDetails chooseNode(
-      List<DatanodeDetails> healthyNodes) {
+  public DatanodeDetails chooseNode(final List<DatanodeDetails> healthyNodes) {
     if (healthyNodes == null || healthyNodes.isEmpty()) {
       return null;
     }
-    DatanodeDetails datanodeDetails = healthyNodes.get(0);
-    healthyNodes.remove(datanodeDetails);
-    return datanodeDetails;
+    DatanodeDetails selectedNode =
+            healthyNodes.get(getRand().nextInt(healthyNodes.size()));
+    healthyNodes.remove(selectedNode);
+    return selectedNode;
   }
 
   /**

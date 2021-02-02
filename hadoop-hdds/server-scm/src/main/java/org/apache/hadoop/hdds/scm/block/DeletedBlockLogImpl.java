@@ -26,6 +26,7 @@ import java.util.LinkedHashSet;
 import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
@@ -70,6 +71,8 @@ public class DeletedBlockLogImpl
 
   public static final Logger LOG =
       LoggerFactory.getLogger(DeletedBlockLogImpl.class);
+  private static final DeletedBlocksTransaction.Builder DUMMY_TXN_BUILDER =
+      DeletedBlocksTransaction.newBuilder().setContainerID(1).setCount(1);
 
   private final int maxRetry;
   private final ContainerManagerV2 containerManager;
@@ -77,10 +80,18 @@ public class DeletedBlockLogImpl
   private final Lock lock;
   // Maps txId to set of DNs which are successful in committing the transaction
   private Map<Long, Set<UUID>> transactionToDNsCommitMap;
+  // Maps txId to its retry counts;
+  private Map<Long, Integer> transactionRetryCountMap;
+
+  private final AtomicLong largestTxnId;
+  // largest transactionId is stored at largestTxnIdHolderKey
+  private final long largestTxnIdHolderKey = 0L;
+
 
   public DeletedBlockLogImpl(ConfigurationSource conf,
                              ContainerManagerV2 containerManager,
-                             SCMMetadataStore scmMetadataStore) {
+                             SCMMetadataStore scmMetadataStore)
+      throws IOException {
     maxRetry = conf.getInt(OZONE_SCM_BLOCK_DELETION_MAX_RETRY,
         OZONE_SCM_BLOCK_DELETION_MAX_RETRY_DEFAULT);
     this.containerManager = containerManager;
@@ -92,8 +103,46 @@ public class DeletedBlockLogImpl
 
     // maps transaction to dns which have committed it.
     transactionToDNsCommitMap = new ConcurrentHashMap<>();
+    transactionRetryCountMap = new ConcurrentHashMap<>();
+    this.largestTxnId = new AtomicLong(this.getLargestRecordedTXID());
   }
 
+  public Long getNextDeleteBlockTXID() {
+    return this.largestTxnId.incrementAndGet();
+  }
+
+  public Long getCurrentTXID() {
+    return this.largestTxnId.get();
+  }
+
+  /**
+   * Returns the largest recorded TXID from the DB.
+   *
+   * @return Long
+   * @throws IOException
+   */
+  private long getLargestRecordedTXID() throws IOException {
+    DeletedBlocksTransaction txn =
+        scmMetadataStore.getDeletedBlocksTXTable().get(largestTxnIdHolderKey);
+    long txnId = txn != null ? txn.getTxID() : 0L;
+    if (txn == null) {
+      // HDDS-4477 adds largestTxnIdHolderKey to table for storing largest
+      // transactionId. In case the key does not exist, fetch largest
+      // transactionId from existing transactions and update
+      // largestTxnIdHolderKey with same.
+      try (TableIterator<Long,
+              ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> txIter =
+              getIterator()) {
+        txIter.seekToLast();
+        txnId = txIter.key() != null ? txIter.key() : 0L;
+        if (txnId > 0) {
+          scmMetadataStore.getDeletedBlocksTXTable().put(largestTxnIdHolderKey,
+              DUMMY_TXN_BUILDER.setTxID(txnId).build());
+        }
+      }
+    }
+    return txnId;
+  }
 
   @Override
   public List<DeletedBlocksTransaction> getFailedTransactions()
@@ -103,7 +152,7 @@ public class DeletedBlockLogImpl
       final List<DeletedBlocksTransaction> failedTXs = Lists.newArrayList();
       try (TableIterator<Long,
           ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> iter =
-               scmMetadataStore.getDeletedBlocksTXTable().iterator()) {
+               getIterator()) {
         while (iter.hasNext()) {
           DeletedBlocksTransaction delTX = iter.next().getValue();
           if (delTX.getCount() == -1) {
@@ -139,19 +188,30 @@ public class DeletedBlockLogImpl
           }
           continue;
         }
-        DeletedBlocksTransaction.Builder builder = block.toBuilder();
-        int currentCount = block.getCount();
+
+        int currentCount =
+            transactionRetryCountMap.getOrDefault(txID, block.getCount());
         if (currentCount > -1) {
-          builder.setCount(++currentCount);
+          int nextCount = currentCount + 1;
+          DeletedBlocksTransaction.Builder builder = block.toBuilder();
+          if (nextCount > maxRetry) {
+            // if the retry time exceeds the maxRetry value
+            // then set the retry value to -1, stop retrying, admins can
+            // analyze those blocks and purge them manually by SCMCli.
+            builder.setCount(-1);
+            scmMetadataStore.getDeletedBlocksTXTable().put(txID,
+                builder.build());
+            transactionRetryCountMap.remove(txID);
+          } else if (nextCount % 100 == 0) {
+            // write retry count after every 100 retries into DB.
+            builder.setCount(nextCount);
+            scmMetadataStore.getDeletedBlocksTXTable().put(txID,
+                builder.build());
+            transactionRetryCountMap.put(txID, nextCount);
+          } else {
+            transactionRetryCountMap.put(txID, nextCount);
+          }
         }
-        // if the retry time exceeds the maxRetry value
-        // then set the retry value to -1, stop retrying, admins can
-        // analyze those blocks and purge them manually by SCMCli.
-        if (currentCount > maxRetry) {
-          builder.setCount(-1);
-        }
-        scmMetadataStore.getDeletedBlocksTXTable().put(txID,
-            builder.build());
       } catch (IOException ex) {
         LOG.warn("Cannot increase count for txID " + txID, ex);
         // We do not throw error here, since we don't want to abort the loop.
@@ -226,6 +286,7 @@ public class DeletedBlockLogImpl
                 .collect(Collectors.toList());
             if (dnsWithCommittedTxn.containsAll(containerDns)) {
               transactionToDNsCommitMap.remove(txID);
+              transactionRetryCountMap.remove(txID);
               if (LOG.isDebugEnabled()) {
                 LOG.debug("Purging txId={} from block deletion log", txID);
               }
@@ -267,7 +328,7 @@ public class DeletedBlockLogImpl
       final AtomicInteger num = new AtomicInteger(0);
       try (TableIterator<Long,
           ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> iter =
-               scmMetadataStore.getDeletedBlocksTXTable().iterator()) {
+               getIterator()) {
         while (iter.hasNext()) {
           DeletedBlocksTransaction delTX = iter.next().getValue();
           if (delTX.getCount() > -1) {
@@ -291,19 +352,20 @@ public class DeletedBlockLogImpl
   public void addTransactions(Map<Long, List<Long>> containerBlocksMap)
       throws IOException {
     lock.lock();
-    try {
-      try(BatchOperation batch =
-          scmMetadataStore.getStore().initBatchOperation()) {
-        for (Map.Entry< Long, List< Long > > entry :
-            containerBlocksMap.entrySet()) {
-          long nextTXID = scmMetadataStore.getNextDeleteBlockTXID();
-          DeletedBlocksTransaction tx = constructNewTransaction(nextTXID,
-              entry.getKey(), entry.getValue());
-          scmMetadataStore.getDeletedBlocksTXTable().putWithBatch(batch,
-              nextTXID, tx);
-        }
-        scmMetadataStore.getStore().commitBatchOperation(batch);
+    try (BatchOperation batch = scmMetadataStore.getStore()
+        .initBatchOperation()) {
+      for (Map.Entry<Long, List<Long>> entry : containerBlocksMap.entrySet()) {
+        long nextTXID = getNextDeleteBlockTXID();
+        scmMetadataStore.getDeletedBlocksTXTable().putWithBatch(batch, nextTXID,
+            constructNewTransaction(nextTXID, entry.getKey(),
+                entry.getValue()));
       }
+      // Add a dummy transaction to store the largestTransactionId at
+      // largestTxnIdHolderKey
+      scmMetadataStore.getDeletedBlocksTXTable()
+          .putWithBatch(batch, largestTxnIdHolderKey,
+              DUMMY_TXN_BUILDER.setTxID(getCurrentTXID()).build());
+      scmMetadataStore.getStore().commitBatchOperation(batch);
     } finally {
       lock.unlock();
     }
@@ -343,7 +405,7 @@ public class DeletedBlockLogImpl
           new DatanodeDeletedBlockTransactions();
       try (TableIterator<Long,
           ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> iter =
-               scmMetadataStore.getDeletedBlocksTXTable().iterator()) {
+               getIterator()) {
         int numBlocksAdded = 0;
         List<DeletedBlocksTransaction> txnsToBePurged =
             new ArrayList<>();
@@ -366,6 +428,10 @@ public class DeletedBlockLogImpl
           }
         }
         purgeTransactions(txnsToBePurged);
+        for (DeletedBlocksTransaction trx : txnsToBePurged) {
+          transactionRetryCountMap.remove(trx.getTxID());
+          transactionToDNsCommitMap.remove(trx.getTxID());
+        }
       }
       return transactions;
     } finally {
@@ -383,6 +449,16 @@ public class DeletedBlockLogImpl
       }
       scmMetadataStore.getBatchHandler().commitBatchOperation(batch);
     }
+  }
+
+  TableIterator<Long,
+      ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> getIterator()
+      throws IOException {
+    TableIterator<Long,
+        ? extends Table.KeyValue<Long, DeletedBlocksTransaction>>
+        iter = scmMetadataStore.getDeletedBlocksTXTable().iterator();
+    iter.seek(largestTxnIdHolderKey + 1);
+    return iter;
   }
 
   @Override

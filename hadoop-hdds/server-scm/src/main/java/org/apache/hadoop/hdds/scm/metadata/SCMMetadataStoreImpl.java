@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm.metadata;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
-import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
@@ -34,7 +33,6 @@ import org.apache.hadoop.hdds.utils.db.BatchOperationHandler;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.CONTAINERS;
@@ -68,7 +66,6 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
       LoggerFactory.getLogger(SCMMetadataStoreImpl.class);
   private DBStore store;
   private final OzoneConfiguration configuration;
-  private final AtomicLong txID;
 
   /**
    * Constructs the metadata store and starts the DB Services.
@@ -80,7 +77,6 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
       throws IOException {
     this.configuration = config;
     start(this.configuration);
-    this.txID = new AtomicLong(this.getLargestRecordedTXID());
   }
 
   @Override
@@ -136,10 +132,6 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
     return deletedBlocksTable;
   }
 
-  @Override
-  public Long getNextDeleteBlockTXID() {
-    return this.txID.incrementAndGet();
-  }
 
   @Override
   public Table<BigInteger, X509Certificate> getValidCertsTable() {
@@ -184,28 +176,6 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
     return containerTable;
   }
 
-  @Override
-  public Long getCurrentTXID() {
-    return this.txID.get();
-  }
-
-  /**
-   * Returns the largest recorded TXID from the DB.
-   *
-   * @return Long
-   * @throws IOException
-   */
-  private Long getLargestRecordedTXID() throws IOException {
-    try (TableIterator<Long, ? extends KeyValue<Long, DeletedBlocksTransaction>>
-        txIter = deletedBlocksTable.iterator()) {
-      txIter.seekToLast();
-      Long txid = txIter.key();
-      if (txid != null) {
-        return txid;
-      }
-    }
-    return 0L;
-  }
 
 
   private void checkTableStatus(Table table, String name) throws IOException {

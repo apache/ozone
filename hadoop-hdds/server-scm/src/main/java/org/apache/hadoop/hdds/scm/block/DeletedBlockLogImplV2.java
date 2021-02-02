@@ -83,6 +83,7 @@ public class DeletedBlockLogImplV2
   // DeletedBlockLogStateManager.
   private final DeletedBlockLogStateManager deletedBlockLogStateManager;
   private final SCMContext scmContext;
+  private final Table<Long, DeletedBlocksTransaction> deletedBlocksTXTable;
 
   public DeletedBlockLogImplV2(ConfigurationSource conf,
       ContainerManagerV2 containerManager,
@@ -108,6 +109,7 @@ public class DeletedBlockLogImplV2
         .setSCMDBTransactionBuffer(dbTxBuffer)
         .build();
     this.scmContext = scmContext;
+    this.deletedBlocksTXTable = deletedBlocksTXTable;
   }
 
 

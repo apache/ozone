@@ -27,7 +27,7 @@ services:
       env_file:
         - ./docker-config
       environment:
-         HADOOP_OPTS: ${HADOOP_OPTS}
+         OZONE_OPTS:
    om1:
       image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
       privileged: true #required by the profiler
@@ -38,7 +38,7 @@ services:
          - 9890:9872
       environment:
          ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
-         HADOOP_OPTS: ${HADOOP_OPTS}
+         OZONE_OPTS:
       env_file:
           - ./docker-config
       command: ["/opt/hadoop/bin/ozone","om"]
@@ -52,7 +52,7 @@ services:
          - 9892:9872
       environment:
          ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
-         HADOOP_OPTS: ${HADOOP_OPTS}
+         OZONE_OPTS:
       env_file:
          - ./docker-config
       command: ["/opt/hadoop/bin/ozone","om"]
@@ -66,7 +66,7 @@ services:
          - 9894:9872
       environment:
          ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
-         HADOOP_OPTS: ${HADOOP_OPTS}
+         OZONE_OPTS:
       env_file:
          - ./docker-config
       command: ["/opt/hadoop/bin/ozone","om"]
@@ -83,7 +83,7 @@ services:
       environment:
           ENSURE_SCM_INITIALIZED: /data/metadata/scm/current/VERSION
           OZONE-SITE.XML_hdds.scm.safemode.min.datanode: "${OZONE_SAFEMODE_MIN_DATANODES:-1}"
-          HADOOP_OPTS: ${HADOOP_OPTS}
+          OZONE_OPTS:
       command: ["/opt/hadoop/bin/ozone","scm"]
    s3g:
       image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
@@ -94,6 +94,6 @@ services:
       env_file:
          - ./docker-config
       environment:
-         HADOOP_OPTS: ${HADOOP_OPTS}
+         OZONE_OPTS:
       command: ["ozone","s3g"]
 

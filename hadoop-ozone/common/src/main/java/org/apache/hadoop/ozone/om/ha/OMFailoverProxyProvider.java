@@ -143,9 +143,9 @@ public class OMFailoverProxyProvider implements
 
 
           // For a non-HA OM setup, nodeId might be null. If so, we assign it
-          // a dummy value
+          // the default value
           if (nodeId == null) {
-            nodeId = OzoneConsts.OM_NODE_ID_DUMMY;
+            nodeId = OzoneConsts.OM_DEFAULT_NODE_ID;
           }
           // ProxyInfo will be set during first time call to server.
           omProxies.put(nodeId, null);

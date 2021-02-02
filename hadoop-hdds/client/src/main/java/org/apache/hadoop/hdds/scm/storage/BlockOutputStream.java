@@ -46,14 +46,13 @@ import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
+import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.security.token.TokenIdentifier;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.putBlockAsync;
 import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.writeChunkAsync;
-
-import org.apache.hadoop.security.token.Token;
-import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -281,7 +280,7 @@ public class BlockOutputStream extends OutputStream {
 
   private void allocateNewBufferIfNeeded() {
     if (currentBufferRemaining == 0) {
-      currentBuffer = bufferPool.allocateBuffer(config.getBytesPerChecksum());
+      currentBuffer = bufferPool.allocateBuffer(config.getBufferIncrement());
       currentBufferRemaining = currentBuffer.remaining();
     }
   }
