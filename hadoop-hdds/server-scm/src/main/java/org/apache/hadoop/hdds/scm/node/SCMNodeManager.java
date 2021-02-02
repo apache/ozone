@@ -417,16 +417,17 @@ public class SCMNodeManager implements NodeManager {
         || scmStatus.getOpStateExpiryEpochSeconds()
         != reportedDn.getPersistedOpStateExpiryEpochSec()) {
       LOG.info("Scheduling a command to update the operationalState " +
-          "persisted on the datanode as the reported value ({}, {}) does not " +
+          "persisted on {} as the reported value does not " +
           "match the value stored in SCM ({}, {})",
-          reportedDn.getPersistedOpState(),
-          reportedDn.getPersistedOpStateExpiryEpochSec(),
+          reportedDn,
           scmStatus.getOperationalState(),
           scmStatus.getOpStateExpiryEpochSeconds());
-      commandQueue.addCommand(reportedDn.getUuid(),
+
+      onMessage(new CommandForDatanode(reportedDn.getUuid(),
           new SetNodeOperationalStateCommand(
               Time.monotonicNow(), scmStatus.getOperationalState(),
-              scmStatus.getOpStateExpiryEpochSeconds()));
+              scmStatus.getOpStateExpiryEpochSeconds())
+      ), null);
     }
     DatanodeDetails scmDnd = nodeStateManager.getNode(reportedDn);
     scmDnd.setPersistedOpStateExpiryEpochSec(
