@@ -17,8 +17,8 @@
  */
 package org.apache.hadoop.ozone.s3.signature;
 
-import javax.ws.rs.core.MultivaluedHashMap;
-import javax.ws.rs.core.MultivaluedMap;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.apache.hadoop.ozone.s3.HeaderPreprocessor;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
@@ -55,10 +55,10 @@ public class TestStringToSignProducer {
     headers.put("Authorization",
         authHeader);
 
-    MultivaluedMap<String, String> queryParameters = new MultivaluedHashMap<>();
+    Map<String, String> queryParameters = new HashMap<>();
 
     final SignatureInfo signatureInfo =
-        new AuthorizationV4HeaderParser(authHeader) {
+        new AuthorizationV4HeaderParser(authHeader, "123") {
           @Override
           public void validateDateRange(Credential credentialObj)
               throws OS3Exception {

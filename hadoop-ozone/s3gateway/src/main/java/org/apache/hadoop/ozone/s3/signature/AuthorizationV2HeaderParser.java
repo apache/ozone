@@ -71,6 +71,7 @@ public class AuthorizationV2HeaderParser implements SignatureParser {
     return new SignatureInfo(
         Version.V2,
         "",
+        "",
         accessKeyID,
         signature,
         "",

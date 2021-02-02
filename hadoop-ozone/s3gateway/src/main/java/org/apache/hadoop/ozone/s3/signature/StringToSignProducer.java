@@ -34,6 +34,7 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -84,7 +85,8 @@ public final class StringToSignProducer {
         context.getMethod(),
         context.getUriInfo().getRequestUri().getPath(),
         LowerCaseKeyStringMap.fromHeaderMap(context.getHeaders()),
-        context.getUriInfo().getQueryParameters());
+        fromMultiValueToSingleValueMap(
+            context.getUriInfo().getQueryParameters()));
   }
 
   @VisibleForTesting
@@ -94,7 +96,7 @@ public final class StringToSignProducer {
       String method,
       String uri,
       LowerCaseKeyStringMap headers,
-      MultivaluedMap<String, String> queryParams
+      Map<String, String> queryParams
   ) throws Exception {
     StringBuilder strToSign = new StringBuilder();
     // According to AWS sigv4 documentation, authorization header should be
@@ -114,7 +116,7 @@ public final class StringToSignProducer {
     uri = (uri.trim().length() > 0) ? uri : "/";
     // Encode URI and preserve forward slashes
     strToSign.append(signatureInfo.getAlgorithm() + NEWLINE);
-    strToSign.append(headers.get(X_AMAZ_DATE) + NEWLINE);
+    strToSign.append(signatureInfo.getDateTime() + NEWLINE);
     strToSign.append(credentialScope + NEWLINE);
 
     String canonicalRequest = buildCanonicalRequest(
@@ -125,7 +127,7 @@ public final class StringToSignProducer {
         headers,
         queryParams,
         !signatureInfo.isSignPayload());
-
+    System.out.println(canonicalRequest);
     strToSign.append(hash(canonicalRequest));
     if (LOG.isDebugEnabled()) {
       LOG.debug("canonicalRequest:[{}]", canonicalRequest);
@@ -133,6 +135,16 @@ public final class StringToSignProducer {
     }
 
     return strToSign.toString();
+  }
+
+  public static Map<String, String> fromMultiValueToSingleValueMap(
+      MultivaluedMap<String, String> queryParameters
+  ) {
+    Map<String, String> result = new HashMap<>();
+    for (String key : queryParameters.keySet()) {
+      result.put(key, queryParameters.getFirst(key));
+    }
+    return result;
   }
 
   public static String hash(String payload) throws NoSuchAlgorithmException {
@@ -148,7 +160,7 @@ public final class StringToSignProducer {
       String uri,
       String signedHeaders,
       Map<String, String> headers,
-      MultivaluedMap<String, String> queryParams,
+      Map<String, String> queryParams,
       boolean unsignedPayload
   ) throws OS3Exception {
 
@@ -193,7 +205,6 @@ public final class StringToSignProducer {
         + canonicalHeaders + NEWLINE
         + signedHeaders + NEWLINE
         + payloadHash;
-
     return canonicalRequest;
   }
 
@@ -247,24 +258,27 @@ public final class StringToSignProducer {
   }
 
   private static String getQueryParamString(
-      MultivaluedMap<String, String> queryMap
+      Map<String, String> queryMap
   ) {
     List<String> params = new ArrayList<>(queryMap.keySet());
 
     // Sort by name, then by value
     Collections.sort(params, (o1, o2) -> o1.equals(o2) ?
-        queryMap.getFirst(o1).compareTo(queryMap.getFirst(o2)) :
+        queryMap.get(o1).compareTo(queryMap.get(o2)) :
         o1.compareTo(o2));
 
     StringBuilder result = new StringBuilder();
     for (String p : params) {
-      if (result.length() > 0) {
-        result.append("&");
-      }
-      result.append(urlEncode(p));
-      result.append('=');
+      if (!p.equals("X-Amz-Signature")) {
 
-      result.append(urlEncode(queryMap.getFirst(p)));
+        if (result.length() > 0) {
+          result.append("&");
+        }
+        result.append(urlEncode(p));
+        result.append('=');
+
+        result.append(urlEncode(queryMap.get(p)));
+      }
     }
     return result.toString();
   }

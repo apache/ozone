@@ -44,7 +44,7 @@ import org.slf4j.LoggerFactory;
 @RequestScoped
 public class AWSSignatureProcessor implements SignatureProcessor {
 
-  private final static Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(AWSSignatureProcessor.class);
 
   @Context
@@ -58,9 +58,11 @@ public class AWSSignatureProcessor implements SignatureProcessor {
     String authHeader = headers.get("Authorization");
 
     List<SignatureParser> signatureParsers = new ArrayList<>();
-    signatureParsers.add(new AuthorizationV4HeaderParser(authHeader));
+    signatureParsers.add(new AuthorizationV4HeaderParser(authHeader,
+        headers.get(StringToSignProducer.X_AMAZ_DATE)));
     signatureParsers.add(new AuthorizationV4QueryParser(
-        context.getUriInfo().getQueryParameters()));
+        StringToSignProducer.fromMultiValueToSingleValueMap(
+            context.getUriInfo().getQueryParameters())));
     signatureParsers.add(new AuthorizationV2HeaderParser(authHeader));
 
     SignatureInfo signatureInfo = null;
@@ -73,7 +75,7 @@ public class AWSSignatureProcessor implements SignatureProcessor {
     if (signatureInfo == null) {
       signatureInfo = new SignatureInfo(
           Version.NONE,
-          "", "", "", "", "", "", false
+          "", "", "", "", "", "", "", false
       );
     }
     return signatureInfo;

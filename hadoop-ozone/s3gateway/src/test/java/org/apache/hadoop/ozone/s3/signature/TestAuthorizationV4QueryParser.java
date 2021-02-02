@@ -18,13 +18,14 @@
 
 package org.apache.hadoop.ozone.s3.signature;
 
-import javax.ws.rs.core.MultivaluedMap;
-
 import java.time.ZonedDateTime;
+import java.util.HashMap;
+import java.util.Map;
+
+import org.apache.hadoop.ozone.s3.signature.AWSSignatureProcessor.LowerCaseKeyStringMap;
 
 import org.junit.Assert;
 import org.junit.Test;
-import org.mockito.Mockito;
 
 public class TestAuthorizationV4QueryParser {
 
@@ -32,11 +33,14 @@ public class TestAuthorizationV4QueryParser {
   public void testExpiredHeaders() throws Exception {
 
     //GIVEN
-    final MultivaluedMap parameters = Mockito.mock(MultivaluedMap.class);
-    Mockito.when(parameters.getFirst("X-Amz-Date"))
-        .thenReturn("20160801T083241Z");
-    Mockito.when(parameters.getFirst("X-Amz-Expires")).thenReturn("10000");
-    Mockito.when(parameters.containsKey("X-Amz-Signature")).thenReturn(true);
+    Map<String, String> parameters = new HashMap<>();
+    parameters.put("X-Amz-Algorithm", "AWS4-HMAC-SHA256");
+    parameters.put("X-Amz-Credential",
+        "AKIAIOSFODNN7EXAMPLE%2F20130524%2Fus-east-1%2Fs3%2Faws4_request");
+    parameters.put("X-Amz-Date", "20160801T083241Z");
+    parameters.put("X-Amz-Expires", "10000");
+    parameters.put("X-Amz-Signature",
+        "aeeed9bbccd4d02ee5c0109b86d86835f995330da4c265957d157751f604d404");
 
     AuthorizationV4QueryParser parser =
         new AuthorizationV4QueryParser(parameters);
@@ -52,14 +56,16 @@ public class TestAuthorizationV4QueryParser {
   public void testUnExpiredHeaders() throws Exception {
 
     //GIVEN
-    final MultivaluedMap parameters = Mockito.mock(MultivaluedMap.class);
-    Mockito.when(parameters.getFirst("X-Amz-Date"))
-        .thenReturn(
-            ZonedDateTime.now().format(StringToSignProducer.TIME_FORMATTER));
-    Mockito.when(parameters.getFirst("X-Amz-Expires")).thenReturn("10000");
-    Mockito.when(parameters.getFirst("X-Amz-Credential"))
-        .thenReturn("AKIAIOSFODNN7EXAMPLE/20130524/us-east-1/s3/aws4_request");
-    Mockito.when(parameters.containsKey("X-Amz-Signature")).thenReturn(true);
+    Map<String, String> parameters = new HashMap<>();
+    parameters.put("X-Amz-Algorithm", "AWS4-HMAC-SHA256");
+    parameters.put("X-Amz-Credential",
+        "AKIAIOSFODNN7EXAMPLE%2F20130524%2Fus-east-1%2Fs3%2Faws4_request");
+    parameters.put("X-Amz-Date",
+        ZonedDateTime.now().format(StringToSignProducer.TIME_FORMATTER));
+    parameters.put("X-Amz-Expires", "10000");
+    parameters.put("X-Amz-Signature",
+        "aeeed9bbccd4d02ee5c0109b86d86835f995330da4c265957d157751f604d404");
+
 
     AuthorizationV4QueryParser parser =
         new AuthorizationV4QueryParser(parameters);
@@ -70,19 +76,18 @@ public class TestAuthorizationV4QueryParser {
     //THEN
     //passed
   }
-
 
   @Test()
-  public void testWithoutEpiration() throws Exception {
+  public void testWithoutExpiration() throws Exception {
 
     //GIVEN
-    final MultivaluedMap parameters = Mockito.mock(MultivaluedMap.class);
-    Mockito.when(parameters.getFirst("X-Amz-Date"))
-        .thenReturn(
-            ZonedDateTime.now().format(StringToSignProducer.TIME_FORMATTER));
-    Mockito.when(parameters.getFirst("X-Amz-Credential"))
-        .thenReturn("AKIAIOSFODNN7EXAMPLE/20130524/us-east-1/s3/aws4_request");
-    Mockito.when(parameters.containsKey("X-Amz-Signature")).thenReturn(true);
+    Map<String, String> parameters = new HashMap<>();
+    parameters.put("X-Amz-Algorithm", "AWS4-HMAC-SHA256");
+    parameters.put("X-Amz-Credential",
+        "AKIAIOSFODNN7EXAMPLE%2F20130524%2Fus-east-1%2Fs3%2Faws4_request");
+    parameters.put("X-Amz-Date", "20130524T000000Z");
+    parameters.put("X-Amz-Signature",
+        "aeeed9bbccd4d02ee5c0109b86d86835f995330da4c265957d157751f604d404");
 
     AuthorizationV4QueryParser parser =
         new AuthorizationV4QueryParser(parameters);
@@ -93,4 +98,49 @@ public class TestAuthorizationV4QueryParser {
     //THEN
     //passed
   }
+
+  @Test
+  /**
+   * Based on https://docs.aws.amazon
+   * .com/AmazonS3/latest/API/sigv4-query-string-auth.html.
+   */
+  public void testWithAWSExample() throws Exception {
+
+    Map<String, String> queryParams = new HashMap<>();
+
+    queryParams.put("X-Amz-Algorithm", "AWS4-HMAC-SHA256");
+    queryParams.put("X-Amz-Credential",
+        "AKIAIOSFODNN7EXAMPLE/20130524/us-east-1/s3/aws4_request");
+    queryParams.put("X-Amz-Date", "20130524T000000Z");
+    queryParams.put("X-Amz-Expires", "86400");
+    queryParams.put("X-Amz-SignedHeaders", "host");
+    queryParams.put("X-Amz-Signature",
+        "aeeed9bbccd4d02ee5c0109b86d86835f995330da4c265957d157751f604d404");
+
+    AuthorizationV4QueryParser parser =
+        new AuthorizationV4QueryParser(queryParams) {
+          @Override
+          protected void validateDateAndExpires() {
+            //noop
+          }
+        };
+
+    final SignatureInfo signatureInfo = parser.parseSignature();
+
+    LowerCaseKeyStringMap headers = new LowerCaseKeyStringMap();
+    headers.put("host", "examplebucket.s3.amazonaws.com");
+
+    final String stringToSign =
+        StringToSignProducer.createSignatureBase(signatureInfo, "https", "GET",
+            "/test.txt", headers,
+            queryParams);
+
+    Assert.assertEquals("AWS4-HMAC-SHA256\n"
+            + "20130524T000000Z\n"
+            + "20130524/us-east-1/s3/aws4_request\n"
+            +
+            "3bfa292879f6447bbcda7001decf97f4a54dc650c8942174ae0a9121cf58ad04",
+        stringToSign);
+  }
+
 }

@@ -17,12 +17,15 @@
  */
 package org.apache.hadoop.ozone.s3.signature;
 
-import javax.ws.rs.core.MultivaluedMap;
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
 import java.time.ZonedDateTime;
+import java.util.Map;
 
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.signature.SignatureInfo.Version;
 
+import com.google.common.annotations.VisibleForTesting;
 import static java.time.temporal.ChronoUnit.SECONDS;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,10 +41,10 @@ public class AuthorizationV4QueryParser implements SignatureParser {
   private static final Logger LOG =
       LoggerFactory.getLogger(AuthorizationV4QueryParser.class);
 
-  private final MultivaluedMap<String, String> queryParameters;
+  private final Map<String, String> queryParameters;
 
   public AuthorizationV4QueryParser(
-      MultivaluedMap<String, String> queryParameters
+      Map<String, String> queryParameters
   ) {
     this.queryParameters = queryParameters;
   }
@@ -53,30 +56,43 @@ public class AuthorizationV4QueryParser implements SignatureParser {
       return null;
     }
 
-    final String dateString = queryParameters.getFirst("X-Amz-Date");
-    final String expiresString = queryParameters.getFirst("X-Amz-Expires");
+    validateDateAndExpires();
+
+    final String rawCredential = queryParameters.get("X-Amz-Credential");
+
+    Credential credential =
+        null;
+    try {
+      credential = new Credential(URLDecoder.decode(rawCredential, "UTF-8"));
+    } catch (UnsupportedEncodingException e) {
+      throw new IllegalArgumentException(
+          "X-Amz-Credential is not proper URL encoded");
+    }
+
+    return new SignatureInfo(
+        Version.V4,
+        credential.getDate(),
+        queryParameters.get("X-Amz-Date"),
+        credential.getAccessKeyID(),
+        queryParameters.get("X-Amz-Signature"),
+        queryParameters.get("X-Amz-SignedHeaders"),
+        credential.createScope(),
+        queryParameters.get("X-Amz-Algorithm"),
+        false
+    );
+  }
+
+  @VisibleForTesting
+  protected void validateDateAndExpires() {
+    final String dateString = queryParameters.get("X-Amz-Date");
+    final String expiresString = queryParameters.get("X-Amz-Expires");
     if (expiresString != null && expiresString.length() > 0) {
-      final Long expires =
-          Long.valueOf(expiresString);
+      final Long expires = Long.valueOf(expiresString);
 
       if (ZonedDateTime.parse(dateString, StringToSignProducer.TIME_FORMATTER)
           .plus(expires, SECONDS).isBefore(ZonedDateTime.now())) {
         throw new IllegalArgumentException("Pre-signed S3 url is expired");
       }
     }
-
-    Credential credential =
-        new Credential(queryParameters.getFirst("X-Amz-Credential"));
-
-    return new SignatureInfo(
-        Version.V4,
-        dateString,
-        credential.getAccessKeyID(),
-        queryParameters.getFirst("X-Amz-Signature"),
-        queryParameters.getFirst("X-Amz-SignedHeaders"),
-        credential.createScope(),
-        queryParameters.getFirst("X-Amz-Algorithm"),
-        false
-    );
   }
 }

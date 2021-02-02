@@ -26,7 +26,15 @@ public class SignatureInfo {
 
   private Version version;
 
+  /**
+   * Information comes from the credential (Date only).
+   */
   private String date;
+
+  /**
+   * Information comes from header/query param (full timestamp).
+   */
+  private String dateTime;
 
   private String awsAccessId;
 
@@ -40,9 +48,11 @@ public class SignatureInfo {
 
   private boolean signPayload = true;
 
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public SignatureInfo(
       Version version,
       String date,
+      String dateTime,
       String awsAccessId,
       String signature,
       String signedHeaders,
@@ -52,6 +62,7 @@ public class SignatureInfo {
   ) {
     this.version = version;
     this.date = date;
+    this.dateTime = dateTime;
     this.awsAccessId = awsAccessId;
     this.signature = signature;
     this.signedHeaders = signedHeaders;
@@ -90,6 +101,10 @@ public class SignatureInfo {
 
   public boolean isSignPayload() {
     return signPayload;
+  }
+
+  public String getDateTime() {
+    return dateTime;
   }
 
   public enum Version {

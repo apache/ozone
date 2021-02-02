@@ -51,8 +51,11 @@ public class AuthorizationV4HeaderParser implements SignatureParser {
 
   private String authHeader;
 
-  public AuthorizationV4HeaderParser(String authHeader) {
+  private String dateHeader;
+
+  public AuthorizationV4HeaderParser(String authHeader, String dateHeader) {
     this.authHeader = authHeader;
+    this.dateHeader = dateHeader;
   }
 
   /**
@@ -91,6 +94,7 @@ public class AuthorizationV4HeaderParser implements SignatureParser {
     return new SignatureInfo(
         Version.V4,
         credentialObj.getDate(),
+        dateHeader,
         credentialObj.getAccessKeyID(),
         signature,
         signedHeaders,
