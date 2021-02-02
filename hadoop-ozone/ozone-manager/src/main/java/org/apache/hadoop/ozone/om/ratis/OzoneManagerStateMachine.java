@@ -32,6 +32,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.hadoop.ozone.common.ha.ratis.RatisSnapshotInfo;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
@@ -80,7 +81,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   private RequestHandler handler;
   private RaftGroupId raftGroupId;
   private OzoneManagerDoubleBuffer ozoneManagerDoubleBuffer;
-  private final OMRatisSnapshotInfo snapshotInfo;
+  private final RatisSnapshotInfo snapshotInfo;
   private final ExecutorService executorService;
   private final ExecutorService installSnapshotExecutor;
   private final boolean isTracingEnabled;

@@ -17,6 +17,7 @@
 package org.apache.hadoop.ozone.om.ratis;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.common.ha.ratis.RatisSnapshotInfo;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
@@ -58,7 +59,7 @@ public class TestOzoneManagerStateMachine {
 
     when(ozoneManagerRatisServer.getOzoneManager()).thenReturn(ozoneManager);
     when(ozoneManager.getSnapshotInfo()).thenReturn(
-        Mockito.mock(OMRatisSnapshotInfo.class));
+        Mockito.mock(RatisSnapshotInfo.class));
     ozoneManagerStateMachine =
         new OzoneManagerStateMachine(ozoneManagerRatisServer, false);
     ozoneManagerStateMachine.notifyTermIndexUpdated(0, 0);
