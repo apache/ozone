@@ -40,7 +40,6 @@ import javax.inject.Inject;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -56,11 +55,12 @@ import org.apache.hadoop.ozone.recon.api.types.MissingContainersResponse;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersResponse;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersSummary;
-import org.apache.hadoop.ozone.recon.persistence.ContainerSchemaManager;
+import org.apache.hadoop.ozone.recon.persistence.ContainerHistory;
+import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
+import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
-import org.hadoop.ozone.recon.schema.tables.pojos.ContainerHistory;
 import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
 
 import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_BATCH_NUMBER;
@@ -85,14 +85,15 @@ public class ContainerEndpoint {
   private ReconOMMetadataManager omMetadataManager;
 
   // TODO: Fix ME, This has to be ReconContainerManager
-  private ContainerManagerV2 containerManager;
-  private ContainerSchemaManager containerSchemaManager;
+  private ReconContainerManager containerManager;
+  private final ContainerHealthSchemaManager containerHealthSchemaManager;
 
   @Inject
   public ContainerEndpoint(OzoneStorageContainerManager reconSCM,
-                           ContainerSchemaManager containerSchemaManager) {
-    this.containerManager = reconSCM.getContainerManager();
-    this.containerSchemaManager = containerSchemaManager;
+      ContainerHealthSchemaManager containerHealthSchemaManager) {
+    this.containerManager = (ReconContainerManager) reconSCM
+        .getContainerManager();
+    this.containerHealthSchemaManager = containerHealthSchemaManager;
   }
 
   /**
@@ -226,7 +227,7 @@ public class ContainerEndpoint {
   public Response getReplicaHistoryForContainer(
       @PathParam("id") Long containerID) {
     return Response.ok(
-        containerSchemaManager.getAllContainerHistory(containerID)).build();
+        containerManager.getAllContainerHistory(containerID)).build();
   }
 
   /**
@@ -240,7 +241,7 @@ public class ContainerEndpoint {
   @Path("/missing")
   public Response getMissingContainers() {
     List<MissingContainerMetadata> missingContainers = new ArrayList<>();
-    containerSchemaManager.getUnhealthyContainers(
+    containerHealthSchemaManager.getUnhealthyContainers(
         UnHealthyContainerStates.MISSING, 0, Integer.MAX_VALUE)
         .forEach(container -> {
           long containerID = container.getContainerId();
@@ -251,7 +252,7 @@ public class ContainerEndpoint {
             UUID pipelineID = containerInfo.getPipelineID().getId();
 
             List<ContainerHistory> datanodes =
-                containerSchemaManager.getLatestContainerHistory(containerID,
+                containerManager.getLatestContainerHistory(containerID,
                     containerInfo.getReplicationFactor().getNumber());
             missingContainers.add(new MissingContainerMetadata(containerID,
                 container.getInStateSince(), keyCount, pipelineID, datanodes));
@@ -301,8 +302,8 @@ public class ContainerEndpoint {
         internalState = UnHealthyContainerStates.valueOf(state);
       }
 
-      summary = containerSchemaManager.getUnhealthyContainersSummary();
-      List<UnhealthyContainers> containers = containerSchemaManager
+      summary = containerHealthSchemaManager.getUnhealthyContainersSummary();
+      List<UnhealthyContainers> containers = containerHealthSchemaManager
           .getUnhealthyContainers(internalState, offset, limit);
       for (UnhealthyContainers c : containers) {
         long containerID = c.getContainerId();
@@ -311,8 +312,7 @@ public class ContainerEndpoint {
         long keyCount = containerInfo.getNumberOfKeys();
         UUID pipelineID = containerInfo.getPipelineID().getId();
         List<ContainerHistory> datanodes =
-            containerSchemaManager.getLatestContainerHistory(
-                containerID,
+            containerManager.getLatestContainerHistory(containerID,
                 containerInfo.getReplicationFactor().getNumber());
         unhealthyMeta.add(new UnhealthyContainerMetadata(
             c, datanodes, pipelineID, keyCount));

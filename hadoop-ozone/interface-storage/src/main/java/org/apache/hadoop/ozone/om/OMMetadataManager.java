@@ -17,11 +17,15 @@
 package org.apache.hadoop.ozone.om;
 
 import java.io.IOException;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -387,4 +391,10 @@ public interface OMMetadataManager {
    * @return table names in OM DB.
    */
   Set<String> listTableNames();
+
+  Iterator<Map.Entry<CacheKey<String>, CacheValue<OmBucketInfo>>>
+      getBucketIterator();
+
+  TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+      getKeyIterator();
 }

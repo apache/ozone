@@ -299,8 +299,8 @@ public class ContainerStateMachine extends BaseStateMachine {
             snapshotFile);
         throw ioe;
       }
-      LOG.info("{}: Finished taking a snapshot at:{} file:{} time:{}", gid, ti,
-          snapshotFile, (Time.monotonicNow() - startTime));
+      LOG.info("{}: Finished taking a snapshot at:{} file:{} took: {} ms",
+          gid, ti, snapshotFile, (Time.monotonicNow() - startTime));
       return ti.getIndex();
     }
     return -1;
@@ -445,7 +445,7 @@ public class ContainerStateMachine extends BaseStateMachine {
             return runCommand(requestProto, context);
           } catch (Exception e) {
             LOG.error("{}: writeChunk writeStateMachineData failed: blockId" +
-                "{} logIndex {} chunkName {} {}", gid, write.getBlockID(),
+                "{} logIndex {} chunkName {}", gid, write.getBlockID(),
                 entryIndex, write.getChunkData().getChunkName(), e);
             metrics.incNumWriteDataFails();
             // write chunks go in parallel. It's possible that one write chunk
@@ -458,8 +458,8 @@ public class ContainerStateMachine extends BaseStateMachine {
 
     writeChunkFutureMap.put(entryIndex, writeChunkFuture);
     if (LOG.isDebugEnabled()) {
-      LOG.error("{}: writeChunk writeStateMachineData : blockId" +
-              "{} logIndex {} chunkName {} {}", gid, write.getBlockID(),
+      LOG.debug("{}: writeChunk writeStateMachineData : blockId" +
+              "{} logIndex {} chunkName {}", gid, write.getBlockID(),
           entryIndex, write.getChunkData().getChunkName());
     }
     // Remove the future once it finishes execution from the
@@ -764,7 +764,7 @@ public class ContainerStateMachine extends BaseStateMachine {
             && trx.getStateMachineContext() != null) {
           long startTime = (long) trx.getStateMachineContext();
           metrics.incPipelineLatency(cmdType,
-              Time.monotonicNowNanos() - startTime);
+              (Time.monotonicNowNanos() - startTime) / 1000000L);
         }
         // ignore close container exception while marking the stateMachine
         // unhealthy

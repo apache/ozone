@@ -56,6 +56,8 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
     xmlPropsToSkipCompare.add("ozone.om.nodes.EXAMPLEOMSERVICEID");
     xmlPropsToSkipCompare.add("ozone.scm.nodes.EXAMPLESCMSERVICEID");
     xmlPrefixToSkipCompare.add("ipc.client.rpc-timeout.ms");
+    xmlPropsToSkipCompare.add("ozone.om.leader.election.minimum.timeout" +
+        ".duration"); // Deprecated config
     addPropertiesNotInXml();
   }
 

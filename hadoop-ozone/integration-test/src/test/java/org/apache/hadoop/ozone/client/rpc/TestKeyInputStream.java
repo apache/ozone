@@ -58,7 +58,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.ozone.container.TestHelper.countReplicas;
-import static org.apache.hadoop.ozone.container.TestHelper.waitForReplicaCount;
 import static org.junit.Assert.fail;
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -135,6 +134,7 @@ public class TestKeyInputStream {
     conf.setTimeDuration(HDDS_SCM_WATCHER_TIMEOUT, 1000, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, TimeUnit.SECONDS);
     conf.setTimeDuration(OZONE_SCM_DEADNODE_INTERVAL, 6, TimeUnit.SECONDS);
+    conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 1);
     conf.setQuietMode(false);
     conf.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 64,
         StorageUnit.MB);
@@ -464,21 +464,7 @@ public class TestKeyInputStream {
         keyInputStream.unbuffer();
       }
 
-      // stop one node, wait for container to be replicated to another one
       cluster.shutdownHddsDatanode(pipelineNodes.get(0));
-      waitForNodeToBecomeDead(pipelineNodes.get(0));
-      waitForReplicaCount(containerID, 2, cluster);
-      waitForReplicaCount(containerID, 3, cluster);
-
-      // avoid polluting the logs
-      cluster.getStorageContainerManager().getReplicationManager().stop();
-
-      // stop original pipeline's remaining nodes
-      cluster.shutdownHddsDatanode(pipelineNodes.get(1));
-      cluster.shutdownHddsDatanode(pipelineNodes.get(2));
-
-      // now only the new node has the container
-      waitForReplicaCount(containerID, 1, cluster);
 
       // check that we can still read it
       assertReadFully(data, keyInputStream, dataLength - 1, 1);

@@ -15,6 +15,7 @@
 # limitations under the License.
 
 CORE-SITE.XML_fs.defaultFS=ofs://om
+CORE-SITE.XML_fs.trash.interval=1
 
 OZONE-SITE.XML_ozone.om.address=om
 OZONE-SITE.XML_ozone.om.http-address=om:9874
@@ -29,6 +30,7 @@ OZONE-SITE.XML_ozone.handler.type=distributed
 OZONE-SITE.XML_ozone.scm.client.address=scm
 OZONE-SITE.XML_hdds.block.token.enabled=true
 OZONE-SITE.XML_ozone.replication=3
+OZONE-SITE.XML_ozone.datanode.pipeline.limit=1
 
 OZONE-SITE.XML_ozone.recon.om.snapshot.task.interval.delay=1m
 OZONE-SITE.XML_ozone.recon.db.dir=/data/metadata/recon
@@ -111,5 +113,8 @@ JAVA_HOME=/usr/lib/jvm/jre
 JSVC_HOME=/usr/bin
 SLEEP_SECONDS=5
 KERBEROS_ENABLED=true
+
+OZONE_CONF_DIR=/etc/hadoop
+OZONE_LOG_DIR=/var/log/hadoop
 
 no_proxy=om,scm,recon,s3g,kdc,localhost,127.0.0.1

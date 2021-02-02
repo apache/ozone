@@ -18,7 +18,7 @@ cd "$DIR/../../.." || exit 1
 
 REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/acceptance"}
 
-OZONE_VERSION=$(grep "<ozone.version>" "pom.xml" | sed 's/<[^>]*>//g'|  sed 's/^[ \t]*//')
+OZONE_VERSION=$(mvn help:evaluate -Dexpression=ozone.version -q -DforceStdout)
 DIST_DIR="$DIR/../../dist/target/ozone-$OZONE_VERSION"
 
 if [ ! -d "$DIST_DIR" ]; then

@@ -99,15 +99,14 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   @Override
   public SCMRatisResponse submitRequest(SCMRatisRequest request)
       throws IOException, ExecutionException, InterruptedException {
-    final RaftClientRequest raftClientRequest =
-        new RaftClientRequest(
-            clientId,
-            division.getId(),
-            division.getGroup().getGroupId(),
-            nextCallId(),
-            request.encode(),
-            RaftClientRequest.writeRequestType(),
-            null);
+    final RaftClientRequest raftClientRequest = RaftClientRequest.newBuilder()
+        .setClientId(clientId)
+        .setServerId(division.getId())
+        .setGroupId(division.getGroup().getGroupId())
+        .setCallId(nextCallId())
+        .setMessage(request.encode())
+        .setType(RaftClientRequest.writeRequestType())
+        .build();
     final RaftClientReply raftClientReply =
         division.getRaftServer()
             .submitClientRequestAsync(raftClientRequest)

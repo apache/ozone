@@ -29,7 +29,6 @@ import org.apache.hadoop.hdds.scm.container.common.helpers
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
-import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
@@ -59,15 +58,19 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.ArrayList;
+import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static org.apache.ratis.util.Preconditions.assertTrue;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -125,36 +128,9 @@ public class TestKeyValueContainer {
     keyValueContainer = new KeyValueContainer(keyValueContainerData, CONF);
   }
 
-  private void addBlocks(int count) throws Exception {
-    long containerId = keyValueContainerData.getContainerID();
-
-    try(ReferenceCountedDB metadataStore = BlockUtils.getDB(keyValueContainer
-        .getContainerData(), CONF)) {
-      for (int i = 0; i < count; i++) {
-        // Creating BlockData
-        BlockID blockID = new BlockID(containerId, i);
-        BlockData blockData = new BlockData(blockID);
-        blockData.addMetadata(OzoneConsts.VOLUME, OzoneConsts.OZONE);
-        blockData.addMetadata(OzoneConsts.OWNER,
-            OzoneConsts.OZONE_SIMPLE_HDFS_USER);
-        List<ContainerProtos.ChunkInfo> chunkList = new ArrayList<>();
-        ChunkInfo info = new ChunkInfo(String.format("%d.data.%d", blockID
-            .getLocalID(), 0), 0, 1024);
-        chunkList.add(info.getProtoBufMessage());
-        blockData.setChunks(chunkList);
-        metadataStore.getStore().getBlockDataTable()
-                .put(Long.toString(blockID.getLocalID()), blockData);
-      }
-    }
-  }
-
   @Test
   public void testCreateContainer() throws Exception {
-
-    // Create Container.
-    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
-
-    keyValueContainerData = keyValueContainer.getContainerData();
+    createContainer();
 
     String containerMetaDataPath = keyValueContainerData.getMetadataPath();
     String chunksPath = keyValueContainerData.getChunksPath();
@@ -171,38 +147,11 @@ public class TestKeyValueContainer {
 
   @Test
   public void testContainerImportExport() throws Exception {
-
     long containerId = keyValueContainer.getContainerData().getContainerID();
-    // Create Container.
-    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
-
-
-    keyValueContainerData = keyValueContainer
-        .getContainerData();
-
-    keyValueContainerData.setState(
-        ContainerProtos.ContainerDataProto.State.CLOSED);
-
+    createContainer();
     long numberOfKeysToWrite = 12;
-    //write one few keys to check the key count after import
-    try(ReferenceCountedDB metadataStore =
-        BlockUtils.getDB(keyValueContainerData, CONF)) {
-      Table<String, BlockData> blockDataTable =
-              metadataStore.getStore().getBlockDataTable();
-
-      for (long i = 0; i < numberOfKeysToWrite; i++) {
-        blockDataTable.put("test" + i, new BlockData(new BlockID(i, i)));
-      }
-
-      // As now when we put blocks, we increment block count and update in DB.
-      // As for test, we are doing manually so adding key count to DB.
-      metadataStore.getStore().getMetadataTable()
-              .put(OzoneConsts.BLOCK_COUNT, numberOfKeysToWrite);
-    }
-
-    Map<String, String> metadata = new HashMap<>();
-    metadata.put("key1", "value1");
-    keyValueContainer.update(metadata, true);
+    closeContainer();
+    populate(numberOfKeysToWrite);
 
     //destination path
     File folderToExport = folder.newFile("exported.tar.gz");
@@ -261,6 +210,76 @@ public class TestKeyValueContainer {
 
   }
 
+  /**
+   * Create the container on disk.
+   */
+  private void createContainer() throws StorageContainerException {
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+    keyValueContainerData = keyValueContainer.getContainerData();
+  }
+
+  /**
+   * Add some keys to the container.
+   */
+  private void populate(long numberOfKeysToWrite) throws IOException {
+    try (ReferenceCountedDB metadataStore =
+        BlockUtils.getDB(keyValueContainer.getContainerData(), CONF)) {
+      Table<String, BlockData> blockDataTable =
+              metadataStore.getStore().getBlockDataTable();
+
+      for (long i = 0; i < numberOfKeysToWrite; i++) {
+        blockDataTable.put("test" + i, new BlockData(new BlockID(i, i)));
+      }
+
+      // As now when we put blocks, we increment block count and update in DB.
+      // As for test, we are doing manually so adding key count to DB.
+      metadataStore.getStore().getMetadataTable()
+              .put(OzoneConsts.BLOCK_COUNT, numberOfKeysToWrite);
+    }
+
+    Map<String, String> metadata = new HashMap<>();
+    metadata.put("key1", "value1");
+    keyValueContainer.update(metadata, true);
+  }
+
+  /**
+   * Set container state to CLOSED.
+   */
+  private void closeContainer() {
+    keyValueContainerData.setState(
+        ContainerProtos.ContainerDataProto.State.CLOSED);
+  }
+
+  @Test
+  public void concurrentExport() throws Exception {
+    createContainer();
+    populate(100);
+    closeContainer();
+
+    AtomicReference<String> failed = new AtomicReference<>();
+
+    TarContainerPacker packer = new TarContainerPacker();
+    List<Thread> threads = IntStream.range(0, 20)
+        .mapToObj(i -> new Thread(() -> {
+          try {
+            File file = folder.newFile("concurrent" + i + ".tar.gz");
+            try (OutputStream out = new FileOutputStream(file)) {
+              keyValueContainer.exportContainerData(out, packer);
+            }
+          } catch (Exception e) {
+            failed.compareAndSet(null, e.getMessage());
+          }
+        }))
+        .collect(Collectors.toList());
+
+    threads.forEach(Thread::start);
+    for (Thread thread : threads) {
+      thread.join();
+    }
+
+    assertNull(failed.get());
+  }
+
   @Test
   public void testDuplicateContainer() throws Exception {
     try {
@@ -293,8 +312,7 @@ public class TestKeyValueContainer {
 
   @Test
   public void testDeleteContainer() throws Exception {
-    keyValueContainerData.setState(ContainerProtos.ContainerDataProto.State
-        .CLOSED);
+    closeContainer();
     keyValueContainer = new KeyValueContainer(
         keyValueContainerData, CONF);
     keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
@@ -373,8 +391,7 @@ public class TestKeyValueContainer {
   @Test
   public void testUpdateContainerUnsupportedRequest() throws Exception {
     try {
-      keyValueContainerData.setState(
-          ContainerProtos.ContainerDataProto.State.CLOSED);
+      closeContainer();
       keyValueContainer = new KeyValueContainer(keyValueContainerData, CONF);
       keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
       Map<String, String> metadata = new HashMap<>();

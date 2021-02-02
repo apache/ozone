@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.fs.ozone;
 
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
@@ -101,10 +102,11 @@ public class TestOzoneFSWithObjectStoreCreate {
   }
 
   @After
-  public void shutdown() {
+  public void teardown() {
     if (cluster != null) {
       cluster.shutdown();
     }
+    IOUtils.closeQuietly(o3fs);
   }
 
   @Test

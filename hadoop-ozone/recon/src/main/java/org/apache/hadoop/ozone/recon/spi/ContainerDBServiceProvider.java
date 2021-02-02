@@ -20,11 +20,13 @@ package org.apache.hadoop.ozone.recon.spi;
 
 import java.io.IOException;
 import java.util.Map;
+import java.util.UUID;
 
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.recon.scm.ContainerReplicaHistory;
 
 /**
  * The Recon Container DB Service interface.
@@ -66,6 +68,27 @@ public interface ContainerDBServiceProvider {
   void storeContainerKeyCount(Long containerID, Long count) throws IOException;
 
   /**
+   * Store the containerID -> ContainerReplicaWithTimestamp mapping to the
+   * container DB store.
+   *
+   * @param containerID the containerID.
+   * @param tsMap A map from datanode UUID to ContainerReplicaWithTimestamp.
+   * @throws IOException
+   */
+  void storeContainerReplicaHistory(Long containerID,
+      Map<UUID, ContainerReplicaHistory> tsMap) throws IOException;
+
+  /**
+   * Batch version of storeContainerReplicaHistory.
+   *
+   * @param replicaHistoryMap Replica history map
+   * @throws IOException
+   */
+  void batchStoreContainerReplicaHistory(
+      Map<Long, Map<UUID, ContainerReplicaHistory>> replicaHistoryMap)
+      throws IOException;
+
+  /**
    * Store the total count of containers into the container DB store.
    *
    * @param count count of the containers present in the system.
@@ -89,6 +112,16 @@ public interface ContainerDBServiceProvider {
    * @throws IOException
    */
   long getKeyCountForContainer(Long containerID) throws IOException;
+
+  /**
+   * Get the container replica history of the given containerID.
+   *
+   * @param containerID the given containerId.
+   * @return A map of ContainerReplicaWithTimestamp of the given containerID.
+   * @throws IOException
+   */
+  Map<UUID, ContainerReplicaHistory> getContainerReplicaHistory(
+      Long containerID) throws IOException;
 
   /**
    * Get if a containerID exists or not.
