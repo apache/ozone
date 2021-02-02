@@ -78,10 +78,10 @@ public class OMAdmin extends GenericCli implements SubcommandWithParent {
         .getClientProxy();
     } else {
       throw new OzoneClientException("This command works only on OzoneManager" +
-          " HA cluster. Service ID specified does not match" +
-          " with " + OZONE_OM_SERVICE_IDS_KEY + " defined in the " +
-              "configuration. Configured " + OZONE_OM_SERVICE_IDS_KEY + " are" +
-              conf.getTrimmedStringCollection(OZONE_OM_SERVICE_IDS_KEY));
+            " HA cluster. Service ID specified does not match" +
+            " with " + OZONE_OM_SERVICE_IDS_KEY + " defined in the " +
+            "configuration. Configured " + OZONE_OM_SERVICE_IDS_KEY + " are " +
+            conf.getTrimmedStringCollection(OZONE_OM_SERVICE_IDS_KEY) + "\n");
     }
   }
 
@@ -99,10 +99,10 @@ public class OMAdmin extends GenericCli implements SubcommandWithParent {
           clientId);
     } else {
       throw new OzoneClientException("This command works only on OzoneManager" +
-          " HA cluster. Service ID specified does not match" +
-          " with " + OZONE_OM_SERVICE_IDS_KEY + " defined in the " +
-          "configuration. Configured " + OZONE_OM_SERVICE_IDS_KEY + " are" +
-          conf.getTrimmedStringCollection(OZONE_OM_SERVICE_IDS_KEY));
+            " HA cluster. Service ID specified does not match" +
+            " with " + OZONE_OM_SERVICE_IDS_KEY + " defined in the " +
+            "configuration. Configured " + OZONE_OM_SERVICE_IDS_KEY + " are " +
+            conf.getTrimmedStringCollection(OZONE_OM_SERVICE_IDS_KEY) + "\n");
     }
   }
 
