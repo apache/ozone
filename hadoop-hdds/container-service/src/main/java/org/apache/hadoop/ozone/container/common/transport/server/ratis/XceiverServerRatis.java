@@ -241,6 +241,13 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     // Set the ratis leader election timeout
     setRatisLeaderElectionTimeout(properties);
 
+    // Enable/Disable the pre-vote of ratis leader election
+    boolean preVote = conf.getBoolean(
+        OzoneConfigKeys.DFS_RATIS_LEADER_ELECTION_PRE_VOTE_ENABLE_KEY,
+        OzoneConfigKeys.
+            DFS_RATIS_LEADER_ELECTION_PRE_VOTE_ENABLE_DEFAULT);
+    RaftServerConfigKeys.LeaderElection.setPreVote(properties, preVote);
+
     // Set the maximum cache segments
     RaftServerConfigKeys.Log.setSegmentCacheNumMax(properties, 2);
 

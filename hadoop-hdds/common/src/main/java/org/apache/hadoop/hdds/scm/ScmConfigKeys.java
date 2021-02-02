@@ -118,6 +118,11 @@ public final class ScmConfigKeys {
       DFS_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DURATION_DEFAULT =
       TimeDuration.valueOf(600000, TimeUnit.MILLISECONDS);
   public static final String
+      DFS_RATIS_LEADER_ELECTION_PRE_VOTE_ENABLE_KEY =
+      "dfs.ratis.leader.election.pre-vote.enable";
+  public static final boolean
+      DFS_RATIS_LEADER_ELECTION_PRE_VOTE_ENABLE_DEFAULT = false;
+  public static final String
       DFS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY =
       "dfs.ratis.leader.election.minimum.timeout.duration";
   public static final TimeDuration

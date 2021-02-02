@@ -263,6 +263,12 @@
     <description>Retry Cache entry timeout for ratis server.</description>
   </property>
   <property>
+    <name>dfs.ratis.leader.election.pre-vote.enable</name>
+    <value>false</value>
+    <tag>OZONE, RATIS, MANAGEMENT</tag>
+    <description>True if pre-vote is enabled for ozone.</description>
+  </property>
+  <property>
     <name>dfs.ratis.leader.election.minimum.timeout.duration</name>
     <value>5s</value>
     <tag>OZONE, RATIS, MANAGEMENT</tag>

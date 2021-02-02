@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ipc.ProtobufRpcEngine.Server;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -495,6 +496,12 @@ public final class OzoneManagerRatisServer {
 
     // Set the number of maximum cached segments
     RaftServerConfigKeys.Log.setSegmentCacheNumMax(properties, 2);
+
+    // Enable/Disable the pre-vote of ratis leader election
+    final boolean preVote = conf.getBoolean(
+        OzoneConfigKeys.DFS_RATIS_LEADER_ELECTION_PRE_VOTE_ENABLE_KEY,
+        OzoneConfigKeys.DFS_RATIS_LEADER_ELECTION_PRE_VOTE_ENABLE_DEFAULT);
+    RaftServerConfigKeys.LeaderElection.setPreVote(properties, preVote);
 
     // TODO: set max write buffer size
 
