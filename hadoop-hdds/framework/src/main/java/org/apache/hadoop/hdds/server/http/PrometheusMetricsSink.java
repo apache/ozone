@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.hdds.server.http;
 
-import static org.apache.hadoop.hdds.utils.RocksDBStoreMBean.ROCKSDB_CONTEXT_PREFIX;
-
 import java.io.IOException;
 import java.io.Writer;
 import java.util.Map;
@@ -51,6 +49,8 @@ public class PrometheusMetricsSink implements MetricsSink {
 
   private static final Pattern REPLACE_PATTERN =
       Pattern.compile("[^a-zA-Z0-9]+");
+
+  public static final String ROCKSDB_CONTEXT_PREFIX = "Rocksdb_";
 
   public PrometheusMetricsSink() {
   }
