@@ -156,7 +156,10 @@ public class ExportContainer implements SubcommandWithParent, Callable<Void> {
     final Path firstStorageDirPath = Files.list(Paths.get(storageDir, "hdds"))
         .filter(Files::isDirectory)
         .findFirst().get().getFileName();
-    Preconditions.checkNotNull(firstStorageDirPath);
+    if (firstStorageDirPath == null) {
+      throw new IllegalArgumentException(
+          "HDDS storage dir couldn't be identified!");
+    }
     return firstStorageDirPath.toString();
   }
 
