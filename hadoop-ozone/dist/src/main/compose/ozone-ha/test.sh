@@ -20,6 +20,7 @@ export COMPOSE_DIR
 
 export SECURITY_ENABLED=false
 export OZONE_REPLICATION_FACTOR=3
+export OM_SERVICE_ID=omservice
 
 # shellcheck source=/dev/null
 source "$COMPOSE_DIR/../testlib.sh"
