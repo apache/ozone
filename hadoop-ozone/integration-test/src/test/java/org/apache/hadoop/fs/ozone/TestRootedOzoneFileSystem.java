@@ -55,7 +55,6 @@ import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.test.LambdaTestUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
-import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
@@ -87,6 +86,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCK
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 /**
  * Ozone file system tests that are not covered by contract tests.
@@ -106,8 +106,22 @@ public class TestRootedOzoneFileSystem {
 
   public TestRootedOzoneFileSystem(boolean setDefaultFs,
       boolean enableOMRatis) {
-    enabledFileSystemPaths = setDefaultFs;
-    omRatisEnabled = enableOMRatis;
+    // Checking whether 'defaultFS' and 'omRatis' flags represents next
+    // parameter index values. This is to ensure that initialize
+    // TestRootedOzoneFileSystem#init() function will be invoked only at the
+    // beginning of every new set of Parameterized.Parameters.
+    if (enabledFileSystemPaths != setDefaultFs ||
+            omRatisEnabled != enableOMRatis) {
+      enabledFileSystemPaths = setDefaultFs;
+      omRatisEnabled = enableOMRatis;
+      try {
+        teardown();
+        init();
+      } catch (Exception e) {
+        LOG.info("Unexpected exception", e);
+        fail("Unexpected exception:" + e.getMessage());
+      }
+    }
   }
 
   @Rule
@@ -131,8 +145,7 @@ public class TestRootedOzoneFileSystem {
   private static Path bucketPath;
   private static String rootPath;
 
-  @BeforeClass
-  public static void init() throws Exception {
+  private void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.setInt(FS_TRASH_INTERVAL_KEY, 1);
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
