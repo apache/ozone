@@ -216,5 +216,5 @@ public class RadixTree<T> {
   // root of a radix tree has a name of "/" and may optionally has it value.
   private RadixNode root;
 
-  private final static String PATH_DELIMITER = OzoneConsts.OZONE_URI_DELIMITER;
+  private static final String PATH_DELIMITER = OzoneConsts.OZONE_URI_DELIMITER;
 }

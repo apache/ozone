@@ -27,7 +27,7 @@ import java.nio.ByteBuffer;
 public class ReadOnlyLoadGenerator extends LoadGenerator {
   private final LoadBucket replBucket;
   private final DataBuffer dataBuffer;
-  private final static int NUM_KEYS = 10;
+  private static final int NUM_KEYS = 10;
 
   public ReadOnlyLoadGenerator(DataBuffer dataBuffer, LoadBucket replBucket) {
     this.dataBuffer = dataBuffer;

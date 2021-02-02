@@ -79,7 +79,7 @@ public class TestKeyValueHandler {
   private static HddsDispatcher dispatcher;
   private static KeyValueHandler handler;
 
-  private final static String DATANODE_UUID = UUID.randomUUID().toString();
+  private static final String DATANODE_UUID = UUID.randomUUID().toString();
 
   private static final long DUMMY_CONTAINER_ID = 9999;
 

@@ -46,7 +46,7 @@ import static org.mockito.Mockito.when;
  */
 public class TestPartUpload {
 
-  private final static ObjectEndpoint REST = new ObjectEndpoint();
+  private static final ObjectEndpoint REST = new ObjectEndpoint();
 
   @BeforeClass
   public static void setUp() throws Exception {
