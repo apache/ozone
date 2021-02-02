@@ -35,4 +35,7 @@ OZONE-SITE.XML_ozone.replication=3
 OZONE-SITE.XML_hdds.datanode.dir=/data/hdds
 OZONE-SITE.XML_hdds.profiler.endpoint.enabled=true
 
+OZONE_CONF_DIR=/etc/hadoop
+OZONE_LOG_DIR=/var/log/hadoop
+
 no_proxy=om,scm,s3g,recon,kdc,localhost,127.0.0.1

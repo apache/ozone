@@ -1620,7 +1620,7 @@
 
   <property>
     <name>ozone.om.ratis.minimum.timeout</name>
-    <value>1s</value>
+    <value>5s</value>
     <tag>OZONE, OM, RATIS, MANAGEMENT</tag>
     <description>The minimum timeout duration for OM's Ratis server rpc.
     </description>
@@ -1628,10 +1628,10 @@
 
   <property>
     <name>ozone.om.leader.election.minimum.timeout.duration</name>
-    <value>1s</value>
-    <tag>OZONE, OM, RATIS, MANAGEMENT</tag>
-    <description>The minimum timeout duration for OM ratis leader election.
-      Default is 1s.
+    <value>5s</value>
+    <tag>OZONE, OM, RATIS, MANAGEMENT, DEPRECATED</tag>
+    <description>DEPRECATED. Leader election timeout uses ratis
+      rpc timeout which can be set via ozone.om.ratis.minimum.timeout.
     </description>
   </property>
 

@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.http.HttpConfig;
 import org.apache.hadoop.http.HttpConfig.Policy;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
@@ -101,6 +102,7 @@ public class TestOzoneManagerHttpServer {
     OzoneManagerHttpServer server = null;
     try {
       server = new OzoneManagerHttpServer(conf, null);
+      DefaultMetricsSystem.initialize("TestOzoneManagerHttpServer");
       server.start();
 
       Assert.assertTrue(implies(policy.isHttpEnabled(),

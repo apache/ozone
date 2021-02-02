@@ -188,7 +188,7 @@ public class ContainerHealthTask extends ReconScmTask {
    * Helper methods to generate and update the required database records for
    * unhealthy containers.
    */
-  static public class ContainerHealthRecords {
+  public static class ContainerHealthRecords {
 
     /**
      * Given an existing database record and a ContainerHealthStatus object,
@@ -205,7 +205,7 @@ public class ContainerHealthTask extends ReconScmTask {
      * @param rec Existing database record from the UnhealthyContainers table.
      * @return
      */
-    static public boolean retainOrUpdateRecord(
+    public static boolean retainOrUpdateRecord(
         ContainerHealthStatus container, UnhealthyContainersRecord rec) {
       boolean returnValue = false;
       switch(UnHealthyContainerStates.valueOf(rec.getContainerState())) {
@@ -227,7 +227,7 @@ public class ContainerHealthTask extends ReconScmTask {
       return returnValue;
     }
 
-    static public List<UnhealthyContainers> generateUnhealthyRecords(
+    public static List<UnhealthyContainers> generateUnhealthyRecords(
         ContainerHealthStatus container, long time) {
       return generateUnhealthyRecords(container, new HashSet<>(), time);
     }
@@ -240,7 +240,7 @@ public class ContainerHealthTask extends ReconScmTask {
      * missing records which have not been seen already.
      * @return List of UnhealthyContainer records to be stored in the DB
      */
-    static public List<UnhealthyContainers> generateUnhealthyRecords(
+    public static List<UnhealthyContainers> generateUnhealthyRecords(
         ContainerHealthStatus container, Set<String> recordForStateExists,
         long time) {
       List<UnhealthyContainers> records = new ArrayList<>();
@@ -280,7 +280,7 @@ public class ContainerHealthTask extends ReconScmTask {
       return records;
     }
 
-    static private UnhealthyContainers recordForState(
+    private static UnhealthyContainers recordForState(
         ContainerHealthStatus container, UnHealthyContainerStates state,
         long time) {
       UnhealthyContainers rec = new UnhealthyContainers();
@@ -300,7 +300,7 @@ public class ContainerHealthTask extends ReconScmTask {
       return rec;
     }
 
-    static private boolean keepOverReplicatedRecord(
+    private static boolean keepOverReplicatedRecord(
         ContainerHealthStatus container, UnhealthyContainersRecord rec) {
       if (container.isOverReplicated()) {
         updateExpectedReplicaCount(rec, container.getReplicationFactor());
@@ -311,7 +311,7 @@ public class ContainerHealthTask extends ReconScmTask {
       return false;
     }
 
-    static private boolean keepUnderReplicatedRecord(
+    private static boolean keepUnderReplicatedRecord(
         ContainerHealthStatus container, UnhealthyContainersRecord rec) {
       if (container.isUnderReplicated()) {
         updateExpectedReplicaCount(rec, container.getReplicationFactor());
@@ -322,7 +322,7 @@ public class ContainerHealthTask extends ReconScmTask {
       return false;
     }
 
-    static private boolean keepMisReplicatedRecord(
+    private static boolean keepMisReplicatedRecord(
         ContainerHealthStatus container, UnhealthyContainersRecord rec) {
       if (container.isMisReplicated()) {
         updateExpectedReplicaCount(rec, container.expectedPlacementCount());
@@ -341,28 +341,28 @@ public class ContainerHealthTask extends ReconScmTask {
      * has really changed. The methods below ensure we do not update the Jooq
      * record unless the values have changed and hence save a DB execution
      */
-    static private void updateExpectedReplicaCount(
+    private static void updateExpectedReplicaCount(
         UnhealthyContainersRecord rec, int expectedCount) {
       if (rec.getExpectedReplicaCount() != expectedCount) {
         rec.setExpectedReplicaCount(expectedCount);
       }
     }
 
-    static private void updateActualReplicaCount(
+    private static void updateActualReplicaCount(
         UnhealthyContainersRecord rec, int actualCount) {
       if (rec.getActualReplicaCount() != actualCount) {
         rec.setActualReplicaCount(actualCount);
       }
     }
 
-    static private void updateReplicaDelta(
+    private static void updateReplicaDelta(
         UnhealthyContainersRecord rec, int delta) {
       if (rec.getReplicaDelta() != delta) {
         rec.setReplicaDelta(delta);
       }
     }
 
-    static private void updateReason(
+    private static void updateReason(
         UnhealthyContainersRecord rec, String reason) {
       if (!rec.getReason().equals(reason)) {
         rec.setReason(reason);

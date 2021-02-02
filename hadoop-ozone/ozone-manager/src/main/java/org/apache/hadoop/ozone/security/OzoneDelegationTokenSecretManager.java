@@ -20,6 +20,9 @@ package org.apache.hadoop.ozone.security;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
+import java.security.cert.CertificateExpiredException;
+import java.security.cert.CertificateNotYetValidException;
+import java.security.cert.X509Certificate;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -436,9 +439,28 @@ public class OzoneDelegationTokenSecretManager
    */
   public boolean verifySignature(OzoneTokenIdentifier identifier,
       byte[] password) {
+    X509Certificate signerCert = null;
+    try {
+      signerCert = getCertClient().getCertificate(
+          identifier.getOmCertSerialId());
+    } catch (CertificateException e) {
+      return false;
+    }
+
+    if (signerCert == null) {
+      return false;
+    }
+
+    // Check for expired certificate or not yet valid certificate
+    try {
+      signerCert.checkValidity();
+    } catch (CertificateExpiredException | CertificateNotYetValidException e) {
+      return false;
+    }
+
     try {
       return getCertClient().verifySignature(identifier.getBytes(), password,
-          getCertClient().getCertificate(identifier.getOmCertSerialId()));
+          signerCert);
     } catch (CertificateException e) {
       return false;
     }

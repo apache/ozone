@@ -182,7 +182,7 @@ public final class OzoneQuota {
         .replaceAll("\\s+", "");
     String size = "";
     long nSize = 0;
-    Units currUnit = Units.MB;
+    Units currUnit = Units.B;
 
     try {
       for (String quota : quotaList.getOzoneQuotaArray()) {
@@ -192,6 +192,10 @@ public final class OzoneQuota {
           currUnit = quotaList.getUnits(quota);
           break;
         }
+      }
+      // there might be no unit specified.
+      if (size.equals("")) {
+        size = uppercase;
       }
       nSize = Long.parseLong(size);
     } catch (NumberFormatException e) {

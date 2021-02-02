@@ -80,7 +80,7 @@ public class TestBlockManager {
   private MockNodeManager nodeManager;
   private SCMPipelineManager pipelineManager;
   private BlockManagerImpl blockManager;
-  private final static long DEFAULT_BLOCK_SIZE = 128 * MB;
+  private static final long DEFAULT_BLOCK_SIZE = 128 * MB;
   private static HddsProtos.ReplicationFactor factor;
   private static HddsProtos.ReplicationType type;
   private EventQueue eventQueue;

@@ -52,7 +52,7 @@ public class ReconNodeManager extends SCMNodeManager {
       .getLogger(ReconNodeManager.class);
 
   private Table<UUID, DatanodeDetails> nodeDB;
-  private final static Set<Type> ALLOWED_COMMANDS =
+  private static final Set<Type> ALLOWED_COMMANDS =
       ImmutableSet.of(reregisterCommand);
 
   /**
