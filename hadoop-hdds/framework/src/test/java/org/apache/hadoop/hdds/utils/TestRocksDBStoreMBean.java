@@ -86,9 +86,7 @@ public class TestRocksDBStoreMBean {
     conf.set(OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS,
         OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF);
 
-    RocksDBStore metadataStore =
-        (RocksDBStore) MetadataStoreBuilder.newBuilder().setConf(conf)
-            .setCreateIfMissing(true).setDbFile(testDir).build();
+    RocksDBStore metadataStore = null;
 
     Assert.assertNull(metadataStore.getStatMBeanName());
   }
@@ -119,9 +117,7 @@ public class TestRocksDBStoreMBean {
 
     conf.set(OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS, "ALL");
 
-    RocksDBStore metadataStore =
-        (RocksDBStore) MetadataStoreBuilder.newBuilder().setConf(conf)
-            .setCreateIfMissing(true).setDbFile(testDir).build();
+    RocksDBStore metadataStore = null;
 
     for (int i = 0; i < 10; i++) {
       metadataStore.put("key".getBytes(UTF_8), "value".getBytes(UTF_8));

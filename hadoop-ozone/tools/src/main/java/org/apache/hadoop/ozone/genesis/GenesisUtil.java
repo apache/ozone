@@ -39,7 +39,6 @@ import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.MetadataStore;
-import org.apache.hadoop.hdds.utils.MetadataStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -75,28 +74,7 @@ public final class GenesisUtil {
 
   public static MetadataStore getMetadataStore(String dbType)
       throws IOException {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    MetadataStoreBuilder builder = MetadataStoreBuilder.newBuilder();
-    builder.setConf(conf);
-    builder.setCreateIfMissing(true);
-    builder.setDbFile(
-        getTempPath().resolve(RandomStringUtils.randomNumeric(DB_FILE_LEN))
-            .toFile());
-    switch (dbType) {
-    case DEFAULT_TYPE:
-      break;
-    case CLOSED_TYPE:
-      break;
-    case CACHE_10MB_TYPE:
-      builder.setCacheSize((long) StorageUnit.MB.toBytes(10));
-      break;
-    case CACHE_1GB_TYPE:
-      builder.setCacheSize((long) StorageUnit.GB.toBytes(1));
-      break;
-    default:
-      throw new IllegalStateException("Unknown type: " + dbType);
-    }
-    return builder.build();
+    return null;
   }
 
   public static DatanodeDetails createDatanodeDetails(UUID uuid) {
