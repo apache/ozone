@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.container.common.impl;
 
 import com.google.common.base.Preconditions;
-import javafx.util.Pair;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.hadoop.hdds.scm.container.common.helpers
     .StorageContainerException;
@@ -27,6 +26,7 @@ import org.apache.hadoop.ozone.container.common.interfaces
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.BlockDeletingService.ContainerBlockInfo;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -41,13 +41,13 @@ public class RandomContainerDeletionChoosingPolicy
       LoggerFactory.getLogger(RandomContainerDeletionChoosingPolicy.class);
 
   @Override
-  public List<Pair<ContainerData, Long>> chooseContainerForBlockDeletion(
+  public List<ContainerBlockInfo> chooseContainerForBlockDeletion(
       int blockCount, Map<Long, ContainerData> candidateContainers)
       throws StorageContainerException {
     Preconditions.checkNotNull(candidateContainers,
         "Internal assertion: candidate containers cannot be null");
 
-    List<Pair<ContainerData, Long>> result = new ArrayList<>();
+    List<ContainerBlockInfo> result = new ArrayList<>();
     ContainerData[] values = new ContainerData[candidateContainers.size()];
     // to get a shuffle list
     ContainerData[] shuffled = candidateContainers.values().toArray(values);
@@ -66,10 +66,15 @@ public class RandomContainerDeletionChoosingPolicy
         blockCount -=
             ((KeyValueContainerData) entry).getNumPendingDeletionBlocks();
         if (blockCount >= 0) {
-          result.add(new Pair<>(entry,
+//          result.add(new Pair<>(entry,
+//              ((KeyValueContainerData) entry).getNumPendingDeletionBlocks()));
+          result.add(new ContainerBlockInfo(entry,
               ((KeyValueContainerData) entry).getNumPendingDeletionBlocks()));
         } else if (flag == 0 && blockCount < 0) {
-          result.add(new Pair<>(entry,
+//          result.add(new Pair<>(entry,
+//              ((KeyValueContainerData) entry).getNumPendingDeletionBlocks()
+//                  + blockCount));
+          result.add(new ContainerBlockInfo(entry,
               ((KeyValueContainerData) entry).getNumPendingDeletionBlocks()
                   + blockCount));
           flag = 1;

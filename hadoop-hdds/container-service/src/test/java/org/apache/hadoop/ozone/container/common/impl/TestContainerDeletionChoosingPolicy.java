@@ -28,7 +28,6 @@ import java.util.UUID;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.concurrent.TimeUnit;
-import javafx.util.Pair;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
@@ -40,6 +39,7 @@ import org.apache.hadoop.ozone.container.keyvalue.ChunkLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.BlockDeletingService;
+import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.BlockDeletingService.ContainerBlockInfo;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.Assert;
@@ -114,28 +114,28 @@ public class TestContainerDeletionChoosingPolicy {
     int blockLimitPerInterval = 5;
     ContainerDeletionChoosingPolicy deletionPolicy =
         new RandomContainerDeletionChoosingPolicy();
-    List<Pair<ContainerData, Long>> result0 = blockDeletingService
+    List<ContainerBlockInfo> result0 = blockDeletingService
         .chooseContainerForBlockDeletion(blockLimitPerInterval, deletionPolicy);
 
     if (result0.size() > 0) {
       long totPendingBlocks = 0;
-      for (Pair<ContainerData, Long> pr : result0) {
-        totPendingBlocks += pr.getValue();
+      for (ContainerBlockInfo pr : result0) {
+        totPendingBlocks += pr.getBlocks();
       }
       Assert.assertTrue(totPendingBlocks >= blockLimitPerInterval);
     }
 
     // test random choosing
-    List<Pair<ContainerData, Long>> result1 = blockDeletingService
+    List<ContainerBlockInfo> result1 = blockDeletingService
         .chooseContainerForBlockDeletion(numContainers, deletionPolicy);
-    List<Pair<ContainerData, Long>> result2 = blockDeletingService
+    List<ContainerBlockInfo> result2 = blockDeletingService
         .chooseContainerForBlockDeletion(numContainers, deletionPolicy);
 
     if (result1.size() > 0 && result2.size() > 0) {
       boolean hasShuffled = false;
       for (int i = 0; i < numContainers; i++) {
-        if (result1.get(i).getKey().getContainerID() != result2.get(i).getKey()
-            .getContainerID()) {
+        if (result1.get(i).getContainerData().getContainerID() != result2
+            .get(i).getContainerData().getContainerID()) {
           hasShuffled = true;
           break;
         }
@@ -190,17 +190,17 @@ public class TestContainerDeletionChoosingPolicy {
     blockDeletingService = getBlockDeletingService();
     ContainerDeletionChoosingPolicy deletionPolicy =
         new TopNOrderedContainerDeletionChoosingPolicy();
-    List<Pair<ContainerData, Long>> result0 = blockDeletingService
+    List<ContainerBlockInfo> result0 = blockDeletingService
         .chooseContainerForBlockDeletion(blockLimitPerInterval, deletionPolicy);
     if (result0.size() > 0) {
       long totPendingBlocks = 0;
-      for (Pair<ContainerData, Long> pr : result0) {
-        totPendingBlocks += pr.getValue();
+      for (ContainerBlockInfo pr : result0) {
+        totPendingBlocks += pr.getBlocks();
       }
       Assert.assertTrue(totPendingBlocks >= blockLimitPerInterval);
     }
 
-    List<Pair<ContainerData, Long>> result1 = blockDeletingService
+    List<ContainerBlockInfo> result1 = blockDeletingService
         .chooseContainerForBlockDeletion(numContainers + 1, deletionPolicy);
     // the empty deletion blocks container should not be chosen
     int containerCount = 0;
@@ -217,8 +217,9 @@ public class TestContainerDeletionChoosingPolicy {
     // verify the order of return list
     int initialName2CountSize = name2Count.size();
     int lastCount = Integer.MAX_VALUE;
-    for (Pair<ContainerData, Long> data : result1) {
-      int currentCount = name2Count.remove(data.getKey().getContainerID());
+    for (ContainerBlockInfo data : result1) {
+      int currentCount =
+          name2Count.remove(data.getContainerData().getContainerID());
       // previous count should not smaller than next one
       Assert.assertTrue(currentCount > 0 && currentCount <= lastCount);
       lastCount = currentCount;

@@ -29,7 +29,6 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-import javafx.util.Pair;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
@@ -112,11 +111,30 @@ public class BlockDeletingService extends BackgroundService {
             OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER_DEFAULT);
   }
 
+  public static class ContainerBlockInfo {
+    private final ContainerData containerData;
+    private final Long blocks;
+
+    public ContainerBlockInfo(ContainerData containerData, Long blocks) {
+      this.containerData = containerData;
+      this.blocks = blocks;
+    }
+
+    public ContainerData getContainerData() {
+      return containerData;
+    }
+
+    public Long getBlocks() {
+      return blocks;
+    }
+
+  }
+
 
   @Override
   public BackgroundTaskQueue getTasks() {
     BackgroundTaskQueue queue = new BackgroundTaskQueue();
-    List<Pair<ContainerData, Long>> containers = Lists.newArrayList();
+    List<ContainerBlockInfo> containers = Lists.newArrayList();
     try {
       // We at most list a number of containers a time,
       // in case there are too many containers and start too many workers.
@@ -131,10 +149,10 @@ public class BlockDeletingService extends BackgroundService {
             blockLimitPerInterval, containers.size());
       }
 
-      for (Pair<ContainerData, Long> container : containers) {
+      for (ContainerBlockInfo container : containers) {
         BlockDeletingTask containerTask =
-            new BlockDeletingTask(container.getKey(), TASK_PRIORITY_DEFAULT,
-                container.getValue());
+            new BlockDeletingTask(container.containerData,
+                TASK_PRIORITY_DEFAULT, container.blocks);
         queue.add(containerTask);
       }
     } catch (StorageContainerException e) {
@@ -150,7 +168,7 @@ public class BlockDeletingService extends BackgroundService {
     return queue;
   }
 
-  public List<Pair<ContainerData, Long>> chooseContainerForBlockDeletion(
+  public List<ContainerBlockInfo> chooseContainerForBlockDeletion(
       int blockLimit, ContainerDeletionChoosingPolicy deletionPolicy)
       throws StorageContainerException {
     Map<Long, ContainerData> containerDataMap =

@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.container.common.impl;
 
 import com.google.common.base.Preconditions;
-import javafx.util.Pair;
 import org.apache.hadoop.hdds.scm.container.common.helpers
     .StorageContainerException;
 import org.apache.hadoop.ozone.container.common.interfaces
@@ -33,6 +32,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.ArrayList;
+import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.BlockDeletingService.ContainerBlockInfo;
 
 /**
  * TopN Ordered choosing policy that choosing containers based on pending
@@ -51,13 +51,15 @@ public class TopNOrderedContainerDeletionChoosingPolicy
                   c1.getNumPendingDeletionBlocks());
 
   @Override
-  public List<Pair<ContainerData, Long>> chooseContainerForBlockDeletion(
+  public List<ContainerBlockInfo> chooseContainerForBlockDeletion(
       int totalBlocks, Map<Long, ContainerData> candidateContainers)
       throws StorageContainerException {
+
     Preconditions.checkNotNull(candidateContainers,
         "Internal assertion: candidate containers cannot be null");
 
-    List<Pair<ContainerData, Long>> result = new ArrayList<>();
+    //List<Pair<ContainerData, Long>> result = new ArrayList<>();
+    List<ContainerBlockInfo> result = new ArrayList<>();
     List<KeyValueContainerData> orderedList = new LinkedList<>();
     for (ContainerData entry : candidateContainers.values()) {
       orderedList.add((KeyValueContainerData)entry);
@@ -77,9 +79,13 @@ public class TopNOrderedContainerDeletionChoosingPolicy
       if (entry.getNumPendingDeletionBlocks() > 0) {
         totalBlocks -= entry.getNumPendingDeletionBlocks();
         if (totalBlocks >= 0) {
-          result.add(new Pair<>(entry, entry.getNumPendingDeletionBlocks()));
+          //result.add(new Pair<>(entry, entry.getNumPendingDeletionBlocks()));
+          result.add(new ContainerBlockInfo(entry,
+              entry.getNumPendingDeletionBlocks()));
         } else if (flag == 0 && (totalBlocks < 0)) {
-          result.add(new Pair<>(entry,
+//          result.add(new Pair<>(entry,
+//              totalBlocks + entry.getNumPendingDeletionBlocks()));
+          result.add(new ContainerBlockInfo(entry,
               totalBlocks + entry.getNumPendingDeletionBlocks()));
           flag = 1;
         } else {
