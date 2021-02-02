@@ -399,7 +399,7 @@ public class RocksDBStore implements MetadataStore {
 
   @Override
   public MetaStoreIterator<KeyValue> iterator() {
-    return new RocksDBStoreIterator(db.newIterator());
+    return null;
   }
 
 }
