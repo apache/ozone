@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.HashMap;
@@ -152,9 +153,11 @@ public class ExportContainer implements SubcommandWithParent, Callable<Void> {
 
   public String getScmId(String storageDir) throws IOException {
     Preconditions.checkNotNull(storageDir);
-    return Files.list(Paths.get(storageDir, "hdds"))
+    final Path firstStorageDirPath = Files.list(Paths.get(storageDir, "hdds"))
         .filter(Files::isDirectory)
-        .findFirst().get().getFileName().toString();
+        .findFirst().get().getFileName();
+    Preconditions.checkNotNull(firstStorageDirPath);
+    return firstStorageDirPath.toString();
   }
 
   public String getDatanodeUUID(String storageDir, ConfigurationSource config)
