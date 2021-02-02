@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.ozone.recon.scm.ReconSCMDBDefinition;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition;
 
+import com.amazonaws.services.kms.model.InvalidArnException;
 import com.google.common.base.Preconditions;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_CONTAINER_KEY_DB;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OM_SNAPSHOT_DB;
@@ -63,8 +64,10 @@ public final class DBDefinitionFactory {
     Preconditions.checkNotNull(dbPath,
         "Path is required to identify the used db scheme");
     final Path fileName = dbPath.getFileName();
-    Preconditions.checkNotNull(fileName,
-        "Path is required to identify the used db scheme");
+    if (fileName == null) {
+      throw new InvalidArnException(
+          "Path is required to identify the used db scheme");
+    }
     String dbName = fileName.toString();
     if (dbName.endsWith("-container.db")) {
       return new DatanodeSchemaTwoDBDefinition(
