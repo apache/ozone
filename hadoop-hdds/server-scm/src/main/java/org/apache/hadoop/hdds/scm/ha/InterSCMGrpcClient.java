@@ -42,9 +42,9 @@ import java.util.concurrent.TimeUnit;
  * Grpc client to download a Rocks db checkpoint from leader node
  * in SCM HA ring.
  */
-public class SCMGrpcClient implements SCMSnapshotDownloader{
+public class InterSCMGrpcClient implements SCMSnapshotDownloader{
   private static final Logger LOG =
-      LoggerFactory.getLogger(SCMGrpcClient.class);
+      LoggerFactory.getLogger(InterSCMGrpcClient.class);
 
   private final ManagedChannel channel;
 
@@ -53,7 +53,7 @@ public class SCMGrpcClient implements SCMSnapshotDownloader{
 
   private final long timeout;
 
-  public SCMGrpcClient(final String host, final ConfigurationSource conf) {
+  public InterSCMGrpcClient(final String host, final ConfigurationSource conf) {
     Preconditions.checkNotNull(conf);
     int port = conf.getObject(SCMHAConfiguration.class).getGrpcBindPort();
     timeout =
@@ -125,7 +125,7 @@ public class SCMGrpcClient implements SCMSnapshotDownloader{
       try {
         checkPoint.getData().writeTo(stream);
       } catch (IOException e) {
-        response.completeExceptionally(e);
+        onError(e);
       }
     }
 

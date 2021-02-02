@@ -512,24 +512,19 @@ public final class HddsServerUtil {
   public static void writeDBCheckpointToStream(DBCheckpoint checkpoint,
       OutputStream destination)
       throws IOException {
-
     try (CompressorOutputStream gzippedOut = new CompressorStreamFactory()
         .createCompressorOutputStream(CompressorStreamFactory.GZIP,
-            destination)) {
-
-      try (ArchiveOutputStream archiveOutputStream =
-          new TarArchiveOutputStream(gzippedOut)) {
-
-        Path checkpointPath = checkpoint.getCheckpointLocation();
-        try (Stream<Path> files = Files.list(checkpointPath)) {
-          for (Path path : files.collect(Collectors.toList())) {
-            if (path != null) {
-              Path fileName = path.getFileName();
-              if (fileName != null) {
-                includeFile(path.toFile(), fileName.toString(),
-                    archiveOutputStream);
-              }
-            }
+            destination);
+        ArchiveOutputStream archiveOutputStream =
+            new TarArchiveOutputStream(gzippedOut);
+        Stream<Path> files =
+            Files.list(checkpoint.getCheckpointLocation())) {
+      for (Path path : files.collect(Collectors.toList())) {
+        if (path != null) {
+          Path fileName = path.getFileName();
+          if (fileName != null) {
+            includeFile(path.toFile(), fileName.toString(),
+                archiveOutputStream);
           }
         }
       }

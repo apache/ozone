@@ -196,7 +196,7 @@ public final class ScmConfigKeys {
       "ozone.scm.https-address";
 
   public static final String OZONE_SCM_ADDRESS_KEY =
-      "ozone.om.address";
+      "ozone.scm.address";
   public static final String OZONE_SCM_BIND_HOST_DEFAULT =
       "0.0.0.0";
   public static final String OZONE_SCM_HTTP_BIND_HOST_DEFAULT = "0.0.0.0";

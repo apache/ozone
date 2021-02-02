@@ -45,7 +45,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
   private final SCMSnapshotProvider scmSnapshotProvider;
 
   // this should ideally be started only in a ratis leader
-  private final SCMGrpcProtocolService grpcServer;
+  private final InterSCMGrpcProtocolService grpcServer;
 
   /**
    * Creates SCMHAManager instance.
@@ -59,7 +59,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
         conf.getObject(SCMHAConfiguration.class), conf, scm, transactionBuffer);
     // TODO: build SCM Node detail peer map and pass it to SCM SnapshotManager
     this.scmSnapshotProvider = new SCMSnapshotProvider(conf, null);
-    grpcServer = new SCMGrpcProtocolService(conf, scm);
+    grpcServer = new InterSCMGrpcProtocolService(conf, scm);
 
   }
 

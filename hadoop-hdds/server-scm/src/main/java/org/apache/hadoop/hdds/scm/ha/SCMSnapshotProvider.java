@@ -105,7 +105,7 @@ public class SCMSnapshotProvider {
     // the client instance will be initialized only when first install snapshot
     // notification from ratis leader will be received.
     if (client == null) {
-      client = new SCMGrpcClient(
+      client = new InterSCMGrpcClient(
           peerNodesMap.get(leaderSCMNodeID).getAddress().getHostAddress(),
           conf);
     }

@@ -32,18 +32,18 @@ import org.slf4j.LoggerFactory;
 /**
  * Service to handle Rocks db Checkpointing.
  */
-public class SCMGrpcService extends
+public class InterSCMGrpcService extends
     InterSCMProtocolServiceGrpc.InterSCMProtocolServiceImplBase {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(SCMGrpcService.class);
+      LoggerFactory.getLogger(InterSCMGrpcService.class);
 
   private static final int BUFFER_SIZE = 1024 * 1024;
 
   private final String clusterId;
   private final SCMDBCheckpointProvider provider;
 
-  public SCMGrpcService(final StorageContainerManager scm) {
+  public InterSCMGrpcService(final StorageContainerManager scm) {
     Preconditions.checkNotNull(scm);
     this.clusterId = scm.getClusterId();
     provider =

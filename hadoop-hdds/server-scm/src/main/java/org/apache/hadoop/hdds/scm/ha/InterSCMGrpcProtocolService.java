@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.ha;
 
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -34,15 +35,15 @@ import org.slf4j.LoggerFactory;
  * Service to serve SCM DB checkpoints available for SCM HA.
  * Ideally should only be run on a ratis leader.
  */
-public class SCMGrpcProtocolService  {
+public class InterSCMGrpcProtocolService {
   private static final Logger LOG =
-      LoggerFactory.getLogger(SCMGrpcService.class);
+      LoggerFactory.getLogger(InterSCMGrpcService.class);
 
   private final int port;
   private Server server;
-  private boolean isStarted = false;
+  private final AtomicBoolean isStarted = new AtomicBoolean(false);
 
-  public SCMGrpcProtocolService(final ConfigurationSource conf,
+  public InterSCMGrpcProtocolService(final ConfigurationSource conf,
       final StorageContainerManager scm) {
     Preconditions.checkNotNull(conf);
     this.port = conf.getObject(SCMHAConfiguration.class).getGrpcBindPort();
@@ -51,7 +52,7 @@ public class SCMGrpcProtocolService  {
         ((NettyServerBuilder) ServerBuilder.forPort(port))
             .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE);
 
-    SCMGrpcService service = new SCMGrpcService(scm);
+    InterSCMGrpcService service = new InterSCMGrpcService(scm);
     nettyServerBuilder.addService(service);
     server = nettyServerBuilder.build();
   }
@@ -61,22 +62,21 @@ public class SCMGrpcProtocolService  {
   }
 
   public void start() throws IOException {
-    if (!isStarted) {
-      server.start();
-      LOG.info("Starting SCM Grpc Service for port {}", server.getPort());
-      isStarted = true;
+    if (!isStarted.compareAndSet(false, true)) {
+      LOG.info("Ignore. already started.");
+      return;
     }
   }
 
   public void stop() {
-    if (isStarted) {
+    if (isStarted.get()) {
       server.shutdown();
       try {
         server.awaitTermination(5, TimeUnit.SECONDS);
       } catch (Exception e) {
         LOG.error("failed to shutdown XceiverServerGrpc", e);
       }
-      isStarted = false;
+     isStarted.set(false);
     }
   }
 }
