@@ -69,7 +69,6 @@ import org.apache.hadoop.test.LambdaTestUtils;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Assert;
-import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
@@ -94,8 +93,22 @@ public class TestOzoneFileSystem {
   }
 
   public TestOzoneFileSystem(boolean setDefaultFs, boolean enableOMRatis) {
-    this.enabledFileSystemPaths = setDefaultFs;
-    this.omRatisEnabled = enableOMRatis;
+    // Checking whether 'defaultFS' and 'omRatis' flags represents next
+    // parameter index values. This is to ensure that initialize
+    // TestOzoneFileSystem#init() function will be invoked only at the
+    // beginning of every new set of Parameterized.Parameters.
+    if (enabledFileSystemPaths != setDefaultFs ||
+            omRatisEnabled != enableOMRatis) {
+      enabledFileSystemPaths = setDefaultFs;
+      omRatisEnabled = enableOMRatis;
+      try {
+        teardown();
+        init();
+      } catch (Exception e) {
+        LOG.info("Unexpected exception", e);
+        fail("Unexpected exception:" + e.getMessage());
+      }
+    }
   }
   /**
    * Set a timeout for each test.
@@ -116,8 +129,7 @@ public class TestOzoneFileSystem {
   private static String bucketName;
   private static Trash trash;
 
-  @BeforeClass
-  public static void init() throws Exception {
+  private void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(FS_TRASH_INTERVAL_KEY, 1);
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
