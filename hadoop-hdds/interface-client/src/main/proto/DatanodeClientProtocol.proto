@@ -198,7 +198,7 @@ message ContainerCommandRequestProto {
   optional   GetCommittedBlockLengthRequestProto getCommittedBlockLength = 22;
 
   optional   string encodedToken = 23;
-  optional uint32 version = 24;
+  optional   uint32 version = 24;
 }
 
 message ContainerCommandResponseProto {
