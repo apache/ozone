@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.common.impl;
 
 import com.google.common.base.Preconditions;
+import javafx.util.Pair;
 import org.apache.hadoop.hdds.scm.container.common.helpers
     .StorageContainerException;
 import org.apache.hadoop.ozone.container.common.interfaces
@@ -31,6 +32,7 @@ import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.ArrayList;
 
 /**
  * TopN Ordered choosing policy that choosing containers based on pending
@@ -49,13 +51,13 @@ public class TopNOrderedContainerDeletionChoosingPolicy
                   c1.getNumPendingDeletionBlocks());
 
   @Override
-  public List<ContainerData> chooseContainerForBlockDeletion(int count,
-      Map<Long, ContainerData> candidateContainers)
+  public List<Pair<ContainerData, Long>> chooseContainerForBlockDeletion(
+      int totalBlocks, Map<Long, ContainerData> candidateContainers)
       throws StorageContainerException {
     Preconditions.checkNotNull(candidateContainers,
         "Internal assertion: candidate containers cannot be null");
 
-    List<ContainerData> result = new LinkedList<>();
+    List<Pair<ContainerData, Long>> result = new ArrayList<>();
     List<KeyValueContainerData> orderedList = new LinkedList<>();
     for (ContainerData entry : candidateContainers.values()) {
       orderedList.add((KeyValueContainerData)entry);
@@ -63,29 +65,40 @@ public class TopNOrderedContainerDeletionChoosingPolicy
     Collections.sort(orderedList, KEY_VALUE_CONTAINER_DATA_COMPARATOR);
 
     // get top N list ordered by pending deletion blocks' number
-    int currentCount = 0;
+    // Here we are returning containers based on totalBlocks which is basically
+    // number of blocks to be deleted in an interval. We are also considering
+    // the boundary case where the blocks of the last container exceeds the
+    // number of blocks to be deleted in an interval, there we return that
+    // container but with container we also return an integer so that total
+    // blocks don't exceed the number of blocks to be deleted in an interval.
+
+    int flag = 0;
     for (KeyValueContainerData entry : orderedList) {
-      if (currentCount < count) {
-        if (entry.getNumPendingDeletionBlocks() > 0) {
-          result.add(entry);
-          currentCount++;
-          if (LOG.isDebugEnabled()) {
-            LOG.debug(
-                "Select container {} for block deletion, "
-                    + "pending deletion blocks num: {}.",
-                entry.getContainerID(),
-                entry.getNumPendingDeletionBlocks());
-          }
+      if (entry.getNumPendingDeletionBlocks() > 0) {
+        totalBlocks -= entry.getNumPendingDeletionBlocks();
+        if (totalBlocks >= 0) {
+          result.add(new Pair<>(entry, entry.getNumPendingDeletionBlocks()));
+        } else if (flag == 0 && (totalBlocks < 0)) {
+          result.add(new Pair<>(entry,
+              totalBlocks + entry.getNumPendingDeletionBlocks()));
+          flag = 1;
         } else {
-          LOG.debug("Stop looking for next container, there is no"
-              + " pending deletion block contained in remaining containers.");
+          break;
+        }
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Select container {} for block deletion, "
+                  + "pending deletion blocks num: {}.", entry.getContainerID(),
+              entry.getNumPendingDeletionBlocks());
+        }
+        if (totalBlocks == 0) {
           break;
         }
       } else {
+        LOG.debug("Stop looking for next container, there is no"
+            + " pending deletion block contained in remaining containers.");
         break;
       }
     }
-
     return result;
   }
 }

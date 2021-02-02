@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.common.impl;
 
 import com.google.common.base.Preconditions;
+import javafx.util.Pair;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.hadoop.hdds.scm.container.common.helpers
     .StorageContainerException;
@@ -27,7 +28,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.LinkedList;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -40,33 +41,51 @@ public class RandomContainerDeletionChoosingPolicy
       LoggerFactory.getLogger(RandomContainerDeletionChoosingPolicy.class);
 
   @Override
-  public List<ContainerData> chooseContainerForBlockDeletion(int count,
-      Map<Long, ContainerData> candidateContainers)
+  public List<Pair<ContainerData, Long>> chooseContainerForBlockDeletion(
+      int blockCount, Map<Long, ContainerData> candidateContainers)
       throws StorageContainerException {
     Preconditions.checkNotNull(candidateContainers,
         "Internal assertion: candidate containers cannot be null");
 
-    int currentCount = 0;
-    List<ContainerData> result = new LinkedList<>();
+    List<Pair<ContainerData, Long>> result = new ArrayList<>();
     ContainerData[] values = new ContainerData[candidateContainers.size()];
     // to get a shuffle list
     ContainerData[] shuffled = candidateContainers.values().toArray(values);
     ArrayUtils.shuffle(shuffled);
+
+    // Here we are returning containers based on totalBlocks which is basically
+    // number of blocks to be deleted in an interval. We are also considering
+    // the boundary case where the blocks of the last container exceeds the
+    // number of blocks to be deleted in an interval, there we return that
+    // container but with container we also return an integer so that total
+    // blocks don't exceed the number of blocks to be deleted in an interval.
+
+    int flag = 0;
     for (ContainerData entry : shuffled) {
-      if (currentCount < count) {
-        result.add(entry);
-        currentCount++;
+      if (((KeyValueContainerData) entry).getNumPendingDeletionBlocks() > 0) {
+        blockCount -=
+            ((KeyValueContainerData) entry).getNumPendingDeletionBlocks();
+        if (blockCount >= 0) {
+          result.add(new Pair<>(entry,
+              ((KeyValueContainerData) entry).getNumPendingDeletionBlocks()));
+        } else if (flag == 0 && blockCount < 0) {
+          result.add(new Pair<>(entry,
+              ((KeyValueContainerData) entry).getNumPendingDeletionBlocks()
+                  + blockCount));
+          flag = 1;
+        } else {
+          break;
+        }
         if (LOG.isDebugEnabled()) {
           LOG.debug("Select container {} for block deletion, "
-                  + "pending deletion blocks num: {}.",
-              entry.getContainerID(),
+                  + "pending deletion blocks num: {}.", entry.getContainerID(),
               ((KeyValueContainerData) entry).getNumPendingDeletionBlocks());
         }
-      } else {
-        break;
+        if (blockCount == 0) {
+          break;
+        }
       }
     }
-
     return result;
   }
 }
