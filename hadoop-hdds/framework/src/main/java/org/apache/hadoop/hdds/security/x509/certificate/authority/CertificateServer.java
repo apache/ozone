@@ -101,26 +101,22 @@ public interface CertificateServer {
   /**
    * Revokes a Certificate issued by this CertificateServer.
    *
-   * @param certificate - Certificate to revoke
-   * @param approver - Approval process to follow.
+   * @param certificates - List of Certificates to revoke.
+   * @param reason - Reason for revocation.
+   * @param securityConfig - Security Configuration.
    * @return Future that tells us what happened.
-   * @throws SCMSecurityException - on Error.
    */
-  Future<Boolean> revokeCertificate(X509Certificate certificate,
-      ApprovalType approver) throws SCMSecurityException;
-
-  /**
-   * TODO : CRL, OCSP etc. Later. This is the start of a CertificateServer
-   * framework.
-   */
+  Future<Boolean> revokeCertificates(List<X509Certificate> certificates,
+                                     int reason,
+                                     SecurityConfig securityConfig);
 
   /**
    * List certificates.
    * @param type            - node type: OM/SCM/DN
    * @param startSerialId   - start certificate serial id
    * @param count           - max number of certificates returned in a batch
-   * @return
-   * @throws IOException
+   * @return List of X509 Certificates.
+   * @throws IOException - On Failure
    */
   List<X509Certificate> listCertificate(HddsProtos.NodeType type,
       long startSerialId, int count, boolean isRevoked) throws IOException;

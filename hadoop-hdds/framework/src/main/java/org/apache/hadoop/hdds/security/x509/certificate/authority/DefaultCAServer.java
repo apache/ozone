@@ -272,20 +272,22 @@ public class DefaultCAServer implements CertificateServer {
   }
 
   @Override
-  public Future<Boolean> revokeCertificate(X509Certificate certificate,
-      CertificateApprover.ApprovalType approverType)
-      throws SCMSecurityException {
+  public Future<Boolean> revokeCertificates(List<X509Certificate> certificates,
+                                            int reason,
+                                            SecurityConfig securityConfig) {
     CompletableFuture<Boolean> revoked = new CompletableFuture<>();
-    if (certificate == null) {
+    if (certificates == null || certificates.isEmpty()) {
       revoked.completeExceptionally(new SCMSecurityException(
-          "Certificate cannot be null"));
+          "Certificates cannot be null or empty"));
       return revoked;
     }
     try {
-      store.revokeCertificate(certificate.getSerialNumber());
+      store.revokeCertificates(certificates,
+          getCACertificate(), reason, securityConfig, getCAKeys());
+      revoked.complete(true);
     } catch (IOException ex) {
       LOG.error("Revoking the certificate failed.", ex.getCause());
-      throw new SCMSecurityException(ex);
+      revoked.completeExceptionally(new SCMSecurityException(ex));
     }
     return revoked;
   }
@@ -347,11 +349,14 @@ public class DefaultCAServer implements CertificateServer {
     boolean keyStatus = checkIfKeysExist();
     boolean certStatus = checkIfCertificatesExist();
 
+    // Check if both certStatus and keyStatus is set to true and return success.
     if ((certStatus == keyStatus) && (certStatus)) {
       return VerificationStatus.SUCCESS;
     }
 
-    if ((certStatus == keyStatus) && (!certStatus)) {
+    // At this point both certStatus and keyStatus should be false if they
+    // are equal
+    if ((certStatus == keyStatus)) {
       return VerificationStatus.INITIALIZE;
     }
 

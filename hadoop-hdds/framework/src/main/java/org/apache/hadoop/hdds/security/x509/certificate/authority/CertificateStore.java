@@ -20,9 +20,12 @@
 package org.apache.hadoop.hdds.security.x509.certificate.authority;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.bouncycastle.cert.X509CertificateHolder;
 
 import java.io.IOException;
 import java.math.BigInteger;
+import java.security.KeyPair;
 import java.security.cert.X509Certificate;
 import java.util.List;
 
@@ -47,12 +50,21 @@ public interface CertificateStore {
                              X509Certificate certificate) throws IOException;
 
   /**
-   * Moves a certificate in a transactional manner from valid certificate to
+   * Adds the certificates to be revoked to a new CRL and moves all the
+   * certificates in a transactional manner from valid certificate to
    * revoked certificate state.
-   * @param serialID - Serial ID of the certificate.
+   * @param certificates - List of X509 Certificates to be revoked.
+   * @param caCertificateHolder - X509 Certificate Holder of the CA.
+   * @param reason - CRLReason for revocation.
+   * @param securityConfig - Security Configuration.
+   * @param keyPair - Public and Private key of the CA.
    * @throws IOException
    */
-  void revokeCertificate(BigInteger serialID) throws IOException;
+  void revokeCertificates(List<X509Certificate> certificates,
+                          X509CertificateHolder caCertificateHolder,
+                          int reason, SecurityConfig securityConfig,
+                          KeyPair keyPair)
+      throws IOException;
 
   /**
    * Deletes an expired certificate from the store. Please note: We don't
@@ -65,7 +77,7 @@ public interface CertificateStore {
   /**
    * Retrieves a Certificate based on the Serial number of that certificate.
    * @param serialID - ID of the certificate.
-   * @param certType
+   * @param certType - Whether its Valid or Revoked certificate.
    * @return X509Certificate
    * @throws IOException
    */

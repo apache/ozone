@@ -26,7 +26,10 @@ import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.test.LambdaTestUtils;
+
+import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.cert.X509CertificateHolder;
+import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.junit.Before;
 import org.junit.Rule;
@@ -38,12 +41,20 @@ import java.security.KeyPair;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.function.Consumer;
 
+import static junit.framework.TestCase.assertTrue;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.fail;
+
 
 /**
  * Tests the Default CA Server.
@@ -211,6 +222,55 @@ public class TestDefaultCAServer {
     // Right now our calls are synchronous. Eventually this will have to wait.
     assertTrue(holder.isDone());
     assertNotNull(holder.get());
+  }
+
+  @Test
+  public void testRevokeCertificates() throws Exception {
+    String scmId =  RandomStringUtils.randomAlphabetic(4);
+    String clusterId =  RandomStringUtils.randomAlphabetic(4);
+
+    CertificateServer testCA = new DefaultCAServer("testCA",
+        clusterId, scmId, caStore);
+    testCA.init(new SecurityConfig(conf),
+        CertificateServer.CAType.SELF_SIGNED_CA);
+
+    KeyPair keyPair =
+        new HDDSKeyGenerator(conf).generateKey();
+    PKCS10CertificationRequest csr = new CertificateSignRequest.Builder()
+        .addDnsName("hadoop.apache.org")
+        .addIpAddress("8.8.8.8")
+        .setCA(false)
+        .setSubject("testCA")
+        .setConfiguration(conf)
+        .setKey(keyPair)
+        .build();
+
+    // Let us convert this to a string to mimic the common use case.
+    String csrString = CertificateSignRequest.getEncodedString(csr);
+
+    Future<X509CertificateHolder> holder = testCA.requestCertificate(csrString,
+        CertificateApprover.ApprovalType.TESTING_AUTOMATIC);
+
+    X509Certificate certificate =
+        new JcaX509CertificateConverter().getCertificate(holder.get());
+    List<X509Certificate> certs = new ArrayList<>();
+    certs.add(certificate);
+    Future<Boolean> revoked = testCA.revokeCertificates(certs,
+        CRLReason.keyCompromise, new SecurityConfig(conf));
+
+    // Revoking a valid certificate should return true.
+    assertTrue(revoked.get());
+
+    // Revoking empty list of certificates should throw an error.
+    LambdaTestUtils.intercept(ExecutionException.class, "Certificates " +
+        "cannot be null",
+        () -> {
+          Future<Boolean> result =
+              testCA.revokeCertificates(Collections.emptyList(),
+              CRLReason.keyCompromise, new SecurityConfig(conf));
+          result.isDone();
+          result.get();
+        });
   }
 
   @Test

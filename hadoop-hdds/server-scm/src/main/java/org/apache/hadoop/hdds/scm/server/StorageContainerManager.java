@@ -34,6 +34,7 @@ import java.util.Objects;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -111,19 +112,19 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.util.JvmPauseMonitor;
+import org.apache.ratis.grpc.GrpcTlsConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
 import com.google.protobuf.BlockingService;
-import org.apache.commons.lang3.tuple.Pair;
+
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
-
-import org.apache.ratis.grpc.GrpcTlsConfig;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static org.apache.hadoop.ozone.OzoneConsts.CRL_SEQUENCE_ID_KEY;
 
 /**
  * StorageContainerManager is the main entry point for the service that
@@ -568,8 +569,22 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       throw new SCMException("Cannot initialize CA without a valid metadata " +
           "store", ResultCodes.SCM_NOT_INITIALIZED);
     }
-    SCMCertStore certStore = new SCMCertStore(this.scmMetadataStore);
+    SCMCertStore certStore = new SCMCertStore(this.scmMetadataStore,
+        getLastSequenceIdForCRL());
     return new DefaultCAServer(subject, clusterID, scmID, certStore);
+  }
+
+  long getLastSequenceIdForCRL() throws IOException {
+    Long sequenceId =
+        scmMetadataStore.getCRLSequenceIdTable().get(CRL_SEQUENCE_ID_KEY);
+    // If the CRL_SEQUENCE_ID_KEY does not exist in DB return 0 so that new
+    // CRL requests can have sequence id starting from 1.
+    if (sequenceId == null) {
+      return 0L;
+    }
+    // If there exists a last sequence id in the DB, the new incoming
+    // CRL requests must have sequence ids greater than the one stored in the DB
+    return sequenceId;
   }
 
   /**
