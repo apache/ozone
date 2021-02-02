@@ -968,7 +968,8 @@ public class ReplicationManager
                                     final List<DatanodeDetails> sources) {
 
     LOG.info("Sending replicate container command for container {}" +
-            " to datanode {}", container.containerID(), datanode);
+            " to datanode {} from datanodes {}",
+        container.containerID(), datanode, sources);
 
     final ContainerID id = container.containerID();
     final ReplicateContainerCommand replicateCommand =

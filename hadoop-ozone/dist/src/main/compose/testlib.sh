@@ -19,7 +19,6 @@ set -e
 COMPOSE_ENV_NAME=$(basename "$COMPOSE_DIR")
 RESULT_DIR=${RESULT_DIR:-"$COMPOSE_DIR/result"}
 RESULT_DIR_INSIDE="/tmp/smoketest/$(basename "$COMPOSE_ENV_NAME")/result"
-SMOKETEST_DIR_INSIDE="${OZONE_DIR:-/opt/hadoop}/smoketest"
 
 OM_HA_PARAM=""
 if [[ -n "${OM_SERVICE_ID}" ]] && [[ "${OM_SERVICE_ID}" != "om" ]]; then
@@ -135,10 +134,19 @@ execute_robot_test(){
     OUTPUT_FILE="robot-${OUTPUT_NAME}-${i}.xml"
   done
 
+  SMOKETEST_DIR_INSIDE="${OZONE_DIR:-/opt/hadoop}/smoketest"
+
   OUTPUT_PATH="$RESULT_DIR_INSIDE/${OUTPUT_FILE}"
   # shellcheck disable=SC2068
   docker-compose exec -T "$CONTAINER" mkdir -p "$RESULT_DIR_INSIDE" \
-    && docker-compose exec -T "$CONTAINER" robot -v OM_SERVICE_ID:"${OM_SERVICE_ID}" -v SECURITY_ENABLED:"${SECURITY_ENABLED}" -v OM_HA_PARAM:"${OM_HA_PARAM}" -v KEY_NAME:"${OZONE_BUCKET_KEY_NAME}" ${ARGUMENTS[@]} --log NONE --report NONE "${OZONE_ROBOT_OPTS[@]}" --output "$OUTPUT_PATH" "$SMOKETEST_DIR_INSIDE/$TEST"
+    && docker-compose exec -T "$CONTAINER" robot \
+      -v KEY_NAME:"${OZONE_BUCKET_KEY_NAME}" \
+      -v OM_HA_PARAM:"${OM_HA_PARAM}" \
+      -v OM_SERVICE_ID:"${OM_SERVICE_ID}" \
+      -v OZONE_DIR:"${OZONE_DIR}" \
+      -v SECURITY_ENABLED:"${SECURITY_ENABLED}" \
+      ${ARGUMENTS[@]} --log NONE --report NONE "${OZONE_ROBOT_OPTS[@]}" --output "$OUTPUT_PATH" \
+      "$SMOKETEST_DIR_INSIDE/$TEST"
   local -i rc=$?
 
   FULL_CONTAINER_NAME=$(docker-compose ps | grep "_${CONTAINER}_" | head -n 1 | awk '{print $1}')
@@ -243,7 +251,7 @@ generate_report(){
 
   if command -v rebot > /dev/null 2>&1; then
      #Generate the combined output and return with the right exit code (note: robot = execute test, rebot = generate output)
-     rebot -d "$RESULT_DIR" "$RESULT_DIR/robot-*.xml"
+     rebot --reporttitle "${COMPOSE_ENV_NAME}" -N "${COMPOSE_ENV_NAME}" -d "$RESULT_DIR" "$RESULT_DIR/robot-*.xml"
   else
      echo "Robot framework is not installed, the reports can be generated (sudo pip install robotframework)."
      exit 1
