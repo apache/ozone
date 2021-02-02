@@ -167,6 +167,15 @@ To start Ozone from IntelliJ:
 3. Start the IDE
 4. New runner definitions are available from the Run menu.
 
+You can use the installed Run configurations in the following order:
+
+1. StorageContainerManagerInit (to initialize the SCM dir)
+2. StorageContainerManger (to start SCM)
+3. OzoneManagerInit (to initialize OM, it requires SCM)
+4. OzoneManager
+5. Recon (required by datanode)
+6. Datanode1, Datanode2, Datanode3
+
 ### Setting up Checkstyle
 
 Checkstyle plugin may help to detect violations directly from the IDE.
