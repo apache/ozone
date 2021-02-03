@@ -362,7 +362,7 @@
     <tag>OZONE, PERFORMANCE, SCM</tag>
     <description>A maximum number of blocks to be deleted by block deleting
       service per time interval. This property is used to throttle the actual
-      number of block deletions on a data.
+      number of block deletions on a datanode.
     </description>
   </property>
   <property>
