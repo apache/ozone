@@ -94,23 +94,8 @@ public class ContainerAttribute<T> {
   public boolean insert(T key, ContainerID value) throws SCMException {
     Preconditions.checkNotNull(key);
     Preconditions.checkNotNull(value);
-
-    if (attributeMap.containsKey(key)) {
-      if (attributeMap.get(key).add(value)) {
-        return true; //we inserted the value as it doesn’t exist in the set.
-      } else { // Failure indicates that this ContainerID exists in the Set
-        return updateContainerID(key, value);
-      }
-    } else {
-      // This key does not exist, we need to allocate this key in the map.
-      // TODO: Replace TreeSet with FoldedTreeSet from HDFS Utils.
-      // Skipping for now, since FoldedTreeSet does not have implementations
-      // for headSet and TailSet. We need those calls.
-      this.attributeMap.put(key, new TreeSet<>());
-      // This should not fail, we just allocated this object.
-      attributeMap.get(key).add(value);
-      return true;
-    }
+    attributeMap.computeIfAbsent(key, any -> new TreeSet<>()).add(value);
+    return true;
   }
 
   /**
@@ -245,20 +230,5 @@ public class ContainerAttribute<T> {
       }
       throw ex;
     }
-  }
-
-  /**
-   * Update the ContainerID for the specified key.
-   *
-   * @param key - Key to update.
-   * @param value - ContainerID.
-   * @return true or false
-   */
-  private boolean updateContainerID(T key, ContainerID value) {
-    // Since ContainerID contains no information other than id, we keep the the
-    // old value.
-    LOG.debug("Updating ContainerID: {} in Map.Key :{} by keeping old value.",
-        value, key);
-    return true;
   }
 }
