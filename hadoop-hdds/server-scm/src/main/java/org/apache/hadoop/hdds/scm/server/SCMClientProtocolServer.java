@@ -386,8 +386,8 @@ public class SCMClientProtocolServer implements
   @Override
   public List<HddsProtos.Node> queryNode(
       HddsProtos.NodeOperationalState opState, HddsProtos.NodeState state,
-      HddsProtos.QueryScope queryScope, String poolName) throws
-      IOException {
+      HddsProtos.QueryScope queryScope, String poolName, int clientVersion)
+      throws IOException {
 
     if (queryScope == HddsProtos.QueryScope.POOL) {
       throw new IllegalArgumentException("Not Supported yet");
@@ -398,7 +398,7 @@ public class SCMClientProtocolServer implements
       try {
         NodeStatus ns = scm.getScmNodeManager().getNodeStatus(node);
         result.add(HddsProtos.Node.newBuilder()
-            .setNodeID(node.getProtoBufMessage())
+            .setNodeID(node.toProto(clientVersion))
             .addNodeStates(ns.getHealth())
             .addNodeOperationalStates(ns.getOperationalState())
             .build());

@@ -38,6 +38,7 @@ import java.util.List;
 import java.util.ArrayList;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
 
 
 /**
@@ -88,7 +89,8 @@ public class TestOmLDBCli {
           HddsProtos.ReplicationFactor.ONE);
       String key = "key"+ (i);
       Table<byte[], byte[]> keyTable = dbStore.getTable("keyTable");
-      keyTable.put(key.getBytes(UTF_8), value.getProtobuf().toByteArray());
+      byte[] arr = value.getProtobuf(CURRENT_VERSION).toByteArray();
+      keyTable.put(key.getBytes(UTF_8), arr);
     }
     rdbParser.setDbPath(dbStore.getDbLocation().getAbsolutePath());
     dbScanner.setParent(rdbParser);
