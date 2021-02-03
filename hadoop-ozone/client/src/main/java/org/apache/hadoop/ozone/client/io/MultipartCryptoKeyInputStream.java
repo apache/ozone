@@ -55,12 +55,12 @@ public class MultipartCryptoKeyInputStream extends OzoneInputStream
   private long[] partOffsets;
 
   // Index of the partStream corresponding to the current position of the
-  // MultipartCryptoKeyInputStream i.e. offset of the data to be read next
+  // MultipartCryptoKeyInputStream.
   private int partIndex = 0;
 
   // Tracks the partIndex corresponding to the last seeked position so that it
   // can be reset if a new position is seeked.
-  private int partIndexOfPrevPos = 0;
+  private int prevPartIndex = 0;
 
   // If a read's start/ length position doesn't coincide with a Crypto buffer
   // boundary, it will be adjusted as reads should happen only at the buffer
@@ -226,10 +226,11 @@ public class MultipartCryptoKeyInputStream extends OzoneInputStream
   private void adjustReadPosition(long cryptoBufferSize) throws IOException {
     // Position of the buffer in current stream
     long currentPosOfStream = partStreams.get(partIndex).getPos();
-    if (currentPosOfStream % cryptoBufferSize != 0) {
+    int modulus = (int) (currentPosOfStream % cryptoBufferSize);
+    if (modulus != 0) {
       // Adjustment required.
       // Update readPositionAdjustedBy and seek to the adjusted position
-      readPositionAdjustedBy = (int) (currentPosOfStream % cryptoBufferSize);
+      readPositionAdjustedBy = modulus;
       // Seek current partStream to adjusted position. We do not need to
       // reset the seeked positions of other streams.
       partStreams.get(partIndex)
@@ -302,7 +303,7 @@ public class MultipartCryptoKeyInputStream extends OzoneInputStream
     }
 
     // Reset the previous partStream's position
-    partStreams.get(partIndexOfPrevPos).seek(0);
+    partStreams.get(prevPartIndex).seek(0);
 
     // Reset all the partStreams above the partIndex. We do this to reset
     // any previous reads which might have updated the higher part
@@ -312,11 +313,12 @@ public class MultipartCryptoKeyInputStream extends OzoneInputStream
     }
     // 2. Seek the partStream to the adjusted position
     partStreams.get(partIndex).seek(pos - partOffsets[partIndex]);
-    partIndexOfPrevPos = partIndex;
+    prevPartIndex = partIndex;
   }
 
   @Override
   public synchronized long getPos() throws IOException {
+    checkOpen();
     return length == 0 ? 0 : partOffsets[partIndex] +
         partStreams.get(partIndex).getPos();
   }
