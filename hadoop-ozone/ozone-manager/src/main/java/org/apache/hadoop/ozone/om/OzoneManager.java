@@ -1698,16 +1698,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private void checkAcls(ResourceType resType, StoreType store,
       ACLType acl, String vol, String bucket, String key)
       throws IOException {
+    UserGroupInformation user = ProtobufRpcEngine.Server.getRemoteUser();
+    InetAddress remoteIp = ProtobufRpcEngine.Server.getRemoteIp();
     checkAcls(resType, store, acl, vol, bucket, key,
-        ProtobufRpcEngine.Server.getRemoteUser() != null ?
-            ProtobufRpcEngine.Server.getRemoteUser() :
-            getRemoteUser(),
-        ProtobufRpcEngine.Server.getRemoteIp() != null ?
-            ProtobufRpcEngine.Server.getRemoteIp() :
-            omRpcAddress.getAddress(),
-        ProtobufRpcEngine.Server.getRemoteIp() != null ?
-            ProtobufRpcEngine.Server.getRemoteIp().getHostName() :
-            omRpcAddress.getHostName(),
+        user != null ? user : getRemoteUser(),
+        remoteIp != null ? remoteIp : omRpcAddress.getAddress(),
+        remoteIp != null ? remoteIp.getHostName() : omRpcAddress.getHostName(),
         true, getVolumeOwner(vol, acl, resType));
   }
 

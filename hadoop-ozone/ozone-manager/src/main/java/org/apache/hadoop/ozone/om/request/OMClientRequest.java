@@ -90,7 +90,8 @@ public abstract class OMClientRequest implements RequestAuditor {
    */
   public OMRequest preExecute(OzoneManager ozoneManager)
       throws IOException {
-    omRequest = getOmRequest().toBuilder().setUserInfo(getUserInfo()).build();
+    omRequest = getOmRequest().toBuilder()
+        .setUserInfo(getUserIfNotExists(ozoneManager)).build();
     return omRequest;
   }
 
@@ -133,6 +134,30 @@ public abstract class OMClientRequest implements RequestAuditor {
     }
 
     return userInfo.build();
+  }
+
+  /**
+   * For non-rpc internal calls Server.getRemoteUser()
+   * and Server.getRemoteIp() will be null.
+   * Passing getCurrentUser() and Ip of the Om node that started it.
+   * @return User Info.
+   */
+  public OzoneManagerProtocolProtos.UserInfo getUserIfNotExists(
+      OzoneManager ozoneManager)
+      throws IOException {
+    OzoneManagerProtocolProtos.UserInfo userInfo = getUserInfo();
+    if (!userInfo.hasRemoteAddress() || !userInfo.hasUserName()){
+      OzoneManagerProtocolProtos.UserInfo.Builder newuserInfo =
+          OzoneManagerProtocolProtos.UserInfo.newBuilder();
+      UserGroupInformation user = UserGroupInformation.getCurrentUser();
+      InetAddress remoteAddress = ozoneManager.getOmRpcServerAddr()
+          .getAddress();
+      newuserInfo.setUserName(user.getUserName());
+      newuserInfo.setHostName(remoteAddress.getHostName());
+      newuserInfo.setRemoteAddress(remoteAddress.getHostAddress());
+      return newuserInfo.build();
+    }
+    return getUserInfo();
   }
 
   /**

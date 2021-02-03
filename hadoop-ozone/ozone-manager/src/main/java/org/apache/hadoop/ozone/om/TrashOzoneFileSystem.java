@@ -523,7 +523,7 @@ public class TrashOzoneFileSystem extends FileSystem {
 
     if (remoteAddress != null) {
       userInfo.setHostName(remoteAddress.getHostName());
-      userInfo.setRemoteAddress(remoteAddress.getHostAddress()).build();
+      userInfo.setRemoteAddress(remoteAddress.getHostAddress());
     }
 
     return userInfo.build();
