@@ -58,7 +58,6 @@ public class TopNOrderedContainerDeletionChoosingPolicy
     Preconditions.checkNotNull(candidateContainers,
         "Internal assertion: candidate containers cannot be null");
 
-    //List<Pair<ContainerData, Long>> result = new ArrayList<>();
     List<ContainerBlockInfo> result = new ArrayList<>();
     List<KeyValueContainerData> orderedList = new LinkedList<>();
     for (ContainerData entry : candidateContainers.values()) {
@@ -79,12 +78,9 @@ public class TopNOrderedContainerDeletionChoosingPolicy
       if (entry.getNumPendingDeletionBlocks() > 0) {
         totalBlocks -= entry.getNumPendingDeletionBlocks();
         if (totalBlocks >= 0) {
-          //result.add(new Pair<>(entry, entry.getNumPendingDeletionBlocks()));
           result.add(new ContainerBlockInfo(entry,
               entry.getNumPendingDeletionBlocks()));
         } else if (flag == 0 && (totalBlocks < 0)) {
-//          result.add(new Pair<>(entry,
-//              totalBlocks + entry.getNumPendingDeletionBlocks()));
           result.add(new ContainerBlockInfo(entry,
               totalBlocks + entry.getNumPendingDeletionBlocks()));
           flag = 1;
