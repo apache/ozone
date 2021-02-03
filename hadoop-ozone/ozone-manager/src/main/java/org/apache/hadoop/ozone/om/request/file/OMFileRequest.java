@@ -456,6 +456,7 @@ public final class OMFileRequest {
       // For example, the user given key path is '/a/b/c/d/e/file1', then in DB
       // keyName field stores only the leaf node name, which is 'file1'.
       omFileInfo.setKeyName(fileName);
+      omFileInfo.setFileName(fileName);
       keyInfoOptional = Optional.of(omFileInfo);
     }
 
@@ -481,6 +482,7 @@ public final class OMFileRequest {
     // For example, the user given key path is '/a/b/c/d/e/file1', then in DB
     // keyName field stores only the leaf node name, which is 'file1'.
     omFileInfo.setKeyName(fileName);
+    omFileInfo.setFileName(fileName);
 
     omMetadataManager.getKeyTable().addCacheEntry(
             new CacheKey<>(dbFileKey),
@@ -505,6 +507,28 @@ public final class OMFileRequest {
     String dbOpenFileKey = omMetadataMgr.getOpenFileName(
             omFileInfo.getParentObjectID(), omFileInfo.getFileName(),
             openKeySessionID);
+
+    omMetadataMgr.getOpenKeyTable().putWithBatch(batchOp, dbOpenFileKey,
+            omFileInfo);
+  }
+
+
+  /**
+   * Adding omKeyInfo to open file table.
+   *
+   * @param omMetadataMgr OM Metadata Manager
+   * @param batchOp       batch of db operations
+   * @param omFileInfo    omKeyInfo
+   * @param uploadID      uploadID
+   * @throws IOException DB failure
+   */
+  public static void addToOpenFileTable(OMMetadataManager omMetadataMgr,
+      BatchOperation batchOp, OmKeyInfo omFileInfo, String uploadID)
+          throws IOException {
+
+    String dbOpenFileKey = omMetadataMgr.getMultipartKey(
+            omFileInfo.getParentObjectID(), omFileInfo.getFileName(),
+            uploadID);
 
     omMetadataMgr.getOpenKeyTable().putWithBatch(batchOp, dbOpenFileKey,
             omFileInfo);
