@@ -42,4 +42,6 @@ public interface DeletedBlockLogStateManager {
       KeyValue<Long, DeletedBlocksTransaction>> getReadOnlyIterator();
 
   void onFlush();
+
+  void clear();
 }

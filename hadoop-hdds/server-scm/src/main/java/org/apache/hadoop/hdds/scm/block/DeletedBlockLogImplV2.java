@@ -279,9 +279,10 @@ public class DeletedBlockLogImplV2
 
   /**
    * Called in SCMStateMachine#notifyLeaderChanged when current SCM becomes
-   *  leader.
+   * leader.
    */
-  public void clearTransactionToDNsCommitMap() {
+  public void clear() {
+    deletedBlockLogStateManager.clear();
     transactionToDNsCommitMap.clear();
   }
 

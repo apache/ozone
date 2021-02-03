@@ -216,6 +216,9 @@ public class DeletedBlockLogStateManagerImpl
     }
   }
 
+  public void clear() {
+    transactionRetryCountMap.clear();
+  }
 
   public void onFlush() {
     deletingTxIDs.clear();

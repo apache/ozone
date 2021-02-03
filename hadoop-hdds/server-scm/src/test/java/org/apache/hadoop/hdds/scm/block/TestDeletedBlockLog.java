@@ -266,7 +266,12 @@ public class TestDeletedBlockLog {
     OzoneConfiguration testConf = OzoneConfiguration.of(conf);
     testConf.setInt(OZONE_SCM_BLOCK_DELETION_MAX_RETRY, 120);
 
-    deletedBlockLog.addTransactions(generateData(1));
+    deletedBlockLog = new DeletedBlockLogImplV2(testConf, containerManager,
+        MockSCMHAManager.getInstance(true).getRatisServer(),
+        scm.getScmMetadataStore().getDeletedBlocksTXTable(),
+        dbTransactionBuffer, SCMContext.emptyContext());
+
+    addTransactions(generateData(30));
 
     List<DeletedBlocksTransaction> blocks =
         getTransactions(40 * BLOCKS_PER_TXN);
@@ -274,7 +279,7 @@ public class TestDeletedBlockLog {
         .collect(Collectors.toList());
 
     for (int i = 0; i < 50; i++) {
-      deletedBlockLog.incrementCount(txIDs);
+      incrementCount(txIDs);
     }
     blocks = getTransactions(40 * BLOCKS_PER_TXN);
     for (DeletedBlocksTransaction block : blocks) {
@@ -283,7 +288,7 @@ public class TestDeletedBlockLog {
     }
 
     for (int i = 0; i < 60; i++) {
-      deletedBlockLog.incrementCount(txIDs);
+      incrementCount(txIDs);
     }
     blocks = getTransactions(40 * BLOCKS_PER_TXN);
     for (DeletedBlocksTransaction block : blocks) {
@@ -292,7 +297,7 @@ public class TestDeletedBlockLog {
     }
 
     for (int i = 0; i < 50; i++) {
-      deletedBlockLog.incrementCount(txIDs);
+      incrementCount(txIDs);
     }
     blocks = getTransactions(40 * BLOCKS_PER_TXN);
     for (DeletedBlocksTransaction block : blocks) {
