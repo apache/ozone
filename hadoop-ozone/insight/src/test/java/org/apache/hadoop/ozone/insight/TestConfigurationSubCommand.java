@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.insight;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
+import java.nio.charset.StandardCharsets;
 
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
@@ -42,7 +43,7 @@ public class TestConfigurationSubCommand {
 
   @Before
   public void setup() throws Exception {
-    System.setOut(new PrintStream(out, false, "UTF-8"));
+    System.setOut(new PrintStream(out, false, StandardCharsets.UTF_8.name()));
   }
 
   @After
@@ -58,7 +59,7 @@ public class TestConfigurationSubCommand {
 
     subCommand.printConfig(CustomConfig.class, conf);
 
-    final String output = out.toString("UTF-8");
+    final String output = out.toString(StandardCharsets.UTF_8.name());
     Assert.assertTrue(output.contains(">>> ozone.scm.client.address"));
     Assert.assertTrue(output.contains("default: localhost"));
     Assert.assertTrue(output.contains("current: omclient"));

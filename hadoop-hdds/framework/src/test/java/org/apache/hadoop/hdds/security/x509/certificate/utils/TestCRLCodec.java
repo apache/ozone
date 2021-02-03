@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.hdds.security.x509.certificate.utils;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -32,7 +33,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.math.BigInteger;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.security.KeyPair;
 import java.security.NoSuchAlgorithmException;
@@ -137,7 +137,7 @@ public class TestCRLCodec {
     assertTrue(crlFile.exists());
 
     try (BufferedReader reader = new BufferedReader(new InputStreamReader(
-        new FileInputStream(crlFile), StandardCharsets.UTF_8))){
+        new FileInputStream(crlFile), UTF_8))){
 
       // Verify contents of the file
       String header = reader.readLine();
@@ -162,7 +162,7 @@ public class TestCRLCodec {
     builder.addCRLEntry(x509CertificateHolder.getSerialNumber(), now,
                         CRLReason.cACompromise);
 
-    byte[] crlBytes = TMP_CRL_ENTRY.getBytes(StandardCharsets.UTF_8);
+    byte[] crlBytes = TMP_CRL_ENTRY.getBytes(UTF_8);
     try (InputStream inStream = new ByteArrayInputStream(crlBytes)) {
       CertificateFactory cf = CertificateFactory.getInstance("X.509");
       X509CRL crl = (X509CRL)cf.generateCRL(inStream);

@@ -46,6 +46,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+
 /**
  * Tests GenerateOzoneRequiredConfigurations.
  */
@@ -58,7 +60,7 @@ public class TestGenerateOzoneRequiredConfigurations {
   private final ByteArrayOutputStream err = new ByteArrayOutputStream();
   private static final PrintStream OLD_OUT = System.out;
   private static final PrintStream OLD_ERR = System.err;
-  private static final String DEFAULT_ENCODING = "UTF-8";
+  private static final String DEFAULT_ENCODING = UTF_8.name();
   /**
    * Creates output directory which will be used by the test-cases.
    * If a test-case needs a separate directory, it has to create a random

@@ -22,7 +22,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.junit.Assert;
 import org.junit.Test;
 
-import java.nio.charset.StandardCharsets;
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
  * Tests for {@link Checksum} class.
@@ -47,8 +47,7 @@ public class TestChecksum {
   public void testVerifyChecksum() throws Exception {
     Checksum checksum = getChecksum(null);
     int dataLen = 55;
-    byte[] data = RandomStringUtils.randomAlphabetic(dataLen).getBytes(
-        StandardCharsets.UTF_8);
+    byte[] data = RandomStringUtils.randomAlphabetic(dataLen).getBytes(UTF_8);
 
     ChecksumData checksumData = checksum.computeChecksum(data);
 
@@ -68,8 +67,7 @@ public class TestChecksum {
   @Test
   public void testIncorrectChecksum() throws Exception {
     Checksum checksum = getChecksum(null);
-    byte[] data = RandomStringUtils.randomAlphabetic(55).getBytes(
-        StandardCharsets.UTF_8);
+    byte[] data = RandomStringUtils.randomAlphabetic(55).getBytes(UTF_8);
     ChecksumData originalChecksumData = checksum.computeChecksum(data);
 
     // Change the data and check if new checksum matches the original checksum.

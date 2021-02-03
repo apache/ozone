@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.om.ratis;
 
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collections;
@@ -53,6 +52,7 @@ import org.junit.rules.TemporaryFolder;
 import org.mockito.Mockito;
 import org.slf4j.LoggerFactory;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.junit.Assert.assertFalse;
 import static org.mockito.Mockito.when;
@@ -187,7 +187,7 @@ public class TestOzoneManagerRatisServer {
   public void verifyRaftGroupIdGenerationWithDefaultOmServiceId() throws
       Exception {
     UUID uuid = UUID.nameUUIDFromBytes(OzoneConsts.OM_SERVICE_ID_DEFAULT
-        .getBytes(StandardCharsets.UTF_8));
+        .getBytes(UTF_8));
     RaftGroupId raftGroupId = omRatisServer.getRaftGroup().getGroupId();
     Assert.assertEquals(uuid, raftGroupId.getUuid());
     Assert.assertEquals(raftGroupId.toByteString().size(), 16);
@@ -220,8 +220,7 @@ public class TestOzoneManagerRatisServer {
             Collections.emptyList());
     newOmRatisServer.start();
 
-    UUID uuid = UUID.nameUUIDFromBytes(customOmServiceId.getBytes(
-        StandardCharsets.UTF_8));
+    UUID uuid = UUID.nameUUIDFromBytes(customOmServiceId.getBytes(UTF_8));
     RaftGroupId raftGroupId = newOmRatisServer.getRaftGroup().getGroupId();
     Assert.assertEquals(uuid, raftGroupId.getUuid());
     Assert.assertEquals(raftGroupId.toByteString().size(), 16);

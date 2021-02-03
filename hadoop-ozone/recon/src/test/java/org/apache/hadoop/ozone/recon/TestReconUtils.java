@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.recon;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.recon.ReconUtils.createTarFile;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -35,7 +36,6 @@ import java.io.InputStream;
 import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.net.URL;
 
@@ -86,13 +86,13 @@ public class TestReconUtils {
 
       File file = new File(testDirName + "/temp1.txt");
       OutputStreamWriter writer = new OutputStreamWriter(
-          new FileOutputStream(file), StandardCharsets.UTF_8);
+          new FileOutputStream(file), UTF_8);
       writer.write("Test data 1");
       writer.close();
 
       file = new File(testDirName + "/temp2.txt");
       writer = new OutputStreamWriter(
-          new FileOutputStream(file), StandardCharsets.UTF_8);
+          new FileOutputStream(file), UTF_8);
       writer.write("Test data 2");
       writer.close();
 
@@ -116,7 +116,7 @@ public class TestReconUtils {
         .toFile();
     String str = "File1 Contents";
     BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(
-        new FileOutputStream(file1.getAbsoluteFile()), StandardCharsets.UTF_8));
+        new FileOutputStream(file1.getAbsoluteFile()), UTF_8));
     writer.write(str);
     writer.close();
 
@@ -124,7 +124,7 @@ public class TestReconUtils {
         .toFile();
     str = "File2 Contents";
     writer = new BufferedWriter(new OutputStreamWriter(
-        new FileOutputStream(file2.getAbsoluteFile()), StandardCharsets.UTF_8));
+        new FileOutputStream(file2.getAbsoluteFile()), UTF_8));
     writer.write(str);
     writer.close();
 
@@ -143,7 +143,7 @@ public class TestReconUtils {
     File file1 = Paths.get(folder.getRoot().getPath(), "file1")
         .toFile();
     BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(
-        new FileOutputStream(file1.getAbsoluteFile()), StandardCharsets.UTF_8));
+        new FileOutputStream(file1.getAbsoluteFile()), UTF_8));
     writer.write("File 1 Contents");
     writer.close();
     InputStream fileInputStream = new FileInputStream(file1);
@@ -171,7 +171,7 @@ public class TestReconUtils {
         .toFile();
     String str = "File1 Contents";
     BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(
-        new FileOutputStream(file1.getAbsoluteFile()), StandardCharsets.UTF_8));
+        new FileOutputStream(file1.getAbsoluteFile()), UTF_8));
     writer.write(str);
     writer.close();
 
@@ -179,7 +179,7 @@ public class TestReconUtils {
         .toFile();
     str = "File2 Contents";
     writer = new BufferedWriter(new OutputStreamWriter(
-        new FileOutputStream(file2.getAbsoluteFile()), StandardCharsets.UTF_8));
+        new FileOutputStream(file2.getAbsoluteFile()), UTF_8));
     writer.write(str);
     writer.close();
 
@@ -188,7 +188,7 @@ public class TestReconUtils {
         .toFile();
     str = "File3 Contents";
     writer = new BufferedWriter(new OutputStreamWriter(
-        new FileOutputStream(file3.getAbsoluteFile()), StandardCharsets.UTF_8));
+        new FileOutputStream(file3.getAbsoluteFile()), UTF_8));
     writer.write(str);
     writer.close();
 

@@ -135,7 +135,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   private static final String HOST2 = "host2.datanode";
   private static final String IP1 = "1.1.1.1";
   private static final String IP2 = "2.2.2.2";
-  private static final String PROMETHEUSTESTRESPONSEFILE =
+  private static final String PROMETHEUS_TEST_RESPONSE_FILE =
       "prometheus-test-response.txt";
   private ReconUtils reconUtilsMock;
 
@@ -174,7 +174,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
 
     InputStream inputStream =
         Thread.currentThread().getContextClassLoader().getResourceAsStream(
-            PROMETHEUSTESTRESPONSEFILE);
+            PROMETHEUS_TEST_RESPONSE_FILE);
     reconUtilsMock = mock(ReconUtils.class);
     HttpURLConnection urlConnectionMock = mock(HttpURLConnection.class);
     when(urlConnectionMock.getResponseCode())
@@ -489,7 +489,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     // when the prometheus endpoint is queried.
     ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
     InputStream inputStream = classLoader
-        .getResourceAsStream(PROMETHEUSTESTRESPONSEFILE);
+        .getResourceAsStream(PROMETHEUS_TEST_RESPONSE_FILE);
     HttpURLConnection urlConnectionMock = mock(HttpURLConnection.class);
     when(urlConnectionMock.getResponseCode())
         .thenReturn(HttpServletResponse.SC_OK);
@@ -501,7 +501,8 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         uriInfoMock, responseMock);
 
     byte[] fileBytes = FileUtils.readFileToByteArray(
-        new File(classLoader.getResource(PROMETHEUSTESTRESPONSEFILE).getFile())
+        new File(classLoader.getResource(PROMETHEUS_TEST_RESPONSE_FILE)
+            .getFile())
         );
     verify(outputStreamMock).write(fileBytes, 0, fileBytes.length);
   }

@@ -168,7 +168,7 @@ public class TestReadRetries {
 
     // Make sure that the data size matched.
     Assert.assertEquals(value.getBytes(UTF_8).length,
-            keyLocations.get(0).getLength());
+        keyLocations.get(0).getLength());
 
     ContainerInfo container = cluster.getStorageContainerManager()
         .getContainerManager().getContainer(ContainerID.valueof(containerID));

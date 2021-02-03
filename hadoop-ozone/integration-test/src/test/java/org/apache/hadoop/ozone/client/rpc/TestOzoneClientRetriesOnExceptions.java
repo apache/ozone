@@ -62,7 +62,7 @@ import org.junit.rules.Timeout;
 /**
  * Tests failure detection and handling in BlockOutputStream Class.
  */
-public class TestOzoneClientRetriesOnException extends Exception {
+public class TestOzoneClientRetriesOnExceptions {
 
   private static final int MAX_RETRIES = 3;
 

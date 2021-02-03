@@ -49,7 +49,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.RandomAccessFile;
-import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.ArrayList;
 import java.nio.ByteBuffer;
@@ -57,6 +56,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -209,8 +209,7 @@ import static org.junit.Assert.assertFalse;
     int bytesPerChecksum = 2 * unitLen;
     Checksum checksum = new Checksum(ContainerProtos.ChecksumType.SHA256,
         bytesPerChecksum);
-    byte[] chunkData = RandomStringUtils.randomAscii(chunkLen).getBytes(
-        StandardCharsets.UTF_8);
+    byte[] chunkData = RandomStringUtils.randomAscii(chunkLen).getBytes(UTF_8);
     ChecksumData checksumData = checksum.computeChecksum(chunkData);
     DispatcherContext writeStage = new DispatcherContext.Builder()
         .setStage(DispatcherContext.WriteChunkStage.WRITE_DATA)

@@ -32,9 +32,9 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 
 import java.io.ByteArrayInputStream;
-import java.nio.charset.StandardCharsets;
 
 import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
@@ -78,8 +78,8 @@ public class TestPartUpload {
     assertEquals(200, response.getStatus());
 
     String content = "Multipart Upload";
-    ByteArrayInputStream body = new ByteArrayInputStream(content.getBytes(
-        StandardCharsets.UTF_8));
+    ByteArrayInputStream body =
+        new ByteArrayInputStream(content.getBytes(UTF_8));
     response = REST.put(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
         content.length(), 1, uploadID, body);
 
@@ -100,8 +100,8 @@ public class TestPartUpload {
     assertEquals(200, response.getStatus());
 
     String content = "Multipart Upload";
-    ByteArrayInputStream body = new ByteArrayInputStream(content.getBytes(
-        StandardCharsets.UTF_8));
+    ByteArrayInputStream body =
+        new ByteArrayInputStream(content.getBytes(UTF_8));
     response = REST.put(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
         content.length(), 1, uploadID, body);
 
@@ -123,8 +123,8 @@ public class TestPartUpload {
   public void testPartUploadWithIncorrectUploadID() throws Exception {
     try {
       String content = "Multipart Upload With Incorrect uploadID";
-      ByteArrayInputStream body = new ByteArrayInputStream(content.getBytes(
-          StandardCharsets.UTF_8));
+      ByteArrayInputStream body =
+          new ByteArrayInputStream(content.getBytes(UTF_8));
       REST.put(OzoneConsts.S3_BUCKET, OzoneConsts.KEY, content.length(), 1,
           "random", body);
       fail("testPartUploadWithIncorrectUploadID failed");

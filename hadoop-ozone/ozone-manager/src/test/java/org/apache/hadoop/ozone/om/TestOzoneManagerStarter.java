@@ -28,6 +28,8 @@ import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.Assert.*;
 
 /**
@@ -42,7 +44,7 @@ public class TestOzoneManagerStarter {
   private final ByteArrayOutputStream errContent = new ByteArrayOutputStream();
   private final PrintStream originalOut = System.out;
   private final PrintStream originalErr = System.err;
-  private static final String DEFAULT_ENCODING = "UTF-8";
+  private static final String DEFAULT_ENCODING = UTF_8.name();
 
   private MockOMStarter mock;
 

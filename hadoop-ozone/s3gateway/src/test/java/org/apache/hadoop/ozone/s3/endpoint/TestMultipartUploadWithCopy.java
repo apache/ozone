@@ -26,7 +26,6 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -42,6 +41,7 @@ import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.endpoint.CompleteMultipartUploadRequest.Part;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER_RANGE;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
@@ -75,7 +75,7 @@ public class TestMultipartUploadWithCopy {
     OzoneBucket bucket =
         CLIENT.getObjectStore().getS3Bucket(OzoneConsts.S3_BUCKET);
 
-    byte[] keyContent = EXISTING_KEY_CONTENT.getBytes(StandardCharsets.UTF_8);
+    byte[] keyContent = EXISTING_KEY_CONTENT.getBytes(UTF_8);
     try (OutputStream stream = bucket
         .createKey(EXISTING_KEY, keyContent.length, ReplicationType.RATIS,
             ReplicationFactor.THREE, new HashMap<>())) {
@@ -125,7 +125,8 @@ public class TestMultipartUploadWithCopy {
     OzoneBucket bucket =
         CLIENT.getObjectStore().getS3Bucket(OzoneConsts.S3_BUCKET);
     try (InputStream is = bucket.readKey(KEY)) {
-      String keyContent = new Scanner(is, "UTF-8").useDelimiter("\\A").next();
+      String keyContent = new Scanner(is, UTF_8.name())
+          .useDelimiter("\\A").next();
       Assert.assertEquals(
           content + EXISTING_KEY_CONTENT + EXISTING_KEY_CONTENT.substring(0, 4),
           keyContent);
@@ -151,8 +152,8 @@ public class TestMultipartUploadWithCopy {
   private Part uploadPart(String key, String uploadID, int partNumber, String
       content) throws IOException, OS3Exception {
     setHeaders();
-    ByteArrayInputStream body = new ByteArrayInputStream(content.getBytes(
-        StandardCharsets.UTF_8));
+    ByteArrayInputStream body =
+        new ByteArrayInputStream(content.getBytes(UTF_8));
     Response response = REST.put(OzoneConsts.S3_BUCKET, key, content.length(),
         partNumber, uploadID, body);
     assertEquals(200, response.getStatus());
@@ -174,8 +175,7 @@ public class TestMultipartUploadWithCopy {
     }
     setHeaders(additionalHeaders);
 
-    ByteArrayInputStream body = new ByteArrayInputStream(
-        "".getBytes(StandardCharsets.UTF_8));
+    ByteArrayInputStream body = new ByteArrayInputStream("".getBytes(UTF_8));
     Response response = REST.put(OzoneConsts.S3_BUCKET, key, 0, partNumber,
         uploadID, body);
     assertEquals(200, response.getStatus());

@@ -25,10 +25,10 @@ import org.junit.Test;
 /**
  * This class tests OS3Exception class.
  */
-public class TestOS3Exception extends Exception {
+public class TestOS3Exceptions {
 
   @Test
-  public void testOS3Exception() {
+  public void testOS3Exceptions() {
     OS3Exception ex = new OS3Exception("AccessDenied", "Access Denied",
         403);
     String requestId = OzoneUtils.getRequestID();

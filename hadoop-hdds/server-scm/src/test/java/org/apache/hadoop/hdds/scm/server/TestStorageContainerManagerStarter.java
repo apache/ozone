@@ -25,6 +25,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
+import java.nio.charset.StandardCharsets;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import static org.junit.Assert.*;
@@ -40,7 +41,7 @@ public class TestStorageContainerManagerStarter {
   private final ByteArrayOutputStream errContent = new ByteArrayOutputStream();
   private final PrintStream originalOut = System.out;
   private final PrintStream originalErr = System.err;
-  private static final String DEFAULT_ENCODING = "UTF-8";
+  private static final String DEFAULT_ENCODING = StandardCharsets.UTF_8.name();
 
   private MockSCMStarter mock;
 

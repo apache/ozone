@@ -45,6 +45,8 @@ import org.apache.hadoop.test.LambdaTestUtils;
 import org.apache.hadoop.util.ToolRunner;
 
 import com.google.common.base.Strings;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
 import static org.apache.hadoop.fs.FileSystem.FS_DEFAULT_NAME_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
@@ -151,8 +153,8 @@ public class TestOzoneShellHA {
 
   @Before
   public void setup() throws UnsupportedEncodingException {
-    System.setOut(new PrintStream(out, false, "UTF-8"));
-    System.setErr(new PrintStream(err, false, "UTF-8"));
+    System.setOut(new PrintStream(out, false, UTF_8.name()));
+    System.setErr(new PrintStream(err, false, UTF_8.name()));
   }
 
   @After
@@ -318,7 +320,7 @@ public class TestOzoneShellHA {
    * Helper function to get nums of keys from info of listing command.
    */
   private int getNumOfKeys() throws UnsupportedEncodingException {
-    return out.toString("UTF-8").split("key").length - 1;
+    return out.toString(UTF_8.name()).split("key").length - 1;
   }
 
   /**
@@ -342,7 +344,8 @@ public class TestOzoneShellHA {
    */
   private int getNumOfBuckets(String bucketPrefix)
       throws UnsupportedEncodingException {
-    return out.toString("UTF-8").split(bucketPrefix).length - 1;
+    return out.toString(UTF_8.name())
+        .split(bucketPrefix).length - 1;
   }
 
 

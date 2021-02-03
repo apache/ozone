@@ -26,6 +26,7 @@ import org.junit.Test;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -48,7 +49,7 @@ public class TestListInfoSubcommand {
   private final ByteArrayOutputStream errContent = new ByteArrayOutputStream();
   private final PrintStream originalOut = System.out;
   private final PrintStream originalErr = System.err;
-  private static final String DEFAULT_ENCODING = "UTF-8";
+  private static final String DEFAULT_ENCODING = StandardCharsets.UTF_8.name();
 
   @Before
   public void setup() throws UnsupportedEncodingException {

@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.recon.spi.impl;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeEmptyOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
@@ -48,7 +49,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -156,7 +156,7 @@ public class TestOzoneManagerServiceProviderImpl {
     BufferedWriter writer = null;
     try {
       writer = new BufferedWriter(new OutputStreamWriter(
-          new FileOutputStream(file1), StandardCharsets.UTF_8));
+          new FileOutputStream(file1), UTF_8));
       writer.write(str);
     } finally {
       if (writer != null) {
@@ -169,7 +169,7 @@ public class TestOzoneManagerServiceProviderImpl {
     str = "File2 Contents";
     try {
       writer = new BufferedWriter(new OutputStreamWriter(
-          new FileOutputStream(file2), StandardCharsets.UTF_8));
+          new FileOutputStream(file2), UTF_8));
       writer.write(str);
     } finally {
       writer.close();
