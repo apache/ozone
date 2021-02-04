@@ -158,10 +158,10 @@ public abstract class OMClientRequest implements RequestAuditor {
         LOG.debug("Couldn't get om Rpc server address", e);
         return getUserInfo();
       }
-        newuserInfo.setUserName(user.getUserName());
-        newuserInfo.setHostName(remoteAddress.getHostName());
-        newuserInfo.setRemoteAddress(remoteAddress.getHostAddress());
-        return newuserInfo.build();
+      newuserInfo.setUserName(user.getUserName());
+      newuserInfo.setHostName(remoteAddress.getHostName());
+      newuserInfo.setRemoteAddress(remoteAddress.getHostAddress());
+      return newuserInfo.build();
     }
     return getUserInfo();
   }

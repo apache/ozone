@@ -3618,11 +3618,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     Pair<String, String> resolved;
     try {
       if (isAclEnabled) {
+        InetAddress remoteIp = Server.getRemoteIp();
         resolved = resolveBucketLink(requested, new HashSet<>(),
             Server.getRemoteUser(),
-            Server.getRemoteIp(),
-            Server.getRemoteIp() != null ?
-                Server.getRemoteIp().getHostName() :
+            remoteIp,
+            remoteIp != null ? remoteIp.getHostName() :
                 omRpcAddress.getHostName());
       } else {
         resolved = resolveBucketLink(requested, new HashSet<>(),
