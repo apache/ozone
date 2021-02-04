@@ -39,6 +39,8 @@ import java.util.List;
 import java.util.UUID;
 
 import org.apache.hadoop.ozone.s3.endpoint.CompleteMultipartUploadRequest.Part;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -85,7 +87,8 @@ public class TestMultipartUploadComplete {
 
   private Part uploadPart(String key, String uploadID, int partNumber, String
       content) throws IOException, OS3Exception {
-    ByteArrayInputStream body = new ByteArrayInputStream(content.getBytes());
+    ByteArrayInputStream body =
+        new ByteArrayInputStream(content.getBytes(UTF_8));
     Response response = REST.put(OzoneConsts.S3_BUCKET, key, content.length(),
         partNumber, uploadID, body);
     assertEquals(200, response.getStatus());

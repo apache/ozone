@@ -44,7 +44,6 @@ import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.jetbrains.annotations.NotNull;
 import org.junit.Assert;
 import org.junit.Test;
 import org.mockito.Mockito;
@@ -88,7 +87,6 @@ public class TestBlockOutputStreamCorrectness {
     }
   }
 
-  @NotNull
   private BlockOutputStream createBlockOutputStream(BufferPool bufferPool)
       throws IOException {
 
@@ -119,7 +117,7 @@ public class TestBlockOutputStreamCorrectness {
   /**
    * XCeiverClient which simulates responses.
    */
-  private class MockXceiverClientSpi extends XceiverClientSpi {
+  private static class MockXceiverClientSpi extends XceiverClientSpi {
 
     private final Pipeline pipeline;
 

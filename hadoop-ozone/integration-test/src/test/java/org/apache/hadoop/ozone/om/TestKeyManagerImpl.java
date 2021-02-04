@@ -305,13 +305,15 @@ public class TestKeyManagerImpl {
   @Test
   public void testCreateDirectory() throws IOException {
     // Create directory where the parent directory does not exist
-    String keyName = RandomStringUtils.randomAlphabetic(5);
+    StringBuffer keyNameBuf = new StringBuffer();
+    keyNameBuf.append(RandomStringUtils.randomAlphabetic(5));
     OmKeyArgs keyArgs = createBuilder()
-        .setKeyName(keyName)
+        .setKeyName(keyNameBuf.toString())
         .build();
     for (int i =0; i< 5; i++) {
-      keyName += "/" + RandomStringUtils.randomAlphabetic(5);
+      keyNameBuf.append("/").append(RandomStringUtils.randomAlphabetic(5));
     }
+    String keyName = keyNameBuf.toString();
     keyManager.createDirectory(keyArgs);
     Path path = Paths.get(keyName);
     while (path != null) {
@@ -329,9 +331,6 @@ public class TestKeyManagerImpl {
     keyArgs.setLocationInfoList(
         keySession.getKeyInfo().getLatestVersionLocations().getLocationList());
     keyManager.commitKey(keyArgs, keySession.getId());
-    for (int i =0; i< 5; i++) {
-      keyName += "/" + RandomStringUtils.randomAlphabetic(5);
-    }
     try {
       keyManager.createDirectory(keyArgs);
       Assert.fail("Creation should fail for directory.");
@@ -387,10 +386,12 @@ public class TestKeyManagerImpl {
 
     // try to create a file where parent directories do not exist and
     // recursive flag is set to false
-    keyName = RandomStringUtils.randomAlphabetic(5);
+    StringBuffer keyNameBuf = new StringBuffer();
+    keyNameBuf.append(RandomStringUtils.randomAlphabetic(5));
     for (int i =0; i< 5; i++) {
-      keyName += "/" + RandomStringUtils.randomAlphabetic(5);
+      keyNameBuf.append("/").append(RandomStringUtils.randomAlphabetic(5));
     }
+    keyName = keyNameBuf.toString();
     keyArgs = createBuilder()
         .setKeyName(keyName)
         .build();
@@ -612,7 +613,6 @@ public class TestKeyManagerImpl {
     // get acl with invalid prefix name
     exception.expect(OMException.class);
     exception.expectMessage("Invalid prefix name");
-    ozAclGet = prefixManager.getAcl(ozInvalidPrefix);
     Assert.assertEquals(null, ozAcl1);
 
     // set acl with invalid prefix name

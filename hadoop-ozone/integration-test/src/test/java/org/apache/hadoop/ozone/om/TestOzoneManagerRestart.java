@@ -36,6 +36,7 @@ import org.apache.hadoop.test.GenericTestUtils;
 
 import org.apache.commons.lang3.RandomStringUtils;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
@@ -191,7 +192,7 @@ public class TestOzoneManagerRestart {
         data.length(), ReplicationType.RATIS, ReplicationFactor.ONE,
         new HashMap<>());
 
-    ozoneOutputStream.write(data.getBytes(), 0, data.length());
+    ozoneOutputStream.write(data.getBytes(UTF_8), 0, data.length());
     ozoneOutputStream.close();
 
     cluster.restartOzoneManager();

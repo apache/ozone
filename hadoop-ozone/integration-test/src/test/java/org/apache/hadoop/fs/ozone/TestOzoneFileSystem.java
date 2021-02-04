@@ -53,6 +53,7 @@ import org.apache.hadoop.test.GenericTestUtils;
 
 import org.apache.commons.io.IOUtils;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
 import static org.apache.hadoop.fs.FileSystem.TRASH_PREFIX;
 import static org.apache.hadoop.fs.ozone.Constants.LISTING_PAGE_SIZE;
@@ -589,7 +590,7 @@ public class TestOzoneFileSystem {
   @Test
   public void testSeekOnFileLength() throws IOException {
     Path file = new Path("/file");
-    ContractTestUtils.createFile(fs, file, true, "a".getBytes());
+    ContractTestUtils.createFile(fs, file, true, "a".getBytes(UTF_8));
     try (FSDataInputStream stream = fs.open(file)) {
       long fileLength = fs.getFileStatus(file).getLen();
       stream.seek(fileLength);

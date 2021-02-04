@@ -1073,7 +1073,6 @@ public class TestReplicationManager {
   private ContainerInfo createContainer(LifeCycleState containerState)
       throws SCMException {
     final ContainerInfo container = getContainer(containerState);
-    final ContainerID id = container.containerID();
     containerStateManager.loadContainer(container);
     return container;
   }
@@ -1116,7 +1115,7 @@ public class TestReplicationManager {
     replicationManager.stop();
   }
 
-  private class DatanodeCommandHandler implements
+  private static class DatanodeCommandHandler implements
       EventHandler<CommandForDatanode> {
 
     private AtomicInteger invocation = new AtomicInteger(0);
@@ -1163,7 +1162,7 @@ public class TestReplicationManager {
     }
   }
 
-  class ListOfNElements extends ArgumentMatcher<List> {
+  static class ListOfNElements extends ArgumentMatcher<List> {
 
     private int expected;
 
@@ -1177,7 +1176,7 @@ public class TestReplicationManager {
     }
   }
 
-  class FunctionMatcher extends ArgumentMatcher<List> {
+  static class FunctionMatcher extends ArgumentMatcher<List> {
 
     private Function<Object, Boolean> function;
 

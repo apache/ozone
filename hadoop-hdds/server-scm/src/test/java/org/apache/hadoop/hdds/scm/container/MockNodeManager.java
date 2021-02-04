@@ -542,7 +542,7 @@ public class MockNodeManager implements NodeManager {
   @Override
   public Boolean isNodeRegistered(
       DatanodeDetails datanodeDetails) {
-    return null;
+    return false;
   }
 
   @Override

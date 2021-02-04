@@ -52,7 +52,7 @@ public class TestPipelineManagerMXBean {
   public Timeout timeout = new Timeout(300000);
 
   private MiniOzoneCluster cluster;
-  private static MBeanServer mbs;
+  private MBeanServer mbs;
 
   @Before
   public void init()

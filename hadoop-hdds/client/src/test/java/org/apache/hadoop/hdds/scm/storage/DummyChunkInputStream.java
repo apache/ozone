@@ -44,7 +44,7 @@ public class DummyChunkInputStream extends ChunkInputStream {
       byte[] data, Pipeline pipeline) {
     super(chunkInfo, blockId, xceiverClientFactory, () -> pipeline,
         verifyChecksum, null);
-    this.chunkData = data;
+    this.chunkData = data.clone();
   }
 
   @Override

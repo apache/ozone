@@ -104,10 +104,10 @@ public class TestOzoneNativeAuthorizer {
   private static UserGroupInformation adminUgi;
   private static UserGroupInformation testUgi;
 
-  private static OzoneObj volObj;
-  private static OzoneObj buckObj;
-  private static OzoneObj keyObj;
-  private static OzoneObj prefixObj;
+  private OzoneObj volObj;
+  private OzoneObj buckObj;
+  private OzoneObj keyObj;
+  private OzoneObj prefixObj;
 
   @Parameterized.Parameters
   public static Collection<Object[]> data() {

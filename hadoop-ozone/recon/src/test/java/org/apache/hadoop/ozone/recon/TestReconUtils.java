@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.recon;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.recon.ReconUtils.createTarFile;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -30,9 +31,9 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 import java.nio.charset.Charset;
 import java.nio.file.Paths;
@@ -84,12 +85,14 @@ public class TestReconUtils {
       tempSnapshotDir.mkdirs();
 
       File file = new File(testDirName + "/temp1.txt");
-      FileWriter writer = new FileWriter(file);
+      OutputStreamWriter writer = new OutputStreamWriter(
+          new FileOutputStream(file), UTF_8);
       writer.write("Test data 1");
       writer.close();
 
       file = new File(testDirName + "/temp2.txt");
-      writer = new FileWriter(file);
+      writer = new OutputStreamWriter(
+          new FileOutputStream(file), UTF_8);
       writer.write("Test data 2");
       writer.close();
 
@@ -112,15 +115,16 @@ public class TestReconUtils {
     File file1 = Paths.get(newDir.getAbsolutePath(), "file1")
         .toFile();
     String str = "File1 Contents";
-    BufferedWriter writer = new BufferedWriter(new FileWriter(
-        file1.getAbsolutePath()));
+    BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(
+        new FileOutputStream(file1.getAbsoluteFile()), UTF_8));
     writer.write(str);
     writer.close();
 
     File file2 = Paths.get(newDir.getAbsolutePath(), "file2")
         .toFile();
     str = "File2 Contents";
-    writer = new BufferedWriter(new FileWriter(file2.getAbsolutePath()));
+    writer = new BufferedWriter(new OutputStreamWriter(
+        new FileOutputStream(file2.getAbsoluteFile()), UTF_8));
     writer.write(str);
     writer.close();
 
@@ -138,8 +142,8 @@ public class TestReconUtils {
     String url = "http://localhost:9874/dbCheckpoint";
     File file1 = Paths.get(folder.getRoot().getPath(), "file1")
         .toFile();
-    BufferedWriter writer = new BufferedWriter(new FileWriter(
-        file1.getAbsolutePath()));
+    BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(
+        new FileOutputStream(file1.getAbsoluteFile()), UTF_8));
     writer.write("File 1 Contents");
     writer.close();
     InputStream fileInputStream = new FileInputStream(file1);
@@ -166,15 +170,16 @@ public class TestReconUtils {
     File file1 = Paths.get(newDir.getAbsolutePath(), "valid_1")
         .toFile();
     String str = "File1 Contents";
-    BufferedWriter writer = new BufferedWriter(new FileWriter(
-        file1.getAbsolutePath()));
+    BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(
+        new FileOutputStream(file1.getAbsoluteFile()), UTF_8));
     writer.write(str);
     writer.close();
 
     File file2 = Paths.get(newDir.getAbsolutePath(), "valid_2")
         .toFile();
     str = "File2 Contents";
-    writer = new BufferedWriter(new FileWriter(file2.getAbsolutePath()));
+    writer = new BufferedWriter(new OutputStreamWriter(
+        new FileOutputStream(file2.getAbsoluteFile()), UTF_8));
     writer.write(str);
     writer.close();
 
@@ -182,7 +187,8 @@ public class TestReconUtils {
     File file3 = Paths.get(newDir.getAbsolutePath(), "invalid_3")
         .toFile();
     str = "File3 Contents";
-    writer = new BufferedWriter(new FileWriter(file3.getAbsolutePath()));
+    writer = new BufferedWriter(new OutputStreamWriter(
+        new FileOutputStream(file3.getAbsoluteFile()), UTF_8));
     writer.write(str);
     writer.close();
 
