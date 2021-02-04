@@ -143,19 +143,25 @@ public abstract class OMClientRequest implements RequestAuditor {
    * @return User Info.
    */
   public OzoneManagerProtocolProtos.UserInfo getUserIfNotExists(
-      OzoneManager ozoneManager)
-      throws IOException {
+      OzoneManager ozoneManager) {
     OzoneManagerProtocolProtos.UserInfo userInfo = getUserInfo();
     if (!userInfo.hasRemoteAddress() || !userInfo.hasUserName()){
       OzoneManagerProtocolProtos.UserInfo.Builder newuserInfo =
           OzoneManagerProtocolProtos.UserInfo.newBuilder();
-      UserGroupInformation user = UserGroupInformation.getCurrentUser();
-      InetAddress remoteAddress = ozoneManager.getOmRpcServerAddr()
-          .getAddress();
-      newuserInfo.setUserName(user.getUserName());
-      newuserInfo.setHostName(remoteAddress.getHostName());
-      newuserInfo.setRemoteAddress(remoteAddress.getHostAddress());
-      return newuserInfo.build();
+      UserGroupInformation user;
+      InetAddress remoteAddress;
+      try {
+        user = UserGroupInformation.getCurrentUser();
+        remoteAddress = ozoneManager.getOmRpcServerAddr()
+            .getAddress();
+      } catch (Exception e){
+        LOG.debug("Couldn't get om Rpc server address", e);
+        return getUserInfo();
+      }
+        newuserInfo.setUserName(user.getUserName());
+        newuserInfo.setHostName(remoteAddress.getHostName());
+        newuserInfo.setRemoteAddress(remoteAddress.getHostAddress());
+        return newuserInfo.build();
     }
     return getUserInfo();
   }
