@@ -14,6 +14,15 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 -->
+
+<footer class="footer">
+  <div class="container">
+    <span class="small text-muted">
+      Version: {{ getenv "OZONE_VERSION" }}{{ with .GitInfo }}, Last Modified: {{ .AuthorDate.Format "January 2, 2006" }} <a class="hide-child link primary-color" href="{{$.Site.Params.ghrepo}}commit/{{ .Hash }}">{{ .AbbreviatedHash }}</a>{{end }}
+    </span>
+  </div>
+</footer>
+
 <!-- Bootstrap core JavaScript
 ================================================== -->
 <!-- Placed at the end of the document so the pages load faster -->

@@ -67,4 +67,8 @@
     <name>ozone.recon.db.dir</name>
     <value>/tmp/recon</value>
   </property>
+  <property>
+    <name>datanode.replication.port</name>
+    <value>0</value>
+  </property>
 </configuration>

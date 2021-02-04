@@ -129,7 +129,7 @@ public class KeyDeletingService extends BackgroundService {
       // OzoneManager can be null for testing
       return true;
     }
-    return ozoneManager.isLeader();
+    return ozoneManager.isLeaderReady();
   }
 
   private boolean isRatisEnabled() {
@@ -282,11 +282,16 @@ public class KeyDeletingService extends BackgroundService {
 
   private RaftClientRequest createRaftClientRequestForPurge(
       OMRequest omRequest) {
-    return new RaftClientRequest(clientId,
-        ozoneManager.getOmRatisServer().getRaftPeerId(),
-        ozoneManager.getOmRatisServer().getRaftGroupId(), runCount.get(),
-        Message.valueOf(OMRatisHelper.convertRequestToByteString(omRequest)),
-        RaftClientRequest.writeRequestType(), null);
+    return RaftClientRequest.newBuilder()
+        .setClientId(clientId)
+        .setServerId(ozoneManager.getOmRatisServer().getRaftPeerId())
+        .setGroupId(ozoneManager.getOmRatisServer().getRaftGroupId())
+        .setCallId(runCount.get())
+        .setMessage(
+            Message.valueOf(
+                OMRatisHelper.convertRequestToByteString(omRequest)))
+        .setType(RaftClientRequest.writeRequestType())
+        .build();
   }
 
   /**

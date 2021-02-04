@@ -30,12 +30,12 @@ As a summary:
  * Ozone: provides Object Store semantics with the help of HDDS
  * CBlock: provides mountable volumes with the help of the HDDS layer (based on iScsi protocol)
 
-In the beginning of the year 2017 a new podling project was started inside [Apache Incubator](http://incubator.apache.org/): [Apache Ratis](https://ratis.apache.org/). Ratis is an embeddable RAFT protcol implementation it is which became the corner stone of consensus inside both Ozone and HDDS projects. (Started to [be used](https://issues.apache.org/jira/browse/HDFS-11519) by Ozone in March of 2017) 
+In the beginning of the year 2017 a new podling project was started inside [Apache Incubator](http://incubator.apache.org/): [Apache Ratis](https://ratis.apache.org/). Ratis is an embeddable RAFT protocol implementation it is which became the corner stone of consensus inside both Ozone and HDDS projects. (Started to [be used](https://issues.apache.org/jira/browse/HDFS-11519) by Ozone in March of 2017) 
 
 In the October of 2017 a [discussion](https://lists.apache.org/thread.html/3b5b65ce428f88299e6cb4c5d745ec65917490be9e417d361cc08d7e@%3Chdfs-dev.hadoop.apache.org%3E) has been started on hdfs-dev mailing list to merge the existing functionality to the Apache Hadoop trunk. After a long debate Owen O'Malley [suggested a consensus](https://lists.apache.org/thread.html/c85e5263dcc0ca1d13cbbe3bcfb53236784a39111b8c353f60582eb4@%3Chdfs-dev.hadoop.apache.org%3E) to merge it to the trunk but use separated release cycle:
 
  > * HDSL become a subproject of Hadoop.
- > * HDSL will release separately from Hadoop. Hadoop releases will notcontain HDSL and vice versa.
+ > * HDSL will release separately from Hadoop. Hadoop releases will not contain HDSL and vice versa.
  > * HDSL will get its own jira instance so that the release tags stay separate.
  > * On trunk (as opposed to release branches) HDSL will be a separate module in Hadoop's source tree. This will enable the HDSL to work on their trunk and the Hadoop trunk without making releases for every change.
  > * Hadoop's trunk will only build HDSL if a non-default profile is enabled. When Hadoop creates a release branch, the RM will delete the HDSL module from the branch.

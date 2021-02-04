@@ -20,7 +20,7 @@
 package org.apache.hadoop.hdds.scm.metadata;
 
 import java.io.IOException;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
@@ -35,7 +35,7 @@ public class X509CertificateCodec implements Codec<X509Certificate> {
   public byte[] toPersistedFormat(X509Certificate object) throws IOException {
     try {
       return CertificateCodec.getPEMEncodedString(object)
-          .getBytes(Charset.forName("UTF-8"));
+          .getBytes(StandardCharsets.UTF_8);
     } catch (SCMSecurityException exp) {
       throw new IOException(exp);
     }
@@ -45,7 +45,7 @@ public class X509CertificateCodec implements Codec<X509Certificate> {
   public X509Certificate fromPersistedFormat(byte[] rawData)
       throws IOException {
     try{
-      String s = new String(rawData, Charset.forName("UTF-8"));
+      String s = new String(rawData, StandardCharsets.UTF_8);
       return CertificateCodec.getX509Certificate(s);
     } catch (CertificateException exp) {
       throw new IOException(exp);

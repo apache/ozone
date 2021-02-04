@@ -34,7 +34,7 @@ public final class VolumeArgs {
   private final String admin;
   private final String owner;
   private final long quotaInBytes;
-  private final long quotaInCounts;
+  private final long quotaInNamespace;
   private final List<OzoneAcl> acls;
   private Map<String, String> metadata;
 
@@ -43,20 +43,20 @@ public final class VolumeArgs {
    * @param admin Administrator's name.
    * @param owner Volume owner's name
    * @param quotaInBytes Volume quota in bytes.
-   * @param quotaInCounts Volume quota in counts.
+   * @param quotaInNamespace Volume quota in counts.
    * @param acls User to access rights map.
    * @param metadata Metadata of volume.
    */
   private VolumeArgs(String admin,
       String owner,
       long quotaInBytes,
-      long quotaInCounts,
+      long quotaInNamespace,
       List<OzoneAcl> acls,
       Map<String, String> metadata) {
     this.admin = admin;
     this.owner = owner;
     this.quotaInBytes = quotaInBytes;
-    this.quotaInCounts = quotaInCounts;
+    this.quotaInNamespace = quotaInNamespace;
     this.acls = acls;
     this.metadata = metadata;
   }
@@ -87,10 +87,10 @@ public final class VolumeArgs {
 
   /**
    * Returns Volume Quota in bucket counts.
-   * @return quotaInCounts.
+   * @return quotaInNamespace.
    */
-  public long getQuotaInCounts() {
-    return quotaInCounts;
+  public long getQuotaInNamespace() {
+    return quotaInNamespace;
   }
 
   /**
@@ -121,7 +121,7 @@ public final class VolumeArgs {
     private String adminName;
     private String ownerName;
     private long quotaInBytes;
-    private long quotaInCounts;
+    private long quotaInNamespace;
     private List<OzoneAcl> listOfAcls;
     private Map<String, String> metadata = new HashMap<>();
 
@@ -141,8 +141,8 @@ public final class VolumeArgs {
       return this;
     }
 
-    public VolumeArgs.Builder setQuotaInCounts(long quota) {
-      this.quotaInCounts = quota;
+    public VolumeArgs.Builder setQuotaInNamespace(long quota) {
+      this.quotaInNamespace = quota;
       return this;
     }
 
@@ -162,7 +162,7 @@ public final class VolumeArgs {
      */
     public VolumeArgs build() {
       return new VolumeArgs(adminName, ownerName, quotaInBytes,
-          quotaInCounts, listOfAcls, metadata);
+          quotaInNamespace, listOfAcls, metadata);
     }
   }
 

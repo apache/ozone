@@ -109,8 +109,8 @@ public class ReconTaskControllerImpl implements ReconTaskController {
         for (Map.Entry<String, ReconOmTask> taskEntry :
             reconOmTasks.entrySet()) {
           ReconOmTask task = taskEntry.getValue();
-          Collection<String> tables = task.getTaskTables();
-          tasks.add(() -> task.process(events.filter(tables)));
+          // events passed to process method is no longer filtered
+          tasks.add(() -> task.process(events));
         }
 
         List<Future<Pair<String, Boolean>>> results =
@@ -123,8 +123,8 @@ public class ReconTaskControllerImpl implements ReconTaskController {
           tasks.clear();
           for (String taskName : failedTasks) {
             ReconOmTask task = reconOmTasks.get(taskName);
-            Collection<String> tables = task.getTaskTables();
-            tasks.add(() -> task.process(events.filter(tables)));
+            // events passed to process method is no longer filtered
+            tasks.add(() -> task.process(events));
           }
           results = executorService.invokeAll(tasks);
           retryFailedTasks = processTaskResults(results, events);

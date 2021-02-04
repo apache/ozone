@@ -223,8 +223,9 @@ public class OMPrepareRequest extends OMClientRequest {
       snapshotIndex = raftLogIndex;
     }
 
+    // TODO : avijayanhwx, Ethan Rose, please check and replace.
     CompletableFuture<Long> purgeFuture =
-        raftLog.syncWithSnapshot(snapshotIndex);
+        raftLog.onSnapshotInstalled(snapshotIndex);
 
     try {
       Long purgeIndex = purgeFuture.get();

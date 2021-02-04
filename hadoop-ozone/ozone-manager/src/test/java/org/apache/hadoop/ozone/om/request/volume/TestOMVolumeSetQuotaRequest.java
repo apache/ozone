@@ -41,10 +41,10 @@ public class TestOMVolumeSetQuotaRequest extends TestOMVolumeRequest {
   public void testPreExecute() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     long quotaInBytes = 100L;
-    long quotaInCounts = 1000L;
+    long quotaInNamespace = 1000L;
     OMRequest originalRequest =
         TestOMRequestUtils.createSetVolumePropertyRequest(volumeName,
-            quotaInBytes, quotaInCounts);
+            quotaInBytes, quotaInNamespace);
 
     OMVolumeSetQuotaRequest omVolumeSetQuotaRequest =
         new OMVolumeSetQuotaRequest(originalRequest);
@@ -59,14 +59,14 @@ public class TestOMVolumeSetQuotaRequest extends TestOMVolumeRequest {
     String volumeName = UUID.randomUUID().toString();
     String ownerName = "user1";
     long quotaInBytes = 100L;
-    long quotaInCounts = 1000L;
+    long quotaInNamespace = 1000L;
 
     TestOMRequestUtils.addUserToDB(volumeName, ownerName, omMetadataManager);
     TestOMRequestUtils.addVolumeToDB(volumeName, ownerName, omMetadataManager);
 
     OMRequest originalRequest =
         TestOMRequestUtils.createSetVolumePropertyRequest(volumeName,
-            quotaInBytes, quotaInCounts);
+            quotaInBytes, quotaInNamespace);
 
     OMVolumeSetQuotaRequest omVolumeSetQuotaRequest =
         new OMVolumeSetQuotaRequest(originalRequest);
@@ -81,7 +81,7 @@ public class TestOMVolumeSetQuotaRequest extends TestOMVolumeRequest {
     // As request is valid volume table should not have entry.
     Assert.assertNotNull(omVolumeArgs);
     long quotaBytesBeforeSet = omVolumeArgs.getQuotaInBytes();
-    long quotaCountBeforeSet = omVolumeArgs.getQuotaInCounts();
+    long quotaNamespaceBeforeSet = omVolumeArgs.getQuotaInNamespace();
 
     OMClientResponse omClientResponse =
         omVolumeSetQuotaRequest.validateAndUpdateCache(ozoneManager, 1,
@@ -96,11 +96,11 @@ public class TestOMVolumeSetQuotaRequest extends TestOMVolumeRequest {
 
     OmVolumeArgs ova = omMetadataManager.getVolumeTable().get(volumeKey);
     long quotaBytesAfterSet = ova.getQuotaInBytes();
-    long quotaCountAfterSet = ova.getQuotaInCounts();
+    long quotaNamespaceAfterSet = ova.getQuotaInNamespace();
     Assert.assertEquals(quotaInBytes, quotaBytesAfterSet);
-    Assert.assertEquals(quotaInCounts, quotaCountAfterSet);
+    Assert.assertEquals(quotaInNamespace, quotaNamespaceAfterSet);
     Assert.assertNotEquals(quotaBytesBeforeSet, quotaBytesAfterSet);
-    Assert.assertNotEquals(quotaCountBeforeSet, quotaCountAfterSet);
+    Assert.assertNotEquals(quotaNamespaceBeforeSet, quotaNamespaceAfterSet);
 
     // modificationTime should be greater than creationTime.
     long creationTime = omMetadataManager
@@ -115,11 +115,11 @@ public class TestOMVolumeSetQuotaRequest extends TestOMVolumeRequest {
       throws Exception {
     String volumeName = UUID.randomUUID().toString();
     long quotaInBytes = 100L;
-    long quotaInCounts= 100L;
+    long quotaInNamespace= 100L;
 
     OMRequest originalRequest =
         TestOMRequestUtils.createSetVolumePropertyRequest(volumeName,
-            quotaInBytes, quotaInCounts);
+            quotaInBytes, quotaInNamespace);
 
     OMVolumeSetQuotaRequest omVolumeSetQuotaRequest =
         new OMVolumeSetQuotaRequest(originalRequest);

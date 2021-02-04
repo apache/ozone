@@ -20,9 +20,13 @@ package org.apache.hadoop.hdds.scm.node;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Handles New Node event.
@@ -30,11 +34,16 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 public class NewNodeHandler implements EventHandler<DatanodeDetails> {
 
   private final PipelineManager pipelineManager;
+  private final NodeDecommissionManager decommissionManager;
   private final ConfigurationSource conf;
+  private static final Logger LOG =
+      LoggerFactory.getLogger(NewNodeHandler.class);
 
   public NewNodeHandler(PipelineManager pipelineManager,
+      NodeDecommissionManager decommissionManager,
       ConfigurationSource conf) {
     this.pipelineManager = pipelineManager;
+    this.decommissionManager = decommissionManager;
     this.conf = conf;
   }
 
@@ -42,5 +51,16 @@ public class NewNodeHandler implements EventHandler<DatanodeDetails> {
   public void onMessage(DatanodeDetails datanodeDetails,
       EventPublisher publisher) {
     pipelineManager.triggerPipelineCreation();
+    if (datanodeDetails.getPersistedOpState()
+        != HddsProtos.NodeOperationalState.IN_SERVICE) {
+      try {
+        decommissionManager.continueAdminForNode(datanodeDetails);
+      } catch (NodeNotFoundException e) {
+        // Should not happen, as the node has just registered to call this event
+        // handler.
+        LOG.warn("NodeNotFound when adding the node to the decommissionManager",
+            e);
+      }
+    }
   }
 }

@@ -128,17 +128,17 @@ change ozone.recon.http.auth.simple.anonymous_allowed to true.
 ### Enable SIMPLE authentication for SCM HTTP
 Property| Value
 -----------------------------------|-----------------------------------------
-ozone.scm.http.auth.type | simple
-ozone.scm.http.auth.simple.anonymous_allowed | false
+hdds.scm.http.auth.type | simple
+hdds.scm.http.auth.simple.anonymous_allowed | false
 
 If you don't want to specify the user.name in the query string parameter, 
-change ozone.scm.http.auth.simple.anonymous_allowed to true.
+change hdds.scm.http.auth.simple.anonymous_allowed to true.
 
 ### Enable SIMPLE authentication for DATANODE HTTP
 Property| Value
 -----------------------------------|-----------------------------------------
-ozone.datanode.http.auth.type | simple
-ozone.datanode.http.auth.simple.anonymous_allowed | false
+hdds.datanode.http.auth.type | simple
+hdds.datanode.http.auth.simple.anonymous_allowed | false
 
 If you don't want to specify the user.name in the query string parameter, 
-change ozone.datanode.http.auth.simple.anonymous_allowed to true.
+change hdds.datanode.http.auth.simple.anonymous_allowed to true.

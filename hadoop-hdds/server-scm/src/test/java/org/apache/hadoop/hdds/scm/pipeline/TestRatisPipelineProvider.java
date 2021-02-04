@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.Test;
@@ -146,7 +147,7 @@ public class TestRatisPipelineProvider {
       throws Exception {
     init(2);
     List<DatanodeDetails> healthyNodes = nodeManager
-        .getNodes(HddsProtos.NodeState.HEALTHY).stream()
+        .getNodes(NodeStatus.inServiceHealthy()).stream()
         .limit(3).collect(Collectors.toList());
 
     Pipeline pipeline1 = provider.create(
@@ -163,7 +164,7 @@ public class TestRatisPipelineProvider {
     int maxPipelinePerNode = 2;
     init(maxPipelinePerNode);
     List<DatanodeDetails> healthyNodes =
-        nodeManager.getNodes(HddsProtos.NodeState.HEALTHY);
+        nodeManager.getNodes(NodeStatus.inServiceHealthy());
 
     Assume.assumeTrue(healthyNodes.size() == 8);
 

@@ -933,13 +933,8 @@ public class KeyValueHandler extends Handler {
       final OutputStream outputStream,
       final TarContainerPacker packer)
       throws IOException{
-    container.readLock();
-    try {
-      final KeyValueContainer kvc = (KeyValueContainer) container;
-      kvc.exportContainerData(outputStream, packer);
-    } finally {
-      container.readUnlock();
-    }
+    final KeyValueContainer kvc = (KeyValueContainer) container;
+    kvc.exportContainerData(outputStream, packer);
   }
 
   @Override

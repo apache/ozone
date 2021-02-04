@@ -419,7 +419,6 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   @Override
   public void notifyNotLeader(Collection<TransactionContext> pendingEntries)
       throws IOException {
-    omRatisServer.updateServerRole();
   }
 
   @Override

@@ -44,9 +44,9 @@ _注意_: 对于基于 docker-compose 方式的伪集群，在 `docker-config` �
 
 * 重启 OM 和 SCM，检查端点：
 
- * http://scm:9874/prom
+ * http://scm:9876/prom
 
- * http://ozoneManager:9876/prom
+ * http://ozoneManager:9874/prom
 
 * 根据这两个端点，创建 prometheus.yaml 配置文件：
 

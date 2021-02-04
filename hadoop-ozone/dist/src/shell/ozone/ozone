@@ -77,6 +77,14 @@ function ozonecmd_case
   if [ ! -f "${ozone_shell_log4j}" ]; then
     ozone_shell_log4j=${ozone_default_log4j}
   fi
+  # Add JVM parameter (org.apache.ratis.thirdparty.io.netty.allocator.useCacheForAllThreads=false)
+  # for disabling netty PooledByteBufAllocator thread caches for non-netty threads.
+  # This parameter significantly reduces GC pressure for Datanode.
+  # Corresponding Ratis issue https://issues.apache.org/jira/browse/RATIS-534.
+  # TODO: Fix the problem related to netty resource leak detector throwing
+  # exception as mentioned in HDDS-3812
+  RATIS_OPTS="-Dorg.apache.ratis.thirdparty.io.netty.allocator.useCacheForAllThreads=false ${RATIS_OPTS}"
+  RATIS_OPTS="-Dorg.apache.ratis.thirdparty.io.netty.leakDetection.level=disabled ${RATIS_OPTS}"
 
   case ${subcmd} in
     auditparser)
@@ -101,14 +109,9 @@ function ozonecmd_case
     ;;
     datanode)
       HADOOP_SUBCMD_SUPPORTDAEMONIZATION="true"
-      # Add JVM parameter (org.apache.ratis.thirdparty.io.netty.allocator.useCacheForAllThreads=false)
-      # for disabling netty PooledByteBufAllocator thread caches for non-netty threads.
-      # This parameter significantly reduces GC pressure for Datanode.
-      # Corresponding Ratis issue https://issues.apache.org/jira/browse/RATIS-534.
-      # TODO: Fix the problem related to netty resource leak detector throwing
-      # exception as mentioned in HDDS-3812
       hadoop_deprecate_envvar HDDS_DN_OPTS OZONE_DATANODE_OPTS
-      OZONE_DATANODE_OPTS="-Dorg.apache.ratis.thirdparty.io.netty.allocator.useCacheForAllThreads=false -Dorg.apache.ratis.thirdparty.io.netty.leakDetection.level=disabled -Dlog4j.configurationFile=${HADOOP_CONF_DIR}/dn-audit-log4j2.properties ${OZONE_DATANODE_OPTS}"
+      OZONE_DATANODE_OPTS="${RATIS_OPTS} ${OZONE_DATANODE_OPTS}"
+      OZONE_DATANODE_OPTS="-Dlog4j.configurationFile=${HADOOP_CONF_DIR}/dn-audit-log4j2.properties ${OZONE_DATANODE_OPTS}"
       OZONE_DATANODE_OPTS="-Dlog4j2.contextSelector=org.apache.logging.log4j.core.async.AsyncLoggerContextSelector ${OZONE_DATANODE_OPTS}"
       HADOOP_CLASSNAME=org.apache.hadoop.ozone.HddsDatanodeService
       OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-datanode"
@@ -158,6 +161,7 @@ function ozonecmd_case
       HADOOP_SUBCMD_SUPPORTDAEMONIZATION="true"
       HADOOP_CLASSNAME=org.apache.hadoop.ozone.om.OzoneManagerStarter
       hadoop_deprecate_envvar HDFS_OM_OPTS OZONE_OM_OPTS
+      OZONE_OM_OPTS="${RATIS_OPTS} ${OZONE_OM_OPTS}"
       OZONE_OM_OPTS="${OZONE_OM_OPTS} -Dlog4j.configurationFile=${HADOOP_CONF_DIR}/om-audit-log4j2.properties"
       OZONE_OM_OPTS="-Dlog4j2.contextSelector=org.apache.logging.log4j.core.async.AsyncLoggerContextSelector ${OZONE_OM_OPTS}"
       OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-ozone-manager"
@@ -177,6 +181,7 @@ function ozonecmd_case
       HADOOP_SUBCMD_SUPPORTDAEMONIZATION="true"
       HADOOP_CLASSNAME='org.apache.hadoop.hdds.scm.server.StorageContainerManagerStarter'
       hadoop_deprecate_envvar HDFS_STORAGECONTAINERMANAGER_OPTS OZONE_SCM_OPTS
+      OZONE_SCM_OPTS="${RATIS_OPTS} ${OZONE_SCM_OPTS}"
       OZONE_SCM_OPTS="${OZONE_SCM_OPTS} -Dlog4j.configurationFile=${HADOOP_CONF_DIR}/scm-audit-log4j2.properties"
       OZONE_SCM_OPTS="-Dlog4j2.contextSelector=org.apache.logging.log4j.core.async.AsyncLoggerContextSelector ${OZONE_SCM_OPTS}"
       OZONE_RUN_ARTIFACT_NAME="hadoop-hdds-server-scm"

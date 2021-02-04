@@ -23,6 +23,8 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.thirdparty.io.grpc.Context;
 import org.apache.ratis.thirdparty.io.grpc.Metadata;
 
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.regex.Pattern;
 
 import static org.apache.ratis.thirdparty.io.grpc.Metadata.ASCII_STRING_MARSHALLER;
@@ -253,10 +255,14 @@ public final class OzoneConsts {
   // versions, requiring this property to be tracked on a per container basis.
   // V1: All data in default column family.
   public static final String SCHEMA_V1 = "1";
-  // V2: Metadata, block data, and deleted blocks in their own column families.
+  // V2: Metadata, block data, and delete transactions in their own
+  // column families.
   public static final String SCHEMA_V2 = "2";
   // Most recent schema version that all new containers should be created with.
   public static final String SCHEMA_LATEST = SCHEMA_V2;
+
+  public static final String[] SCHEMA_VERSIONS =
+      new String[] {SCHEMA_V1, SCHEMA_V2};
 
   // Supported store types.
   public static final String OZONE = "ozone";
@@ -269,8 +275,9 @@ public final class OzoneConsts {
   public static final String SRC_KEY = "srcKey";
   public static final String DST_KEY = "dstKey";
   public static final String USED_BYTES = "usedBytes";
+  public static final String USED_NAMESPACE = "usedNamespace";
   public static final String QUOTA_IN_BYTES = "quotaInBytes";
-  public static final String QUOTA_IN_COUNTS = "quotaInCounts";
+  public static final String QUOTA_IN_NAMESPACE = "quotaInNamespace";
   public static final String OBJECT_ID = "objectID";
   public static final String UPDATE_ID = "updateID";
   public static final String CLIENT_ID = "clientID";
@@ -352,7 +359,7 @@ public final class OzoneConsts {
   public static final String GDPR_FLAG = "gdprEnabled";
   public static final String GDPR_ALGORITHM_NAME = "AES";
   public static final int GDPR_DEFAULT_RANDOM_SECRET_LENGTH = 16;
-  public static final String GDPR_CHARSET = "UTF-8";
+  public static final Charset GDPR_CHARSET = StandardCharsets.UTF_8;
   public static final String GDPR_LENGTH = "length";
   public static final String GDPR_SECRET = "secret";
   public static final String GDPR_ALGORITHM = "algorithm";
@@ -382,6 +389,10 @@ public final class OzoneConsts {
 
   // An on-disk transient marker file used when replacing DB with checkpoint
   public static final String DB_TRANSIENT_MARKER = "dbInconsistentMarker";
+
+  public static final String OM_RATIS_SNAPSHOT_DIR = "snapshot";
+
+  public static final long DEFAULT_OM_UPDATE_ID = -1L;  
 
   // An on-disk marker file used to indicate that the OM is in prepare and
   // should remain prepared even after a restart.

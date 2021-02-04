@@ -25,11 +25,11 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 
 /**
  * Interface for creating pipelines.
@@ -79,7 +79,7 @@ public abstract class PipelineProvider {
 
     // Get list of healthy nodes
     List<DatanodeDetails> dns = nodeManager
-        .getNodes(HddsProtos.NodeState.HEALTHY)
+        .getNodes(NodeStatus.inServiceHealthy())
         .parallelStream()
         .filter(dn -> !dnsUsed.contains(dn))
         .limit(factor.getNumber())
@@ -89,7 +89,7 @@ public abstract class PipelineProvider {
           .format("Cannot create pipeline of factor %d using %d nodes." +
                   " Used %d nodes. Healthy nodes %d", factor.getNumber(),
               dns.size(), dnsUsed.size(),
-              nodeManager.getNodes(HddsProtos.NodeState.HEALTHY).size());
+              nodeManager.getNodes(NodeStatus.inServiceHealthy()).size());
       throw new SCMException(e,
           SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
     }

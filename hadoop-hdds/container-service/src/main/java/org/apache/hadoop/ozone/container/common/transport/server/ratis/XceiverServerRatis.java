@@ -515,6 +515,15 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     return server;
   }
 
+  public RaftServer.Division getServerDivision() throws IOException {
+    return getServerDivision(server.getGroupIds().iterator().next());
+  }
+
+  public RaftServer.Division getServerDivision(RaftGroupId id)
+      throws IOException {
+    return server.getDivision(id);
+  }
+
   private void processReply(RaftClientReply reply) throws IOException {
     // NotLeader exception is thrown only when the raft server to which the
     // request is submitted is not the leader. The request will be rejected
@@ -596,10 +605,16 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   private RaftClientRequest createRaftClientRequest(
       ContainerCommandRequestProto request, HddsProtos.PipelineID pipelineID,
       RaftClientRequest.Type type) {
-    return new RaftClientRequest(clientId, server.getId(),
-        RaftGroupId.valueOf(PipelineID.getFromProtobuf(pipelineID).getId()),
-        nextCallId(), ContainerCommandRequestMessage.toMessage(request, null),
-        type, null);
+    return RaftClientRequest.newBuilder()
+        .setClientId(clientId)
+        .setServerId(server.getId())
+        .setGroupId(
+            RaftGroupId.valueOf(
+                PipelineID.getFromProtobuf(pipelineID).getId()))
+        .setCallId(nextCallId())
+        .setMessage(ContainerCommandRequestMessage.toMessage(request, null))
+        .setType(type)
+        .build();
   }
 
   private GroupInfoRequest createGroupInfoRequest(

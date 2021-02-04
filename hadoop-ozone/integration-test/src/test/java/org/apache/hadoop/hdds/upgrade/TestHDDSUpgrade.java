@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
@@ -238,8 +239,13 @@ public class TestHDDSUpgrade {
   private void testDataNodesStateOnSCM(NodeState state) {
     int countNodes = 0;
     for (DatanodeDetails dn : scm.getScmNodeManager().getAllNodes()){
-      Assert.assertEquals(state,
-          scm.getScmNodeManager().getNodeState(dn));
+      try {
+        Assert.assertEquals(state,
+            scm.getScmNodeManager().getNodeStatus(dn).getHealth());
+      } catch (NodeNotFoundException e) {
+        e.printStackTrace();
+        Assert.fail("Node not found");
+      }
       ++countNodes;
     }
     Assert.assertEquals(NUM_DATA_NODES, countNodes);
