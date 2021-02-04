@@ -326,20 +326,22 @@ public class StateContext {
    */
   public List<GeneratedMessage> getReports(InetSocketAddress endpoint,
                                            int maxLimit) {
-    List<GeneratedMessage> reportsToReturn =
-        getIncrementalReports(endpoint, maxLimit);
+    List<GeneratedMessage> nonIncrementalReports = new LinkedList<>();
     GeneratedMessage report = containerReports.get();
     if (report != null) {
-      reportsToReturn.add(report);
+      nonIncrementalReports.add(report);
     }
     report = nodeReport.get();
     if (report != null) {
-      reportsToReturn.add(report);
+      nonIncrementalReports.add(report);
     }
     report = pipelineReports.get();
     if (report != null) {
-      reportsToReturn.add(report);
+      nonIncrementalReports.add(report);
     }
+    List<GeneratedMessage> reportsToReturn = getIncrementalReports(endpoint,
+        maxLimit - nonIncrementalReports.size());
+    reportsToReturn.addAll(nonIncrementalReports);
     return reportsToReturn;
   }
 
