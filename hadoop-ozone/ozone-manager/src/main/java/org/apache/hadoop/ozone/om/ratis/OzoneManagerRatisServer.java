@@ -411,6 +411,8 @@ public final class OzoneManagerRatisServer {
     String storageDir = OzoneManagerRatisServer.getOMRatisDirectory(conf);
     RaftServerConfigKeys.setStorageDir(properties,
         Collections.singletonList(new File(storageDir)));
+    // Disable the pre vote feature in Ratis
+    RaftServerConfigKeys.LeaderElection.setPreVote(properties, false);
 
     // Set RAFT segment size
     final int raftSegmentSize = (int) conf.getStorageSize(
