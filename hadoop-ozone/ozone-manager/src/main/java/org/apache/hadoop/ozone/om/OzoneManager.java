@@ -31,6 +31,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.security.KeyPair;
 import java.security.PrivateKey;
+import java.security.PrivilegedExceptionAction;
 import java.security.PublicKey;
 import java.security.cert.CertificateException;
 import java.util.ArrayList;
@@ -1275,7 +1276,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throw new IOException("Cannot start trash emptier with negative interval."
               + " Set " + FS_TRASH_INTERVAL_KEY + " to a positive value.");
     }
-    FileSystem fs = new TrashOzoneFileSystem(this);
+
+    OzoneManager i = this;
+    FileSystem fs = SecurityUtil.doAsLoginUser(
+        new PrivilegedExceptionAction<FileSystem>() {
+          @Override
+          public FileSystem run() throws IOException {
+            return new TrashOzoneFileSystem(i);
+          }
+        });
     this.emptier = new Thread(new OzoneTrash(fs, conf, this).
       getEmptier(), "Trash Emptier");
     this.emptier.setDaemon(true);
@@ -1688,11 +1697,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   private void checkAcls(ResourceType resType, StoreType store,
       ACLType acl, String vol, String bucket, String key)
-      throws OMException {
+      throws IOException {
+    UserGroupInformation user = ProtobufRpcEngine.Server.getRemoteUser();
+    InetAddress remoteIp = ProtobufRpcEngine.Server.getRemoteIp();
     checkAcls(resType, store, acl, vol, bucket, key,
-        ProtobufRpcEngine.Server.getRemoteUser(),
-        ProtobufRpcEngine.Server.getRemoteIp(),
-        ProtobufRpcEngine.Server.getRemoteIp().getHostName(),
+        user != null ? user : getRemoteUser(),
+        remoteIp != null ? remoteIp : omRpcAddress.getAddress(),
+        remoteIp != null ? remoteIp.getHostName() : omRpcAddress.getHostName(),
         true, getVolumeOwner(vol, acl, resType));
   }
 
@@ -3605,14 +3616,20 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throws IOException {
 
     Pair<String, String> resolved;
-    if (isAclEnabled) {
-      resolved = resolveBucketLink(requested, new HashSet<>(),
-              Server.getRemoteUser(),
-              Server.getRemoteIp(),
-              Server.getRemoteIp().getHostName());
-    } else {
-      resolved = resolveBucketLink(requested, new HashSet<>(),
-          null, null, null);
+    try {
+      if (isAclEnabled) {
+        InetAddress remoteIp = Server.getRemoteIp();
+        resolved = resolveBucketLink(requested, new HashSet<>(),
+            Server.getRemoteUser(),
+            remoteIp,
+            remoteIp != null ? remoteIp.getHostName() :
+                omRpcAddress.getHostName());
+      } else {
+        resolved = resolveBucketLink(requested, new HashSet<>(),
+            null, null, null);
+      }
+    } catch (Throwable t) {
+      throw t;
     }
     return new ResolvedBucket(requested, resolved);
   }

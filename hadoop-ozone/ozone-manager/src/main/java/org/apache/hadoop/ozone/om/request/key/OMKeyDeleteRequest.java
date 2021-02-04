@@ -78,7 +78,8 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
 
     return getOmRequest().toBuilder()
         .setDeleteKeyRequest(deleteKeyRequest.toBuilder()
-            .setKeyArgs(newKeyArgs)).setUserInfo(getUserInfo()).build();
+            .setKeyArgs(newKeyArgs))
+        .setUserInfo(getUserIfNotExists(ozoneManager)).build();
   }
 
   @Override
