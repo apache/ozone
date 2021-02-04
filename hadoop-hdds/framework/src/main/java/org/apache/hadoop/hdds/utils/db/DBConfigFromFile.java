@@ -20,6 +20,7 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.eclipse.jetty.util.StringUtil;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.DBOptions;
@@ -134,7 +135,7 @@ public final class DBConfigFromFile {
               env, options, cfDescs, true);
 
         } catch (RocksDBException rdEx) {
-          RDBTable.toIOException("Unable to find/open Options file.", rdEx);
+          HddsServerUtil.toIOException("Unable to find/open Options file.", rdEx);
         }
       }
     }
