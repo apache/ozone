@@ -36,7 +36,7 @@ public class TestS3InitiateMultipartUploadResponseV1
     extends TestS3InitiateMultipartUploadResponse {
 
   @Test
-  public void addDBToBatch() throws Exception {
+  public void testAddDBToBatch() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     String prefix = "a/b/c/d/";
