@@ -88,6 +88,8 @@ import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.PipelineResponseProto.Error.errorPipelineAlreadyExists;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.PipelineResponseProto.Error.success;
+import static org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol.ADMIN_COMMAND_TYPE;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -133,7 +135,9 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   @Override
   public ScmContainerLocationResponse submitRequest(RpcController controller,
       ScmContainerLocationRequest request) throws ServiceException {
-    if (!scm.getScmContext().isLeader()) {
+    // not leader or not belong to admin command.
+    if (!scm.getScmContext().isLeader()
+        && !ADMIN_COMMAND_TYPE.contains(request.getCmdType())) {
       throw new ServiceException(scm.getScmHAManager()
                                     .getRatisServer()
                                     .triggerNotLeaderException());
