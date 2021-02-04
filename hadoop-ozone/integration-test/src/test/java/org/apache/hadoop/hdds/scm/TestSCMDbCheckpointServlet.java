@@ -27,6 +27,7 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.UUID;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -114,7 +115,9 @@ public class TestSCMDbCheckpointServlet {
       doCallRealMethod().when(scmDbCheckpointServletMock).initialize(
           cluster.getStorageContainerManager().getScmMetadataStore().getStore(),
           cluster.getStorageContainerManager().getMetrics()
-              .getDBCheckpointMetrics());
+              .getDBCheckpointMetrics(),
+          false,
+          Collections.emptyList());
 
       HttpServletRequest requestMock = mock(HttpServletRequest.class);
       HttpServletResponse responseMock = mock(HttpServletResponse.class);
