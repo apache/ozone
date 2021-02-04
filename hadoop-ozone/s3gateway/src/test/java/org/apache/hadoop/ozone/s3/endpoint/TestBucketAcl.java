@@ -50,14 +50,14 @@ import static org.mockito.Mockito.when;
  */
 public class TestBucketAcl {
 
-  private final String bucketName = OzoneConsts.S3_BUCKET;
+  private static final String bucketName = OzoneConsts.S3_BUCKET;
   private OzoneClient client;
 
   private HttpServletRequest servletRequest;
   private Map<String, String[]> parameterMap;
   private HttpHeaders headers;
   private BucketEndpoint bucketEndpoint;
-  private final String aclMarker = "acl";
+  private static final String aclMarker = "acl";
 
   @Before
   public void setup() throws IOException {
@@ -96,8 +96,7 @@ public class TestBucketAcl {
         .thenReturn(S3Acl.ACLIdentityType.GROUP.getHeaderType() + "=root");
     when(parameterMap.containsKey(aclMarker)).thenReturn(true);
     try {
-      Response response =
-          bucketEndpoint.put(bucketName, aclMarker, headers, null);
+      bucketEndpoint.put(bucketName, aclMarker, headers, null);
     } catch (Exception e) {
       Assert.assertTrue(e instanceof OS3Exception &&
           ((OS3Exception) e).getHttpCode() == HTTP_NOT_IMPLEMENTED);
@@ -263,8 +262,7 @@ public class TestBucketAcl {
                 "</AccessControlPolicy>\n").getBytes(UTF_8));
 
     when(parameterMap.containsKey(aclMarker)).thenReturn(true);
-    Response response =
-        bucketEndpoint.put(bucketName, aclMarker, headers, inputBody);
+    bucketEndpoint.put(bucketName, aclMarker, headers, inputBody);
   }
 
   @Test
