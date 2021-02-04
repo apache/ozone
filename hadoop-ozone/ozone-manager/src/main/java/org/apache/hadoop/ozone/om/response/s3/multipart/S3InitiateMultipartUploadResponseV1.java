@@ -24,6 +24,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
@@ -69,12 +70,9 @@ public class S3InitiateMultipartUploadResponseV1 extends
       }
     }
 
-    String multipartFileKey = omMetadataManager.getMultipartKey(
-            getOmKeyInfo().getParentObjectID(), getOmKeyInfo().getFileName(),
-            getOmMultipartKeyInfo().getUploadID());
-
-    omMetadataManager.getOpenKeyTable().putWithBatch(batchOperation,
-            multipartFileKey, getOmKeyInfo());
+    String multipartFileKey =
+            OMFileRequest.addToOpenFileTable(omMetadataManager, batchOperation,
+                    getOmKeyInfo(), getOmMultipartKeyInfo().getUploadID());
 
     omMetadataManager.getMultipartInfoTable().putWithBatch(batchOperation,
             multipartFileKey, getOmMultipartKeyInfo());

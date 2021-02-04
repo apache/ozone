@@ -35,6 +35,29 @@ public class OmMultipartKeyInfo extends WithObjectID {
   private final ReplicationType replicationType;
   private final ReplicationFactor replicationFactor;
   private TreeMap<Integer, PartKeyInfo> partKeyInfoList;
+
+  /**
+   * A pointer to parent directory used for path traversal. ParentID will be
+   * used only when the multipart key is created into a FileSystemOptimized(FSO)
+   * bucket.
+   * <p>
+   * For example, if a key "a/b/multiKey1" created into a FSOBucket then each
+   * path component will be assigned an ObjectId and linked to its parent path
+   * component using parent's objectID.
+   * <p>
+   * Say, Bucket's ObjectID = 512, which is the parent for its immediate child
+   * element.
+   * <p>
+   * ------------------------------------------|
+   * PathComponent |   ObjectID   |   ParentID |
+   * ------------------------------------------|
+   *      a        |     1024     |     512    |
+   * ------------------------------------------|
+   *      b        |     1025     |     1024   |
+   * ------------------------------------------|
+   *   multiKey1   |     1026     |     1025   |
+   * ------------------------------------------|
+   */
   private long parentID;
 
   /**

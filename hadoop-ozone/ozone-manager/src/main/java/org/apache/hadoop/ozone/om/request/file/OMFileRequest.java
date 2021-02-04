@@ -512,26 +512,28 @@ public final class OMFileRequest {
             omFileInfo);
   }
 
-
   /**
-   * Adding omKeyInfo to open file table.
+   * Adding multipart omKeyInfo to open file table.
    *
    * @param omMetadataMgr OM Metadata Manager
    * @param batchOp       batch of db operations
    * @param omFileInfo    omKeyInfo
    * @param uploadID      uploadID
+   * @return multipartFileKey
    * @throws IOException DB failure
    */
-  public static void addToOpenFileTable(OMMetadataManager omMetadataMgr,
+  public static String addToOpenFileTable(OMMetadataManager omMetadataMgr,
       BatchOperation batchOp, OmKeyInfo omFileInfo, String uploadID)
           throws IOException {
 
-    String dbOpenFileKey = omMetadataMgr.getMultipartKey(
+    String multipartFileKey = omMetadataMgr.getMultipartKey(
             omFileInfo.getParentObjectID(), omFileInfo.getFileName(),
             uploadID);
 
-    omMetadataMgr.getOpenKeyTable().putWithBatch(batchOp, dbOpenFileKey,
+    omMetadataMgr.getOpenKeyTable().putWithBatch(batchOp, multipartFileKey,
             omFileInfo);
+
+    return multipartFileKey;
   }
 
   /**

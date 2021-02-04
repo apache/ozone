@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 
+import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -69,9 +70,8 @@ public class TestOzoneClientMultipartUploadV1 {
   @BeforeClass
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
-    conf.set(OMConfigKeys.OZONE_OM_LAYOUT_VERSION,
-            OMConfigKeys.OZONE_OM_LAYOUT_VERSION_V1);
+    TestOMRequestUtils.configureFSOptimizedPaths(conf,
+            true, OMConfigKeys.OZONE_OM_LAYOUT_VERSION_V1);
     startCluster(conf);
   }
 
