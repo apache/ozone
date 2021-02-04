@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -28,6 +29,7 @@ import java.util.function.Consumer;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
@@ -43,6 +45,7 @@ import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerGrpc;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
@@ -50,14 +53,12 @@ import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverSe
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.BlockDeletingService;
-import org.apache.hadoop.ozone.container.replication.GrpcReplicationService;
-import org.apache.hadoop.ozone.container.replication.OnDemandContainerReplicationSource;
+import org.apache.hadoop.ozone.container.replication.ReplicationServer;
+import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT;
 import org.apache.ratis.grpc.GrpcTlsConfig;
@@ -85,19 +86,25 @@ public class OzoneContainer {
   private List<ContainerDataScanner> dataScanners;
   private final BlockDeletingService blockDeletingService;
   private final GrpcTlsConfig tlsClientConfig;
+  private final ReplicationServer replicationServer;
+  private DatanodeDetails datanodeDetails;
 
   /**
    * Construct OzoneContainer object.
+   *
    * @param datanodeDetails
    * @param conf
    * @param certClient
    * @throws DiskOutOfSpaceException
    * @throws IOException
    */
-  public OzoneContainer(DatanodeDetails datanodeDetails, ConfigurationSource
-      conf, StateContext context, CertificateClient certClient)
+  public OzoneContainer(
+      DatanodeDetails datanodeDetails, ConfigurationSource
+      conf, StateContext context, CertificateClient certClient
+  )
       throws IOException {
     config = conf;
+    this.datanodeDetails = datanodeDetails;
     volumeSet = new MutableVolumeSet(datanodeDetails.getUuidString(), conf);
     volumeSet.setFailedVolumeListener(this::handleVolumeFailures);
     containerSet = new ContainerSet();
@@ -135,22 +142,28 @@ public class OzoneContainer {
      * XceiverServerGrpc is the read channel
      */
     controller = new ContainerController(containerSet, handlers);
+
     writeChannel = XceiverServerRatis.newXceiverServerRatis(
         datanodeDetails, config, hddsDispatcher, controller, certClient,
         context);
+
+    replicationServer = new ReplicationServer(
+        controller,
+        conf.getObject(ReplicationConfig.class),
+        secConf,
+        certClient);
+
     readChannel = new XceiverServerGrpc(
-        datanodeDetails, config, hddsDispatcher, certClient,
-        createReplicationService());
-    long svcInterval = config
-        .getTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL,
-            OZONE_BLOCK_DELETING_SERVICE_INTERVAL_DEFAULT,
-            TimeUnit.MILLISECONDS);
+        datanodeDetails, config, hddsDispatcher, certClient);
+    Duration svcInterval = conf.getObject(
+            DatanodeConfiguration.class).getBlockDeletionInterval();
+
     long serviceTimeout = config
         .getTimeDuration(OZONE_BLOCK_DELETING_SERVICE_TIMEOUT,
             OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT,
             TimeUnit.MILLISECONDS);
     blockDeletingService =
-        new BlockDeletingService(this, svcInterval, serviceTimeout,
+        new BlockDeletingService(this, svcInterval.toMillis(), serviceTimeout,
             TimeUnit.MILLISECONDS, config);
     tlsClientConfig = RatisHelper.createTlsClientConfig(
         secConf, certClient != null ? certClient.getCACertificate() : null);
@@ -160,10 +173,7 @@ public class OzoneContainer {
     return tlsClientConfig;
   }
 
-  private GrpcReplicationService createReplicationService() {
-    return new GrpcReplicationService(
-        new OnDemandContainerReplicationSource(controller));
-  }
+
 
   /**
    * Build's container map.
@@ -171,7 +181,7 @@ public class OzoneContainer {
   private void buildContainerSet() {
     Iterator<HddsVolume> volumeSetIterator = volumeSet.getVolumesList()
         .iterator();
-    ArrayList<Thread> volumeThreads = new ArrayList<Thread>();
+    ArrayList<Thread> volumeThreads = new ArrayList<>();
     long startTime = System.currentTimeMillis();
 
     //TODO: diskchecker should be run before this, to see how disks are.
@@ -244,6 +254,10 @@ public class OzoneContainer {
   public void start(String scmId) throws IOException {
     LOG.info("Attempting to start container services.");
     startContainerScrub();
+
+    replicationServer.start();
+    datanodeDetails.setPort(Name.REPLICATION, replicationServer.getPort());
+
     writeChannel.start();
     readChannel.start();
     hddsDispatcher.init();
@@ -258,6 +272,7 @@ public class OzoneContainer {
     //TODO: at end of container IO integration work.
     LOG.info("Attempting to stop container services.");
     stopContainerScrub();
+    replicationServer.stop();
     writeChannel.stop();
     readChannel.stop();
     this.handlers.values().forEach(Handler::stop);

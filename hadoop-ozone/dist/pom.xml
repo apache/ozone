@@ -19,12 +19,12 @@
   <parent>
     <groupId>org.apache.hadoop</groupId>
     <artifactId>hadoop-ozone</artifactId>
-    <version>0.6.0-SNAPSHOT</version>
+    <version>1.1.0-SNAPSHOT</version>
   </parent>
   <artifactId>hadoop-ozone-dist</artifactId>
   <name>Apache Hadoop Ozone Distribution</name>
   <packaging>jar</packaging>
-  <version>0.6.0-SNAPSHOT</version>
+  <version>1.1.0-SNAPSHOT</version>
   <properties>
     <file.encoding>UTF-8</file.encoding>
     <downloadSources>true</downloadSources>
@@ -33,6 +33,30 @@
 
   <build>
     <plugins>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>exec-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>dist</id>
+            <phase>prepare-package</phase>
+            <goals>
+              <goal>exec</goal>
+            </goals>
+            <configuration>
+              <executable>${shell-executable}</executable>
+              <workingDirectory>${project.build.directory}</workingDirectory>
+              <arguments>
+                <argument>
+                  ${basedir}/dev-support/bin/dist-layout-stitching
+                </argument>
+                <argument>${project.build.directory}</argument>
+                <argument>${hdds.version}</argument>
+              </arguments>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-dependency-plugin</artifactId>
@@ -134,30 +158,6 @@
                   <filtering>true</filtering>
                 </resource>
               </resources>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
-      <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>exec-maven-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>dist</id>
-            <phase>prepare-package</phase>
-            <goals>
-              <goal>exec</goal>
-            </goals>
-            <configuration>
-              <executable>${shell-executable}</executable>
-              <workingDirectory>${project.build.directory}</workingDirectory>
-              <arguments>
-                <argument>
-                  ${basedir}/dev-support/bin/dist-layout-stitching
-                </argument>
-                <argument>${project.build.directory}</argument>
-                <argument>${hdds.version}</argument>
-              </arguments>
             </configuration>
           </execution>
         </executions>

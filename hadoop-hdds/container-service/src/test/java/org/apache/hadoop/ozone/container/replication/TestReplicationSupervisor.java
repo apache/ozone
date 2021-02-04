@@ -18,9 +18,12 @@
 
 package org.apache.hadoop.ozone.container.replication;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.AbstractExecutorService;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -33,12 +36,14 @@ import org.apache.hadoop.ozone.container.keyvalue.ChunkLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 
+import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
+import org.mockito.Mockito;
 
 import javax.annotation.Nonnull;
 
@@ -171,6 +176,36 @@ public class TestReplicationSupervisor {
     } finally {
       supervisor.stop();
     }
+  }
+
+  @Test
+  public void testDownloadAndImportReplicatorFailure() {
+    ReplicationSupervisor supervisor =
+        new ReplicationSupervisor(set, mutableReplicator,
+            newDirectExecutorService());
+
+    // Mock to fetch an exception in the importContainer method.
+    SimpleContainerDownloader moc =
+        Mockito.mock(SimpleContainerDownloader.class);
+    CompletableFuture<Path> res = new CompletableFuture<>();
+    res.complete(Paths.get("file:/tmp/no-such-file"));
+    Mockito.when(
+        moc.getContainerDataFromReplicas(Mockito.anyLong(), Mockito.anyList()))
+        .thenReturn(res);
+
+    ContainerReplicator replicatorFactory =
+        new DownloadAndImportReplicator(set, null, moc, null);
+
+    replicatorRef.set(replicatorFactory);
+
+    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
+        .captureLogs(DownloadAndImportReplicator.LOG);
+
+    supervisor.addTask(new ReplicationTask(1L, emptyList()));
+    Assert.assertEquals(1, supervisor.getReplicationFailureCount());
+    Assert.assertEquals(0, supervisor.getReplicationSuccessCount());
+    Assert.assertTrue(logCapturer.getOutput()
+        .contains("Container 1 replication was unsuccessful."));
   }
 
   private ReplicationSupervisor supervisorWithSuccessfulReplicator() {

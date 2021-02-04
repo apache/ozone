@@ -20,8 +20,12 @@ package org.apache.hadoop.ozone.om.request.key.acl.prefix;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 import com.google.common.collect.Lists;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.PrefixManagerImpl;
 import org.apache.hadoop.ozone.om.PrefixManagerImpl.OMPrefixAclOpResult;
@@ -46,7 +50,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RemoveA
 public class OMPrefixRemoveAclRequest extends OMPrefixAclRequest {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(OMPrefixAddAclRequest.class);
+      LoggerFactory.getLogger(OMPrefixRemoveAclRequest.class);
 
   private OzoneObj ozoneObj;
   private List<OzoneAcl> ozoneAcls;
@@ -90,7 +94,8 @@ public class OMPrefixRemoveAclRequest extends OMPrefixAclRequest {
 
   @Override
   void onComplete(boolean operationResult, IOException exception,
-      OMMetrics omMetrics, Result result, long trxnLogIndex) {
+      OMMetrics omMetrics, Result result, long trxnLogIndex,
+      AuditLogger auditLogger, Map<String, String> auditMap) {
     switch (result) {
     case SUCCESS:
       if (LOG.isDebugEnabled()) {
@@ -112,6 +117,12 @@ public class OMPrefixRemoveAclRequest extends OMPrefixAclRequest {
       LOG.error("Unrecognized Result for OMPrefixRemoveAclRequest: {}",
           getOmRequest());
     }
+
+    if (ozoneAcls != null) {
+      auditMap.put(OzoneConsts.ACL, ozoneAcls.toString());
+    }
+    auditLog(auditLogger, buildAuditMessage(OMAction.REMOVE_ACL, auditMap,
+        exception, getOmRequest().getUserInfo()));
   }
 
   @Override

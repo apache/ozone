@@ -20,6 +20,7 @@
 
   {{ partial "navbar.html" . }}
 
+  <div class="wrapper">
   <div class="container-fluid">
     <div class="row">
       {{ partial "sidebar.html" . }}
@@ -30,7 +31,7 @@
         <div class="col-md-9">
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb">
-                  <li class="breadcrumb-item"><a href="/">Home</a></li>
+                  <li class="breadcrumb-item"><a href="{{ "index.html" | relLangURL }}">Home</a></li>
                   <li class="breadcrumb-item" aria-current="page"><a href="{{.CurrentSection.Permalink}}">{{.CurrentSection.Title}}</a></li>
                   <li class="breadcrumb-item active" aria-current="page">{{ .Title }}</li>
                 </ol>
@@ -52,6 +53,8 @@
         </div>
       </div>
     </div>
+  </div>
+    <div class="push"></div>
   </div>
 
   {{ partial "footer.html" . }}

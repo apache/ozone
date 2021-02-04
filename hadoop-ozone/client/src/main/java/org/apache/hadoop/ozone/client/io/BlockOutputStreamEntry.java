@@ -19,75 +19,60 @@ package org.apache.hadoop.ozone.client.io;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.Collection;
+import java.util.Collections;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .ChecksumType;
-import org.apache.hadoop.hdds.scm.XceiverClientManager;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockOutputStream;
 import org.apache.hadoop.hdds.scm.storage.BufferPool;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 
-import java.util.Collection;
-import java.util.Collections;
+import com.google.common.annotations.VisibleForTesting;
 
 /**
  * Helper class used inside {@link BlockOutputStream}.
  * */
 public final class BlockOutputStreamEntry extends OutputStream {
 
+  private final OzoneClientConfig config;
   private OutputStream outputStream;
   private BlockID blockID;
   private final String key;
-  private final XceiverClientManager xceiverClientManager;
+  private final XceiverClientFactory xceiverClientManager;
   private final Pipeline pipeline;
-  private final ChecksumType checksumType;
-  private final int bytesPerChecksum;
-  private final int chunkSize;
   // total number of bytes that should be written to this stream
   private final long length;
   // the current position of this stream 0 <= currentPosition < length
   private long currentPosition;
-  private Token<OzoneBlockTokenIdentifier> token;
+  private final Token<OzoneBlockTokenIdentifier> token;
 
-  private final int streamBufferSize;
-  private final long streamBufferFlushSize;
-  private final boolean streamBufferFlushDelay;
-  private final long streamBufferMaxSize;
-  private final long watchTimeout;
   private BufferPool bufferPool;
 
   @SuppressWarnings({"parameternumber", "squid:S00107"})
-  private BlockOutputStreamEntry(BlockID blockID, String key,
-      XceiverClientManager xceiverClientManager,
-      Pipeline pipeline, String requestId, int chunkSize,
-      long length, int streamBufferSize, long streamBufferFlushSize,
-      boolean streamBufferFlushDelay, long streamBufferMaxSize,
-      long watchTimeout, BufferPool bufferPool,
-      ChecksumType checksumType, int bytesPerChecksum,
-      Token<OzoneBlockTokenIdentifier> token) {
+  private BlockOutputStreamEntry(
+      BlockID blockID, String key,
+      XceiverClientFactory xceiverClientManager,
+      Pipeline pipeline,
+      long length,
+      BufferPool bufferPool,
+      Token<OzoneBlockTokenIdentifier> token,
+      OzoneClientConfig config
+  ) {
+    this.config = config;
     this.outputStream = null;
     this.blockID = blockID;
     this.key = key;
     this.xceiverClientManager = xceiverClientManager;
     this.pipeline = pipeline;
-    this.chunkSize = chunkSize;
     this.token = token;
     this.length = length;
     this.currentPosition = 0;
-    this.streamBufferSize = streamBufferSize;
-    this.streamBufferFlushSize = streamBufferFlushSize;
-    this.streamBufferFlushDelay = streamBufferFlushDelay;
-    this.streamBufferMaxSize = streamBufferMaxSize;
-    this.watchTimeout = watchTimeout;
     this.bufferPool = bufferPool;
-    this.checksumType = checksumType;
-    this.bytesPerChecksum = bytesPerChecksum;
   }
 
   long getLength() {
@@ -110,14 +95,9 @@ public final class BlockOutputStreamEntry extends OutputStream {
    */
   private void checkStream() throws IOException {
     if (this.outputStream == null) {
-      if (getToken() != null) {
-        UserGroupInformation.getCurrentUser().addToken(getToken());
-      }
       this.outputStream =
           new BlockOutputStream(blockID, xceiverClientManager,
-              pipeline, streamBufferSize, streamBufferFlushSize,
-              streamBufferFlushDelay, streamBufferMaxSize, bufferPool,
-              checksumType, bytesPerChecksum);
+              pipeline, bufferPool, config, token);
     }
   }
 
@@ -215,30 +195,12 @@ public final class BlockOutputStreamEntry extends OutputStream {
 
     private BlockID blockID;
     private String key;
-    private XceiverClientManager xceiverClientManager;
+    private XceiverClientFactory xceiverClientManager;
     private Pipeline pipeline;
-    private String requestId;
-    private int chunkSize;
     private long length;
-    private int  streamBufferSize;
-    private long streamBufferFlushSize;
-    private boolean streamBufferFlushDelay;
-    private long streamBufferMaxSize;
-    private long watchTimeout;
     private BufferPool bufferPool;
     private Token<OzoneBlockTokenIdentifier> token;
-    private ChecksumType checksumType;
-    private int bytesPerChecksum;
-
-    public Builder setChecksumType(ChecksumType type) {
-      this.checksumType = type;
-      return this;
-    }
-
-    public Builder setBytesPerChecksum(int bytes) {
-      this.bytesPerChecksum = bytes;
-      return this;
-    }
+    private OzoneClientConfig config;
 
     public Builder setBlockID(BlockID bID) {
       this.blockID = bID;
@@ -250,7 +212,8 @@ public final class BlockOutputStreamEntry extends OutputStream {
       return this;
     }
 
-    public Builder setXceiverClientManager(XceiverClientManager
+    public Builder setXceiverClientManager(
+        XceiverClientFactory
         xClientManager) {
       this.xceiverClientManager = xClientManager;
       return this;
@@ -261,48 +224,20 @@ public final class BlockOutputStreamEntry extends OutputStream {
       return this;
     }
 
-    public Builder setRequestId(String request) {
-      this.requestId = request;
-      return this;
-    }
-
-    public Builder setChunkSize(int cSize) {
-      this.chunkSize = cSize;
-      return this;
-    }
 
     public Builder setLength(long len) {
       this.length = len;
       return this;
     }
 
-    public Builder setStreamBufferSize(int bufferSize) {
-      this.streamBufferSize = bufferSize;
-      return this;
-    }
 
-    public Builder setStreamBufferFlushSize(long bufferFlushSize) {
-      this.streamBufferFlushSize = bufferFlushSize;
-      return this;
-    }
-
-    public Builder setStreamBufferFlushDelay(boolean bufferFlushDelay) {
-      this.streamBufferFlushDelay = bufferFlushDelay;
-      return this;
-    }
-
-    public Builder setStreamBufferMaxSize(long bufferMaxSize) {
-      this.streamBufferMaxSize = bufferMaxSize;
-      return this;
-    }
-
-    public Builder setWatchTimeout(long timeout) {
-      this.watchTimeout = timeout;
-      return this;
-    }
-
-    public Builder setbufferPool(BufferPool pool) {
+    public Builder setBufferPool(BufferPool pool) {
       this.bufferPool = pool;
+      return this;
+    }
+
+    public Builder setConfig(OzoneClientConfig clientConfig) {
+      this.config = clientConfig;
       return this;
     }
 
@@ -312,11 +247,13 @@ public final class BlockOutputStreamEntry extends OutputStream {
     }
 
     public BlockOutputStreamEntry build() {
-      return new BlockOutputStreamEntry(blockID, key,
-          xceiverClientManager, pipeline, requestId, chunkSize,
-          length, streamBufferSize, streamBufferFlushSize,
-          streamBufferFlushDelay, streamBufferMaxSize, watchTimeout,
-          bufferPool, checksumType, bytesPerChecksum, token);
+      return new BlockOutputStreamEntry(blockID,
+          key,
+          xceiverClientManager,
+          pipeline,
+          length,
+          bufferPool,
+          token, config);
     }
   }
 
@@ -333,7 +270,7 @@ public final class BlockOutputStreamEntry extends OutputStream {
     return key;
   }
 
-  public XceiverClientManager getXceiverClientManager() {
+  public XceiverClientFactory getXceiverClientManager() {
     return xceiverClientManager;
   }
 
@@ -341,32 +278,8 @@ public final class BlockOutputStreamEntry extends OutputStream {
     return pipeline;
   }
 
-  public int getChunkSize() {
-    return chunkSize;
-  }
-
   public long getCurrentPosition() {
     return currentPosition;
-  }
-
-  public int getStreamBufferSize() {
-    return streamBufferSize;
-  }
-
-  public long getStreamBufferFlushSize() {
-    return streamBufferFlushSize;
-  }
-
-  public boolean getStreamBufferFlushDelay() {
-    return streamBufferFlushDelay;
-  }
-
-  public long getStreamBufferMaxSize() {
-    return streamBufferMaxSize;
-  }
-
-  public long getWatchTimeout() {
-    return watchTimeout;
   }
 
   public BufferPool getBufferPool() {

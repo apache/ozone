@@ -30,33 +30,22 @@ source "$SCRIPT_DIR"/testlib.sh
 if [ "$OZONE_WITH_COVERAGE" ]; then
    java -cp "$PROJECT_DIR"/share/coverage/$(ls "$PROJECT_DIR"/share/coverage | grep test-util):"$PROJECT_DIR"/share/coverage/jacoco-core.jar org.apache.hadoop.test.JacocoServer &
    DOCKER_BRIDGE_IP=$(docker network inspect bridge --format='{{(index .IPAM.Config 0).Gateway}}')
-   export HADOOP_OPTS="-javaagent:share/coverage/jacoco-agent.jar=output=tcpclient,address=$DOCKER_BRIDGE_IP,includes=org.apache.hadoop.ozone.*:org.apache.hadoop.hdds.*:org.apache.hadoop.fs.ozone.*"
+   export OZONE_OPTS="-javaagent:share/coverage/jacoco-agent.jar=output=tcpclient,address=$DOCKER_BRIDGE_IP,includes=org.apache.hadoop.ozone.*:org.apache.hadoop.hdds.*:org.apache.hadoop.fs.ozone.*"
 fi
 
 tests=$(find_tests)
+cd "$SCRIPT_DIR"
 
 RESULT=0
 # shellcheck disable=SC2044
 for t in ${tests}; do
   d="$(dirname "${t}")"
-  echo "Executing test in ${d}"
 
-  #required to read the .env file from the right location
-  cd "${d}" || continue
-  set +e
-  ./test.sh
-  ret=$?
-  set -e
-  if [[ $ret -ne 0 ]]; then
-      RESULT=1
-      echo "ERROR: Test execution of ${d} is FAILED!!!!"
+  if ! run_test_script "${d}"; then
+    RESULT=1
   fi
-  cd "$SCRIPT_DIR"
-  RESULT_DIR="${d}/result"
-  TEST_DIR_NAME=$(basename ${d})
-  rebot --nostatusrc -N $TEST_DIR_NAME -o "$ALL_RESULT_DIR"/$TEST_DIR_NAME.xml "$RESULT_DIR"/"*.xml"
-  cp "$RESULT_DIR"/docker-*.log "$ALL_RESULT_DIR"/
-  cp "$RESULT_DIR"/*.out* "$ALL_RESULT_DIR"/ || true
+
+  copy_results "${d}" "${ALL_RESULT_DIR}"
 done
 
 rebot --nostatusrc -N acceptance -d "$ALL_RESULT_DIR" "$ALL_RESULT_DIR"/*.xml

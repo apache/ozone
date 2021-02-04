@@ -49,7 +49,7 @@ public final class DBConfigFromFile {
   private static final Logger LOG =
       LoggerFactory.getLogger(DBConfigFromFile.class);
 
-  public static final String CONFIG_DIR = "HADOOP_CONF_DIR";
+  public static final String CONFIG_DIR = "OZONE_CONF_DIR";
 
   private DBConfigFromFile() {
   }
@@ -65,13 +65,11 @@ public final class DBConfigFromFile {
 
     if (StringUtil.isBlank(path)) {
       LOG.debug("Unable to find the configuration directory. "
-          + "Please make sure that HADOOP_CONF_DIR is setup correctly.");
-    }
-    if(StringUtil.isBlank(path)){
+          + "Please make sure that " + CONFIG_DIR + " is setup correctly.");
       return null;
     }
-    return new File(path);
 
+    return new File(path);
   }
 
   /**
@@ -105,9 +103,9 @@ public final class DBConfigFromFile {
    * and the user does not need to become an expert in RockDB config.
    * <p>
    * This code assumes the .ini file is placed in the same directory as normal
-   * config files. That is in $HADOOP_DIR/etc/hadoop. For example, if we want to
+   * config files. That is in $OZONE_DIR/etc/hadoop. For example, if we want to
    * control OzoneManager.db configs from a file, we need to create a file
-   * called OzoneManager.db.ini and place that file in $HADOOP_DIR/etc/hadoop.
+   * called OzoneManager.db.ini and place that file in $OZONE_DIR/etc/hadoop.
    *
    * @param dbFileName - The DB File Name, for example, OzoneManager.db.
    * @param cfDescs - ColumnFamily Handles.

@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -44,6 +45,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
+import org.apache.hadoop.ozone.om.helpers.OmRenameKeys;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
@@ -121,7 +123,10 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Recover
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RecoverTrashResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RemoveAclRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RemoveAclResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameKeysArgs;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameKeysMap;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameKeyRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameKeysRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenewDelegationTokenResponseProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListResponse;
@@ -144,6 +149,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.protobuf.ByteString;
 
+import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.ACCESS_DENIED;
@@ -195,6 +201,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     return OMRequest.newBuilder()
         .setCmdType(cmdType)
+        .setVersion(CURRENT_VERSION)
         .setClientId(clientID);
   }
 
@@ -258,14 +265,18 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    * Changes the Quota on a volume.
    *
    * @param volume - Name of the volume.
-   * @param quota - Quota in bytes.
+   * @param quotaInNamespace - Volume quota in counts.
+   * @param quotaInBytes - Volume quota in bytes.
    * @throws IOException
    */
   @Override
-  public void setQuota(String volume, long quota) throws IOException {
+  public void setQuota(String volume, long quotaInNamespace,
+      long quotaInBytes) throws IOException {
     SetVolumePropertyRequest.Builder req =
         SetVolumePropertyRequest.newBuilder();
-    req.setVolumeName(volume).setQuotaInBytes(quota);
+    req.setVolumeName(volume)
+        .setQuotaInBytes(quotaInBytes)
+        .setQuotaInNamespace(quotaInNamespace);
 
     OMRequest omRequest = createOMRequest(Type.SetVolumeProperty)
         .setSetVolumePropertyRequest(req)
@@ -637,9 +648,10 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setBucketName(args.getBucketName())
         .setKeyName(args.getKeyName())
         .setDataSize(args.getDataSize())
-        .addAllKeyLocations(
-            locationInfoList.stream().map(OmKeyLocationInfo::getProtobuf)
-                .collect(Collectors.toList())).build();
+        .addAllKeyLocations(locationInfoList.stream()
+            // TODO use OM version?
+            .map(info -> info.getProtobuf(CURRENT_VERSION))
+            .collect(Collectors.toList())).build();
     req.setKeyArgs(keyArgs);
     req.setClientID(clientId);
 
@@ -673,6 +685,33 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         handleError(submitRequest(omRequest)).getLookupKeyResponse();
 
     return OmKeyInfo.getFromProtobuf(resp.getKeyInfo());
+  }
+
+  @Override
+  public void renameKeys(OmRenameKeys omRenameKeys) throws IOException {
+
+    List<RenameKeysMap> renameKeyList  = new ArrayList<>();
+    for (Map.Entry< String, String> entry :
+        omRenameKeys.getFromAndToKey().entrySet()) {
+      RenameKeysMap.Builder renameKey = RenameKeysMap.newBuilder()
+          .setFromKeyName(entry.getKey())
+          .setToKeyName(entry.getValue());
+      renameKeyList.add(renameKey.build());
+    }
+
+    RenameKeysArgs.Builder renameKeyArgs = RenameKeysArgs.newBuilder()
+        .setVolumeName(omRenameKeys.getVolume())
+        .setBucketName(omRenameKeys.getBucket())
+        .addAllRenameKeysMap(renameKeyList);
+
+    RenameKeysRequest.Builder reqKeys = RenameKeysRequest.newBuilder()
+        .setRenameKeysArgs(renameKeyArgs.build());
+
+    OMRequest omRequest = createOMRequest(Type.RenameKeys)
+        .setRenameKeysRequest(reqKeys.build())
+        .build();
+
+    handleError(submitRequest(omRequest));
   }
 
   @Override
@@ -862,9 +901,10 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setIsMultipartKey(omKeyArgs.getIsMultipartKey())
         .setMultipartNumber(omKeyArgs.getMultipartUploadPartNumber())
         .setDataSize(omKeyArgs.getDataSize())
-        .addAllKeyLocations(
-            locationInfoList.stream().map(OmKeyLocationInfo::getProtobuf)
-                .collect(Collectors.toList()));
+        .addAllKeyLocations(locationInfoList.stream()
+            // TODO use OM version?
+            .map(info -> info.getProtobuf(CURRENT_VERSION))
+            .collect(Collectors.toList()));
     multipartCommitUploadPartRequest.setClientID(clientId);
     multipartCommitUploadPartRequest.setKeyArgs(keyArgs.build());
 
@@ -1145,6 +1185,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setVolumeName(args.getVolumeName())
         .setBucketName(args.getBucketName())
         .setKeyName(args.getKeyName())
+        .setSortDatanodes(args.getSortDatanodes())
         .build();
     GetFileStatusRequest req =
         GetFileStatusRequest.newBuilder()
@@ -1358,6 +1399,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setVolumeName(args.getVolumeName())
         .setBucketName(args.getBucketName())
         .setKeyName(args.getKeyName())
+        .setSortDatanodes(args.getSortDatanodes())
         .build();
     ListStatusRequest listStatusRequest =
         ListStatusRequest.newBuilder()

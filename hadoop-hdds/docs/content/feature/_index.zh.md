@@ -1,9 +1,8 @@
 ---
-title: GDPR
-name: GDPR
-identifier: gdpr
+title: 特点
+name: 特点
 menu: main
-weight: 5
+weight: 4
 ---
 <!---
     Licensed to the Apache Software Foundation (ASF) under one or more

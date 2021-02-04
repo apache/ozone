@@ -80,13 +80,13 @@ public class ReconIncrementalContainerReportHandler
           return;
         }
         getNodeManager().addContainer(dd, id);
-        processContainerReplica(dd, replicaProto);
+        processContainerReplica(dd, replicaProto, publisher);
       } catch (ContainerNotFoundException e) {
         success = false;
         LOG.warn("Container {} not found!", replicaProto.getContainerID());
       } catch (NodeNotFoundException ex) {
         success = false;
-        LOG.error("Received ICR from unknown datanode {} {}",
+        LOG.error("Received ICR from unknown datanode {}.",
             report.getDatanodeDetails(), ex);
       } catch (IOException e) {
         success = false;

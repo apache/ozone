@@ -20,13 +20,12 @@ export COMPOSE_DIR
 
 : "${OZONE_REPLICATION_FACTOR:=3}"
 : "${OZONE_UPGRADE_FROM:="0.5.0"}"
-: "${OZONE_UPGRADE_TO:="0.6.0"}"
+: "${OZONE_UPGRADE_TO:="1.0.0"}"
 : "${OZONE_VOLUME:="${COMPOSE_DIR}/data"}"
 
 export OZONE_VOLUME
 
 mkdir -p "${OZONE_VOLUME}"/{dn1,dn2,dn3,om,recon,s3g,scm}
-mkdir -p "${OZONE_VOLUME}/debug"
 
 if [[ -n "${OZONE_VOLUME_OWNER}" ]]; then
   current_user=$(whoami)
@@ -46,8 +45,9 @@ source "${COMPOSE_DIR}/../testlib.sh"
 
 # prepare pre-upgrade cluster
 start_docker_env
-execute_robot_test scm topology/loaddata.robot
-stop_docker_env
+execute_robot_test scm -v PREFIX:pre freon/generate.robot
+execute_robot_test scm -v PREFIX:pre freon/validate.robot
+KEEP_RUNNING=false stop_docker_env
 
 # run upgrade scripts
 SCRIPT_DIR=../../libexec/upgrade
@@ -64,7 +64,10 @@ source "${COMPOSE_DIR}/../testlib.sh"
 # re-start cluster with new version and check after upgrade
 export OZONE_KEEP_RESULTS=true
 start_docker_env
-execute_robot_test scm topology/readdata.robot
+execute_robot_test scm -v PREFIX:pre freon/validate.robot
+# test write key to old bucket after upgrade
+execute_robot_test scm -v PREFIX:post freon/generate.robot
+execute_robot_test scm -v PREFIX:post freon/validate.robot
 stop_docker_env
 
 generate_report

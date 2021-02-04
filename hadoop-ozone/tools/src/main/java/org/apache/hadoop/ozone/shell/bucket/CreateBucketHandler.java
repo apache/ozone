@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.ozone.shell.bucket;
 
+import com.google.common.base.Strings;
+import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.BucketArgs;
@@ -25,6 +27,8 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 
+import org.apache.hadoop.ozone.shell.SetSpaceQuotaOptions;
+import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -45,6 +49,9 @@ public class CreateBucketHandler extends BucketHandler {
       description = "if true, indicates GDPR enforced bucket, " +
           "false/unspecified indicates otherwise")
   private Boolean isGdprEnforced;
+
+  @CommandLine.Mixin
+  private SetSpaceQuotaOptions quotaOptions;
 
   /**
    * Executes create bucket.
@@ -74,6 +81,15 @@ public class CreateBucketHandler extends BucketHandler {
       }
     }
 
+    if (!Strings.isNullOrEmpty(quotaOptions.getQuotaInBytes())) {
+      bb.setQuotaInBytes(OzoneQuota.parseSpaceQuota(
+          quotaOptions.getQuotaInBytes()).getQuotaInBytes());
+    }
+
+    if (!Strings.isNullOrEmpty(quotaOptions.getQuotaInNamespace())) {
+      bb.setQuotaInNamespace(OzoneQuota.parseNameSpaceQuota(
+          quotaOptions.getQuotaInNamespace()).getQuotaInNamespace());
+    }
     String volumeName = address.getVolumeName();
     String bucketName = address.getBucketName();
 

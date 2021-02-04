@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -27,7 +27,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
-import picocli.CommandLine.ParentCommand;
+import picocli.CommandLine.Mixin;
 
 /**
  * This is the handler that process safe mode wait command.
@@ -45,36 +45,39 @@ public class SafeModeWaitSubcommand implements Callable<Void> {
   @Option(description =
       "Define timeout (in second) to wait until (exit code 1) "
           + "or until safemode is ended (exit code 0).", defaultValue = "30",
-      required = false, names = {
-      "-t", "--timeout"})
+      names = { "-t", "--timeout"})
   private long timeoutSeconds;
 
   private long startTestTime;
 
-  @ParentCommand
-  private SafeModeCommands parent;
+  @Mixin
+  private ScmOption scmOption;
 
   @Override
   public Void call() throws Exception {
     startTestTime = System.currentTimeMillis();
 
     while (getRemainingTimeInSec() > 0) {
-      try (ScmClient scmClient = parent.getParent().createScmClient()) {
-        while (getRemainingTimeInSec() > 0) {
-
-          boolean isSafeModeActive = scmClient.inSafeMode();
-
-          if (!isSafeModeActive) {
+      try (ScmClient scmClient = scmOption.createScmClient()) {
+        long remainingTime;
+        do {
+          if (!scmClient.inSafeMode()) {
             LOG.info("SCM is out of safe mode.");
             return null;
-          } else {
+          }
+
+          remainingTime = getRemainingTimeInSec();
+
+          if (remainingTime > 0) {
             LOG.info(
                 "SCM is in safe mode. Will retry in 1 sec. Remaining time "
                     + "(sec): {}",
-                getRemainingTimeInSec());
+                remainingTime);
             Thread.sleep(1000);
+          } else {
+            LOG.info("SCM is in safe mode. No more retries.");
           }
-        }
+        } while (remainingTime > 0);
       } catch (Exception ex) {
         LOG.info(
             "SCM is not available (yet?). Error is {}. Will retry in 1 sec. "

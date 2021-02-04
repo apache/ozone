@@ -78,7 +78,7 @@ Cat file
                    Execute               ozone fs -cat ${DEEP_URL}/subdir1/NOTICE.txt
 
 Delete file
-                   Execute               ozone fs -rm ${DEEP_URL}/subdir1/NOTICE.txt
+                   Execute               ozone fs -rm -skipTrash ${DEEP_URL}/subdir1/NOTICE.txt
     ${result} =    Execute               ozone sh key list ${VOLUME}/${BUCKET} | jq -r '.name'
                    Should not contain    ${result}       NOTICE.txt
 
@@ -92,10 +92,19 @@ Touch file
     ${result} =    Execute               ozone sh key list ${VOLUME}/${BUCKET} | jq -r '.name'
                    Should contain        ${result}       TOUCHFILE-${SCHEME}.txt
 
+Delete file with Trash
+                   Execute               ozone fs -touch ${DEEP_URL}/testFile.txt
+                   Execute               ozone fs -rm ${DEEP_URL}/testFile.txt
+    ${result} =    Execute               ozone fs -ls -R ${BASE_URL}/
+                   Should not contain    ${result}     ${DEEP_URL}/testFile.txt
+                   Should Contain Any    ${result}     .Trash/hadoop    .Trash/testuser/scm@EXAMPLE.COM    .Trash/root
+                   Should contain        ${result}     ${DEEP_DIR}/testFile.txt
+
 Delete recursively
-                   Execute               ozone fs -rm -r ${DEEP_URL}/
+                   Execute               ozone fs -mkdir -p ${DEEP_URL}/subdir2
+                   Execute               ozone fs -rm -skipTrash -r ${DEEP_URL}/subdir2
     ${result} =    Execute               ozone sh key list ${VOLUME}/${BUCKET} | jq -r '.name'
-                   Should not contain    ${result}       ${DEEP_DIR}
+                   Should not contain    ${result}       ${DEEP_DIR}/subdir2
 
 List recursively
     [Setup]        Setup localdir1

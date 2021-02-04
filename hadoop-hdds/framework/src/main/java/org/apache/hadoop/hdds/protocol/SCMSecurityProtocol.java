@@ -17,7 +17,10 @@
 package org.apache.hadoop.hdds.protocol;
 
 import java.io.IOException;
+import java.util.List;
+
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.OzoneManagerDetailsProto;
 import org.apache.hadoop.hdds.scm.ScmConfig;
@@ -76,5 +79,17 @@ public interface SCMSecurityProtocol {
    * @return String         - pem encoded CA certificate.
    */
   String getCACertificate() throws IOException;
+
+  /**
+   * Get list of certificates meet the query criteria.
+   *
+   * @param type            - node type: OM/SCM/DN.
+   * @param startSerialId   - start certificate serial id.
+   * @param count           - max number of certificates returned in a batch.
+   * @param isRevoked       - whether list for revoked certs only.
+   * @return list of PEM encoded certificate strings.
+   */
+  List<String> listCertificate(HddsProtos.NodeType type, long startSerialId,
+      int count, boolean isRevoked) throws IOException;
 
 }

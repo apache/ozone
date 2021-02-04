@@ -28,24 +28,42 @@ import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.OMCertificateClient;
-import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.test.LambdaTestUtils;
 import org.apache.hadoop.util.Time;
+import org.bouncycastle.asn1.x500.X500Name;
+import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
+import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
+import org.bouncycastle.cert.X509CertificateHolder;
+import org.bouncycastle.cert.X509v1CertificateBuilder;
+import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
+import org.bouncycastle.crypto.util.PrivateKeyFactory;
+import org.bouncycastle.operator.ContentSigner;
+import org.bouncycastle.operator.DefaultDigestAlgorithmIdentifierFinder;
+import org.bouncycastle.operator.DefaultSignatureAlgorithmIdentifierFinder;
+import org.bouncycastle.operator.OperatorCreationException;
+import org.bouncycastle.operator.bc.BcRSAContentSignerBuilder;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
+import org.mockito.Mockito;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
+import java.io.IOException;
+import java.math.BigInteger;
 import java.security.KeyPair;
-import java.security.PrivateKey;
-import java.security.PublicKey;
+import java.security.SecureRandom;
 import java.security.Signature;
+import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.time.Instant;
+import java.util.Date;
 import java.util.EnumSet;
 
 /**
@@ -62,7 +80,10 @@ public class TestOzoneBlockTokenSecretManager {
   private static final String BASEDIR = GenericTestUtils
       .getTempPath(TestOzoneBlockTokenSecretManager.class.getSimpleName());
   private BlockTokenVerifier tokenVerifier;
+  private static final String ALGORITHM = "SHA256withRSA";
 
+  @Rule
+  public ExpectedException exception = ExpectedException.none();
 
   @Before
   public void setUp() throws Exception {
@@ -75,41 +96,25 @@ public class TestOzoneBlockTokenSecretManager {
     // Create Ozone Master certificate (SCM CA issued cert) and key store.
     SecurityConfig securityConfig = new SecurityConfig(conf);
     x509Certificate = KeyStoreTestUtil
-        .generateCertificate("CN=OzoneMaster", keyPair, 30, "SHA256withRSA");
+        .generateCertificate("CN=OzoneMaster", keyPair, 30, ALGORITHM);
     omCertSerialId = x509Certificate.getSerialNumber().toString();
     secretManager = new OzoneBlockTokenSecretManager(securityConfig,
         expiryTime, omCertSerialId);
-    client = getCertificateClient(securityConfig);
-    client.init();
+    client = Mockito.mock(OMCertificateClient.class);
+    Mockito.when(client.getCertificate()).thenReturn(x509Certificate);
+    Mockito.when(client.getCertificate(Mockito.anyString())).
+        thenReturn(x509Certificate);
+    Mockito.when(client.getPublicKey()).thenReturn(keyPair.getPublic());
+    Mockito.when(client.getPrivateKey()).thenReturn(keyPair.getPrivate());
+    Mockito.when(client.getSignatureAlgorithm()).thenReturn(
+        securityConfig.getSignatureAlgo());
+    Mockito.when(client.getSecurityProvider()).thenReturn(
+        securityConfig.getProvider());
+    Mockito.when(client.verifySignature((byte[]) Mockito.any(),
+        Mockito.any(), Mockito.any())).thenCallRealMethod();
+
     secretManager.start(client);
     tokenVerifier = new BlockTokenVerifier(securityConfig, client);
-
-  }
-
-  private CertificateClient getCertificateClient(SecurityConfig secConf)
-      throws Exception {
-    return new OMCertificateClient(secConf){
-      @Override
-      public X509Certificate getCertificate() {
-        return x509Certificate;
-      }
-
-      @Override
-      public X509Certificate getCertificate(String certSerialId)
-          throws CertificateException {
-        return x509Certificate;
-      }
-
-      @Override
-      public PrivateKey getPrivateKey() {
-        return keyPair.getPrivate();
-      }
-
-      @Override
-      public PublicKey getPublicKey() {
-        return keyPair.getPublic();
-      }
-    };
   }
 
   @After
@@ -230,5 +235,131 @@ public class TestOzoneBlockTokenSecretManager {
     // Non block operations are not checked by block token verifier
     tokenVerifier.verify(null, null,
         ContainerProtos.Type.CloseContainer, null);
+  }
+
+  @Test
+  public void testBlockTokenReadAccessMode() throws Exception {
+    final String testUser1 = "testUser1";
+    final String testBlockId1 = "101";
+    Token<OzoneBlockTokenIdentifier> readToken =
+        secretManager.generateToken(testUser1, testBlockId1,
+            EnumSet.of(AccessModeProto.READ), 100);
+
+    exception.expect(BlockTokenException.class);
+    exception.expectMessage("doesn't have WRITE permission");
+    tokenVerifier.verify(testUser1, readToken.encodeToUrlString(),
+        ContainerProtos.Type.PutBlock, testBlockId1);
+
+    tokenVerifier.verify(testUser1, readToken.encodeToUrlString(),
+        ContainerProtos.Type.GetBlock, testBlockId1);
+  }
+
+  @Test
+  public void testBlockTokenWriteAccessMode() throws Exception {
+    final String testUser2 = "testUser2";
+    final String testBlockId2 = "102";
+    Token<OzoneBlockTokenIdentifier> writeToken =
+        secretManager.generateToken("testUser2", testBlockId2,
+            EnumSet.of(AccessModeProto.WRITE), 100);
+
+    tokenVerifier.verify(testUser2, writeToken.encodeToUrlString(),
+        ContainerProtos.Type.WriteChunk, testBlockId2);
+
+    exception.expect(BlockTokenException.class);
+    exception.expectMessage("doesn't have READ permission");
+    tokenVerifier.verify(testUser2, writeToken.encodeToUrlString(),
+        ContainerProtos.Type.ReadChunk, testBlockId2);
+  }
+
+  @Test
+  public void testExpiredCertificate() throws Exception {
+    String tokenBlockID = "102";
+    Token<OzoneBlockTokenIdentifier> blockToken =
+        secretManager.generateToken("testUser2", tokenBlockID,
+            EnumSet.allOf(AccessModeProto.class), 100);
+
+    // Mock client with an expired cert
+    X509Certificate expiredCert = generateExpiredCert(
+        "CN=OzoneMaster", keyPair, ALGORITHM);
+    Mockito.when(client.getCertificate(Mockito.anyString())).
+        thenReturn(expiredCert);
+
+    exception.expect(BlockTokenException.class);
+    exception.expectMessage("Block token can't be verified due to expired" +
+        " certificate");
+    tokenVerifier.verify("testUser", blockToken.encodeToUrlString(),
+        ContainerProtos.Type.PutBlock, "102");
+
+    // Reset to original valid certificate
+    Mockito.when(client.getCertificate(Mockito.anyString())).
+        thenReturn(x509Certificate);
+
+    tokenVerifier.verify("testUser", blockToken.encodeToUrlString(),
+        ContainerProtos.Type.PutBlock, "102");
+  }
+
+  @Test
+  public void testNetYetValidCertificate() throws Exception {
+    String tokenBlockID = "103";
+    Token<OzoneBlockTokenIdentifier> blockToken =
+        secretManager.generateToken("testUser3", tokenBlockID,
+            EnumSet.allOf(AccessModeProto.class), 100);
+
+    // Mock client with an expired cert
+    X509Certificate netYetValidCert = generateNotValidYetCert(
+        "CN=OzoneMaster", keyPair, ALGORITHM);
+    Mockito.when(client.getCertificate(Mockito.anyString())).
+        thenReturn(netYetValidCert);
+
+    exception.expect(BlockTokenException.class);
+    exception.expectMessage("Block token can't be verified due to not" +
+        " yet valid certificate");
+    tokenVerifier.verify("testUser", blockToken.encodeToUrlString(),
+        ContainerProtos.Type.PutBlock, "103");
+
+    // Reset to original valid certificate
+    Mockito.when(client.getCertificate(Mockito.anyString())).
+        thenReturn(x509Certificate);
+
+    tokenVerifier.verify("testUser", blockToken.encodeToUrlString(),
+        ContainerProtos.Type.PutBlock, "103");
+  }
+
+  private X509Certificate generateExpiredCert(String dn,
+      KeyPair pair, String algorithm) throws CertificateException,
+      IllegalStateException, IOException, OperatorCreationException {
+    Date from = new Date();
+    // Set end date same as start date to make sure the cert is expired.
+    return generateTestCert(dn, pair, algorithm, from, from);
+  }
+
+  private X509Certificate generateNotValidYetCert(String dn,
+      KeyPair pair, String algorithm) throws CertificateException,
+      IllegalStateException, IOException, OperatorCreationException {
+    Date from = new Date(Instant.now().toEpochMilli() + 100000L);
+    Date to = new Date(from.getTime() + 200000L);
+    return generateTestCert(dn, pair, algorithm, from, to);
+  }
+
+  private X509Certificate generateTestCert(String dn,
+      KeyPair pair, String algorithm, Date from, Date to)
+      throws CertificateException, IllegalStateException,
+      IOException, OperatorCreationException {
+    BigInteger sn = new BigInteger(64, new SecureRandom());
+    SubjectPublicKeyInfo subPubKeyInfo = SubjectPublicKeyInfo.getInstance(
+        pair.getPublic().getEncoded());
+    X500Name subjectDN = new X500Name(dn);
+    X509v1CertificateBuilder builder = new X509v1CertificateBuilder(
+        subjectDN, sn, from, to, subjectDN, subPubKeyInfo);
+
+    AlgorithmIdentifier sigAlgId =
+        new DefaultSignatureAlgorithmIdentifierFinder().find(algorithm);
+    AlgorithmIdentifier digAlgId =
+        new DefaultDigestAlgorithmIdentifierFinder().find(sigAlgId);
+    ContentSigner signer =
+        new BcRSAContentSignerBuilder(sigAlgId, digAlgId)
+            .build(PrivateKeyFactory.createKey(pair.getPrivate().getEncoded()));
+    X509CertificateHolder holder = builder.build(signer);
+    return new JcaX509CertificateConverter().getCertificate(holder);
   }
 }

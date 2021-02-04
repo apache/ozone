@@ -46,7 +46,7 @@ Test GDPR -g=false
 *** Keywords ***
 Test GDPR(disabled) without explicit options
     [arguments]     ${volume}
-                    Execute             ozone sh volume create /${volume} --quota 100TB
+                    Execute             ozone sh volume create /${volume} --space-quota 100TB --namespace-quota 100
                     Execute             ozone sh bucket create /${volume}/mybucket1
     ${result} =     Execute             ozone sh bucket info /${volume}/mybucket1 | jq -r '. | select(.name=="mybucket1") | .metadata | .gdprEnabled'
                     Should Be Equal     ${result}       null

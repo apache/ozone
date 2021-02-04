@@ -18,16 +18,20 @@ Documentation       Test ozone fs with hadoopfs
 Library             OperatingSystem
 Library             String
 Resource            ../commonlib.robot
+Resource            ../lib/fs.robot
 Test Timeout        5 minutes
 
 *** Variables ***
-${DATANODE_HOST}        datanode
-${PREFIX}               ozone
+${SCHEME}           o3fs
+${volume}           volume1
+${bucket}           bucket1
+${PREFIX}           ozone
 
 *** Test cases ***
 
 Test hadoop dfs
+    ${dir} =          Format FS URL         ${SCHEME}     ${volume}    ${bucket}
     ${random} =        Generate Random String  5  [NUMBERS]
-    ${result} =        Execute                    hdfs dfs -put /opt/hadoop/NOTICE.txt o3fs://bucket1.volume1/${PREFIX}-${random}
-    ${result} =        Execute                    hdfs dfs -ls o3fs://bucket1.volume1/
+    ${result} =        Execute                    hdfs dfs -put /opt/hadoop/NOTICE.txt ${dir}/${PREFIX}-${random}
+    ${result} =        Execute                    hdfs dfs -ls ${dir}
                        Should contain             ${result}   ${PREFIX}-${random}

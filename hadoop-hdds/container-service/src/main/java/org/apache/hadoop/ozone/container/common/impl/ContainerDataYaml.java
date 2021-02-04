@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.container.common.impl;
 
-import java.beans.IntrospectionException;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -201,8 +200,7 @@ public final class ContainerDataYaml {
    */
   private static class ContainerDataRepresenter extends Representer {
     @Override
-    protected Set<Property> getProperties(Class<? extends Object> type)
-        throws IntrospectionException {
+    protected Set<Property> getProperties(Class<? extends Object> type) {
       Set<Property> set = super.getProperties(type);
       Set<Property> filtered = new TreeSet<Property>();
 
@@ -280,6 +278,9 @@ public final class ContainerDataYaml {
         String state = (String) nodes.get(OzoneConsts.STATE);
         kvData
             .setState(ContainerProtos.ContainerDataProto.State.valueOf(state));
+        String schemaVersion = (String) nodes.get(OzoneConsts.SCHEMA_VERSION);
+        kvData.setSchemaVersion(schemaVersion);
+
         return kvData;
       }
     }

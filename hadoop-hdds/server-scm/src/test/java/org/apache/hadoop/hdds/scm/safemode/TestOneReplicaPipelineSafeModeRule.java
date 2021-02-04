@@ -18,21 +18,24 @@
 package org.apache.hadoop.hdds.scm.safemode;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
-import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
-import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
+import org.apache.hadoop.hdds.scm.pipeline.*;
+import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.test.GenericTestUtils;
 
@@ -52,6 +55,7 @@ public class TestOneReplicaPipelineSafeModeRule {
   private OneReplicaPipelineSafeModeRule rule;
   private SCMPipelineManager pipelineManager;
   private EventQueue eventQueue;
+  private MockNodeManager mockNodeManager;
 
   private void setup(int nodes, int pipelineFactorThreeCount,
       int pipelineFactorOneCount) throws Exception {
@@ -65,7 +69,7 @@ public class TestOneReplicaPipelineSafeModeRule {
 
     List<ContainerInfo> containers = new ArrayList<>();
     containers.addAll(HddsTestUtils.getContainerInfo(1));
-    MockNodeManager mockNodeManager = new MockNodeManager(true, nodes);
+    mockNodeManager = new MockNodeManager(true, nodes);
 
     eventQueue = new EventQueue();
 
@@ -112,9 +116,7 @@ public class TestOneReplicaPipelineSafeModeRule {
             LoggerFactory.getLogger(SCMSafeModeManager.class));
 
     List<Pipeline> pipelines = pipelineManager.getPipelines();
-    for (int i = 0; i < pipelineFactorThreeCount -1; i++) {
-      firePipelineEvent(pipelines.get(i));
-    }
+    firePipelineEvent(pipelines.subList(0, pipelineFactorThreeCount -1));
 
     // As 90% of 7 with ceil is 7, if we send 6 pipeline reports, rule
     // validate should be still false.
@@ -125,7 +127,8 @@ public class TestOneReplicaPipelineSafeModeRule {
     Assert.assertFalse(rule.validate());
 
     //Fire last pipeline event from datanode.
-    firePipelineEvent(pipelines.get(pipelineFactorThreeCount - 1));
+    firePipelineEvent(pipelines.subList(pipelineFactorThreeCount -1,
+            pipelineFactorThreeCount));
 
     GenericTestUtils.waitFor(() -> rule.validate(), 1000, 5000);
   }
@@ -150,10 +153,7 @@ public class TestOneReplicaPipelineSafeModeRule {
     List<Pipeline> pipelines =
         pipelineManager.getPipelines(HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.ONE);
-    for (int i = 0; i < pipelineCountOne; i++) {
-      firePipelineEvent(pipelines.get(i));
-    }
-
+    firePipelineEvent(pipelines);
     GenericTestUtils.waitFor(() -> logCapturer.getOutput().contains(
         "reported count is 0"), 1000, 5000);
 
@@ -163,15 +163,14 @@ public class TestOneReplicaPipelineSafeModeRule {
     pipelines =
         pipelineManager.getPipelines(HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.THREE);
-    for (int i = 0; i < pipelineCountThree - 1; i++) {
-      firePipelineEvent(pipelines.get(i));
-    }
+    firePipelineEvent(pipelines.subList(0, pipelineCountThree -1));
 
     GenericTestUtils.waitFor(() -> logCapturer.getOutput().contains(
         "reported count is 6"), 1000, 5000);
 
     //Fire last pipeline event from datanode.
-    firePipelineEvent(pipelines.get(pipelineCountThree - 1));
+    firePipelineEvent(pipelines.subList(pipelineCountThree -1,
+            pipelineCountThree));
 
     GenericTestUtils.waitFor(() -> rule.validate(), 1000, 5000);
   }
@@ -179,12 +178,45 @@ public class TestOneReplicaPipelineSafeModeRule {
   private void createPipelines(int count,
       HddsProtos.ReplicationFactor factor) throws Exception {
     for (int i = 0; i < count; i++) {
-      pipelineManager.createPipeline(HddsProtos.ReplicationType.RATIS,
-          factor);
+      Pipeline pipeline = pipelineManager.createPipeline(
+              HddsProtos.ReplicationType.RATIS, factor);
+      pipelineManager.openPipeline(pipeline.getId());
+
     }
   }
 
-  private void firePipelineEvent(Pipeline pipeline) {
-    eventQueue.fireEvent(SCMEvents.OPEN_PIPELINE, pipeline);
+  private void firePipelineEvent(List<Pipeline> pipelines) {
+    Map<DatanodeDetails, PipelineReportsProto.Builder>
+            reportMap = new HashMap<>();
+    for (Pipeline pipeline : pipelines) {
+      for (DatanodeDetails dn : pipeline.getNodes()) {
+        reportMap.putIfAbsent(dn, PipelineReportsProto.newBuilder());
+      }
+    }
+    for (DatanodeDetails dn : reportMap.keySet()) {
+      List<PipelineReport> reports = new ArrayList<>();
+      for (PipelineID pipeline : mockNodeManager.
+              getNode2PipelineMap().getPipelines(dn.getUuid())) {
+        try {
+          if (!pipelines.contains(pipelineManager.getPipeline(pipeline))) {
+            continue;
+          }
+        } catch (PipelineNotFoundException pnfe) {
+          continue;
+        }
+        HddsProtos.PipelineID pipelineID = pipeline.getProtobuf();
+        reports.add(PipelineReport.newBuilder()
+                .setPipelineID(pipelineID)
+                .setIsLeader(true)
+                .setBytesWritten(0)
+                .build());
+      }
+      PipelineReportsProto.Builder pipelineReportsProto =
+              PipelineReportsProto.newBuilder();
+      pipelineReportsProto.addAllPipelineReport(reports);
+      eventQueue.fireEvent(SCMEvents.PIPELINE_REPORT, new
+              SCMDatanodeHeartbeatDispatcher.PipelineReportFromDatanode(dn,
+              pipelineReportsProto.build()));
+    }
   }
 }

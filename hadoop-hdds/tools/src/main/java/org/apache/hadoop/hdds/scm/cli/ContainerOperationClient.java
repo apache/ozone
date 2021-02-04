@@ -58,6 +58,8 @@ import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForClients;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClient;
+import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -259,18 +261,39 @@ public class ContainerOperationClient implements ScmClient {
   /**
    * Returns a set of Nodes that meet a query criteria.
    *
-   * @param nodeStatuses - Criteria that we want the node to have.
-   * @param queryScope   - Query scope - Cluster or pool.
-   * @param poolName     - if it is pool, a pool name is required.
+   * @param opState - The operational state we want the node to have
+   *                eg IN_SERVICE, DECOMMISSIONED, etc
+   * @param nodeState - The health we want the node to have, eg HEALTHY, STALE,
+   *                  etc
+   * @param queryScope - Query scope - Cluster or pool.
+   * @param poolName - if it is pool, a pool name is required.
    * @return A set of nodes that meet the requested criteria.
    * @throws IOException
    */
   @Override
-  public List<HddsProtos.Node> queryNode(HddsProtos.NodeState
-      nodeStatuses, HddsProtos.QueryScope queryScope, String poolName)
+  public List<HddsProtos.Node> queryNode(
+      HddsProtos.NodeOperationalState opState,
+      HddsProtos.NodeState nodeState,
+      HddsProtos.QueryScope queryScope, String poolName)
       throws IOException {
-    return storageContainerLocationClient.queryNode(nodeStatuses, queryScope,
-        poolName);
+    return storageContainerLocationClient.queryNode(opState, nodeState,
+        queryScope, poolName, CURRENT_VERSION);
+  }
+
+  @Override
+  public void decommissionNodes(List<String> hosts) throws IOException {
+    storageContainerLocationClient.decommissionNodes(hosts);
+  }
+
+  @Override
+  public void recommissionNodes(List<String> hosts) throws IOException {
+    storageContainerLocationClient.recommissionNodes(hosts);
+  }
+
+  @Override
+  public void startMaintenanceNodes(List<String> hosts, int endHours)
+      throws IOException {
+    storageContainerLocationClient.startMaintenanceNodes(hosts, endHours);
   }
 
   /**

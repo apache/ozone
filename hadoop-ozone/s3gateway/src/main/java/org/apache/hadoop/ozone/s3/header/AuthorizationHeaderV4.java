@@ -45,12 +45,12 @@ import static org.apache.hadoop.ozone.s3.AWSSignatureProcessor.DATE_FORMATTER;
  */
 public class AuthorizationHeaderV4 {
 
-  private final static Logger LOG = LoggerFactory.getLogger(
+  private static final Logger LOG = LoggerFactory.getLogger(
       AuthorizationHeaderV4.class);
 
-  private final static String CREDENTIAL = "Credential=";
-  private final static String SIGNEDHEADERS = "SignedHeaders=";
-  private final static String SIGNATURE = "Signature=";
+  private static final String CREDENTIAL = "Credential=";
+  private static final String SIGNEDHEADERS = "SignedHeaders=";
+  private static final String SIGNATURE = "Signature=";
 
   private String authHeader;
   private String algorithm;

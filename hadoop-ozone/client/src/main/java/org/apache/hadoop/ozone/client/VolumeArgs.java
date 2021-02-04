@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.client;
 
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.OzoneConsts;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -33,7 +34,8 @@ public final class VolumeArgs {
 
   private final String admin;
   private final String owner;
-  private final String quota;
+  private final long quotaInBytes;
+  private final long quotaInNamespace;
   private final List<OzoneAcl> acls;
   private Map<String, String> metadata;
 
@@ -41,17 +43,21 @@ public final class VolumeArgs {
    * Private constructor, constructed via builder.
    * @param admin Administrator's name.
    * @param owner Volume owner's name
-   * @param quota Volume Quota.
+   * @param quotaInBytes Volume quota in bytes.
+   * @param quotaInNamespace Volume quota in counts.
    * @param acls User to access rights map.
+   * @param metadata Metadata of volume.
    */
   private VolumeArgs(String admin,
       String owner,
-      String quota,
+      long quotaInBytes,
+      long quotaInNamespace,
       List<OzoneAcl> acls,
       Map<String, String> metadata) {
     this.admin = admin;
     this.owner = owner;
-    this.quota = quota;
+    this.quotaInBytes = quotaInBytes;
+    this.quotaInNamespace = quotaInNamespace;
     this.acls = acls;
     this.metadata = metadata;
   }
@@ -73,11 +79,19 @@ public final class VolumeArgs {
   }
 
   /**
-   * Returns Volume Quota.
-   * @return Quota.
+   * Returns Volume Quota in bytes.
+   * @return quotaInBytes.
    */
-  public String getQuota() {
-    return quota;
+  public long getQuotaInBytes() {
+    return quotaInBytes;
+  }
+
+  /**
+   * Returns Volume Quota in bucket counts.
+   * @return quotaInNamespace.
+   */
+  public long getQuotaInNamespace() {
+    return quotaInNamespace;
   }
 
   /**
@@ -107,10 +121,18 @@ public final class VolumeArgs {
   public static class Builder {
     private String adminName;
     private String ownerName;
-    private String volumeQuota;
+    private long quotaInBytes;
+    private long quotaInNamespace;
     private List<OzoneAcl> listOfAcls;
     private Map<String, String> metadata = new HashMap<>();
 
+    /**
+     * Constructs a builder.
+     */
+    public Builder() {
+      quotaInBytes = OzoneConsts.QUOTA_RESET;
+      quotaInNamespace = OzoneConsts.QUOTA_RESET;
+    }
 
     public VolumeArgs.Builder setAdmin(String admin) {
       this.adminName = admin;
@@ -122,8 +144,13 @@ public final class VolumeArgs {
       return this;
     }
 
-    public VolumeArgs.Builder setQuota(String quota) {
-      this.volumeQuota = quota;
+    public VolumeArgs.Builder setQuotaInBytes(long quota) {
+      this.quotaInBytes = quota;
+      return this;
+    }
+
+    public VolumeArgs.Builder setQuotaInNamespace(long quota) {
+      this.quotaInNamespace = quota;
       return this;
     }
 
@@ -142,8 +169,8 @@ public final class VolumeArgs {
      * @return CreateVolumeArgs.
      */
     public VolumeArgs build() {
-      return new VolumeArgs(adminName, ownerName, volumeQuota, listOfAcls,
-          metadata);
+      return new VolumeArgs(adminName, ownerName, quotaInBytes,
+          quotaInNamespace, listOfAcls, metadata);
     }
   }
 

@@ -24,27 +24,28 @@
  */
 package org.apache.hadoop.hdds.scm.storage;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.scm.XceiverClientReply;
-import org.apache.hadoop.hdds.scm.XceiverClientSpi;
-import org.apache.hadoop.ozone.common.ChunkBuffer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.ExecutionException;
-
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
+
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
+import org.apache.hadoop.hdds.scm.XceiverClientReply;
+import org.apache.hadoop.hdds.scm.XceiverClientSpi;
+import org.apache.hadoop.ozone.common.ChunkBuffer;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This class executes watchForCommit on ratis pipeline and releases
@@ -96,7 +97,15 @@ public class CommitWatcher {
       long length = buffers.stream().mapToLong(ChunkBuffer::position).sum();
       totalAckDataLength += length;
       // clear the future object from the future Map
-      Preconditions.checkNotNull(futureMap.remove(totalAckDataLength));
+      final CompletableFuture<ContainerCommandResponseProto> remove =
+          futureMap.remove(totalAckDataLength);
+      if (remove == null) {
+        LOG.error("Couldn't find required future for " + totalAckDataLength);
+        for (Long key : futureMap.keySet()) {
+          LOG.error("Existing acknowledged data: " + key);
+        }
+      }
+      Preconditions.checkNotNull(remove);
       for (ChunkBuffer byteBuffer : buffers) {
         bufferPool.releaseBuffer(byteBuffer);
       }
@@ -106,7 +115,7 @@ public class CommitWatcher {
 
   public void updateCommitInfoMap(long index, List<ChunkBuffer> buffers) {
     commitIndex2flushedDataMap.computeIfAbsent(index, k -> new LinkedList<>())
-      .addAll(buffers);
+        .addAll(buffers);
   }
 
   int getCommitInfoMapSize() {

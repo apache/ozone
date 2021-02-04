@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.scm.block;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -42,10 +41,10 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerBlocksDeletionACKProto
     .DeleteBlockTransactionResult;
-import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -62,6 +61,7 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
@@ -79,6 +79,7 @@ import static org.mockito.Mockito.when;
 public class TestDeletedBlockLog {
 
   private static DeletedBlockLogImpl deletedBlockLog;
+  private static final int BLOCKS_PER_TXN = 5;
   private OzoneConfiguration conf;
   private File testDir;
   private ContainerManager containerManager;
@@ -146,8 +147,7 @@ public class TestDeletedBlockLog {
     for (int i = 0; i < dataSize; i++) {
       long containerID = continerIDBase + i;
       List<Long> blocks = new ArrayList<>();
-      int blockSize = random.nextInt(30) + 1;
-      for (int j = 0; j < blockSize; j++)  {
+      for (int j = 0; j < BLOCKS_PER_TXN; j++)  {
         long localID = localIDBase + j;
         blocks.add(localID);
       }
@@ -194,12 +194,16 @@ public class TestDeletedBlockLog {
   }
 
   private List<DeletedBlocksTransaction> getTransactions(
-      int maximumAllowedTXNum) throws IOException {
+      int maximumAllowedBlocksNum) throws IOException {
     DatanodeDeletedBlockTransactions transactions =
-        new DatanodeDeletedBlockTransactions(containerManager,
-            maximumAllowedTXNum, 3);
-    deletedBlockLog.getTransactions(transactions);
-    return transactions.getDatanodeTransactions(dnList.get(0).getUuid());
+        deletedBlockLog.getTransactions(maximumAllowedBlocksNum);
+    List<DeletedBlocksTransaction> txns = new LinkedList<>();
+    for (DatanodeDetails dn : dnList) {
+      txns.addAll(Optional.ofNullable(
+          transactions.getDatanodeTransactionMap().get(dn.getUuid()))
+          .orElseGet(LinkedList::new));
+    }
+    return txns.stream().distinct().collect(Collectors.toList());
   }
 
   @Test
@@ -213,7 +217,7 @@ public class TestDeletedBlockLog {
 
     // This will return all TXs, total num 30.
     List<DeletedBlocksTransaction> blocks =
-        getTransactions(40);
+        getTransactions(40 * BLOCKS_PER_TXN);
     List<Long> txIDs = blocks.stream().map(DeletedBlocksTransaction::getTxID)
         .collect(Collectors.toList());
 
@@ -224,14 +228,61 @@ public class TestDeletedBlockLog {
     // Increment another time so it exceed the maxRetry.
     // On this call, count will be set to -1 which means TX eventually fails.
     deletedBlockLog.incrementCount(txIDs);
-    blocks = getTransactions(40);
+    blocks = getTransactions(40 * BLOCKS_PER_TXN);
     for (DeletedBlocksTransaction block : blocks) {
       Assert.assertEquals(-1, block.getCount());
     }
 
     // If all TXs are failed, getTransactions call will always return nothing.
-    blocks = getTransactions(40);
+    blocks = getTransactions(40 * BLOCKS_PER_TXN);
     Assert.assertEquals(blocks.size(), 0);
+  }
+
+  @Test
+  public void testIncrementCountLessFrequentWritingToDB() throws Exception {
+    OzoneConfiguration testConf = OzoneConfiguration.of(conf);
+    testConf.setInt(OZONE_SCM_BLOCK_DELETION_MAX_RETRY, 120);
+
+    deletedBlockLog = new DeletedBlockLogImpl(testConf, containerManager,
+        scm.getScmMetadataStore());
+
+    for (Map.Entry<Long, List<Long>> entry :
+        generateData(1).entrySet()) {
+      deletedBlockLog.addTransaction(entry.getKey(), entry.getValue());
+    }
+
+    List<DeletedBlocksTransaction> blocks =
+        getTransactions(40 * BLOCKS_PER_TXN);
+    List<Long> txIDs = blocks.stream().map(DeletedBlocksTransaction::getTxID)
+        .collect(Collectors.toList());
+
+    for (int i = 0; i < 50; i++) {
+      deletedBlockLog.incrementCount(txIDs);
+    }
+    blocks = getTransactions(40 * BLOCKS_PER_TXN);
+    for (DeletedBlocksTransaction block : blocks) {
+      // block count should not be updated as there are only 50 retries.
+      Assert.assertEquals(0, block.getCount());
+    }
+
+    for (int i = 0; i < 60; i++) {
+      deletedBlockLog.incrementCount(txIDs);
+    }
+    blocks = getTransactions(40 * BLOCKS_PER_TXN);
+    for (DeletedBlocksTransaction block : blocks) {
+      // block count should be updated to 100 as there are already 110 retries.
+      Assert.assertEquals(100, block.getCount());
+    }
+
+    for (int i = 0; i < 50; i++) {
+      deletedBlockLog.incrementCount(txIDs);
+    }
+    blocks = getTransactions(40 * BLOCKS_PER_TXN);
+    for (DeletedBlocksTransaction block : blocks) {
+      // block count should be updated to -1 as retry count exceeds maxRetry
+      // (i.e. 160 > maxRetry which is 120).
+      Assert.assertEquals(-1, block.getCount());
+    }
   }
 
   @Test
@@ -240,7 +291,7 @@ public class TestDeletedBlockLog {
       deletedBlockLog.addTransaction(entry.getKey(), entry.getValue());
     }
     List<DeletedBlocksTransaction> blocks =
-        getTransactions(20);
+        getTransactions(20 * BLOCKS_PER_TXN);
     // Add an invalid txn.
     blocks.add(
         DeletedBlocksTransaction.newBuilder().setContainerID(1).setTxID(70)
@@ -248,17 +299,17 @@ public class TestDeletedBlockLog {
     commitTransactions(blocks);
     blocks.remove(blocks.size() - 1);
 
-    blocks = getTransactions(50);
+    blocks = getTransactions(50 * BLOCKS_PER_TXN);
     Assert.assertEquals(30, blocks.size());
     commitTransactions(blocks, dnList.get(1), dnList.get(2),
         DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
             .build());
 
-    blocks = getTransactions(50);
+    blocks = getTransactions(50 * BLOCKS_PER_TXN);
     Assert.assertEquals(30, blocks.size());
     commitTransactions(blocks, dnList.get(0));
 
-    blocks = getTransactions(50);
+    blocks = getTransactions(50 * BLOCKS_PER_TXN);
     Assert.assertEquals(0, blocks.size());
   }
 
@@ -296,7 +347,7 @@ public class TestDeletedBlockLog {
         // verify the number of added and committed.
         try (TableIterator<Long,
             ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> iter =
-            scm.getScmMetadataStore().getDeletedBlocksTXTable().iterator()) {
+            deletedBlockLog.getIterator()) {
           AtomicInteger count = new AtomicInteger();
           iter.forEachRemaining((keyValue) -> count.incrementAndGet());
           Assert.assertEquals(added, count.get() + committed);
@@ -318,87 +369,64 @@ public class TestDeletedBlockLog {
     deletedBlockLog = new DeletedBlockLogImpl(conf, containerManager,
         scm.getScmMetadataStore());
     List<DeletedBlocksTransaction> blocks =
-        getTransactions(10);
+        getTransactions(BLOCKS_PER_TXN * 10);
+    Assert.assertEquals(10, blocks.size());
     commitTransactions(blocks);
-    blocks = getTransactions(100);
+    blocks = getTransactions(BLOCKS_PER_TXN * 40);
     Assert.assertEquals(40, blocks.size());
     commitTransactions(blocks);
+
+    // close db and reopen it again to make sure
+    // currentTxnID = 50
+    deletedBlockLog.close();
+    deletedBlockLog = new DeletedBlockLogImpl(conf, containerManager,
+        scm.getScmMetadataStore());
+    blocks = getTransactions(BLOCKS_PER_TXN * 40);
+    Assert.assertEquals(0, blocks.size());
+    Assert.assertEquals((long)deletedBlockLog.getCurrentTXID(), 50L);
   }
 
   @Test
   public void testDeletedBlockTransactions() throws IOException {
     int txNum = 10;
-    int maximumAllowedTXNum = 5;
-    List<DeletedBlocksTransaction> blocks = null;
-    List<Long> containerIDs = new LinkedList<>();
+    List<DeletedBlocksTransaction> blocks;
     DatanodeDetails dnId1 = dnList.get(0), dnId2 = dnList.get(1);
 
     int count = 0;
-    long containerID = 0L;
+    long containerID;
 
     // Creates {TXNum} TX in the log.
-    for (Map.Entry<Long, List<Long>> entry : generateData(txNum)
-        .entrySet()) {
+    for (Map.Entry<Long, List<Long>> entry : generateData(txNum).entrySet()) {
       count++;
       containerID = entry.getKey();
-      containerIDs.add(containerID);
       deletedBlockLog.addTransaction(containerID, entry.getValue());
 
-      // make TX[1-6] for datanode1; TX[7-10] for datanode2
-      if (count <= (maximumAllowedTXNum + 1)) {
+      if (count % 2 == 0) {
         mockContainerInfo(containerID, dnId1);
       } else {
         mockContainerInfo(containerID, dnId2);
       }
     }
 
-    DatanodeDeletedBlockTransactions transactions =
-        new DatanodeDeletedBlockTransactions(containerManager,
-            maximumAllowedTXNum, 2);
-    deletedBlockLog.getTransactions(transactions);
+    // fetch and delete 1 less txn Id
+    commitTransactions(getTransactions((txNum - 1) * BLOCKS_PER_TXN));
 
-    for (UUID id : transactions.getDatanodeIDs()) {
-      List<DeletedBlocksTransaction> txs = transactions
-          .getDatanodeTransactions(id);
-      // delete TX ID
-      commitTransactions(txs);
-    }
-
-    blocks = getTransactions(txNum);
-    // There should be one block remained since dnID1 reaches
-    // the maximum value (5).
+    blocks = getTransactions(txNum * BLOCKS_PER_TXN);
+    // There should be one txn remaining
     Assert.assertEquals(1, blocks.size());
 
-    Assert.assertFalse(transactions.isFull());
-    // The number of TX in dnID1 won't more than maximum value.
-    Assert.assertEquals(maximumAllowedTXNum,
-        transactions.getDatanodeTransactions(dnId1.getUuid()).size());
-
-    int size = transactions.getDatanodeTransactions(dnId2.getUuid()).size();
-    // add duplicated container in dnID2, this should be failed.
+    // add two transactions for same container
+    containerID = blocks.get(0).getContainerID();
     DeletedBlocksTransaction.Builder builder =
         DeletedBlocksTransaction.newBuilder();
     builder.setTxID(11);
     builder.setContainerID(containerID);
     builder.setCount(0);
-    transactions.addTransaction(builder.build(),
-        null);
+    deletedBlockLog.addTransaction(containerID, new LinkedList<>());
 
-    // The number of TX in dnID2 should not be changed.
-    Assert.assertEquals(size,
-        transactions.getDatanodeTransactions(dnId2.getUuid()).size());
-
-    // Add new TX in dnID2, then dnID2 will reach maximum value.
-    containerID = RandomUtils.nextLong();
-    builder = DeletedBlocksTransaction.newBuilder();
-    builder.setTxID(12);
-    builder.setContainerID(containerID);
-    builder.setCount(0);
-    mockContainerInfo(containerID, dnId2);
-    transactions.addTransaction(builder.build(),
-        null);
-    // Since all node are full, then transactions is full.
-    Assert.assertTrue(transactions.isFull());
+    // get should return two transactions for the same container
+    blocks = getTransactions(txNum);
+    Assert.assertEquals(2, blocks.size());
   }
 
   private void mockContainerInfo(long containerID, DatanodeDetails dd)

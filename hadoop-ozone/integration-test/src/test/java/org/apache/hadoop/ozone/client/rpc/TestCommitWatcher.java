@@ -17,18 +17,28 @@
 
 package org.apache.hadoop.ozone.client.rpc;
 
+import java.io.IOException;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientRatis;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -43,28 +53,19 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
-import org.apache.ratis.protocol.AlreadyClosedException;
-import org.apache.ratis.protocol.NotReplicatedException;
-import org.apache.ratis.protocol.RaftRetryFailureException;
-import org.apache.ratis.protocol.TimeoutIOException;
+
+import static java.util.Collections.singletonList;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import org.apache.ratis.protocol.exceptions.AlreadyClosedException;
+import org.apache.ratis.protocol.exceptions.NotReplicatedException;
+import org.apache.ratis.protocol.exceptions.RaftRetryFailureException;
+import org.apache.ratis.protocol.exceptions.TimeoutIOException;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
-import org.junit.Test;
-
-import java.io.IOException;
-import java.time.Duration;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
-
 import org.junit.Rule;
+import org.junit.Test;
 import org.junit.rules.Timeout;
-import static java.util.Collections.singletonList;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.
-        OZONE_SCM_STALENODE_INTERVAL;
 
 /**
  * Class to test CommitWatcher functionality.
@@ -126,7 +127,10 @@ public class TestCommitWatcher {
     ratisClientConfig.setWatchRequestTimeout(Duration.ofSeconds(10));
     conf.setFromObject(ratisClientConfig);
 
-    conf.set(OzoneConfigKeys.OZONE_CLIENT_CHECKSUM_TYPE, "NONE");
+    OzoneClientConfig clientConfig = new OzoneClientConfig();
+    clientConfig.setChecksumType(ChecksumType.NONE);
+    conf.setFromObject(clientConfig);
+
     conf.setQuietMode(false);
     conf.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 4,
         StorageUnit.MB);
@@ -187,7 +191,7 @@ public class TestCommitWatcher {
           ContainerTestHelper
               .getWriteChunkRequest(pipeline, blockID, chunkSize, null);
       // add the data to the buffer pool
-      final ChunkBuffer byteBuffer = bufferPool.allocateBufferIfNeeded(0);
+      final ChunkBuffer byteBuffer = bufferPool.allocateBuffer(0);
       byteBuffer.put(writeChunkRequest.getWriteChunk().getData());
       ratisClient.sendCommandAsync(writeChunkRequest);
       ContainerProtos.ContainerCommandRequestProto putBlockRequest =
@@ -264,7 +268,7 @@ public class TestCommitWatcher {
           ContainerTestHelper
               .getWriteChunkRequest(pipeline, blockID, chunkSize, null);
       // add the data to the buffer pool
-      final ChunkBuffer byteBuffer = bufferPool.allocateBufferIfNeeded(0);
+      final ChunkBuffer byteBuffer = bufferPool.allocateBuffer(0);
       byteBuffer.put(writeChunkRequest.getWriteChunk().getData());
       ratisClient.sendCommandAsync(writeChunkRequest);
       ContainerProtos.ContainerCommandRequestProto putBlockRequest =

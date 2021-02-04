@@ -37,7 +37,6 @@ import com.google.gson.GsonBuilder;
 import org.kohsuke.MetaInfServices;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
-import org.rocksdb.Options;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksIterator;
 import picocli.CommandLine;
@@ -61,25 +60,24 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       description = "List Key -> Value instead of just Value.",
       defaultValue = "false",
       showDefaultValue = CommandLine.Help.Visibility.ALWAYS)
-  private boolean withKey;
+  private static boolean withKey;
+
+  @CommandLine.Option(names = {"--length", "-l"},
+          description = "Maximum number of items to list")
+  private static int limit = 100;
 
   @CommandLine.ParentCommand
   private RDBParser parent;
 
   private HashMap<String, DBColumnFamilyDefinition> columnFamilyMap;
 
-  private static void displayTable(RocksDB rocksDB,
-        DBColumnFamilyDefinition dbColumnFamilyDefinition,
-        List<ColumnFamilyHandle> list, boolean withKey) throws IOException {
-    ColumnFamilyHandle columnFamilyHandle = getColumnFamilyHandle(
-            dbColumnFamilyDefinition.getTableName()
-                    .getBytes(StandardCharsets.UTF_8), list);
-    if (columnFamilyHandle == null) {
-      throw new IllegalArgumentException("columnFamilyHandle is null");
-    }
-    RocksIterator iterator = rocksDB.newIterator(columnFamilyHandle);
+  private List<Object> scannedObjects;
+
+  private static List<Object> displayTable(RocksIterator iterator,
+      DBColumnFamilyDefinition dbColumnFamilyDefinition) throws IOException {
+    List<Object> outputs = new ArrayList<>();
     iterator.seekToFirst();
-    while (iterator.isValid()){
+    while (iterator.isValid() && limit > 0){
       StringBuilder result = new StringBuilder();
       if (withKey) {
         Object key = dbColumnFamilyDefinition.getKeyCodec()
@@ -90,11 +88,34 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       }
       Object o = dbColumnFamilyDefinition.getValueCodec()
               .fromPersistedFormat(iterator.value());
+      outputs.add(o);
       Gson gson = new GsonBuilder().setPrettyPrinting().create();
       result.append(gson.toJson(o));
       System.out.println(result.toString());
+      limit--;
       iterator.next();
     }
+    return outputs;
+  }
+
+  public void setTableName(String tableName) {
+    this.tableName = tableName;
+  }
+
+  public RDBParser getParent() {
+    return parent;
+  }
+
+  public void setParent(RDBParser parent) {
+    this.parent = parent;
+  }
+
+  public static void setLimit(int limit) {
+    DBScanner.limit = limit;
+  }
+
+  public List<Object> getScannedObjects() {
+    return scannedObjects;
   }
 
   private static ColumnFamilyHandle getColumnFamilyHandle(
@@ -121,26 +142,21 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     this.columnFamilyMap = new HashMap<>();
     DBColumnFamilyDefinition[] columnFamilyDefinitions = dbDefinition
             .getColumnFamilies();
-    for(DBColumnFamilyDefinition definition:columnFamilyDefinitions){
+    for (DBColumnFamilyDefinition definition:columnFamilyDefinitions) {
+      System.out.println("Added definition for table:" +
+          definition.getTableName());
       this.columnFamilyMap.put(definition.getTableName(), definition);
     }
   }
 
   @Override
   public Void call() throws Exception {
-    List<ColumnFamilyDescriptor> cfs = new ArrayList<>();
+    List<ColumnFamilyDescriptor> cfs =
+        RocksDBUtils.getColumnFamilyDescriptors(parent.getDbPath());
+
     final List<ColumnFamilyHandle> columnFamilyHandleList =
-            new ArrayList<>();
-    List<byte[]> cfList = null;
-    cfList = RocksDB.listColumnFamilies(new Options(),
-            parent.getDbPath());
-    if (cfList != null) {
-      for (byte[] b : cfList) {
-        cfs.add(new ColumnFamilyDescriptor(b));
-      }
-    }
-    RocksDB rocksDB = null;
-    rocksDB = RocksDB.openReadOnly(parent.getDbPath(),
+        new ArrayList<>();
+    RocksDB rocksDB = RocksDB.openReadOnly(parent.getDbPath(),
             cfs, columnFamilyHandleList);
     this.printAppropriateTable(columnFamilyHandleList,
            rocksDB, parent.getDbPath());
@@ -150,17 +166,28 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
   private void printAppropriateTable(
           List<ColumnFamilyHandle> columnFamilyHandleList,
           RocksDB rocksDB, String dbPath) throws IOException {
+    if (limit < 1) {
+      throw new IllegalArgumentException(
+              "List length should be a positive number");
+    }
     dbPath = removeTrailingSlashIfNeeded(dbPath);
     this.constructColumnFamilyMap(DBDefinitionFactory.
             getDefinition(new File(dbPath).getName()));
     if (this.columnFamilyMap !=null) {
       if (!this.columnFamilyMap.containsKey(tableName)) {
-        System.out.print("Table with specified name does not exist");
+        System.out.print("Table with name:" + tableName + " does not exist");
       } else {
         DBColumnFamilyDefinition columnFamilyDefinition =
                 this.columnFamilyMap.get(tableName);
-        displayTable(rocksDB, columnFamilyDefinition, columnFamilyHandleList,
-            withKey);
+        ColumnFamilyHandle columnFamilyHandle = getColumnFamilyHandle(
+                columnFamilyDefinition.getTableName()
+                        .getBytes(StandardCharsets.UTF_8),
+                columnFamilyHandleList);
+        if (columnFamilyHandle == null) {
+          throw new IllegalArgumentException("columnFamilyHandle is null");
+        }
+        RocksIterator iterator = rocksDB.newIterator(columnFamilyHandle);
+        scannedObjects = displayTable(iterator, columnFamilyDefinition);
       }
     } else {
       System.out.println("Incorrect db Path");
@@ -179,3 +206,4 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     return RDBParser.class;
   }
 }
+

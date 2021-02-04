@@ -27,6 +27,8 @@ import org.apache.hadoop.hdds.utils.db.Codec;
 
 import com.google.common.base.Preconditions;
 
+import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
+
 /**
  * Codec to serialize / deserialize Pipeline.
  */
@@ -34,15 +36,14 @@ public class PipelineCodec implements Codec<Pipeline> {
 
   @Override
   public byte[] toPersistedFormat(Pipeline object) throws IOException {
-    return object.getProtobufMessage().toByteArray();
+    return object.getProtobufMessage(CURRENT_VERSION).toByteArray();
   }
 
   @Override
   public Pipeline fromPersistedFormat(byte[] rawData) throws IOException {
     HddsProtos.Pipeline.Builder pipelineBuilder = HddsProtos.Pipeline
         .newBuilder(HddsProtos.Pipeline.PARSER.parseFrom(rawData));
-    Pipeline pipeline = Pipeline.getFromProtobuf(pipelineBuilder.setState(
-        HddsProtos.PipelineState.PIPELINE_ALLOCATED).build());
+    Pipeline pipeline = Pipeline.getFromProtobuf(pipelineBuilder.build());
     // When SCM is restarted, set Creation time with current time.
     pipeline.setCreationTimestamp(Instant.now());
     Preconditions.checkNotNull(pipeline);

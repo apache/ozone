@@ -143,7 +143,8 @@ public class TestGenerateOzoneRequiredConfigurations {
       cmd.parseWithHandlers(new CommandLine.RunLast(),
           exceptionHandler, args);
     }catch(Exception ex){
-      Assert.assertTrue(ex.getMessage().contains(msg));
+      Assert.assertTrue("Expected " + msg + ", but got: " + ex.getMessage(),
+          ex.getMessage().contains(msg));
     }
   }
 
@@ -225,7 +226,7 @@ public class TestGenerateOzoneRequiredConfigurations {
   public void genconfPathNotSpecified() throws Exception {
     File tempPath = getRandomTempDir();
     String[] args = new String[]{};
-    executeWithException(args, "Missing required parameter: <path>");
+    executeWithException(args, "Missing required parameter: '<path>'");
   }
 
   /**

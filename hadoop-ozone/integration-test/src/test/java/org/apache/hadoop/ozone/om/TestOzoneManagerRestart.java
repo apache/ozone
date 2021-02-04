@@ -104,7 +104,6 @@ public class TestOzoneManagerRestart {
     String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
 
     OzoneClient client = cluster.getClient();
-
     ObjectStore objectStore = client.getObjectStore();
 
     objectStore.createVolume(volumeName);
@@ -208,6 +207,4 @@ public class TestOzoneManagerRestart {
     Assert.assertTrue(ozoneKey.getReplicationType().equals(
         ReplicationType.RATIS));
   }
-
-
 }

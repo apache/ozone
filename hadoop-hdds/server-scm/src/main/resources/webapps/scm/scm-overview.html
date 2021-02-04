@@ -14,13 +14,35 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 -->
+<h2>SCM Information</h2>
+<table class="table table-bordered table-striped">
+    <tbody>
+    <tr>
+        <td>Scm Id:</td>
+        <td>{{$ctrl.overview.jmx.ScmId}}</td>
+    </tr>
+    <tr>
+        <td>Cluster Id:</td>
+        <td>{{$ctrl.overview.jmx.ClusterId}}</td>
+    </tr>
+    </tbody>
+</table>
+
 <h2>Node counts</h2>
 
 <table class="table table-bordered table-striped" class="col-md-6">
+    <thead>
+    <tr>
+        <th class="col-md-3"></th>
+        <th>HEALTHY</th>
+        <th>STALE</th>
+        <th>DEAD</th>
+    </tr>
+    </thead>
     <tbody>
-    <tr ng-repeat="typestat in $ctrl.nodemanagermetrics.NodeCount | orderBy:'key':false:$ctrl.nodeOrder">
-        <td>{{typestat.key}}</td>
-        <td>{{typestat.value}}</td>
+    <tr ng-repeat="nodeOpState in $ctrl.nodemanagermetrics.NodeCount | orderBy:'key':false:$ctrl.nodeOpStateOrder">
+        <td>{{nodeOpState.key}}</td>
+        <td ng-repeat="nodeState in nodeOpState.value | orderBy:'key':false:$ctrl.nodeStateOrder">{{nodeState.value}}</td>
     </tr>
     </tbody>
 </table>
@@ -38,7 +60,7 @@
     </tr>
     <tr>
         <td>Node Manager: Safe mode status</td>
-        <td>{{$ctrl.scmmetrics.InSafeMode}}</td>
+        <td>{{$ctrl.overview.jmx.InSafeMode}}</td>
     </tr>
     </tbody>
 </table>
@@ -46,10 +68,18 @@
 <h2>Safemode rules statuses</h2>
 
 <table class="table table-bordered table-striped" class="col-md-6">
+    <thead>
+    <tr>
+        <th>Rule Id</th>
+        <th>Rule definition</th>
+        <th>Passed</th>
+    </tr>
+    </thead>
     <tbody>
-    <tr ng-repeat="typestat in $ctrl.scmmetrics.RuleStatusMetrics">
+    <tr ng-repeat="typestat in $ctrl.overview.jmx.SafeModeRuleStatus">
         <td>{{typestat.key}}</td>
-        <td>{{typestat.value}}</td>
+        <td>{{typestat.value[0]}}</td>
+        <td>{{typestat.value[1]}}</td>
     </tr>
     </tbody>
 </table>

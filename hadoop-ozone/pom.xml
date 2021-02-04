@@ -16,21 +16,22 @@
   <parent>
     <groupId>org.apache.hadoop</groupId>
     <artifactId>hadoop-main-ozone</artifactId>
-    <version>0.6.0-SNAPSHOT</version>
+    <version>1.1.0-SNAPSHOT</version>
   </parent>
   <artifactId>hadoop-ozone</artifactId>
-  <version>0.6.0-SNAPSHOT</version>
+  <version>1.1.0-SNAPSHOT</version>
   <description>Apache Hadoop Ozone Project</description>
   <name>Apache Hadoop Ozone</name>
   <packaging>pom</packaging>
 
   <properties>
     <docker.image>apache/ozone:${project.version}</docker.image>
-    <spring.version>5.2.5.RELEASE</spring.version>
+    <spring.version>5.2.11.RELEASE</spring.version>
     <jooq.version>3.11.10</jooq.version>
   </properties>
   <modules>
     <module>interface-client</module>
+    <module>interface-storage</module>
     <module>common</module>
     <module>client</module>
     <module>ozone-manager</module>
@@ -69,6 +70,11 @@
       <dependency>
         <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-ozone-interface-client</artifactId>
+        <version>${ozone.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-ozone-interface-storage</artifactId>
         <version>${ozone.version}</version>
       </dependency>
       <dependency>
@@ -151,6 +157,13 @@
         <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-hdds-hadoop-dependency-test</artifactId>
         <version>${hdds.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-hdds-common</artifactId>
+        <version>${hdds.version}</version>
+        <type>test-jar</type>
         <scope>test</scope>
       </dependency>
       <dependency>
@@ -267,7 +280,7 @@
             <exclude>**/output.xml</exclude>
             <exclude>**/log.html</exclude>
             <exclude>**/report.html</exclude>
-            <exclude>.idea/**</exclude>
+            <exclude>**/.idea/**</exclude>
             <exclude>**/.ssh/id_rsa*</exclude>
             <exclude>dev-support/*tests</exclude>
             <exclude>dev-support/checkstyle*</exclude>
@@ -288,9 +301,9 @@
             <exclude>src/test/resources/ssl/*</exclude>
             <exclude>src/main/compose/ozonesecure/docker-image/runner/build/apache-rat-0.12/README-CLI.txt</exclude>
             <exclude>src/main/compose/ozonesecure/docker-image/runner/build/apache-rat-0.12/README-ANT.txt</exclude>
-            <exclude>webapps/static/angular-1.7.9.min.js</exclude>
+            <exclude>webapps/static/angular-1.8.0.min.js</exclude>
             <exclude>webapps/static/angular-nvd3-1.0.9.min.js</exclude>
-            <exclude>webapps/static/angular-route-1.7.9.min.js</exclude>
+            <exclude>webapps/static/angular-route-1.8.0.min.js</exclude>
             <exclude>webapps/static/bootstrap-3.4.1/**</exclude>
             <exclude>webapps/static/d3-3.5.17.min.js</exclude>
             <exclude>webapps/static/jquery-3.5.1.min.js</exclude>
@@ -304,29 +317,11 @@
             <exclude>**/yarn.lock</exclude>
             <exclude>**/pnpm-lock.yaml</exclude>
             <exclude>**/ozone-recon-web/build/**</exclude>
+            <exclude>src/test/resources/prometheus-test-response.txt</exclude>
             <exclude>src/main/license/**</exclude>
             <exclude>src/main/resources/proto.lock</exclude>
           </excludes>
         </configuration>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-dependency-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>add-classpath-descriptor</id>
-            <phase>prepare-package</phase>
-            <goals>
-              <goal>build-classpath</goal>
-            </goals>
-            <configuration>
-              <outputFile>${project.build.outputDirectory}/${project.artifactId}.classpath</outputFile>
-              <prefix>$HDDS_LIB_JARS_DIR</prefix>
-              <outputFilterFile>true</outputFilterFile>
-              <includeScope>runtime</includeScope>
-            </configuration>
-          </execution>
-        </executions>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -423,6 +418,37 @@
                 <test.unique.fork.id>fork-${surefire.forkNumber}</test.unique.fork.id>
               </systemPropertyVariables>
             </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>add-classpath-descriptor</id>
+      <activation>
+        <file>
+          <exists>src/main/java</exists>
+        </file>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-dependency-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>add-classpath-descriptor</id>
+                <phase>prepare-package</phase>
+                <goals>
+                  <goal>build-classpath</goal>
+                </goals>
+                <configuration>
+                  <outputFile>${project.build.outputDirectory}/${project.artifactId}.classpath</outputFile>
+                  <prefix>$HDDS_LIB_JARS_DIR</prefix>
+                  <outputFilterFile>true</outputFilterFile>
+                  <includeScope>runtime</includeScope>
+                </configuration>
+              </execution>
+            </executions>
           </plugin>
         </plugins>
       </build>

@@ -25,6 +25,8 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Collections;
+
 /**
  * Provides the current checkpoint Snapshot of the OM DB. (tar.gz)
  */
@@ -48,6 +50,8 @@ public class SCMDBCheckpointServlet extends DBCheckpointServlet {
     }
 
     initialize(scm.getScmMetadataStore().getStore(),
-        scm.getMetrics().getDBCheckpointMetrics());
+        scm.getMetrics().getDBCheckpointMetrics(),
+        false,
+        Collections.emptyList());
   }
 }

@@ -30,6 +30,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -44,6 +45,8 @@ import org.apache.commons.compress.compressors.CompressorOutputStream;
 import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.apache.commons.compress.utils.IOUtils;
 import org.apache.commons.lang3.StringUtils;
+
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
 
 import org.slf4j.Logger;
@@ -61,7 +64,11 @@ public class DBCheckpointServlet extends HttpServlet {
   private transient DBStore dbStore;
   private transient DBCheckpointMetrics dbMetrics;
 
-  public void initialize(DBStore store, DBCheckpointMetrics metrics)
+  private boolean omAclEnabled;
+  private Collection<String> ozoneAdmins;
+
+  public void initialize(DBStore store, DBCheckpointMetrics metrics,
+      boolean omAclEnabled, Collection<String> ozoneAdmins)
       throws ServletException {
 
     dbStore = store;
@@ -69,6 +76,20 @@ public class DBCheckpointServlet extends HttpServlet {
     if (dbStore == null) {
       LOG.error(
           "Unable to set metadata snapshot request. DB Store is null");
+    }
+
+    this.omAclEnabled = omAclEnabled;
+    this.ozoneAdmins = ozoneAdmins;
+  }
+
+  private boolean hasPermission(String username) {
+    // Check ACL for dbCheckpoint only when global Ozone ACL is enabled
+    if (omAclEnabled) {
+      // Only Ozone admins are allowed
+      return ozoneAdmins.contains(OZONE_ADMINISTRATORS_WILDCARD)
+          || ozoneAdmins.contains(username);
+    } else {
+      return true;
     }
   }
 
@@ -87,6 +108,33 @@ public class DBCheckpointServlet extends HttpServlet {
           "Unable to process metadata snapshot request. DB Store is null");
       response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
       return;
+    }
+
+    // Check ACL for dbCheckpoint only when global Ozone ACL is enable
+    if (omAclEnabled) {
+      final java.security.Principal userPrincipal = request.getUserPrincipal();
+      if (userPrincipal == null) {
+        final String remoteUser = request.getRemoteUser();
+        LOG.error("Permission denied: Unauthorized access to /dbCheckpoint,"
+                + " no user principal found. Current login user is {}.",
+            remoteUser != null ? "'" + remoteUser + "'" : "UNKNOWN");
+        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+        return;
+      } else {
+        final String userPrincipalName = userPrincipal.getName();
+        if (!hasPermission(userPrincipalName)) {
+          LOG.error("Permission denied: User principal '{}' does not have"
+                  + " access to /dbCheckpoint.\nThis can happen when Ozone Manager"
+                  + " is started with a different user.\nPlease append '{}' to OM"
+                  + " 'ozone.administrators' config and restart OM to grant current"
+                  + " user access to this endpoint.",
+              userPrincipalName, userPrincipalName);
+          response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+          return;
+        }
+        LOG.debug("Granted user principal '{}' access to /dbCheckpoint.",
+            userPrincipalName);
+      }
     }
 
     DBCheckpoint checkpoint = null;

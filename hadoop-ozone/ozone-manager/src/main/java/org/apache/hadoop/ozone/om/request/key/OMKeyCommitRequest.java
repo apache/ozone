@@ -29,6 +29,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -45,21 +47,17 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyCommitResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .CommitKeyRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .KeyArgs;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .KeyLocation;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CommitKeyRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocation;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
 /**
@@ -125,6 +123,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
     IOException exception = null;
     OmKeyInfo omKeyInfo = null;
+    OmBucketInfo omBucketInfo = null;
     OMClientResponse omClientResponse = null;
     boolean bucketLockAcquired = false;
     Result result;
@@ -153,10 +152,27 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       }
 
       bucketLockAcquired =
-          omMetadataManager.getLock().acquireLock(BUCKET_LOCK,
+          omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
               volumeName, bucketName);
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
+
+      // Check for directory exists with same name, if it exists throw error.
+      if (ozoneManager.getEnableFileSystemPaths()) {
+        if (checkDirectoryAlreadyExists(volumeName, bucketName, keyName,
+            omMetadataManager)) {
+          throw new OMException("Can not create file: " + keyName +
+              " as there is already directory in the given path", NOT_A_FILE);
+        }
+        // Ensure the parent exist.
+        if (!"".equals(OzoneFSUtils.getParent(keyName))
+            && !checkDirectoryAlreadyExists(volumeName, bucketName,
+            OzoneFSUtils.getParent(keyName), omMetadataManager)) {
+          throw new OMException("Cannot create file : " + keyName
+              + " as parent directory doesn't exist",
+              OMException.ResultCodes.DIRECTORY_NOT_FOUND);
+        }
+      }
 
       omKeyInfo = omMetadataManager.getOpenKeyTable().get(dbOpenKey);
       if (omKeyInfo == null) {
@@ -168,6 +184,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       omKeyInfo.setModificationTime(commitKeyArgs.getModificationTime());
 
       // Update the block length for each block
+      List<OmKeyLocationInfo> allocatedLocationInfoList =
+          omKeyInfo.getLatestVersionLocations().getLocationList();
       omKeyInfo.updateLocationInfoList(locationInfoList);
 
       // Set the UpdateID to current transactionLogIndex
@@ -182,8 +200,19 @@ public class OMKeyCommitRequest extends OMKeyRequest {
           new CacheKey<>(dbOzoneKey),
           new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
 
+      long scmBlockSize = ozoneManager.getScmBlockSize();
+      int factor = omKeyInfo.getFactor().getNumber();
+      omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
+      // Block was pre-requested and UsedBytes updated when createKey and
+      // AllocatedBlock. The space occupied by the Key shall be based on
+      // the actual Key size, and the total Block size applied before should
+      // be subtracted.
+      long correctedSpace = omKeyInfo.getDataSize() * factor -
+          allocatedLocationInfoList.size() * scmBlockSize * factor;
+      omBucketInfo.incrUsedBytes(correctedSpace);
+
       omClientResponse = new OMKeyCommitResponse(omResponse.build(),
-          omKeyInfo, dbOzoneKey, dbOpenKey);
+          omKeyInfo, dbOzoneKey, dbOpenKey, omBucketInfo.copyObject());
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
@@ -196,7 +225,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
           omDoubleBufferHelper);
 
       if(bucketLockAcquired) {
-        omMetadataManager.getLock().releaseLock(BUCKET_LOCK, volumeName,
+        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
             bucketName);
       }
     }
@@ -218,7 +247,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
           bucketName, keyName);
       break;
     case FAILURE:
-      LOG.error("Key commit failed. Volume:{}, Bucket:{}, Key:{}. Exception:{}",
+      LOG.error("Key commit failed. Volume:{}, Bucket:{}, Key:{}.",
           volumeName, bucketName, keyName, exception);
       omMetrics.incNumKeyCommitFails();
       break;

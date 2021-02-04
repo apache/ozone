@@ -69,6 +69,7 @@ import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.hadoop.ozone.protocol.commands.SetNodeOperationalStateCommand;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolPB;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolServerSideTranslatorPB;
 import org.apache.hadoop.security.authorize.PolicyProvider;
@@ -85,6 +86,7 @@ import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProt
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.deleteContainerCommand;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.replicateContainerCommand;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.reregisterCommand;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.setNodeOperationalStateCommand;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY;
@@ -203,13 +205,13 @@ public class SCMDatanodeProtocolServer implements
 
   @Override
   public SCMRegisteredResponseProto register(
-      HddsProtos.DatanodeDetailsProto datanodeDetailsProto,
+      HddsProtos.ExtendedDatanodeDetailsProto extendedDatanodeDetailsProto,
       NodeReportProto nodeReport,
       ContainerReportsProto containerReportsProto,
           PipelineReportsProto pipelineReportsProto)
       throws IOException {
     DatanodeDetails datanodeDetails = DatanodeDetails
-        .getFromProtoBuf(datanodeDetailsProto);
+        .getFromProtoBuf(extendedDatanodeDetailsProto);
     boolean auditSuccess = true;
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("datanodeDetails", datanodeDetails.toString());
@@ -343,6 +345,12 @@ public class SCMDatanodeProtocolServer implements
           .setCommandType(closePipelineCommand)
           .setClosePipelineCommandProto(
               ((ClosePipelineCommand)cmd).getProto())
+          .build();
+    case setNodeOperationalStateCommand:
+      return builder
+          .setCommandType(setNodeOperationalStateCommand)
+          .setSetNodeOperationalStateCommandProto(
+              ((SetNodeOperationalStateCommand)cmd).getProto())
           .build();
     default:
       throw new IllegalArgumentException("Scm command " +

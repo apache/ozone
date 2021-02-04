@@ -19,10 +19,9 @@ set -e
 COMPOSE_ENV_NAME=$(basename "$COMPOSE_DIR")
 RESULT_DIR=${RESULT_DIR:-"$COMPOSE_DIR/result"}
 RESULT_DIR_INSIDE="/tmp/smoketest/$(basename "$COMPOSE_ENV_NAME")/result"
-SMOKETEST_DIR_INSIDE="${OZONE_DIR:-/opt/hadoop}/smoketest"
 
 OM_HA_PARAM=""
-if [[ -n "${OM_SERVICE_ID}" ]]; then
+if [[ -n "${OM_SERVICE_ID}" ]] && [[ "${OM_SERVICE_ID}" != "om" ]]; then
   OM_HA_PARAM="--om-service-id=${OM_SERVICE_ID}"
 else
   OM_SERVICE_ID=om
@@ -60,24 +59,26 @@ find_tests(){
   echo $tests
 }
 
-## @description wait until safemode exit (or 180 seconds)
+## @description wait until safemode exit (or 240 seconds)
 wait_for_safemode_exit(){
   # version-dependent
-  : ${OZONE_ADMIN_COMMAND:=admin}
+  : ${OZONE_SAFEMODE_STATUS_COMMAND:=ozone admin safemode status --verbose}
 
   #Reset the timer
   SECONDS=0
 
-  #Don't give it up until 180 seconds
-  while [[ $SECONDS -lt 180 ]]; do
+  #Don't give it up until 240 seconds
+  while [[ $SECONDS -lt 240 ]]; do
 
      #This line checks the safemode status in scm
-     local command="ozone ${OZONE_ADMIN_COMMAND} safemode status"
+     local command="${OZONE_SAFEMODE_STATUS_COMMAND}"
      if [[ "${SECURITY_ENABLED}" == 'true' ]]; then
          status=$(docker-compose exec -T scm bash -c "kinit -k HTTP/scm@EXAMPLE.COM -t /etc/security/keytabs/HTTP.keytab && $command" || true)
      else
          status=$(docker-compose exec -T scm bash -c "$command")
      fi
+
+     echo "SECONDS: $SECONDS"
 
      echo $status
      if [[ "$status" ]]; then
@@ -133,10 +134,19 @@ execute_robot_test(){
     OUTPUT_FILE="robot-${OUTPUT_NAME}-${i}.xml"
   done
 
+  SMOKETEST_DIR_INSIDE="${OZONE_DIR:-/opt/hadoop}/smoketest"
+
   OUTPUT_PATH="$RESULT_DIR_INSIDE/${OUTPUT_FILE}"
   # shellcheck disable=SC2068
   docker-compose exec -T "$CONTAINER" mkdir -p "$RESULT_DIR_INSIDE" \
-    && docker-compose exec -T "$CONTAINER" robot -v OM_SERVICE_ID:"${OM_SERVICE_ID}" -v SECURITY_ENABLED:"${SECURITY_ENABLED}" -v OM_HA_PARAM:"${OM_HA_PARAM}" -v KEY_NAME:"${OZONE_BUCKET_KEY_NAME}" ${ARGUMENTS[@]} --log NONE --report NONE "${OZONE_ROBOT_OPTS[@]}" --output "$OUTPUT_PATH" "$SMOKETEST_DIR_INSIDE/$TEST"
+    && docker-compose exec -T "$CONTAINER" robot \
+      -v KEY_NAME:"${OZONE_BUCKET_KEY_NAME}" \
+      -v OM_HA_PARAM:"${OM_HA_PARAM}" \
+      -v OM_SERVICE_ID:"${OM_SERVICE_ID}" \
+      -v OZONE_DIR:"${OZONE_DIR}" \
+      -v SECURITY_ENABLED:"${SECURITY_ENABLED}" \
+      ${ARGUMENTS[@]} --log NONE --report NONE "${OZONE_ROBOT_OPTS[@]}" --output "$OUTPUT_PATH" \
+      "$SMOKETEST_DIR_INSIDE/$TEST"
   local -i rc=$?
 
   FULL_CONTAINER_NAME=$(docker-compose ps | grep "_${CONTAINER}_" | head -n 1 | awk '{print $1}')
@@ -241,9 +251,45 @@ generate_report(){
 
   if command -v rebot > /dev/null 2>&1; then
      #Generate the combined output and return with the right exit code (note: robot = execute test, rebot = generate output)
-     rebot -d "$RESULT_DIR" "$RESULT_DIR/robot-*.xml"
+     rebot --reporttitle "${COMPOSE_ENV_NAME}" -N "${COMPOSE_ENV_NAME}" -d "$RESULT_DIR" "$RESULT_DIR/robot-*.xml"
   else
      echo "Robot framework is not installed, the reports can be generated (sudo pip install robotframework)."
      exit 1
   fi
+}
+
+## @description  Copy results of a single test environment to the "all tests" dir.
+copy_results() {
+  local test_dir="$1"
+  local all_result_dir="$2"
+
+  local result_dir="${test_dir}/result"
+  local test_dir_name=$(basename ${test_dir})
+  if [[ -n "$(find "${result_dir}" -name "*.xml")" ]]; then
+    rebot --nostatusrc -N "${test_dir_name}" -o "${all_result_dir}/${test_dir_name}.xml" "${result_dir}/*.xml"
+  fi
+
+  cp "${result_dir}"/docker-*.log "${all_result_dir}"/
+  if [[ -n "$(find "${result_dir}" -name "*.out")" ]]; then
+    cp "${result_dir}"/*.out* "${all_result_dir}"/
+  fi
+}
+
+run_test_script() {
+  local d="$1"
+
+  echo "Executing test in ${d}"
+
+  #required to read the .env file from the right location
+  cd "${d}" || return
+
+  ret=0
+  if ! ./test.sh; then
+    ret=1
+    echo "ERROR: Test execution of ${d} is FAILED!!!!"
+  fi
+
+  cd - > /dev/null
+
+  return ${ret}
 }

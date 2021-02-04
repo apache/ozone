@@ -26,8 +26,20 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+
 /**
  * Provides the current checkpoint Snapshot of the OM DB. (tar.gz)
+ *
+ * When Ozone ACL is enabled (`ozone.acl.enabled`=`true`), only users/principals
+ * configured in `ozone.administrator` (along with the user that starts OM,
+ * which automatically becomes an Ozone administrator but not necessarily in
+ * the config) are allowed to access this endpoint.
+ *
+ * If Kerberos is enabled, the principal should be appended to
+ * `ozone.administrator`, e.g. `scm/scm@EXAMPLE.COM`
+ * If Kerberos is not enabled, simply append the login user name to
+ * `ozone.administrator`, e.g. `scm`
  */
 public class OMDBCheckpointServlet extends DBCheckpointServlet {
 
@@ -35,12 +47,10 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       LoggerFactory.getLogger(OMDBCheckpointServlet.class);
   private static final long serialVersionUID = 1L;
 
-  private transient OzoneManager om;
-
   @Override
   public void init() throws ServletException {
 
-    om = (OzoneManager) getServletContext()
+    OzoneManager om = (OzoneManager) getServletContext()
         .getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE);
 
     if (om == null) {
@@ -48,7 +58,13 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       return;
     }
 
-    initialize(om.getMetadataManager().getStore(),
-        om.getMetrics().getDBCheckpointMetrics());
+    try {
+      initialize(om.getMetadataManager().getStore(),
+          om.getMetrics().getDBCheckpointMetrics(),
+          om.getAclsEnabled(),
+          om.getOzoneAdmins(om.getConfiguration()));
+    } catch (IOException e) {
+      LOG.error("Error in getOzoneAdmins: {}", e.getMessage());
+    }
   }
 }

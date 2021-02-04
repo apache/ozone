@@ -18,7 +18,7 @@ cd "$DIR/../../.." || exit 1
 
 REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/kubernetes"}
 
-OZONE_VERSION=$(grep "<ozone.version>" "pom.xml" | sed 's/<[^>]*>//g'|  sed 's/^[ \t]*//')
+OZONE_VERSION=$(mvn help:evaluate -Dexpression=ozone.version -q -DforceStdout)
 DIST_DIR="$DIR/../../dist/target/ozone-$OZONE_VERSION"
 
 if [ ! -d "$DIST_DIR" ]; then
@@ -31,6 +31,6 @@ mkdir -p "$REPORT_DIR"
 cd "$DIST_DIR/kubernetes/examples" || exit 1
 ./test-all.sh
 RES=$?
-cp result/* "$REPORT_DIR/"
+cp -r result/* "$REPORT_DIR/"
 cp "$REPORT_DIR/log.html" "$REPORT_DIR/summary.html"
 exit $RES

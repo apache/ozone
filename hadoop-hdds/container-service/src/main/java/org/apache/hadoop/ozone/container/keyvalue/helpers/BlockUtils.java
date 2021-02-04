@@ -23,12 +23,17 @@ import java.io.IOException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.utils.ContainerCache;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaOneImpl;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
+
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.NO_SUCH_BLOCK;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNABLE_TO_READ_METADATA_DB;
 
@@ -41,6 +46,55 @@ public final class BlockUtils {
   private BlockUtils() {
 
   }
+
+  /**
+   * Obtain a DB handler for a given container. This handler is not cached and
+   * the caller must close it after using it.
+   * If another thread attempts to open the same container when it is already
+   * opened by this thread, the other thread will get a RocksDB exception.
+   * @param containerID The containerID
+   * @param containerDBPath The absolute path to the container database folder
+   * @param schemaVersion The Container Schema version
+   * @param conf Configuration
+   * @return Handler to the given container.
+   * @throws IOException
+   */
+  public static DatanodeStore getUncachedDatanodeStore(long containerID,
+      String containerDBPath, String schemaVersion,
+      ConfigurationSource conf, boolean readOnly) throws IOException {
+
+    DatanodeStore store;
+    if (schemaVersion.equals(OzoneConsts.SCHEMA_V1)) {
+      store = new DatanodeStoreSchemaOneImpl(conf,
+          containerID, containerDBPath, readOnly);
+    } else if (schemaVersion.equals(OzoneConsts.SCHEMA_V2)) {
+      store = new DatanodeStoreSchemaTwoImpl(conf,
+          containerID, containerDBPath, readOnly);
+    } else {
+      throw new IllegalArgumentException(
+          "Unrecognized database schema version: " + schemaVersion);
+    }
+    return store;
+  }
+
+  /**
+   * Obtain a DB handler for a given container. This handler is not cached and
+   * the caller must close it after using it.
+   * If another thread attempts to open the same container when it is already
+   * opened by this thread, the other thread will get a RocksDB exception.
+   * @param containerData The container data
+   * @param conf Configuration
+   * @return
+   * @throws IOException
+   */
+  public static DatanodeStore getUncachedDatanodeStore(
+      KeyValueContainerData containerData, ConfigurationSource conf,
+      boolean readOnly) throws IOException {
+    return getUncachedDatanodeStore(containerData.getContainerID(),
+        containerData.getDbFile().getAbsolutePath(),
+        containerData.getSchemaVersion(), conf, readOnly);
+  }
+
   /**
    * Get a DB handler for a given container.
    * If the handler doesn't exist in cache yet, first create one and
@@ -62,7 +116,7 @@ public final class BlockUtils {
     try {
       return cache.getDB(containerData.getContainerID(), containerData
           .getContainerDBType(), containerData.getDbFile().getAbsolutePath(),
-          conf);
+              containerData.getSchemaVersion(), conf);
     } catch (IOException ex) {
       String message = String.format("Error opening DB. Container:%s " +
           "ContainerPath:%s", containerData.getContainerID(), containerData

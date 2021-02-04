@@ -61,6 +61,8 @@ public final class Pipeline {
   private UUID leaderId;
   // Timestamp for pipeline upon creation
   private Instant creationTimestamp;
+  // suggested leader id with high priority
+  private final UUID suggestedLeaderId;
 
   /**
    * The immutable properties of pipeline object is used in
@@ -69,13 +71,14 @@ public final class Pipeline {
    */
   private Pipeline(PipelineID id, ReplicationType type,
       ReplicationFactor factor, PipelineState state,
-      Map<DatanodeDetails, Long> nodeStatus) {
+      Map<DatanodeDetails, Long> nodeStatus, UUID suggestedLeaderId) {
     this.id = id;
     this.type = type;
     this.factor = factor;
     this.state = state;
     this.nodeStatus = nodeStatus;
     this.creationTimestamp = Instant.now();
+    this.suggestedLeaderId = suggestedLeaderId;
   }
 
   /**
@@ -124,9 +127,17 @@ public final class Pipeline {
   }
 
   /**
-   * Set the creation timestamp. Only for protobuf now.
+   * Return the suggested leaderId which has a high priority among DNs of the
+   * pipeline.
    *
-   * @param creationTimestamp
+   * @return Suggested LeaderId
+   */
+  public UUID getSuggestedLeaderId() {
+    return suggestedLeaderId;
+  }
+
+  /**
+   * Set the creation timestamp. Only for protobuf now.
    */
   public void setCreationTimestamp(Instant creationTimestamp) {
     this.creationTimestamp = creationTimestamp;
@@ -159,6 +170,7 @@ public final class Pipeline {
 
   /**
    * Return an immutable set of nodes which form this pipeline.
+   *
    * @return Set of DatanodeDetails
    */
   public Set<DatanodeDetails> getNodeSet() {
@@ -167,7 +179,7 @@ public final class Pipeline {
 
   /**
    * Check if the input pipeline share the same set of datanodes.
-   * @param pipeline
+   *
    * @return true if the input pipeline shares the same set of datanodes.
    */
   public boolean sameDatanodes(Pipeline pipeline) {
@@ -254,11 +266,11 @@ public final class Pipeline {
     return nodeStatus.isEmpty();
   }
 
-  public HddsProtos.Pipeline getProtobufMessage()
+  public HddsProtos.Pipeline getProtobufMessage(int clientVersion)
       throws UnknownPipelineStateException {
     List<HddsProtos.DatanodeDetailsProto> members = new ArrayList<>();
     for (DatanodeDetails dn : nodeStatus.keySet()) {
-      members.add(dn.getProtoBufMessage());
+      members.add(dn.toProto(clientVersion));
     }
 
     HddsProtos.Pipeline.Builder builder = HddsProtos.Pipeline.newBuilder()
@@ -276,6 +288,14 @@ public final class Pipeline {
           .setLeastSigBits(leaderId.getLeastSignificantBits())
           .build();
       builder.setLeaderID128(uuid128);
+    }
+
+    if (suggestedLeaderId != null) {
+      HddsProtos.UUID uuid128 = HddsProtos.UUID.newBuilder()
+          .setMostSigBits(suggestedLeaderId.getMostSignificantBits())
+          .setLeastSigBits(suggestedLeaderId.getLeastSignificantBits())
+          .build();
+      builder.setSuggestedLeaderID(uuid128);
     }
 
     // To save the message size on wire, only transfer the node order based on
@@ -315,12 +335,20 @@ public final class Pipeline {
       leaderId = UUID.fromString(pipeline.getLeaderID());
     }
 
+    UUID suggestedLeaderId = null;
+    if (pipeline.hasSuggestedLeaderID()) {
+      HddsProtos.UUID uuid = pipeline.getSuggestedLeaderID();
+      suggestedLeaderId =
+          new UUID(uuid.getMostSigBits(), uuid.getLeastSigBits());
+    }
+
     return new Builder().setId(PipelineID.getFromProtobuf(pipeline.getId()))
         .setFactor(pipeline.getFactor())
         .setType(pipeline.getType())
         .setState(PipelineState.fromProtobuf(pipeline.getState()))
         .setNodes(nodes)
         .setLeaderId(leaderId)
+        .setSuggestedLeaderId(suggestedLeaderId)
         .setNodesInOrder(pipeline.getMemberOrdersList())
         .setCreateTimestamp(pipeline.getCreationTimeStamp())
         .build();
@@ -392,6 +420,7 @@ public final class Pipeline {
     private List<DatanodeDetails> nodesInOrder = null;
     private UUID leaderId = null;
     private Instant creationTimestamp = null;
+    private UUID suggestedLeaderId = null;
 
     public Builder() {}
 
@@ -404,6 +433,7 @@ public final class Pipeline {
       this.nodesInOrder = pipeline.nodesInOrder.get();
       this.leaderId = pipeline.getLeaderId();
       this.creationTimestamp = pipeline.getCreationTimestamp();
+      this.suggestedLeaderId = pipeline.getSuggestedLeaderId();
     }
 
     public Builder setId(PipelineID id1) {
@@ -447,13 +477,19 @@ public final class Pipeline {
       return this;
     }
 
+    public Builder setSuggestedLeaderId(UUID uuid) {
+      this.suggestedLeaderId = uuid;
+      return this;
+    }
+
     public Pipeline build() {
       Preconditions.checkNotNull(id);
       Preconditions.checkNotNull(type);
       Preconditions.checkNotNull(factor);
       Preconditions.checkNotNull(state);
       Preconditions.checkNotNull(nodeStatus);
-      Pipeline pipeline = new Pipeline(id, type, factor, state, nodeStatus);
+      Pipeline pipeline =
+          new Pipeline(id, type, factor, state, nodeStatus, suggestedLeaderId);
       pipeline.setLeaderId(leaderId);
       // overwrite with original creationTimestamp
       if (creationTimestamp != null) {
@@ -484,6 +520,7 @@ public final class Pipeline {
         // This branch is for pipeline clone
         pipeline.setNodesInOrder(nodesInOrder);
       }
+
       return pipeline;
     }
   }

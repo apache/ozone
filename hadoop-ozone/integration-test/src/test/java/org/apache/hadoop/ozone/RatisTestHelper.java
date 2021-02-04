@@ -122,6 +122,7 @@ public interface RatisTestHelper {
     final OzoneConfiguration conf = new OzoneConfiguration();
     final RaftClient client =
         newRaftClient(rpc, p, RatisHelper.createRetryPolicy(conf), conf);
-    client.groupAdd(RatisHelper.newRaftGroup(pipeline), p.getId());
+    client.getGroupManagementApi(p.getId())
+        .add(RatisHelper.newRaftGroup(pipeline));
   }
 }

@@ -18,12 +18,16 @@
 
 package org.apache.hadoop.ozone.shell.volume;
 
+import com.google.common.base.Strings;
+import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
+import org.apache.hadoop.ozone.shell.SetSpaceQuotaOptions;
 import org.apache.hadoop.security.UserGroupInformation;
 
+import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -40,10 +44,8 @@ public class CreateVolumeHandler extends VolumeHandler {
       description = "Owner of the volume")
   private String ownerName;
 
-  @Option(names = {"--quota", "-q"},
-      description =
-          "Quota of the newly created volume (eg. 1G)")
-  private String quota;
+  @CommandLine.Mixin
+  private SetSpaceQuotaOptions quotaOptions;
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
@@ -58,9 +60,16 @@ public class CreateVolumeHandler extends VolumeHandler {
     VolumeArgs.Builder volumeArgsBuilder = VolumeArgs.newBuilder()
         .setAdmin(adminName)
         .setOwner(ownerName);
-    if (quota != null) {
-      volumeArgsBuilder.setQuota(quota);
+    if (!Strings.isNullOrEmpty(quotaOptions.getQuotaInBytes())) {
+      volumeArgsBuilder.setQuotaInBytes(OzoneQuota.parseSpaceQuota(
+          quotaOptions.getQuotaInBytes()).getQuotaInBytes());
     }
+
+    if (!Strings.isNullOrEmpty(quotaOptions.getQuotaInNamespace())) {
+      volumeArgsBuilder.setQuotaInNamespace(OzoneQuota.parseNameSpaceQuota(
+          quotaOptions.getQuotaInNamespace()).getQuotaInNamespace());
+    }
+
     client.getObjectStore().createVolume(volumeName,
         volumeArgsBuilder.build());
 

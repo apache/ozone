@@ -17,6 +17,7 @@
 OZONE-SITE.XML_ozone.om.address=om
 OZONE-SITE.XML_ozone.om.http-address=om:9874
 OZONE-SITE.XML_ozone.scm.container.size=1GB
+OZONE-SITE.XML_ozone.scm.pipeline.creation.interval=30s
 OZONE-SITE.XML_ozone.scm.pipeline.owner.container.count=1
 OZONE-SITE.XML_ozone.scm.names=scm
 OZONE-SITE.XML_ozone.scm.datanode.id=/data/datanode.id
@@ -30,7 +31,7 @@ OZONE-SITE.XML_hdds.datanode.dir=/data/hdds
 HDFS-SITE.XML_dfs.datanode.address=0.0.0.0:1019
 HDFS-SITE.XML_dfs.datanode.http.address=0.0.0.0:1012
 
-CORE-SITE.xml_fs.defaultFS=o3fs://bucket1.volume1/
+CORE-SITE.xml_fs.defaultFS=ofs://om/
 
 MAPRED-SITE.XML_mapreduce.framework.name=yarn
 MAPRED-SITE.XML_yarn.app.mapreduce.am.env=HADOOP_MAPRED_HOME=$HADOOP_HOME
@@ -77,3 +78,6 @@ CAPACITY-SCHEDULER.XML_yarn.scheduler.capacity.root.default.acl_administer_queue
 CAPACITY-SCHEDULER.XML_yarn.scheduler.capacity.node-locality-delay=40
 CAPACITY-SCHEDULER.XML_yarn.scheduler.capacity.queue-mappings=
 CAPACITY-SCHEDULER.XML_yarn.scheduler.capacity.queue-mappings-override.enable=false
+
+OZONE_CONF_DIR=/etc/hadoop
+OZONE_LOG_DIR=/var/log/hadoop

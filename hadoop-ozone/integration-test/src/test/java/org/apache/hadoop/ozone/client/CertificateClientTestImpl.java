@@ -172,4 +172,15 @@ public class CertificateClientTestImpl implements CertificateClient {
   public InitResponse init() throws CertificateException {
     return null;
   }
+
+  @Override
+  public String getSignatureAlgorithm(){
+    return securityConfig.getSignatureAlgo();
+  }
+
+  @Override
+  public String getSecurityProvider(){
+    return securityConfig.getProvider();
+  }
+
 }

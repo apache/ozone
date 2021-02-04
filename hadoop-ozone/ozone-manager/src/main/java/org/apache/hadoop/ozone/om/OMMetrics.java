@@ -73,6 +73,15 @@ public class OMMetrics {
   private @Metric MutableCounterLong numLookupFile;
   private @Metric MutableCounterLong numListStatus;
 
+  private @Metric MutableCounterLong numOpenKeyDeleteRequests;
+  private @Metric MutableCounterLong numOpenKeysSubmittedForDeletion;
+  private @Metric MutableCounterLong numOpenKeysDeleted;
+
+  private @Metric MutableCounterLong numAddAcl;
+  private @Metric MutableCounterLong numSetAcl;
+  private @Metric MutableCounterLong numGetAcl;
+  private @Metric MutableCounterLong numRemoveAcl;
+
   // Failure Metrics
   private @Metric MutableCounterLong numVolumeCreateFails;
   private @Metric MutableCounterLong numVolumeUpdateFails;
@@ -103,6 +112,7 @@ public class OMMetrics {
   private @Metric MutableCounterLong numAbortMultipartUploadFails;
   private @Metric MutableCounterLong numListMultipartUploadParts;
   private @Metric MutableCounterLong numListMultipartUploadPartFails;
+  private @Metric MutableCounterLong numOpenKeyDeleteRequestFails;
 
   private @Metric MutableCounterLong numGetFileStatusFails;
   private @Metric MutableCounterLong numCreateDirectoryFails;
@@ -129,7 +139,23 @@ public class OMMetrics {
   private @Metric MutableCounterLong numListMultipartUploadFails;
   private @Metric MutableCounterLong numListMultipartUploads;
 
-  private DBCheckpointMetrics dbCheckpointMetrics;
+  // Metrics related to OM Trash.
+  private @Metric MutableCounterLong numTrashRenames;
+  private @Metric MutableCounterLong numTrashDeletes;
+  private @Metric MutableCounterLong numTrashListStatus;
+  private @Metric MutableCounterLong numTrashGetFileStatus;
+  private @Metric MutableCounterLong numTrashGetTrashRoots;
+  private @Metric MutableCounterLong numTrashExists;
+  private @Metric MutableCounterLong numTrashWriteRequests;
+  private @Metric MutableCounterLong numTrashFilesRenames;
+  private @Metric MutableCounterLong numTrashFilesDeletes;
+  private @Metric MutableCounterLong numTrashActiveCycles;
+  private @Metric MutableCounterLong numTrashCheckpointsProcessed;
+  private @Metric MutableCounterLong numTrashFails;
+  private @Metric MutableCounterLong numTrashRootsEnqueued;
+  private @Metric MutableCounterLong numTrashRootsProcessed;
+
+  private final DBCheckpointMetrics dbCheckpointMetrics;
 
   public OMMetrics() {
     dbCheckpointMetrics = DBCheckpointMetrics.create("OM Metrics");
@@ -192,6 +218,10 @@ public class OMMetrics {
 
   public void incNumKeys() {
     numKeys.incr();
+  }
+
+  public void incNumKeys(int count) {
+    numKeys.incr(count);
   }
 
   public void decNumKeys() {
@@ -522,6 +552,38 @@ public class OMMetrics {
     numGetServiceListFails.incr();
   }
 
+  public void incNumOpenKeyDeleteRequests() {
+    numOpenKeyDeleteRequests.incr();
+  }
+
+  public void incNumOpenKeysSubmittedForDeletion(long amount) {
+    numOpenKeysSubmittedForDeletion.incr(amount);
+  }
+
+  public void incNumOpenKeysDeleted() {
+    numOpenKeysDeleted.incr();
+  }
+
+  public void incNumOpenKeyDeleteRequestFails() {
+    numOpenKeyDeleteRequestFails.incr();
+  }
+
+  public void incNumAddAcl() {
+    numAddAcl.incr();
+  }
+
+  public void incNumSetAcl() {
+    numSetAcl.incr();
+  }
+
+  public void incNumGetAcl() {
+    numGetAcl.incr();
+  }
+
+  public void incNumRemoveAcl() {
+    numRemoveAcl.incr();
+  }
+
   @VisibleForTesting
   public long getNumVolumeCreates() {
     return numVolumeCreates.value();
@@ -761,6 +823,107 @@ public class OMMetrics {
 
   public long getNumAbortMultipartUploadFails() {
     return numAbortMultipartUploadFails.value();
+  }
+
+  public long getNumOpenKeyDeleteRequests() {
+    return numOpenKeyDeleteRequests.value();
+  }
+
+  public long getNumOpenKeysSubmittedForDeletion() {
+    return numOpenKeysSubmittedForDeletion.value();
+  }
+
+  public long getNumOpenKeysDeleted() {
+    return numOpenKeysDeleted.value();
+  }
+
+  public long getNumOpenKeyDeleteRequestFails() {
+    return numOpenKeyDeleteRequestFails.value();
+  }
+
+  public long getNumAddAcl() {
+    return numAddAcl.value();
+  }
+
+  public long getNumSetAcl() {
+    return numSetAcl.value();
+  }
+
+  public long getNumGetAcl() {
+    return numGetAcl.value();
+  }
+
+  public long getNumRemoveAcl() {
+    return numRemoveAcl.value();
+  }
+
+  public void incNumTrashRenames() {
+    numTrashRenames.incr();
+  }
+
+  public long getNumTrashRenames() {
+    return numTrashRenames.value();
+  }
+
+  public void incNumTrashDeletes() {
+    numTrashDeletes.incr();
+  }
+
+  public long getNumTrashDeletes() {
+    return numTrashDeletes.value();
+  }
+
+  public void incNumTrashListStatus() {
+    numTrashListStatus.incr();
+  }
+
+  public void incNumTrashGetFileStatus() {
+    numTrashGetFileStatus.incr();
+  }
+
+  public void incNumTrashGetTrashRoots() {
+    numTrashGetTrashRoots.incr();
+  }
+
+  public void incNumTrashExists() {
+    numTrashExists.incr();
+  }
+
+  public void incNumTrashWriteRequests() {
+    numTrashWriteRequests.incr();
+  }
+
+  public void incNumTrashFilesRenames() {
+    numTrashFilesRenames.incr();
+  }
+
+  public long getNumTrashFilesRenames() {
+    return numTrashFilesRenames.value();
+  }
+
+  public void incNumTrashFilesDeletes() {
+    numTrashFilesDeletes.incr();
+  }
+
+  public long getNumTrashFilesDeletes() {
+    return numTrashFilesDeletes.value();
+  }
+
+
+  public void incNumTrashActiveCycles() {
+    numTrashActiveCycles.incr();
+  }
+
+  public void incNumTrashRootsEnqueued() {
+    numTrashRootsEnqueued.incr();
+  }
+
+  public void incNumTrashRootsProcessed() {
+    numTrashRootsProcessed.incr();
+  }
+
+  public void incNumTrashFails() {
+    numTrashFails.incr();
   }
 
   public void unRegister() {

@@ -18,10 +18,10 @@
 
 package org.apache.hadoop.hdds.scm.server;
 
+import java.util.Map;
+
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.server.ServiceRuntimeInfo;
-
-import java.util.Map;
 
 /**
  *
@@ -65,5 +65,9 @@ public interface SCMMXBean extends ServiceRuntimeInfo {
    */
   Map<String, Integer> getContainerStateCount();
 
-  Map<String, String> getRuleStatusMetrics();
+  Map<String, String[]> getSafeModeRuleStatus();
+
+  String getScmId();
+
+  String getClusterId();
 }

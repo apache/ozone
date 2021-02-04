@@ -23,12 +23,12 @@ Resource            ../commonlib.robot
 Test Timeout        5 minutes
 
 *** Variables ***
-${OM_URL}       http://om:9874
-${OM_DB_CHECKPOINT_URL}       http://om:9874/dbCheckpoint
-${OM_SERVICE_LIST_URL}       http://om:9874/serviceList
+${OM_URL}           http://om:9874
+${OM_DB_CHECKPOINT_URL}      ${OM_URL}/dbCheckpoint
+${OM_SERVICE_LIST_URL}       ${OM_URL}/serviceList
 
-${SCM_URL}       http://scm:9876
-${RECON_URL}       http://recon:9888
+${SCM_URL}          http://scm:9876
+${RECON_URL}        http://recon:9888
 
 ${SCM_CONF_URL}     http://scm:9876/conf
 ${SCM_JMX_URL}      http://scm:9876/jmx
@@ -51,7 +51,7 @@ Verify SPNEGO enabled URL
 *** Test Cases ***
 Generate Freon data
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user     testuser     testuser.keytab
-                        Execute                             ozone freon rk --replicationType=RATIS --numOfVolumes 1 --numOfBuckets 1 --numOfKeys 2 --keySize 1025
+                        Execute                             ozone freon rk --replication-type=RATIS --num-of-volumes 1 --num-of-buckets 1 --num-of-keys 2 --key-size 1025
 
 Test OM portal
     Verify SPNEGO enabled URL       ${OM_URL}

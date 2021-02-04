@@ -19,8 +19,10 @@
 package org.apache.hadoop.ozone.om.request.key.acl.prefix;
 
 import java.io.IOException;
+import java.util.Map;
 
 import com.google.common.base.Optional;
+import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -29,7 +31,9 @@ import org.apache.hadoop.ozone.om.PrefixManagerImpl.OMPrefixAclOpResult;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
+import org.apache.hadoop.ozone.om.request.util.ObjectParser;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -71,6 +75,11 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
         (PrefixManagerImpl) ozoneManager.getPrefixManager();
     try {
       String prefixPath = getOzoneObj().getPath();
+      ObjectParser objectParser = new ObjectParser(prefixPath,
+          OzoneManagerProtocolProtos.OzoneObj.ObjectType.PREFIX);
+      volume = objectParser.getVolume();
+      bucket = objectParser.getBucket();
+      key = objectParser.getKey();
 
       // check Acl
       if (ozoneManager.getAclsEnabled()) {
@@ -131,8 +140,10 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
       }
     }
 
+    OzoneObj obj = getOzoneObj();
+    Map<String, String> auditMap = obj.toAuditMap();
     onComplete(opResult, exception, ozoneManager.getMetrics(), result,
-        trxnLogIndex);
+        trxnLogIndex, ozoneManager.getAuditLogger(), auditMap);
 
     return omClientResponse;
   }
@@ -179,7 +190,8 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
    * @param omMetrics
    */
   abstract void onComplete(boolean operationResult, IOException exception,
-      OMMetrics omMetrics, Result result, long trxnLogIndex);
+      OMMetrics omMetrics, Result result, long trxnLogIndex,
+      AuditLogger auditLogger, Map<String, String> auditMap);
 
   /**
    * Apply the acl operation, if successfully completed returns true,

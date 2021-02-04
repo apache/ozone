@@ -20,14 +20,23 @@ package org.apache.hadoop.ozone.om.request.key.acl;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 import com.google.common.collect.Lists;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.audit.OMAction;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.key.acl.OMKeyAclResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,16 +51,31 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetAclR
 public class OMKeySetAclRequest extends OMKeyAclRequest {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(OMKeyAddAclRequest.class);
+      LoggerFactory.getLogger(OMKeySetAclRequest.class);
+
+  @Override
+  public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    long modificationTime = Time.now();
+    OzoneManagerProtocolProtos.SetAclRequest.Builder setAclRequestBuilder =
+        getOmRequest().getSetAclRequest().toBuilder()
+            .setModificationTime(modificationTime);
+
+    return getOmRequest().toBuilder()
+        .setSetAclRequest(setAclRequestBuilder)
+        .setUserInfo(getUserInfo())
+        .build();
+  }
 
   private String path;
   private List<OzoneAcl> ozoneAcls;
+  private OzoneObj obj;
 
   public OMKeySetAclRequest(OMRequest omRequest) {
     super(omRequest);
     OzoneManagerProtocolProtos.SetAclRequest setAclRequest =
         getOmRequest().getSetAclRequest();
-    path = setAclRequest.getObj().getPath();
+    obj = OzoneObjInfo.fromProtobuf(setAclRequest.getObj());
+    path = obj.getPath();
     ozoneAcls = Lists.newArrayList(
         OzoneAclUtil.fromProtobuf(setAclRequest.getAclList()));
   }
@@ -59,6 +83,11 @@ public class OMKeySetAclRequest extends OMKeyAclRequest {
   @Override
   String getPath() {
     return path;
+  }
+
+  @Override
+  OzoneObj getObject() {
+    return obj;
   }
 
   @Override
@@ -77,7 +106,8 @@ public class OMKeySetAclRequest extends OMKeyAclRequest {
 
   @Override
   void onComplete(Result result, boolean operationResult,
-      IOException exception, long trxnLogIndex) {
+      IOException exception, long trxnLogIndex, AuditLogger auditLogger,
+      Map<String, String> auditMap) {
     switch (result) {
     case SUCCESS:
       if (LOG.isDebugEnabled()) {
@@ -91,12 +121,26 @@ public class OMKeySetAclRequest extends OMKeyAclRequest {
       LOG.error("Unrecognized Result for OMKeySetAclRequest: {}",
           getOmRequest());
     }
+
+    if (ozoneAcls != null) {
+      auditMap.put(OzoneConsts.ACL, ozoneAcls.toString());
+    }
+    auditLog(auditLogger, buildAuditMessage(OMAction.SET_ACL, auditMap,
+        exception, getOmRequest().getUserInfo()));
   }
 
   @Override
   boolean apply(OmKeyInfo omKeyInfo, long trxnLogIndex) {
     // No need to check not null here, this will be never called with null.
     return omKeyInfo.setAcls(ozoneAcls);
+  }
+
+  @Override
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
+      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+    ozoneManager.getMetrics().incNumSetAcl();
+    return super.validateAndUpdateCache(ozoneManager, trxnLogIndex,
+        omDoubleBufferHelper);
   }
 }
 

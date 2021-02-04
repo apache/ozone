@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.scm.pipeline;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -29,7 +30,9 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.util.concurrent.TimeUnit;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.proto
         .HddsProtos.ReplicationFactor.THREE;
@@ -65,6 +68,9 @@ public class TestSCMRestart {
   @BeforeClass
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
+    conf.setTimeDuration(HDDS_PIPELINE_REPORT_INTERVAL, 1000,
+            TimeUnit.MILLISECONDS);
+    conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 1);
     int numOfNodes = 4;
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(numOfNodes)
@@ -80,9 +86,11 @@ public class TestSCMRestart {
     ratisPipeline1 = pipelineManager.getPipeline(
         containerManager.allocateContainer(
         RATIS, THREE, "Owner1").getPipelineID());
+    pipelineManager.openPipeline(ratisPipeline1.getId());
     ratisPipeline2 = pipelineManager.getPipeline(
         containerManager.allocateContainer(
         RATIS, ONE, "Owner2").getPipelineID());
+    pipelineManager.openPipeline(ratisPipeline2.getId());
     // At this stage, there should be 2 pipeline one with 1 open container
     // each. Try restarting the SCM and then discover that pipeline are in
     // correct state.

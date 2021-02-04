@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.client.io;
 
+import org.apache.hadoop.fs.CanUnbuffer;
+
 import java.io.IOException;
 import java.io.InputStream;
 
@@ -24,7 +26,7 @@ import java.io.InputStream;
  * OzoneInputStream is used to read data from Ozone.
  * It uses {@link KeyInputStream} for reading the data.
  */
-public class OzoneInputStream extends InputStream {
+public class OzoneInputStream extends InputStream implements CanUnbuffer {
 
   private final InputStream inputStream;
 
@@ -57,7 +59,19 @@ public class OzoneInputStream extends InputStream {
     return inputStream.available();
   }
 
+  @Override
+  public long skip(long n) throws IOException {
+    return inputStream.skip(n);
+  }
+
   public InputStream getInputStream() {
     return inputStream;
+  }
+
+  @Override
+  public void unbuffer() {
+    if (inputStream instanceof CanUnbuffer) {
+      ((CanUnbuffer) inputStream).unbuffer();
+    }
   }
 }

@@ -38,6 +38,7 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.ResponseBuilder;
 import javax.ws.rs.core.Response.Status;
 import javax.ws.rs.core.StreamingOutput;
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.Instant;
@@ -82,6 +83,7 @@ import org.apache.commons.io.IOUtils;
 
 import org.apache.commons.lang3.tuple.Pair;
 
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BUFFER_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BUFFER_SIZE_KEY;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.ENTITY_TOO_SMALL;
@@ -197,6 +199,21 @@ public class ObjectEndpoint extends EndpointBase {
           .build();
     } catch (IOException ex) {
       LOG.error("Exception occurred in PutObject", ex);
+      if (ex instanceof  OMException) {
+        if (((OMException) ex).getResult() == ResultCodes.NOT_A_FILE) {
+          OS3Exception os3Exception = S3ErrorTable.newError(INVALID_REQUEST,
+              keyPath);
+          os3Exception.setErrorMessage("An error occurred (InvalidRequest) " +
+              "when calling the PutObject/MPU PartUpload operation: " +
+              OZONE_OM_ENABLE_FILESYSTEM_PATHS + " is enabled Keys are" +
+              " considered as Unix Paths. Path has Violated FS Semantics " +
+              "which caused put operation to fail.");
+          throw os3Exception;
+        } else if ((((OMException) ex).getResult() ==
+            ResultCodes.PERMISSION_DENIED)) {
+          throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, keyPath);
+        }
+      }
       throw ex;
     } finally {
       if (output != null) {
@@ -277,7 +294,8 @@ public class ObjectEndpoint extends EndpointBase {
           try (S3WrapperInputStream s3WrapperInputStream =
               new S3WrapperInputStream(
                   key.getInputStream())) {
-            IOUtils.copyLarge(s3WrapperInputStream, dest, startOffset,
+            s3WrapperInputStream.seek(startOffset);
+            IOUtils.copyLarge(s3WrapperInputStream, dest, 0,
                 copyLength, new byte[bufferSize]);
           }
         };
@@ -305,6 +323,8 @@ public class ObjectEndpoint extends EndpointBase {
       if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
         throw S3ErrorTable.newError(S3ErrorTable
             .NO_SUCH_KEY, keyPath);
+      } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
+        throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, keyPath);
       } else {
         throw ex;
       }
@@ -342,6 +362,8 @@ public class ObjectEndpoint extends EndpointBase {
       if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
         // Just return 404 with no content
         return Response.status(Status.NOT_FOUND).build();
+      } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
+        throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, keyPath);
       } else {
         throw ex;
       }
@@ -411,6 +433,8 @@ public class ObjectEndpoint extends EndpointBase {
       } else if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
         //NOT_FOUND is not a problem, AWS doesn't throw exception for missing
         // keys. Just return 204
+      } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
+        throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, keyPath);
       } else {
         throw ex;
       }
@@ -459,9 +483,12 @@ public class ObjectEndpoint extends EndpointBase {
 
       return Response.status(Status.OK).entity(
           multipartUploadInitiateResponse).build();
-    } catch (IOException ex) {
+    } catch (OMException ex) {
       LOG.error("Error in Initiate Multipart Upload Request for bucket: {}, " +
           "key: {}", bucket, key, ex);
+      if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
+        throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, key);
+      }
       throw ex;
     }
   }
@@ -520,6 +547,14 @@ public class ObjectEndpoint extends EndpointBase {
             "when calling the CompleteMultipartUpload operation: You must " +
             "specify at least one part");
         throw os3Exception;
+      } else if(ex.getResult() == ResultCodes.NOT_A_FILE) {
+        OS3Exception os3Exception = S3ErrorTable.newError(INVALID_REQUEST, key);
+        os3Exception.setErrorMessage("An error occurred (InvalidRequest) " +
+            "when calling the CompleteMultipartUpload operation: " +
+            OZONE_OM_ENABLE_FILESYSTEM_PATHS + " is enabled Keys are " +
+            "considered as Unix Paths. A directory already exists with a " +
+            "given KeyName caused failure for MPU");
+        throw os3Exception;
       }
       throw ex;
     }
@@ -557,9 +592,16 @@ public class ObjectEndpoint extends EndpointBase {
             if (range != null) {
               RangeHeader rangeHeader =
                   RangeHeaderParserUtil.parseRangeHeader(range, 0);
-              IOUtils.copyLarge(sourceObject, ozoneOutputStream,
-                  rangeHeader.getStartOffset(),
-                  rangeHeader.getEndOffset() - rangeHeader.getStartOffset());
+              final long skipped =
+                  sourceObject.skip(rangeHeader.getStartOffset());
+              if (skipped != rangeHeader.getStartOffset()) {
+                throw new EOFException(
+                    "Bytes to skip: "
+                        + rangeHeader.getStartOffset() + " actual: " + skipped);
+              }
+              IOUtils.copyLarge(sourceObject, ozoneOutputStream, 0,
+                  rangeHeader.getEndOffset() - rangeHeader.getStartOffset()
+                      + 1);
             } else {
               IOUtils.copy(sourceObject, ozoneOutputStream);
             }
@@ -568,9 +610,12 @@ public class ObjectEndpoint extends EndpointBase {
           IOUtils.copy(body, ozoneOutputStream);
         }
       } finally {
-        IOUtils.closeQuietly(ozoneOutputStream);
+        if (ozoneOutputStream != null) {
+          ozoneOutputStream.close();
+        }
       }
 
+      assert ozoneOutputStream != null;
       OmMultipartCommitUploadPartInfo omMultipartCommitUploadPartInfo =
           ozoneOutputStream.getCommitUploadPartInfo();
       String eTag = omMultipartCommitUploadPartInfo.getPartName();
@@ -586,6 +631,9 @@ public class ObjectEndpoint extends EndpointBase {
       if (ex.getResult() == ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR) {
         throw S3ErrorTable.newError(NO_SUCH_UPLOAD,
             uploadID);
+      } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
+        throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED,
+            bucket + "/" + key);
       }
       throw ex;
     }
@@ -642,6 +690,9 @@ public class ObjectEndpoint extends EndpointBase {
       if (ex.getResult() == ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR) {
         throw S3ErrorTable.newError(NO_SUCH_UPLOAD,
             uploadID);
+      } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
+        throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED,
+            bucket + "/" + key + "/" + uploadID);
       }
       throw ex;
     }
@@ -727,6 +778,9 @@ public class ObjectEndpoint extends EndpointBase {
         throw S3ErrorTable.newError(S3ErrorTable.NO_SUCH_KEY, sourceKey);
       } else if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
         throw S3ErrorTable.newError(S3ErrorTable.NO_SUCH_BUCKET, sourceBucket);
+      } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
+        throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED,
+            destBucket + "/" + destkey);
       }
       throw ex;
     } finally {

@@ -22,9 +22,17 @@ Resource            ../commonlib.robot
 Test Timeout        5 minutes
 
 *** Keywords ***
-Get Token in Secure Cluster
-    Execute                      ozone sh token get > /tmp/token.txt
-    File Should Not Be Empty     /tmp/token.txt
+Get and use Token in Secure Cluster
+    Execute                      ozone sh token get -t /tmp/ozone.token
+    File Should Not Be Empty     /tmp/ozone.token
+    Execute                      kdestroy
+    Set Environment Variable     HADOOP_TOKEN_FILE_LOCATION    /tmp/ozone.token
+    ${output} =                  Execute             ozone sh volume list /
+    Should not contain           ${output}           Client cannot authenticate
+    Remove Environment Variable  HADOOP_TOKEN_FILE_LOCATION
+    ${output} =                  Execute and Ignore Error  ozone sh volume list /
+    Should contain               ${output}           Client cannot authenticate
+    Run Keyword                  Kinit test user     testuser  testuser.keytab
 
 Get Token in Unsecure Cluster
     ${output} =                  Execute             ozone sh token get
@@ -59,7 +67,7 @@ Cancel Token in Unsecure Cluster
     Should Contain               ${output}           only when security is enabled
 
 Token Test in Secure Cluster
-    Get Token in Secure Cluster
+    Get and use Token in Secure Cluster
     Print Valid Token File
     Renew Token in Secure Cluster
     Cancel Token in Secure Cluster

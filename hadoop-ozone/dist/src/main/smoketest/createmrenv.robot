@@ -17,17 +17,19 @@
 Documentation       Create directories required for MR test
 Library             OperatingSystem
 Resource            commonlib.robot
+Resource            lib/fs.robot
 Test Timeout        2 minute
 
 
 *** Variables ***
+${SCHEME}       o3fs
 ${volume}       volume1
 ${bucket}       bucket1
 
 
 *** Keywords ***
 Create volume
-    ${result} =     Execute             ozone sh volume create /${volume} --user hadoop --quota 100TB
+    ${result} =     Execute             ozone sh volume create /${volume} --user hadoop --space-quota 100TB --namespace-quota 100
                     Should not contain  ${result}       Failed
 Create bucket
                     Execute             ozone sh bucket create /${volume}/${bucket}
@@ -40,8 +42,13 @@ Create test volume, bucket and key
                     Run Keyword if      "BUCKET_NOT_FOUND" in """${result}"""       Create bucket
     ${result} =     Execute             ozone sh bucket info /${volume}/${bucket}
                     Should not contain  ${result}  NOT_FOUND
-                    Execute             ozone sh key put /volume1/bucket1/key1 LICENSE.txt
+    ${dir} =        Format FS URL       ${SCHEME}    ${volume}    ${bucket}   input
+                    Execute             ozone fs -mkdir ${dir}
+                    Execute             ozone sh key put /${volume}/${bucket}/input/key1 LICENSE.txt
+                    Execute             ozone sh key put /${volume}/${bucket}/input/key2 NOTICE.txt
+                    Execute             ozone sh key put /${volume}/${bucket}/input/key3 README.md
 
 Create user dir for hadoop
-         Execute        ozone fs -mkdir /user
-         Execute        ozone fs -mkdir /user/hadoop
+    ${dir} =        Format FS URL       ${SCHEME}    ${volume}    ${bucket}   user
+                    Execute             ozone fs -mkdir ${dir}
+                    Execute             ozone fs -mkdir ${dir}/hadoop

@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.Map;
 
 import com.google.common.base.Optional;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.slf4j.Logger;
@@ -134,9 +135,23 @@ public class OMBucketDeleteRequest extends OMClientRequest {
       omResponse.setDeleteBucketResponse(
           DeleteBucketResponse.newBuilder().build());
 
+      // update used namespace for volume
+      String volumeKey = omMetadataManager.getVolumeKey(volumeName);
+      OmVolumeArgs omVolumeArgs =
+          omMetadataManager.getVolumeTable().getReadCopy(volumeKey);
+      if (omVolumeArgs == null) {
+        throw new OMException("Volume " + volumeName + " is not found",
+            OMException.ResultCodes.VOLUME_NOT_FOUND);
+      }
+      omVolumeArgs.incrUsedNamespace(-1L);
+      // Update table cache.
+      omMetadataManager.getVolumeTable().addCacheEntry(
+          new CacheKey<>(volumeKey),
+          new CacheValue<>(Optional.of(omVolumeArgs), transactionLogIndex));
+
       // Add to double buffer.
       omClientResponse = new OMBucketDeleteResponse(omResponse.build(),
-          volumeName, bucketName);
+          volumeName, bucketName, omVolumeArgs.copyObject());
     } catch (IOException ex) {
       success = false;
       exception = ex;

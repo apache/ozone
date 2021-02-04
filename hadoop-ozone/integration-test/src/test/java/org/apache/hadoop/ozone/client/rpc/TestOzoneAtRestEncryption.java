@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.client.rpc;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.HashMap;
@@ -177,9 +178,10 @@ public class TestOzoneAtRestEncryption extends TestOzoneRpcClient {
       String keyName = UUID.randomUUID().toString();
 
       try (OzoneOutputStream out = bucket.createKey(keyName,
-          value.getBytes("UTF-8").length, ReplicationType.STAND_ALONE,
+          value.getBytes(StandardCharsets.UTF_8).length,
+          ReplicationType.STAND_ALONE,
           ReplicationFactor.ONE, new HashMap<>())) {
-        out.write(value.getBytes("UTF-8"));
+        out.write(value.getBytes(StandardCharsets.UTF_8));
       }
 
       OzoneKey key = bucket.getKey(keyName);
@@ -188,7 +190,7 @@ public class TestOzoneAtRestEncryption extends TestOzoneRpcClient {
       int len = 0;
 
       try(OzoneInputStream is = bucket.readKey(keyName)) {
-        fileContent = new byte[value.getBytes("UTF-8").length];
+        fileContent = new byte[value.getBytes(StandardCharsets.UTF_8).length];
         len = is.read(fileContent);
       }
 
@@ -196,7 +198,8 @@ public class TestOzoneAtRestEncryption extends TestOzoneRpcClient {
       Assert.assertTrue(verifyRatisReplication(volumeName, bucketName,
           keyName, ReplicationType.STAND_ALONE,
           ReplicationFactor.ONE));
-      Assert.assertEquals(value, new String(fileContent, "UTF-8"));
+      Assert.assertEquals(value, new String(fileContent,
+          StandardCharsets.UTF_8));
       Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
       Assert.assertFalse(key.getModificationTime().isBefore(testStartTime));
     }
@@ -235,9 +238,10 @@ public class TestOzoneAtRestEncryption extends TestOzoneRpcClient {
     Map<String, String> keyMetadata = new HashMap<>();
     keyMetadata.put(OzoneConsts.GDPR_FLAG, "true");
     try (OzoneOutputStream out = bucket.createKey(keyName,
-        value.getBytes("UTF-8").length, ReplicationType.STAND_ALONE,
+        value.getBytes(StandardCharsets.UTF_8).length,
+        ReplicationType.STAND_ALONE,
         ReplicationFactor.ONE, keyMetadata)) {
-      out.write(value.getBytes("UTF-8"));
+      out.write(value.getBytes(StandardCharsets.UTF_8));
     }
 
     OzoneKeyDetails key = bucket.getKey(keyName);
@@ -246,7 +250,7 @@ public class TestOzoneAtRestEncryption extends TestOzoneRpcClient {
     int len = 0;
 
     try(OzoneInputStream is = bucket.readKey(keyName)) {
-      fileContent = new byte[value.getBytes("UTF-8").length];
+      fileContent = new byte[value.getBytes(StandardCharsets.UTF_8).length];
       len = is.read(fileContent);
     }
 
@@ -254,7 +258,7 @@ public class TestOzoneAtRestEncryption extends TestOzoneRpcClient {
     Assert.assertTrue(verifyRatisReplication(volumeName, bucketName,
         keyName, ReplicationType.STAND_ALONE,
         ReplicationFactor.ONE));
-    Assert.assertEquals(value, new String(fileContent, "UTF-8"));
+    Assert.assertEquals(value, new String(fileContent, StandardCharsets.UTF_8));
     Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
     Assert.assertFalse(key.getModificationTime().isBefore(testStartTime));
     Assert.assertEquals("true", key.getMetadata().get(OzoneConsts.GDPR_FLAG));

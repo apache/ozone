@@ -42,7 +42,6 @@ import org.apache.logging.log4j.util.Strings;
 import org.bouncycastle.asn1.ASN1EncodableVector;
 import org.bouncycastle.asn1.ASN1Object;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
-import org.bouncycastle.asn1.DEROctetString;
 import org.bouncycastle.asn1.DERSequence;
 import org.bouncycastle.asn1.DERTaggedObject;
 import org.bouncycastle.asn1.DERUTF8String;
@@ -145,8 +144,7 @@ public final class SelfSignedCertificate {
           new BasicConstraints(true));
       int keyUsageFlag = KeyUsage.keyCertSign | KeyUsage.cRLSign;
       KeyUsage keyUsage = new KeyUsage(keyUsageFlag);
-      builder.addExtension(Extension.keyUsage, false,
-          new DEROctetString(keyUsage));
+      builder.addExtension(Extension.keyUsage, true, keyUsage);
       if (altNames != null && altNames.size() >= 1) {
         builder.addExtension(new Extension(Extension.subjectAlternativeName,
             false, new GeneralNames(altNames.toArray(

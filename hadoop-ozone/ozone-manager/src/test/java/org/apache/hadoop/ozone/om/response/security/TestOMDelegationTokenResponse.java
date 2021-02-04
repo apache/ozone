@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.rules.TemporaryFolder;
@@ -47,5 +48,12 @@ public class TestOMDelegationTokenResponse {
         folder.newFolder().getAbsolutePath());
     omMetadataManager = new OmMetadataManagerImpl((OzoneConfiguration) conf);
     batchOperation = omMetadataManager.getStore().initBatchOperation();
+  }
+
+  @After
+  public void tearDown() {
+    if (batchOperation != null) {
+      batchOperation.close();
+    }
   }
 }

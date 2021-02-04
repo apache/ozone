@@ -18,33 +18,99 @@
 
 package org.apache.hadoop.hdds.client;
 
-import org.apache.hadoop.ozone.OzoneConsts;
+import com.google.common.base.Strings;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import static org.apache.hadoop.ozone.OzoneConsts.GB;
+import static org.apache.hadoop.ozone.OzoneConsts.KB;
+import static org.apache.hadoop.ozone.OzoneConsts.MB;
+import static org.apache.hadoop.ozone.OzoneConsts.TB;
 
 
 /**
  * represents an OzoneQuota Object that can be applied to
  * a storage volume.
  */
-public class OzoneQuota {
+public final class OzoneQuota {
+  public static final Logger LOG =
+      LoggerFactory.getLogger(OzoneQuota.class);
 
-  public static final String OZONE_QUOTA_BYTES = "BYTES";
+  public static final String OZONE_QUOTA_B = "B";
+  public static final String OZONE_QUOTA_KB = "KB";
   public static final String OZONE_QUOTA_MB = "MB";
   public static final String OZONE_QUOTA_GB = "GB";
   public static final String OZONE_QUOTA_TB = "TB";
 
-  private Units unit;
-  private long size;
-
   /** Quota Units.*/
-  public enum Units {UNDEFINED, BYTES, KB, MB, GB, TB}
+  public enum Units {B, KB, MB, GB, TB}
+
+  // Quota to decide how many buckets can be created.
+  private long quotaInNamespace;
+  // Quota to decide how many storage space will be used in bytes.
+  private long quotaInBytes;
+  private RawQuotaInBytes rawQuotaInBytes;
+  // Data class of Quota.
+  private static QuotaList quotaList;
+
+  /** Setting QuotaList parameters from large to small. */
+  static {
+    quotaList = new QuotaList();
+    quotaList.addQuotaList(OZONE_QUOTA_TB, Units.TB, TB);
+    quotaList.addQuotaList(OZONE_QUOTA_GB, Units.GB, GB);
+    quotaList.addQuotaList(OZONE_QUOTA_MB, Units.MB, MB);
+    quotaList.addQuotaList(OZONE_QUOTA_KB, Units.KB, KB);
+    quotaList.addQuotaList(OZONE_QUOTA_B, Units.B, 1L);
+  }
+
+  /**
+   * Used to convert user input values into bytes such as: 1MB-> 1048576.
+   */
+  private static class RawQuotaInBytes {
+    private Units unit;
+    private long size;
+
+    RawQuotaInBytes(Units unit, long size) {
+      this.unit = unit;
+      this.size = size;
+    }
+
+    public Units getUnit() {
+      return unit;
+    }
+
+    public long getSize() {
+      return size;
+    }
+
+    /**
+     * Returns size in Bytes or negative num if there is no Quota.
+     */
+    public long sizeInBytes() {
+      long sQuota = -1L;
+      for (Units quota : quotaList.getUnitQuotaArray()) {
+        if (quota == this.unit) {
+          sQuota = quotaList.getQuotaSize(quota);
+          break;
+        }
+      }
+      return this.getSize() * sQuota;
+    }
+
+    @Override
+    public String toString() {
+      return size + " " + unit;
+    }
+
+  }
 
   /**
    * Returns size.
    *
    * @return long
    */
-  public long getSize() {
-    return size;
+  public long getRawSize() {
+    return this.rawQuotaInBytes.getSize();
   }
 
   /**
@@ -53,26 +119,38 @@ public class OzoneQuota {
    * @return Unit in MB, GB or TB
    */
   public Units getUnit() {
-    return unit;
+    return this.rawQuotaInBytes.getUnit();
   }
 
   /**
-   * Constructs a default Quota object.
+   * Constructor for Ozone Space Quota.
+   *
+   * @param rawQuotaInBytes RawQuotaInBytes value
    */
-  public OzoneQuota() {
-    this.size = 0;
-    this.unit = Units.UNDEFINED;
+  private OzoneQuota(RawQuotaInBytes rawQuotaInBytes) {
+    this.rawQuotaInBytes = rawQuotaInBytes;
+    this.quotaInBytes = rawQuotaInBytes.sizeInBytes();
+  }
+
+  /**
+   * Constructor for Ozone NameSpace Quota.
+   *
+   * @param quotaInNamespace long value
+   */
+  private OzoneQuota(long quotaInNamespace) {
+    this.quotaInNamespace = quotaInNamespace;
   }
 
   /**
    * Constructor for Ozone Quota.
    *
-   * @param size Long Size
-   * @param unit MB, GB  or TB
+   * @param quotaInNamespace ozone quota in counts
+   * @param rawQuotaInBytes RawQuotaInBytes value
    */
-  public OzoneQuota(long size, Units unit) {
-    this.size = size;
-    this.unit = unit;
+  private OzoneQuota(long quotaInNamespace, RawQuotaInBytes rawQuotaInBytes) {
+    this.quotaInNamespace = quotaInNamespace;
+    this.rawQuotaInBytes = rawQuotaInBytes;
+    this.quotaInBytes = rawQuotaInBytes.sizeInBytes();
   }
 
   /**
@@ -82,118 +160,127 @@ public class OzoneQuota {
    * @return string representation of quota
    */
   public static String formatQuota(OzoneQuota quota) {
-    return String.valueOf(quota.size) + quota.unit;
+    return String.valueOf(quota.getRawSize()) + quota.getUnit();
+  }
+
+  /**
+   * Parses a user provided string space quota and returns the
+   * Quota Object.
+   *
+   * @param quotaInBytes ozone quota in bytes
+   *
+   * @return OzoneQuota object
+   */
+  public static OzoneQuota parseSpaceQuota(String quotaInBytes) {
+
+    if (Strings.isNullOrEmpty(quotaInBytes)) {
+      throw new IllegalArgumentException(
+          "Quota string cannot be null or empty.");
+    }
+
+    String uppercase = quotaInBytes.toUpperCase()
+        .replaceAll("\\s+", "");
+    String size = "";
+    long nSize = 0;
+    Units currUnit = Units.B;
+
+    try {
+      for (String quota : quotaList.getOzoneQuotaArray()) {
+        if (uppercase.endsWith((quota))) {
+          size = uppercase
+              .substring(0, uppercase.length() - quota.length());
+          currUnit = quotaList.getUnits(quota);
+          break;
+        }
+      }
+      // there might be no unit specified.
+      if (size.equals("")) {
+        size = uppercase;
+      }
+      nSize = Long.parseLong(size);
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException("Invalid values for quota, to ensure" +
+          " that the Quota format is legal(supported values are B," +
+          " KB, MB, GB and TB). And the quota value cannot be greater than " +
+          "Long.MAX_VALUE BYTES");
+    }
+
+    if (nSize <= 0) {
+      throw new IllegalArgumentException("Invalid values for space quota: "
+          + nSize);
+    }
+
+    return new OzoneQuota(new RawQuotaInBytes(currUnit, nSize));
+  }
+
+  /**
+   * Parses a user provided string Namespace quota and returns the
+   * Quota Object.
+   *
+   * @param quotaInNamespace ozone quota in counts
+   *
+   * @return OzoneQuota object
+   */
+  public static OzoneQuota parseNameSpaceQuota(String quotaInNamespace) {
+    if (Strings.isNullOrEmpty(quotaInNamespace)) {
+      throw new IllegalArgumentException(
+          "Quota string cannot be null or empty.");
+    }
+    long nameSpaceQuota = Long.parseLong(quotaInNamespace);
+    if (nameSpaceQuota <= 0) {
+      throw new IllegalArgumentException(
+          "Invalid values for namespace quota: " + nameSpaceQuota);
+    }
+    return new OzoneQuota(nameSpaceQuota, new RawQuotaInBytes(Units.B, -1));
   }
 
   /**
    * Parses a user provided string and returns the
    * Quota Object.
    *
-   * @param quotaString Quota String
+   * @param quotaInBytes ozone quota in bytes
+   * @param quotaInNamespace ozone quota in counts
    *
    * @return OzoneQuota object
    */
-  public static OzoneQuota parseQuota(String quotaString) {
-
-    if ((quotaString == null) || (quotaString.isEmpty())) {
-      throw new IllegalArgumentException(
-          "Quota string cannot be null or empty.");
-    }
-
-    String uppercase = quotaString.toUpperCase().replaceAll("\\s+", "");
-    String size = "";
-    int nSize;
-    Units currUnit = Units.MB;
-    boolean found = false;
-    if (uppercase.endsWith(OZONE_QUOTA_MB)) {
-      size = uppercase
-          .substring(0, uppercase.length() - OZONE_QUOTA_MB.length());
-      currUnit = Units.MB;
-      found = true;
-    }
-
-    if (uppercase.endsWith(OZONE_QUOTA_GB)) {
-      size = uppercase
-          .substring(0, uppercase.length() - OZONE_QUOTA_GB.length());
-      currUnit = Units.GB;
-      found = true;
-    }
-
-    if (uppercase.endsWith(OZONE_QUOTA_TB)) {
-      size = uppercase
-          .substring(0, uppercase.length() - OZONE_QUOTA_TB.length());
-      currUnit = Units.TB;
-      found = true;
-    }
-
-    if (uppercase.endsWith(OZONE_QUOTA_BYTES)) {
-      size = uppercase
-          .substring(0, uppercase.length() - OZONE_QUOTA_BYTES.length());
-      currUnit = Units.BYTES;
-      found = true;
-    }
-
-    if (!found) {
-      throw new IllegalArgumentException("Quota unit not recognized. " +
-          "Supported values are BYTES, MB, GB and TB.");
-    }
-
-    nSize = Integer.parseInt(size);
-    if (nSize < 0) {
-      throw new IllegalArgumentException("Quota cannot be negative.");
-    }
-
-    return new OzoneQuota(nSize, currUnit);
-  }
-
-
-  /**
-   * Returns size in Bytes or -1 if there is no Quota.
-   */
-  public long sizeInBytes() {
-    switch (this.unit) {
-    case BYTES:
-      return this.getSize();
-    case MB:
-      return this.getSize() * OzoneConsts.MB;
-    case GB:
-      return this.getSize() * OzoneConsts.GB;
-    case TB:
-      return this.getSize() * OzoneConsts.TB;
-    case UNDEFINED:
-    default:
-      return -1;
-    }
+  public static OzoneQuota parseQuota(String quotaInBytes,
+      String quotaInNamespace) {
+    return new OzoneQuota(parseNameSpaceQuota(quotaInNamespace)
+        .quotaInNamespace, parseSpaceQuota(quotaInBytes).rawQuotaInBytes);
   }
 
   /**
    * Returns OzoneQuota corresponding to size in bytes.
    *
-   * @param sizeInBytes size in bytes to be converted
+   * @param quotaInBytes in bytes to be converted
+   * @param quotaInNamespace in counts to be converted
    *
    * @return OzoneQuota object
    */
-  public static OzoneQuota getOzoneQuota(long sizeInBytes) {
-    long size;
-    Units unit;
-    if (sizeInBytes % OzoneConsts.TB == 0) {
-      size = sizeInBytes / OzoneConsts.TB;
-      unit = Units.TB;
-    } else if (sizeInBytes % OzoneConsts.GB == 0) {
-      size = sizeInBytes / OzoneConsts.GB;
-      unit = Units.GB;
-    } else if (sizeInBytes % OzoneConsts.MB == 0) {
-      size = sizeInBytes / OzoneConsts.MB;
-      unit = Units.MB;
-    } else {
-      size = sizeInBytes;
-      unit = Units.BYTES;
+  public static OzoneQuota getOzoneQuota(long quotaInBytes,
+      long quotaInNamespace) {
+    long size = 1L;
+    Units unit = Units.B;
+    for (Long quota : quotaList.getSizeQuotaArray()) {
+      if (quotaInBytes % quota == 0) {
+        size = quotaInBytes / quota;
+        unit = quotaList.getQuotaUnit(quota);
+      }
     }
-    return new OzoneQuota((int)size, unit);
+    return new OzoneQuota(quotaInNamespace, new RawQuotaInBytes(unit, size));
+  }
+
+  public long getQuotaInNamespace() {
+    return quotaInNamespace;
+  }
+
+  public long getQuotaInBytes() {
+    return quotaInBytes;
   }
 
   @Override
   public String toString() {
-    return size + " " + unit;
+    return "Space Bytes Quota: " + rawQuotaInBytes.toString() + "\n" +
+        "Counts Quota: " + quotaInNamespace;
   }
 }

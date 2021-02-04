@@ -21,6 +21,7 @@ import java.io.DataInput;
 import java.io.DataInputStream;
 import java.io.DataOutput;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.Arrays;
 
 import org.apache.commons.lang3.builder.EqualsBuilder;
@@ -45,7 +46,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 public class OzoneTokenIdentifier extends
     AbstractDelegationTokenIdentifier {
 
-  public final static Text KIND_NAME = new Text("OzoneToken");
+  public static final Text KIND_NAME = new Text("OzoneToken");
   private String omCertSerialId;
   private Type tokenType;
   private String awsAccessId;
@@ -374,8 +375,8 @@ public class OzoneTokenIdentifier extends
         .append(" owner=").append(getOwner())
         .append(", renewer=").append(getRenewer())
         .append(", realUser=").append(getRealUser())
-        .append(", issueDate=").append(getIssueDate())
-        .append(", maxDate=").append(getMaxDate())
+        .append(", issueDate=").append(Instant.ofEpochMilli(getIssueDate()))
+        .append(", maxDate=").append(Instant.ofEpochMilli(getMaxDate()))
         .append(", sequenceNumber=").append(getSequenceNumber())
         .append(", masterKeyId=").append(getMasterKeyId())
         .append(", strToSign=").append(getStrToSign())

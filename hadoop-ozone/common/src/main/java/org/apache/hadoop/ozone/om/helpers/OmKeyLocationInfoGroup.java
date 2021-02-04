@@ -36,8 +36,12 @@ public class OmKeyLocationInfoGroup {
   public OmKeyLocationInfoGroup(long version,
                                 List<OmKeyLocationInfo> locations) {
     this.version = version;
-    this.locationVersionMap = locations.stream()
-        .collect(Collectors.groupingBy(OmKeyLocationInfo::getCreateVersion));
+    locationVersionMap = new HashMap<>();
+    for (OmKeyLocationInfo info : locations) {
+      locationVersionMap
+          .computeIfAbsent(info.getCreateVersion(), v -> new ArrayList<>())
+          .add(info);
+    }
     //prevent NPE
     this.locationVersionMap.putIfAbsent(version, new ArrayList<>());
   }
@@ -76,15 +80,15 @@ public class OmKeyLocationInfoGroup {
     return new ArrayList<>(locationVersionMap.get(versionToFetch));
   }
 
-  public KeyLocationList getProtobuf(boolean ignorePipeline) {
+  public KeyLocationList getProtobuf(boolean ignorePipeline,
+      int clientVersion) {
     KeyLocationList.Builder builder = KeyLocationList.newBuilder()
         .setVersion(version);
     List<OzoneManagerProtocolProtos.KeyLocation> keyLocationList =
         new ArrayList<>();
     for (List<OmKeyLocationInfo> locationList : locationVersionMap.values()) {
       for (OmKeyLocationInfo keyInfo : locationList) {
-        keyLocationList.add(ignorePipeline ?
-            keyInfo.getCompactProtobuf() : keyInfo.getProtobuf());
+        keyLocationList.add(keyInfo.getProtobuf(ignorePipeline, clientVersion));
       }
     }
     return  builder.addAllKeyLocations(keyLocationList).build();

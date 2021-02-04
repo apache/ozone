@@ -21,18 +21,26 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import org.apache.hadoop.hdds.scm.storage.CheckedBiFunction;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.audit.OMAction;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.volume.OMVolumeAclOpResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Handles volume remove acl request.
@@ -48,8 +56,22 @@ public class OMVolumeRemoveAclRequest extends OMVolumeAclRequest {
     volumeRemoveAclOp = (acls, volArgs) -> volArgs.removeAcl(acls.get(0));
   }
 
+  @Override
+  public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    long modificationTime = Time.now();
+    OzoneManagerProtocolProtos.RemoveAclRequest.Builder removeAclRequestBuilder
+        = getOmRequest().getRemoveAclRequest().toBuilder()
+            .setModificationTime(modificationTime);
+
+    return getOmRequest().toBuilder()
+        .setRemoveAclRequest(removeAclRequestBuilder)
+        .setUserInfo(getUserInfo())
+        .build();
+  }
+
   private List<OzoneAcl> ozoneAcls;
   private String volumeName;
+  private OzoneObj obj;
 
   public OMVolumeRemoveAclRequest(OMRequest omRequest) {
     super(omRequest, volumeRemoveAclOp);
@@ -58,7 +80,8 @@ public class OMVolumeRemoveAclRequest extends OMVolumeAclRequest {
     Preconditions.checkNotNull(removeAclRequest);
     ozoneAcls = Lists.newArrayList(
         OzoneAcl.fromProtobuf(removeAclRequest.getAcl()));
-    volumeName = removeAclRequest.getObj().getPath().substring(1);
+    obj = OzoneObjInfo.fromProtobuf(removeAclRequest.getObj());
+    volumeName = obj.getPath().substring(1);
   }
 
   @Override
@@ -73,6 +96,11 @@ public class OMVolumeRemoveAclRequest extends OMVolumeAclRequest {
 
   private OzoneAcl getAcl() {
     return ozoneAcls.get(0);
+  }
+
+  @Override
+  OzoneObj getObject() {
+    return obj;
   }
 
   @Override
@@ -95,7 +123,8 @@ public class OMVolumeRemoveAclRequest extends OMVolumeAclRequest {
   }
 
   @Override
-  void onComplete(Result result, IOException ex, long trxnLogIndex) {
+  void onComplete(Result result, IOException ex, long trxnLogIndex,
+      AuditLogger auditLogger, Map<String, String> auditMap) {
     switch (result) {
     case SUCCESS:
       if (LOG.isDebugEnabled()) {
@@ -111,5 +140,15 @@ public class OMVolumeRemoveAclRequest extends OMVolumeAclRequest {
       LOG.error("Unrecognized Result for OMVolumeRemoveAclRequest: {}",
           getOmRequest());
     }
+    auditLog(auditLogger, buildAuditMessage(OMAction.REMOVE_ACL, auditMap,
+        ex, getOmRequest().getUserInfo()));
+  }
+
+  @Override
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
+      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+    ozoneManager.getMetrics().incNumRemoveAcl();
+    return super.validateAndUpdateCache(ozoneManager, trxnLogIndex,
+        omDoubleBufferHelper);
   }
 }

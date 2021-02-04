@@ -21,10 +21,11 @@ import org.apache.hadoop.hdds.function.FunctionWithServiceException;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 
-import com.google.protobuf.ProtocolMessageEnum;
 import com.google.protobuf.ServiceException;
 import io.opentracing.Span;
 import org.slf4j.Logger;
+
+import java.util.function.UnaryOperator;
 
 /**
  * Dispatch message after tracing and message logging for insight.
@@ -34,27 +35,39 @@ import org.slf4j.Logger;
  * It logs the message type/content on DEBUG/TRACING log for insight and create
  * a new span based on the tracing information.
  */
-public class OzoneProtocolMessageDispatcher<REQUEST, RESPONSE> {
+public class OzoneProtocolMessageDispatcher<REQUEST, RESPONSE, TYPE> {
 
-  private String serviceName;
+  private final String serviceName;
 
-  private final ProtocolMessageMetrics<ProtocolMessageEnum>
+  private final ProtocolMessageMetrics<TYPE>
       protocolMessageMetrics;
 
-  private Logger logger;
+  private final Logger logger;
+  private final UnaryOperator<REQUEST> requestPreprocessor;
+  private final UnaryOperator<RESPONSE> responsePreprocessor;
 
   public OzoneProtocolMessageDispatcher(String serviceName,
-      ProtocolMessageMetrics<ProtocolMessageEnum> protocolMessageMetrics,
+      ProtocolMessageMetrics<TYPE> protocolMessageMetrics,
       Logger logger) {
+    this(serviceName, protocolMessageMetrics, logger, req -> req, resp -> resp);
+  }
+
+  public OzoneProtocolMessageDispatcher(String serviceName,
+      ProtocolMessageMetrics<TYPE> protocolMessageMetrics,
+      Logger logger,
+      UnaryOperator<REQUEST> requestPreprocessor,
+      UnaryOperator<RESPONSE> responsePreprocessor) {
     this.serviceName = serviceName;
     this.protocolMessageMetrics = protocolMessageMetrics;
     this.logger = logger;
+    this.requestPreprocessor = requestPreprocessor;
+    this.responsePreprocessor = responsePreprocessor;
   }
 
   public RESPONSE processRequest(
       REQUEST request,
       FunctionWithServiceException<REQUEST, RESPONSE> methodCall,
-      ProtocolMessageEnum type,
+      TYPE type,
       String traceId) throws ServiceException {
     Span span = TracingUtil.importAndCreateSpan(type.toString(), traceId);
     try {
@@ -62,31 +75,36 @@ public class OzoneProtocolMessageDispatcher<REQUEST, RESPONSE> {
         logger.trace(
             "[service={}] [type={}] request is received: <json>{}</json>",
             serviceName,
-            type.toString(),
-            request.toString().replaceAll("\n", "\\\\n"));
+            type,
+            escapeNewLines(requestPreprocessor.apply(request)));
       } else if (logger.isDebugEnabled()) {
         logger.debug("{} {} request is received",
-            serviceName, type.toString());
+            serviceName, type);
       }
 
-      long startTime = System.nanoTime();
+      long startTime = System.currentTimeMillis();
 
       RESPONSE response = methodCall.apply(request);
 
-      protocolMessageMetrics.increment(type, System.nanoTime() - startTime);
+      protocolMessageMetrics.increment(type,
+          System.currentTimeMillis() - startTime);
 
       if (logger.isTraceEnabled()) {
         logger.trace(
             "[service={}] [type={}] request is processed. Response: "
                 + "<json>{}</json>",
             serviceName,
-            type.toString(),
-            response.toString().replaceAll("\n", "\\\\n"));
+            type,
+            escapeNewLines(responsePreprocessor.apply(response)));
       }
       return response;
 
     } finally {
       span.finish();
     }
+  }
+
+  private static String escapeNewLines(Object input) {
+    return input.toString().replaceAll("\n", "\\\\n");
   }
 }

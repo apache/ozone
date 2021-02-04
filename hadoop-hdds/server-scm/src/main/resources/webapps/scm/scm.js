@@ -30,22 +30,29 @@
                 .then(function (result) {
                     ctrl.nodemanagermetrics = result.data.beans[0];
                 });
-            $http.get("jmx?qry=Hadoop:service=StorageContainerManager,name=StorageContainerManagerInfo,component=ServerRuntime")
-                .then(function (result) {
-                    ctrl.scmmetrics = result.data.beans[0];
-                });
 
-            var statusSortOrder = {
+            const nodeOpStateSortOrder = {
+                "IN_SERVICE": "a",
+                "DECOMMISSIONING": "b",
+                "DECOMMISSIONED": "c",
+                "ENTERING_MAINTENANCE": "d",
+                "IN_MAINTENANCE": "e"
+            };
+            ctrl.nodeOpStateOrder = function (v1, v2) {
+                //status with non defined sort order will be "undefined"
+                return ("" + nodeOpStateSortOrder[v1.value])
+                    .localeCompare("" + nodeOpStateSortOrder[v2.value])
+            }
+
+            const nodeStateSortOrder = {
                 "HEALTHY": "a",
                 "STALE": "b",
-                "DEAD": "c",
-                "UNKNOWN": "z",
-                "DECOMMISSIONING": "x",
-                "DECOMMISSIONED": "y"
+                "DEAD": "c"
             };
-            ctrl.nodeOrder = function (v1, v2) {
+            ctrl.nodeStateOrder = function (v1, v2) {
                 //status with non defined sort order will be "undefined"
-                return ("" + statusSortOrder[v1.value]).localeCompare("" + statusSortOrder[v2.value])
+                return ("" + nodeStateSortOrder[v1.value])
+                    .localeCompare("" + nodeStateSortOrder[v2.value])
             }
 
         }

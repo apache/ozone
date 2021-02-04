@@ -44,16 +44,24 @@ public abstract class Shell extends GenericCli {
 
   @Override
   protected void printError(Throwable errorArg) {
+    OMException omException = null;
+
     if (errorArg instanceof OMException) {
-      if (isVerbose()) {
-        errorArg.printStackTrace(System.err);
-      } else {
-        OMException omException = (OMException) errorArg;
-        System.err.println(String
-            .format("%s %s", omException.getResult().name(),
-                omException.getMessage()));
-      }
+      omException = (OMException) errorArg;
+    } else if (errorArg.getCause() instanceof OMException) {
+      // If the OMException occurred in a method that could not throw a
+      // checked exception (like an Iterator implementation), it will be
+      // chained to an unchecked exception and thrown.
+      omException = (OMException) errorArg.getCause();
+    }
+
+    if (omException != null && !isVerbose()) {
+      // In non-verbose mode, reformat OMExceptions as error messages to the
+      // user.
+      System.err.println(String.format("%s %s", omException.getResult().name(),
+              omException.getMessage()));
     } else {
+      // Prints the stack trace when in verbose mode.
       super.printError(errorArg);
     }
   }

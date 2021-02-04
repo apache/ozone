@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.scm.node;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
 
 import java.io.File;
@@ -34,6 +35,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto
@@ -41,6 +43,7 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -89,6 +92,7 @@ public class TestDeadNodeHandler {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setTimeDuration(HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
         0, TimeUnit.SECONDS);
+    conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 2);
     storageDir = GenericTestUtils.getTempPath(
         TestDeadNodeHandler.class.getSimpleName() + UUID.randomUUID());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, storageDir);
@@ -162,7 +166,9 @@ public class TestDeadNodeHandler {
     LambdaTestUtils.await(120000, 1000,
         () -> {
           pipelineManager.triggerPipelineCreation();
-          return pipelineManager.getPipelines(RATIS, THREE).size() == 3;
+          System.out.println(pipelineManager.getPipelines(RATIS, THREE).size());
+          System.out.println(pipelineManager.getPipelines(RATIS, ONE).size());
+          return pipelineManager.getPipelines(RATIS, THREE).size() > 3;
         });
     TestUtils.openAllRatisPipelines(pipelineManager);
 
@@ -188,22 +194,44 @@ public class TestDeadNodeHandler {
     TestUtils.closeContainer(containerManager, container2.containerID());
     TestUtils.quasiCloseContainer(containerManager, container3.containerID());
 
+    // First set the node to IN_MAINTENANCE and ensure the container replicas
+    // are not removed on the dead event
+    nodeManager.setNodeOperationalState(datanode1,
+        HddsProtos.NodeOperationalState.IN_MAINTENANCE);
     deadNodeHandler.onMessage(datanode1, publisher);
 
     Set<ContainerReplica> container1Replicas = containerManager
+        .getContainerReplicas(new ContainerID(container1.getContainerID()));
+    Assert.assertEquals(2, container1Replicas.size());
+
+    Set<ContainerReplica> container2Replicas = containerManager
+        .getContainerReplicas(new ContainerID(container2.getContainerID()));
+    Assert.assertEquals(2, container2Replicas.size());
+
+    Set<ContainerReplica> container3Replicas = containerManager
+            .getContainerReplicas(new ContainerID(container3.getContainerID()));
+    Assert.assertEquals(1, container3Replicas.size());
+
+    // Now set the node to anything other than IN_MAINTENANCE and the relevant
+    // replicas should be removed
+    nodeManager.setNodeOperationalState(datanode1,
+        HddsProtos.NodeOperationalState.IN_SERVICE);
+    deadNodeHandler.onMessage(datanode1, publisher);
+
+    container1Replicas = containerManager
         .getContainerReplicas(new ContainerID(container1.getContainerID()));
     Assert.assertEquals(1, container1Replicas.size());
     Assert.assertEquals(datanode2,
         container1Replicas.iterator().next().getDatanodeDetails());
 
-    Set<ContainerReplica> container2Replicas = containerManager
+    container2Replicas = containerManager
         .getContainerReplicas(new ContainerID(container2.getContainerID()));
     Assert.assertEquals(1, container2Replicas.size());
     Assert.assertEquals(datanode2,
         container2Replicas.iterator().next().getDatanodeDetails());
 
-    Set<ContainerReplica> container3Replicas = containerManager
-            .getContainerReplicas(new ContainerID(container3.getContainerID()));
+    container3Replicas = containerManager
+        .getContainerReplicas(new ContainerID(container3.getContainerID()));
     Assert.assertEquals(1, container3Replicas.size());
     Assert.assertEquals(datanode3,
         container3Replicas.iterator().next().getDatanodeDetails());

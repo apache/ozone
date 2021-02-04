@@ -18,9 +18,12 @@
  */
 package org.apache.hadoop.hdds.utils.db;
 
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.server.ServerUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.util.Arrays;
 import java.util.Optional;
 import java.util.function.Function;
@@ -43,7 +46,16 @@ public interface DBDefinition {
   String getLocationConfigKey();
 
   /**
-   * Create a new DB store instance based on the configuration.
+   * @param conf The configuration for the DB.
+   * @return The parent directory for this definition's .db file.
+   */
+  default File getDBLocation(ConfigurationSource conf) {
+    return ServerUtils.getDirectoryFromConfig(conf,
+            getLocationConfigKey(), getName());
+  }
+
+  /**
+   * @return The column families present in the DB.
    */
   DBColumnFamilyDefinition[] getColumnFamilies();
 
