@@ -120,10 +120,14 @@ public class TestOMDbCheckpointServlet {
       OMDBCheckpointServlet omDbCheckpointServletMock =
           mock(OMDBCheckpointServlet.class);
 
+      final OzoneManager om = cluster.getOzoneManager();
+
       doCallRealMethod().when(omDbCheckpointServletMock).init();
       doCallRealMethod().when(omDbCheckpointServletMock).initialize(
-          cluster.getOzoneManager().getMetadataManager().getStore(),
-          cluster.getOzoneManager().getMetrics().getDBCheckpointMetrics());
+          om.getMetadataManager().getStore(),
+          om.getMetrics().getDBCheckpointMetrics(),
+          om.getAclsEnabled(),
+          om.getOzoneAdmins(om.getConfiguration()));
 
       HttpServletRequest requestMock = mock(HttpServletRequest.class);
       // Return current user short name when asked
