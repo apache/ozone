@@ -220,7 +220,7 @@ public class TestMetadataStore {
       store.close();
       store.destroy();
     } else {
-      System.out.println("--- Store already closed: " + store.getClass());
+      System.out.println("--- Store already closed.");
     }
     if (testDir != null) {
       FileUtils.deleteDirectory(testDir);

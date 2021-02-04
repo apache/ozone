@@ -73,11 +73,11 @@ public class TestScmSafeMode {
 
   private static final Logger LOG = LoggerFactory
       .getLogger(TestScmSafeMode.class);
-  private static MiniOzoneCluster cluster = null;
-  private static MiniOzoneCluster.Builder builder = null;
-  private static OzoneConfiguration conf;
-  private static OzoneManager om;
-  private static StorageContainerLocationProtocolClientSideTranslatorPB
+  private MiniOzoneCluster cluster = null;
+  private MiniOzoneCluster.Builder builder = null;
+  private OzoneConfiguration conf;
+  private OzoneManager om;
+  private StorageContainerLocationProtocolClientSideTranslatorPB
       storageContainerLocationClient;
 
 

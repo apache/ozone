@@ -61,12 +61,13 @@ public class TestHddsSecureDatanodeInit {
   private static PrivateKey privateKey;
   private static PublicKey publicKey;
   private static GenericTestUtils.LogCapturer dnLogs;
-  private static CertificateClient client;
   private static SecurityConfig securityConfig;
   private static KeyCodec keyCodec;
   private static CertificateCodec certCodec;
   private static X509CertificateHolder certHolder;
   private static final String DN_COMPONENT = DNCertificateClient.COMPONENT_NAME;
+
+  private CertificateClient client;
 
   @BeforeClass
   public static void setUp() throws Exception {

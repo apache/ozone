@@ -1727,6 +1727,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
           <configuration>
             <maxHeap>1024</maxHeap>
             <xmlOutput>true</xmlOutput>
+            <includeTests>true</includeTests>
           </configuration>
         </plugin>
         <plugin>

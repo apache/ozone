@@ -37,6 +37,7 @@ import java.io.File;
 import java.util.List;
 import java.util.ArrayList;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
 
 
@@ -49,7 +50,7 @@ public class TestOmLDBCli {
   private RDBParser rdbParser;
   private DBScanner dbScanner;
   private DBStore dbStore = null;
-  private static List<String> keyNames;
+  private List<String> keyNames;
 
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();
@@ -89,7 +90,7 @@ public class TestOmLDBCli {
       String key = "key"+ (i);
       Table<byte[], byte[]> keyTable = dbStore.getTable("keyTable");
       byte[] arr = value.getProtobuf(CURRENT_VERSION).toByteArray();
-      keyTable.put(key.getBytes(), arr);
+      keyTable.put(key.getBytes(UTF_8), arr);
     }
     rdbParser.setDbPath(dbStore.getDbLocation().getAbsolutePath());
     dbScanner.setParent(rdbParser);
@@ -108,13 +109,13 @@ public class TestOmLDBCli {
     }
   }
 
-  private static List<String> getKeyNames(DBScanner dbScanner)
+  private List<String> getKeyNames(DBScanner scanner)
             throws Exception {
     keyNames.clear();
-    dbScanner.setTableName("keyTable");
-    dbScanner.call();
-    Assert.assertFalse(dbScanner.getScannedObjects().isEmpty());
-    for (Object o : dbScanner.getScannedObjects()){
+    scanner.setTableName("keyTable");
+    scanner.call();
+    Assert.assertFalse(scanner.getScannedObjects().isEmpty());
+    for (Object o : scanner.getScannedObjects()){
       OmKeyInfo keyInfo = (OmKeyInfo)o;
       keyNames.add(keyInfo.getKeyName());
     }

@@ -27,6 +27,8 @@ import org.junit.Test;
 
 import java.util.UUID;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+
 /**
  * This class tests OmMultipartKeyInfoCodec.
  */
@@ -60,7 +62,7 @@ public class TestOmMultipartKeyInfoCodec {
 
     // When random byte data passed returns null.
     try {
-      codec.fromPersistedFormat("random".getBytes());
+      codec.fromPersistedFormat("random".getBytes(UTF_8));
     } catch (IllegalArgumentException ex) {
       GenericTestUtils.assertExceptionContains("Can't encode the the raw " +
           "data from the byte array", ex);

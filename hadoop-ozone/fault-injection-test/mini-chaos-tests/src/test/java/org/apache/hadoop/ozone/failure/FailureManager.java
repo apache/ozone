@@ -68,7 +68,7 @@ public class FailureManager {
       f.fail(cluster);
     } catch (Throwable t) {
       LOG.info("Caught exception while inducing failure:{}", f.getName(), t);
-      System.exit(-2);
+      throw new RuntimeException();
     }
 
   }
