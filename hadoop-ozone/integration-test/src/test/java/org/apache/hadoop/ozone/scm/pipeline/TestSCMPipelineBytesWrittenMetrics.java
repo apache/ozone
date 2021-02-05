@@ -47,6 +47,8 @@ import java.util.concurrent.TimeUnit;
 
 import org.junit.Rule;
 import org.junit.rules.Timeout;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE;
@@ -97,9 +99,9 @@ public class TestSCMPipelineBytesWrittenMetrics {
     String keyName = UUID.randomUUID().toString();
 
     OzoneOutputStream out = bucket
-        .createKey(keyName, value.getBytes().length, ReplicationType.RATIS,
+        .createKey(keyName, value.getBytes(UTF_8).length, ReplicationType.RATIS,
             ReplicationFactor.THREE, new HashMap<>());
-    out.write(value.getBytes());
+    out.write(value.getBytes(UTF_8));
     out.close();
 
     OmKeyArgs.Builder builder = new OmKeyArgs.Builder();
@@ -108,7 +110,7 @@ public class TestSCMPipelineBytesWrittenMetrics {
 
     OzoneKeyDetails keyDetails = bucket.getKey(keyName);
     Assert.assertEquals(keyName, keyDetails.getName());
-    Assert.assertEquals(value.getBytes().length, keyDetails
+    Assert.assertEquals(value.getBytes(UTF_8).length, keyDetails
         .getOzoneKeyLocations().get(0).getLength());
   }
 

@@ -37,9 +37,12 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
  * Tests AuditParser.
@@ -53,6 +56,7 @@ public class TestAuditParser {
   private final ByteArrayOutputStream err = new ByteArrayOutputStream();
   private static final PrintStream OLD_OUT = System.out;
   private static final PrintStream OLD_ERR = System.err;
+  private static final String DEFAULT_CODING = UTF_8.name();
   private static String dbName;
   private static final String LOGS = TestAuditParser.class
       .getClassLoader().getResource("testaudit.log").getPath();
@@ -73,9 +77,9 @@ public class TestAuditParser {
   }
 
   @Before
-  public void setup() {
-    System.setOut(new PrintStream(OUT));
-    System.setErr(new PrintStream(err));
+  public void setup() throws UnsupportedEncodingException {
+    System.setOut(new PrintStream(OUT, false, DEFAULT_CODING));
+    System.setErr(new PrintStream(err, false, DEFAULT_CODING));
   }
 
   @After
@@ -118,7 +122,10 @@ public class TestAuditParser {
         };
     cmd.parseWithHandlers(new CommandLine.RunLast(),
         exceptionHandler, args);
-    Assert.assertTrue(OUT.toString().contains(msg));
+    try {
+      Assert.assertTrue(OUT.toString(DEFAULT_CODING).contains(msg));
+    } catch (UnsupportedEncodingException ignored) {
+    }
   }
 
   /**

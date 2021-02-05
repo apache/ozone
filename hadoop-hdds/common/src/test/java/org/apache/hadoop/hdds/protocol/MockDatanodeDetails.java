@@ -25,6 +25,8 @@ import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
+import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.ALL_PORTS;
+
 /**
  * Provides {@link DatanodeDetails} factory methods for testing.
  */
@@ -89,23 +91,20 @@ public final class MockDatanodeDetails {
 
   public static DatanodeDetails createDatanodeDetails(String uuid,
       String hostname, String ipAddress, String networkLocation, int port) {
-    DatanodeDetails.Port containerPort = DatanodeDetails.newPort(
-        DatanodeDetails.Port.Name.STANDALONE, port);
-    DatanodeDetails.Port ratisPort = DatanodeDetails.newPort(
-        DatanodeDetails.Port.Name.RATIS, port);
-    DatanodeDetails.Port restPort = DatanodeDetails.newPort(
-        DatanodeDetails.Port.Name.REST, port);
-    return DatanodeDetails.newBuilder()
+
+    DatanodeDetails.Builder dn = DatanodeDetails.newBuilder()
         .setUuid(UUID.fromString(uuid))
         .setHostName(hostname)
         .setIpAddress(ipAddress)
-        .addPort(containerPort)
-        .addPort(ratisPort)
-        .addPort(restPort)
         .setNetworkLocation(networkLocation)
         .setPersistedOpState(HddsProtos.NodeOperationalState.IN_SERVICE)
-        .setPersistedOpStateExpiry(0)
-        .build();
+        .setPersistedOpStateExpiry(0);
+
+    for (DatanodeDetails.Port.Name name : ALL_PORTS) {
+      dn.addPort(DatanodeDetails.newPort(name, port));
+    }
+
+    return dn.build();
   }
 
   /**

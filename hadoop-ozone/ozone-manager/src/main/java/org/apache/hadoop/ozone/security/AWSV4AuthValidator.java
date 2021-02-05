@@ -38,7 +38,7 @@ import java.security.NoSuchAlgorithmException;
  **/
 final class AWSV4AuthValidator {
 
-  private final static Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(AWSV4AuthValidator.class);
   private static final String HMAC_SHA256_ALGORITHM = "HmacSHA256";
 

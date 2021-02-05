@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.metrics2.util.MBeans;
+import org.apache.hadoop.ozone.ClientVersions;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
@@ -149,7 +150,8 @@ public final class PipelineManagerV2Impl implements PipelineManager {
     lock.lock();
     try {
       Pipeline pipeline = pipelineFactory.create(type, factor);
-      stateManager.addPipeline(pipeline.getProtobufMessage());
+      stateManager.addPipeline(pipeline.getProtobufMessage(
+          ClientVersions.CURRENT_VERSION));
       recordMetricsForPipeline(pipeline);
       return pipeline;
     } catch (IOException ex) {

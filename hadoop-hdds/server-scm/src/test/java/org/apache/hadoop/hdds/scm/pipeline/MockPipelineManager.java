@@ -147,7 +147,7 @@ public final class MockPipelineManager implements PipelineManager {
   @Override
   public NavigableSet<ContainerID> getContainersInPipeline(
       final PipelineID pipelineID) throws IOException {
-    return getContainersInPipeline(pipelineID);
+    return stateManager.getContainers(pipelineID);
   }
 
   @Override

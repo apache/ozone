@@ -162,7 +162,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
    * ozone.scm.ha.ratis.bind.port.
    */
   private static class SCMHAGroupBuilder {
-    private final static String SCM_SERVICE_ID = "SCM-HA-Service";
+    private static final String SCM_SERVICE_ID = "SCM-HA-Service";
 
     private final RaftGroupId raftGroupId;
     private final RaftGroup raftGroup;

@@ -160,7 +160,9 @@ public class OMKeyCreateRequest extends OMKeyRequest {
               .setDataSize(requestedSize);
 
       newKeyArgs.addAllKeyLocations(omKeyLocationInfoList.stream()
-          .map(OmKeyLocationInfo::getProtobuf).collect(Collectors.toList()));
+          .map(info -> info.getProtobuf(false,
+              getOmRequest().getVersion()))
+          .collect(Collectors.toList()));
     } else {
       newKeyArgs = keyArgs.toBuilder().setModificationTime(Time.now());
     }
@@ -314,7 +316,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
       // Prepare response
       omResponse.setCreateKeyResponse(CreateKeyResponse.newBuilder()
-          .setKeyInfo(omKeyInfo.getProtobuf())
+          .setKeyInfo(omKeyInfo.getProtobuf(getOmRequest().getVersion()))
           .setID(clientID)
           .setOpenVersion(openVersion).build())
           .setCmdType(Type.CreateKey);

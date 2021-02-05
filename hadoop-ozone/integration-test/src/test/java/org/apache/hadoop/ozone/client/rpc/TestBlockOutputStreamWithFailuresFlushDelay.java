@@ -72,7 +72,7 @@ public class TestBlockOutputStreamWithFailuresFlushDelay {
   @Rule
   public Timeout timeout = new Timeout(300000);
 
-  private static MiniOzoneCluster cluster;
+  private MiniOzoneCluster cluster;
   private OzoneConfiguration conf = new OzoneConfiguration();
   private OzoneClient client;
   private ObjectStore objectStore;
@@ -247,7 +247,7 @@ public class TestBlockOutputStreamWithFailuresFlushDelay {
     Assert.assertEquals(0, keyOutputStream.getStreamEntries().size());
     // Written the same data twice
     String dataString = new String(data1, UTF_8);
-    validateData(keyName, dataString.concat(dataString).getBytes());
+    validateData(keyName, dataString.concat(dataString).getBytes(UTF_8));
   }
 
   @Test
@@ -334,7 +334,7 @@ public class TestBlockOutputStreamWithFailuresFlushDelay {
     Assert.assertEquals(0, keyOutputStream.getStreamEntries().size());
     // Written the same data twice
     String dataString = new String(data1, UTF_8);
-    validateData(keyName, dataString.concat(dataString).getBytes());
+    validateData(keyName, dataString.concat(dataString).getBytes(UTF_8));
   }
   
   @Test
@@ -503,7 +503,7 @@ public class TestBlockOutputStreamWithFailuresFlushDelay {
     Assert.assertTrue(keyOutputStream.getLocationInfoList().size() == 0);
     // Written the same data twice
     String dataString = new String(data1, UTF_8);
-    validateData(keyName, dataString.concat(dataString).getBytes());
+    validateData(keyName, dataString.concat(dataString).getBytes(UTF_8));
   }
 
   @Test
@@ -574,7 +574,7 @@ public class TestBlockOutputStreamWithFailuresFlushDelay {
     Assert.assertTrue(keyOutputStream.getStreamEntries().size() == 0);
     // Written the same data twice
     String dataString = new String(data1, UTF_8);
-    validateData(keyName, dataString.concat(dataString).getBytes());
+    validateData(keyName, dataString.concat(dataString).getBytes(UTF_8));
   }
 
   @Test
@@ -665,7 +665,7 @@ public class TestBlockOutputStreamWithFailuresFlushDelay {
     Assert.assertEquals(0, keyOutputStream.getLocationInfoList().size());
     // Written the same data twice
     String dataString = new String(data1, UTF_8);
-    validateData(keyName, dataString.concat(dataString).getBytes());
+    validateData(keyName, dataString.concat(dataString).getBytes(UTF_8));
   }
 
   @Test
@@ -758,7 +758,7 @@ public class TestBlockOutputStreamWithFailuresFlushDelay {
     // Written the same data twice
     String dataString = new String(data1, UTF_8);
     cluster.restartHddsDatanode(pipeline.getNodes().get(0), true);
-    validateData(keyName, dataString.concat(dataString).getBytes());
+    validateData(keyName, dataString.concat(dataString).getBytes(UTF_8));
   }
 
   @Test
@@ -851,7 +851,7 @@ public class TestBlockOutputStreamWithFailuresFlushDelay {
     // Written the same data twice
     String dataString = new String(data1, UTF_8);
     cluster.restartHddsDatanode(pipeline.getNodes().get(0), true);
-    validateData(keyName, dataString.concat(dataString).getBytes());
+    validateData(keyName, dataString.concat(dataString).getBytes(UTF_8));
   }
 
   private OzoneOutputStream createKey(String keyName, ReplicationType type,

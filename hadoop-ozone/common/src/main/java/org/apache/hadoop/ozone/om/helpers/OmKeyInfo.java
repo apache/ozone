@@ -381,8 +381,8 @@ public final class OmKeyInfo extends WithObjectID {
    * For network transmit.
    * @return
    */
-  public KeyInfo getProtobuf() {
-    return getProtobuf(false);
+  public KeyInfo getProtobuf(int clientVersion) {
+    return getProtobuf(false, clientVersion);
   }
 
   /**
@@ -390,13 +390,14 @@ public final class OmKeyInfo extends WithObjectID {
    * @param ignorePipeline true for persist to DB, false for network transmit.
    * @return
    */
-  public KeyInfo getProtobuf(boolean ignorePipeline) {
+  public KeyInfo getProtobuf(boolean ignorePipeline, int clientVersion) {
     long latestVersion = keyLocationVersions.size() == 0 ? -1 :
         keyLocationVersions.get(keyLocationVersions.size() - 1).getVersion();
 
     List<KeyLocationList> keyLocations = new ArrayList<>();
     for (OmKeyLocationInfoGroup locationInfoGroup : keyLocationVersions) {
-      keyLocations.add(locationInfoGroup.getProtobuf(ignorePipeline));
+      keyLocations.add(locationInfoGroup.getProtobuf(
+          ignorePipeline, clientVersion));
     }
 
     KeyInfo.Builder kb = KeyInfo.newBuilder()
