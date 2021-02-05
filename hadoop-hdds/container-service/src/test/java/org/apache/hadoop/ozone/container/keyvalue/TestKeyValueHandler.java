@@ -76,14 +76,14 @@ public class TestKeyValueHandler {
   @Rule
   public TestRule timeout = new Timeout(300000);
 
-  private static HddsDispatcher dispatcher;
-  private static KeyValueHandler handler;
-
   private static final String DATANODE_UUID = UUID.randomUUID().toString();
 
   private static final long DUMMY_CONTAINER_ID = 9999;
 
   private final ChunkLayOutVersion layout;
+
+  private HddsDispatcher dispatcher;
+  private KeyValueHandler handler;
 
   public TestKeyValueHandler(ChunkLayOutVersion layout) {
     this.layout = layout;

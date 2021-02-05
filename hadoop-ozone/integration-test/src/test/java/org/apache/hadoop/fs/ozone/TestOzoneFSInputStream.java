@@ -135,7 +135,7 @@ public class TestOzoneFSInputStream {
         System.arraycopy(tmp, 0, value, i * tmp.length, tmp.length);
         i++;
       }
-      Assert.assertEquals(i * tmp.length, data.length);
+      Assert.assertEquals((long) i * tmp.length, data.length);
       Assert.assertArrayEquals(value, data);
     }
   }

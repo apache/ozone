@@ -49,7 +49,7 @@ import static org.junit.Assert.fail;
 @Ignore
 public class TestSCMSafeModeWithPipelineRules {
 
-  private static MiniOzoneCluster cluster;
+  private MiniOzoneCluster cluster;
   private OzoneConfiguration conf = new OzoneConfiguration();
   private PipelineManager pipelineManager;
   private MiniOzoneCluster.Builder clusterBuilder;

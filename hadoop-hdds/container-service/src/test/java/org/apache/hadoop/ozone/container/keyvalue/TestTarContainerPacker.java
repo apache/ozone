@@ -21,9 +21,8 @@ package org.apache.hadoop.ozone.container.keyvalue;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.FileWriter;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
+import java.io.OutputStreamWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -55,6 +54,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.commons.compress.compressors.CompressorStreamFactory.GZIP;
 
 /**
@@ -167,10 +167,11 @@ public class TestTarContainerPacker {
     }
 
     //THEN: check the result
+    TarArchiveInputStream tarStream = null;
     try (FileInputStream input = new FileInputStream(targetFile.toFile())) {
       CompressorInputStream uncompressed = new CompressorStreamFactory()
           .createCompressorInputStream(GZIP, input);
-      TarArchiveInputStream tarStream = new TarArchiveInputStream(uncompressed);
+      tarStream = new TarArchiveInputStream(uncompressed);
 
       TarArchiveEntry entry;
       Map<String, TarArchiveEntry> entries = new HashMap<>();
@@ -181,12 +182,16 @@ public class TestTarContainerPacker {
       Assert.assertTrue(
           entries.containsKey("container.yaml"));
 
+    } finally {
+      if (tarStream != null) {
+        tarStream.close();
+      }
     }
 
     //read the container descriptor only
     try (FileInputStream input = new FileInputStream(targetFile.toFile())) {
       String containerYaml = new String(packer.unpackContainerDescriptor(input),
-          StandardCharsets.UTF_8);
+          UTF_8);
       Assert.assertEquals(TEST_DESCRIPTOR_FILE_CONTENT, containerYaml);
     }
 
@@ -202,7 +207,7 @@ public class TestTarContainerPacker {
     try (FileInputStream input = new FileInputStream(targetFile.toFile())) {
       descriptor =
           new String(packer.unpackContainerData(destinationContainer, input),
-              StandardCharsets.UTF_8);
+              UTF_8);
     }
 
     assertExampleMetadataDbIsGood(
@@ -304,7 +309,10 @@ public class TestTarContainerPacker {
   }
 
   private void writeDescriptor(KeyValueContainer container) throws IOException {
-    try (FileWriter writer = new FileWriter(container.getContainerFile())) {
+    FileOutputStream fileStream = new FileOutputStream(
+        container.getContainerFile());
+    try (OutputStreamWriter writer = new OutputStreamWriter(fileStream,
+        UTF_8)) {
       IOUtils.write(TEST_DESCRIPTOR_FILE_CONTENT, writer);
     }
   }
@@ -316,7 +324,9 @@ public class TestTarContainerPacker {
         .resolve(chunkFileName);
     Files.createDirectories(path.getParent());
     File file = path.toFile();
-    try (FileWriter writer = new FileWriter(file)) {
+    FileOutputStream fileStream = new FileOutputStream(file);
+    try (OutputStreamWriter writer = new OutputStreamWriter(fileStream,
+        UTF_8)) {
       IOUtils.write(TEST_CHUNK_FILE_CONTENT, writer);
     }
     return file;
@@ -329,7 +339,9 @@ public class TestTarContainerPacker {
         .resolve(dbFileName);
     Files.createDirectories(path.getParent());
     File file = path.toFile();
-    try (FileWriter writer = new FileWriter(file)) {
+    FileOutputStream fileStream = new FileOutputStream(file);
+    try (OutputStreamWriter writer = new OutputStreamWriter(fileStream,
+        UTF_8)) {
       IOUtils.write(TEST_DB_FILE_CONTENT, writer);
     }
     return file;
@@ -357,8 +369,7 @@ public class TestTarContainerPacker {
         Files.exists(dbFile));
 
     try (FileInputStream testFile = new FileInputStream(dbFile.toFile())) {
-      List<String> strings = IOUtils
-          .readLines(testFile, StandardCharsets.UTF_8);
+      List<String> strings = IOUtils.readLines(testFile, UTF_8);
       Assert.assertEquals(1, strings.size());
       Assert.assertEquals(TEST_DB_FILE_CONTENT, strings.get(0));
     }
@@ -375,8 +386,7 @@ public class TestTarContainerPacker {
         Files.exists(chunkFile));
 
     try (FileInputStream testFile = new FileInputStream(chunkFile.toFile())) {
-      List<String> strings = IOUtils
-          .readLines(testFile, StandardCharsets.UTF_8);
+      List<String> strings = IOUtils.readLines(testFile, UTF_8);
       Assert.assertEquals(1, strings.size());
       Assert.assertEquals(TEST_CHUNK_FILE_CONTENT, strings.get(0));
     }

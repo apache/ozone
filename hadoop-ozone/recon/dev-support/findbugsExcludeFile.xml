@@ -25,4 +25,30 @@
   <Match>
     <Package name="org.hadoop.ozone.recon.schema.tables.pojos"/>
   </Match>
+
+  <!-- Test -->
+  <Match>
+    <Class name="org.apache.hadoop.ozone.recon.TestReconUtils"/>
+    <Bug pattern="RV_RETURN_VALUE_IGNORED_BAD_PRACTICE" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.ozone.recon.recovery.TestReconOmMetadataManagerImpl"/>
+    <Bug pattern="RV_RETURN_VALUE_IGNORED_BAD_PRACTICE" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.ozone.recon.spi.impl.TestOzoneManagerServiceProviderImpl"/>
+    <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.ozone.recon.spi.impl.TestOzoneManagerServiceProviderImpl"/>
+    <Bug pattern="OBL_UNSATISFIED_OBLIGATION" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.ozone.recon.spi.impl.TestOzoneManagerServiceProviderImpl"/>
+    <Bug pattern="RV_RETURN_VALUE_IGNORED_BAD_PRACTICE" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.ozone.recon.TestReconUtils"/>
+    <Bug pattern="OBL_UNSATISFIED_OBLIGATION_EXCEPTION_EDGE" />
+  </Match>
 </FindBugsFilter>

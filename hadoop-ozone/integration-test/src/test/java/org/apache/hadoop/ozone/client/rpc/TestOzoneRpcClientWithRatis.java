@@ -42,6 +42,7 @@ import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
 import static org.junit.Assert.fail;
 
@@ -97,9 +98,9 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
 
     // Write data into a key
     try (OzoneOutputStream out = bucket.createKey(keyName,
-        value.getBytes().length, ReplicationType.RATIS,
+        value.getBytes(UTF_8).length, ReplicationType.RATIS,
         THREE, new HashMap<>())) {
-      out.write(value.getBytes());
+      out.write(value.getBytes(UTF_8));
     }
 
     // Since the rpc client is outside of cluster, then getFirstNode should be
@@ -110,18 +111,18 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
 
     // read key with topology aware read enabled
     try (OzoneInputStream is = bucket.readKey(keyName)) {
-      byte[] b = new byte[value.getBytes().length];
+      byte[] b = new byte[value.getBytes(UTF_8).length];
       is.read(b);
-      Assert.assertTrue(Arrays.equals(b, value.getBytes()));
+      Assert.assertTrue(Arrays.equals(b, value.getBytes(UTF_8)));
     } catch (OzoneChecksumException e) {
       fail("Read key should succeed");
     }
 
     // read file with topology aware read enabled
     try (OzoneInputStream is = bucket.readKey(keyName)) {
-      byte[] b = new byte[value.getBytes().length];
+      byte[] b = new byte[value.getBytes(UTF_8).length];
       is.read(b);
-      Assert.assertTrue(Arrays.equals(b, value.getBytes()));
+      Assert.assertTrue(Arrays.equals(b, value.getBytes(UTF_8)));
     } catch (OzoneChecksumException e) {
       fail("Read file should succeed");
     }
@@ -134,18 +135,18 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
       OzoneBucket newBucket =
           newStore.getVolume(volumeName).getBucket(bucketName);
       try (OzoneInputStream is = newBucket.readKey(keyName)) {
-        byte[] b = new byte[value.getBytes().length];
+        byte[] b = new byte[value.getBytes(UTF_8).length];
         is.read(b);
-        Assert.assertTrue(Arrays.equals(b, value.getBytes()));
+        Assert.assertTrue(Arrays.equals(b, value.getBytes(UTF_8)));
       } catch (OzoneChecksumException e) {
         fail("Read key should succeed");
       }
 
       // read file with topology aware read disabled
       try (OzoneInputStream is = newBucket.readFile(keyName)) {
-        byte[] b = new byte[value.getBytes().length];
+        byte[] b = new byte[value.getBytes(UTF_8).length];
         is.read(b);
-        Assert.assertTrue(Arrays.equals(b, value.getBytes()));
+        Assert.assertTrue(Arrays.equals(b, value.getBytes(UTF_8)));
       } catch (OzoneChecksumException e) {
         fail("Read file should succeed");
       }

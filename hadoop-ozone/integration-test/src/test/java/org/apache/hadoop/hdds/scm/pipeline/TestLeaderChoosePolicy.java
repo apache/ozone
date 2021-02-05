@@ -46,9 +46,9 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_L
 @Ignore
 public class TestLeaderChoosePolicy {
 
-  private static MiniOzoneCluster cluster;
+  private MiniOzoneCluster cluster;
   private OzoneConfiguration conf = new OzoneConfiguration();
-  private static PipelineManager pipelineManager;
+  private PipelineManager pipelineManager;
 
   public void init(int numDatanodes, int datanodePipelineLimit)
       throws Exception {
@@ -94,8 +94,8 @@ public class TestLeaderChoosePolicy {
     }
 
     Assert.assertTrue(leaderCount.size() == dnNum);
-    for (UUID key : leaderCount.keySet()) {
-      Assert.assertTrue(leaderCount.get(key) == leaderNumOfEachDn);
+    for (Map.Entry<UUID, Integer> entry: leaderCount.entrySet()) {
+      Assert.assertTrue(leaderCount.get(entry.getKey()) == leaderNumOfEachDn);
     }
   }
 

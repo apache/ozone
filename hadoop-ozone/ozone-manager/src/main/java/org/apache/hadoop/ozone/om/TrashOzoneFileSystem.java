@@ -48,6 +48,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -274,7 +275,7 @@ public class TrashOzoneFileSystem extends FileSystem {
         }
       } catch (Exception e){
         LOG.error("Couldn't perform fs operation " +
-            "fs.listStatus()/fs.exists()" + e);
+            "fs.listStatus()/fs.exists()", e);
       }
     }
     return ret;
@@ -428,11 +429,17 @@ public class TrashOzoneFileSystem extends FileSystem {
               .setToKeyName(toKeyName)
               .build();
       OzoneManagerProtocolProtos.OMRequest omRequest =
-          OzoneManagerProtocolProtos.OMRequest.newBuilder()
-              .setClientId(CLIENT_ID.toString())
-              .setRenameKeyRequest(renameKeyRequest)
-              .setCmdType(OzoneManagerProtocolProtos.Type.RenameKey)
-              .build();
+          null;
+      try {
+        omRequest = OzoneManagerProtocolProtos.OMRequest.newBuilder()
+            .setClientId(CLIENT_ID.toString())
+            .setUserInfo(getUserInfo())
+            .setRenameKeyRequest(renameKeyRequest)
+            .setCmdType(OzoneManagerProtocolProtos.Type.RenameKey)
+            .build();
+      } catch (IOException e) {
+        LOG.error("Couldn't get userinfo", e);
+      }
       return omRequest;
     }
   }
@@ -490,13 +497,36 @@ public class TrashOzoneFileSystem extends FileSystem {
               .setDeleteKeys(deleteKeyArgs)
               .build();
       OzoneManagerProtocolProtos.OMRequest omRequest =
-          OzoneManagerProtocolProtos.OMRequest.newBuilder()
-              .setClientId(CLIENT_ID.toString())
-              .setDeleteKeysRequest(deleteKeysRequest)
-              .setCmdType(OzoneManagerProtocolProtos.Type.DeleteKeys)
-              .build();
+          null;
+      try {
+        omRequest = OzoneManagerProtocolProtos.OMRequest.newBuilder()
+            .setClientId(CLIENT_ID.toString())
+            .setUserInfo(getUserInfo())
+            .setDeleteKeysRequest(deleteKeysRequest)
+            .setCmdType(OzoneManagerProtocolProtos.Type.DeleteKeys)
+            .build();
+      } catch (IOException e) {
+        LOG.error("Couldn't get userinfo", e);
+      }
       return omRequest;
     }
+  }
+
+  OzoneManagerProtocolProtos.UserInfo getUserInfo() throws IOException {
+    UserGroupInformation user = UserGroupInformation.getCurrentUser();
+    InetAddress remoteAddress = ozoneManager.getOmRpcServerAddr().getAddress();
+    OzoneManagerProtocolProtos.UserInfo.Builder userInfo =
+        OzoneManagerProtocolProtos.UserInfo.newBuilder();
+    if (user != null) {
+      userInfo.setUserName(user.getUserName());
+    }
+
+    if (remoteAddress != null) {
+      userInfo.setHostName(remoteAddress.getHostName());
+      userInfo.setRemoteAddress(remoteAddress.getHostAddress());
+    }
+
+    return userInfo.build();
   }
 
 

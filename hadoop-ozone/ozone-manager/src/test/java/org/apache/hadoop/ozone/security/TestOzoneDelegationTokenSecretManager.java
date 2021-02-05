@@ -18,6 +18,16 @@
 
 package org.apache.hadoop.ozone.security;
 
+import java.io.File;
+import java.io.IOException;
+import java.security.KeyPair;
+import java.security.PrivateKey;
+import java.security.PublicKey;
+import java.security.Signature;
+import java.security.cert.X509Certificate;
+import java.util.HashMap;
+import java.util.Map;
+
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
@@ -36,25 +46,15 @@ import org.apache.hadoop.security.token.SecretManager;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.test.LambdaTestUtils;
 import org.apache.hadoop.util.Time;
+
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
-
-import java.io.File;
-import java.io.IOException;
-import java.security.KeyPair;
-import java.security.PrivateKey;
-import java.security.PublicKey;
-import java.security.Signature;
-import java.security.cert.X509Certificate;
-import java.util.HashMap;
-import java.util.Map;
-
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY;
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
 
 /**
  * Test class for {@link OzoneDelegationTokenSecretManager}.
@@ -342,6 +342,7 @@ public class TestOzoneDelegationTokenSecretManager {
         "20190221/us-west-1/s3/aws4_request\n" +
         "c297c080cce4e0927779823d3fd1f5cae71481a8f7dfc7e18d91851294efc47d");
     identifier.setAwsAccessId("testuser1");
+    identifier.setOwner(new Text("testuser1"));
     secretManager.retrievePassword(identifier);
   }
 
@@ -360,6 +361,7 @@ public class TestOzoneDelegationTokenSecretManager {
         "20190221/us-west-1/s3/aws4_request\n" +
         "c297c080cce4e0927779823d3fd1f5cae71481a8f7dfc7e18d91851294efc47d");
     identifier.setAwsAccessId("testuser2");
+    identifier.setOwner(new Text("testuser2"));
     // Case 1: User don't have aws secret set.
     LambdaTestUtils.intercept(SecretManager.InvalidToken.class, " No S3 " +
             "secret found for S3 identifier",
