@@ -218,4 +218,33 @@ public class TestS3MultipartRequest {
   }
 
 
+  /**
+   * Perform preExecute of Initiate Multipart upload request for given
+   * volume, bucket and key name.
+   * @param volumeName
+   * @param bucketName
+   * @param keyName
+   * @return OMRequest - returned from preExecute.
+   */
+  protected OMRequest doPreExecuteInitiateMPUV1(
+      String volumeName, String bucketName, String keyName) throws Exception {
+    OMRequest omRequest =
+            TestOMRequestUtils.createInitiateMPURequest(volumeName, bucketName,
+                    keyName);
+
+    S3InitiateMultipartUploadRequestV1 s3InitiateMultipartUploadRequestV1 =
+            new S3InitiateMultipartUploadRequestV1(omRequest);
+
+    OMRequest modifiedRequest =
+            s3InitiateMultipartUploadRequestV1.preExecute(ozoneManager);
+
+    Assert.assertNotEquals(omRequest, modifiedRequest);
+    Assert.assertTrue(modifiedRequest.hasInitiateMultiPartUploadRequest());
+    Assert.assertNotNull(modifiedRequest.getInitiateMultiPartUploadRequest()
+            .getKeyArgs().getMultipartUploadID());
+    Assert.assertTrue(modifiedRequest.getInitiateMultiPartUploadRequest()
+            .getKeyArgs().getModificationTime() > 0);
+
+    return modifiedRequest;
+  }
 }

@@ -1099,6 +1099,7 @@ message MultipartKeyInfo {
     repeated PartKeyInfo partKeyInfoList = 5;
     optional uint64 objectID = 6;
     optional uint64 updateID = 7;
+    optional uint64 parentID = 8;
 }
 
 message PartKeyInfo {
