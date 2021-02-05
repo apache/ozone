@@ -200,34 +200,4 @@ public final class SCMNodeDetails extends NodeDetails {
   public String getDatanodeAddressKey() {
     return datanodeAddressKey;
   }
-
-//  public static SCMNodeDetails loadDefaultConfig(
-//      OzoneConfiguration conf) throws IOException {
-//    int ratisPort = conf.getInt(
-//        ScmConfigKeys.OZONE_SCM_RATIS_PORT_KEY,
-//        ScmConfigKeys.OZONE_SCM_RATIS_PORT_DEFAULT);
-//    InetSocketAddress rpcAddress = new InetSocketAddress(
-//        InetAddress.getLocalHost(), 0);
-//    SCMNodeDetails scmNodeDetails = new SCMNodeDetails.Builder()
-//        .setRatisPort(ratisPort)
-//        .setRpcAddress(rpcAddress)
-//        .setDatanodeProtocolServerAddress(
-//            HddsServerUtil.getScmDataNodeBindAddress(conf))
-//        .setDatanodeAddressKey(OZONE_SCM_DATANODE_ADDRESS_KEY)
-//        .setBlockProtocolServerAddress(
-//            HddsServerUtil.getScmBlockClientBindAddress(conf))
-//        .setBlockProtocolServerAddressKey(
-//            ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY)
-//        .setClientProtocolServerAddress(
-//            HddsServerUtil.getScmClientBindAddress(conf))
-//        .setClientProtocolServerAddressKey(
-//            ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY)
-//        .build();
-//    return scmNodeDetails;
-//  }
-
-//  public static SCMNodeDetails loadSCMHAConfig(
-//      OzoneConfiguration conf) throws IOException {
-//
-//  }
 }
