@@ -426,4 +426,14 @@ public interface OMMetadataManager extends DBStoreHAManager {
    * @return DB directory key as String.
    */
   String getOpenFileName(long parentObjectId, String fileName, long id);
+
+  /**
+   * Returns the DB key name of a multipart upload key in OM metadata store.
+   *
+   * @param parentObjectId - parent object Id
+   * @param fileName       - file name
+   * @param uploadId       - the upload id for this key
+   * @return bytes of DB key.
+   */
+  String getMultipartKey(long parentObjectId, String fileName, String uploadId);
 }

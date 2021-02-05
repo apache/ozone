@@ -146,9 +146,10 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       // Check for directory exists with same name, if it exists throw error. 
       if (ozoneManager.getEnableFileSystemPaths()) {
         if (checkDirectoryAlreadyExists(volumeName, bucketName, keyName,
-            omMetadataManager)) {
+                omMetadataManager)) {
           throw new OMException("Can not Complete MPU for file: " + keyName +
-              " as there is already directory in the given path", NOT_A_FILE);
+                  " as there is already directory in the given path",
+                  NOT_A_FILE);
         }
       }
 
