@@ -177,10 +177,6 @@ public class SCMHANodeDetails {
           localRatisPort = ratisPort;
           found++;
         } else {
-          // This OMNode belongs to same OM service as the current OMNode.
-          // Add it to peerNodes list.
-          // This OMNode belongs to same OM service as the current OMNode.
-          // Add it to peerNodes list.
           peerNodesList.add(getHASCMNodeDetails(conf, serviceId,
               nodeId, addr, ratisPort));
         }
