@@ -37,7 +37,6 @@ import com.google.common.base.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static java.util.Collections.unmodifiableList;
 import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
 import static org.apache.hadoop.ozone.ClientVersions.VERSION_HANDLES_UNKNOWN_DN_PORTS;
 
@@ -74,7 +73,8 @@ public class DatanodeDetails extends NodeImpl implements
   private String buildDate;
   private HddsProtos.NodeOperationalState persistedOpState;
   private long persistedOpStateExpiryEpochSec = 0;
-  private final List<String> features = new ArrayList<>();
+  private int initialVersion;
+  private int currentVersion;
 
   /**
    * Constructs DatanodeDetails instance. DatanodeDetails.Builder is used
@@ -112,6 +112,8 @@ public class DatanodeDetails extends NodeImpl implements
     this.buildDate = buildDate;
     this.persistedOpState = persistedOpState;
     this.persistedOpStateExpiryEpochSec = persistedOpStateExpiryEpochSec;
+    this.initialVersion = initialVersion;
+    this.currentVersion = currentVersion;
   }
 
   public DatanodeDetails(DatanodeDetails datanodeDetails) {
@@ -131,6 +133,8 @@ public class DatanodeDetails extends NodeImpl implements
     this.persistedOpState = datanodeDetails.getPersistedOpState();
     this.persistedOpStateExpiryEpochSec =
         datanodeDetails.getPersistedOpStateExpiryEpochSec();
+    this.initialVersion = datanodeDetails.getInitialVersion();
+    this.currentVersion = datanodeDetails.getCurrentVersion();
   }
 
   /**
@@ -446,16 +450,26 @@ public class DatanodeDetails extends NodeImpl implements
     return extendedBuilder.build();
   }
 
-  public List<String> getFeatures() {
-    return unmodifiableList(features);
+  /**
+   * @return the version this datanode was initially created with
+   */
+  public int getInitialVersion() {
+    return initialVersion;
   }
 
-  public boolean hasFeature(String feature) {
-    return features.contains(feature);
+  public void setInitialVersion(int initialVersion) {
+    this.initialVersion = initialVersion;
   }
 
-  public void addFeature(String feature) {
-    features.add(feature);
+  /**
+   * @return the version this datanode was last started with
+   */
+  public int getCurrentVersion() {
+    return currentVersion;
+  }
+
+  public void setCurrentVersion(int currentVersion) {
+    this.currentVersion = currentVersion;
   }
 
   @Override

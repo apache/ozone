@@ -33,6 +33,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
+import org.apache.hadoop.hdds.DatanodeVersions;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
@@ -69,7 +70,6 @@ import com.sun.jmx.mbeanserver.Introspector;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec.getX509Certificate;
 import static org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest.getEncodedString;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_PLUGINS_KEY;
-import static org.apache.hadoop.ozone.OzoneConsts.SEPARATE_RATIS_PORTS_AVAILABLE;
 import static org.apache.hadoop.util.ExitUtil.terminate;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
@@ -437,7 +437,8 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       // is started.
       DatanodeDetails details = DatanodeDetails.newBuilder()
           .setUuid(UUID.randomUUID()).build();
-      details.addFeature(SEPARATE_RATIS_PORTS_AVAILABLE);
+      details.setInitialVersion(DatanodeVersions.CURRENT_VERSION);
+      details.setCurrentVersion(DatanodeVersions.CURRENT_VERSION);
       return details;
     }
   }

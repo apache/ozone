@@ -35,6 +35,7 @@ import java.security.NoSuchAlgorithmException;
 
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
+import org.apache.hadoop.hdds.DatanodeVersions;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
@@ -150,6 +151,7 @@ public final class ContainerUtils {
         throw new IOException("Unable to create datanode ID directories.");
       }
     }
+    datanodeDetails.setCurrentVersion(DatanodeVersions.CURRENT_VERSION);
     DatanodeIdYaml.createDatanodeIdFile(datanodeDetails, path);
   }
 

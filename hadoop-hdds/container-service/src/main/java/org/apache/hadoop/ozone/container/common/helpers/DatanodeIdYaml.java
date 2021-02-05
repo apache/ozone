@@ -25,7 +25,6 @@ import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -102,11 +101,10 @@ public final class DatanodeIdYaml {
         }
       }
       datanodeDetails = builder.build();
-      if (datanodeDetailsYaml.getFeatures() != null) {
-        for (String feature : datanodeDetailsYaml.getFeatures()) {
-          datanodeDetails.addFeature(feature);
-        }
-      }
+      datanodeDetails.setInitialVersion(
+          datanodeDetailsYaml.getInitialVersion());
+      datanodeDetails.setCurrentVersion(
+          datanodeDetailsYaml.getCurrentVersion());
     }
 
     return datanodeDetails;
@@ -123,7 +121,8 @@ public final class DatanodeIdYaml {
     private String persistedOpState;
     private long persistedOpStateExpiryEpochSec = 0;
     private Map<String, Integer> portDetails;
-    private List<String> features;
+    private int initialVersion;
+    private int currentVersion;
 
     public DatanodeDetailsYaml() {
       // Needed for snake-yaml introspection.
@@ -133,7 +132,8 @@ public final class DatanodeIdYaml {
     private DatanodeDetailsYaml(String uuid, String ipAddress,
         String hostName, String certSerialId,
         String persistedOpState, long persistedOpStateExpiryEpochSec,
-        Map<String, Integer> portDetails, List<String> features) {
+        Map<String, Integer> portDetails,
+        int initialVersion, int currentVersion) {
       this.uuid = uuid;
       this.ipAddress = ipAddress;
       this.hostName = hostName;
@@ -141,7 +141,8 @@ public final class DatanodeIdYaml {
       this.persistedOpState = persistedOpState;
       this.persistedOpStateExpiryEpochSec = persistedOpStateExpiryEpochSec;
       this.portDetails = portDetails;
-      this.features = features;
+      this.initialVersion = initialVersion;
+      this.currentVersion = currentVersion;
     }
 
     public String getUuid() {
@@ -200,12 +201,20 @@ public final class DatanodeIdYaml {
       this.portDetails = portDetails;
     }
 
-    public void setFeatures(List<String> features) {
-      this.features = features;
+    public int getInitialVersion() {
+      return initialVersion;
     }
 
-    public List<String> getFeatures() {
-      return features;
+    public void setInitialVersion(int version) {
+      this.initialVersion = version;
+    }
+
+    public int getCurrentVersion() {
+      return currentVersion;
+    }
+
+    public void setCurrentVersion(int version) {
+      this.currentVersion = version;
     }
   }
 
@@ -232,6 +241,7 @@ public final class DatanodeIdYaml {
         persistedOpString,
         datanodeDetails.getPersistedOpStateExpiryEpochSec(),
         portDetails,
-        datanodeDetails.getFeatures());
+        datanodeDetails.getInitialVersion(),
+        datanodeDetails.getCurrentVersion());
   }
 }

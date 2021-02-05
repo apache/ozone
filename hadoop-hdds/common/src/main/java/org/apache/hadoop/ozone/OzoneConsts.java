@@ -129,8 +129,6 @@ public final class OzoneConsts {
   public static final String OZONE_DB_CHECKPOINT_REQUEST_FLUSH =
       "flushBeforeCheckpoint";
 
-  public static final String SEPARATE_RATIS_PORTS_AVAILABLE = "RatisPorts";
-
   /**
    * Supports Bucket Versioning.
    */
