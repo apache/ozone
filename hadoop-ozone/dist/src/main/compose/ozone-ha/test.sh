@@ -27,6 +27,9 @@ source "$COMPOSE_DIR/../testlib.sh"
 start_docker_env
 
 execute_robot_test scm basic/ozone-shell-single.robot
+execute_robot_test scm basic/links.robot
+execute_robot_test scm s3
+execute_robot_test scm freon
 
 stop_docker_env
 
