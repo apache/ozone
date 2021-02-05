@@ -29,9 +29,9 @@ import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_SPLIT_KEY;
 
 /**
  * This class captures the snapshotIndex and term of the latest snapshot in
- * the OM.
+ * the server.
  * Ratis server loads the snapshotInfo during startup and updates the
- * lastApplied index to this snapshotIndex. OM SnapshotInfo does not contain
+ * lastApplied index to this snapshotIndex. SnapshotInfo does not contain
  * any files. It is used only to store/ update the last applied index and term.
  */
 public class RatisSnapshotInfo implements SnapshotInfo {
