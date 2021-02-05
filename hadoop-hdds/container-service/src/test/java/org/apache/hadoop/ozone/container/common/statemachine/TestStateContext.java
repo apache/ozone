@@ -406,21 +406,15 @@ public class TestStateContext {
     // Add PipelineAction. Should be added to all endpoints.
     stateContext.addPipelineActionIfAbsent(pipelineAction);
 
-    pipelineActions = stateContext.getPendingPipelineAction(scm1, 10);
-    assertEquals(1, pipelineActions.size());
     pipelineActions = stateContext.getPendingPipelineAction(scm2, 10);
     assertEquals(1, pipelineActions.size());
-
-    // Deliberately remove the pipeline action from scm2, but keep it in scm1
-    stateContext.clearPendingPipelineAction(scm2);
-    pipelineActions = stateContext.getPendingPipelineAction(scm2, 10);
-    assertEquals(0, pipelineActions.size());
+    // The pipeline action should have been removed from scm2, but still in scm1
 
     // The same pipeline action will not be added if it already exists
     stateContext.addPipelineActionIfAbsent(pipelineAction);
     pipelineActions = stateContext.getPendingPipelineAction(scm1, 10);
     assertEquals(1, pipelineActions.size());
-    // Pipeline action will be added back to the scm2
+    // The pipeline action should have been be added back to the scm2
     pipelineActions = stateContext.getPendingPipelineAction(scm2, 10);
     assertEquals(1, pipelineActions.size());
 

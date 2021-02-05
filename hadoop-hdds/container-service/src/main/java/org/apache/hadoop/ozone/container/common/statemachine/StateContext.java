@@ -473,19 +473,6 @@ public class StateContext {
   }
 
   /**
-   * Clear all pending pipeline actions of an endpoint.
-   */
-  @VisibleForTesting
-  void clearPendingPipelineAction(InetSocketAddress endpoint) {
-    synchronized (pipelineActions) {
-      Queue<PipelineAction> actions = this.pipelineActions.get(endpoint);
-      if (actions != null) {
-        actions.clear();
-      }
-    }
-  }
-
-  /**
    * Returns the next task to get executed by the datanode state machine.
    * @return A callable that will be executed by the
    * {@link DatanodeStateMachine}
