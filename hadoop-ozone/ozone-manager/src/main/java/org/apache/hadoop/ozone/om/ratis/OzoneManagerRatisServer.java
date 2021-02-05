@@ -299,9 +299,9 @@ public final class OzoneManagerRatisServer {
       throws IOException {
 
     // RaftGroupId is the omServiceId
-    String omServiceId = omNodeDetails.getOMServiceId();
+    String omServiceId = omNodeDetails.getServiceId();
 
-    String omNodeId = omNodeDetails.getOMNodeId();
+    String omNodeId = omNodeDetails.getNodeId();
     RaftPeerId localRaftPeerId = RaftPeerId.getRaftPeerId(omNodeId);
 
     InetSocketAddress ratisAddr = new InetSocketAddress(
@@ -317,7 +317,7 @@ public final class OzoneManagerRatisServer {
     raftPeers.add(localRaftPeer);
 
     for (OMNodeDetails peerInfo : peerNodes) {
-      String peerNodeId = peerInfo.getOMNodeId();
+      String peerNodeId = peerInfo.getNodeId();
       RaftPeerId raftPeerId = RaftPeerId.valueOf(peerNodeId);
       RaftPeer raftPeer;
       if (peerInfo.isHostUnresolved()) {

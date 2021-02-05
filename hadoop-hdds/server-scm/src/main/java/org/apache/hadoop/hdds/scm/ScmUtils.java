@@ -20,15 +20,23 @@ package org.apache.hadoop.hdds.scm;
 
 import com.google.common.base.Joiner;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ScmOps;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.safemode.Precheck;
 
+import org.apache.hadoop.net.NetUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.net.InetSocketAddress;
 import java.util.Collection;
+import java.util.Optional;
+import java.util.OptionalInt;
+
+import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
+import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
 
 /**
  * SCM utility class.
@@ -70,6 +78,82 @@ public final class ScmUtils {
     return conf.getTrimmedStringCollection(key);
   }
 
+  public static InetSocketAddress getScmBlockProtocolServerAddress(
+      OzoneConfiguration conf, String localScmServiceId, String nodeId) {
+    String bindHostKey = ScmUtils.addKeySuffixes(
+        ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_BIND_HOST_KEY,
+        localScmServiceId, nodeId);
+    final Optional<String> host = getHostNameFromConfigKeys(conf, bindHostKey);
+
+    String addressKey = ScmUtils.addKeySuffixes(
+        ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY,
+        localScmServiceId, nodeId);
+    final OptionalInt port = getPortNumberFromConfigKeys(conf, addressKey);
+
+    return NetUtils.createSocketAddr(
+        host.orElse(
+            ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_BIND_HOST_DEFAULT) + ":" +
+            port.orElse(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT));
+  }
+
+  public static String getScmBlockProtocolServerAddressKey(
+      String serviceId, String nodeId) {
+    return ScmUtils.addKeySuffixes(
+        ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY,
+        serviceId, nodeId);
+  }
+
+  public static InetSocketAddress getClientProtocolServerAddress(
+      OzoneConfiguration conf, String localScmServiceId, String nodeId) {
+    String bindHostKey = ScmUtils.addKeySuffixes(
+        ScmConfigKeys.OZONE_SCM_CLIENT_BIND_HOST_KEY,
+        localScmServiceId, nodeId);
+
+    final String host = getHostNameFromConfigKeys(conf, bindHostKey)
+        .orElse(ScmConfigKeys.OZONE_SCM_CLIENT_BIND_HOST_DEFAULT);
+
+    String addressKey = ScmUtils.addKeySuffixes(
+        ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY,
+        localScmServiceId, nodeId);
+
+    final int port = getPortNumberFromConfigKeys(conf, addressKey)
+        .orElse(ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT);
+
+    return NetUtils.createSocketAddr(host + ":" + port);
+  }
+
+  public static String getClientProtocolServerAddressKey(
+      String serviceId, String nodeId) {
+    return ScmUtils.addKeySuffixes(
+        ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY,
+        serviceId, nodeId);
+  }
+
+  public static InetSocketAddress getScmDataNodeBindAddress(
+      ConfigurationSource conf, String localScmServiceId, String nodeId) {
+    String bindHostKey = ScmUtils.addKeySuffixes(
+        ScmConfigKeys.OZONE_SCM_DATANODE_BIND_HOST_KEY,
+        localScmServiceId, nodeId
+    );
+    final Optional<String> host = getHostNameFromConfigKeys(conf, bindHostKey);
+    String addressKey = ScmUtils.addKeySuffixes(
+        ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY,
+        localScmServiceId, nodeId
+    );
+    final OptionalInt port = getPortNumberFromConfigKeys(conf, addressKey);
+
+    return NetUtils.createSocketAddr(
+        host.orElse(ScmConfigKeys.OZONE_SCM_DATANODE_BIND_HOST_DEFAULT) + ":" +
+            port.orElse(ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT));
+  }
+
+  public static String getScmDataNodeBindAddressKey(
+      String serviceId, String nodeId) {
+    return ScmUtils.addKeySuffixes(
+        ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY,
+        serviceId, nodeId);
+  }
+
   private static String addSuffix(String key, String suffix) {
     if (suffix == null || suffix.isEmpty()) {
       return key;
@@ -89,5 +173,9 @@ public final class ScmUtils {
       return null;
     }
     return Joiner.on(".").skipNulls().join(suffixes);
+  }
+
+  public static boolean isAddressLocal(InetSocketAddress addr) {
+    return NetUtils.isLocalAddress(addr.getAddress());
   }
 }

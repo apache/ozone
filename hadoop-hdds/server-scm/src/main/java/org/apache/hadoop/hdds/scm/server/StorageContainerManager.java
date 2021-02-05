@@ -55,6 +55,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerImpl;
+import org.apache.hadoop.hdds.scm.ha.SCMHANodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
@@ -214,7 +215,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private NetworkTopology clusterMap;
   private PipelineChoosePolicy pipelineChoosePolicy;
 
-  private final SCMNodeDetails scmNodeDetails;
+  private final SCMHANodeDetails scmHANodeDetails;
 
   /**
    * Creates a new StorageContainerManager. Configuration will be
@@ -247,7 +248,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     Objects.requireNonNull(configurator, "configurator cannot not be null");
     Objects.requireNonNull(conf, "configuration cannot not be null");
 
-    scmNodeDetails = SCMNodeDetails.loadSCMHAConfig(conf);
+    scmHANodeDetails = SCMHANodeDetails.loadSCMHAConfig(conf);
 
     configuration = conf;
     initMetrics();
@@ -825,7 +826,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
   @Override
   public SCMNodeDetails getScmNodeDetails() {
-    return scmNodeDetails;
+    return scmHANodeDetails.getLocalNodeDetails();
   }
 
   @Override

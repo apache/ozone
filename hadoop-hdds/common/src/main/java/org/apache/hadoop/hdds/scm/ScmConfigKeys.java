@@ -283,6 +283,9 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_NODE_ID_KEY =
       "ozone.scm.node.id";
 
+  public static final String OZONE_SCM_ADDRESS_KEY =
+      "ozone.scm.address";
+
   public static final int OZONE_SCM_DEFAULT_PORT =
       OZONE_SCM_DATANODE_PORT_DEFAULT;
   // The path where datanode ID is to be written to.
