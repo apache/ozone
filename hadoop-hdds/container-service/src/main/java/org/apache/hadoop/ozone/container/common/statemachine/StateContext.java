@@ -411,6 +411,14 @@ public class StateContext {
     }
   }
 
+  boolean isSamePipelineAction(PipelineAction action1, PipelineAction action2) {
+    return action1.getAction() == action2.getAction()
+        && action1.hasClosePipeline()
+        && action2.hasClosePipeline()
+        && action1.getClosePipeline().getPipelineID()
+        .equals(action2.getClosePipeline().getPipelineID());
+  }
+
   /**
    * Add PipelineAction to PipelineAction queue if it's not present.
    *
@@ -427,20 +435,10 @@ public class StateContext {
        * multiple times here.
        */
       for (InetSocketAddress endpoint : endpoints) {
-        Queue<PipelineAction> actionsForEndpoint =
-            this.pipelineActions.get(endpoint);
-        boolean actionAbsent = true;
-        for (PipelineAction pipelineActionIter : actionsForEndpoint) {
-          if (pipelineActionIter.getAction() == pipelineAction.getAction()
-              && pipelineActionIter.hasClosePipeline()
-              && pipelineAction.hasClosePipeline()
-              && pipelineActionIter.getClosePipeline().getPipelineID()
-              .equals(pipelineAction.getClosePipeline().getPipelineID())) {
-            actionAbsent = false;
-            break;
-          }
-        }
-        if (actionAbsent) {
+        final Queue<PipelineAction> actionsForEndpoint =
+            pipelineActions.get(endpoint);
+        if (actionsForEndpoint.stream().noneMatch(
+            action -> isSamePipelineAction(action, pipelineAction))) {
           actionsForEndpoint.add(pipelineAction);
         }
       }
