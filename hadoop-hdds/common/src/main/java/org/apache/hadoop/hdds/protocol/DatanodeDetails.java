@@ -98,7 +98,8 @@ public class DatanodeDetails extends NodeImpl implements
       String networkLocation, List<Port> ports, String certSerialId,
       String version, long setupTime, String revision, String buildDate,
       HddsProtos.NodeOperationalState persistedOpState,
-      long persistedOpStateExpiryEpochSec) {
+      long persistedOpStateExpiryEpochSec,
+      int initialVersion, int currentVersion) {
     super(hostName, networkLocation, NetConstants.NODE_COST_DEFAULT);
     this.uuid = uuid;
     this.uuidString = uuid.toString();
@@ -727,7 +728,7 @@ public class DatanodeDetails extends NodeImpl implements
       }
       DatanodeDetails dn = new DatanodeDetails(id, ipAddress, hostName,
           networkLocation, ports, certSerialId, version, setupTime, revision,
-          buildDate, persistedOpState, persistedOpStateExpiryEpochSec);
+          buildDate, persistedOpState, persistedOpStateExpiryEpochSec, 0, 0);
       if (networkName != null) {
         dn.setNetworkName(networkName);
       }
