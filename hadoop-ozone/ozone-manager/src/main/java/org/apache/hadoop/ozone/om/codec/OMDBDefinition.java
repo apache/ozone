@@ -170,6 +170,15 @@ public class OMDBDefinition implements DBDefinition {
                   OmKeyInfo.class,
                   new OmKeyInfoCodec(true));
 
+  public static final DBColumnFamilyDefinition<String, OmMultipartKeyInfo>
+          MULTIPART_FILEINFO_TABLE =
+          new DBColumnFamilyDefinition<>(
+                  OmMetadataManagerImpl.MULTIPARTFILEINFO_TABLE,
+                  String.class,
+                  new StringCodec(),
+                  OmMultipartKeyInfo.class,
+                  new OmMultipartKeyInfoCodec());
+
   @Override
   public String getName() {
     return OzoneConsts.OM_DB_NAME;
@@ -186,7 +195,7 @@ public class OMDBDefinition implements DBDefinition {
         VOLUME_TABLE, OPEN_KEY_TABLE, KEY_TABLE,
         BUCKET_TABLE, MULTIPART_INFO_TABLE, PREFIX_TABLE, DTOKEN_TABLE,
         S3_SECRET_TABLE, TRANSACTION_INFO_TABLE, DIRECTORY_TABLE,
-        FILE_TABLE, OPEN_FILE_TABLE};
+        FILE_TABLE, OPEN_FILE_TABLE, MULTIPART_FILEINFO_TABLE};
   }
 }
 

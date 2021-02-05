@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.response.s3.multipart;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
 
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -30,9 +31,11 @@ import org.junit.Rule;
 import org.junit.rules.TemporaryFolder;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .KeyInfo;
@@ -152,4 +155,47 @@ public class TestS3MultipartResponse {
             .setType(HddsProtos.ReplicationType.RATIS)
             .setFactor(HddsProtos.ReplicationFactor.ONE).build()).build();
   }
+
+
+  public S3InitiateMultipartUploadResponse createS3InitiateMPUResponseV1(
+      String volumeName, String bucketName, long parentID, String keyName,
+      String multipartUploadID, List<OmDirectoryInfo> parentDirInfos) {
+    OmMultipartKeyInfo multipartKeyInfo = new OmMultipartKeyInfo.Builder()
+            .setUploadID(multipartUploadID)
+            .setCreationTime(Time.now())
+            .setReplicationType(HddsProtos.ReplicationType.RATIS)
+            .setReplicationFactor(HddsProtos.ReplicationFactor.ONE)
+            .setParentID(parentID)
+            .build();
+
+    String fileName = OzoneFSUtils.getFileName(keyName);
+
+    OmKeyInfo omKeyInfo = new OmKeyInfo.Builder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setKeyName(fileName)
+            .setFileName(fileName)
+            .setCreationTime(Time.now())
+            .setModificationTime(Time.now())
+            .setReplicationType(HddsProtos.ReplicationType.RATIS)
+            .setReplicationFactor(HddsProtos.ReplicationFactor.ONE)
+            .setOmKeyLocationInfos(Collections.singletonList(
+                    new OmKeyLocationInfoGroup(0, new ArrayList<>())))
+            .setParentObjectID(parentID)
+            .build();
+
+    OMResponse omResponse = OMResponse.newBuilder()
+            .setCmdType(OzoneManagerProtocolProtos.Type.InitiateMultiPartUpload)
+            .setStatus(OzoneManagerProtocolProtos.Status.OK)
+            .setSuccess(true).setInitiateMultiPartUploadResponse(
+                    OzoneManagerProtocolProtos.MultipartInfoInitiateResponse
+                            .newBuilder().setVolumeName(volumeName)
+                            .setBucketName(bucketName)
+                            .setKeyName(keyName)
+                            .setMultipartUploadID(multipartUploadID)).build();
+
+    return new S3InitiateMultipartUploadResponseV1(omResponse, multipartKeyInfo,
+            omKeyInfo, parentDirInfos);
+  }
+
 }
