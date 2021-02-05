@@ -429,16 +429,20 @@ public class StateContext {
       for (InetSocketAddress endpoint : endpoints) {
         Queue<PipelineAction> actionsForEndpoint =
             this.pipelineActions.get(endpoint);
+        boolean actionAbsent = true;
         for (PipelineAction pipelineActionIter : actionsForEndpoint) {
           if (pipelineActionIter.getAction() == pipelineAction.getAction()
               && pipelineActionIter.hasClosePipeline()
               && pipelineAction.hasClosePipeline()
               && pipelineActionIter.getClosePipeline().getPipelineID()
               .equals(pipelineAction.getClosePipeline().getPipelineID())) {
-            return;
+            actionAbsent = false;
+            break;
           }
         }
-        actionsForEndpoint.add(pipelineAction);
+        if (actionAbsent) {
+          actionsForEndpoint.add(pipelineAction);
+        }
       }
     }
   }
@@ -465,6 +469,19 @@ public class StateContext {
         }
       }
       return pipelineActionList;
+    }
+  }
+
+  /**
+   * Clear all pending pipeline actions of an endpoint.
+   */
+  @VisibleForTesting
+  void clearPendingPipelineAction(InetSocketAddress endpoint) {
+    synchronized (pipelineActions) {
+      Queue<PipelineAction> actions = this.pipelineActions.get(endpoint);
+      if (actions != null) {
+        actions.clear();
+      }
     }
   }
 

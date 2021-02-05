@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.container.common.statemachine;
 
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ClosePipelineInfo;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction.Action.CLOSE;
 import static org.apache.hadoop.test.GenericTestUtils.waitFor;
 import static org.junit.Assert.assertEquals;
@@ -49,6 +50,7 @@ import com.google.protobuf.Descriptors.Descriptor;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineAction;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
 import org.apache.hadoop.ozone.container.common.states.DatanodeState;
 import org.apache.hadoop.test.LambdaTestUtils;
@@ -392,12 +394,34 @@ public class TestStateContext {
     stateContext.addEndpoint(scm1);
     stateContext.addEndpoint(scm2);
 
+    final ClosePipelineInfo closePipelineInfo = ClosePipelineInfo.newBuilder()
+        .setPipelineID(PipelineID.randomId().getProtobuf())
+        .setReason(ClosePipelineInfo.Reason.PIPELINE_FAILED)
+        .setDetailedReason("Test").build();
+    final PipelineAction pipelineAction = PipelineAction.newBuilder()
+        .setClosePipeline(closePipelineInfo)
+        .setAction(PipelineAction.Action.CLOSE)
+        .build();
+
     // Add PipelineAction. Should be added to all endpoints.
-    stateContext.addPipelineActionIfAbsent(
-        PipelineAction.newBuilder().setAction(
-            PipelineAction.Action.CLOSE).build());
+    stateContext.addPipelineActionIfAbsent(pipelineAction);
 
     pipelineActions = stateContext.getPendingPipelineAction(scm1, 10);
+    assertEquals(1, pipelineActions.size());
+    pipelineActions = stateContext.getPendingPipelineAction(scm2, 10);
+    assertEquals(1, pipelineActions.size());
+
+    // Deliberately remove the pipeline action from scm2, but keep it in scm1
+    stateContext.clearPendingPipelineAction(scm2);
+    pipelineActions = stateContext.getPendingPipelineAction(scm2, 10);
+    assertEquals(0, pipelineActions.size());
+
+    // The same pipeline action will not be added if it already exists
+    stateContext.addPipelineActionIfAbsent(pipelineAction);
+    pipelineActions = stateContext.getPendingPipelineAction(scm1, 10);
+    assertEquals(1, pipelineActions.size());
+    // Pipeline action will be added back to the scm2
+    pipelineActions = stateContext.getPendingPipelineAction(scm2, 10);
     assertEquals(1, pipelineActions.size());
 
     // Add ContainerAction. Should be added to all endpoints.
