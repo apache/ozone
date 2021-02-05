@@ -19,6 +19,8 @@
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import com.google.common.base.Optional;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -28,30 +30,25 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
-import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
+import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.om.response.s3.multipart
-    .S3MultipartUploadCommitPartResponse;
+import org.apache.hadoop.ozone.om.response.s3.multipart.S3MultipartUploadCommitPartResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .KeyArgs;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .MultipartCommitUploadPartRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .MultipartCommitUploadPartResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMResponse;
-import org.apache.hadoop.util.Time;
-import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
-import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartCommitUploadPartRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartCommitUploadPartResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -61,28 +58,14 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_L
 /**
  * Handle Multipart upload commit upload part file.
  */
-public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
+public class S3MultipartUploadCommitPartRequestV1
+        extends S3MultipartUploadCommitPartRequest {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(S3MultipartUploadCommitPartRequest.class);
+      LoggerFactory.getLogger(S3MultipartUploadCommitPartRequestV1.class);
 
-  public S3MultipartUploadCommitPartRequest(OMRequest omRequest) {
+  public S3MultipartUploadCommitPartRequestV1(OMRequest omRequest) {
     super(omRequest);
-  }
-
-  @Override
-  public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    MultipartCommitUploadPartRequest multipartCommitUploadPartRequest =
-        getOmRequest().getCommitMultiPartUploadRequest();
-
-    KeyArgs keyArgs = multipartCommitUploadPartRequest.getKeyArgs();
-    return getOmRequest().toBuilder().setCommitMultiPartUploadRequest(
-        multipartCommitUploadPartRequest.toBuilder()
-            .setKeyArgs(keyArgs.toBuilder().setModificationTime(Time.now())
-                .setKeyName(validateAndNormalizeKey(
-                    ozoneManager.getEnableFileSystemPaths(),
-                    keyArgs.getKeyName()))))
-        .setUserInfo(getUserInfo()).build();
   }
 
   @Override
@@ -128,22 +111,27 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
+      String fileName = OzoneFSUtils.getFileName(keyName);
+      Iterator<Path> pathComponents = Paths.get(keyName).iterator();
+      String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+      omBucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
+      long bucketId = omBucketInfo.getObjectID();
+      long parentID = OMFileRequest.getParentID(bucketId, pathComponents,
+              keyName, omMetadataManager);
+
       String uploadID = keyArgs.getMultipartUploadID();
-      multipartKey = omMetadataManager.getMultipartKey(volumeName, bucketName,
-          keyName, uploadID);
+      multipartKey = omMetadataManager.getMultipartKey(parentID,
+          fileName, uploadID);
 
       multipartKeyInfo = omMetadataManager.getMultipartInfoTable()
           .get(multipartKey);
 
       long clientID = multipartCommitUploadPartRequest.getClientID();
 
-      openKey = omMetadataManager.getOpenKey(
-          volumeName, bucketName, keyName, clientID);
+      openKey = omMetadataManager.getOpenFileName(parentID, fileName, clientID);
 
-      String ozoneKey = omMetadataManager.getOzoneKey(
-          volumeName, bucketName, keyName);
-
-      omKeyInfo = omMetadataManager.getOpenKeyTable().get(openKey);
+      omKeyInfo = OMFileRequest.getOmKeyInfoFromFileTable(true,
+              omMetadataManager, openKey, keyName);
 
       if (omKeyInfo == null) {
         throw new OMException("Failed to commit Multipart Upload key, as " +
@@ -161,6 +149,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       // Set the UpdateID to current transactionLogIndex
       omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
+      String ozoneKey = omMetadataManager.getOzonePathKey(parentID, fileName);
       partName = ozoneKey + clientID;
 
       if (multipartKeyInfo == null) {
@@ -255,38 +244,4 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
     return omClientResponse;
   }
 
-  @SuppressWarnings("parameternumber")
-  protected void logResult(OzoneManager ozoneManager,
-      MultipartCommitUploadPartRequest multipartCommitUploadPartRequest,
-      KeyArgs keyArgs, Map<String, String> auditMap, String volumeName,
-      String bucketName, String keyName, IOException exception,
-      String partName, Result result) {
-    // audit log
-    // Add MPU related information.
-    auditMap.put(OzoneConsts.MULTIPART_UPLOAD_PART_NUMBER,
-        String.valueOf(keyArgs.getMultipartNumber()));
-    auditMap.put(OzoneConsts.MULTIPART_UPLOAD_PART_NAME, partName);
-    auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
-        OMAction.COMMIT_MULTIPART_UPLOAD_PARTKEY,
-        auditMap, exception,
-        getOmRequest().getUserInfo()));
-
-    switch (result) {
-    case SUCCESS:
-      LOG.debug("MultipartUpload Commit is successfully for Key:{} in " +
-          "Volume/Bucket {}/{}", keyName, volumeName, bucketName);
-      break;
-    case FAILURE:
-      ozoneManager.getMetrics().incNumCommitMultipartUploadPartFails();
-      LOG.error("MultipartUpload Commit is failed for Key:{} in " +
-          "Volume/Bucket {}/{}", keyName, volumeName, bucketName,
-          exception);
-      break;
-    default:
-      LOG.error("Unrecognized Result for S3MultipartUploadCommitPartRequest: " +
-          "{}", multipartCommitUploadPartRequest);
-    }
-  }
-
 }
-
