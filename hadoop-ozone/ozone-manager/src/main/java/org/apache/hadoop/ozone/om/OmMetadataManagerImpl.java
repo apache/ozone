@@ -131,9 +131,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
    * |----------------------------------------------------------------------|
    * |  directoryTable    | parentId/directoryName -> DirectoryInfo         |
    * |----------------------------------------------------------------------|
-   * |  fileTable         | parentId/fileName -> KeyInfo                |
+   * |  fileTable         | parentId/fileName -> KeyInfo                    |
    * |----------------------------------------------------------------------|
-   * |  openFileTable     | parentId/fileName/id -> KeyInfo                   |
+   * |  openFileTable     | parentId/fileName/id -> KeyInfo                 |
+   * |----------------------------------------------------------------------|
+   * |  multipartFileInfoTable | parentId/fileName/uploadId ->...           |
    * |----------------------------------------------------------------------|
    * |  transactionInfoTable | #TRANSACTIONINFO -> OMTransactionInfo        |
    * |----------------------------------------------------------------------|
@@ -152,6 +154,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   public static final String DIRECTORY_TABLE = "directoryTable";
   public static final String FILE_TABLE = "fileTable";
   public static final String OPEN_FILE_TABLE = "openFileTable";
+  public static final String MULTIPARTFILEINFO_TABLE = "multipartFileInfoTable";
   public static final String TRANSACTION_INFO_TABLE =
       "transactionInfoTable";
 
@@ -176,6 +179,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   private Table transactionInfoTable;
   private boolean isRatisEnabled;
   private boolean ignorePipelineinKey;
+  private Table<String, OmMultipartKeyInfo> multipartFileInfoTable;
 
   // Epoch is used to generate the objectIDs. The most significant 2 bits of
   // objectIDs is set to this epoch. For clusters before HDDS-4315 there is
@@ -271,6 +275,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
 
   @Override
   public Table<String, OmMultipartKeyInfo> getMultipartInfoTable() {
+    if (OzoneManagerRatisUtils.isBucketFSOptimized()) {
+      return multipartFileInfoTable;
+    }
     return multipartInfoTable;
   }
 
@@ -364,6 +371,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         .addTable(DIRECTORY_TABLE)
         .addTable(FILE_TABLE)
         .addTable(OPEN_FILE_TABLE)
+        .addTable(MULTIPARTFILEINFO_TABLE)
         .addTable(TRANSACTION_INFO_TABLE)
         .addCodec(OzoneTokenIdentifier.class, new TokenIdentifierCodec())
         .addCodec(OmKeyInfo.class, new OmKeyInfoCodec(true))
@@ -441,6 +449,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     openFileTable = this.store.getTable(OPEN_FILE_TABLE, String.class,
             OmKeyInfo.class);
     checkTableStatus(openFileTable, OPEN_FILE_TABLE);
+
+    multipartFileInfoTable = this.store.getTable(MULTIPARTFILEINFO_TABLE,
+            String.class, OmMultipartKeyInfo.class);
+    checkTableStatus(multipartFileInfoTable, MULTIPARTFILEINFO_TABLE);
 
     transactionInfoTable = this.store.getTable(TRANSACTION_INFO_TABLE,
         String.class, TransactionInfo.class);
@@ -1222,6 +1234,16 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     openKey.append(parentID);
     openKey.append(OM_KEY_PREFIX).append(fileName);
     openKey.append(OM_KEY_PREFIX).append(id);
+    return openKey.toString();
+  }
+
+  @Override
+  public String getMultipartKey(long parentID, String fileName,
+                                String uploadId) {
+    StringBuilder openKey = new StringBuilder();
+    openKey.append(parentID);
+    openKey.append(OM_KEY_PREFIX).append(fileName);
+    openKey.append(OM_KEY_PREFIX).append(uploadId);
     return openKey.toString();
   }
 }

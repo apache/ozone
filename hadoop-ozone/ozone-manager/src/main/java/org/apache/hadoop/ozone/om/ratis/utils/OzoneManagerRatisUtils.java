@@ -56,6 +56,7 @@ import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixAddAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixRemoveAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixSetAclRequest;
 import org.apache.hadoop.ozone.om.request.s3.multipart.S3InitiateMultipartUploadRequest;
+import org.apache.hadoop.ozone.om.request.s3.multipart.S3InitiateMultipartUploadRequestV1;
 import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadAbortRequest;
 import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadCommitPartRequest;
 import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadCompleteRequest;
@@ -178,6 +179,9 @@ public final class OzoneManagerRatisUtils {
     case PurgeKeys:
       return new OMKeyPurgeRequest(omRequest);
     case InitiateMultiPartUpload:
+      if (isBucketFSOptimized()) {
+        return new S3InitiateMultipartUploadRequestV1(omRequest);
+      }
       return new S3InitiateMultipartUploadRequest(omRequest);
     case CommitMultiPartUpload:
       return new S3MultipartUploadCommitPartRequest(omRequest);
