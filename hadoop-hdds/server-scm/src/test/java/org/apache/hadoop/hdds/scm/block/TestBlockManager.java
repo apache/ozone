@@ -87,7 +87,7 @@ public class TestBlockManager {
   private PipelineManagerV2Impl pipelineManager;
   private BlockManagerImpl blockManager;
   private SCMHAManager scmHAManager;
-  private final static long DEFAULT_BLOCK_SIZE = 128 * MB;
+  private static final long DEFAULT_BLOCK_SIZE = 128 * MB;
   private static HddsProtos.ReplicationFactor factor;
   private static HddsProtos.ReplicationType type;
   private EventQueue eventQueue;
@@ -455,7 +455,7 @@ public class TestBlockManager {
   public void testAllocateOversizedBlock() throws Exception {
     long size = 6 * GB;
     thrown.expectMessage("Unsupported block size");
-    AllocatedBlock block = blockManager.allocateBlock(size,
+    blockManager.allocateBlock(size,
         type, factor, OzoneConsts.OZONE, new ExcludeList());
   }
 

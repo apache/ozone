@@ -196,7 +196,9 @@ message ContainerCommandRequestProto {
   optional   PutSmallFileRequestProto putSmallFile = 20;
   optional   GetSmallFileRequestProto getSmallFile = 21;
   optional   GetCommittedBlockLengthRequestProto getCommittedBlockLength = 22;
+
   optional   string encodedToken = 23;
+  optional   uint32 version = 24;
 }
 
 message ContainerCommandResponseProto {
@@ -451,6 +453,7 @@ message CopyContainerRequestProto {
   required int64 containerID = 1;
   required uint64 readOffset = 2;
   optional uint64 len = 3;
+  optional uint32 version = 4;
 }
 
 message CopyContainerResponseProto {

@@ -54,7 +54,7 @@ public class BlockTokenVerifier implements TokenVerifier {
   private final CertificateClient caClient;
   private final SecurityConfig conf;
   private static boolean testStub = false;
-  private final static Logger LOGGER =
+  private static final Logger LOGGER =
       LoggerFactory.getLogger(BlockTokenVerifier.class);
 
   public BlockTokenVerifier(SecurityConfig conf, CertificateClient caClient) {

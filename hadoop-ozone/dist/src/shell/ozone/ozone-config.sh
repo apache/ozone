@@ -71,7 +71,6 @@ ozone_exec_userfuncs
 #
 
 ozone_exec_user_env
-ozone_verify_confdir
 
 ozone_deprecate_envvar HADOOP_SLAVES HADOOP_WORKERS
 ozone_deprecate_envvar HADOOP_SLAVE_NAMES HADOOP_WORKER_NAMES

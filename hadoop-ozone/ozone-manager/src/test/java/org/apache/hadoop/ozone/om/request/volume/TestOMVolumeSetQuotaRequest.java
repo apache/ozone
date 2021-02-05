@@ -181,9 +181,8 @@ public class TestOMVolumeSetQuotaRequest extends TestOMVolumeRequest {
 
     int countException = 0;
     try {
-      OMClientResponse omClientResponse =
-          omVolumeSetQuotaRequest.validateAndUpdateCache(ozoneManager, 1,
-              ozoneManagerDoubleBufferHelper);
+      omVolumeSetQuotaRequest.validateAndUpdateCache(ozoneManager, 1,
+          ozoneManagerDoubleBufferHelper);
     } catch (IllegalArgumentException ex) {
       countException++;
       GenericTestUtils.assertExceptionContains(

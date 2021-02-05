@@ -590,10 +590,15 @@ public class SCMPipelineManager implements
   @Override
   public void activatePipeline(PipelineID pipelineID)
       throws IOException {
-    Pipeline.PipelineState state = stateManager.
-            getPipeline(pipelineID).getPipelineState();
-    stateManager.activatePipeline(pipelineID);
-    updatePipelineStateInDb(pipelineID, state);
+    lock.writeLock().lock();
+    try {
+      Pipeline.PipelineState state = stateManager.
+              getPipeline(pipelineID).getPipelineState();
+      stateManager.activatePipeline(pipelineID);
+      updatePipelineStateInDb(pipelineID, state);
+    } finally {
+      lock.writeLock().unlock();
+    }
   }
 
   /**
@@ -605,10 +610,15 @@ public class SCMPipelineManager implements
   @Override
   public void deactivatePipeline(PipelineID pipelineID)
       throws IOException {
-    Pipeline.PipelineState state = stateManager.
-            getPipeline(pipelineID).getPipelineState();
-    stateManager.deactivatePipeline(pipelineID);
-    updatePipelineStateInDb(pipelineID, state);
+    lock.writeLock().lock();
+    try {
+      Pipeline.PipelineState state = stateManager.
+              getPipeline(pipelineID).getPipelineState();
+      stateManager.deactivatePipeline(pipelineID);
+      updatePipelineStateInDb(pipelineID, state);
+    } finally {
+      lock.writeLock().unlock();
+    }
   }
 
   /**

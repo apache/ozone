@@ -40,6 +40,8 @@ import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.util.Time;
 
 import com.google.common.collect.ImmutableSet;
+
+import static java.util.stream.Collectors.toList;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.reregisterCommand;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,7 +55,7 @@ public class ReconNodeManager extends SCMNodeManager {
       .getLogger(ReconNodeManager.class);
 
   private Table<UUID, DatanodeDetails> nodeDB;
-  private final static Set<Type> ALLOWED_COMMANDS =
+  private static final Set<Type> ALLOWED_COMMANDS =
       ImmutableSet.of(reregisterCommand);
 
   /**
@@ -131,6 +133,10 @@ public class ReconNodeManager extends SCMNodeManager {
   public List<SCMCommand> processHeartbeat(DatanodeDetails datanodeDetails) {
     // Update heartbeat map with current time
     datanodeHeartbeatMap.put(datanodeDetails.getUuid(), Time.now());
-    return super.processHeartbeat(datanodeDetails);
+
+    List<SCMCommand> cmds = super.processHeartbeat(datanodeDetails);
+    return cmds.stream()
+        .filter(c -> ALLOWED_COMMANDS.contains(c.getType()))
+        .collect(toList());
   }
 }

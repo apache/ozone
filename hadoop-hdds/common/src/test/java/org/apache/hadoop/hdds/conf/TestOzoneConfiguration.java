@@ -19,8 +19,10 @@ package org.apache.hadoop.hdds.conf;
 
 import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileWriter;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.fs.Path;
@@ -61,7 +63,9 @@ public class TestOzoneConfiguration {
   public void testGetAllPropertiesByTags() throws Exception {
     File coreDefault = tempConfigs.newFile("core-default-test.xml");
     File coreSite = tempConfigs.newFile("core-site-test.xml");
-    try (BufferedWriter out = new BufferedWriter(new FileWriter(coreDefault))) {
+    FileOutputStream coreDefaultStream = new FileOutputStream(coreDefault);
+    try (BufferedWriter out = new BufferedWriter(new OutputStreamWriter(
+        coreDefaultStream, StandardCharsets.UTF_8))) {
       startConfig(out);
       appendProperty(out, "hadoop.tags.system", "YARN,HDFS,NAMENODE");
       appendProperty(out, "hadoop.tags.custom", "MYCUSTOMTAG");
@@ -78,7 +82,9 @@ public class TestOzoneConfiguration {
           .getProperty("dfs.random.key"));
     }
 
-    try (BufferedWriter out = new BufferedWriter(new FileWriter(coreSite))) {
+    FileOutputStream coreSiteStream = new FileOutputStream(coreSite);
+    try (BufferedWriter out = new BufferedWriter(new OutputStreamWriter(
+        coreSiteStream, StandardCharsets.UTF_8))) {
       startConfig(out);
       appendProperty(out, "dfs.random.key", "ABC");
       appendProperty(out, "dfs.replication", "3");

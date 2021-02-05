@@ -48,7 +48,7 @@ public abstract class ReconRestServletModule extends ServletModule {
       LoggerFactory.getLogger(ReconRestServletModule.class);
 
   @Override
-  abstract protected void configureServlets();
+  protected abstract void configureServlets();
 
   /**
    * Interface to provide packages for scanning.

@@ -653,7 +653,7 @@ function ozone_verify_confdir
 {
   # Check only log4j.properties by default.
   # --loglevel does not work without logger settings in log4j.properties.
-  [[ -f "${OZONE_CONF_DIR}/log4j.properties" ]]
+  [[ -f "${1:?ozone_verify_confir requires parameter}/log4j.properties" ]]
 }
 
 ## @description  Import the ozone-env.sh settings

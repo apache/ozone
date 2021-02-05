@@ -83,7 +83,7 @@ public class TestNodeDecommissionManager {
     assertEquals(1234, def.getPort());
 
     try {
-      def = new NodeDecommissionManager.HostDefinition("foobar:abcd");
+      new NodeDecommissionManager.HostDefinition("foobar:abcd");
       fail("InvalidHostStringException should have been thrown");
     } catch (InvalidHostStringException e) {
     }

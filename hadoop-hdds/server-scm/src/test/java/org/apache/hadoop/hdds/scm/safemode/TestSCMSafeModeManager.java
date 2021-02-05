@@ -74,7 +74,7 @@ public class TestSCMSafeModeManager {
   private SCMContext scmContext;
   private SCMServiceManager serviceManager;
   private SCMSafeModeManager scmSafeModeManager;
-  private static OzoneConfiguration config;
+  private OzoneConfiguration config;
   private List<ContainerInfo> containers = Collections.emptyList();
 
   @Rule

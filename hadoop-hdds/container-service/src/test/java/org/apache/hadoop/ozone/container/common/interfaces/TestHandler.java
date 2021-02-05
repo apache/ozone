@@ -54,7 +54,6 @@ public class TestHandler {
   private HddsDispatcher dispatcher;
   private ContainerSet containerSet;
   private VolumeSet volumeSet;
-  private Handler handler;
 
   @Before
   public void setup() throws Exception {
