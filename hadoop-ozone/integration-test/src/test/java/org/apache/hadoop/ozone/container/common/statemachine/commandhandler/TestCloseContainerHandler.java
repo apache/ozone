@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.test.GenericTestUtils;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
 
 import org.junit.After;
@@ -92,7 +93,7 @@ public class TestCloseContainerHandler {
     OzoneOutputStream key = objectStore.getVolume("test").getBucket("test")
         .createKey("test", 1024, ReplicationType.STAND_ALONE,
             ReplicationFactor.ONE, new HashMap<>());
-    key.write("test".getBytes());
+    key.write("test".getBytes(UTF_8));
     key.close();
 
     //get the name of a valid container

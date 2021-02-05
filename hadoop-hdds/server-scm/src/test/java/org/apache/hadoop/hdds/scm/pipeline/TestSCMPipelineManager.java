@@ -86,10 +86,10 @@ import static org.slf4j.event.Level.INFO;
  * Test cases to verify PipelineManager.
  */
 public class TestSCMPipelineManager {
-  private static MockNodeManager nodeManager;
-  private static File testDir;
-  private static OzoneConfiguration conf;
-  private static SCMMetadataStore scmMetadataStore;
+  private MockNodeManager nodeManager;
+  private File testDir;
+  private OzoneConfiguration conf;
+  private SCMMetadataStore scmMetadataStore;
 
   @Before
   public void setUp() throws Exception {
@@ -592,8 +592,7 @@ public class TestSCMPipelineManager {
         ratisProvider);
 
     try {
-      Pipeline pipeline = pipelineManager
-          .createPipeline(HddsProtos.ReplicationType.RATIS,
+      pipelineManager.createPipeline(HddsProtos.ReplicationType.RATIS,
               HddsProtos.ReplicationFactor.THREE);
       fail("Pipelines should not have been created");
     } catch (IOException e) {
@@ -602,8 +601,7 @@ public class TestSCMPipelineManager {
 
     // Ensure a pipeline of factor ONE can be created - no exceptions should be
     // raised.
-    Pipeline pipeline = pipelineManager
-        .createPipeline(HddsProtos.ReplicationType.RATIS,
+    pipelineManager.createPipeline(HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.ONE);
 
     // Simulate safemode check exiting.
@@ -760,7 +758,9 @@ public class TestSCMPipelineManager {
       oldPipelines.values().forEach(p ->
           pipelineManager.containsPipeline(p.getId()));
     } finally {
-      newScmMetadataStore.stop();
+      if (newScmMetadataStore != null) {
+        newScmMetadataStore.stop();
+      }
     }
 
     // Mimicking another restart.

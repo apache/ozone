@@ -47,8 +47,8 @@ import static org.apache.hadoop.hdds.utils.db.DBConfigFromFile.getOptionsFileNam
  * DBConf tests.
  */
 public class TestDBConfigFromFile {
-  private final static String DB_FILE = "test.db";
-  private final static String INI_FILE = getOptionsFileNameFromDB(DB_FILE);
+  private static final String DB_FILE = "test.db";
+  private static final String INI_FILE = getOptionsFileNameFromDB(DB_FILE);
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();
 

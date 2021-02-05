@@ -54,9 +54,9 @@ public class TestXceiverClientManager {
     */
   @Rule
   public Timeout timeout = new Timeout(300000);
-  private static OzoneConfiguration config;
-  private static MiniOzoneCluster cluster;
-  private static StorageContainerLocationProtocolClientSideTranslatorPB
+  private OzoneConfiguration config;
+  private MiniOzoneCluster cluster;
+  private StorageContainerLocationProtocolClientSideTranslatorPB
       storageContainerLocationClient;
 
   @Rule

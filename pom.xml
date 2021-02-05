@@ -79,10 +79,10 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <declared.ozone.version>${ozone.version}</declared.ozone.version>
 
     <!-- Apache Ratis version -->
-    <ratis.version>1.1.0-eb66796d-SNAPSHOT</ratis.version>
+    <ratis.version>1.1.0-0bdf24f-SNAPSHOT</ratis.version>
 
     <!-- Apache Ratis thirdparty version -->
-    <ratis.thirdparty.version>0.6.0-SNAPSHOT</ratis.thirdparty.version>
+    <ratis.thirdparty.version>0.6.0</ratis.thirdparty.version>
 
     <distMgmtSnapshotsId>apache.snapshots.https</distMgmtSnapshotsId>
     <distMgmtSnapshotsName>Apache Development Snapshot Repository</distMgmtSnapshotsName>
@@ -174,15 +174,16 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <hamcrest.version>1.3</hamcrest.version>
     <powermock1.version>1.6.5</powermock1.version>
     <powermock2.version>2.0.4</powermock2.version>
-    <junit.jupiter.version>5.3.1</junit.jupiter.version>
+    <junit.jupiter.version>5.7.0</junit.jupiter.version>
+    <junit.platform.version>1.7.0</junit.platform.version>
 
     <!-- Maven protoc compiler -->
     <protobuf-maven-plugin.version>0.5.1</protobuf-maven-plugin.version>
-    <protobuf-compile.version>3.11.0</protobuf-compile.version>
-    <grpc-compile.version>1.29.0</grpc-compile.version>
+    <protobuf-compile.version>3.12.0</protobuf-compile.version>
+    <grpc-compile.version>1.33.0</grpc-compile.version>
     <os-maven-plugin.version>1.5.0.Final</os-maven-plugin.version>
 
-    <netty.version>4.1.48.Final</netty.version>
+    <netty.version>4.1.51.Final</netty.version>
 
     <!-- define the Java language version used by the compiler -->
     <javac.version>1.8</javac.version>
@@ -1126,12 +1127,30 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       <dependency>
         <groupId>junit</groupId>
         <artifactId>junit</artifactId>
-        <version>4.11</version>
+        <version>4.13.1</version>
       </dependency>
       <dependency>
         <groupId>org.junit.jupiter</groupId>
         <artifactId>junit-jupiter-api</artifactId>
         <version>${junit.jupiter.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.junit.jupiter</groupId>
+        <artifactId>junit-jupiter-engine</artifactId>
+        <version>${junit.jupiter.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.junit.vintage</groupId>
+        <artifactId>junit-vintage-engine</artifactId>
+        <version>${junit.jupiter.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.junit.platform</groupId>
+        <artifactId>junit-platform-launcher</artifactId>
+        <version>${junit.platform.version}</version>
         <scope>test</scope>
       </dependency>
       <dependency>
@@ -1708,6 +1727,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
           <configuration>
             <maxHeap>1024</maxHeap>
             <xmlOutput>true</xmlOutput>
+            <includeTests>true</includeTests>
           </configuration>
         </plugin>
         <plugin>

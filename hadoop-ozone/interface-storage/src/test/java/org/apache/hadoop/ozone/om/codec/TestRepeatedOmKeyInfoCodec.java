@@ -42,9 +42,10 @@ import static org.junit.Assert.fail;
  * This class tests RepeatedOmKeyInfoCodec.
  */
 public class TestRepeatedOmKeyInfoCodec {
-  private final String volume = "hadoop";
-  private final String bucket = "ozone";
-  private final String keyName = "user/root/terasort/10G-input-6/part-m-00037";
+  private static final String VOLUME = "hadoop";
+  private static final String BUCKET = "ozone";
+  private static final String KEYNAME =
+      "user/root/terasort/10G-input-6/part-m-00037";
 
 
   private OmKeyInfo getKeyInfo(int chunkNum) {
@@ -65,9 +66,9 @@ public class TestRepeatedOmKeyInfoCodec {
         .setModificationTime(Time.now())
         .setReplicationType(HddsProtos.ReplicationType.RATIS)
         .setReplicationFactor(HddsProtos.ReplicationFactor.THREE)
-        .setVolumeName(volume)
-        .setBucketName(bucket)
-        .setKeyName(keyName)
+        .setVolumeName(VOLUME)
+        .setBucketName(BUCKET)
+        .setKeyName(KEYNAME)
         .setObjectID(Time.now())
         .setUpdateID(Time.now())
         .setDataSize(100)

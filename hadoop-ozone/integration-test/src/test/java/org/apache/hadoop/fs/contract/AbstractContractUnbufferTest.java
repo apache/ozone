@@ -133,6 +133,7 @@ public abstract class AbstractContractUnbufferTest
 
   protected void validateFullFileContents(FSDataInputStream stream)
           throws IOException {
+    assertNotNull(stream);
     validateFileContents(stream, TEST_FILE_LEN, 0);
   }
 

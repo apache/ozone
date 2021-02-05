@@ -33,7 +33,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_NOT_SATISFIABLE;
  */
 public final class S3ErrorTable {
 
-  private final static Logger LOG = LoggerFactory.getLogger(
+  private static final Logger LOG = LoggerFactory.getLogger(
       S3ErrorTable.class);
 
   private S3ErrorTable() {

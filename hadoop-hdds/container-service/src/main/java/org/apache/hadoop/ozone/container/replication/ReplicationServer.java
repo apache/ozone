@@ -31,7 +31,6 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 
 import org.apache.ratis.thirdparty.io.grpc.Server;
-import org.apache.ratis.thirdparty.io.grpc.ServerBuilder;
 import org.apache.ratis.thirdparty.io.grpc.ServerInterceptors;
 import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
 import org.apache.ratis.thirdparty.io.grpc.netty.NettyServerBuilder;
@@ -72,15 +71,11 @@ public class ReplicationServer {
   }
 
   public void init() {
-    NettyServerBuilder nettyServerBuilder =
-        ((NettyServerBuilder) ServerBuilder.forPort(port))
-            .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE);
-
-    GrpcServerInterceptor tracingInterceptor = new GrpcServerInterceptor();
-    nettyServerBuilder
+    NettyServerBuilder nettyServerBuilder = NettyServerBuilder.forPort(port)
+        .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE)
         .addService(ServerInterceptors.intercept(new GrpcReplicationService(
             new OnDemandContainerReplicationSource(controller)
-        ), tracingInterceptor));
+        ), new GrpcServerInterceptor()));
 
     if (secConf.isSecurityEnabled()) {
       try {

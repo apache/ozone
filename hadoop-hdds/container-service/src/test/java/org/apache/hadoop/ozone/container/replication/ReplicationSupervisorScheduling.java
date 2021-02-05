@@ -81,11 +81,12 @@ public class ReplicationSupervisorScheduling {
 
           final Map<Integer, Object> volumes =
               volumeLocks.get(sourceDatanode.getUuid());
-          synchronized (volumes.get(random.nextInt(volumes.size()))) {
+          Object volumeLock = volumes.get(random.nextInt(volumes.size()));
+          synchronized (volumeLock) {
             System.out.println("Downloading " + task.getContainerId() + " from "
                 + sourceDatanode.getUuid());
             try {
-              Thread.sleep(1000);
+              volumeLock.wait(1000);
             } catch (InterruptedException ex) {
               ex.printStackTrace();
             }
@@ -93,13 +94,14 @@ public class ReplicationSupervisorScheduling {
 
           //import, limited by the destination datanode
           final int volumeIndex = random.nextInt(destinationLocks.size());
-          synchronized (destinationLocks.get(volumeIndex)) {
+          Object destinationLock = destinationLocks.get(volumeIndex);
+          synchronized (destinationLock) {
             System.out.println(
                 "Importing " + task.getContainerId() + " to disk "
                     + volumeIndex);
 
             try {
-              Thread.sleep(1000);
+              destinationLock.wait(1000);
             } catch (InterruptedException ex) {
               ex.printStackTrace();
             }

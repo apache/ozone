@@ -105,6 +105,7 @@ message OMRequest {
   required string clientId = 3;
 
   optional UserInfo userInfo = 4;
+  optional uint32 version = 5;
 
 
   optional CreateVolumeRequest              createVolumeRequest            = 11;

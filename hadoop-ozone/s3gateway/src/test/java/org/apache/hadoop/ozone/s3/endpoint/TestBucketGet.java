@@ -314,9 +314,8 @@ public class TestBucketGet {
     getBucket.setClient(ozoneClient);
 
     try {
-      ListObjectResponse getBucketResponse =
-          (ListObjectResponse) getBucket.list("b1", "/", null, null, 2,
-              "dir", null, "random", null, null, null).getEntity();
+      getBucket.list("b1", "/", null, null, 2, "dir", null, "random", null,
+          null, null).getEntity();
       fail("listWithContinuationTokenFail");
     } catch (OS3Exception ex) {
       Assert.assertEquals("random", ex.getResource());

@@ -342,7 +342,8 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       SCMSecurityProtocolClientSideTranslatorPB secureScmClient =
           HddsServerUtil.getScmSecurityClient(config);
       SCMGetCertResponseProto response = secureScmClient.
-          getDataNodeCertificateChain(datanodeDetails.getProtoBufMessage(),
+          getDataNodeCertificateChain(
+              datanodeDetails.getProtoBufMessage(),
               getEncodedString(csr));
       // Persist certificates.
       if(response.hasX509CACertificate()) {

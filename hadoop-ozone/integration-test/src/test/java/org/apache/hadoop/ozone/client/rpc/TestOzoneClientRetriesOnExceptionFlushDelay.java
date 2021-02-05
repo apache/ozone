@@ -66,7 +66,7 @@ public class TestOzoneClientRetriesOnExceptionFlushDelay {
   @Rule
   public Timeout timeout = new Timeout(300000);
 
-  private static MiniOzoneCluster cluster;
+  private MiniOzoneCluster cluster;
   private OzoneConfiguration conf = new OzoneConfiguration();
   private OzoneClient client;
   private ObjectStore objectStore;

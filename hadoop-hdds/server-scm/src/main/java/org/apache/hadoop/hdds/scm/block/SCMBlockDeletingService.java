@@ -67,7 +67,7 @@ public class SCMBlockDeletingService extends BackgroundService
   public static final Logger LOG =
       LoggerFactory.getLogger(SCMBlockDeletingService.class);
 
-  private final static int BLOCK_DELETING_SERVICE_CORE_POOL_SIZE = 1;
+  private static final int BLOCK_DELETING_SERVICE_CORE_POOL_SIZE = 1;
   private final DeletedBlockLog deletedBlockLog;
   private final ContainerManagerV2 containerManager;
   private final NodeManager nodeManager;

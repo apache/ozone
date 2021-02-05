@@ -108,7 +108,8 @@ public class BasicOzoneFileSystem extends FileSystem {
       "should be one of the following formats: " +
       "o3fs://bucket.volume/key  OR " +
       "o3fs://bucket.volume.om-host.example.com/key  OR " +
-      "o3fs://bucket.volume.om-host.example.com:5678/key";
+      "o3fs://bucket.volume.om-host.example.com:5678/key  OR " +
+      "o3fs://bucket.volume.omServiceId/key";
 
   @Override
   public void initialize(URI name, Configuration conf) throws IOException {

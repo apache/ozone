@@ -49,6 +49,7 @@ Find valid dirs
                         Should Contain   ${output}   OZONE_CONF_DIR='/opt/hadoop/etc/hadoop'
                         Should Contain   ${output}   OZONE_LIBEXEC_DIR='/opt/hadoop/libexec'
                         Should Contain   ${output}   WARNING: HADOOP_HOME
+                        Should Not Contain   ${output}   WARNING: OZONE_CONF_DIR
                         Should Not Contain   ${output}   WARNING: HADOOP_CONF_DIR
 
 Picks up deprecated vars if valid

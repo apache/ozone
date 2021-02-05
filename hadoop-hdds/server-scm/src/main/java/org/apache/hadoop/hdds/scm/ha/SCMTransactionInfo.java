@@ -31,7 +31,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_SPLIT_KEY;
  *  2. transactionIndex, which is a monotonic increasing index
  *     (e.g. Raft Log index)
  */
-final public class SCMTransactionInfo {
+public final class SCMTransactionInfo {
   private long term;
   private long transactionIndex;
 

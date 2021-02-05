@@ -48,6 +48,8 @@ import com.google.common.base.Preconditions;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClient;
+import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -253,7 +255,7 @@ public class ContainerOperationClient implements ScmClient {
       HddsProtos.QueryScope queryScope, String poolName)
       throws IOException {
     return storageContainerLocationClient.queryNode(opState, nodeState,
-        queryScope, poolName);
+        queryScope, poolName, CURRENT_VERSION);
   }
 
   @Override

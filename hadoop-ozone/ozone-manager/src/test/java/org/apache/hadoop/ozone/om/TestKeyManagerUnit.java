@@ -143,14 +143,9 @@ public class TestKeyManagerUnit {
     createBucket(metadataManager, "vol1", "bucket1");
     createBucket(metadataManager, "vol1", "bucket2");
 
-    OmMultipartInfo upload1 =
-        initMultipartUpload(keyManager, "vol1", "bucket1", "dir/key1");
-
-    OmMultipartInfo upload2 =
-        initMultipartUpload(keyManager, "vol1", "bucket1", "dir/key2");
-
-    OmMultipartInfo upload3 =
-        initMultipartUpload(keyManager, "vol1", "bucket2", "dir/key1");
+    initMultipartUpload(keyManager, "vol1", "bucket1", "dir/key1");
+    initMultipartUpload(keyManager, "vol1", "bucket1", "dir/key2");
+    initMultipartUpload(keyManager, "vol1", "bucket2", "dir/key1");
 
     //WHEN
     OmMultipartUploadList omMultipartUploadList =
@@ -263,8 +258,7 @@ public class TestKeyManagerUnit {
     createBucket(metadataManager, "vol1", "bucket1");
     createBucket(metadataManager, "vol1", "bucket2");
 
-    OmMultipartInfo upload1 =
-        initMultipartUpload(keyManager, "vol1", "bucket1", "dip/key1");
+    initMultipartUpload(keyManager, "vol1", "bucket1", "dip/key1");
 
     initMultipartUpload(keyManager, "vol1", "bucket1", "dir/key1");
     initMultipartUpload(keyManager, "vol1", "bucket1", "dir/key2");
@@ -332,8 +326,6 @@ public class TestKeyManagerUnit {
 
   private void abortMultipart(
       String volume, String bucket, String key, String uploadID) {
-    Map<Integer, OzoneManagerProtocolProtos.PartKeyInfo > partKeyInfoMap =
-        new HashMap<>();
     metadataManager.getMultipartInfoTable().addCacheEntry(
         new CacheKey<>(metadataManager.getMultipartKey(volume, bucket, key,
             uploadID)), new CacheValue<>(Optional.absent(),
