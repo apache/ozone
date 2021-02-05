@@ -24,11 +24,17 @@ import java.util.concurrent.CompletableFuture;
  * <p>
  *
  * The underlying implementation is supposed to download SCM snapshot via
- * any chosen protoclol(for now its Grpc).
+ * any chosen protocol(for now its Grpc).
  * images.
  */
 public interface SCMSnapshotDownloader {
 
+  /**
+   * Downloads the contents to the target file path.
+   * @param destination
+   * @return Future task for download progress
+   * @throws IOException
+   */
   CompletableFuture<Path> download(final Path destination) throws IOException;
 
   void close() throws Exception;
