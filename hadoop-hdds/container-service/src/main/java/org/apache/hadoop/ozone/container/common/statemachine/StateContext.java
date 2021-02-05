@@ -431,11 +431,11 @@ public class StateContext {
             this.pipelineActions.get(endpoint);
         for (PipelineAction pipelineActionIter : actionsForEndpoint) {
           if (pipelineActionIter.getAction() == pipelineAction.getAction()
-              && pipelineActionIter.hasClosePipeline() && pipelineAction
-              .hasClosePipeline()
+              && pipelineActionIter.hasClosePipeline()
+              && pipelineAction.hasClosePipeline()
               && pipelineActionIter.getClosePipeline().getPipelineID()
               .equals(pipelineAction.getClosePipeline().getPipelineID())) {
-            break;
+            return;
           }
         }
         actionsForEndpoint.add(pipelineAction);
