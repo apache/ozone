@@ -64,7 +64,6 @@ public final class SCMNodeDetails extends NodeDetails {
 
   @Override
   public String toString() {
-    // TODO: add new fields to toString
     return "SCMNodeDetails["
         + "scmServiceId=" + getServiceId() +
         ", scmNodeId=" + getNodeId() +
@@ -72,7 +71,10 @@ public final class SCMNodeDetails extends NodeDetails {
         ", ratisPort=" + getRatisPort() +
         ", httpAddress=" + getHttpAddress() +
         ", httpsAddress=" + getHttpsAddress() +
-        "]";
+        ", blockProtocolServerAddress=" + getBlockProtocolServerAddress() +
+        ", clientProtocolServerAddress=" + getClientProtocolServerAddress() +
+        ", datanodeProtocolServerAddress=" + getDatanodeProtocolServerAddress()
+        + "]";
   }
 
   /**

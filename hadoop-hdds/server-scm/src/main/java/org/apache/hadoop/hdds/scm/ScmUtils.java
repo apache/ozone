@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.hdds.scm;
 
-import com.google.common.base.Joiner;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ScmOps;
@@ -26,6 +25,7 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.safemode.Precheck;
 
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,18 +74,19 @@ public final class ScmUtils {
 
   public static Collection<String> getSCMNodeIds(ConfigurationSource conf,
       String scmServiceId) {
-    String key = addSuffix(ScmConfigKeys.OZONE_SCM_NODES_KEY, scmServiceId);
+    String key = ConfUtils.addSuffix(
+        ScmConfigKeys.OZONE_SCM_NODES_KEY, scmServiceId);
     return conf.getTrimmedStringCollection(key);
   }
 
   public static InetSocketAddress getScmBlockProtocolServerAddress(
       OzoneConfiguration conf, String localScmServiceId, String nodeId) {
-    String bindHostKey = ScmUtils.addKeySuffixes(
+    String bindHostKey = ConfUtils.addKeySuffixes(
         ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_BIND_HOST_KEY,
         localScmServiceId, nodeId);
     final Optional<String> host = getHostNameFromConfigKeys(conf, bindHostKey);
 
-    String addressKey = ScmUtils.addKeySuffixes(
+    String addressKey = ConfUtils.addKeySuffixes(
         ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY,
         localScmServiceId, nodeId);
     final OptionalInt port = getPortNumberFromConfigKeys(conf, addressKey);
@@ -98,21 +99,21 @@ public final class ScmUtils {
 
   public static String getScmBlockProtocolServerAddressKey(
       String serviceId, String nodeId) {
-    return ScmUtils.addKeySuffixes(
+    return ConfUtils.addKeySuffixes(
         ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY,
         serviceId, nodeId);
   }
 
   public static InetSocketAddress getClientProtocolServerAddress(
       OzoneConfiguration conf, String localScmServiceId, String nodeId) {
-    String bindHostKey = ScmUtils.addKeySuffixes(
+    String bindHostKey = ConfUtils.addKeySuffixes(
         ScmConfigKeys.OZONE_SCM_CLIENT_BIND_HOST_KEY,
         localScmServiceId, nodeId);
 
     final String host = getHostNameFromConfigKeys(conf, bindHostKey)
         .orElse(ScmConfigKeys.OZONE_SCM_CLIENT_BIND_HOST_DEFAULT);
 
-    String addressKey = ScmUtils.addKeySuffixes(
+    String addressKey = ConfUtils.addKeySuffixes(
         ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY,
         localScmServiceId, nodeId);
 
@@ -124,19 +125,19 @@ public final class ScmUtils {
 
   public static String getClientProtocolServerAddressKey(
       String serviceId, String nodeId) {
-    return ScmUtils.addKeySuffixes(
+    return ConfUtils.addKeySuffixes(
         ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY,
         serviceId, nodeId);
   }
 
   public static InetSocketAddress getScmDataNodeBindAddress(
       ConfigurationSource conf, String localScmServiceId, String nodeId) {
-    String bindHostKey = ScmUtils.addKeySuffixes(
+    String bindHostKey = ConfUtils.addKeySuffixes(
         ScmConfigKeys.OZONE_SCM_DATANODE_BIND_HOST_KEY,
         localScmServiceId, nodeId
     );
     final Optional<String> host = getHostNameFromConfigKeys(conf, bindHostKey);
-    String addressKey = ScmUtils.addKeySuffixes(
+    String addressKey = ConfUtils.addKeySuffixes(
         ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY,
         localScmServiceId, nodeId
     );
@@ -149,33 +150,8 @@ public final class ScmUtils {
 
   public static String getScmDataNodeBindAddressKey(
       String serviceId, String nodeId) {
-    return ScmUtils.addKeySuffixes(
+    return ConfUtils.addKeySuffixes(
         ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY,
         serviceId, nodeId);
-  }
-
-  private static String addSuffix(String key, String suffix) {
-    if (suffix == null || suffix.isEmpty()) {
-      return key;
-    }
-    assert !suffix.startsWith(".") :
-        "suffix '" + suffix + "' should not already have '.' prepended.";
-    return key + "." + suffix;
-  }
-
-  public static String addKeySuffixes(String key, String... suffixes) {
-    String keySuffix = concatSuffixes(suffixes);
-    return addSuffix(key, keySuffix);
-  }
-
-  private static String concatSuffixes(String... suffixes) {
-    if (suffixes == null) {
-      return null;
-    }
-    return Joiner.on(".").skipNulls().join(suffixes);
-  }
-
-  public static boolean isAddressLocal(InetSocketAddress addr) {
-    return NetUtils.isLocalAddress(addr.getAddress());
   }
 }

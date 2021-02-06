@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.scm.ScmUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OzoneIllegalArgumentException;
+import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -140,7 +141,7 @@ public class SCMHANodeDetails {
           isPeer = false;
         }
 
-        String rpcAddrKey = ScmUtils.addKeySuffixes(
+        String rpcAddrKey = ConfUtils.addKeySuffixes(
             OZONE_SCM_ADDRESS_KEY, localScmNodeId, nodeId);
         String rpcAddrStr = conf.get(rpcAddrKey);
         if (rpcAddrStr == null || rpcAddrStr.isEmpty()) {
@@ -151,7 +152,7 @@ public class SCMHANodeDetails {
         }
         isSCMddressSet = true;
 
-        String ratisPortKey = ScmUtils.addKeySuffixes(OZONE_SCM_RATIS_PORT_KEY,
+        String ratisPortKey = ConfUtils.addKeySuffixes(OZONE_SCM_RATIS_PORT_KEY,
             serviceId, nodeId);
         int ratisPort = conf.getInt(ratisPortKey, OZONE_SCM_RATIS_PORT_DEFAULT);
 
@@ -170,7 +171,7 @@ public class SCMHANodeDetails {
               rpcAddrStr);
         }
 
-        if (!addr.isUnresolved() && !isPeer && ScmUtils.isAddressLocal(addr)) {
+        if (!addr.isUnresolved() && !isPeer && ConfUtils.isAddressLocal(addr)) {
           localRpcAddress = addr;
           localScmServiceId = serviceId;
           localScmNodeId = nodeId;

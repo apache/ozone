@@ -49,6 +49,7 @@ import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
@@ -129,7 +130,7 @@ public class OMFailoverProxyProvider implements
 
       for (String nodeId : OmUtils.emptyAsSingletonNull(omNodeIds)) {
 
-        String rpcAddrKey = OmUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY,
+        String rpcAddrKey = ConfUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY,
             serviceId, nodeId);
         String rpcAddrStr = OmUtils.getOmRpcAddress(config, rpcAddrKey);
         if (rpcAddrStr == null) {
