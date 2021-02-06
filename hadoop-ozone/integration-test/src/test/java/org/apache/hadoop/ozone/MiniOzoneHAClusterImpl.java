@@ -28,6 +28,7 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
+import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -417,7 +418,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       // way in OM start it uses internal service id to find it's service id.
       conf.set(OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY, omServiceId);
       conf.set(OMConfigKeys.OZONE_OM_INTERNAL_SERVICE_ID, omServiceId);
-      String omNodesKey = OmUtils.addKeySuffixes(
+      String omNodesKey = ConfUtils.addKeySuffixes(
           OMConfigKeys.OZONE_OM_NODES_KEY, omServiceId);
       StringBuilder omNodesKeyValue = new StringBuilder();
 
@@ -426,13 +427,13 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       for (int i = 1; i <= numOfOMs; i++, port+=6) {
         String omNodeId = NODE_ID_PREFIX + i;
         omNodesKeyValue.append(",").append(omNodeId);
-        String omAddrKey = OmUtils.addKeySuffixes(
+        String omAddrKey = ConfUtils.addKeySuffixes(
             OMConfigKeys.OZONE_OM_ADDRESS_KEY, omServiceId, omNodeId);
-        String omHttpAddrKey = OmUtils.addKeySuffixes(
+        String omHttpAddrKey = ConfUtils.addKeySuffixes(
             OMConfigKeys.OZONE_OM_HTTP_ADDRESS_KEY, omServiceId, omNodeId);
-        String omHttpsAddrKey = OmUtils.addKeySuffixes(
+        String omHttpsAddrKey = ConfUtils.addKeySuffixes(
             OMConfigKeys.OZONE_OM_HTTPS_ADDRESS_KEY, omServiceId, omNodeId);
-        String omRatisPortKey = OmUtils.addKeySuffixes(
+        String omRatisPortKey = ConfUtils.addKeySuffixes(
             OMConfigKeys.OZONE_OM_RATIS_PORT_KEY, omServiceId, omNodeId);
 
         conf.set(omAddrKey, "127.0.0.1:" + port);

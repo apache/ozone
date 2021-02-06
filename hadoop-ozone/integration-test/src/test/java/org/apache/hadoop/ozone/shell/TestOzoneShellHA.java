@@ -35,9 +35,9 @@ import org.apache.hadoop.fs.ozone.OzoneFsShell;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
-import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.test.GenericTestUtils;
@@ -260,7 +260,7 @@ public class TestOzoneShellHA {
     res[indexOmServiceIds] = getSetConfStringFromConf(
         OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY);
 
-    String omNodesKey = OmUtils.addKeySuffixes(
+    String omNodesKey = ConfUtils.addKeySuffixes(
         OMConfigKeys.OZONE_OM_NODES_KEY, omServiceId);
     String omNodesVal = conf.get(omNodesKey);
     res[indexOmNodes] = generateSetConfString(omNodesKey, omNodesVal);
@@ -270,7 +270,7 @@ public class TestOzoneShellHA {
     assert(omNodesArr.length == numOfOMs);
     for (int i = 0; i < numOfOMs; i++) {
       res[indexOmAddressStart + i] =
-          getSetConfStringFromConf(OmUtils.addKeySuffixes(
+          getSetConfStringFromConf(ConfUtils.addKeySuffixes(
               OMConfigKeys.OZONE_OM_ADDRESS_KEY, omServiceId, omNodesArr[i]));
     }
 
@@ -358,7 +358,7 @@ public class TestOzoneShellHA {
 
     // Get leader OM node RPC address from ozone.om.address.omServiceId.omNode
     String omLeaderNodeId = getLeaderOMNodeId();
-    String omLeaderNodeAddrKey = OmUtils.addKeySuffixes(
+    String omLeaderNodeAddrKey = ConfUtils.addKeySuffixes(
         OMConfigKeys.OZONE_OM_ADDRESS_KEY, omServiceId, omLeaderNodeId);
     String omLeaderNodeAddr = conf.get(omLeaderNodeAddrKey);
     String omLeaderNodeAddrWithoutPort = omLeaderNodeAddr.split(":")[0];
