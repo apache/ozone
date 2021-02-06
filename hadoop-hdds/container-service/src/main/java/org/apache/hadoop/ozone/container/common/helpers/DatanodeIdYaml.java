@@ -100,11 +100,11 @@ public final class DatanodeIdYaml {
               portEntry.getValue()));
         }
       }
+
+      builder.setInitialVersion(datanodeDetailsYaml.getInitialVersion())
+          .setCurrentVersion(datanodeDetailsYaml.getCurrentVersion());
+
       datanodeDetails = builder.build();
-      datanodeDetails.setInitialVersion(
-          datanodeDetailsYaml.getInitialVersion());
-      datanodeDetails.setCurrentVersion(
-          datanodeDetailsYaml.getCurrentVersion());
     }
 
     return datanodeDetails;

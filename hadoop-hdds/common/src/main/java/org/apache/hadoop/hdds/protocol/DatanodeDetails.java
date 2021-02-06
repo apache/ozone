@@ -25,6 +25,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import com.google.common.collect.ImmutableSet;
+import org.apache.hadoop.hdds.DatanodeVersions;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
@@ -531,6 +532,8 @@ public class DatanodeDetails extends NodeImpl implements
     private String buildDate;
     private HddsProtos.NodeOperationalState persistedOpState;
     private long persistedOpStateExpiryEpochSec = 0;
+    private int initialVersion;
+    private int currentVersion = DatanodeVersions.CURRENT_VERSION;
 
     /**
      * Default private constructor. To create Builder instance use
@@ -716,6 +719,16 @@ public class DatanodeDetails extends NodeImpl implements
       return this;
     }
 
+    public Builder setInitialVersion(int v) {
+      this.initialVersion = v;
+      return this;
+    }
+
+    public Builder setCurrentVersion(int v) {
+      this.currentVersion = v;
+      return this;
+    }
+
     /**
      * Builds and returns DatanodeDetails instance.
      *
@@ -728,7 +741,8 @@ public class DatanodeDetails extends NodeImpl implements
       }
       DatanodeDetails dn = new DatanodeDetails(id, ipAddress, hostName,
           networkLocation, ports, certSerialId, version, setupTime, revision,
-          buildDate, persistedOpState, persistedOpStateExpiryEpochSec, 0, 0);
+          buildDate, persistedOpState, persistedOpStateExpiryEpochSec,
+          initialVersion, currentVersion);
       if (networkName != null) {
         dn.setNetworkName(networkName);
       }

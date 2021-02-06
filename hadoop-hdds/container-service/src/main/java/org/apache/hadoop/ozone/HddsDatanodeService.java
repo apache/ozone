@@ -210,6 +210,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       datanodeDetails.setRevision(
           HddsVersionInfo.HDDS_VERSION_INFO.getRevision());
       datanodeDetails.setBuildDate(HddsVersionInfo.HDDS_VERSION_INFO.getDate());
+      datanodeDetails.setCurrentVersion(DatanodeVersions.CURRENT_VERSION);
       TracingUtil.initTracing(
           "HddsDatanodeService." + datanodeDetails.getUuidString()
               .substring(0, 8), conf);
