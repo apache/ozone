@@ -23,8 +23,6 @@ RESULT_DIR_INSIDE="/tmp/smoketest/$(basename "$COMPOSE_ENV_NAME")/result"
 OM_HA_PARAM=""
 if [[ -n "${OM_SERVICE_ID}" ]] && [[ "${OM_SERVICE_ID}" != "om" ]]; then
   OM_HA_PARAM="--om-service-id=${OM_SERVICE_ID}"
-else
-  OM_SERVICE_ID=om
 fi
 
 ## @description create results directory, purging any prior data
@@ -95,6 +93,39 @@ wait_for_safemode_exit(){
    return 1
 }
 
+## @description wait until OM leader is elected (or 120 seconds)
+wait_for_om_leader() {
+  if [[ -z "${OM_SERVICE_ID:-}" ]]; then
+    echo "No OM HA service, no need to wait"
+    return
+  fi
+
+  #Reset the timer
+  SECONDS=0
+
+  #Don't give it up until 120 seconds
+  while [[ $SECONDS -lt 120 ]]; do
+    local command="ozone admin om roles --service-id '${OM_SERVICE_ID}'"
+    if [[ "${SECURITY_ENABLED}" == 'true' ]]; then
+      status=$(docker-compose exec -T scm bash -c "kinit -k scm/scm@EXAMPLE.COM -t /etc/security/keytabs/scm.keytab && $command" | grep LEADER)
+    else
+      status=$(docker-compose exec -T scm bash -c "$command" | grep LEADER)
+    fi
+    if [[ -n "${status}" ]]; then
+      echo "Found OM leader for service ${OM_SERVICE_ID}: $status"
+      return
+    else
+      echo "Waiting for OM leader for service ${OM_SERVICE_ID}"
+    fi
+
+    echo "SECONDS: $SECONDS"
+
+    sleep 2
+  done
+  echo "WARNING: OM leader still not found for service ${OM_SERVICE_ID}"
+  return 1
+}
+
 ## @description  Starts a docker-compose based test environment
 ## @param number of datanodes to start and wait for (default: 3)
 start_docker_env(){
@@ -104,7 +135,8 @@ start_docker_env(){
   export OZONE_SAFEMODE_MIN_DATANODES="${datanode_count}"
   docker-compose --no-ansi down
   if ! { docker-compose --no-ansi up -d --scale datanode="${datanode_count}" \
-      && wait_for_safemode_exit ; }; then
+      && wait_for_safemode_exit \
+      && wait_for_om_leader ; }; then
     OUTPUT_NAME="$COMPOSE_ENV_NAME"
     stop_docker_env
     return 1
@@ -142,7 +174,7 @@ execute_robot_test(){
     && docker-compose exec -T "$CONTAINER" robot \
       -v KEY_NAME:"${OZONE_BUCKET_KEY_NAME}" \
       -v OM_HA_PARAM:"${OM_HA_PARAM}" \
-      -v OM_SERVICE_ID:"${OM_SERVICE_ID}" \
+      -v OM_SERVICE_ID:"${OM_SERVICE_ID:-om}" \
       -v OZONE_DIR:"${OZONE_DIR}" \
       -v SECURITY_ENABLED:"${SECURITY_ENABLED}" \
       ${ARGUMENTS[@]} --log NONE --report NONE "${OZONE_ROBOT_OPTS[@]}" --output "$OUTPUT_PATH" \
