@@ -70,8 +70,10 @@ public class TestBlockManagerImpl {
   private KeyValueContainerData keyValueContainerData;
   private KeyValueContainer keyValueContainer;
   private BlockData blockData;
+  private BlockData blockData1;
   private BlockManagerImpl blockManager;
   private BlockID blockID;
+  private BlockID blockID1;
 
   private final ChunkLayOutVersion layout;
 
@@ -120,8 +122,49 @@ public class TestBlockManagerImpl {
     chunkList.add(info.getProtoBufMessage());
     blockData.setChunks(chunkList);
 
+    // Creating BlockData
+    blockID1 = new BlockID(1L, 2L);
+    blockData1 = new BlockData(blockID1);
+    blockData1.addMetadata(OzoneConsts.VOLUME, OzoneConsts.OZONE);
+    blockData1.addMetadata(OzoneConsts.OWNER,
+        OzoneConsts.OZONE_SIMPLE_HDFS_USER);
+    List<ContainerProtos.ChunkInfo> chunkList1 = new ArrayList<>();
+    ChunkInfo info1 = new ChunkInfo(String.format("%d.data.%d", blockID1
+        .getLocalID(), 0), 0, 1024);
+    chunkList1.add(info1.getProtoBufMessage());
+    blockData1.setChunks(chunkList1);
+    blockData1.setBlockCommitSequenceId(1);
+
     // Create KeyValueContainerManager
     blockManager = new BlockManagerImpl(config);
+
+  }
+
+  @Test
+  public void testPutBlock() throws Exception {
+    assertEquals(0, keyValueContainer.getContainerData().getKeyCount());
+    //Put Block with bcsId != 0
+    blockManager.putBlock(keyValueContainer, blockData1);
+
+    BlockData fromGetBlockData;
+    //Check Container's bcsId
+    fromGetBlockData = blockManager.getBlock(keyValueContainer,
+        blockData1.getBlockID());
+    assertEquals(1, keyValueContainer.getContainerData().getKeyCount());
+    assertEquals(1,
+        keyValueContainer.getContainerData().getBlockCommitSequenceId());
+    assertEquals(1, fromGetBlockData.getBlockCommitSequenceId());
+
+    //Put Block with bcsId == 0
+    blockManager.putBlock(keyValueContainer, blockData);
+
+    //Check Container's bcsId
+    fromGetBlockData = blockManager.getBlock(keyValueContainer,
+        blockData.getBlockID());
+    assertEquals(2, keyValueContainer.getContainerData().getKeyCount());
+    assertEquals(0, fromGetBlockData.getBlockCommitSequenceId());
+    assertEquals(1,
+        keyValueContainer.getContainerData().getBlockCommitSequenceId());
 
   }
 
