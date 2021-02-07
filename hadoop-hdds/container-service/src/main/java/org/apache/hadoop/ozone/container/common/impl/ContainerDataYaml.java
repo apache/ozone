@@ -245,6 +245,7 @@ public final class ContainerDataYaml {
     }
 
     private class ConstructKeyValueContainerData extends AbstractConstruct {
+      @Override
       public Object construct(Node node) {
         MappingNode mnode = (MappingNode) node;
         Map<Object, Object> nodes = constructMapping(mnode);
@@ -289,6 +290,7 @@ public final class ContainerDataYaml {
     // number if it fits in integer, otherwise returns long. So, slightly
     // modified the code to return long in all cases.
     private class ConstructLong extends AbstractConstruct {
+      @Override
       public Object construct(Node node) {
         String value = constructScalar((ScalarNode) node).toString()
             .replaceAll("_", "");

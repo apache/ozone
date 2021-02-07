@@ -72,6 +72,7 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
    * @param context Context object encapsulating all user related information.
    * @return true if user has access else false.
    */
+  @Override
   public boolean checkAccess(IOzoneObj ozObject, RequestContext context)
       throws OMException {
     Objects.requireNonNull(ozObject);

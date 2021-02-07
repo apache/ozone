@@ -291,6 +291,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     }
   }
 
+  @Override
   public FileStatusAdapter getFileStatus(String key, URI uri,
       Path qualifiedPath, String userName)
       throws IOException {
@@ -315,6 +316,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     return new IteratorAdapter(bucket.listKeys(pathKey));
   }
 
+  @Override
   public List<FileStatusAdapter> listStatus(String keyName, boolean recursive,
       String startKey, long numEntries, URI uri,
       Path workingDir, String username) throws IOException {

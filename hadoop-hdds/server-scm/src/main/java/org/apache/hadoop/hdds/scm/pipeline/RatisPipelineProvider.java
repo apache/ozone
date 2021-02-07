@@ -190,6 +190,7 @@ public class RatisPipelineProvider extends PipelineProvider {
    * @param pipeline        - Pipeline to be destroyed
    * @throws IOException
    */
+  @Override
   public void close(Pipeline pipeline) {
     final ClosePipelineCommand closeCommand =
         new ClosePipelineCommand(pipeline.getId());
