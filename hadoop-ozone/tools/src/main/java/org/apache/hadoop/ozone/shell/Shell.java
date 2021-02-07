@@ -31,7 +31,7 @@ public abstract class Shell extends GenericCli {
 
   public static final String OZONE_URI_DESCRIPTION = "Ozone URI could start "
       + "with o3:// or without prefix. URI may contain the host/serviceId "
-      + " and port of the OM server. Both are optional. "
+      + "and port of the OM server. Both are optional. "
       + "If they are not specified it will be identified from "
       + "the config files.";
 

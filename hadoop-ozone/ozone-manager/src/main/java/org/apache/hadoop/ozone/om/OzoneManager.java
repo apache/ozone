@@ -635,6 +635,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * Class which schedule saving metrics to a file.
    */
   private class ScheduleOMMetricsWriteTask extends TimerTask {
+    @Override
     public void run() {
       saveOmMetrics();
     }

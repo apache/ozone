@@ -71,6 +71,7 @@ public class ReconDatanodeProtocolServer extends SCMDatanodeProtocolServer
     return ReconPolicyProvider.getInstance();
   }
 
+  @Override
   protected Class<ReconDatanodeProtocolPB> getProtocolClass() {
     return ReconDatanodeProtocolPB.class;
   }

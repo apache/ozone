@@ -24,6 +24,7 @@ import java.util.concurrent.Callable;
  */
 public interface BackgroundTask extends Callable<BackgroundTaskResult> {
 
+  @Override
   BackgroundTaskResult call() throws Exception;
 
   int getPriority();
