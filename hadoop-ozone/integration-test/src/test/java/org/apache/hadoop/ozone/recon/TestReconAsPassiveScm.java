@@ -125,7 +125,6 @@ public class TestReconAsPassiveScm {
         reconNodeManager.getAllNodes().size());
 
     // Create container
-    ContainerManagerV2 reconContainerManager = reconScm.getContainerManager();
     ContainerInfo containerInfo =
         scmContainerManager.allocateContainer(RATIS, ONE, "test");
     long containerID = containerInfo.getContainerID();
