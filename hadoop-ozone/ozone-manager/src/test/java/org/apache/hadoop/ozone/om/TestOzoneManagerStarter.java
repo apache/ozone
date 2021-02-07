@@ -139,6 +139,7 @@ public class TestOzoneManagerStarter {
     private boolean throwOnStart = false;
     private boolean throwOnInit = false;
 
+    @Override
     public void start(OzoneConfiguration conf) throws IOException,
         AuthenticationException {
       startCalled = true;
@@ -147,6 +148,7 @@ public class TestOzoneManagerStarter {
       }
     }
 
+    @Override
     public boolean init(OzoneConfiguration conf) throws IOException,
         AuthenticationException {
       initCalled = true;

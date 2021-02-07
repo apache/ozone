@@ -110,6 +110,7 @@ public class FullTableCache<CACHEKEY extends CacheKey,
     }
   }
 
+  @Override
   public void cleanup(List<Long> epochs) {
     executorService.execute(() -> evictCache(epochs));
   }
@@ -125,6 +126,7 @@ public class FullTableCache<CACHEKEY extends CacheKey,
   }
 
   @VisibleForTesting
+  @Override
   public void evictCache(List<Long> epochs) {
     EpochEntry<CACHEKEY> currentEntry;
     CACHEKEY cachekey;
@@ -165,6 +167,7 @@ public class FullTableCache<CACHEKEY extends CacheKey,
     }
   }
 
+  @Override
   public CacheResult<CACHEVALUE> lookup(CACHEKEY cachekey) {
 
     CACHEVALUE cachevalue = cache.get(cachekey);
@@ -183,6 +186,7 @@ public class FullTableCache<CACHEKEY extends CacheKey,
   }
 
   @VisibleForTesting
+  @Override
   public Set<EpochEntry<CACHEKEY>> getEpochEntrySet() {
     return epochEntries;
   }

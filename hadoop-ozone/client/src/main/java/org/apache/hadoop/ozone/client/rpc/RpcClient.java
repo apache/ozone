@@ -1287,6 +1287,7 @@ public class RpcClient implements ClientProtocol {
     return (dtService != null) ? dtService.toString() : null;
   }
 
+  @Override
   @VisibleForTesting
   public OzoneManagerProtocol getOzoneManagerClient() {
     return ozoneManagerClient;

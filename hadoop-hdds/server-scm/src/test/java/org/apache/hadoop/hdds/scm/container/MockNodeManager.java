@@ -299,6 +299,7 @@ public class MockNodeManager implements NodeManager {
    * @param datanodeDetails The datanode to set the new state for
    * @param newState The new operational state for the node
    */
+  @Override
   public void setNodeOperationalState(DatanodeDetails datanodeDetails,
       HddsProtos.NodeOperationalState newState) throws NodeNotFoundException {
   }
@@ -308,6 +309,7 @@ public class MockNodeManager implements NodeManager {
    * @param datanodeDetails The datanode to set the new state for
    * @param newState The new operational state for the node
    */
+  @Override
   public void setNodeOperationalState(DatanodeDetails datanodeDetails,
       HddsProtos.NodeOperationalState newState, long opStateExpiryEpocSec)
       throws NodeNotFoundException {
