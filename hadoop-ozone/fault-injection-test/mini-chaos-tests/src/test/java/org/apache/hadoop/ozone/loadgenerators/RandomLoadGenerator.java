@@ -52,6 +52,7 @@ public class RandomLoadGenerator extends LoadGenerator {
     ozoneBucket.deleteKey(keyName);
   }
 
+  @Override
   public void initialize() {
     // Nothing to do here
   }
