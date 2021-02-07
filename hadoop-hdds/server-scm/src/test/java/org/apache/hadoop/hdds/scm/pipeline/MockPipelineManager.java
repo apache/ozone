@@ -86,7 +86,8 @@ public final class MockPipelineManager implements PipelineManager {
   @Override
   public boolean containsPipeline(final PipelineID pipelineID) {
     try {
-      return stateManager.getPipeline(pipelineID) != null;
+      stateManager.getPipeline(pipelineID);
+      return true;
     } catch (PipelineNotFoundException e) {
       return false;
     }

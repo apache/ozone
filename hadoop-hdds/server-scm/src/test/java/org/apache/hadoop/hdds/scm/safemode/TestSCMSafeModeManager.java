@@ -70,7 +70,7 @@ import org.mockito.Mockito;
  */
 public class TestSCMSafeModeManager {
 
-  private static EventQueue queue;
+  private EventQueue queue;
   private SCMContext scmContext;
   private SCMServiceManager serviceManager;
   private SCMSafeModeManager scmSafeModeManager;

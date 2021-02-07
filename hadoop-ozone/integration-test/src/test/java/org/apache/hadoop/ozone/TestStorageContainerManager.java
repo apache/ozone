@@ -286,7 +286,6 @@ public class TestStorageContainerManager {
       Map<Long, List<Long>> containerBlocks = createDeleteTXLog(
           cluster.getStorageContainerManager(),
           delLog, keyLocations, helper);
-      Set<Long> containerIDs = containerBlocks.keySet();
 
       // Verify a few TX gets created in the TX log.
       Assert.assertTrue(delLog.getNumOfValidTransactions() > 0);

@@ -67,11 +67,11 @@ import static org.junit.Assert.fail;
  * Tests for PipelineManagerImpl.
  */
 public class TestPipelineManagerImpl {
-  private static OzoneConfiguration conf;
-  private static File testDir;
+  private OzoneConfiguration conf;
+  private File testDir;
   private DBStore dbStore;
-  private static MockNodeManager nodeManager;
-  private static int maxPipelineCount;
+  private MockNodeManager nodeManager;
+  private int maxPipelineCount;
   private SCMContext scmContext;
   private SCMServiceManager serviceManager;
 
