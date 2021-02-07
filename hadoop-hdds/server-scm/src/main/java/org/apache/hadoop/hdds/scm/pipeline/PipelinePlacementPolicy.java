@@ -250,7 +250,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
 
     if (node == null) {
       String msg = String.format("Unable to find fall back node in" +
-          " pipeline allocation. nodeSet size: {}", nodeSet.size());
+          " pipeline allocation. nodeSet size: %d", nodeSet.size());
       LOG.warn(msg);
       throw new SCMException(msg,
           SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
@@ -332,11 +332,9 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
         }
       }
 
-      if (pick != null) {
-        results.add(pick);
-        exclude.add(pick);
-        LOG.debug("Remaining node chosen: {}", pick);
-      }
+      results.add(pick);
+      exclude.add(pick);
+      LOG.debug("Remaining node chosen: {}", pick);
     }
 
     if (results.size() < nodesRequired) {
