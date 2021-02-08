@@ -771,6 +771,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    *
    * @return Address where datanode are communicating.
    */
+  @Override
   public InetSocketAddress getDatanodeRpcAddress() {
     return getDatanodeProtocolServer().getDatanodeRpcAddress();
   }
@@ -784,6 +785,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   /**
    * Start service.
    */
+  @Override
   public void start() throws IOException {
     if (LOG.isInfoEnabled()) {
       LOG.info(buildRpcServerStartMessage(
@@ -826,6 +828,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   /**
    * Stop service.
    */
+  @Override
   public void stop() {
 
     try {
@@ -936,6 +939,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   /**
    * Wait until service has completed shutdown.
    */
+  @Override
   public void join() {
     try {
       getBlockProtocolServer().join();
@@ -975,6 +979,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    * Returns SCM container manager.
    */
   @VisibleForTesting
+  @Override
   public ContainerManager getContainerManager() {
     return containerManager;
   }
@@ -985,6 +990,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    * @return - Node Manager
    */
   @VisibleForTesting
+  @Override
   public NodeManager getScmNodeManager() {
     return scmNodeManager;
   }
@@ -995,11 +1001,13 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    * @return - Pipeline Manager
    */
   @VisibleForTesting
+  @Override
   public PipelineManager getPipelineManager() {
     return pipelineManager;
   }
 
   @VisibleForTesting
+  @Override
   public BlockManager getScmBlockManager() {
     return scmBlockManager;
   }
@@ -1010,6 +1018,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   }
 
   @VisibleForTesting
+  @Override
   public ReplicationManager getReplicationManager() {
     return replicationManager;
   }
@@ -1162,10 +1171,12 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     return this.pipelineChoosePolicy;
   }
 
+  @Override
   public String getScmId() {
     return getScmStorageConfig().getScmId();
   }
 
+  @Override
   public String getClusterId() {
     return getScmStorageConfig().getClusterID();
   }

@@ -27,4 +27,62 @@
     <Class name="org.apache.hadoop.ozone.container.common.volume.AbstractFuture" />
     <Bug pattern="NS_DANGEROUS_NON_SHORT_CIRCUIT" />
   </Match>
+
+  <!-- Test -->
+  <Match>
+    <Class name="org.apache.hadoop.ozone.container.common.TestContainerCache" />
+    <Bug pattern="RV_RETURN_VALUE_IGNORED_BAD_PRACTICE" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.ozone.container.common.TestDatanodeStateMachine" />
+    <Bug pattern="RV_RETURN_VALUE_IGNORED_BAD_PRACTICE" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.ozone.container.common.TestDatanodeStateMachine" />
+    <Bug pattern="REC_CATCH_EXCEPTION" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.ozone.container.common.impl.TestContainerDataYaml" />
+    <Bug pattern="DLS_DEAD_LOCAL_STORE" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.ozone.container.common.impl.TestContainerDataYaml" />
+    <Bug pattern="RV_RETURN_VALUE_IGNORED_BAD_PRACTICE" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.ozone.container.common.impl.TestContainerDeletionChoosingPolicy" />
+    <Bug pattern="UC_USELESS_OBJECT" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.ozone.container.common.impl.TestContainerPersistence" />
+    <Bug pattern="DLS_DEAD_LOCAL_STORE" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.ozone.container.common.interfaces.TestHandler" />
+    <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.ozone.container.common.statemachine.TestStateContext" />
+    <Bug pattern="RV_RETURN_VALUE_IGNORED_BAD_PRACTICE" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.ozone.container.common.volume.TestVolumeSet" />
+    <Bug pattern="RV_RETURN_VALUE_IGNORED_BAD_PRACTICE" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.ozone.container.common.volume.TestVolumeSet" />
+    <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.ozone.container.keyvalue.TestKeyValueContainerMarkUnhealthy" />
+    <Bug pattern="RV_RETURN_VALUE_IGNORED_BAD_PRACTICE" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.ozone.container.keyvalue.TestTarContainerPacker" />
+    <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.ozone.container.ozoneimpl.TestContainerScrubberMetrics" />
+    <Bug pattern="RU_INVOKE_RUN" />
+  </Match>
 </FindBugsFilter>

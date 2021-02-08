@@ -351,7 +351,7 @@ public class TestAuthorizationV4HeaderParser {
             + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027";
-    Assert.assertNull(new AuthorizationV4HeaderParser(auth2, SAMPLE_DATE)
+    Assert.assertNull(new AuthorizationV4HeaderParser(auth3, SAMPLE_DATE)
         .parseSignature());
   }
 

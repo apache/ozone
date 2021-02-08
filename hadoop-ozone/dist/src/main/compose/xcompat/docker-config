@@ -14,6 +14,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-HDDS_VERSION=${hdds.version}
-OZONE_RUNNER_VERSION=${docker.ozone-runner.version}
-OZONE_OPTS=
+OZONE-SITE.XML_hdds.datanode.dir=/data/hdds
+OZONE-SITE.XML_hdds.scm.safemode.min.datanode=3
+OZONE-SITE.XML_ozone.metadata.dirs=/data/metadata
+OZONE-SITE.XML_ozone.om.address=om
+OZONE-SITE.XML_ozone.om.http-address=om:9874
+OZONE-SITE.XML_ozone.recon.address=recon:9891
+OZONE-SITE.XML_ozone.recon.db.dir=/data/metadata/recon
+OZONE-SITE.XML_ozone.replication=3
+OZONE-SITE.XML_ozone.scm.block.client.address=scm
+OZONE-SITE.XML_ozone.scm.client.address=scm
+OZONE-SITE.XML_ozone.scm.container.size=1GB
+OZONE-SITE.XML_ozone.scm.datanode.id.dir=/data
+OZONE-SITE.XML_ozone.scm.names=scm
+OZONE-SITE.XML_ozone.scm.pipeline.owner.container.count=1
+OZONE-SITE.XML_recon.om.snapshot.task.interval.delay=1m
+
+no_proxy=om,recon,scm,s3g,kdc,localhost,127.0.0.1

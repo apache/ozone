@@ -65,7 +65,7 @@ public class TestNetworkTopologyImpl {
   public TestNetworkTopologyImpl(NodeSchema[] schemas, Node[] nodeArray) {
     NodeSchemaManager.getInstance().init(schemas, true);
     cluster = new NetworkTopologyImpl(NodeSchemaManager.getInstance());
-    dataNodes = nodeArray;
+    dataNodes = nodeArray.clone();
     for (int i = 0; i < dataNodes.length; i++) {
       cluster.add(dataNodes[i]);
     }
@@ -634,8 +634,7 @@ public class TestNetworkTopologyImpl {
                         key.getNetworkFullPath() + ", ancestor node:" +
                         affinityAncestor.getNetworkFullPath() +
                         ", excludedScope: " + pathList.toString() + ", " +
-                        "excludedList:" + (excludedList == null ? "" :
-                        excludedList.toString()));
+                        "excludedList:" + excludedList.toString());
                   }
                 }
               }

@@ -27,8 +27,9 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.FileWriter;
 import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.UUID;
@@ -191,12 +192,14 @@ public class TestOMDbCheckpointServlet {
     try {
       String testDirName = folder.newFolder().getAbsolutePath();
       File file = new File(testDirName + "/temp1.txt");
-      FileWriter writer = new FileWriter(file);
+      OutputStreamWriter writer = new OutputStreamWriter(
+          new FileOutputStream(file), StandardCharsets.UTF_8);
       writer.write("Test data 1");
       writer.close();
 
       file = new File(testDirName + "/temp2.txt");
-      writer = new FileWriter(file);
+      writer = new OutputStreamWriter(
+          new FileOutputStream(file), StandardCharsets.UTF_8);
       writer.write("Test data 2");
       writer.close();
 

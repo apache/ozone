@@ -19,9 +19,11 @@
 package org.apache.hadoop.ozone;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -154,7 +156,8 @@ public class TestMiniOzoneCluster {
     // Validate using yaml parser
     Yaml yaml = new Yaml();
     try {
-      yaml.load(new FileReader(validIdsFile));
+      yaml.load(new InputStreamReader(new FileInputStream(validIdsFile),
+          StandardCharsets.UTF_8));
     } catch (Exception e) {
       Assert.fail("Failed parsing datanode id yaml.");
     }
@@ -283,9 +286,15 @@ public class TestMiniOzoneCluster {
     DatanodeDetails id = randomDatanodeDetails();
     ContainerUtils.writeDatanodeDetailsTo(id, malformedFile);
 
-    FileOutputStream out = new FileOutputStream(malformedFile);
-    out.write("malformed".getBytes());
-    out.close();
+    FileOutputStream out = null;
+    try {
+      out = new FileOutputStream(malformedFile);
+      out.write("malformed".getBytes(StandardCharsets.UTF_8));
+    } finally {
+      if (out != null) {
+        out.close();
+      }
+    }
   }
 
   /**

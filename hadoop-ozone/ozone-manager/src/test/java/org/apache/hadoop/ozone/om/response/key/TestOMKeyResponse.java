@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
+import java.util.Random;
 import java.util.UUID;
 
 import org.junit.After;
@@ -50,6 +51,7 @@ public class TestOMKeyResponse {
   protected HddsProtos.ReplicationFactor replicationFactor;
   protected HddsProtos.ReplicationType replicationType;
   protected long clientID;
+  protected Random random;
 
   @Before
   public void setup() throws Exception {
@@ -65,6 +67,7 @@ public class TestOMKeyResponse {
     replicationFactor = HddsProtos.ReplicationFactor.ONE;
     replicationType = HddsProtos.ReplicationType.RATIS;
     clientID = 1000L;
+    random = new Random();
   }
 
   @After

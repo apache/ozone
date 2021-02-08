@@ -50,6 +50,7 @@ public class TemplateCommandHandler implements Callable<Void> {
   @ParentCommand
   private AuditParser auditParser;
 
+  @Override
   public Void call() throws Exception {
     try {
       if(DatabaseHelper.validateTemplate(template)) {

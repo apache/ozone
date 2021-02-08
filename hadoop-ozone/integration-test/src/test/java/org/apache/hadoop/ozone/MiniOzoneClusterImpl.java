@@ -156,10 +156,12 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     this.reconServer = reconServer;
   }
 
+  @Override
   public OzoneConfiguration getConf() {
     return conf;
   }
 
+  @Override
   public String getServiceId() {
     // Non-HA cluster doesn't have OM Service Id.
     return null;

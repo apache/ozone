@@ -114,6 +114,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
     failureManager.start(initialDelay, period, timeUnit);
   }
 
+  @Override
   public void shutdown() {
     try {
       failureManager.stop();
@@ -166,6 +167,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
      * @param val number of datanodes
      * @return MiniOzoneChaosCluster.Builder
      */
+    @Override
     public Builder setNumDatanodes(int val) {
       super.setNumDatanodes(val);
       return this;
@@ -196,6 +198,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
       return this;
     }
 
+    @Override
     protected void initializeConfiguration() throws IOException {
       super.initializeConfiguration();
 
@@ -253,6 +256,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
      *
      * @return MiniOzoneCluster.Builder
      */
+    @Override
     public Builder setNumDataVolumes(int val) {
       numDataVolumes = val;
       return this;
@@ -317,11 +321,13 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
     return oms;
   }
 
+  @Override
   public void shutdownOzoneManager(OzoneManager om) {
     super.shutdownOzoneManager(om);
     failedOmSet.add(om);
   }
 
+  @Override
   public void restartOzoneManager(OzoneManager om, boolean waitForOM)
       throws IOException, TimeoutException, InterruptedException {
     super.restartOzoneManager(om, waitForOM);

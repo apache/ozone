@@ -28,6 +28,9 @@ import org.junit.Test;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
+import java.io.UnsupportedEncodingException;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
  * Tests the ozone getconf command.
@@ -36,16 +39,17 @@ public class TestGetConfOptions {
   private static OzoneConfiguration conf;
   private static ByteArrayOutputStream bout;
   private static PrintStream psBackup;
+  private static final String DEFAULT_ENCODING = UTF_8.name();
 
   @BeforeClass
-  public static void init() {
+  public static void init() throws UnsupportedEncodingException {
     conf = new OzoneConfiguration();
     conf.set(OMConfigKeys.OZONE_OM_NODE_ID_KEY, "1");
     conf.set(OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY, "service1");
     conf.set(ScmConfigKeys.OZONE_SCM_NAMES, "localhost");
     psBackup = System.out;
     bout = new ByteArrayOutputStream();
-    PrintStream psOut = new PrintStream(bout);
+    PrintStream psOut = new PrintStream(bout, false, DEFAULT_ENCODING);
     System.setOut(psOut);
   }
 
@@ -60,31 +64,34 @@ public class TestGetConfOptions {
   }
 
   @Test
-  public void testGetConfWithTheOptionConfKey() {
+  public void testGetConfWithTheOptionConfKey()
+      throws UnsupportedEncodingException {
     new OzoneGetConf(conf)
         .run(new String[] {"-confKey", ScmConfigKeys.OZONE_SCM_NAMES});
-    Assert.assertEquals("localhost\n", bout.toString());
+    Assert.assertEquals("localhost\n", bout.toString(DEFAULT_ENCODING));
     bout.reset();
     new OzoneGetConf(conf)
         .run(new String[] {"confKey", OMConfigKeys.OZONE_OM_NODE_ID_KEY});
-    Assert.assertEquals("1\n", bout.toString());
+    Assert.assertEquals("1\n", bout.toString(DEFAULT_ENCODING));
   }
 
   @Test
-  public void testGetConfWithTheOptionStorageContainerManagers() {
+  public void testGetConfWithTheOptionStorageContainerManagers()
+      throws UnsupportedEncodingException {
     new OzoneGetConf(conf).run(new String[] {"-storagecontainermanagers"});
-    Assert.assertEquals("localhost\n", bout.toString());
+    Assert.assertEquals("localhost\n", bout.toString(DEFAULT_ENCODING));
     bout.reset();
     new OzoneGetConf(conf).run(new String[] {"storagecontainermanagers"});
-    Assert.assertEquals("localhost\n", bout.toString());
+    Assert.assertEquals("localhost\n", bout.toString(DEFAULT_ENCODING));
   }
 
   @Test
-  public void testGetConfWithTheOptionOzoneManagers() {
+  public void testGetConfWithTheOptionOzoneManagers()
+      throws UnsupportedEncodingException {
     new OzoneGetConf(conf).run(new String[] {"-ozonemanagers"});
-    Assert.assertEquals("{service1=[]}\n", bout.toString());
+    Assert.assertEquals("{service1=[]}\n", bout.toString(DEFAULT_ENCODING));
     bout.reset();
     new OzoneGetConf(conf).run(new String[] {"ozonemanagers"});
-    Assert.assertEquals("{service1=[]}\n", bout.toString());
+    Assert.assertEquals("{service1=[]}\n", bout.toString(DEFAULT_ENCODING));
   }
 }

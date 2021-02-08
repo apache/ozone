@@ -47,9 +47,9 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTER
 @Ignore
 public class TestRatisPipelineCreateAndDestroy {
 
-  private static MiniOzoneCluster cluster;
+  private MiniOzoneCluster cluster;
   private OzoneConfiguration conf = new OzoneConfiguration();
-  private static PipelineManager pipelineManager;
+  private PipelineManager pipelineManager;
 
   public void init(int numDatanodes) throws Exception {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,

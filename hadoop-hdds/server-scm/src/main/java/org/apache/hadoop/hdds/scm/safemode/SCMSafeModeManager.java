@@ -266,6 +266,7 @@ public class SCMSafeModeManager implements SafeModeManager {
     emitSafeModeStatus();
   }
 
+  @Override
   public boolean getInSafeMode() {
     if (!isSafeModeEnabled) {
       return false;

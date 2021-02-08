@@ -80,6 +80,8 @@ import com.google.common.base.Preconditions;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 
+import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
+
 /**
  * This class is the client-side translator to translate the requests made on
  * the {@link StorageContainerLocationProtocol} interface to the RPC server
@@ -117,6 +119,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
       Builder builder = ScmContainerLocationRequest.newBuilder()
           .setCmdType(type)
+          .setVersion(CURRENT_VERSION)
           .setTraceID(TracingUtil.exportCurrentSpan());
       builderConsumer.accept(builder);
       ScmContainerLocationRequest wrapper = builder.build();
@@ -166,6 +169,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
         response.getContainerWithPipeline());
   }
 
+  @Override
   public ContainerInfo getContainer(long containerID) throws IOException {
     Preconditions.checkState(containerID >= 0,
         "Container ID cannot be negative");
@@ -185,6 +189,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   /**
    * {@inheritDoc}
    */
+  @Override
   public ContainerWithPipeline getContainerWithPipeline(long containerID)
       throws IOException {
     Preconditions.checkState(containerID >= 0,
@@ -207,6 +212,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   /**
    * {@inheritDoc}
    */
+  @Override
   public List<ContainerWithPipeline> getContainerWithPipelineBatch(
       List<Long> containerIDs) throws IOException {
     for (Long containerID: containerIDs) {
@@ -293,13 +299,14 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
    *
    * @param opState The operation state of the node
    * @param nodeState The health of the node
+   * @param clientVersion
    * @return List of Datanodes.
    */
   @Override
   public List<HddsProtos.Node> queryNode(
       HddsProtos.NodeOperationalState opState, HddsProtos.NodeState
-      nodeState, HddsProtos.QueryScope queryScope, String poolName)
-      throws IOException {
+      nodeState, HddsProtos.QueryScope queryScope, String poolName,
+      int clientVersion) throws IOException {
     // TODO : We support only cluster wide query right now. So ignoring checking
     // queryScope and poolName
     NodeQueryRequestProto.Builder builder = NodeQueryRequestProto.newBuilder()

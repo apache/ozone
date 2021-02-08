@@ -18,17 +18,21 @@
 
 package org.apache.hadoop.ozone.debug;
 
-import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_CONTAINER_KEY_DB;
-import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OM_SNAPSHOT_DB;
+import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.HashMap;
 
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
+import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaTwoDBDefinition;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.ozone.recon.scm.ReconSCMDBDefinition;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition;
 
-import java.util.Arrays;
-import java.util.HashMap;
+import com.amazonaws.services.kms.model.InvalidArnException;
+import com.google.common.base.Preconditions;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_CONTAINER_KEY_DB;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OM_SNAPSHOT_DB;
 
 /**
  * Utility class to get appropriate DBDefinition.
@@ -44,19 +48,35 @@ public final class DBDefinitionFactory {
     dbMap = new HashMap<>();
     Arrays.asList(
       new SCMDBDefinition(),
-      new OMDBDefinition(),
-      new ReconSCMDBDefinition()
+        new OMDBDefinition(),
+        new ReconSCMDBDefinition()
     ).forEach(dbDefinition -> dbMap.put(dbDefinition.getName(), dbDefinition));
   }
 
-  public static DBDefinition getDefinition(String dbName){
-    if (dbMap.containsKey(dbName)){
+  public static DBDefinition getDefinition(String dbName) {
+    if (dbMap.containsKey(dbName)) {
       return dbMap.get(dbName);
     }
     return getReconDBDefinition(dbName);
   }
 
-  private static DBDefinition getReconDBDefinition(String dbName){
+  public static DBDefinition getDefinition(Path dbPath) {
+    Preconditions.checkNotNull(dbPath,
+        "Path is required to identify the used db scheme");
+    final Path fileName = dbPath.getFileName();
+    if (fileName == null) {
+      throw new InvalidArnException(
+          "Path is required to identify the used db scheme");
+    }
+    String dbName = fileName.toString();
+    if (dbName.endsWith("-container.db")) {
+      return new DatanodeSchemaTwoDBDefinition(
+          dbPath.toAbsolutePath().toString());
+    }
+    return getDefinition(dbName);
+  }
+
+  private static DBDefinition getReconDBDefinition(String dbName) {
     if (dbName.startsWith(RECON_CONTAINER_KEY_DB)) {
       return new ReconDBDefinition(dbName);
     } else if (dbName.startsWith(RECON_OM_SNAPSHOT_DB)) {

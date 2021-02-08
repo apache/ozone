@@ -115,14 +115,20 @@ public class TestOzoneFSInputStream {
   }
 
   @Test
-  public void testStreamCapability() {
+  public void testStreamCapability() throws IOException {
     final OzoneFSInputStream subject = createTestSubject(emptyStream());
-    final CapableOzoneFSInputStream capableOzoneFSInputStream =
-        new CapableOzoneFSInputStream(subject,
-            new FileSystem.Statistics("test"));
+    CapableOzoneFSInputStream capableOzoneFSInputStream = null;
+    try {
+      capableOzoneFSInputStream = new CapableOzoneFSInputStream(subject,
+          new FileSystem.Statistics("test"));
 
-    assertTrue(capableOzoneFSInputStream.
-        hasCapability(OzoneStreamCapabilities.READBYTEBUFFER));
+      assertTrue(capableOzoneFSInputStream.
+          hasCapability(OzoneStreamCapabilities.READBYTEBUFFER));
+    } finally {
+      if (capableOzoneFSInputStream != null) {
+        capableOzoneFSInputStream.close();
+      }
+    }
   }
 
   private static OzoneFSInputStream createTestSubject(InputStream input) {

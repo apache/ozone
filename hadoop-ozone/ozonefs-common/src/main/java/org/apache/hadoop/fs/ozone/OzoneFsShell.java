@@ -50,6 +50,7 @@ public class OzoneFsShell extends FsShell {
     super(conf);
   }
 
+  @Override
   protected void registerCommands(CommandFactory factory) {
     // TODO: DFSAdmin subclasses FsShell so need to protect the command
     // registration.  This class should morph into a base class for
