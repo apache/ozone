@@ -167,8 +167,20 @@
   <property>
     <name>dfs.container.ratis.ipc</name>
     <value>9858</value>
+    <tag>OZONE, CONTAINER, PIPELINE, RATIS</tag>
+    <description>The ipc port number of container for clients.</description>
+  </property>
+  <property>
+    <name>dfs.container.ratis.admin.port</name>
+    <value>9857</value>
     <tag>OZONE, CONTAINER, PIPELINE, RATIS, MANAGEMENT</tag>
-    <description>The ipc port number of container.</description>
+    <description>The ipc port number of container for admin requests.</description>
+  </property>
+  <property>
+    <name>dfs.container.ratis.server.port</name>
+    <value>9856</value>
+    <tag>OZONE, CONTAINER, PIPELINE, RATIS, MANAGEMENT</tag>
+    <description>The ipc port number of container for server-server communication.</description>
   </property>
   <property>
     <name>dfs.container.ratis.ipc.random.port</name>
