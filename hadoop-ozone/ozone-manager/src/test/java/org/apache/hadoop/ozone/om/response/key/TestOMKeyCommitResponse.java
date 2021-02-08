@@ -34,8 +34,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 @SuppressWarnings("visibilitymodifier")
 public class TestOMKeyCommitResponse extends TestOMKeyResponse {
 
-  protected OmBucketInfo omBucketInfo;
-
   @Test
   public void testAddToDBBatch() throws Exception {
 

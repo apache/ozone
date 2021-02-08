@@ -29,9 +29,7 @@ import org.junit.Assert;
 import org.junit.After;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.Timeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.slf4j.Logger;
@@ -66,7 +64,7 @@ public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
 
   @BeforeClass
   public static void init() {
-    isBucketFSOptimized = true;
+    setIsBucketFSOptimized(true);
   }
 
   public TestOzoneFileSystemV1(boolean setDefaultFs, boolean enableOMRatis) {
@@ -85,12 +83,6 @@ public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
     }
   }
 
-  /**
-   * Set a timeout for each test.
-   */
-  @Rule
-  public Timeout timeout = new Timeout(300000);
-
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOzoneFileSystemV1.class);
 
@@ -106,30 +98,32 @@ public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
      * Op 7. create file -> /d1/d2/key1
      */
     Path key1 = new Path("/key1");
-    try (FSDataOutputStream outputStream = fs.create(key1, false)) {
+    try (FSDataOutputStream outputStream = getFs().create(key1,
+            false)) {
       assertNotNull("Should be able to create file: key1",
               outputStream);
     }
     Path d1 = new Path("/d1");
     Path dir1Key1 = new Path(d1, "key1");
-    try (FSDataOutputStream outputStream = fs.create(dir1Key1, false)) {
+    try (FSDataOutputStream outputStream = getFs().create(dir1Key1, false)) {
       assertNotNull("Should be able to create file: " + dir1Key1,
               outputStream);
     }
     Path d2 = new Path("/d2");
     Path dir2Key1 = new Path(d2, "key1");
-    try (FSDataOutputStream outputStream = fs.create(dir2Key1, false)) {
+    try (FSDataOutputStream outputStream = getFs().create(dir2Key1, false)) {
       assertNotNull("Should be able to create file: " + dir2Key1,
               outputStream);
     }
     Path dir1Dir2 = new Path("/d1/d2/");
     Path dir1Dir2Key1 = new Path(dir1Dir2, "key1");
-    try (FSDataOutputStream outputStream = fs.create(dir1Dir2Key1, false)) {
+    try (FSDataOutputStream outputStream = getFs().create(dir1Dir2Key1,
+            false)) {
       assertNotNull("Should be able to create file: " + dir1Dir2Key1,
               outputStream);
     }
     Path d1Key2 = new Path(d1, "key2");
-    try (FSDataOutputStream outputStream = fs.create(d1Key2, false)) {
+    try (FSDataOutputStream outputStream = getFs().create(d1Key2, false)) {
       assertNotNull("Should be able to create file: " + d1Key2,
               outputStream);
     }
@@ -137,11 +131,14 @@ public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
     Path dir1Dir3 = new Path("/d1/d3/");
     Path dir1Dir4 = new Path("/d1/d4/");
 
-    fs.mkdirs(dir1Dir3);
-    fs.mkdirs(dir1Dir4);
+    getFs().mkdirs(dir1Dir3);
+    getFs().mkdirs(dir1Dir4);
+
+    String bucketName = getBucketName();
+    String volumeName = getVolumeName();
 
     // Root Directory
-    FileStatus[] fileStatusList = fs.listStatus(new Path("/"));
+    FileStatus[] fileStatusList = getFs().listStatus(new Path("/"));
     assertEquals("FileStatus should return files and directories",
             3, fileStatusList.length);
     ArrayList<String> expectedPaths = new ArrayList<>();
@@ -155,7 +152,7 @@ public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
             0, expectedPaths.size());
 
     // level-1 sub-dirs
-    fileStatusList = fs.listStatus(new Path("/d1"));
+    fileStatusList = getFs().listStatus(new Path("/d1"));
     assertEquals("FileStatus should return files and directories",
             5, fileStatusList.length);
     expectedPaths = new ArrayList<>();
@@ -171,7 +168,7 @@ public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
             0, expectedPaths.size());
 
     // level-2 sub-dirs
-    fileStatusList = fs.listStatus(new Path("/d1/d2"));
+    fileStatusList = getFs().listStatus(new Path("/d1/d2"));
     assertEquals("FileStatus should return files and directories",
             1, fileStatusList.length);
     expectedPaths = new ArrayList<>();
@@ -184,7 +181,7 @@ public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
             0, expectedPaths.size());
 
     // level-2 key2
-    fileStatusList = fs.listStatus(new Path("/d1/d2/key1"));
+    fileStatusList = getFs().listStatus(new Path("/d1/d2/key1"));
     assertEquals("FileStatus should return files and directories",
             1, fileStatusList.length);
     expectedPaths = new ArrayList<>();
@@ -198,13 +195,13 @@ public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
 
     // invalid root key
     try {
-      fileStatusList = fs.listStatus(new Path("/key2"));
+      fileStatusList = getFs().listStatus(new Path("/key2"));
       fail("Should throw FileNotFoundException");
     } catch (FileNotFoundException fnfe) {
       // ignore as its expected
     }
     try {
-      fileStatusList = fs.listStatus(new Path("/d1/d2/key2"));
+      fileStatusList = getFs().listStatus(new Path("/d1/d2/key2"));
       fail("Should throw FileNotFoundException");
     } catch (FileNotFoundException fnfe) {
       // ignore as its expected
@@ -221,30 +218,30 @@ public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
      * Op 4. create dir -> /d1/d2/d1/d2/key1
      */
     Path dir1Dir1Dir2Key1 = new Path("/d1/d1/d2/key1");
-    try (FSDataOutputStream outputStream = fs.create(dir1Dir1Dir2Key1,
+    try (FSDataOutputStream outputStream = getFs().create(dir1Dir1Dir2Key1,
             false)) {
       assertNotNull("Should be able to create file: " + dir1Dir1Dir2Key1,
               outputStream);
     }
     Path key1 = new Path("/key1");
-    try (FSDataOutputStream outputStream = fs.create(key1, false)) {
+    try (FSDataOutputStream outputStream = getFs().create(key1, false)) {
       assertNotNull("Should be able to create file: " + key1,
               outputStream);
     }
     Path key2 = new Path("/key2");
-    try (FSDataOutputStream outputStream = fs.create(key2, false)) {
+    try (FSDataOutputStream outputStream = getFs().create(key2, false)) {
       assertNotNull("Should be able to create file: key2",
               outputStream);
     }
     Path dir1Dir2Dir1Dir2Key1 = new Path("/d1/d2/d1/d2/key1");
-    try (FSDataOutputStream outputStream = fs.create(dir1Dir2Dir1Dir2Key1,
+    try (FSDataOutputStream outputStream = getFs().create(dir1Dir2Dir1Dir2Key1,
             false)) {
       assertNotNull("Should be able to create file: "
               + dir1Dir2Dir1Dir2Key1, outputStream);
     }
-    RemoteIterator<LocatedFileStatus> fileStatusItr = fs.listFiles(new Path(
-            "/"), true);
-    String uriPrefix = "o3fs://" + bucketName + "." + volumeName;
+    RemoteIterator<LocatedFileStatus> fileStatusItr = getFs().listFiles(
+            new Path("/"), true);
+    String uriPrefix = "o3fs://" + getBucketName() + "." + getVolumeName();
     ArrayList<String> expectedPaths = new ArrayList<>();
     expectedPaths.add(uriPrefix + dir1Dir1Dir2Key1.toString());
     expectedPaths.add(uriPrefix + key1.toString());
@@ -263,7 +260,7 @@ public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
             expectedPaths.size());
 
     // Recursive=false
-    fileStatusItr = fs.listFiles(new Path("/"), false);
+    fileStatusItr = getFs().listFiles(new Path("/"), false);
     expectedPaths.clear();
     expectedPaths.add(uriPrefix + "/key1");
     expectedPaths.add(uriPrefix + "/key2");
@@ -286,23 +283,23 @@ public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
   @Test
   public void testRenameWithNonExistentSource() throws Exception {
     // Skip as this will run only in new layout
-    if (!enabledFileSystemPaths) {
+    if (!isEnabledFileSystemPaths()) {
       return;
     }
 
     final String root = "/root";
     final String dir1 = root + "/dir1";
     final String dir2 = root + "/dir2";
-    final Path source = new Path(fs.getUri().toString() + dir1);
-    final Path destin = new Path(fs.getUri().toString() + dir2);
+    final Path source = new Path(getFs().getUri().toString() + dir1);
+    final Path destin = new Path(getFs().getUri().toString() + dir2);
 
     // creates destin
-    fs.mkdirs(destin);
+    getFs().mkdirs(destin);
     LOG.info("Created destin dir: {}", destin);
 
     LOG.info("Rename op-> source:{} to destin:{}}", source, destin);
     try {
-      fs.rename(source, destin);
+      getFs().rename(source, destin);
       Assert.fail("Should throw exception : Source doesn't exist!");
     } catch (OMException ome) {
       // expected
@@ -316,22 +313,22 @@ public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
   @Test
   public void testRenameDirToItsOwnSubDir() throws Exception {
     // Skip as this will run only in new layout
-    if (!enabledFileSystemPaths) {
+    if (!isEnabledFileSystemPaths()) {
       return;
     }
 
     final String root = "/root";
     final String dir1 = root + "/dir1";
-    final Path dir1Path = new Path(fs.getUri().toString() + dir1);
+    final Path dir1Path = new Path(getFs().getUri().toString() + dir1);
     // Add a sub-dir1 to the directory to be moved.
     final Path subDir1 = new Path(dir1Path, "sub_dir1");
-    fs.mkdirs(subDir1);
+    getFs().mkdirs(subDir1);
     LOG.info("Created dir1 {}", subDir1);
 
-    final Path sourceRoot = new Path(fs.getUri().toString() + root);
+    final Path sourceRoot = new Path(getFs().getUri().toString() + root);
     LOG.info("Rename op-> source:{} to destin:{}", sourceRoot, subDir1);
     try {
-      fs.rename(sourceRoot, subDir1);
+      getFs().rename(sourceRoot, subDir1);
       Assert.fail("Should throw exception : Cannot rename a directory to" +
               " its own subdirectory");
     } catch (OMException ome) {
@@ -348,20 +345,21 @@ public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
   @Test
   public void testRenameDestinationParentDoesntExist() throws Exception {
     // Skip as this will run only in new layout
-    if (!enabledFileSystemPaths) {
+    if (!isEnabledFileSystemPaths()) {
       return;
     }
 
     final String root = "/root_dir";
     final String dir1 = root + "/dir1";
     final String dir2 = dir1 + "/dir2";
-    final Path dir2SourcePath = new Path(fs.getUri().toString() + dir2);
-    fs.mkdirs(dir2SourcePath);
+    final Path dir2SourcePath = new Path(getFs().getUri().toString() + dir2);
+    getFs().mkdirs(dir2SourcePath);
 
     // (a) parent of dst does not exist.  /root_dir/b/c
-    final Path destinPath = new Path(fs.getUri().toString() + root + "/b/c");
+    final Path destinPath = new Path(getFs().getUri().toString()
+            + root + "/b/c");
     try {
-      fs.rename(dir2SourcePath, destinPath);
+      getFs().rename(dir2SourcePath, destinPath);
       Assert.fail("Should fail as parent of dst does not exist!");
     } catch (OMException ome) {
       // expected
@@ -369,12 +367,12 @@ public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
     }
 
     // (b) parent of dst is a file. /root_dir/file1/c
-    Path filePath = new Path(fs.getUri().toString() + root + "/file1");
-    ContractTestUtils.touch(fs, filePath);
+    Path filePath = new Path(getFs().getUri().toString() + root + "/file1");
+    ContractTestUtils.touch(getFs(), filePath);
 
     Path newDestinPath = new Path(filePath, "c");
     try {
-      fs.rename(dir2SourcePath, newDestinPath);
+      getFs().rename(dir2SourcePath, newDestinPath);
       Assert.fail("Should fail as parent of dst is a file!");
     } catch (OMException ome) {
       // expected
