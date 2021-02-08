@@ -70,6 +70,7 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         HddsConfigKeys.HDDS_X509_CRL_NAME, // HDDS-2873
         OMConfigKeys.OZONE_OM_NODES_KEY,
         ScmConfigKeys.OZONE_SCM_NODES_KEY,
+        ScmConfigKeys.OZONE_SCM_ADDRESS_KEY,
         OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE,
         OzoneConfigKeys.OZONE_S3_AUTHINFO_MAX_LIFETIME_KEY,
         ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR,
