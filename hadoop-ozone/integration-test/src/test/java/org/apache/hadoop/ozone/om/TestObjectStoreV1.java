@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.StringUtils;
 import org.junit.Assert;
 import org.junit.AfterClass;
@@ -50,8 +51,10 @@ import org.junit.Test;
 import org.junit.rules.Timeout;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationType.STAND_ALONE;
@@ -175,7 +178,8 @@ public class TestObjectStoreV1 {
     verifyKeyInOpenFileTable(openFileTable, clientID, file,
             dirPathC.getObjectID(), false);
 
-    ozoneOutputStream.write(data.getBytes(), 0, data.length());
+    ozoneOutputStream.write(data.getBytes(StandardCharsets.UTF_8), 0,
+            data.length());
     ozoneOutputStream.close();
 
     Table<String, OmKeyInfo> fileTable =
@@ -227,7 +231,8 @@ public class TestObjectStoreV1 {
     verifyKeyInOpenFileTable(openFileTable, clientID, fileName,
             dirPathC.getObjectID(), false);
 
-    ozoneOutputStream.write(data.getBytes(), 0, data.length());
+    ozoneOutputStream.write(data.getBytes(StandardCharsets.UTF_8), 0,
+            data.length());
 
     // open key
     try {
@@ -356,22 +361,21 @@ public class TestObjectStoreV1 {
   }
 
   private void assertKeyRenamedEx(OzoneBucket bucket, String keyName)
-      throws Exception {
-    OMException oe = null;
+          throws Exception {
     try {
       bucket.getKey(keyName);
-    } catch (OMException e) {
-      oe = e;
+      fail("Should throw KeyNotFound as the key got renamed!");
+    } catch (OMException ome) {
+      Assert.assertEquals(KEY_NOT_FOUND, ome.getResult());
     }
-    Assert.assertEquals(KEY_NOT_FOUND, oe.getResult());
   }
 
   private void createTestKey(OzoneBucket bucket, String keyName,
       String keyValue) throws IOException {
     OzoneOutputStream out = bucket.createKey(keyName,
-            keyValue.getBytes().length, STAND_ALONE,
+            keyValue.getBytes(StandardCharsets.UTF_8).length, STAND_ALONE,
             ONE, new HashMap<>());
-    out.write(keyValue.getBytes());
+    out.write(keyValue.getBytes(StandardCharsets.UTF_8));
     out.close();
     OzoneKey key = bucket.getKey(keyName);
     Assert.assertEquals(keyName, key.getName());
@@ -416,13 +420,24 @@ public class TestObjectStoreV1 {
 
   private void verifyKeyInOpenFileTable(Table<String, OmKeyInfo> openFileTable,
       long clientID, String fileName, long parentID, boolean isEmpty)
-          throws IOException {
+          throws IOException, TimeoutException, InterruptedException {
     String dbOpenFileKey =
             parentID + OM_KEY_PREFIX + fileName + OM_KEY_PREFIX + clientID;
-    OmKeyInfo omKeyInfo = openFileTable.get(dbOpenFileKey);
+
     if (isEmpty) {
-      Assert.assertNull("Table is not empty!", omKeyInfo);
+      // wait for DB updates
+      GenericTestUtils.waitFor(() -> {
+        try {
+          OmKeyInfo omKeyInfo = openFileTable.get(dbOpenFileKey);
+          return omKeyInfo == null;
+        } catch (IOException e) {
+          Assert.fail("DB failure!");
+          return false;
+        }
+
+      }, 1000, 120000);
     } else {
+      OmKeyInfo omKeyInfo = openFileTable.get(dbOpenFileKey);
       Assert.assertNotNull("Table is empty!", omKeyInfo);
       // used startsWith because the key format is,
       // <parentID>/fileName/<clientID> and clientID is not visible.

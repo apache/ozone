@@ -133,10 +133,6 @@ public class TestS3InitiateMultipartUploadRequestV1
     Assert.assertEquals(OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND,
         omClientResponse.getOMResponse().getStatus());
 
-    String multipartKey = omMetadataManager.getMultipartKey(volumeName,
-        bucketName, keyName, modifiedRequest.getInitiateMultiPartUploadRequest()
-            .getKeyArgs().getMultipartUploadID());
-
     Assert.assertTrue(omMetadataManager.getOpenKeyTable().isEmpty());
     Assert.assertTrue(omMetadataManager.getMultipartInfoTable().isEmpty());
   }
