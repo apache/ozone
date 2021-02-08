@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.StringUtils;
 import org.junit.Assert;
 import org.junit.AfterClass;
@@ -53,6 +54,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationType.STAND_ALONE;
@@ -418,13 +420,28 @@ public class TestObjectStoreV1 {
 
   private void verifyKeyInOpenFileTable(Table<String, OmKeyInfo> openFileTable,
       long clientID, String fileName, long parentID, boolean isEmpty)
-          throws IOException {
+          throws IOException, TimeoutException, InterruptedException {
     String dbOpenFileKey =
             parentID + OM_KEY_PREFIX + fileName + OM_KEY_PREFIX + clientID;
-    OmKeyInfo omKeyInfo = openFileTable.get(dbOpenFileKey);
+
     if (isEmpty) {
-      Assert.assertNull("Table is not empty!", omKeyInfo);
+      // wait for DB updates
+      GenericTestUtils.waitFor(() -> {
+        try {
+          OmKeyInfo omKeyInfo = openFileTable.get(dbOpenFileKey);
+          if (omKeyInfo == null) {
+            return true;
+          } else {
+            return false;
+          }
+        } catch (IOException e) {
+          Assert.fail("DB failure!");
+          return false;
+        }
+
+      }, 1000, 120000);
     } else {
+      OmKeyInfo omKeyInfo = openFileTable.get(dbOpenFileKey);
       Assert.assertNotNull("Table is empty!", omKeyInfo);
       // used startsWith because the key format is,
       // <parentID>/fileName/<clientID> and clientID is not visible.

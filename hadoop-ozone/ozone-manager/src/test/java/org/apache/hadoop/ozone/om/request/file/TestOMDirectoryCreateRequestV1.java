@@ -521,7 +521,6 @@ public class TestOMDirectoryCreateRequestV1 {
     // Add volume and bucket entries to DB.
     TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
             omMetadataManager);
-    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
 
     OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
             OzoneFSUtils.addTrailingSlashIfNeeded(keyName));

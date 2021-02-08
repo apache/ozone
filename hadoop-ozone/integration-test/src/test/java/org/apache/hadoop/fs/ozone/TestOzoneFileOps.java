@@ -36,6 +36,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.StringUtils;
 import org.junit.After;
 import org.junit.Before;
@@ -155,12 +156,20 @@ public class TestOzoneFileOps {
     // trigger CommitKeyRequest
     outputStream.close();
 
-    Assert.assertTrue("Failed to commit the open file:" + openFileKey,
-            omMgr.getOpenKeyTable().isEmpty());
-
     OmKeyInfo omKeyInfo = omMgr.getKeyTable().get(openFileKey);
     Assert.assertNotNull("Invalid Key!", omKeyInfo);
     verifyOMFileInfoFormat(omKeyInfo, file.getName(), d2ObjectID);
+
+    // wait for DB updates
+    GenericTestUtils.waitFor(() -> {
+      try {
+        return omMgr.getOpenKeyTable().isEmpty();
+      } catch (IOException e) {
+        LOG.error("DB failure!", e);
+        Assert.fail("DB failure!");
+        return false;
+      }
+    }, 1000, 120000);
   }
 
   private void verifyOMFileInfoFormat(OmKeyInfo omKeyInfo, String fileName,
