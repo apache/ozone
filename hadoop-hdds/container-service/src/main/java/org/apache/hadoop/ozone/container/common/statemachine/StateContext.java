@@ -411,12 +411,22 @@ public class StateContext {
     }
   }
 
-  boolean isSamePipelineAction(PipelineAction action1, PipelineAction action2) {
-    return action1.getAction() == action2.getAction()
-        && action1.hasClosePipeline()
-        && action2.hasClosePipeline()
-        && action1.getClosePipeline().getPipelineID()
-        .equals(action2.getClosePipeline().getPipelineID());
+  /**
+   * Helper function for addPipelineActionIfAbsent that check if inputs are the
+   * same close pipeline action.
+   *
+   * Important Note: Make sure to double check for correctness before using this
+   * helper function for other purposes!
+   *
+   * @return true if a1 and a2 are the same close pipeline action,
+   *         false otherwise
+   */
+  boolean isSameClosePipelineAction(PipelineAction a1, PipelineAction a2) {
+    return a1.getAction() == a2.getAction()
+        && a1.hasClosePipeline()
+        && a2.hasClosePipeline()
+        && a1.getClosePipeline().getPipelineID()
+        .equals(a2.getClosePipeline().getPipelineID());
   }
 
   /**
@@ -438,7 +448,7 @@ public class StateContext {
         final Queue<PipelineAction> actionsForEndpoint =
             pipelineActions.get(endpoint);
         if (actionsForEndpoint.stream().noneMatch(
-            action -> isSamePipelineAction(action, pipelineAction))) {
+            action -> isSameClosePipelineAction(action, pipelineAction))) {
           actionsForEndpoint.add(pipelineAction);
         }
       }

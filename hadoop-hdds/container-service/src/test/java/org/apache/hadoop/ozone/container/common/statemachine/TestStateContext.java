@@ -408,7 +408,7 @@ public class TestStateContext {
 
     pipelineActions = stateContext.getPendingPipelineAction(scm2, 10);
     assertEquals(1, pipelineActions.size());
-    // The pipeline action should have been removed from scm2, but still in scm1
+    // The pipeline action is dequeued from scm2 now, but still in scm1
 
     // The same pipeline action will not be added if it already exists
     stateContext.addPipelineActionIfAbsent(pipelineAction);
