@@ -86,7 +86,7 @@ public class BenchMarkCRCStreaming {
     }
 
     public String crcImpl() {
-      return crcImpl();
+      return crcImpl;
     }
 
     public int checksumSize() {

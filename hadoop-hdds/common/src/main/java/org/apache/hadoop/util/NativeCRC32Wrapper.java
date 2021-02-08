@@ -53,8 +53,8 @@ public final class NativeCRC32Wrapper {
       int checksumType, byte[] sums, int sumsOffset, byte[] data,
       int dataOffset, int dataLength, String fileName, long basePos)
       throws ChecksumException {
-    NativeCrc32.verifyChunkedSumsByteArray(bytesPerSum, checksumType, sums, sumsOffset,
-        data, dataOffset, dataLength, fileName, basePos);
+    NativeCrc32.verifyChunkedSumsByteArray(bytesPerSum, checksumType, sums,
+        sumsOffset, data, dataOffset, dataLength, fileName, basePos);
   }
 
   public static void calculateChunkedSums(int bytesPerSum, int checksumType,
