@@ -51,9 +51,6 @@ import org.junit.Test;
  */
 public class TestReconContainerManager
     extends AbstractReconContainerManagerTest {
-
-  private Pipeline pipeline =  getRandomPipeline();
-
   @Test
   public void testAddNewOpenContainer() throws IOException {
     ContainerWithPipeline containerWithPipeline =
@@ -154,7 +151,7 @@ public class TestReconContainerManager
         getContainerManager().getContainer(containerID).getState());
   }
 
-  ContainerInfo newContainerInfo(long containerId) {
+  ContainerInfo newContainerInfo(long containerId, Pipeline pipeline) {
     return new ContainerInfo.Builder()
         .setContainerID(containerId)
         .setReplicationType(HddsProtos.ReplicationType.RATIS)
@@ -164,15 +161,6 @@ public class TestReconContainerManager
         .setReplicationFactor(HddsProtos.ReplicationFactor.THREE)
         .setPipelineID(pipeline.getId())
         .build();
-  }
-
-  void putContainerInfos(ReconContainerManager containerManager, int num)
-      throws IOException {
-    for (int i = 1; i <= num; i++) {
-      final ContainerInfo info = newContainerInfo(i);
-      containerManager.addNewContainer(i,
-          new ContainerWithPipeline(info, pipeline));
-    }
   }
 
   @Test
@@ -198,7 +186,14 @@ public class TestReconContainerManager
     Assert.assertEquals(0, repHistMap.size());
 
     // Put a replica info and call updateContainerReplica
-    putContainerInfos(containerManager, 10);
+    Pipeline pipeline = getRandomPipeline();
+    getPipelineManager().addPipeline(pipeline);
+    for (int i = 1; i <= 10; i++) {
+      final ContainerInfo info = newContainerInfo(i, pipeline);
+      containerManager.addNewContainer(i,
+          new ContainerWithPipeline(info, pipeline));
+    }
+
     containerManager.updateContainerReplica(containerID1, containerReplica1);
     // Should have 1 container entry in the replica history map
     Assert.assertEquals(1, repHistMap.size());
