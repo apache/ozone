@@ -17,6 +17,7 @@
 package org.apache.hadoop.ozone;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -32,9 +33,14 @@ import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
+
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -135,6 +141,29 @@ public class TestStorageContainerManagerHelper {
     }
     meta.close();
     return allBlocks;
+  }
+
+  public boolean verifyBlocksWithTxnTable(Map<Long, List<Long>> containerBlocks)
+      throws IOException {
+    for (Map.Entry<Long, List<Long>> entry : containerBlocks.entrySet()) {
+      ReferenceCountedDB meta = getContainerMetadata(entry.getKey());
+      DatanodeStore ds = meta.getStore();
+      DatanodeStoreSchemaTwoImpl dnStoreTwoImpl =
+          (DatanodeStoreSchemaTwoImpl) ds;
+      List<? extends Table.KeyValue<Long, DeletedBlocksTransaction>>
+          txnsInTxnTable = dnStoreTwoImpl.getDeleteTransactionTable()
+          .getRangeKVs(null, Integer.MAX_VALUE, null);
+      List<Long> conID = new ArrayList<>();
+      for (Table.KeyValue<Long, DeletedBlocksTransaction> txn :
+          txnsInTxnTable) {
+        conID.addAll(txn.getValue().getLocalIDList());
+      }
+      if (!conID.equals(containerBlocks.get(entry.getKey()))) {
+        return false;
+      }
+      meta.close();
+    }
+    return true;
   }
 
   private ReferenceCountedDB getContainerMetadata(Long containerID)

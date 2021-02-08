@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.recon;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_DB_CHECKPOINT_HTTP_ENDPOINT;
 
 import java.util.HashMap;
@@ -56,8 +57,8 @@ public class TestReconWithOzoneManagerHA {
 
   private MiniOzoneHAClusterImpl cluster;
   private ObjectStore objectStore;
-  private final String omServiceId = "omService1";
-  private final String volName = "testrecon";
+  private static final String OM_SERVICE_ID = "omService1";
+  private static final String VOL_NAME = "testrecon";
 
   @Before
   public void setup() throws Exception {
@@ -72,16 +73,16 @@ public class TestReconWithOzoneManagerHA {
     cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
         .setClusterId(UUID.randomUUID().toString())
         .setScmId(UUID.randomUUID().toString())
-        .setOMServiceId(omServiceId)
+        .setOMServiceId(OM_SERVICE_ID)
         .setNumDatanodes(1)
         .setNumOfOzoneManagers(3)
         .includeRecon(true)
         .build();
     cluster.waitForClusterToBeReady();
-    objectStore = OzoneClientFactory.getRpcClient(omServiceId, conf)
+    objectStore = OzoneClientFactory.getRpcClient(OM_SERVICE_ID, conf)
         .getObjectStore();
-    objectStore.createVolume(volName);
-    objectStore.getVolume(volName).createBucket(volName);
+    objectStore.createVolume(VOL_NAME);
+    objectStore.getVolume(VOL_NAME).createBucket(VOL_NAME);
   }
 
   @After
@@ -103,7 +104,7 @@ public class TestReconWithOzoneManagerHA {
     Assert.assertNotNull("Timed out waiting OM leader election to finish: "
         + "no leader or more than one leader.", ozoneManager);
     Assert.assertTrue("Should have gotten the leader!",
-        ozoneManager.get().isLeader());
+        ozoneManager.get().isLeaderReady());
 
     OzoneManagerServiceProviderImpl impl = (OzoneManagerServiceProviderImpl)
         cluster.getReconServer().getOzoneManagerServiceProvider();
@@ -119,11 +120,11 @@ public class TestReconWithOzoneManagerHA {
         expectedUrl, snapshotUrl);
     // Write some data
     String keyPrefix = "ratis";
-    OzoneOutputStream key = objectStore.getVolume(volName)
-        .getBucket(volName)
+    OzoneOutputStream key = objectStore.getVolume(VOL_NAME)
+        .getBucket(VOL_NAME)
         .createKey(keyPrefix, 1024, ReplicationType.RATIS,
             ReplicationFactor.ONE, new HashMap<>());
-    key.write(keyPrefix.getBytes());
+    key.write(keyPrefix.getBytes(UTF_8));
     key.flush();
     key.close();
     // Sync data to Recon
@@ -140,7 +141,7 @@ public class TestReconWithOzoneManagerHA {
       reconKeyPrefix = keyValue.getKey().getKeyPrefix();
     }
     Assert.assertEquals("Container data should be synced to recon.",
-        String.format("/%s/%s/%s", volName, volName, keyPrefix),
+        String.format("/%s/%s/%s", VOL_NAME, VOL_NAME, keyPrefix),
         reconKeyPrefix);
   }
 }

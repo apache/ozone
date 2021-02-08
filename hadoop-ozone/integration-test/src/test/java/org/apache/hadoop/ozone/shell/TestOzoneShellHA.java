@@ -20,8 +20,8 @@ package org.apache.hadoop.ozone.shell;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.io.PrintStream;
+import java.io.UnsupportedEncodingException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
@@ -30,7 +30,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.ozone.OFSPath;
+import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.fs.ozone.OzoneFsShell;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -41,9 +41,12 @@ import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.hadoop.test.LambdaTestUtils;
 import org.apache.hadoop.util.ToolRunner;
 
 import com.google.common.base.Strings;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
 import static org.apache.hadoop.fs.FileSystem.FS_DEFAULT_NAME_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
@@ -55,7 +58,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 import org.junit.Before;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
@@ -150,9 +152,9 @@ public class TestOzoneShellHA {
   }
 
   @Before
-  public void setup() {
-    System.setOut(new PrintStream(out));
-    System.setErr(new PrintStream(err));
+  public void setup() throws UnsupportedEncodingException {
+    System.setOut(new PrintStream(out, false, UTF_8.name()));
+    System.setErr(new PrintStream(err, false, UTF_8.name()));
   }
 
   @After
@@ -317,8 +319,8 @@ public class TestOzoneShellHA {
   /**
    * Helper function to get nums of keys from info of listing command.
    */
-  private int getNumOfKeys() {
-    return out.toString().split("key").length - 1;
+  private int getNumOfKeys() throws UnsupportedEncodingException {
+    return out.toString(UTF_8.name()).split("key").length - 1;
   }
 
   /**
@@ -340,8 +342,10 @@ public class TestOzoneShellHA {
   /**
    * Helper function to get nums of buckets from info of listing command.
    */
-  private int getNumOfBuckets(String bucketPrefix) {
-    return out.toString().split(bucketPrefix).length - 1;
+  private int getNumOfBuckets(String bucketPrefix)
+      throws UnsupportedEncodingException {
+    return out.toString(UTF_8.name())
+        .split(bucketPrefix).length - 1;
   }
 
 
@@ -367,9 +371,9 @@ public class TestOzoneShellHA {
     // TODO: Fix this behavior, then uncomment the execute() below.
     String setOmAddress = "--set=" + OMConfigKeys.OZONE_OM_ADDRESS_KEY + "="
         + omLeaderNodeAddr;
-    String[] args = new String[] {setOmAddress,
-        "volume", "create", "o3://" + omLeaderNodeAddrWithoutPort + "/volume2"};
-    //execute(ozoneShell, args);
+    String[] args = new String[] {setOmAddress, "volume", "create",
+        "o3://" + omLeaderNodeAddrWithoutPort + "/volume2"};
+    execute(ozoneShell, args);
 
     // Test case 3: ozone sh volume create o3://om1:port/volume3
     // Expectation: Success.
@@ -404,7 +408,7 @@ public class TestOzoneShellHA {
    * Test ozone shell list command.
    */
   @Test
-  public void testOzoneShCmdList() {
+  public void testOzoneShCmdList() throws UnsupportedEncodingException {
     // Part of listing keys test.
     generateKeys("/volume4", "/bucket");
     final String destinationBucket = "o3://" + omServiceId + "/volume4/bucket";
@@ -467,7 +471,6 @@ public class TestOzoneShellHA {
   }
 
   @Test
-  @Ignore("HDDS-3982. Disable moveToTrash in o3fs and ofs temporarily")
   public void testDeleteToTrashOrSkipTrash() throws Exception {
     final String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + omServiceId;
     OzoneConfiguration clientConf = getClientConfForOFS(hostPrefix, conf);
@@ -530,41 +533,201 @@ public class TestOzoneShellHA {
   }
 
   @Test
-  public void testShQuota() throws IOException {
+  @SuppressWarnings("methodlength")
+  public void testShQuota() throws Exception {
     ObjectStore objectStore = cluster.getClient().getObjectStore();
-    try {
-      // Test --quota option.
 
-      String[] args =
-          new String[] {"volume", "create", "vol1", "--quota", "100BYTES"};
-      execute(ozoneShell, args);
-      assertEquals(100, objectStore.getVolume("vol1").getQuotaInBytes());
-      out.reset();
+    // Test create with no quota
+    String[] args = new String[]{"volume", "create", "vol"};
+    execute(ozoneShell, args);
+    assertEquals(-1, objectStore.getVolume("vol").getQuotaInBytes());
+    assertEquals(-1,
+        objectStore.getVolume("vol").getQuotaInNamespace());
+    out.reset();
 
-      args =
-          new String[] {"bucket", "create", "vol1/buck1", "--quota", "10BYTES"};
-      execute(ozoneShell, args);
-      assertEquals(10,
-          objectStore.getVolume("vol1").getBucket("buck1").getQuotaInBytes());
+    args = new String[]{"bucket", "create", "vol/buck"};
+    execute(ozoneShell, args);
+    assertEquals(-1,
+        objectStore.getVolume("vol").getBucket("buck").getQuotaInBytes());
+    assertEquals(-1,
+        objectStore.getVolume("vol").getBucket("buck")
+            .getQuotaInNamespace());
 
-      // Test --space-quota option.
+    // Test --quota option.
+    args = new String[]{"volume", "create", "vol1", "--quota", "100B"};
+    execute(ozoneShell, args);
+    assertEquals(100, objectStore.getVolume("vol1").getQuotaInBytes());
+    assertEquals(-1,
+        objectStore.getVolume("vol1").getQuotaInNamespace());
+    out.reset();
 
-      args = new String[] {"volume", "create", "vol2", "--space-quota",
-          "100BYTES"};
-      execute(ozoneShell, args);
-      assertEquals(100, objectStore.getVolume("vol2").getQuotaInBytes());
-      out.reset();
+    args =
+        new String[]{"bucket", "create", "vol1/buck1", "--quota", "10B"};
+    execute(ozoneShell, args);
+    assertEquals(10,
+        objectStore.getVolume("vol1").getBucket("buck1").getQuotaInBytes());
+    assertEquals(-1,
+        objectStore.getVolume("vol1").getBucket("buck1")
+            .getQuotaInNamespace());
 
-      args = new String[] {"bucket", "create", "vol2/buck2", "--space-quota",
-          "10BYTES"};
-      execute(ozoneShell, args);
-      assertEquals(10,
-          objectStore.getVolume("vol2").getBucket("buck2").getQuotaInBytes());
-    } finally {
-      objectStore.getVolume("vol1").deleteBucket("buck1");
-      objectStore.deleteVolume("vol1");
-      objectStore.getVolume("vol2").deleteBucket("buck2");
-      objectStore.deleteVolume("vol2");
-    }
+    // Test --space-quota option.
+    args = new String[]{"volume", "create", "vol2", "--space-quota",
+        "100B"};
+    execute(ozoneShell, args);
+    assertEquals(100, objectStore.getVolume("vol2").getQuotaInBytes());
+    assertEquals(-1,
+        objectStore.getVolume("vol2").getQuotaInNamespace());
+    out.reset();
+
+    args = new String[]{"bucket", "create", "vol2/buck2", "--space-quota",
+        "10B"};
+    execute(ozoneShell, args);
+    assertEquals(10,
+        objectStore.getVolume("vol2").getBucket("buck2").getQuotaInBytes());
+    assertEquals(-1,
+        objectStore.getVolume("vol2").getBucket("buck2")
+            .getQuotaInNamespace());
+
+    // Test --namespace-quota option.
+    args =
+        new String[]{"volume", "create", "vol3", "--namespace-quota", "100"};
+    execute(ozoneShell, args);
+    assertEquals(-1, objectStore.getVolume("vol3").getQuotaInBytes());
+    assertEquals(100,
+        objectStore.getVolume("vol3").getQuotaInNamespace());
+    out.reset();
+
+    args = new String[]{"bucket", "create", "vol3/buck3",
+        "--namespace-quota", "10"};
+    execute(ozoneShell, args);
+    assertEquals(-1,
+        objectStore.getVolume("vol3").getBucket("buck3").getQuotaInBytes());
+    assertEquals(10,
+        objectStore.getVolume("vol3").getBucket("buck3")
+            .getQuotaInNamespace());
+
+    // Test both --space-quota and --namespace-quota option.
+    args = new String[]{"volume", "create", "vol4", "--space-quota",
+        "100B", "--namespace-quota", "100"};
+    execute(ozoneShell, args);
+    assertEquals(100, objectStore.getVolume("vol4").getQuotaInBytes());
+    assertEquals(100,
+        objectStore.getVolume("vol4").getQuotaInNamespace());
+    out.reset();
+
+    args = new String[]{"bucket", "create", "vol4/buck4",
+        "--space-quota", "10B", "--namespace-quota", "10"};
+    execute(ozoneShell, args);
+    assertEquals(10,
+        objectStore.getVolume("vol4").getBucket("buck4").getQuotaInBytes());
+    assertEquals(10,
+        objectStore.getVolume("vol4").getBucket("buck4")
+            .getQuotaInNamespace());
+
+    // Test clrquota option.
+    args = new String[]{"volume", "clrquota", "vol4", "--space-quota",
+        "--namespace-quota"};
+    execute(ozoneShell, args);
+    assertEquals(-1, objectStore.getVolume("vol4").getQuotaInBytes());
+    assertEquals(-1,
+        objectStore.getVolume("vol4").getQuotaInNamespace());
+    out.reset();
+
+    args = new String[]{"bucket", "clrquota", "vol4/buck4",
+        "--space-quota", "--namespace-quota"};
+    execute(ozoneShell, args);
+    assertEquals(-1,
+        objectStore.getVolume("vol4").getBucket("buck4").getQuotaInBytes());
+    assertEquals(-1,
+        objectStore.getVolume("vol4").getBucket("buck4")
+            .getQuotaInNamespace());
+    out.reset();
+
+    // Test set volume quota to 0.
+    String[] volumeArgs1 = new String[]{"volume", "setquota", "vol4",
+        "--space-quota", "0GB"};
+    LambdaTestUtils.intercept(ExecutionException.class,
+        "Invalid values for space quota",
+        () -> execute(ozoneShell, volumeArgs1));
+    out.reset();
+
+    String[] volumeArgs2 = new String[]{"volume", "setquota", "vol4",
+        "--namespace-quota", "0"};
+    LambdaTestUtils.intercept(ExecutionException.class,
+        "Invalid values for namespace quota",
+        () -> execute(ozoneShell, volumeArgs2));
+    out.reset();
+
+    // Test set volume spaceQuota or nameSpaceQuota to normal value.
+    String[] volumeArgs3 = new String[]{"volume", "setquota", "vol4",
+        "--space-quota", "1000B"};
+    execute(ozoneShell, volumeArgs3);
+    out.reset();
+    assertEquals(1000, objectStore.getVolume("vol4").getQuotaInBytes());
+    assertEquals(-1,
+        objectStore.getVolume("vol4").getQuotaInNamespace());
+
+    String[] volumeArgs4 = new String[]{"volume", "setquota", "vol4",
+        "--namespace-quota", "100"};
+    execute(ozoneShell, volumeArgs4);
+    out.reset();
+    assertEquals(1000, objectStore.getVolume("vol4").getQuotaInBytes());
+    assertEquals(100,
+        objectStore.getVolume("vol4").getQuotaInNamespace());
+
+    // Test set bucket quota to 0.
+    String[] bucketArgs1 = new String[]{"bucket", "setquota", "vol4/buck4",
+        "--space-quota", "0GB"};
+    LambdaTestUtils.intercept(ExecutionException.class,
+        "Invalid values for space quota",
+        () -> execute(ozoneShell, bucketArgs1));
+    out.reset();
+
+    String[] bucketArgs2 = new String[]{"bucket", "setquota", "vol4/buck4",
+        "--namespace-quota", "0"};
+    LambdaTestUtils.intercept(ExecutionException.class,
+        "Invalid values for namespace quota",
+        () -> execute(ozoneShell, bucketArgs2));
+    out.reset();
+
+    // Test set bucket spaceQuota or nameSpaceQuota to normal value.
+    String[] bucketArgs3 = new String[]{"bucket", "setquota", "vol4/buck4",
+        "--space-quota", "1000B"};
+    execute(ozoneShell, bucketArgs3);
+    out.reset();
+    assertEquals(1000, objectStore.getVolume("vol4")
+        .getBucket("buck4").getQuotaInBytes());
+    assertEquals(-1, objectStore.getVolume("vol4")
+        .getBucket("buck4").getQuotaInNamespace());
+
+    String[] bucketArgs4 = new String[]{"bucket", "setquota", "vol4/buck4",
+        "--namespace-quota", "100"};
+    execute(ozoneShell, bucketArgs4);
+    out.reset();
+    assertEquals(1000, objectStore.getVolume("vol4")
+        .getBucket("buck4").getQuotaInBytes());
+    assertEquals(100, objectStore.getVolume("vol4")
+        .getBucket("buck4").getQuotaInNamespace());
+
+    // test whether supports default quota unit as bytes.
+    String[] bucketArgs5 = new String[]{"bucket", "setquota", "vol4/buck4",
+        "--space-quota", "500"};
+    execute(ozoneShell, bucketArgs5);
+    out.reset();
+    assertEquals(500, objectStore.getVolume("vol4")
+        .getBucket("buck4").getQuotaInBytes());
+    assertEquals(100, objectStore.getVolume("vol4")
+        .getBucket("buck4").getQuotaInNamespace());
+
+    objectStore.getVolume("vol").deleteBucket("buck");
+    objectStore.deleteVolume("vol");
+    objectStore.getVolume("vol1").deleteBucket("buck1");
+    objectStore.deleteVolume("vol1");
+    objectStore.getVolume("vol2").deleteBucket("buck2");
+    objectStore.deleteVolume("vol2");
+    objectStore.getVolume("vol3").deleteBucket("buck3");
+    objectStore.deleteVolume("vol3");
+    objectStore.getVolume("vol4").deleteBucket("buck4");
+    objectStore.deleteVolume("vol4");
   }
 }

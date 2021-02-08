@@ -17,16 +17,19 @@
  */
 package org.apache.hadoop.ozone.container.metadata;
 
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
+import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 
 /**
  * This class defines the RocksDB structure for datanodes following schema
- * version 2, where the block data, metadata, and deleted block ids are put in
- * their own separate column families.
+ * version 2, where the block data, metadata, and transactions which are to be
+ * deleted are put in their own separate column families.
  */
 public class DatanodeSchemaTwoDBDefinition extends
         AbstractDatanodeDBDefinition {
@@ -58,8 +61,24 @@ public class DatanodeSchemaTwoDBDefinition extends
                   ChunkInfoList.class,
                   new ChunkInfoListCodec());
 
-  protected DatanodeSchemaTwoDBDefinition(String dbPath) {
+  public static final DBColumnFamilyDefinition<Long, DeletedBlocksTransaction>
+      DELETE_TRANSACTION =
+      new DBColumnFamilyDefinition<>(
+          "delete_txns",
+          Long.class,
+          new LongCodec(),
+          StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction.class,
+          new DeletedBlocksTransactionCodec());
+
+  public DatanodeSchemaTwoDBDefinition(String dbPath) {
     super(dbPath);
+  }
+
+  @Override
+  public DBColumnFamilyDefinition[] getColumnFamilies() {
+    return new DBColumnFamilyDefinition[] {getBlockDataColumnFamily(),
+        getMetadataColumnFamily(), getDeletedBlocksColumnFamily(),
+        getDeleteTransactionsColumnFamily()};
   }
 
   @Override
@@ -77,5 +96,10 @@ public class DatanodeSchemaTwoDBDefinition extends
   public DBColumnFamilyDefinition<String, ChunkInfoList>
       getDeletedBlocksColumnFamily() {
     return DELETED_BLOCKS;
+  }
+
+  public DBColumnFamilyDefinition<Long, DeletedBlocksTransaction>
+      getDeleteTransactionsColumnFamily() {
+    return DELETE_TRANSACTION;
   }
 }

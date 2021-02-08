@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineStateManager;
@@ -36,13 +35,10 @@ import static org.mockito.Mockito.mock;
 public class TestLeaderChoosePolicy {
   private OzoneConfiguration conf;
 
-  private ScmConfig scmConfig;
-
   @Before
   public void setup() {
     //initialize network topology instance
     conf = new OzoneConfiguration();
-    scmConfig = conf.getObject(ScmConfig.class);
   }
 
   @Test
@@ -54,7 +50,7 @@ public class TestLeaderChoosePolicy {
         mock(EventPublisher.class));
     Assert.assertSame(
         ratisPipelineProvider.getLeaderChoosePolicy().getClass(),
-        DefaultLeaderChoosePolicy.class);
+        MinLeaderCountChoosePolicy.class);
   }
 
   @Test(expected = RuntimeException.class)

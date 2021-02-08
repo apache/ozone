@@ -58,6 +58,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.common.Storage.StorageState;
 import org.apache.hadoop.ozone.container.common.utils.ContainerCache;
+import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -69,13 +70,19 @@ import org.apache.hadoop.test.GenericTestUtils;
 
 import org.apache.commons.io.FileUtils;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
+import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.RATIS;
+import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.RATIS_ADMIN;
+import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.RATIS_SERVER;
+import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.STANDALONE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_IPC_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_ADMIN_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_SERVER_PORT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_HTTP_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
@@ -155,10 +162,12 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     this.reconServer = reconServer;
   }
 
+  @Override
   public OzoneConfiguration getConf() {
     return conf;
   }
 
+  @Override
   public String getServiceId() {
     // Non-HA cluster doesn't have OM Service Id.
     return null;
@@ -342,14 +351,17 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     stopDatanode(datanodeService);
     // ensure same ports are used across restarts.
     OzoneConfiguration config = datanodeService.getConf();
-    int currentPort = datanodeService.getDatanodeDetails()
-        .getPort(DatanodeDetails.Port.Name.STANDALONE).getValue();
-    config.setInt(DFS_CONTAINER_IPC_PORT, currentPort);
+    DatanodeDetails dn = datanodeService.getDatanodeDetails();
     config.setBoolean(DFS_CONTAINER_IPC_RANDOM_PORT, false);
-    int ratisPort = datanodeService.getDatanodeDetails()
-        .getPort(DatanodeDetails.Port.Name.RATIS).getValue();
-    config.setInt(DFS_CONTAINER_RATIS_IPC_PORT, ratisPort);
     config.setBoolean(DFS_CONTAINER_RATIS_IPC_RANDOM_PORT, false);
+    config.setInt(DFS_CONTAINER_IPC_PORT,
+        dn.getPort(STANDALONE).getValue());
+    config.setInt(DFS_CONTAINER_RATIS_IPC_PORT,
+        dn.getPort(RATIS).getValue());
+    config.setInt(DFS_CONTAINER_RATIS_ADMIN_PORT,
+        dn.getPort(RATIS_ADMIN).getValue());
+    config.setInt(DFS_CONTAINER_RATIS_SERVER_PORT,
+        dn.getPort(RATIS_SERVER).getValue());
     hddsDatanodes.remove(i);
     if (waitForDatanode) {
       // wait for node to be removed from SCM healthy node list.
@@ -617,6 +629,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       conf.setInt(ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT,
           pipelineNumLimit >= DEFAULT_PIPELIME_LIMIT ?
               pipelineNumLimit : DEFAULT_PIPELIME_LIMIT);
+      conf.setTimeDuration(OMConfigKeys.OZONE_OM_RATIS_MINIMUM_TIMEOUT_KEY,
+          DEFAULT_RATIS_RPC_TIMEOUT_SEC, TimeUnit.SECONDS);
       configureTrace();
     }
 
@@ -788,6 +802,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
           randomContainerPort);
       conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT,
           randomContainerPort);
+
+      conf.setFromObject(new ReplicationConfig().setPort(0));
     }
 
     private void configureTrace() {

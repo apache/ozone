@@ -19,7 +19,6 @@
 package org.apache.hadoop.hdds.scm.node;
 
 import java.io.Closeable;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -33,9 +32,11 @@ import java.util.function.Predicate;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.node.states.Node2PipelineMap;
@@ -58,14 +59,14 @@ import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DEAD;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DECOMMISSIONED;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DECOMMISSIONING;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY_READONLY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.apache.hadoop.hdds.scm.events.SCMEvents.NON_HEALTHY_TO_READONLY_HEALTHY_NODE;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -89,8 +90,7 @@ public class NodeStateManager implements Runnable, Closeable {
    * Node's life cycle events.
    */
   private enum NodeLifeCycleEvent {
-    TIMEOUT, RESTORE, RESURRECT, DECOMMISSION, DECOMMISSIONED, LAYOUT_MISMATCH,
-    LAYOUT_MATCH
+    TIMEOUT, RESTORE, RESURRECT, LAYOUT_MISMATCH, LAYOUT_MATCH
   }
 
   private static final Logger LOG = LoggerFactory
@@ -100,7 +100,7 @@ public class NodeStateManager implements Runnable, Closeable {
   /**
    * StateMachine for node lifecycle.
    */
-  private final StateMachine<NodeState, NodeLifeCycleEvent> stateMachine;
+  private final StateMachine<NodeState, NodeLifeCycleEvent> nodeHealthSM;
   /**
    * This is the map which maintains the current state of all datanodes.
    */
@@ -173,11 +173,9 @@ public class NodeStateManager implements Runnable, Closeable {
     this.state2EventMap = new HashMap<>();
     initialiseState2EventMap();
     Set<NodeState> finalStates = new HashSet<>();
-    finalStates.add(DECOMMISSIONED);
-    // All DataNodes should start in HealthyReadOnly state.
-    this.stateMachine = new StateMachine<>(NodeState.HEALTHY_READONLY,
+    this.nodeHealthSM = new StateMachine<>(NodeState.HEALTHY_READONLY,
         finalStates);
-    initializeStateMachine();
+    initializeStateMachines();
     heartbeatCheckerIntervalMs = HddsServerUtil
         .getScmheartbeatCheckerInterval(conf);
     staleNodeIntervalMs = HddsServerUtil.getStaleNodeInterval(conf);
@@ -206,8 +204,7 @@ public class NodeStateManager implements Runnable, Closeable {
     state2EventMap
         .put(HEALTHY, SCMEvents.READ_ONLY_HEALTHY_TO_HEALTHY_NODE);
     state2EventMap
-        .put(NodeState.HEALTHY_READONLY,
-            SCMEvents.NON_HEALTHY_TO_READONLY_HEALTHY_NODE);
+        .put(NodeState.HEALTHY_READONLY, NON_HEALTHY_TO_READONLY_HEALTHY_NODE);
   }
 
   /*
@@ -217,17 +214,11 @@ public class NodeStateManager implements Runnable, Closeable {
    * State: HEALTHY             -------------------> STALE
    * Event:                          TIMEOUT
    *
-   * State: HEALTHY             -------------------> DECOMMISSIONING
-   * Event:                        DECOMMISSION
-   *
    * State: HEALTHY             -------------------> HEALTHY_READONLY
    * Event:                       LAYOUT_MISMATCH
    *
    * State: HEALTHY_READONLY    -------------------> HEALTHY
    * Event:                       LAYOUT_MATCH
-   *
-   * State: HEALTHY_READONLY    -------------------> DECOMMISSIONING
-   * Event:                        DECOMMISSION
    *
    * State: HEALTHY_READONLY    -------------------> STALE
    * Event:                          TIMEOUT
@@ -241,95 +232,41 @@ public class NodeStateManager implements Runnable, Closeable {
    * State: STALE           -------------------> DEAD
    * Event:                       TIMEOUT
    *
-   * State: STALE           -------------------> DECOMMISSIONING
-   * Event:                     DECOMMISSION
-   *
-   * State: DEAD            -------------------> DECOMMISSIONING
-   * Event:                     DECOMMISSION
-   *
-   * State: DECOMMISSIONING -------------------> DECOMMISSIONED
-   * Event:                     DECOMMISSIONED
-   *
    *  Node State Flow
    *
-   *                                      +->------------------->------+
-   *                                      |                            |
-   *                                      |(DECOMMISSION)              |
-   *                                      ^                            V
-   *                                      |  +-----<---------<---+     |
-   *                                      |  |    (RESURRECT)    |     |
-   *    +-->-----(LAYOUT_MISMATCH)-->--+  |  V                   |     |
-   *    |                              |  |  |                   ^     |
-   *    |                              |  ^  |                   |     |
-   *    |                              V  |  V                   |     |
-   *    |  +-----(LAYOUT_MATCH)--[HEALTHY_READONLY]              |     |
-   *    |  |                            ^  |                     |     V
-   *    |  |                            |  |                     ^     |
-   *    |  |                            |  |(TIMEOUT)            |     |
-   *    ^  |                  (RESTORE) |  |                     |     |
-   *    |  V                            |  V                     |     |
-   * [HEALTHY]---->----------------->[STALE]------->--------->[DEAD]   |
-   *    |           (TIMEOUT)         |         (TIMEOUT)       |      |
-   *    |                             |                         |      |
-   *    V                             |                         V      |
-   *    |                             |                         |      V
-   *    |                             |                         |      |
-   *    |                             |                         |      |
-   *    |(DECOMMISSION)               | (DECOMMISSION)          |(DECOMMISSION)
-   *    |                             V                         |      |
-   *    +---->---------------->[DECOMMISSIONING]<---------------+      |
-   *                                   |   ^                           |
-   *                                   |   |                           V
-   *                                   V   |                           |
-   *                                   |   +-----------<----------<----+
-   *                                   |
-   *                                   |
-   *                                   | (DECOMMISSIONED)
-   *                                   |
-   *                                   V
-   *                          [DECOMMISSIONED]
+   *                                        +-----<---------<---+
+   *                                        |    (RESURRECT)    |
+   *    +-->-----(LAYOUT_MISMATCH)-->--+    V                   |
+   *    |                              |    |                   ^
+   *    |                              |    |                   |
+   *    |                              V    V                   |
+   *    |  +-----(LAYOUT_MATCH)--[HEALTHY_READONLY]             |
+   *    |  |                            ^  |                    |
+   *    |  |                            |  |                    ^
+   *    |  |                            |  |(TIMEOUT)           |
+   *    ^  |                  (RESTORE) |  |                    |
+   *    |  V                            |  V                    |
+   * [HEALTHY]---->----------------->[STALE]------->--------->[DEAD]
+   *               (TIMEOUT)                  (TIMEOUT)
    *
    */
 
   /**
    * Initializes the lifecycle of node state machine.
    */
-  private void initializeStateMachine() {
-    stateMachine.addTransition(
-        HEALTHY_READONLY, HEALTHY,
+  private void initializeStateMachines() {
+    nodeHealthSM.addTransition(HEALTHY_READONLY, HEALTHY,
         NodeLifeCycleEvent.LAYOUT_MATCH);
-    stateMachine.addTransition(
-        HEALTHY_READONLY, STALE,
+    nodeHealthSM.addTransition(HEALTHY_READONLY, STALE,
         NodeLifeCycleEvent.TIMEOUT);
-    stateMachine.addTransition(
-        HEALTHY_READONLY, DECOMMISSIONING,
-        NodeLifeCycleEvent.DECOMMISSION);
-    stateMachine.addTransition(
-        HEALTHY, STALE, NodeLifeCycleEvent.TIMEOUT);
-    stateMachine.addTransition(
-        HEALTHY, HEALTHY_READONLY,
+    nodeHealthSM.addTransition(HEALTHY, STALE, NodeLifeCycleEvent.TIMEOUT);
+    nodeHealthSM.addTransition(HEALTHY, HEALTHY_READONLY,
         NodeLifeCycleEvent.LAYOUT_MISMATCH);
-    stateMachine.addTransition(
-        STALE, DEAD, NodeLifeCycleEvent.TIMEOUT);
-    stateMachine.addTransition(
-        STALE, HEALTHY_READONLY,
+    nodeHealthSM.addTransition(STALE, DEAD, NodeLifeCycleEvent.TIMEOUT);
+    nodeHealthSM.addTransition(STALE, HEALTHY_READONLY,
         NodeLifeCycleEvent.RESTORE);
-    stateMachine.addTransition(
-        DEAD, HEALTHY_READONLY,
+    nodeHealthSM.addTransition(DEAD, HEALTHY_READONLY,
         NodeLifeCycleEvent.RESURRECT);
-    stateMachine.addTransition(
-        HEALTHY, DECOMMISSIONING,
-        NodeLifeCycleEvent.DECOMMISSION);
-    stateMachine.addTransition(
-        STALE, DECOMMISSIONING,
-        NodeLifeCycleEvent.DECOMMISSION);
-    stateMachine.addTransition(
-        DEAD, DECOMMISSIONING,
-        NodeLifeCycleEvent.DECOMMISSION);
-    stateMachine.addTransition(
-        DECOMMISSIONING, DECOMMISSIONED,
-        NodeLifeCycleEvent.DECOMMISSIONED);
-
   }
 
   /**
@@ -343,9 +280,30 @@ public class NodeStateManager implements Runnable, Closeable {
   public void addNode(DatanodeDetails datanodeDetails,
                       LayoutVersionProto layoutInfo)
       throws NodeAlreadyExistsException {
-    nodeStateMap.addNode(datanodeDetails, stateMachine.getInitialState(),
-        layoutInfo);
+    NodeStatus newNodeStatus = newNodeStatus(datanodeDetails);
+    nodeStateMap.addNode(datanodeDetails, newNodeStatus, layoutInfo);
     eventPublisher.fireEvent(SCMEvents.NEW_NODE, datanodeDetails);
+  }
+
+  /**
+   * When a node registers with SCM, the operational state stored on the
+   * datanode is the source of truth. Therefore, if the datanode reports
+   * anything other than IN_SERVICE on registration, the state in SCM should be
+   * updated to reflect the datanode state.
+   * @param dn DatanodeDetails reported by the datanode
+   */
+  private NodeStatus newNodeStatus(DatanodeDetails dn) {
+    HddsProtos.NodeOperationalState dnOpState = dn.getPersistedOpState();
+    if (dnOpState != NodeOperationalState.IN_SERVICE) {
+      LOG.info("Updating nodeOperationalState on registration as the " +
+              "datanode has a persisted state of {} and expiry of {}",
+          dnOpState, dn.getPersistedOpStateExpiryEpochSec());
+      return new NodeStatus(dnOpState, nodeHealthSM.getInitialState(),
+          dn.getPersistedOpStateExpiryEpochSec());
+    } else {
+      return new NodeStatus(
+          NodeOperationalState.IN_SERVICE, nodeHealthSM.getInitialState());
+    }
   }
 
   /**
@@ -413,62 +371,63 @@ public class NodeStateManager implements Runnable, Closeable {
    *
    * @throws NodeNotFoundException if the node is not present
    */
-  public NodeState getNodeState(DatanodeDetails datanodeDetails)
+  public NodeStatus getNodeStatus(DatanodeDetails datanodeDetails)
       throws NodeNotFoundException {
-    return nodeStateMap.getNodeState(datanodeDetails.getUuid());
+    return nodeStateMap.getNodeStatus(datanodeDetails.getUuid());
   }
 
   /**
-   * Returns all the node which are in healthy state.
+   * Returns all the node which are in healthy state, ignoring the operational
+   * state.
    *
    * @return list of healthy nodes
    */
   public List<DatanodeInfo> getHealthyNodes() {
-    List<DatanodeInfo> allHealthyNodes;
-    allHealthyNodes = getNodes(HEALTHY);
-    allHealthyNodes.addAll(getNodes(NodeState.HEALTHY_READONLY));
-    return allHealthyNodes;
+    return getNodes(null, HEALTHY);
   }
 
   /**
-   * Returns all the node which are in stale state.
+   * Returns all the node which are in stale state, ignoring the operational
+   * state.
    *
    * @return list of stale nodes
    */
   public List<DatanodeInfo> getStaleNodes() {
-    return getNodes(STALE);
+    return getNodes(null, NodeState.STALE);
   }
 
   /**
-   * Returns all the node which are in dead state.
+   * Returns all the node which are in dead state, ignoring the operational
+   * state.
    *
    * @return list of dead nodes
    */
   public List<DatanodeInfo> getDeadNodes() {
-    return getNodes(DEAD);
+    return getNodes(null, NodeState.DEAD);
   }
 
   /**
-   * Returns all the node which are in the specified state.
+   * Returns all the nodes with the specified status.
    *
-   * @param state NodeState
+   * @param status NodeStatus
    *
    * @return list of nodes
    */
-  public List<DatanodeInfo> getNodes(NodeState state) {
-    List<DatanodeInfo> nodes = new ArrayList<>();
-    nodeStateMap.getNodes(state).forEach(
-        uuid -> {
-          try {
-            nodes.add(nodeStateMap.getNodeInfo(uuid));
-          } catch (NodeNotFoundException e) {
-            // This should not happen unless someone else other than
-            // NodeStateManager is directly modifying NodeStateMap and removed
-            // the node entry after we got the list of UUIDs.
-            LOG.error("Inconsistent NodeStateMap! {}", nodeStateMap);
-          }
-        });
-    return nodes;
+  public List<DatanodeInfo> getNodes(NodeStatus status) {
+    return nodeStateMap.getDatanodeInfos(status);
+  }
+
+  /**
+   * Returns all the nodes with the specified operationalState and health.
+   *
+   * @param opState The operationalState of the node
+   * @param health  The node health
+   *
+   * @return list of nodes matching the passed states
+   */
+  public List<DatanodeInfo> getNodes(
+      NodeOperationalState opState, NodeState health) {
+    return nodeStateMap.getDatanodeInfos(opState, health);
   }
 
   /**
@@ -477,19 +436,52 @@ public class NodeStateManager implements Runnable, Closeable {
    * @return all the managed nodes
    */
   public List<DatanodeInfo> getAllNodes() {
-    List<DatanodeInfo> nodes = new ArrayList<>();
-    nodeStateMap.getAllNodes().forEach(
-        uuid -> {
-          try {
-            nodes.add(nodeStateMap.getNodeInfo(uuid));
-          } catch (NodeNotFoundException e) {
-            // This should not happen unless someone else other than
-            // NodeStateManager is directly modifying NodeStateMap and removed
-            // the node entry after we got the list of UUIDs.
-            LOG.error("Inconsistent NodeStateMap! {}", nodeStateMap);
-          }
-        });
-    return nodes;
+    return nodeStateMap.getAllDatanodeInfos();
+  }
+
+  /**
+   * Sets the operational state of the given node. Intended to be called when
+   * a node is being decommissioned etc.
+   *
+   * @param dn The datanode having its state set
+   * @param newState The new operational State of the node.
+   */
+  public void setNodeOperationalState(DatanodeDetails dn,
+      NodeOperationalState newState)  throws NodeNotFoundException {
+    setNodeOperationalState(dn, newState, 0);
+  }
+
+  /**
+   * Sets the operational state of the given node. Intended to be called when
+   * a node is being decommissioned etc.
+   *
+   * @param dn The datanode having its state set
+   * @param newState The new operational State of the node.
+   * @param stateExpiryEpochSec The number of seconds from the epoch when the
+   *                            operational state should expire. Passing zero
+   *                            indicates the state will never expire
+   */
+  public void setNodeOperationalState(DatanodeDetails dn,
+      NodeOperationalState newState,
+      long stateExpiryEpochSec)  throws NodeNotFoundException {
+    DatanodeInfo dni = nodeStateMap.getNodeInfo(dn.getUuid());
+    NodeStatus oldStatus = dni.getNodeStatus();
+    if (oldStatus.getOperationalState() != newState ||
+        oldStatus.getOpStateExpiryEpochSeconds() != stateExpiryEpochSec) {
+      nodeStateMap.updateNodeOperationalState(
+          dn.getUuid(), newState, stateExpiryEpochSec);
+      // This will trigger an event based on the nodes health when the
+      // operational state changes. Eg a node that was IN_MAINTENANCE goes
+      // to IN_SERVICE + HEALTHY. This will trigger the HEALTHY node event to
+      // create new pipelines. OTH, if the nodes goes IN_MAINTENANCE to
+      // IN_SERVICE + DEAD, it will trigger the dead node handler to remove its
+      // container replicas. Sometimes the event will do nothing, but it will
+      // not do any harm either. Eg DECOMMISSIONING -> DECOMMISSIONED + HEALTHY
+      // but the pipeline creation logic will ignore decommissioning nodes.
+      if (oldStatus.getOperationalState() != newState) {
+        fireHealthStateEvent(oldStatus.getHealth(), dn);
+      }
+    }
   }
 
   /**
@@ -502,42 +494,53 @@ public class NodeStateManager implements Runnable, Closeable {
   }
 
   /**
-   * Returns the count of healthy nodes.
+   * Returns the count of healthy nodes, ignoring operational state.
    *
    * @return healthy node count
    */
   public int getHealthyNodeCount() {
-    return getNodeCount(HEALTHY) +
-        getNodeCount(NodeState.HEALTHY_READONLY);
+    return getHealthyNodes().size();
   }
 
   /**
-   * Returns the count of stale nodes.
+   * Returns the count of stale nodes, ignoring operational state.
    *
    * @return stale node count
    */
   public int getStaleNodeCount() {
-    return getNodeCount(STALE);
+    return getStaleNodes().size();
   }
 
   /**
-   * Returns the count of dead nodes.
+   * Returns the count of dead nodes, ignoring operational state.
    *
    * @return dead node count
    */
   public int getDeadNodeCount() {
-    return getNodeCount(DEAD);
+    return getDeadNodes().size();
   }
 
   /**
-   * Returns the count of nodes in specified state.
+   * Returns the count of nodes in specified status.
    *
-   * @param state NodeState
+   * @param status NodeState
    *
    * @return node count
    */
-  public int getNodeCount(NodeState state) {
-    return nodeStateMap.getNodeCount(state);
+  public int getNodeCount(NodeStatus status) {
+    return nodeStateMap.getNodeCount(status);
+  }
+
+  /**
+   * Returns the count of nodes in the specified states.
+   *
+   * @param opState The operational state of the node
+   * @param health The health of the node
+   *
+   * @return node count
+   */
+  public int getNodeCount(NodeOperationalState opState, NodeState health) {
+    return nodeStateMap.getNodeCount(opState, health);
   }
 
   /**
@@ -638,10 +641,10 @@ public class NodeStateManager implements Runnable, Closeable {
 
   public void forceNodesToHealthyReadOnly() {
     try {
-      List<UUID> nodes = nodeStateMap.getNodes(HEALTHY);
+      List<UUID> nodes = nodeStateMap.getNodes(null, HEALTHY);
       for (UUID id : nodes) {
         DatanodeInfo node = nodeStateMap.getNodeInfo(id);
-        nodeStateMap.updateNodeState(node.getUuid(), HEALTHY,
+        nodeStateMap.updateNodeHealthState(node.getUuid(),
             HEALTHY_READONLY);
         if (state2EventMap.containsKey(HEALTHY_READONLY)) {
           eventPublisher.fireEvent(state2EventMap.get(HEALTHY_READONLY),
@@ -654,7 +657,8 @@ public class NodeStateManager implements Runnable, Closeable {
     }
   }
 
-  private void checkNodesHealth() {
+  @VisibleForTesting
+  public void checkNodesHealth() {
 
     /*
      *
@@ -702,49 +706,42 @@ public class NodeStateManager implements Runnable, Closeable {
         (layout) -> layout.getMetadataLayoutVersion() !=
             layoutVersionManager.getMetadataLayoutVersion();
     try {
-      for (NodeState state : NodeState.values()) {
-        List<UUID> nodes = nodeStateMap.getNodes(state);
-        for (UUID id : nodes) {
-          DatanodeInfo node = nodeStateMap.getNodeInfo(id);
-          switch (state) {
-          case HEALTHY:
-              // Move the node to STALE if the last heartbeat time is less than
-            // configured stale-node interval.
-            updateNodeLayoutVersionState(node, layoutMisMatchCondition, state,
-                NodeLifeCycleEvent.LAYOUT_MISMATCH);
-            updateNodeState(node, staleNodeCondition, state,
-                NodeLifeCycleEvent.TIMEOUT);
-            break;
-          case HEALTHY_READONLY:
-            // Move the node to STALE if the last heartbeat time is less than
-            // configured stale-node interval.
-            updateNodeLayoutVersionState(node, layoutMatchCondition, state,
-                NodeLifeCycleEvent.LAYOUT_MATCH);
-            updateNodeState(node, staleNodeCondition, state,
-                  NodeLifeCycleEvent.TIMEOUT);
-            break;
-          case STALE:
-            // Move the node to DEAD if the last heartbeat time is less than
-            // configured dead-node interval.
-            updateNodeState(node, deadNodeCondition, state,
-                NodeLifeCycleEvent.TIMEOUT);
-            // Restore the node if we have received heartbeat before configured
-            // stale-node interval.
-            updateNodeState(node, healthyNodeCondition, state,
-                NodeLifeCycleEvent.RESTORE);
-            break;
-          case DEAD:
-            // Resurrect the node if we have received heartbeat before
-            // configured stale-node interval.
-            updateNodeState(node, healthyNodeCondition, state,
-                NodeLifeCycleEvent.RESURRECT);
-            break;
-          // We don't do anything for DECOMMISSIONING and DECOMMISSIONED in
-          // heartbeat processing.
-          case DECOMMISSIONING:
-          case DECOMMISSIONED:
-          default:
-          }
+      for(DatanodeInfo node : nodeStateMap.getAllDatanodeInfos()) {
+        NodeStatus status = nodeStateMap.getNodeStatus(node.getUuid());
+        switch (status.getHealth()) {
+        case HEALTHY:
+          // Move the node to STALE if the last heartbeat time is less than
+          // configured stale-node interval.
+          updateNodeLayoutVersionState(node, layoutMisMatchCondition, status,
+              NodeLifeCycleEvent.LAYOUT_MISMATCH);
+          updateNodeState(node, staleNodeCondition, status,
+              NodeLifeCycleEvent.TIMEOUT);
+          break;
+        case HEALTHY_READONLY:
+          // Move the node to STALE if the last heartbeat time is less than
+          // configured stale-node interval.
+          updateNodeLayoutVersionState(node, layoutMatchCondition, status,
+              NodeLifeCycleEvent.LAYOUT_MATCH);
+          updateNodeState(node, staleNodeCondition, status,
+              NodeLifeCycleEvent.TIMEOUT);
+          break;
+        case STALE:
+          // Move the node to DEAD if the last heartbeat time is less than
+          // configured dead-node interval.
+          updateNodeState(node, deadNodeCondition, status,
+              NodeLifeCycleEvent.TIMEOUT);
+          // Restore the node if we have received heartbeat before configured
+          // stale-node interval.
+          updateNodeState(node, healthyNodeCondition, status,
+              NodeLifeCycleEvent.RESTORE);
+          break;
+        case DEAD:
+          // Resurrect the node if we have received heartbeat before
+          // configured stale-node interval.
+          updateNodeState(node, healthyNodeCondition, status,
+              NodeLifeCycleEvent.RESURRECT);
+          break;
+        default:
         }
       }
     } catch (NodeNotFoundException e) {
@@ -803,27 +800,35 @@ public class NodeStateManager implements Runnable, Closeable {
    *
    * @param node DatanodeInfo
    * @param condition condition to check
-   * @param state current state of node
+   * @param status current status of node
    * @param lifeCycleEvent NodeLifeCycleEvent to be applied if condition
    *                       matches
    *
    * @throws NodeNotFoundException if the node is not present
    */
   private void updateNodeState(DatanodeInfo node, Predicate<Long> condition,
-      NodeState state, NodeLifeCycleEvent lifeCycleEvent)
+      NodeStatus status, NodeLifeCycleEvent lifeCycleEvent)
       throws NodeNotFoundException {
     try {
       if (condition.test(node.getLastHeartbeatTime())) {
-        NodeState newState = stateMachine.getNextState(state, lifeCycleEvent);
-        nodeStateMap.updateNodeState(node.getUuid(), state, newState);
-        if (state2EventMap.containsKey(newState)) {
-          eventPublisher.fireEvent(state2EventMap.get(newState), node);
-        }
+        NodeState newHealthState = nodeHealthSM.
+            getNextState(status.getHealth(), lifeCycleEvent);
+        NodeStatus newStatus =
+            nodeStateMap.updateNodeHealthState(node.getUuid(), newHealthState);
+        fireHealthStateEvent(newStatus.getHealth(), node);
       }
     } catch (InvalidStateTransitionException e) {
       LOG.warn("Invalid state transition of node {}." +
               " Current state: {}, life cycle event: {}",
-          node, state, lifeCycleEvent);
+          node, status.getHealth(), lifeCycleEvent);
+    }
+  }
+
+  private void fireHealthStateEvent(HddsProtos.NodeState health,
+      DatanodeDetails node) {
+    Event<DatanodeDetails> event = state2EventMap.get(health);
+    if (event != null) {
+      eventPublisher.fireEvent(event, node);
     }
   }
 
@@ -832,7 +837,7 @@ public class NodeStateManager implements Runnable, Closeable {
    *
    * @param node DatanodeInfo
    * @param condition condition to check
-   * @param state current state of node
+   * @param status current state of node
    * @param lifeCycleEvent NodeLifeCycleEvent to be applied if condition
    *                       matches
    *
@@ -840,20 +845,21 @@ public class NodeStateManager implements Runnable, Closeable {
    */
   private void updateNodeLayoutVersionState(DatanodeInfo node,
                              Predicate<LayoutVersionProto> condition,
-                             NodeState state, NodeLifeCycleEvent lifeCycleEvent)
+                                            NodeStatus status,
+                                            NodeLifeCycleEvent lifeCycleEvent)
       throws NodeNotFoundException {
     try {
       if (condition.test(node.getLastKnownLayoutVersion())) {
-        NodeState newState = stateMachine.getNextState(state, lifeCycleEvent);
-        nodeStateMap.updateNodeState(node.getUuid(), state, newState);
-        if (state2EventMap.containsKey(newState)) {
-          eventPublisher.fireEvent(state2EventMap.get(newState), node);
-        }
+        NodeState newHealthState = nodeHealthSM.getNextState(status.getHealth(),
+            lifeCycleEvent);
+        NodeStatus newStatus =
+            nodeStateMap.updateNodeHealthState(node.getUuid(), newHealthState);
+        fireHealthStateEvent(newStatus.getHealth(), node);
       }
     } catch (InvalidStateTransitionException e) {
       LOG.warn("Invalid state transition of node {}." +
               " Current state: {}, life cycle event: {}",
-          node, state, lifeCycleEvent);
+          node, status, lifeCycleEvent);
     }
   }
 

@@ -48,7 +48,7 @@ public abstract class ReconRestServletModule extends ServletModule {
       LoggerFactory.getLogger(ReconRestServletModule.class);
 
   @Override
-  abstract protected void configureServlets();
+  protected abstract void configureServlets();
 
   /**
    * Interface to provide packages for scanning.
@@ -109,6 +109,8 @@ public abstract class ReconRestServletModule extends ServletModule {
 class GuiceResourceConfig extends ResourceConfig {
   GuiceResourceConfig() {
     register(new ContainerLifecycleListener() {
+
+      @Override
       public void onStartup(Container container) {
         ServletContainer servletContainer = (ServletContainer) container;
         InjectionManager injectionManager = container.getApplicationHandler()
@@ -123,9 +125,11 @@ class GuiceResourceConfig extends ResourceConfig {
         guiceBridge.bridgeGuiceInjector(injector);
       }
 
+      @Override
       public void onReload(Container container) {
       }
 
+      @Override
       public void onShutdown(Container container) {
       }
     });

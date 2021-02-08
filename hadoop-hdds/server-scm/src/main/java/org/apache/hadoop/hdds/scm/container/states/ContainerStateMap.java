@@ -81,7 +81,7 @@ public class ContainerStateMap {
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerStateMap.class);
 
-  private final static NavigableSet<ContainerID> EMPTY_SET  =
+  private static final NavigableSet<ContainerID> EMPTY_SET  =
       Collections.unmodifiableNavigableSet(new TreeSet<>());
 
   private final ContainerAttribute<LifeCycleState> lifeCycleStateMap;
@@ -538,7 +538,7 @@ public class ContainerStateMap {
   private void checkIfContainerExist(ContainerID containerID)
       throws ContainerNotFoundException {
     if (!containerMap.containsKey(containerID)) {
-      throw new ContainerNotFoundException("Container with id #" +
+      throw new ContainerNotFoundException("Container with id " +
           containerID.getId() + " not found.");
     }
   }

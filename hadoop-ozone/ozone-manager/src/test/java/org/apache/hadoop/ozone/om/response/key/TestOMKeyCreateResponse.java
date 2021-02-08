@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.om.response.key;
 
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.util.Time;
 import org.junit.Assert;
 import org.junit.Test;
@@ -44,9 +43,6 @@ public class TestOMKeyCreateResponse extends TestOMKeyResponse {
     OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo(volumeName,
         bucketName, keyName, replicationType, replicationFactor);
 
-    OmVolumeArgs omVolumeArgs = OmVolumeArgs.newBuilder()
-        .setOwnerName(keyName).setAdminName(keyName)
-        .setVolume(volumeName).setCreationTime(Time.now()).build();
     OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
         .setVolumeName(volumeName).setBucketName(bucketName)
         .setCreationTime(Time.now()).build();
@@ -59,7 +55,7 @@ public class TestOMKeyCreateResponse extends TestOMKeyResponse {
 
     OMKeyCreateResponse omKeyCreateResponse =
         new OMKeyCreateResponse(omResponse, omKeyInfo, null, clientID,
-            omVolumeArgs, omBucketInfo);
+            omBucketInfo);
 
     String openKey = omMetadataManager.getOpenKey(volumeName, bucketName,
         keyName, clientID);
@@ -77,9 +73,6 @@ public class TestOMKeyCreateResponse extends TestOMKeyResponse {
     OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo(volumeName,
         bucketName, keyName, replicationType, replicationFactor);
 
-    OmVolumeArgs omVolumeArgs = OmVolumeArgs.newBuilder()
-        .setOwnerName(keyName).setAdminName(keyName)
-        .setVolume(volumeName).setCreationTime(Time.now()).build();
     OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
         .setVolumeName(volumeName).setBucketName(bucketName)
         .setCreationTime(Time.now()).build();
@@ -92,7 +85,7 @@ public class TestOMKeyCreateResponse extends TestOMKeyResponse {
 
     OMKeyCreateResponse omKeyCreateResponse =
         new OMKeyCreateResponse(omResponse, omKeyInfo, null, clientID,
-            omVolumeArgs, omBucketInfo);
+            omBucketInfo);
 
     // Before calling addToDBBatch
     String openKey = omMetadataManager.getOpenKey(volumeName, bucketName,

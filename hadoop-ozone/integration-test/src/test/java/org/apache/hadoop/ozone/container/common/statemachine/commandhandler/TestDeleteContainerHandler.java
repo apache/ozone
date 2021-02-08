@@ -51,6 +51,8 @@ import java.util.UUID;
 
 import org.junit.Rule;
 import org.junit.rules.Timeout;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
 
 /**
@@ -228,7 +230,7 @@ public class TestDeleteContainerHandler {
         .getBucket(bucketName)
         .createKey(keyName, 1024, ReplicationType.STAND_ALONE,
             ReplicationFactor.ONE, new HashMap<>());
-    key.write("test".getBytes());
+    key.write("test".getBytes(UTF_8));
     key.close();
   }
 

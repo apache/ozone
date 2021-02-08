@@ -19,13 +19,10 @@ set -e
 COMPOSE_ENV_NAME=$(basename "$COMPOSE_DIR")
 RESULT_DIR=${RESULT_DIR:-"$COMPOSE_DIR/result"}
 RESULT_DIR_INSIDE="/tmp/smoketest/$(basename "$COMPOSE_ENV_NAME")/result"
-SMOKETEST_DIR_INSIDE="${OZONE_DIR:-/opt/hadoop}/smoketest"
 
 OM_HA_PARAM=""
-if [[ -n "${OM_SERVICE_ID}" ]]; then
+if [[ -n "${OM_SERVICE_ID}" ]] && [[ "${OM_SERVICE_ID}" != "om" ]]; then
   OM_HA_PARAM="--om-service-id=${OM_SERVICE_ID}"
-else
-  OM_SERVICE_ID=om
 fi
 
 ## @description create results directory, purging any prior data
@@ -96,6 +93,39 @@ wait_for_safemode_exit(){
    return 1
 }
 
+## @description wait until OM leader is elected (or 120 seconds)
+wait_for_om_leader() {
+  if [[ -z "${OM_SERVICE_ID:-}" ]]; then
+    echo "No OM HA service, no need to wait"
+    return
+  fi
+
+  #Reset the timer
+  SECONDS=0
+
+  #Don't give it up until 120 seconds
+  while [[ $SECONDS -lt 120 ]]; do
+    local command="ozone admin om roles --service-id '${OM_SERVICE_ID}'"
+    if [[ "${SECURITY_ENABLED}" == 'true' ]]; then
+      status=$(docker-compose exec -T scm bash -c "kinit -k scm/scm@EXAMPLE.COM -t /etc/security/keytabs/scm.keytab && $command" | grep LEADER)
+    else
+      status=$(docker-compose exec -T scm bash -c "$command" | grep LEADER)
+    fi
+    if [[ -n "${status}" ]]; then
+      echo "Found OM leader for service ${OM_SERVICE_ID}: $status"
+      return
+    else
+      echo "Waiting for OM leader for service ${OM_SERVICE_ID}"
+    fi
+
+    echo "SECONDS: $SECONDS"
+
+    sleep 2
+  done
+  echo "WARNING: OM leader still not found for service ${OM_SERVICE_ID}"
+  return 1
+}
+
 ## @description  Starts a docker-compose based test environment
 ## @param number of datanodes to start and wait for (default: 3)
 start_docker_env(){
@@ -105,7 +135,8 @@ start_docker_env(){
   export OZONE_SAFEMODE_MIN_DATANODES="${datanode_count}"
   docker-compose --no-ansi down
   if ! { docker-compose --no-ansi up -d --scale datanode="${datanode_count}" \
-      && wait_for_safemode_exit ; }; then
+      && wait_for_safemode_exit \
+      && wait_for_om_leader ; }; then
     OUTPUT_NAME="$COMPOSE_ENV_NAME"
     stop_docker_env
     return 1
@@ -135,10 +166,19 @@ execute_robot_test(){
     OUTPUT_FILE="robot-${OUTPUT_NAME}-${i}.xml"
   done
 
+  SMOKETEST_DIR_INSIDE="${OZONE_DIR:-/opt/hadoop}/smoketest"
+
   OUTPUT_PATH="$RESULT_DIR_INSIDE/${OUTPUT_FILE}"
   # shellcheck disable=SC2068
   docker-compose exec -T "$CONTAINER" mkdir -p "$RESULT_DIR_INSIDE" \
-    && docker-compose exec -T "$CONTAINER" robot -v OM_SERVICE_ID:"${OM_SERVICE_ID}" -v SECURITY_ENABLED:"${SECURITY_ENABLED}" -v OM_HA_PARAM:"${OM_HA_PARAM}" -v KEY_NAME:"${OZONE_BUCKET_KEY_NAME}" ${ARGUMENTS[@]} --log NONE --report NONE "${OZONE_ROBOT_OPTS[@]}" --output "$OUTPUT_PATH" "$SMOKETEST_DIR_INSIDE/$TEST"
+    && docker-compose exec -T "$CONTAINER" robot \
+      -v KEY_NAME:"${OZONE_BUCKET_KEY_NAME}" \
+      -v OM_HA_PARAM:"${OM_HA_PARAM}" \
+      -v OM_SERVICE_ID:"${OM_SERVICE_ID:-om}" \
+      -v OZONE_DIR:"${OZONE_DIR}" \
+      -v SECURITY_ENABLED:"${SECURITY_ENABLED}" \
+      ${ARGUMENTS[@]} --log NONE --report NONE "${OZONE_ROBOT_OPTS[@]}" --output "$OUTPUT_PATH" \
+      "$SMOKETEST_DIR_INSIDE/$TEST"
   local -i rc=$?
 
   FULL_CONTAINER_NAME=$(docker-compose ps | grep "_${CONTAINER}_" | head -n 1 | awk '{print $1}')
@@ -243,7 +283,7 @@ generate_report(){
 
   if command -v rebot > /dev/null 2>&1; then
      #Generate the combined output and return with the right exit code (note: robot = execute test, rebot = generate output)
-     rebot -d "$RESULT_DIR" "$RESULT_DIR/robot-*.xml"
+     rebot --reporttitle "${COMPOSE_ENV_NAME}" -N "${COMPOSE_ENV_NAME}" -d "$RESULT_DIR" "$RESULT_DIR/robot-*.xml"
   else
      echo "Robot framework is not installed, the reports can be generated (sudo pip install robotframework)."
      exit 1

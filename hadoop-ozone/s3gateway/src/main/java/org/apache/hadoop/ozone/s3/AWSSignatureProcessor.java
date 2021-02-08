@@ -28,6 +28,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URLEncoder;
 import java.net.UnknownHostException;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
@@ -54,6 +55,7 @@ import org.apache.kerby.util.Hex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 /**
  * Parser to process AWS V2 & V4 auth request. Creates string to sign and auth
  * header. For more details refer to AWS documentation https://docs.aws
@@ -62,7 +64,7 @@ import org.slf4j.LoggerFactory;
 @RequestScoped
 public class AWSSignatureProcessor implements SignatureProcessor {
 
-  private final static Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(AWSSignatureProcessor.class);
 
   @Context
@@ -309,7 +311,7 @@ public class AWSSignatureProcessor implements SignatureProcessor {
   private String urlEncode(String str) {
     try {
 
-      return URLEncoder.encode(str, UTF_8.name())
+      return URLEncoder.encode(str, StandardCharsets.UTF_8.name())
           .replaceAll("\\+", "%20")
           .replaceAll("%7E", "~");
     } catch (UnsupportedEncodingException e) {
@@ -340,20 +342,23 @@ public class AWSSignatureProcessor implements SignatureProcessor {
 
   public static String hash(String payload) throws NoSuchAlgorithmException {
     MessageDigest md = MessageDigest.getInstance("SHA-256");
-    md.update(payload.getBytes(UTF_8));
+    md.update(payload.getBytes(StandardCharsets.UTF_8));
     return Hex.encode(md.digest()).toLowerCase();
   }
 
+  @Override
   public String getAwsAccessId() {
     return (v4Header != null ? v4Header.getAccessKeyID() :
         v2Header != null ? v2Header.getAccessKeyID() : "");
   }
 
+  @Override
   public String getSignature() {
     return (v4Header != null ? v4Header.getSignature() :
         v2Header != null ? v2Header.getSignature() : "");
   }
 
+  @Override
   public String getStringToSign() throws Exception {
     return stringToSign;
   }
@@ -374,6 +379,7 @@ public class AWSSignatureProcessor implements SignatureProcessor {
     this.v2Header = v2Header;
   }
 
+  @Override
   public Exception getException() {
     return this.exception;
   }

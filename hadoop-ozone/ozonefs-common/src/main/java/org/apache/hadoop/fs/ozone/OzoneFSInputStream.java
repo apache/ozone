@@ -23,6 +23,7 @@ import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.ReadOnlyBufferException;
 
+import org.apache.hadoop.fs.CanUnbuffer;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.fs.ByteBufferReadable;
@@ -39,7 +40,7 @@ import org.apache.hadoop.fs.Seekable;
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public class OzoneFSInputStream extends FSInputStream
-    implements ByteBufferReadable {
+    implements ByteBufferReadable, CanUnbuffer {
 
   private final InputStream inputStream;
   private final Statistics statistics;
@@ -122,5 +123,12 @@ public class OzoneFSInputStream extends FSInputStream
     }
 
     return bytesRead;
+  }
+
+  @Override
+  public void unbuffer() {
+    if (inputStream instanceof CanUnbuffer) {
+      ((CanUnbuffer) inputStream).unbuffer();
+    }
   }
 }

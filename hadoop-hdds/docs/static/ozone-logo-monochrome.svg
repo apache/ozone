@@ -28,7 +28,7 @@
    sodipodi:docname="ozone_bolt.svg"
    inkscape:version="0.92.4 (5da689c313, 2019-01-14)">
   <title
-     id="title39">Apache Hadoop Ozone Logo</title>
+     id="title39">Apache Ozone Logo</title>
   <metadata
      id="metadata32">
     <rdf:RDF>
@@ -37,7 +37,7 @@
         <dc:format>image/svg+xml</dc:format>
         <dc:type
            rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-        <dc:title>Apache Hadoop Ozone Logo</dc:title>
+        <dc:title>Apache Ozone Logo</dc:title>
         <cc:license
            rdf:resource="https://www.apache.org/licenses/LICENSE-2.0" />
       </cc:Work>

@@ -20,7 +20,7 @@ weight: -10
   limitations under the License.
 -->
 
-# Apache Hadoop Ozone
+# Apache Ozone
 
 {{<figure src="/ozone-usage.png" width="60%">}}
 
@@ -29,7 +29,7 @@ Ozone 不仅能存储数十亿个不同大小的对象，还支持在容器化�
 
 Apache Spark、Hive 和 YARN 等应用无需任何修改即可使用 Ozone。Ozone 提供了 [Java API]({{<
 ref "JavaApi.zh.md" >}})、[S3 接口]({{< ref "S3.zh.md" >}})和命令行接口，极大地方便了 Ozone
- 在不同应用场景下的的使用。
+ 在不同应用场景下的使用。
 
 Ozone 的管理由卷、桶和键组成：
 

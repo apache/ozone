@@ -26,7 +26,6 @@ import java.util.Map;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -125,7 +124,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
 
     // Add allocated block info.
     newAllocatedBlockRequest.setKeyLocation(
-        omKeyLocationInfoList.get(0).getProtobuf());
+        omKeyLocationInfoList.get(0).getProtobuf(getOmRequest().getVersion()));
 
     return getOmRequest().toBuilder().setUserInfo(getUserInfo())
         .setAllocateBlockRequest(newAllocatedBlockRequest).build();
@@ -168,7 +167,6 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
 
     OmKeyInfo openKeyInfo = null;
     IOException exception = null;
-    OmVolumeArgs omVolumeArgs = null;
     OmBucketInfo omBucketInfo = null;
     boolean acquiredLock = false;
 
@@ -197,7 +195,6 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
 
       List<OmKeyLocationInfo> newLocationList = Collections.singletonList(
           OmKeyLocationInfo.getFromProtobuf(blockLocation));
-      omVolumeArgs = getVolumeInfo(omMetadataManager, volumeName);
 
       acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
           volumeName, bucketName);
@@ -222,11 +219,10 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
           new CacheValue<>(Optional.of(openKeyInfo), trxnLogIndex));
 
       omBucketInfo.incrUsedBytes(preAllocatedSpace);
-
       omResponse.setAllocateBlockResponse(AllocateBlockResponse.newBuilder()
           .setKeyLocation(blockLocation).build());
       omClientResponse = new OMAllocateBlockResponse(omResponse.build(),
-          openKeyInfo, clientID, omVolumeArgs, omBucketInfo.copyObject());
+          openKeyInfo, clientID, omBucketInfo.copyObject());
 
       LOG.debug("Allocated block for Volume:{}, Bucket:{}, OpenKey:{}",
           volumeName, bucketName, openKeyName);

@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.fs.ozone;
 
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
@@ -36,6 +37,7 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
+import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -91,14 +93,20 @@ public class TestOzoneFSWithObjectStoreCreate {
     cluster.waitForClusterToBeReady();
 
     // create a volume and a bucket to be used by OzoneFileSystem
-    OzoneBucket bucket =
-        TestDataUtil.createVolumeAndBucket(cluster, volumeName, bucketName);
+    TestDataUtil.createVolumeAndBucket(cluster, volumeName, bucketName);
 
     rootPath = String.format("%s://%s.%s/", OZONE_URI_SCHEME, bucketName,
         volumeName);
     o3fs = (OzoneFileSystem) FileSystem.get(new URI(rootPath), conf);
   }
 
+  @After
+  public void teardown() {
+    if (cluster != null) {
+      cluster.shutdown();
+    }
+    IOUtils.closeQuietly(o3fs);
+  }
 
   @Test
   public void test() throws Exception {
@@ -422,8 +430,8 @@ public class TestOzoneFSWithObjectStoreCreate {
     ozoneInputStream.read(read, 0, length);
     ozoneInputStream.close();
 
-    String inputString = new String(input);
-    Assert.assertEquals(inputString, new String(read));
+    String inputString = new String(input, UTF_8);
+    Assert.assertEquals(inputString, new String(read, UTF_8));
 
     // Read using filesystem.
     FSDataInputStream fsDataInputStream = o3fs.open(new Path(key));
@@ -431,7 +439,7 @@ public class TestOzoneFSWithObjectStoreCreate {
     fsDataInputStream.read(read, 0, length);
     ozoneInputStream.close();
 
-    Assert.assertEquals(inputString, new String(read));
+    Assert.assertEquals(inputString, new String(read, UTF_8));
   }
 
   private void checkPath(Path path) {

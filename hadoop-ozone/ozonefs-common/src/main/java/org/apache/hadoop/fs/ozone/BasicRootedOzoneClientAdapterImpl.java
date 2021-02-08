@@ -47,6 +47,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -530,6 +531,7 @@ public class BasicRootedOzoneClientAdapterImpl
     }
   }
 
+  @Override
   public FileStatusAdapter getFileStatus(String path, URI uri,
       Path qualifiedPath, String userName) throws IOException {
     incrementCounter(Statistic.OBJECTS_QUERY, 1);
@@ -615,7 +617,7 @@ public class BasicRootedOzoneClientAdapterImpl
   }
 
   @Override
-  public Iterator<BasicKeyInfo> listKeys(String pathStr) {
+  public Iterator<BasicKeyInfo> listKeys(String pathStr) throws IOException {
     incrementCounter(Statistic.OBJECTS_LIST, 1);
     OFSPath ofsPath = new OFSPath(pathStr);
     String key = ofsPath.getKeyName();
@@ -705,6 +707,7 @@ public class BasicRootedOzoneClientAdapterImpl
    * @return A list of FileStatusAdapter.
    * @throws IOException Bucket exception or FileNotFoundException.
    */
+  @Override
   public List<FileStatusAdapter> listStatus(String pathStr, boolean recursive,
       String startPath, long numEntries, URI uri,
       Path workingDir, String username) throws IOException {

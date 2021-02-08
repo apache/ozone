@@ -26,7 +26,6 @@ import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.TestHddsDispatcher;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
-import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.junit.Assert;
@@ -51,7 +50,7 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
   public static final Logger LOG = LoggerFactory.getLogger(
       TestKeyValueHandlerWithUnhealthyContainer.class);
 
-  private final static String DATANODE_UUID = UUID.randomUUID().toString();
+  private static final String DATANODE_UUID = UUID.randomUUID().toString();
   private static final long DUMMY_CONTAINER_ID = 9999;
 
   @Test
@@ -133,7 +132,6 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
   // -- Helper methods below.
 
   private KeyValueHandler getDummyHandler() throws IOException {
-    OzoneConfiguration conf = new OzoneConfiguration();
     DatanodeDetails dnDetails = DatanodeDetails.newBuilder()
         .setUuid(UUID.fromString(DATANODE_UUID))
         .setHostName("dummyHost")
@@ -141,10 +139,6 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
         .build();
     DatanodeStateMachine stateMachine = mock(DatanodeStateMachine.class);
     when(stateMachine.getDatanodeDetails()).thenReturn(dnDetails);
-
-    StateContext context = new StateContext(
-        conf, DatanodeStateMachine.DatanodeStates.RUNNING,
-        stateMachine);
 
     return new KeyValueHandler(
         new OzoneConfiguration(),
@@ -205,6 +199,7 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
       builder.setGetCommittedBlockLength(
           ContainerProtos.GetCommittedBlockLengthRequestProto.newBuilder()
               .setBlockID(fakeBlockId).build());
+      break;
     case ReadChunk:
       builder.setReadChunk(ContainerProtos.ReadChunkRequestProto.newBuilder()
           .setBlockID(fakeBlockId).setChunkData(fakeChunkInfo).build());

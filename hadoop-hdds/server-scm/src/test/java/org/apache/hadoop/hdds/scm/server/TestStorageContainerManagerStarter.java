@@ -24,6 +24,8 @@ import org.junit.Test;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.io.UnsupportedEncodingException;
+import java.nio.charset.StandardCharsets;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import static org.junit.Assert.*;
@@ -39,13 +41,14 @@ public class TestStorageContainerManagerStarter {
   private final ByteArrayOutputStream errContent = new ByteArrayOutputStream();
   private final PrintStream originalOut = System.out;
   private final PrintStream originalErr = System.err;
+  private static final String DEFAULT_ENCODING = StandardCharsets.UTF_8.name();
 
   private MockSCMStarter mock;
 
   @Before
-  public void setUpStreams() {
-    System.setOut(new PrintStream(outContent));
-    System.setErr(new PrintStream(errContent));
+  public void setUpStreams() throws UnsupportedEncodingException {
+    System.setOut(new PrintStream(outContent, false, DEFAULT_ENCODING));
+    System.setErr(new PrintStream(errContent, false, DEFAULT_ENCODING));
     mock = new MockSCMStarter();
   }
 
@@ -120,10 +123,11 @@ public class TestStorageContainerManagerStarter {
   }
 
   @Test
-  public void testUsagePrintedOnInvalidInput() {
+  public void testUsagePrintedOnInvalidInput()
+      throws UnsupportedEncodingException {
     executeCommand("--invalid");
     Pattern p = Pattern.compile("^Unknown option:.*--invalid.*\nUsage");
-    Matcher m = p.matcher(errContent.toString());
+    Matcher m = p.matcher(errContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
   }
 
@@ -141,6 +145,7 @@ public class TestStorageContainerManagerStarter {
     private boolean generateCalled = false;
     private String clusterId = null;
 
+    @Override
     public void start(OzoneConfiguration conf) throws Exception {
       if (throwOnStart) {
         throw new Exception("Simulated error on start");
@@ -148,6 +153,7 @@ public class TestStorageContainerManagerStarter {
       startCalled = true;
     }
 
+    @Override
     public boolean init(OzoneConfiguration conf, String cid)
         throws IOException {
       if (throwOnInit) {
@@ -158,6 +164,7 @@ public class TestStorageContainerManagerStarter {
       return initStatus;
     }
 
+    @Override
     public String generateClusterId() {
       generateCalled = true;
       return "static-cluster-id";

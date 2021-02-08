@@ -39,6 +39,8 @@ import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.toIOException;
+
 /**
  * RocksDB implementation of ozone metadata store. This class should be only
  * used as part of TypedTable as it's underlying implementation to access the
@@ -69,22 +71,6 @@ class RDBTable implements Table<byte[], byte[]> {
     this.handle = handle;
     this.writeOptions = writeOptions;
     this.rdbMetrics = rdbMetrics;
-  }
-
-  /**
-   * Converts RocksDB exception to IOE.
-   * @param msg  - Message to add to exception.
-   * @param e - Original Exception.
-   * @return  IOE.
-   */
-  public static IOException toIOException(String msg, RocksDBException e) {
-    String statusCode = e.getStatus() == null ? "N/A" :
-        e.getStatus().getCodeString();
-    String errMessage = e.getMessage() == null ? "Unknown error" :
-        e.getMessage();
-    String output = msg + "; status : " + statusCode
-        + "; message : " + errMessage;
-    return new IOException(output, e);
   }
 
   /**

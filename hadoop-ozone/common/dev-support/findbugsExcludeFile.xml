@@ -16,4 +16,21 @@
    limitations under the License.
 -->
 <FindBugsFilter>
+  <!-- Test -->
+  <Match>
+    <Class name="org.apache.hadoop.ozone.TestOmUtils"/>
+    <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.ozone.security.TestGDPRSymmetricKey"/>
+    <Bug pattern="DLS_DEAD_LOCAL_STORE" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.ozone.util.TestRadixTree"/>
+    <Bug pattern="DMI_HARDCODED_ABSOLUTE_FILENAME" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.ozone.om.lock.TestOzoneManagerLock"/>
+    <Bug pattern="IMSE_DONT_CATCH_IMSE" />
+  </Match>
 </FindBugsFilter>

@@ -72,7 +72,7 @@ public class KeyDeletingService extends BackgroundService {
   // Use only a single thread for KeyDeletion. Multiple threads would read
   // from the same table and can send deletion requests for same key multiple
   // times.
-  private final static int KEY_DELETING_CORE_POOL_SIZE = 1;
+  private static final int KEY_DELETING_CORE_POOL_SIZE = 1;
 
   private final OzoneManager ozoneManager;
   private final ScmBlockLocationProtocol scmClient;
@@ -129,7 +129,7 @@ public class KeyDeletingService extends BackgroundService {
       // OzoneManager can be null for testing
       return true;
     }
-    return ozoneManager.isLeader();
+    return ozoneManager.isLeaderReady();
   }
 
   private boolean isRatisEnabled() {
@@ -282,11 +282,16 @@ public class KeyDeletingService extends BackgroundService {
 
   private RaftClientRequest createRaftClientRequestForPurge(
       OMRequest omRequest) {
-    return new RaftClientRequest(clientId,
-        ozoneManager.getOmRatisServer().getRaftPeerId(),
-        ozoneManager.getOmRatisServer().getRaftGroupId(), runCount.get(),
-        Message.valueOf(OMRatisHelper.convertRequestToByteString(omRequest)),
-        RaftClientRequest.writeRequestType(), null);
+    return RaftClientRequest.newBuilder()
+        .setClientId(clientId)
+        .setServerId(ozoneManager.getOmRatisServer().getRaftPeerId())
+        .setGroupId(ozoneManager.getOmRatisServer().getRaftGroupId())
+        .setCallId(runCount.get())
+        .setMessage(
+            Message.valueOf(
+                OMRatisHelper.convertRequestToByteString(omRequest)))
+        .setType(RaftClientRequest.writeRequestType())
+        .build();
   }
 
   /**

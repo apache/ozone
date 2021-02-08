@@ -26,7 +26,7 @@ import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 
 import java.io.IOException;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 
 import static org.apache.hadoop.ozone.genesis.GenesisUtil.CACHE_10MB_TYPE;
 import static org.apache.hadoop.ozone.genesis.GenesisUtil.CACHE_1GB_TYPE;
@@ -50,13 +50,13 @@ public class BenchMarkMetadataStoreWrites {
   @Setup
   public void initialize() throws IOException {
     data = RandomStringUtils.randomAlphanumeric(DATA_LEN)
-        .getBytes(Charset.forName("UTF-8"));
+        .getBytes(StandardCharsets.UTF_8);
     store = GenesisUtil.getMetadataStore(this.type);
   }
 
   @Benchmark
   public void test() throws IOException {
     long x = org.apache.commons.lang3.RandomUtils.nextLong(0L, MAX_KEYS);
-    store.put(Long.toHexString(x).getBytes(Charset.forName("UTF-8")), data);
+    store.put(Long.toHexString(x).getBytes(StandardCharsets.UTF_8), data);
   }
 }

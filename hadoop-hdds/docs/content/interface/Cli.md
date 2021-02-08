@@ -146,7 +146,7 @@ Command examples:
 
 ```shell
 $ ozone sh bucket create /vol1/bucket1
-```shell
+```
 
 ```shell
 $ ozone sh bucket info /vol1/bucket1

@@ -167,8 +167,20 @@
   <property>
     <name>dfs.container.ratis.ipc</name>
     <value>9858</value>
+    <tag>OZONE, CONTAINER, PIPELINE, RATIS</tag>
+    <description>The ipc port number of container for clients.</description>
+  </property>
+  <property>
+    <name>dfs.container.ratis.admin.port</name>
+    <value>9857</value>
     <tag>OZONE, CONTAINER, PIPELINE, RATIS, MANAGEMENT</tag>
-    <description>The ipc port number of container.</description>
+    <description>The ipc port number of container for admin requests.</description>
+  </property>
+  <property>
+    <name>dfs.container.ratis.server.port</name>
+    <value>9856</value>
+    <tag>OZONE, CONTAINER, PIPELINE, RATIS, MANAGEMENT</tag>
+    <description>The ipc port number of container for server-server communication.</description>
   </property>
   <property>
     <name>dfs.container.ratis.ipc.random.port</name>
@@ -394,7 +406,7 @@
   </property>
   <property>
     <name>ozone.key.deleting.limit.per.task</name>
-    <value>1000</value>
+    <value>20000</value>
     <tag>OM, PERFORMANCE</tag>
     <description>
       A maximum number of keys to be scanned by key deleting service
@@ -449,7 +461,7 @@
       with the configured address.
 
       If node ID is not deterministic from the configuration, then it is set
-      to the OmId from the OM version file.
+      to default node id - om1.
     </description>
   </property>
   <property>
@@ -776,10 +788,12 @@
     </description>
   </property>
   <property>
-  <name>ozone.datanode.pipeline.limit</name>
+  <name>ozone.scm.datanode.pipeline.limit</name>
   <value>2</value>
   <tag>OZONE, SCM, PIPELINE</tag>
   <description>Max number of pipelines per datanode can be engaged in.
+    Setting the value to 0 means the pipeline limit per dn will be determined
+    by the no of metadata volumes reported per dn.
   </description>
   </property>
   <property>
@@ -807,7 +821,7 @@
   <property>
     <name>ozone.scm.pipeline.leader-choose.policy</name>
     <value>
-      org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms.DefaultLeaderChoosePolicy
+      org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms.MinLeaderCountChoosePolicy
     </value>
     <tag>OZONE, SCM, PIPELINE</tag>
     <description>
@@ -943,7 +957,7 @@
   </property>
   <property>
     <name>ozone.scm.heartbeat.rpc-timeout</name>
-    <value>1s</value>
+    <value>5s</value>
     <tag>OZONE, MANAGEMENT</tag>
     <description>
       Timeout value for the RPC from Datanode to SCM.
@@ -1523,7 +1537,7 @@
 
   <property>
     <name>ozone.om.ratis.enable</name>
-    <value>false</value>
+    <value>true</value>
     <tag>OZONE, OM, RATIS, MANAGEMENT</tag>
     <description>Property to enable or disable Ratis server on OM.
     Please note - this is a temporary property to disable OM Ratis server.
@@ -1618,7 +1632,7 @@
 
   <property>
     <name>ozone.om.ratis.minimum.timeout</name>
-    <value>1s</value>
+    <value>5s</value>
     <tag>OZONE, OM, RATIS, MANAGEMENT</tag>
     <description>The minimum timeout duration for OM's Ratis server rpc.
     </description>
@@ -1626,10 +1640,10 @@
 
   <property>
     <name>ozone.om.leader.election.minimum.timeout.duration</name>
-    <value>1s</value>
-    <tag>OZONE, OM, RATIS, MANAGEMENT</tag>
-    <description>The minimum timeout duration for OM ratis leader election.
-      Default is 1s.
+    <value>5s</value>
+    <tag>OZONE, OM, RATIS, MANAGEMENT, DEPRECATED</tag>
+    <description>DEPRECATED. Leader election timeout uses ratis
+      rpc timeout which can be set via ozone.om.ratis.minimum.timeout.
     </description>
   </property>
 
@@ -1644,24 +1658,13 @@
   </property>
 
   <property>
-    <name>ozone.om.ratis.server.role.check.interval</name>
-    <value>15s</value>
-    <tag>OZONE, OM, RATIS, MANAGEMENT</tag>
-    <description>The interval between OM leader performing a role
-      check on its ratis server. Ratis server informs OM if it
-      loses the leader role. The scheduled check is an secondary
-      check to ensure that the leader role is updated periodically
-      .</description>
-  </property>
-
-  <property>
     <name>ozone.om.ratis.snapshot.dir</name>
     <value/>
     <tag>OZONE, OM, STORAGE, MANAGEMENT, RATIS</tag>
     <description>This directory is used for storing OM's snapshot
       related files like the ratisSnapshotIndex and DB checkpoint from leader
       OM.
-      If undefined, OM snapshot dir will fallback to ozone.om.ratis.storage.dir.
+      If undefined, OM snapshot dir will fallback to ozone.metadata.dirs.
       This fallback approach is not recommended for production environments.
     </description>
   </property>
@@ -2333,6 +2336,17 @@
     <tag>OZONE, RECON</tag>
     <description>
       The number of Recon Tasks that are waiting on updates from OM.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.datanode.admin.monitor.interval</name>
+    <value>30s</value>
+    <tag>SCM</tag>
+    <description>
+      This sets how frequently the datanode admin monitor runs to check for
+      nodes added to the admin workflow or removed from it. The progress
+      of decommissioning and entering maintenance nodes is also checked to see
+      if they have completed.
     </description>
   </property>
   <property>

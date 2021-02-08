@@ -44,9 +44,9 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.
  * Tests OMFailoverProxyProvider failover behaviour.
  */
 public class TestOMFailoverProxyProvider {
-  private final static String OM_SERVICE_ID = "om-service-test1";
-  private final static String NODE_ID_BASE_STR = "omNode-";
-  private final static String DUMMY_NODE_ADDR = "0.0.0.0:8080";
+  private static final String OM_SERVICE_ID = "om-service-test1";
+  private static final String NODE_ID_BASE_STR = "omNode-";
+  private static final String DUMMY_NODE_ADDR = "0.0.0.0:8080";
   private OMFailoverProxyProvider provider;
   private long waitBetweenRetries;
   private int numNodes = 3;

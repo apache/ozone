@@ -24,7 +24,6 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -40,6 +39,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.junit.Assert.assertEquals;
@@ -77,7 +77,8 @@ public class TestObjectPut {
   public void testPutObject() throws IOException, OS3Exception {
     //GIVEN
     HttpHeaders headers = Mockito.mock(HttpHeaders.class);
-    ByteArrayInputStream body = new ByteArrayInputStream(CONTENT.getBytes());
+    ByteArrayInputStream body =
+        new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
     objectEndpoint.setHeaders(headers);
 
     //WHEN
@@ -90,7 +91,7 @@ public class TestObjectPut {
         clientStub.getObjectStore().getS3Bucket(bucketName)
             .readKey(keyName);
     String keyContent =
-        IOUtils.toString(ozoneInputStream, StandardCharsets.UTF_8);
+        IOUtils.toString(ozoneInputStream, UTF_8);
 
     Assert.assertEquals(200, response.getStatus());
     Assert.assertEquals(CONTENT, keyContent);
@@ -113,14 +114,13 @@ public class TestObjectPut {
     //WHEN
     Response response = objectEndpoint.put(bucketName, keyName,
         chunkedContent.length(), 1, null,
-        new ByteArrayInputStream(chunkedContent.getBytes()));
+        new ByteArrayInputStream(chunkedContent.getBytes(UTF_8)));
 
     //THEN
     OzoneInputStream ozoneInputStream =
         clientStub.getObjectStore().getS3Bucket(bucketName)
             .readKey(keyName);
-    String keyContent =
-        IOUtils.toString(ozoneInputStream, StandardCharsets.UTF_8);
+    String keyContent = IOUtils.toString(ozoneInputStream, UTF_8);
 
     Assert.assertEquals(200, response.getStatus());
     Assert.assertEquals("1234567890abcde", keyContent);
@@ -130,7 +130,8 @@ public class TestObjectPut {
   public void testCopyObject() throws IOException, OS3Exception {
     // Put object in to source bucket
     HttpHeaders headers = Mockito.mock(HttpHeaders.class);
-    ByteArrayInputStream body = new ByteArrayInputStream(CONTENT.getBytes());
+    ByteArrayInputStream body =
+        new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
     objectEndpoint.setHeaders(headers);
     keyName = "sourceKey";
 
@@ -141,8 +142,7 @@ public class TestObjectPut {
         .getS3Bucket(bucketName)
         .readKey(keyName);
 
-    String keyContent = IOUtils.toString(ozoneInputStream,
-        StandardCharsets.UTF_8);
+    String keyContent = IOUtils.toString(ozoneInputStream, UTF_8);
 
     Assert.assertEquals(200, response.getStatus());
     Assert.assertEquals(CONTENT, keyContent);
@@ -159,7 +159,7 @@ public class TestObjectPut {
     ozoneInputStream = clientStub.getObjectStore().getS3Bucket(destBucket)
         .readKey(destkey);
 
-    keyContent = IOUtils.toString(ozoneInputStream, StandardCharsets.UTF_8);
+    keyContent = IOUtils.toString(ozoneInputStream, UTF_8);
 
     Assert.assertEquals(200, response.getStatus());
     Assert.assertEquals(CONTENT, keyContent);
@@ -220,13 +220,14 @@ public class TestObjectPut {
   @Test
   public void testInvalidStorageType() throws IOException {
     HttpHeaders headers = Mockito.mock(HttpHeaders.class);
-    ByteArrayInputStream body = new ByteArrayInputStream(CONTENT.getBytes());
+    ByteArrayInputStream body =
+        new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
     objectEndpoint.setHeaders(headers);
     keyName = "sourceKey";
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn("random");
 
     try {
-      Response response = objectEndpoint.put(bucketName, keyName,
+      objectEndpoint.put(bucketName, keyName,
           CONTENT.length(), 1, null, body);
       fail("testInvalidStorageType");
     } catch (OS3Exception ex) {
@@ -239,12 +240,13 @@ public class TestObjectPut {
   @Test
   public void testEmptyStorageType() throws IOException, OS3Exception {
     HttpHeaders headers = Mockito.mock(HttpHeaders.class);
-    ByteArrayInputStream body = new ByteArrayInputStream(CONTENT.getBytes());
+    ByteArrayInputStream body =
+        new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
     objectEndpoint.setHeaders(headers);
     keyName = "sourceKey";
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn("");
 
-    Response response = objectEndpoint.put(bucketName, keyName, CONTENT
+    objectEndpoint.put(bucketName, keyName, CONTENT
             .length(), 1, null, body);
 
     OzoneKeyDetails key =

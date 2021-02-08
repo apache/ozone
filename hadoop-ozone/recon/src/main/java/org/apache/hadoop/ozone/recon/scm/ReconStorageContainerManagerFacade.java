@@ -55,7 +55,8 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.recon.fsck.ContainerHealthTask;
-import org.apache.hadoop.ozone.recon.persistence.ContainerSchemaManager;
+import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
+import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
 import com.google.inject.Inject;
@@ -82,7 +83,7 @@ public class ReconStorageContainerManagerFacade
 
   private ReconNodeManager nodeManager;
   private ReconPipelineManager pipelineManager;
-  private ContainerManager containerManager;
+  private ReconContainerManager containerManager;
   private NetworkTopology clusterMap;
   private StorageContainerServiceProvider scmServiceProvider;
   private Set<ReconScmTask> reconScmTasks = new HashSet<>();
@@ -94,7 +95,8 @@ public class ReconStorageContainerManagerFacade
   public ReconStorageContainerManagerFacade(OzoneConfiguration conf,
       StorageContainerServiceProvider scmServiceProvider,
       ReconTaskStatusDao reconTaskStatusDao,
-      ContainerSchemaManager containerSchemaManager)
+      ContainerHealthSchemaManager containerHealthSchemaManager,
+      ContainerDBServiceProvider containerDBServiceProvider)
       throws IOException {
     this.eventQueue = new EventQueue();
     eventQueue.setSilent(true);
@@ -117,17 +119,14 @@ public class ReconStorageContainerManagerFacade
     this.datanodeProtocolServer = new ReconDatanodeProtocolServer(
         conf, this, eventQueue);
     this.pipelineManager =
-
         new ReconPipelineManager(conf,
             nodeManager,
             ReconSCMDBDefinition.PIPELINES.getTable(dbStore),
             eventQueue);
     this.containerManager = new ReconContainerManager(conf,
         ReconSCMDBDefinition.CONTAINERS.getTable(dbStore),
-        dbStore,
-        pipelineManager,
-        scmServiceProvider,
-        containerSchemaManager);
+        dbStore, pipelineManager, scmServiceProvider,
+        containerHealthSchemaManager, containerDBServiceProvider);
     this.scmServiceProvider = scmServiceProvider;
 
     NodeReportHandler nodeReportHandler =
@@ -177,8 +176,7 @@ public class ReconStorageContainerManagerFacade
         reconTaskConfig));
     reconScmTasks.add(new ContainerHealthTask(
         containerManager,
-        reconTaskStatusDao,
-        containerSchemaManager,
+        reconTaskStatusDao, containerHealthSchemaManager,
         containerPlacementPolicy,
         reconTaskConfig));
   }
@@ -207,6 +205,7 @@ public class ReconStorageContainerManagerFacade
   /**
    * Start the Recon SCM subsystems.
    */
+  @Override
   public void start() {
     if (LOG.isInfoEnabled()) {
       LOG.info(buildRpcServerStartMessage(
@@ -221,6 +220,7 @@ public class ReconStorageContainerManagerFacade
   /**
    * Wait until service has completed shutdown.
    */
+  @Override
   public void join() {
     try {
       getDatanodeProtocolServer().join();
@@ -233,6 +233,7 @@ public class ReconStorageContainerManagerFacade
   /**
    * Stop the Recon SCM subsystems.
    */
+  @Override
   public void stop() {
     getDatanodeProtocolServer().stop();
     reconScmTasks.forEach(ReconScmTask::stop);
@@ -245,6 +246,8 @@ public class ReconStorageContainerManagerFacade
     IOUtils.cleanupWithLogger(LOG, nodeManager);
     IOUtils.cleanupWithLogger(LOG, containerManager);
     IOUtils.cleanupWithLogger(LOG, pipelineManager);
+    LOG.info("Flushing container replica history to DB.");
+    containerManager.flushReplicaHistoryMapToDB(true);
     try {
       dbStore.close();
     } catch (Exception e) {

@@ -43,8 +43,11 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.io.IOException;
+
 import org.junit.Rule;
 import org.junit.rules.Timeout;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
  * Tests the idempotent operations in ContainerStateMachine.
@@ -97,7 +100,8 @@ public class TestContainerStateMachineIdempotency {
       // call create Container again
       BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
       byte[] data =
-          RandomStringUtils.random(RandomUtils.nextInt(0, 1024)).getBytes();
+          RandomStringUtils.random(RandomUtils.nextInt(0, 1024))
+              .getBytes(UTF_8);
       ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
           ContainerTestHelper
               .getWriteChunkRequest(container.getPipeline(), blockID,

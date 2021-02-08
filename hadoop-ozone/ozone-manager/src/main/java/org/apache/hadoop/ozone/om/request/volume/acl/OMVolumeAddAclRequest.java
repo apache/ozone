@@ -23,6 +23,8 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import org.apache.hadoop.hdds.scm.storage.CheckedBiFunction;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
@@ -33,12 +35,15 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneObj.ObjectType;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Handles volume add acl request.
@@ -69,6 +74,7 @@ public class OMVolumeAddAclRequest extends OMVolumeAclRequest {
 
   private List<OzoneAcl> ozoneAcls;
   private String volumeName;
+  private OzoneObj obj;
 
   public OMVolumeAddAclRequest(OMRequest omRequest) {
     super(omRequest, volumeAddAclOp);
@@ -77,7 +83,8 @@ public class OMVolumeAddAclRequest extends OMVolumeAclRequest {
     Preconditions.checkNotNull(addAclRequest);
     ozoneAcls = Lists.newArrayList(
         OzoneAcl.fromProtobuf(addAclRequest.getAcl()));
-    volumeName = addAclRequest.getObj().getPath().substring(1);
+    obj = OzoneObjInfo.fromProtobuf(addAclRequest.getObj());
+    volumeName = obj.getPath().substring(1);
   }
 
   @Override
@@ -94,6 +101,10 @@ public class OMVolumeAddAclRequest extends OMVolumeAclRequest {
     return ozoneAcls.get(0);
   }
 
+  @Override
+  OzoneObj getObject() {
+    return obj;
+  }
 
   @Override
   OMResponse.Builder onInit() {
@@ -115,7 +126,8 @@ public class OMVolumeAddAclRequest extends OMVolumeAclRequest {
   }
 
   @Override
-  void onComplete(Result result, IOException ex, long trxnLogIndex) {
+  void onComplete(Result result, IOException ex, long trxnLogIndex,
+      AuditLogger auditLogger, Map<String, String> auditMap) {
     switch (result) {
     case SUCCESS:
       if (LOG.isDebugEnabled()) {
@@ -131,6 +143,9 @@ public class OMVolumeAddAclRequest extends OMVolumeAclRequest {
       LOG.error("Unrecognized Result for OMVolumeAddAclRequest: {}",
           getOmRequest());
     }
+
+    auditLog(auditLogger, buildAuditMessage(OMAction.ADD_ACL, auditMap,
+        ex, getOmRequest().getUserInfo()));
   }
 
   public static String getRequestType() {

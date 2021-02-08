@@ -94,9 +94,9 @@ public abstract class OMClientRequest implements RequestAuditor {
     LayoutVersion layoutVersion = LayoutVersion.newBuilder()
         .setVersion(ozoneManager.getVersionManager().getMetadataLayoutVersion())
         .build();
-    omRequest =
-        getOmRequest().toBuilder()
-            .setUserInfo(getUserInfo()).setLayoutVersion(layoutVersion).build();
+    omRequest = getOmRequest().toBuilder()
+        .setUserInfo(getUserIfNotExists(ozoneManager))
+        .setLayoutVersion(layoutVersion).build();
     return omRequest;
   }
 
@@ -139,6 +139,36 @@ public abstract class OMClientRequest implements RequestAuditor {
     }
 
     return userInfo.build();
+  }
+
+  /**
+   * For non-rpc internal calls Server.getRemoteUser()
+   * and Server.getRemoteIp() will be null.
+   * Passing getCurrentUser() and Ip of the Om node that started it.
+   * @return User Info.
+   */
+  public OzoneManagerProtocolProtos.UserInfo getUserIfNotExists(
+      OzoneManager ozoneManager) {
+    OzoneManagerProtocolProtos.UserInfo userInfo = getUserInfo();
+    if (!userInfo.hasRemoteAddress() || !userInfo.hasUserName()){
+      OzoneManagerProtocolProtos.UserInfo.Builder newuserInfo =
+          OzoneManagerProtocolProtos.UserInfo.newBuilder();
+      UserGroupInformation user;
+      InetAddress remoteAddress;
+      try {
+        user = UserGroupInformation.getCurrentUser();
+        remoteAddress = ozoneManager.getOmRpcServerAddr()
+            .getAddress();
+      } catch (Exception e){
+        LOG.debug("Couldn't get om Rpc server address", e);
+        return getUserInfo();
+      }
+      newuserInfo.setUserName(user.getUserName());
+      newuserInfo.setHostName(remoteAddress.getHostName());
+      newuserInfo.setRemoteAddress(remoteAddress.getHostAddress());
+      return newuserInfo.build();
+    }
+    return getUserInfo();
   }
 
   /**

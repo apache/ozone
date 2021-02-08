@@ -17,10 +17,12 @@
 
 package org.apache.hadoop.hdds.scm.safemode;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
@@ -31,12 +33,11 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.PipelineReportFromDatanode;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.server.events.TypedEvent;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.HashSet;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * This rule covers whether we have at least one datanode is reported for each
@@ -149,8 +150,11 @@ public class OneReplicaPipelineSafeModeRule extends
 
   @Override
   public String getStatusText() {
-    return "currentReportedPipelineCount "
-        + this.currentReportedPipelineCount + " >= thresholdCount "
-        + this.thresholdCount;
+    return String
+        .format(
+            "reported Ratis/THREE pipelines with at least one datanode (=%d) "
+                + ">= threshold (=%d)",
+            this.currentReportedPipelineCount,
+            this.thresholdCount);
   }
 }

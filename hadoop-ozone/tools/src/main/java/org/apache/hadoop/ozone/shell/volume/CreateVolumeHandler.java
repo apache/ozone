@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.shell.volume;
 
+import com.google.common.base.Strings;
 import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
@@ -59,13 +60,15 @@ public class CreateVolumeHandler extends VolumeHandler {
     VolumeArgs.Builder volumeArgsBuilder = VolumeArgs.newBuilder()
         .setAdmin(adminName)
         .setOwner(ownerName);
-    if (quotaOptions.getQuotaInBytes() != null) {
-      volumeArgsBuilder.setQuotaInBytes(OzoneQuota.parseQuota(
-          quotaOptions.getQuotaInBytes(),
-          quotaOptions.getQuotaInCounts()).getQuotaInBytes());
+    if (!Strings.isNullOrEmpty(quotaOptions.getQuotaInBytes())) {
+      volumeArgsBuilder.setQuotaInBytes(OzoneQuota.parseSpaceQuota(
+          quotaOptions.getQuotaInBytes()).getQuotaInBytes());
     }
 
-    volumeArgsBuilder.setQuotaInCounts(quotaOptions.getQuotaInCounts());
+    if (!Strings.isNullOrEmpty(quotaOptions.getQuotaInNamespace())) {
+      volumeArgsBuilder.setQuotaInNamespace(OzoneQuota.parseNameSpaceQuota(
+          quotaOptions.getQuotaInNamespace()).getQuotaInNamespace());
+    }
 
     client.getObjectStore().createVolume(volumeName,
         volumeArgsBuilder.build());

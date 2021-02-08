@@ -110,8 +110,9 @@ message OMRequest {
   required string clientId = 3;
 
   optional UserInfo userInfo = 4;
+  optional uint32 version = 5;
 
-  optional LayoutVersion layoutVersion = 5;
+  optional LayoutVersion layoutVersion = 6;
 
   optional CreateVolumeRequest              createVolumeRequest            = 11;
   optional SetVolumePropertyRequest         setVolumePropertyRequest       = 12;
@@ -334,12 +335,14 @@ enum Status {
 
     QUOTA_EXCEEDED = 66;
 
-    PERSIST_UPGRADE_TO_LAYOUT_VERSION_FAILED = 67;
-    REMOVE_UPGRADE_TO_LAYOUT_VERSION_FAILED = 68;
-    UPDATE_LAYOUT_VERSION_FAILED = 69;
-    LAYOUT_FEATURE_FINALIZATION_FAILED = 70;
-    PREPARE_FAILED = 71;
-    NOT_SUPPORTED_OPERATION_WHEN_PREPARED = 72;
+    QUOTA_ERROR = 67;
+
+    PERSIST_UPGRADE_TO_LAYOUT_VERSION_FAILED = 68;
+    REMOVE_UPGRADE_TO_LAYOUT_VERSION_FAILED = 69;
+    UPDATE_LAYOUT_VERSION_FAILED = 70;
+    LAYOUT_FEATURE_FINALIZATION_FAILED = 71;
+    PREPARE_FAILED = 72;
+    NOT_SUPPORTED_OPERATION_WHEN_PREPARED = 73;
 }
 
 /**
@@ -385,8 +388,8 @@ message VolumeInfo {
     optional uint64 objectID = 8;
     optional uint64 updateID = 9;
     optional uint64 modificationTime = 10;
-    optional uint64 quotaInCounts = 11;
-
+    optional int64 quotaInNamespace = 11 [default = -2];
+    optional uint64 usedNamespace = 12;
 }
 
 /**
@@ -445,7 +448,7 @@ message SetVolumePropertyRequest {
     optional string ownerName = 2;
     optional uint64 quotaInBytes = 3;
     optional uint64 modificationTime = 4;
-    optional uint64 quotaInCounts = 5;
+    optional uint64 quotaInNamespace = 5;
 }
 
 message SetVolumePropertyResponse {
@@ -525,8 +528,9 @@ message BucketInfo {
     optional string sourceVolume = 12;
     optional string sourceBucket = 13;
     optional uint64 usedBytes = 14;
-    optional uint64 quotaInBytes = 15;
-    optional uint64 quotaInCounts = 16;
+    optional int64 quotaInBytes = 15 [default = -2];
+    optional int64 quotaInNamespace = 16 [default = -2];
+    optional uint64 usedNamespace = 17;
 }
 
 enum StorageTypeProto {
@@ -597,7 +601,7 @@ message BucketArgs {
     optional StorageTypeProto storageType = 6;
     repeated hadoop.hdds.KeyValue metadata = 7;
     optional uint64 quotaInBytes = 8;
-    optional uint64 quotaInCounts = 9;
+    optional uint64 quotaInNamespace = 9;
 }
 
 message PrefixInfo {

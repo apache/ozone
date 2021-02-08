@@ -19,7 +19,7 @@
 /**
  * These .proto interfaces are private and unstable.
  * Please see http://wiki.apache.org/hadoop/Compatibility
- * for what changes are allowed for a *unstable* .proto interface.
+ * for what changes are allowed for an *unstable* .proto interface.
  */
 
 option java_package = "org.apache.hadoop.hdds.protocol.proto";
@@ -43,13 +43,15 @@ message DatanodeDetailsProto {
     // network name, can be Ip address or host name, depends
     optional string networkName = 6;
     optional string networkLocation = 7; // Network topology location
+    optional NodeOperationalState persistedOpState = 8; // The Operational state persisted in the datanode.id file
+    optional int64 persistedOpStateExpiry = 9; // The seconds after the epoch when the OpState should expire
     // TODO(runzhiwang): when uuid is gone, specify 1 as the index of uuid128 and mark as required
     optional UUID uuid128 = 100; // UUID with 128 bits assigned to the Datanode.
 }
 
 /**
  The DatanodeDetailsProto is a basic type that will be shared by many Proto,
- to reduce the number of fields transfered by ProtoBuf, only need to extend
+ to reduce the number of fields transferred by ProtoBuf, only need to extend
  DatanodeDetailsProto for registering DataNode with SCM and Recon.
 */
 message ExtendedDatanodeDetailsProto {
@@ -129,9 +131,15 @@ enum NodeState {
     HEALTHY = 1;
     STALE = 2;
     DEAD = 3;
+    HEALTHY_READONLY = 6;
+}
+
+enum NodeOperationalState {
+    IN_SERVICE = 1;
+    ENTERING_MAINTENANCE = 2;
+    IN_MAINTENANCE = 3;
     DECOMMISSIONING = 4;
     DECOMMISSIONED = 5;
-    HEALTHY_READONLY = 6;
 }
 
 enum QueryScope {
@@ -142,6 +150,7 @@ enum QueryScope {
 message Node {
     required DatanodeDetailsProto nodeID = 1;
     repeated NodeState nodeStates = 2;
+    repeated NodeOperationalState nodeOperationalStates = 3;
 }
 
 message NodePool {
@@ -150,12 +159,12 @@ message NodePool {
 
 /**
  * LifeCycleState for SCM object creation state machine:
- *    ->Allocated: allocated on SCM but clean has not started creating it yet.
+ *    ->Allocated: allocated on SCM but client has not started creating it yet.
  *    ->Creating: allocated and assigned to client to create but not ack-ed yet.
  *    ->Open: allocated on SCM and created on datanodes and ack-ed by a client.
- *    ->Close: container closed due to space all used or error?
+ *    ->Close: container closed due to space all used or error.
  *    ->Timeout -> container failed to create on datanodes or ack-ed by client.
- *    ->Deleting(TBD) -> container will be deleted after timeout
+ *    ->Deleting(TBD) -> container will be deleted after timeout.
  * 1. ALLOCATE-ed containers on SCM can't serve key/block related operation
  *    until ACK-ed explicitly which changes the state to OPEN.
  * 2. Only OPEN/CLOSED containers can serve key/block related operation.

@@ -48,6 +48,7 @@ public final class ByteArrayKeyValue implements KeyValue<byte[], byte[]> {
    *
    * @return byte[]
    */
+  @Override
   public byte[] getKey() {
     byte[] result = new byte[key.length];
     System.arraycopy(key, 0, result, 0, key.length);
@@ -59,6 +60,7 @@ public final class ByteArrayKeyValue implements KeyValue<byte[], byte[]> {
    *
    * @return byte[]
    */
+  @Override
   public byte[] getValue() {
     byte[] result = new byte[value.length];
     System.arraycopy(value, 0, result, 0, value.length);

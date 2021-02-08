@@ -20,6 +20,9 @@ package org.apache.hadoop.ozone.security;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
+import java.security.cert.CertificateExpiredException;
+import java.security.cert.CertificateNotYetValidException;
+import java.security.cert.X509Certificate;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -339,6 +342,7 @@ public class OzoneDelegationTokenSecretManager
    * @throws InvalidToken for invalid token
    * @throws AccessControlException if the user isn't allowed to cancel
    */
+  @Override
   public OzoneTokenIdentifier cancelToken(Token<OzoneTokenIdentifier> token,
       String canceller) throws IOException {
     OzoneTokenIdentifier id = OzoneTokenIdentifier.readProtoBuf(
@@ -436,9 +440,28 @@ public class OzoneDelegationTokenSecretManager
    */
   public boolean verifySignature(OzoneTokenIdentifier identifier,
       byte[] password) {
+    X509Certificate signerCert = null;
+    try {
+      signerCert = getCertClient().getCertificate(
+          identifier.getOmCertSerialId());
+    } catch (CertificateException e) {
+      return false;
+    }
+
+    if (signerCert == null) {
+      return false;
+    }
+
+    // Check for expired certificate or not yet valid certificate
+    try {
+      signerCert.checkValidity();
+    } catch (CertificateExpiredException | CertificateNotYetValidException e) {
+      return false;
+    }
+
     try {
       return getCertClient().verifySignature(identifier.getBytes(), password,
-          getCertClient().getCertificate(identifier.getOmCertSerialId()));
+          signerCert);
     } catch (CertificateException e) {
       return false;
     }
@@ -450,6 +473,19 @@ public class OzoneDelegationTokenSecretManager
   private byte[] validateS3AuthInfo(OzoneTokenIdentifier identifier)
       throws InvalidToken {
     LOG.trace("Validating S3AuthInfo for identifier:{}", identifier);
+    if (identifier.getOwner() == null) {
+      throw new InvalidToken(
+          "Owner is missing from the S3 auth token");
+    }
+    if (!identifier.getOwner().toString().equals(identifier.getAwsAccessId())) {
+      LOG.error(
+          "Owner and AWSAccessId is different in the S3 token. Possible "
+              + " security attack: {}",
+          identifier);
+      throw new InvalidToken(
+          "Invalid S3 identifier: owner=" + identifier.getOwner()
+              + ", awsAccessId=" + identifier.getAwsAccessId());
+    }
     String awsSecret;
     try {
       awsSecret = s3SecretManager.getS3UserSecretString(identifier

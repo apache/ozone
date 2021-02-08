@@ -78,6 +78,7 @@ public class BlockManagerImpl implements BlockManager {
    * @return length of the block.
    * @throws IOException
    */
+  @Override
   public long putBlock(Container container, BlockData data) throws IOException {
     return putBlock(container, data, true);
   }
@@ -91,6 +92,7 @@ public class BlockManagerImpl implements BlockManager {
    * @return length of the block.
    * @throws IOException
    */
+  @Override
   public long putBlock(Container container, BlockData data,
       boolean incrKeyCount) throws IOException {
     Preconditions.checkNotNull(data, "BlockData cannot be null for put " +
@@ -236,6 +238,7 @@ public class BlockManagerImpl implements BlockManager {
    * @param blockID - ID of the block.
    * @throws StorageContainerException
    */
+  @Override
   public void deleteBlock(Container container, BlockID blockID) throws
       IOException {
     Preconditions.checkNotNull(blockID, "block ID cannot be null.");
@@ -318,6 +321,7 @@ public class BlockManagerImpl implements BlockManager {
   /**
    * Shutdown KeyValueContainerManager.
    */
+  @Override
   public void shutdown() {
     BlockUtils.shutdownCache(ContainerCache.getInstance(config));
   }

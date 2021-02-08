@@ -115,7 +115,7 @@ public class TestSimpleContainerDownloader {
           @Override
           protected CompletableFuture<Path> downloadContainer(
               long containerId, DatanodeDetails datanode
-          ) throws Exception {
+          ) {
             //download is always successful.
             return CompletableFuture
                 .completedFuture(Paths.get(datanode.getUuidString()));
@@ -169,7 +169,7 @@ public class TestSimpleContainerDownloader {
       protected CompletableFuture<Path> downloadContainer(
           long containerId,
           DatanodeDetails datanode
-      ) throws Exception {
+      ) {
 
         if (datanodes.contains(datanode)) {
           if (directException) {

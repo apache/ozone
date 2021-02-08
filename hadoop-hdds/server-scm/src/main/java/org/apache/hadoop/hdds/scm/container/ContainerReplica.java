@@ -33,14 +33,14 @@ import java.util.UUID;
  */
 public final class ContainerReplica implements Comparable<ContainerReplica> {
 
-  final private ContainerID containerID;
-  final private ContainerReplicaProto.State state;
-  final private DatanodeDetails datanodeDetails;
-  final private UUID placeOfBirth;
+  private final ContainerID containerID;
+  private final ContainerReplicaProto.State state;
+  private final DatanodeDetails datanodeDetails;
+  private final UUID placeOfBirth;
 
   private Long sequenceId;
-  final private long keyCount;
-  final private long bytesUsed;
+  private final long keyCount;
+  private final long bytesUsed;
 
 
   private ContainerReplica(final ContainerID containerID,
