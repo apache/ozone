@@ -75,7 +75,9 @@ public class TestOMKeyCreateRequestV1 extends TestOMKeyCreateRequest {
     long parentID = checkIntermediatePaths(keyPath);
 
     // Check open key entry
-    String fileName = keyPath.getFileName().toString();
+    Path keyPathFileName = keyPath.getFileName();
+    Assert.assertNotNull("Failed to find fileName", keyPathFileName);
+    String fileName = keyPathFileName.toString();
     String openKey = omMetadataManager.getOpenFileName(parentID, fileName,
             omRequest.getCreateKeyRequest().getClientID());
     OmKeyInfo omKeyInfo = omMetadataManager.getOpenKeyTable().get(openKey);
@@ -88,6 +90,7 @@ public class TestOMKeyCreateRequestV1 extends TestOMKeyCreateRequest {
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
     OmBucketInfo omBucketInfo =
             omMetadataManager.getBucketTable().get(bucketKey);
+    Assert.assertNotNull("Bucket not found!", omBucketInfo);
     long lastKnownParentId = omBucketInfo.getObjectID();
 
     Iterator<Path> elements = keyPath.iterator();

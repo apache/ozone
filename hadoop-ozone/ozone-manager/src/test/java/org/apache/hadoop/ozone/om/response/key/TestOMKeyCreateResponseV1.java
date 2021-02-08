@@ -28,6 +28,8 @@ import org.apache.hadoop.util.Time;
 import org.jetbrains.annotations.NotNull;
 import org.junit.Assert;
 
+import java.util.ArrayList;
+
 /**
  * Tests OMKeyCreateResponseV1.
  */
@@ -67,7 +69,7 @@ public class TestOMKeyCreateResponseV1 extends TestOMKeyCreateResponse {
   protected OMKeyCreateResponse getOmKeyCreateResponse(OmKeyInfo keyInfo,
       OmBucketInfo bucketInfo, OMResponse response) {
 
-    return new OMKeyCreateResponseV1(response, keyInfo, null, clientID,
-            bucketInfo);
+    return new OMKeyCreateResponseV1(response, keyInfo,  new ArrayList<>(),
+            clientID, bucketInfo);
   }
 }
