@@ -140,6 +140,7 @@ public class OzoneManagerStarter extends GenericCli {
    * testing.
    */
   static class OMStarterHelper implements OMStarterInterface{
+
     @Override
     public void start(OzoneConfiguration conf) throws IOException,
         AuthenticationException {

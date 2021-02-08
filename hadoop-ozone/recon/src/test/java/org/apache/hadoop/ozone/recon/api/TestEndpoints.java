@@ -60,7 +60,7 @@ import org.apache.hadoop.ozone.recon.api.types.DatanodesResponse;
 import org.apache.hadoop.ozone.recon.api.types.PipelineMetadata;
 import org.apache.hadoop.ozone.recon.api.types.PipelinesResponse;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
-import org.apache.hadoop.ozone.recon.persistence.ContainerSchemaManager;
+import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
@@ -77,9 +77,7 @@ import org.jooq.Configuration;
 import org.jooq.DSLContext;
 import org.junit.Assert;
 import org.junit.Before;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
@@ -135,18 +133,15 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   private Pipeline pipeline;
   private FileCountBySizeDao fileCountBySizeDao;
   private DSLContext dslContext;
-  private final String host1 = "host1.datanode";
-  private final String host2 = "host2.datanode";
-  private final String ip1 = "1.1.1.1";
-  private final String ip2 = "2.2.2.2";
-  private final String prometheusTestResponseFile =
+  private static final String HOST1 = "host1.datanode";
+  private static final String HOST2 = "host2.datanode";
+  private static final String IP1 = "1.1.1.1";
+  private static final String IP2 = "2.2.2.2";
+  private static final String PROMETHEUS_TEST_RESPONSE_FILE =
       "prometheus-test-response.txt";
   private ReconUtils reconUtilsMock;
   private static final int TEST_SOFTWARE_LAYOUT_VERSION = 0;
   private static final int TEST_METADATA_LAYOUT_VERSION = 0;
-
-  @Rule
-  public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
   private void initializeInjector() throws Exception {
     reconOMMetadataManager = getTestReconOmMetadataManager(
@@ -154,10 +149,10 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         temporaryFolder.newFolder());
     datanodeDetails = randomDatanodeDetails();
     datanodeDetails2 = randomDatanodeDetails();
-    datanodeDetails.setHostName(host1);
-    datanodeDetails.setIpAddress(ip1);
-    datanodeDetails2.setHostName(host2);
-    datanodeDetails2.setIpAddress(ip2);
+    datanodeDetails.setHostName(HOST1);
+    datanodeDetails.setIpAddress(IP1);
+    datanodeDetails2.setHostName(HOST2);
+    datanodeDetails2.setIpAddress(IP2);
     pipeline = getRandomPipeline(datanodeDetails);
     pipelineId = pipeline.getId().getId().toString();
 
@@ -183,7 +178,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
 
     InputStream inputStream =
         Thread.currentThread().getContextClassLoader().getResourceAsStream(
-            prometheusTestResponseFile);
+            PROMETHEUS_TEST_RESPONSE_FILE);
     reconUtilsMock = mock(ReconUtils.class);
     HttpURLConnection urlConnectionMock = mock(HttpURLConnection.class);
     when(urlConnectionMock.getResponseCode())
@@ -201,10 +196,11 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
                 mockScmServiceProvider)
             .addBinding(OzoneStorageContainerManager.class,
                 ReconStorageContainerManagerFacade.class)
+            .withContainerDB()
             .addBinding(ClusterStateEndpoint.class)
             .addBinding(NodeEndpoint.class)
             .addBinding(MetricsServiceProviderFactory.class)
-            .addBinding(ContainerSchemaManager.class)
+            .addBinding(ContainerHealthSchemaManager.class)
             .addBinding(UtilizationEndpoint.class)
             .addBinding(ReconUtils.class, reconUtilsMock)
             .addBinding(StorageContainerLocationProtocol.class, mockScmClient)
@@ -271,9 +267,9 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .addPipelineReport(pipelineReport).build();
     DatanodeDetailsProto datanodeDetailsProto =
         DatanodeDetailsProto.newBuilder()
-            .setHostName(host1)
+            .setHostName(HOST1)
             .setUuid(datanodeId)
-            .setIpAddress(ip1)
+            .setIpAddress(IP1)
             .build();
     extendedDatanodeDetailsProto =
         HddsProtos.ExtendedDatanodeDetailsProto.newBuilder()
@@ -302,9 +298,9 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
 
     DatanodeDetailsProto datanodeDetailsProto2 =
         DatanodeDetailsProto.newBuilder()
-            .setHostName(host2)
+            .setHostName(HOST2)
             .setUuid(datanodeId2)
-            .setIpAddress(ip2)
+            .setIpAddress(IP2)
             .build();
     ExtendedDatanodeDetailsProto extendedDatanodeDetailsProto2 =
         ExtendedDatanodeDetailsProto.newBuilder()
@@ -390,7 +386,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
       throws IOException {
     String hostname = datanodeMetadata.getHostname();
     switch (hostname) {
-    case host1:
+    case HOST1:
       Assert.assertEquals(75000,
           datanodeMetadata.getDatanodeStorageReport().getCapacity());
       Assert.assertEquals(15400,
@@ -409,7 +405,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
           datanodeMetadata.getPipelines().get(0).getLeaderNode());
       Assert.assertEquals(1, datanodeMetadata.getLeaderCount());
       break;
-    case host2:
+    case HOST2:
       Assert.assertEquals(130000,
           datanodeMetadata.getDatanodeStorageReport().getCapacity());
       Assert.assertEquals(17800,
@@ -501,7 +497,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     // when the prometheus endpoint is queried.
     ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
     InputStream inputStream = classLoader
-        .getResourceAsStream(prometheusTestResponseFile);
+        .getResourceAsStream(PROMETHEUS_TEST_RESPONSE_FILE);
     HttpURLConnection urlConnectionMock = mock(HttpURLConnection.class);
     when(urlConnectionMock.getResponseCode())
         .thenReturn(HttpServletResponse.SC_OK);
@@ -513,7 +509,8 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         uriInfoMock, responseMock);
 
     byte[] fileBytes = FileUtils.readFileToByteArray(
-        new File(classLoader.getResource(prometheusTestResponseFile).getFile())
+        new File(classLoader.getResource(PROMETHEUS_TEST_RESPONSE_FILE)
+            .getFile())
         );
     verify(outputStreamMock).write(fileBytes, 0, fileBytes.length);
   }

@@ -116,18 +116,25 @@ public class BucketEndpoint extends EndpointBase {
     if (startAfter == null && marker != null) {
       startAfter = marker;
     }
-    if (startAfter != null && continueToken != null) {
-      // If continuation token and start after both are provided, then we
-      // ignore start After
-      ozoneKeyIterator = bucket.listKeys(prefix, decodedToken.getLastKey());
-    } else if (startAfter != null && continueToken == null) {
-      ozoneKeyIterator = bucket.listKeys(prefix, startAfter);
-    } else if (startAfter == null && continueToken != null){
-      ozoneKeyIterator = bucket.listKeys(prefix, decodedToken.getLastKey());
-    } else {
-      ozoneKeyIterator = bucket.listKeys(prefix);
+    try {
+      if (startAfter != null && continueToken != null) {
+        // If continuation token and start after both are provided, then we
+        // ignore start After
+        ozoneKeyIterator = bucket.listKeys(prefix, decodedToken.getLastKey());
+      } else if (startAfter != null && continueToken == null) {
+        ozoneKeyIterator = bucket.listKeys(prefix, startAfter);
+      } else if (startAfter == null && continueToken != null) {
+        ozoneKeyIterator = bucket.listKeys(prefix, decodedToken.getLastKey());
+      } else {
+        ozoneKeyIterator = bucket.listKeys(prefix);
+      }
+    } catch (OMException ex) {
+      if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
+        throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, bucketName);
+      } else {
+        throw ex;
+      }
     }
-
 
     ListObjectResponse response = new ListObjectResponse();
     response.setDelimiter(delimiter);
@@ -229,8 +236,16 @@ public class BucketEndpoint extends EndpointBase {
 
     OzoneBucket bucket = getBucket(bucketName);
 
-    OzoneMultipartUploadList ozoneMultipartUploadList =
-        bucket.listMultipartUploads(prefix);
+    OzoneMultipartUploadList ozoneMultipartUploadList;
+    try {
+      ozoneMultipartUploadList = bucket.listMultipartUploads(prefix);
+    } catch (OMException exception) {
+      if (exception.getResult() == ResultCodes.PERMISSION_DENIED) {
+        throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED,
+            prefix);
+      }
+      throw exception;
+    }
 
     ListMultipartUploadsResult result = new ListMultipartUploadsResult();
     result.setBucket(bucketName);
@@ -282,6 +297,8 @@ public class BucketEndpoint extends EndpointBase {
       } else if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
         throw S3ErrorTable.newError(S3ErrorTable
             .NO_SUCH_BUCKET, bucketName);
+      } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
+        throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, bucketName);
       } else {
         throw ex;
       }
@@ -315,7 +332,11 @@ public class BucketEndpoint extends EndpointBase {
             result.addDeleted(new DeletedObject(keyToDelete.getKey()));
           }
         } catch (OMException ex) {
-          if (ex.getResult() != ResultCodes.KEY_NOT_FOUND) {
+          if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
+            result.addError(
+                new Error(keyToDelete.getKey(), "PermissionDenied",
+                    ex.getMessage()));
+          } else if (ex.getResult() != ResultCodes.KEY_NOT_FOUND) {
             result.addError(
                 new Error(keyToDelete.getKey(), "InternalError",
                     ex.getMessage()));

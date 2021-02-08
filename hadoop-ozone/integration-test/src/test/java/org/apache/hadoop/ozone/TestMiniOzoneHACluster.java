@@ -19,8 +19,6 @@
 package org.apache.hadoop.ozone;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.client.ObjectStore;
-import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.After;
@@ -46,7 +44,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRE
 public class TestMiniOzoneHACluster {
 
   private MiniOzoneHAClusterImpl cluster = null;
-  private ObjectStore objectStore;
   private OzoneConfiguration conf;
   private String clusterId;
   private String scmId;
@@ -81,8 +78,6 @@ public class TestMiniOzoneHACluster {
         .setNumOfOzoneManagers(numOfOMs)
         .build();
     cluster.waitForClusterToBeReady();
-    objectStore = OzoneClientFactory.getRpcClient(omServiceId, conf)
-        .getObjectStore();
   }
 
   /**
@@ -107,6 +102,6 @@ public class TestMiniOzoneHACluster {
     Assert.assertNotNull("Timed out waiting OM leader election to finish: "
             + "no leader or more than one leader.", ozoneManager);
     Assert.assertTrue("Should have gotten the leader!",
-        ozoneManager.get().isLeader());
+        ozoneManager.get().isLeaderReady());
   }
 }

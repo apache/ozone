@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.CertificateClientTestImpl;
@@ -45,6 +46,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.test.GenericTestUtils;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
@@ -89,6 +91,7 @@ public class TestContainerStateMachine {
     File baseDir = new File(path);
     baseDir.mkdirs();
 
+    conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 1);
     conf.setBoolean(HDDS_BLOCK_TOKEN_ENABLED, true);
     //  conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
     conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 200,
@@ -139,9 +142,9 @@ public class TestContainerStateMachine {
             .createKey("ratis", 1024, ReplicationType.RATIS,
                 ReplicationFactor.ONE, new HashMap<>());
     // First write and flush creates a container in the datanode
-    key.write("ratis".getBytes());
+    key.write("ratis".getBytes(UTF_8));
     key.flush();
-    key.write("ratis".getBytes());
+    key.write("ratis".getBytes(UTF_8));
 
     //get the name of a valid container
     KeyOutputStream groupOutputStream =
@@ -185,9 +188,9 @@ public class TestContainerStateMachine {
               .createKey(("ratis" + i), 1024, ReplicationType.RATIS,
                   ReplicationFactor.ONE, new HashMap<>());
       // First write and flush creates a container in the datanode
-      key.write(("ratis" + i).getBytes());
+      key.write(("ratis" + i).getBytes(UTF_8));
       key.flush();
-      key.write(("ratis" + i).getBytes());
+      key.write(("ratis" + i).getBytes(UTF_8));
       key.close();
     }
 
@@ -209,9 +212,9 @@ public class TestContainerStateMachine {
               .createKey(("ratis" + i), 1024, ReplicationType.RATIS,
                   ReplicationFactor.ONE, new HashMap<>());
       // First write and flush creates a container in the datanode
-      key.write(("ratis" + i).getBytes());
+      key.write(("ratis" + i).getBytes(UTF_8));
       key.flush();
-      key.write(("ratis" + i).getBytes());
+      key.write(("ratis" + i).getBytes(UTF_8));
       key.close();
     }
     stateMachine =

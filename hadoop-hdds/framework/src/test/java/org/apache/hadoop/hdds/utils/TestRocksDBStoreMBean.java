@@ -160,7 +160,7 @@ class BufferedMetricsCollector implements MetricsCollector {
   /**
    * Test class to buffer a single snapshot of metrics.
    */
-  class BufferedMetricsRecordBuilderImpl extends MetricsRecordBuilder {
+  static class BufferedMetricsRecordBuilderImpl extends MetricsRecordBuilder {
 
     private Map<String, Double> metrics = new HashMap<>();
     private String contextName;

@@ -90,7 +90,8 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
    * @throws IOException
    */
   public BlockManagerImpl(final ConfigurationSource conf,
-                          final StorageContainerManager scm) {
+                          final StorageContainerManager scm)
+      throws IOException {
     Objects.requireNonNull(scm, "SCM cannot be null");
     this.pipelineManager = scm.getPipelineManager();
     this.containerManager = scm.getContainerManager();
@@ -124,6 +125,7 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
    *
    * @throws IOException
    */
+  @Override
   public void start() throws IOException {
     this.blockDeletingService.start();
   }
@@ -133,6 +135,7 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
    *
    * @throws IOException
    */
+  @Override
   public void stop() throws IOException {
     this.blockDeletingService.shutdown();
     this.close();
@@ -297,8 +300,10 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
     // TODO: track the block size info so that we can reclaim the container
     // TODO: used space when the block is deleted.
     for (BlockGroup bg : keyBlocksInfoList) {
-      LOG.info("Deleting blocks {}",
-          StringUtils.join(",", bg.getBlockIDList()));
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Deleting blocks {}",
+            StringUtils.join(",", bg.getBlockIDList()));
+      }
       for (BlockID block : bg.getBlockIDList()) {
         long containerID = block.getContainerID();
         if (containerBlocks.containsKey(containerID)) {

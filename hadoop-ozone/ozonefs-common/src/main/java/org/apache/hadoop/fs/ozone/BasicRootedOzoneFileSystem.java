@@ -38,7 +38,9 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
+import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -68,6 +70,8 @@ import static org.apache.hadoop.fs.ozone.Constants.OZONE_DEFAULT_USER;
 import static org.apache.hadoop.fs.ozone.Constants.OZONE_USER_DIR;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_EMPTY;
@@ -140,12 +144,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
           .build();
       LOG.trace("Ozone URI for OFS initialization is " + uri);
 
-      ConfigurationSource source;
-      if (conf instanceof OzoneConfiguration) {
-        source = (ConfigurationSource) conf;
-      } else {
-        source = new LegacyHadoopConfigurationSource(conf);
-      }
+      ConfigurationSource source = getConfSource();
       this.adapter = createAdapter(source, omHostOrServiceId, omPort);
       this.adapterImpl = (BasicRootedOzoneClientAdapterImpl) this.adapter;
 
@@ -390,6 +389,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
    * Intercept rename to trash calls from TrashPolicyDefault.
    */
   @Deprecated
+  @Override
   protected void rename(final Path src, final Path dst,
       final Options.Rename... options) throws IOException {
     boolean hasMoveToTrash = false;
@@ -410,7 +410,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   }
 
   private class DeleteIterator extends OzoneListingIterator {
-    final private boolean recursive;
+    private final boolean recursive;
     private final OzoneBucket bucket;
     private final BasicRootedOzoneClientAdapterImpl adapterImpl;
 
@@ -695,6 +695,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
    * @param allUsers return trashRoots of all users if true, used by emptier
    * @return trash roots
    */
+  @Override
   public Collection<FileStatus> getTrashRoots(boolean allUsers) {
     // Since get all trash roots for one or more users requires listing all
     // volumes and buckets, we will let adapter impl handle it.
@@ -721,6 +722,12 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       return false;
     }
     return mkdir(f);
+  }
+
+  @Override
+  public long getDefaultBlockSize() {
+    return (long) getConfSource().getStorageSize(
+        OZONE_SCM_BLOCK_SIZE, OZONE_SCM_BLOCK_SIZE_DEFAULT, StorageUnit.BYTES);
   }
 
   @Override
@@ -873,6 +880,17 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
         + "userName=" + userName + ", "
         + "statistics=" + statistics
         + "}";
+  }
+
+  public ConfigurationSource getConfSource() {
+    Configuration conf = super.getConf();
+    ConfigurationSource source;
+    if (conf instanceof OzoneConfiguration) {
+      source = (ConfigurationSource) conf;
+    } else {
+      source = new LegacyHadoopConfigurationSource(conf);
+    }
+    return source;
   }
 
   /**

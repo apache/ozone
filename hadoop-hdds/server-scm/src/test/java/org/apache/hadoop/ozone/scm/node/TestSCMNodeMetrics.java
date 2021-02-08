@@ -99,7 +99,6 @@ public class TestSCMNodeMetrics {
   /**
    * Verifies heartbeat processing count.
    *
-   * @throws InterruptedException
    */
   @Test
   public void testHBProcessing() throws InterruptedException {
@@ -197,17 +196,62 @@ public class TestSCMNodeMetrics {
 
     MetricsRecordBuilder metricsSource = getMetrics(SCMNodeMetrics.SOURCE_NAME);
 
-    assertGauge("HealthyReadOnlyNodes", 1, metricsSource);
-    assertGauge("StaleNodes", 0, metricsSource);
-    assertGauge("DeadNodes", 0, metricsSource);
-    assertGauge("DecommissioningNodes", 0, metricsSource);
-    assertGauge("DecommissionedNodes", 0, metricsSource);
-    assertGauge("DiskCapacity", 100L, metricsSource);
-    assertGauge("DiskUsed", 10L, metricsSource);
-    assertGauge("DiskRemaining", 90L, metricsSource);
-    assertGauge("SSDCapacity", 0L, metricsSource);
-    assertGauge("SSDUsed", 0L, metricsSource);
-    assertGauge("SSDRemaining", 0L, metricsSource);
+    assertGauge("InServiceHealthyNodes", 0,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("InServiceHealthyReadonlyNodes", 1,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("InServiceStaleNodes", 0,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("InServiceDeadNodes", 0,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("DecommissioningHealthyNodes", 0,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("DecommissioningStaleNodes", 0,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("DecommissioningDeadNodes", 0,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("DecommissionedHealthyNodes", 0,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("DecommissionedStaleNodes", 0,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("DecommissionedDeadNodes", 0,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("EnteringMaintenanceHealthyNodes", 0,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("EnteringMaintenanceStaleNodes", 0,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("EnteringMaintenanceDeadNodes", 0,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("InMaintenanceHealthyNodes", 0,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("InMaintenanceStaleNodes", 0,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("InMaintenanceDeadNodes", 0,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("MaintenanceDiskCapacity", 0L,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("MaintenanceDiskUsed", 0L,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("MaintenanceDiskRemaining", 0L,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("MaintenanceSSDCapacity", 0L,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("MaintenanceSSDUsed", 0L,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("MaintenanceSSDRemaining", 0L,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("DecommissionedDiskCapacity", 0L,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("DecommissionedDiskUsed", 0L,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("DecommissionedDiskRemaining", 0L,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("DecommissionedSSDCapacity", 0L,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("DecommissionedSSDUsed", 0L,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("DecommissionedSSDRemaining", 0L,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
 
     LayoutVersionManager versionManager = nodeManager.getLayoutVersionManager();
     LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
@@ -217,8 +261,8 @@ public class TestSCMNodeMetrics {
     nodeManager.processHeartbeat(registeredDatanode, layoutInfo);
     sleep(4000);
     metricsSource = getMetrics(SCMNodeMetrics.SOURCE_NAME);
-    assertGauge("HealthyReadOnlyNodes", 0, metricsSource);
-    assertGauge("HealthyNodes", 1, metricsSource);
+    assertGauge("InServiceHealthyReadonlyNodes", 0, metricsSource);
+    assertGauge("InServiceHealthyNodes", 1, metricsSource);
 
   }
 

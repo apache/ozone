@@ -28,7 +28,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.ozone.recon.persistence.ContainerSchemaManager;
+import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.scm.ReconScmTask;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
 import org.apache.hadoop.util.Time;
@@ -50,7 +50,7 @@ public class ContainerHealthTask extends ReconScmTask {
       LoggerFactory.getLogger(ContainerHealthTask.class);
 
   private ContainerManager containerManager;
-  private ContainerSchemaManager containerSchemaManager;
+  private ContainerHealthSchemaManager containerHealthSchemaManager;
   private PlacementPolicy placementPolicy;
   private final long interval;
   private Set<ContainerInfo> processedContainers = new HashSet<>();
@@ -58,16 +58,17 @@ public class ContainerHealthTask extends ReconScmTask {
   public ContainerHealthTask(
       ContainerManager containerManager,
       ReconTaskStatusDao reconTaskStatusDao,
-      ContainerSchemaManager containerSchemaManager,
+      ContainerHealthSchemaManager containerHealthSchemaManager,
       PlacementPolicy placementPolicy,
       ReconTaskConfig reconTaskConfig) {
     super(reconTaskStatusDao);
-    this.containerSchemaManager = containerSchemaManager;
+    this.containerHealthSchemaManager = containerHealthSchemaManager;
     this.placementPolicy = placementPolicy;
     this.containerManager = containerManager;
     interval = reconTaskConfig.getMissingContainerTaskInterval().toMillis();
   }
 
+  @Override
   public synchronized void run() {
     try {
       while (canRun()) {
@@ -105,7 +106,7 @@ public class ContainerHealthTask extends ReconScmTask {
 
   private void completeProcessingContainer(ContainerHealthStatus container,
       Set<String> existingRecords, long currentTime) {
-    containerSchemaManager.insertUnhealthyContainerRecords(
+    containerHealthSchemaManager.insertUnhealthyContainerRecords(
         ContainerHealthRecords.generateUnhealthyRecords(
             container, existingRecords, currentTime));
     processedContainers.add(container.getContainer());
@@ -128,7 +129,7 @@ public class ContainerHealthTask extends ReconScmTask {
   private long processExistingDBRecords(long currentTime) {
     long recordCount = 0;
     try (Cursor<UnhealthyContainersRecord> cursor =
-             containerSchemaManager.getAllUnhealthyRecordsCursor()) {
+             containerHealthSchemaManager.getAllUnhealthyRecordsCursor()) {
       ContainerHealthStatus currentContainer = null;
       Set<String> existingRecords = new HashSet<>();
       while(cursor.hasNext()) {
@@ -176,7 +177,7 @@ public class ContainerHealthTask extends ReconScmTask {
       if (h.isHealthy()) {
         return;
       }
-      containerSchemaManager.insertUnhealthyContainerRecords(
+      containerHealthSchemaManager.insertUnhealthyContainerRecords(
           ContainerHealthRecords.generateUnhealthyRecords(h, currentTime));
     } catch (ContainerNotFoundException e) {
       LOG.error("Container not found while processing container in Container " +
@@ -188,7 +189,7 @@ public class ContainerHealthTask extends ReconScmTask {
    * Helper methods to generate and update the required database records for
    * unhealthy containers.
    */
-  static public class ContainerHealthRecords {
+  public static class ContainerHealthRecords {
 
     /**
      * Given an existing database record and a ContainerHealthStatus object,
@@ -205,7 +206,7 @@ public class ContainerHealthTask extends ReconScmTask {
      * @param rec Existing database record from the UnhealthyContainers table.
      * @return
      */
-    static public boolean retainOrUpdateRecord(
+    public static boolean retainOrUpdateRecord(
         ContainerHealthStatus container, UnhealthyContainersRecord rec) {
       boolean returnValue = false;
       switch(UnHealthyContainerStates.valueOf(rec.getContainerState())) {
@@ -227,7 +228,7 @@ public class ContainerHealthTask extends ReconScmTask {
       return returnValue;
     }
 
-    static public List<UnhealthyContainers> generateUnhealthyRecords(
+    public static List<UnhealthyContainers> generateUnhealthyRecords(
         ContainerHealthStatus container, long time) {
       return generateUnhealthyRecords(container, new HashSet<>(), time);
     }
@@ -240,7 +241,7 @@ public class ContainerHealthTask extends ReconScmTask {
      * missing records which have not been seen already.
      * @return List of UnhealthyContainer records to be stored in the DB
      */
-    static public List<UnhealthyContainers> generateUnhealthyRecords(
+    public static List<UnhealthyContainers> generateUnhealthyRecords(
         ContainerHealthStatus container, Set<String> recordForStateExists,
         long time) {
       List<UnhealthyContainers> records = new ArrayList<>();
@@ -280,7 +281,7 @@ public class ContainerHealthTask extends ReconScmTask {
       return records;
     }
 
-    static private UnhealthyContainers recordForState(
+    private static UnhealthyContainers recordForState(
         ContainerHealthStatus container, UnHealthyContainerStates state,
         long time) {
       UnhealthyContainers rec = new UnhealthyContainers();
@@ -300,7 +301,7 @@ public class ContainerHealthTask extends ReconScmTask {
       return rec;
     }
 
-    static private boolean keepOverReplicatedRecord(
+    private static boolean keepOverReplicatedRecord(
         ContainerHealthStatus container, UnhealthyContainersRecord rec) {
       if (container.isOverReplicated()) {
         updateExpectedReplicaCount(rec, container.getReplicationFactor());
@@ -311,7 +312,7 @@ public class ContainerHealthTask extends ReconScmTask {
       return false;
     }
 
-    static private boolean keepUnderReplicatedRecord(
+    private static boolean keepUnderReplicatedRecord(
         ContainerHealthStatus container, UnhealthyContainersRecord rec) {
       if (container.isUnderReplicated()) {
         updateExpectedReplicaCount(rec, container.getReplicationFactor());
@@ -322,7 +323,7 @@ public class ContainerHealthTask extends ReconScmTask {
       return false;
     }
 
-    static private boolean keepMisReplicatedRecord(
+    private static boolean keepMisReplicatedRecord(
         ContainerHealthStatus container, UnhealthyContainersRecord rec) {
       if (container.isMisReplicated()) {
         updateExpectedReplicaCount(rec, container.expectedPlacementCount());
@@ -341,28 +342,28 @@ public class ContainerHealthTask extends ReconScmTask {
      * has really changed. The methods below ensure we do not update the Jooq
      * record unless the values have changed and hence save a DB execution
      */
-    static private void updateExpectedReplicaCount(
+    private static void updateExpectedReplicaCount(
         UnhealthyContainersRecord rec, int expectedCount) {
       if (rec.getExpectedReplicaCount() != expectedCount) {
         rec.setExpectedReplicaCount(expectedCount);
       }
     }
 
-    static private void updateActualReplicaCount(
+    private static void updateActualReplicaCount(
         UnhealthyContainersRecord rec, int actualCount) {
       if (rec.getActualReplicaCount() != actualCount) {
         rec.setActualReplicaCount(actualCount);
       }
     }
 
-    static private void updateReplicaDelta(
+    private static void updateReplicaDelta(
         UnhealthyContainersRecord rec, int delta) {
       if (rec.getReplicaDelta() != delta) {
         rec.setReplicaDelta(delta);
       }
     }
 
-    static private void updateReason(
+    private static void updateReason(
         UnhealthyContainersRecord rec, String reason) {
       if (!rec.getReason().equals(reason)) {
         rec.setReason(reason);

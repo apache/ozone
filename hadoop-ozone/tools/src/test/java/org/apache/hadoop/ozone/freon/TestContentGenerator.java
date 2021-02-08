@@ -39,7 +39,6 @@ public class TestContentGenerator {
   @Test
   public void writeWithSmallerBuffers() throws IOException {
     ContentGenerator generator = new ContentGenerator(10000, 1024, 3);
-    ByteArrayOutputStream output = new ByteArrayOutputStream();
 
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
     generator.write(baos);

@@ -46,6 +46,7 @@ public class CommandForDatanode<T extends GeneratedMessage> implements
     return command;
   }
 
+  @Override
   public long getId() {
     return command.getId();
   }

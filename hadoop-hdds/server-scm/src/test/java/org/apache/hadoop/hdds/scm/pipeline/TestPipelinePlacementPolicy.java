@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.net.NetConstants;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
@@ -175,7 +176,7 @@ public class TestPipelinePlacementPolicy {
   @Test
   public void testPickLowestLoadAnchor() throws IOException{
     List<DatanodeDetails> healthyNodes = nodeManager
-        .getNodes(HddsProtos.NodeState.HEALTHY);
+        .getNodes(NodeStatus.inServiceHealthy());
 
     int maxPipelineCount = PIPELINE_LOAD_LIMIT * healthyNodes.size()
         / HddsProtos.ReplicationFactor.THREE.getNumber();
@@ -215,7 +216,7 @@ public class TestPipelinePlacementPolicy {
   @Test
   public void testChooseNodeBasedOnRackAwareness() {
     List<DatanodeDetails> healthyNodes = overWriteLocationInNodes(
-        nodeManager.getNodes(HddsProtos.NodeState.HEALTHY));
+        nodeManager.getNodes(NodeStatus.inServiceHealthy()));
     DatanodeDetails anchor = placementPolicy.chooseNode(healthyNodes);
     NetworkTopology topologyWithDifRacks =
         createNetworkTopologyOnDifRacks();
@@ -231,7 +232,7 @@ public class TestPipelinePlacementPolicy {
   @Test
   public void testFallBackPickNodes() {
     List<DatanodeDetails> healthyNodes = overWriteLocationInNodes(
-        nodeManager.getNodes(HddsProtos.NodeState.HEALTHY));
+        nodeManager.getNodes(NodeStatus.inServiceHealthy()));
     DatanodeDetails node;
     try {
       node = placementPolicy.fallBackPickNodes(healthyNodes, null);
@@ -284,7 +285,7 @@ public class TestPipelinePlacementPolicy {
         results.get(2).getNetworkLocation());
   }
 
-  private final static Node[] NODES = new NodeImpl[] {
+  private static final Node[] NODES = new NodeImpl[] {
       new NodeImpl("h1", "/r1", NetConstants.NODE_COST_DEFAULT),
       new NodeImpl("h2", "/r1", NetConstants.NODE_COST_DEFAULT),
       new NodeImpl("h3", "/r2", NetConstants.NODE_COST_DEFAULT),
@@ -296,7 +297,7 @@ public class TestPipelinePlacementPolicy {
   };
 
   // 3 racks with single node.
-  private final static Node[] SINGLE_NODE_RACK = new NodeImpl[] {
+  private static final Node[] SINGLE_NODE_RACK = new NodeImpl[] {
       new NodeImpl("h1", "/r1", NetConstants.NODE_COST_DEFAULT),
       new NodeImpl("h2", "/r2", NetConstants.NODE_COST_DEFAULT),
       new NodeImpl("h3", "/r3", NetConstants.NODE_COST_DEFAULT)
@@ -338,7 +339,7 @@ public class TestPipelinePlacementPolicy {
   @Test
   public void testHeavyNodeShouldBeExcluded() throws SCMException{
     List<DatanodeDetails> healthyNodes =
-        nodeManager.getNodes(HddsProtos.NodeState.HEALTHY);
+        nodeManager.getNodes(NodeStatus.inServiceHealthy());
     int nodesRequired = HddsProtos.ReplicationFactor.THREE.getNumber();
     // only minority of healthy NODES are heavily engaged in pipelines.
     int minorityHeavy = healthyNodes.size()/2 - 1;

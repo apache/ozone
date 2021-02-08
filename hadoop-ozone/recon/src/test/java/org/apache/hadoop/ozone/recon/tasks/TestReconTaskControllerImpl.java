@@ -27,7 +27,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.util.Collections;
 import java.util.HashSet;
 
 import org.apache.commons.lang3.tuple.ImmutablePair;
@@ -78,8 +77,6 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     OMUpdateEventBatch omUpdateEventBatchMock = mock(OMUpdateEventBatch.class);
     when(omUpdateEventBatchMock.getLastSequenceNumber()).thenReturn(100L);
     when(omUpdateEventBatchMock.isEmpty()).thenReturn(false);
-    when(omUpdateEventBatchMock.filter(Collections.singleton("MockTable")))
-        .thenReturn(omUpdateEventBatchMock);
 
     long startTime = System.currentTimeMillis();
     reconTaskController.consumeOMEvents(
@@ -205,11 +202,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
    */
   private ReconOmTask getMockTask(String taskName) {
     ReconOmTask reconOmTaskMock = mock(ReconOmTask.class);
-    when(reconOmTaskMock.getTaskTables()).thenReturn(Collections
-        .EMPTY_LIST);
     when(reconOmTaskMock.getTaskName()).thenReturn(taskName);
-    when(reconOmTaskMock.getTaskTables())
-        .thenReturn(Collections.singleton("MockTable"));
     return reconOmTaskMock;
   }
 }

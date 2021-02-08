@@ -39,8 +39,8 @@ import static org.junit.Assert.fail;
  */
 public class TestVirtualHostStyleFilter {
 
-  private static OzoneConfiguration conf;
-  private static String s3HttpAddr;
+  private OzoneConfiguration conf;
+  private String s3HttpAddr;
 
   @Before
   public void setup() {

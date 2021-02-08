@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
@@ -71,6 +72,8 @@ import static org.apache.hadoop.fs.ozone.Constants.OZONE_DEFAULT_USER;
 import static org.apache.hadoop.fs.ozone.Constants.OZONE_USER_DIR;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
 
@@ -105,7 +108,8 @@ public class BasicOzoneFileSystem extends FileSystem {
       "should be one of the following formats: " +
       "o3fs://bucket.volume/key  OR " +
       "o3fs://bucket.volume.om-host.example.com/key  OR " +
-      "o3fs://bucket.volume.om-host.example.com:5678/key";
+      "o3fs://bucket.volume.om-host.example.com:5678/key  OR " +
+      "o3fs://bucket.volume.omServiceId/key";
 
   @Override
   public void initialize(URI name, Configuration conf) throws IOException {
@@ -155,12 +159,7 @@ public class BasicOzoneFileSystem extends FileSystem {
           .build();
       LOG.trace("Ozone URI for ozfs initialization is {}", uri);
 
-      ConfigurationSource source;
-      if (conf instanceof OzoneConfiguration) {
-        source = (ConfigurationSource) conf;
-      } else {
-        source = new LegacyHadoopConfigurationSource(conf);
-      }
+      ConfigurationSource source = getConfSource();
       this.adapter =
           createAdapter(source, bucketStr,
               volumeStr, omHost, omPort);
@@ -410,6 +409,7 @@ public class BasicOzoneFileSystem extends FileSystem {
    * Intercept rename to trash calls from TrashPolicyDefault.
    */
   @Deprecated
+  @Override
   protected void rename(final Path src, final Path dst,
       final Rename... options) throws IOException {
     boolean hasMoveToTrash = false;
@@ -699,6 +699,12 @@ public class BasicOzoneFileSystem extends FileSystem {
   }
 
   @Override
+  public long getDefaultBlockSize() {
+    return (long)getConfSource().getStorageSize(
+        OZONE_SCM_BLOCK_SIZE, OZONE_SCM_BLOCK_SIZE_DEFAULT, StorageUnit.BYTES);
+  }
+
+  @Override
   public FileStatus getFileStatus(Path f) throws IOException {
     incrementCounter(Statistic.INVOCATION_GET_FILE_STATUS, 1);
     statistics.incrementReadOps(1);
@@ -833,6 +839,17 @@ public class BasicOzoneFileSystem extends FileSystem {
     } else {
       return key;
     }
+  }
+
+  public ConfigurationSource getConfSource() {
+    Configuration conf = super.getConf();
+    ConfigurationSource source;
+    if (conf instanceof OzoneConfiguration) {
+      source = (ConfigurationSource) conf;
+    } else {
+      source = new LegacyHadoopConfigurationSource(conf);
+    }
+    return source;
   }
 
   @Override

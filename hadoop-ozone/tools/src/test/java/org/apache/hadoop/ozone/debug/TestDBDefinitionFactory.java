@@ -18,15 +18,18 @@
 
 package org.apache.hadoop.ozone.debug;
 
-import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_CONTAINER_KEY_DB;
-import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OM_SNAPSHOT_DB;
-import static org.junit.Assert.assertTrue;
+import java.nio.file.Paths;
 
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
+import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaTwoDBDefinition;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.ozone.recon.scm.ReconSCMDBDefinition;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition;
+
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_CONTAINER_KEY_DB;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OM_SNAPSHOT_DB;
+import static org.junit.Assert.assertTrue;
 import org.junit.Test;
 
 /**
@@ -55,5 +58,9 @@ public class TestDBDefinitionFactory {
     definition = DBDefinitionFactory.getDefinition(
         RECON_CONTAINER_KEY_DB + "_1");
     assertTrue(definition instanceof ReconDBDefinition);
+
+    definition =
+        DBDefinitionFactory.getDefinition(Paths.get("/tmp/test-container.db"));
+    assertTrue(definition instanceof DatanodeSchemaTwoDBDefinition);
   }
 }

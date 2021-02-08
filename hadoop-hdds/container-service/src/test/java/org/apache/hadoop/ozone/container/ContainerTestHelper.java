@@ -44,13 +44,11 @@ import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
-import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 import org.apache.hadoop.security.token.Token;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
-import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.statemachine.StateMachine;
 import org.junit.Assert;
@@ -589,14 +587,11 @@ public final class ContainerTestHelper {
           " not exist in datanode:" + dn.getDatanodeDetails().getUuid());
     }
 
-    XceiverServerSpi serverSpi = dn.getDatanodeStateMachine().
-        getContainer().getWriteChannel();
-    RaftServer server = (((XceiverServerRatis) serverSpi).getServer());
-    RaftGroupId groupId =
-        pipeline == null ? server.getGroupIds().iterator().next() :
-            RatisHelper.newRaftGroup(pipeline).getGroupId();
-
-    return server.getDivision(groupId);
+    XceiverServerRatis server =
+        (XceiverServerRatis) (dn.getDatanodeStateMachine().
+        getContainer().getWriteChannel());
+    return server.getServerDivision(
+        RatisHelper.newRaftGroup(pipeline).getGroupId());
   }
 
   public static StateMachine getStateMachine(HddsDatanodeService dn,

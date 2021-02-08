@@ -28,6 +28,8 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
+
 /**
  * Codec to encode OmKeyInfo as byte array.
  */
@@ -38,14 +40,14 @@ public class OmKeyInfoCodec implements Codec<OmKeyInfo> {
   private final boolean ignorePipeline;
   public OmKeyInfoCodec(boolean ignorePipeline) {
     this.ignorePipeline = ignorePipeline;
-    LOG.info("OmKeyInfoCodec ignorePipeline = " + ignorePipeline);
+    LOG.info("OmKeyInfoCodec ignorePipeline = {}", ignorePipeline);
   }
 
   @Override
   public byte[] toPersistedFormat(OmKeyInfo object) throws IOException {
     Preconditions
         .checkNotNull(object, "Null object can't be converted to byte array.");
-    return object.getProtobuf(ignorePipeline).toByteArray();
+    return object.getProtobuf(ignorePipeline, CURRENT_VERSION).toByteArray();
   }
 
   @Override

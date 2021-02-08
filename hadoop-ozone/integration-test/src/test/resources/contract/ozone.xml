@@ -112,6 +112,11 @@
     </property>
 
     <property>
+        <name>fs.contract.supports-unbuffer</name>
+        <value>true</value>
+    </property>
+
+    <property>
         <name>fs.contract.supports-unix-permissions</name>
         <value>false</value>
     </property>

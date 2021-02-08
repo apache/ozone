@@ -18,9 +18,9 @@
 
 package org.apache.hadoop.ozone.debug;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -142,7 +142,9 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     this.columnFamilyMap = new HashMap<>();
     DBColumnFamilyDefinition[] columnFamilyDefinitions = dbDefinition
             .getColumnFamilies();
-    for(DBColumnFamilyDefinition definition:columnFamilyDefinitions){
+    for (DBColumnFamilyDefinition definition:columnFamilyDefinitions) {
+      System.out.println("Added definition for table:" +
+          definition.getTableName());
       this.columnFamilyMap.put(definition.getTableName(), definition);
     }
   }
@@ -170,10 +172,10 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     }
     dbPath = removeTrailingSlashIfNeeded(dbPath);
     this.constructColumnFamilyMap(DBDefinitionFactory.
-            getDefinition(new File(dbPath).getName()));
+            getDefinition(Paths.get(dbPath)));
     if (this.columnFamilyMap !=null) {
       if (!this.columnFamilyMap.containsKey(tableName)) {
-        System.out.print("Table with specified name does not exist");
+        System.out.print("Table with name:" + tableName + " does not exist");
       } else {
         DBColumnFamilyDefinition columnFamilyDefinition =
                 this.columnFamilyMap.get(tableName);

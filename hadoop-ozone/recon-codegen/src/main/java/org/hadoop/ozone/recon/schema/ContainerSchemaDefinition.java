@@ -38,8 +38,6 @@ import java.sql.SQLException;
 @Singleton
 public class ContainerSchemaDefinition implements ReconSchemaDefinition {
 
-  public static final String CONTAINER_HISTORY_TABLE_NAME =
-      "CONTAINER_HISTORY";
   public static final String UNHEALTHY_CONTAINERS_TABLE_NAME =
       "UNHEALTHY_CONTAINERS";
 
@@ -68,26 +66,9 @@ public class ContainerSchemaDefinition implements ReconSchemaDefinition {
   public void initializeSchema() throws SQLException {
     Connection conn = dataSource.getConnection();
     dslContext = DSL.using(conn);
-    if (!TABLE_EXISTS_CHECK.test(conn, CONTAINER_HISTORY_TABLE_NAME)) {
-      createContainerHistoryTable();
-    }
     if (!TABLE_EXISTS_CHECK.test(conn, UNHEALTHY_CONTAINERS_TABLE_NAME)) {
       createUnhealthyContainersTable();
     }
-  }
-
-  /**
-   * Create the Container History table.
-   */
-  private void createContainerHistoryTable() {
-    dslContext.createTableIfNotExists(CONTAINER_HISTORY_TABLE_NAME)
-        .column(CONTAINER_ID, SQLDataType.BIGINT.nullable(false))
-        .column("datanode_host", SQLDataType.VARCHAR(766).nullable(false))
-        .column("first_report_timestamp", SQLDataType.BIGINT)
-        .column("last_report_timestamp", SQLDataType.BIGINT)
-        .constraint(DSL.constraint("pk_container_id_datanode_host")
-            .primaryKey(CONTAINER_ID, "datanode_host"))
-        .execute();
   }
 
   /**

@@ -374,6 +374,7 @@ public class SCMPipelineManager implements PipelineManager {
     }
   }
 
+  @Override
   public List<Pipeline> getPipelines(ReplicationType type,
       Pipeline.PipelineState state) {
     lock.readLock().lock();
@@ -570,10 +571,15 @@ public class SCMPipelineManager implements PipelineManager {
   @Override
   public void activatePipeline(PipelineID pipelineID)
       throws IOException {
-    Pipeline.PipelineState state = stateManager.
-            getPipeline(pipelineID).getPipelineState();
-    stateManager.activatePipeline(pipelineID);
-    updatePipelineStateInDb(pipelineID, state);
+    lock.writeLock().lock();
+    try {
+      Pipeline.PipelineState state = stateManager.
+              getPipeline(pipelineID).getPipelineState();
+      stateManager.activatePipeline(pipelineID);
+      updatePipelineStateInDb(pipelineID, state);
+    } finally {
+      lock.writeLock().unlock();
+    }
   }
 
   /**
@@ -585,10 +591,15 @@ public class SCMPipelineManager implements PipelineManager {
   @Override
   public void deactivatePipeline(PipelineID pipelineID)
       throws IOException {
-    Pipeline.PipelineState state = stateManager.
-            getPipeline(pipelineID).getPipelineState();
-    stateManager.deactivatePipeline(pipelineID);
-    updatePipelineStateInDb(pipelineID, state);
+    lock.writeLock().lock();
+    try {
+      Pipeline.PipelineState state = stateManager.
+              getPipeline(pipelineID).getPipelineState();
+      stateManager.deactivatePipeline(pipelineID);
+      updatePipelineStateInDb(pipelineID, state);
+    } finally {
+      lock.writeLock().unlock();
+    }
   }
 
   /**
@@ -730,6 +741,7 @@ public class SCMPipelineManager implements PipelineManager {
    * @param  pipeline
    * @return healthy volume count
    */
+  @Override
   public int minHealthyVolumeNum(Pipeline pipeline) {
     return nodeManager.minHealthyVolumeNum(pipeline.getNodes());
   }
@@ -740,6 +752,7 @@ public class SCMPipelineManager implements PipelineManager {
    * @param  pipeline
    * @return healthy volume count
    */
+  @Override
   public int minPipelineLimit(Pipeline pipeline) {
     return nodeManager.minPipelineLimit(pipeline.getNodes());
   }

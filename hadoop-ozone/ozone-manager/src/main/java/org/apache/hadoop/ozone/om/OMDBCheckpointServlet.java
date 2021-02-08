@@ -30,6 +30,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -47,12 +48,25 @@ import org.apache.commons.compress.compressors.CompressorOutputStream;
 import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.apache.commons.compress.utils.IOUtils;
 import org.apache.commons.lang3.StringUtils;
+
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Provides the current checkpoint Snapshot of the OM DB. (tar.gz)
+ *
+ * When Ozone ACL is enabled (`ozone.acl.enabled`=`true`), only users/principals
+ * configured in `ozone.administrator` (along with the user that starts OM,
+ * which automatically becomes an Ozone administrator but not necessarily in
+ * the config) are allowed to access this endpoint.
+ *
+ * If Kerberos is enabled, the principal should be appended to
+ * `ozone.administrator`, e.g. `scm/scm@EXAMPLE.COM`
+ * If Kerberos is not enabled, simply append the login user name to
+ * `ozone.administrator`, e.g. `scm`
  */
 public class OMDBCheckpointServlet extends HttpServlet {
 
@@ -89,6 +103,25 @@ public class OMDBCheckpointServlet extends HttpServlet {
     }
   }
 
+  private boolean hasPermission(String username) {
+    // Check ACL for dbCheckpoint only when global Ozone ACL is enabled
+    if (om.getAclsEnabled()) {
+      // Only Ozone admins are allowed
+      try {
+        Collection<String> admins = om.getOzoneAdmins(om.getConfiguration());
+        if (admins.contains(OZONE_ADMINISTRATORS_WILDCARD) ||
+            admins.contains(username)) {
+          return true;
+        }
+      } catch (IOException e) {
+        LOG.warn("Error checking permission: {}", e.getMessage());
+      }
+      return false;
+    } else {
+      return true;
+    }
+  }
+
   /**
    * Process a GET request for the Ozone Manager DB checkpoint snapshot.
    *
@@ -104,6 +137,33 @@ public class OMDBCheckpointServlet extends HttpServlet {
           "Unable to process metadata snapshot request. DB Store is null");
       response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
       return;
+    }
+
+    // Check ACL for dbCheckpoint only when global Ozone ACL is enable
+    if (om.getAclsEnabled()) {
+      final java.security.Principal userPrincipal = request.getUserPrincipal();
+      if (userPrincipal == null) {
+        final String remoteUser = request.getRemoteUser();
+        LOG.error("Permission denied: Unauthorized access to /dbCheckpoint,"
+            + " no user principal found. Current login user is {}.",
+            remoteUser != null ? "'" + remoteUser + "'" : "UNKNOWN");
+        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+        return;
+      } else {
+        final String userPrincipalName = userPrincipal.getName();
+        if (!hasPermission(userPrincipalName)) {
+          LOG.error("Permission denied: User principal '{}' does not have"
+              + " access to /dbCheckpoint.\nThis can happen when Ozone Manager"
+              + " is started with a different user.\nPlease append '{}' to OM"
+              + " 'ozone.administrators' config and restart OM to grant current"
+              + " user access to this endpoint.",
+              userPrincipalName, userPrincipalName);
+          response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+          return;
+        }
+        LOG.debug("Granted user principal '{}' access to /dbCheckpoint.",
+            userPrincipalName);
+      }
     }
 
     DBCheckpoint checkpoint = null;

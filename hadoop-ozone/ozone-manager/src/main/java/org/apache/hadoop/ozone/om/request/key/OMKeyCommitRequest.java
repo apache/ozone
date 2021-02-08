@@ -30,7 +30,7 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -124,7 +124,6 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
     IOException exception = null;
     OmKeyInfo omKeyInfo = null;
-    OmVolumeArgs omVolumeArgs = null;
     OmBucketInfo omBucketInfo = null;
     OMClientResponse omClientResponse = null;
     boolean bucketLockAcquired = false;
@@ -166,6 +165,14 @@ public class OMKeyCommitRequest extends OMKeyRequest {
           throw new OMException("Can not create file: " + keyName +
               " as there is already directory in the given path", NOT_A_FILE);
         }
+        // Ensure the parent exist.
+        if (!"".equals(OzoneFSUtils.getParent(keyName))
+            && !checkDirectoryAlreadyExists(volumeName, bucketName,
+            OzoneFSUtils.getParent(keyName), omMetadataManager)) {
+          throw new OMException("Cannot create file : " + keyName
+              + " as parent directory doesn't exist",
+              OMException.ResultCodes.DIRECTORY_NOT_FOUND);
+        }
       }
 
       omKeyInfo = omMetadataManager.getOpenKeyTable().get(dbOpenKey);
@@ -178,6 +185,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       omKeyInfo.setModificationTime(commitKeyArgs.getModificationTime());
 
       // Update the block length for each block
+      List<OmKeyLocationInfo> allocatedLocationInfoList =
+          omKeyInfo.getLatestVersionLocations().getLocationList();
       omKeyInfo.updateLocationInfoList(locationInfoList);
 
       // Set the UpdateID to current transactionLogIndex
@@ -194,19 +203,17 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
       long scmBlockSize = ozoneManager.getScmBlockSize();
       int factor = omKeyInfo.getFactor().getNumber();
-      omVolumeArgs = getVolumeInfo(omMetadataManager, volumeName);
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
       // Block was pre-requested and UsedBytes updated when createKey and
       // AllocatedBlock. The space occupied by the Key shall be based on
       // the actual Key size, and the total Block size applied before should
       // be subtracted.
       long correctedSpace = omKeyInfo.getDataSize() * factor -
-          locationInfoList.size() * scmBlockSize * factor;
+          allocatedLocationInfoList.size() * scmBlockSize * factor;
       omBucketInfo.incrUsedBytes(correctedSpace);
 
       omClientResponse = new OMKeyCommitResponse(omResponse.build(),
-          omKeyInfo, dbOzoneKey, dbOpenKey, omVolumeArgs,
-          omBucketInfo.copyObject());
+          omKeyInfo, dbOzoneKey, dbOpenKey, omBucketInfo.copyObject());
 
       result = Result.SUCCESS;
     } catch (IOException ex) {

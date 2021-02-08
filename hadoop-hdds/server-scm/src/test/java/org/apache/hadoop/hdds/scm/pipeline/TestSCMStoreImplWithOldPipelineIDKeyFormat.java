@@ -87,16 +87,6 @@ public class TestSCMStoreImplWithOldPipelineIDKeyFormat
   }
 
   @Override
-  public Long getCurrentTXID() {
-    return null;
-  }
-
-  @Override
-  public Long getNextDeleteBlockTXID() {
-    return null;
-  }
-
-  @Override
   public Table<BigInteger, X509Certificate> getValidCertsTable() {
     return null;
   }

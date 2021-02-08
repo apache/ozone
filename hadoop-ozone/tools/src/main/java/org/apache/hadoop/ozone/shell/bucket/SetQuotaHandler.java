@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.shell.bucket;
 
+import com.google.common.base.Strings;
 import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -26,6 +27,8 @@ import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
 import java.io.IOException;
+
+import static org.apache.hadoop.ozone.OzoneConsts.OLD_QUOTA_DEFAULT;
 
 /**
  * set quota of the bucket.
@@ -46,17 +49,25 @@ public class SetQuotaHandler extends BucketHandler {
     OzoneBucket bucket = client.getObjectStore().getVolume(volumeName)
         .getBucket(bucketName);
     long spaceQuota = bucket.getQuotaInBytes();
-    long countQuota = bucket.getQuotaInCounts();
+    long namespaceQuota = bucket.getQuotaInNamespace();
 
-    if (quotaOptions.getQuotaInBytes() != null
-        && !quotaOptions.getQuotaInBytes().isEmpty()) {
-      spaceQuota = OzoneQuota.parseQuota(quotaOptions.getQuotaInBytes(),
-          quotaOptions.getQuotaInCounts()).getQuotaInBytes();
-    }
-    if (quotaOptions.getQuotaInCounts() >= 0) {
-      countQuota = quotaOptions.getQuotaInCounts();
+    if (!Strings.isNullOrEmpty(quotaOptions.getQuotaInBytes())) {
+      spaceQuota = OzoneQuota.parseSpaceQuota(
+          quotaOptions.getQuotaInBytes()).getQuotaInBytes();
     }
 
-    bucket.setQuota(OzoneQuota.getOzoneQuota(spaceQuota, countQuota));
+    if (!Strings.isNullOrEmpty(quotaOptions.getQuotaInNamespace())) {
+      namespaceQuota = OzoneQuota.parseNameSpaceQuota(
+          quotaOptions.getQuotaInNamespace()).getQuotaInNamespace();
+    }
+
+    if (bucket.getQuotaInNamespace() == OLD_QUOTA_DEFAULT ||
+        bucket.getUsedBytes() == OLD_QUOTA_DEFAULT) {
+      String msg = "Bucket " + bucketName + " is created before version " +
+          "1.1.0, usedBytes or usedNamespace may be inaccurate and it is not" +
+          " recommended to enable quota.";
+      printMsg(msg);
+    }
+    bucket.setQuota(OzoneQuota.getOzoneQuota(spaceQuota, namespaceQuota));
   }
 }

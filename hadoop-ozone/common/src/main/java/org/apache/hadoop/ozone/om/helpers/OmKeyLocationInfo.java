@@ -152,15 +152,11 @@ public final class OmKeyLocationInfo {
     }
   }
 
-  public KeyLocation getCompactProtobuf() {
-    return getProtobuf(true);
+  public KeyLocation getProtobuf(int clientVersion) {
+    return getProtobuf(false, clientVersion);
   }
 
-  public KeyLocation getProtobuf() {
-    return getProtobuf(false);
-  }
-
-  private KeyLocation getProtobuf(boolean ignorePipeline) {
+  public KeyLocation getProtobuf(boolean ignorePipeline, int clientVersion) {
     KeyLocation.Builder builder = KeyLocation.newBuilder()
         .setBlockID(blockID.getProtobuf())
         .setLength(length)
@@ -171,7 +167,7 @@ public final class OmKeyLocationInfo {
     }
     if (!ignorePipeline) {
       try {
-        builder.setPipeline(pipeline.getProtobufMessage());
+        builder.setPipeline(pipeline.getProtobufMessage(clientVersion));
       } catch (UnknownPipelineStateException e) {
         //TODO: fix me: we should not return KeyLocation without pipeline.
       }

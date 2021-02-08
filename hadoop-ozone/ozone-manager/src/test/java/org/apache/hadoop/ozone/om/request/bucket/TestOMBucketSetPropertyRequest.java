@@ -119,7 +119,7 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
             BucketArgs.newBuilder().setBucketName(bucketName)
                 .setVolumeName(volumeName)
                 .setQuotaInBytes(quotaInBytes)
-                .setQuotaInCounts(1000L)
+                .setQuotaInNamespace(1000L)
                 .setIsVersionEnabled(isVersionEnabled).build()))
         .setCmdType(OzoneManagerProtocolProtos.Type.SetBucketProperty)
         .setClientId(UUID.randomUUID().toString()).build();
@@ -142,9 +142,8 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
         new OMBucketSetPropertyRequest(omRequest);
     int countException = 0;
     try {
-      OMClientResponse omClientResponse =
-          omBucketSetPropertyRequest.validateAndUpdateCache(ozoneManager, 1,
-              ozoneManagerDoubleBufferHelper);
+      omBucketSetPropertyRequest.validateAndUpdateCache(ozoneManager, 1,
+          ozoneManagerDoubleBufferHelper);
     } catch (IllegalArgumentException ex) {
       countException++;
       GenericTestUtils.assertExceptionContains(

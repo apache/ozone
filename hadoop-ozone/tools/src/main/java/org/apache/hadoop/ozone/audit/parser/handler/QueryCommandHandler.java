@@ -47,6 +47,7 @@ public class QueryCommandHandler implements Callable<Void> {
   @ParentCommand
   private AuditParser auditParser;
 
+  @Override
   public Void call() throws Exception {
     try {
       System.out.println(

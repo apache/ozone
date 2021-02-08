@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.node;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
@@ -47,14 +48,16 @@ public class DatanodeInfo extends DatanodeDetails {
   private List<MetadataStorageReportProto> metadataStorageReports;
   private LayoutVersionProto lastKnownLayoutVersion;
 
+  private NodeStatus nodeStatus;
+
   /**
    * Constructs DatanodeInfo from DatanodeDetails.
    *
    * @param datanodeDetails Details about the datanode
    * @param layoutInfo Details about the LayoutVersionProto
    */
-  public DatanodeInfo(DatanodeDetails datanodeDetails,
-                      LayoutVersionProto layoutInfo) {
+  public DatanodeInfo(DatanodeDetails datanodeDetails, NodeStatus nodeStatus,
+        LayoutVersionProto layoutInfo) {
     super(datanodeDetails);
     this.lock = new ReentrantReadWriteLock();
     this.lastHeartbeatTime = Time.monotonicNow();
@@ -66,6 +69,7 @@ public class DatanodeInfo extends DatanodeDetails {
                 layoutInfo.getSoftwareLayoutVersion() : 0)
             .build();
     this.storageReports = Collections.emptyList();
+    this.nodeStatus = nodeStatus;
     this.metadataStorageReports = Collections.emptyList();
   }
 
@@ -73,9 +77,20 @@ public class DatanodeInfo extends DatanodeDetails {
    * Updates the last heartbeat time with current time.
    */
   public void updateLastHeartbeatTime() {
+    updateLastHeartbeatTime(Time.monotonicNow());
+  }
+
+  /**
+   * Sets the last heartbeat time to a given value. Intended to be used
+   * only for tests.
+   *
+   * @param milliSecondsSinceEpoch - ms since Epoch to set as the heartbeat time
+   */
+  @VisibleForTesting
+  public void updateLastHeartbeatTime(long milliSecondsSinceEpoch) {
     try {
       lock.writeLock().lock();
-      lastHeartbeatTime = Time.monotonicNow();
+      lastHeartbeatTime = milliSecondsSinceEpoch;
     } finally {
       lock.writeLock().unlock();
     }
@@ -213,6 +228,37 @@ public class DatanodeInfo extends DatanodeDetails {
    */
   public long getLastStatsUpdatedTime() {
     return lastStatsUpdatedTime;
+  }
+
+  /**
+   * Return the current NodeStatus for the datanode.
+   *
+   * @return NodeStatus - the current nodeStatus
+   */
+  public NodeStatus getNodeStatus() {
+    try {
+      lock.readLock().lock();
+      return nodeStatus;
+    } finally {
+      lock.readLock().unlock();
+    }
+  }
+
+  /**
+   * Update the NodeStatus for this datanode. When using this method
+   * be ware of the potential for lost updates if two threads read the
+   * current status, update one field and then write it back without
+   * locking enforced outside of this class.
+   *
+   * @param newNodeStatus - the new NodeStatus object
+   */
+  public void setNodeStatus(NodeStatus newNodeStatus) {
+    try {
+      lock.writeLock().lock();
+      this.nodeStatus = newNodeStatus;
+    } finally {
+      lock.writeLock().unlock();
+    }
   }
 
   @Override

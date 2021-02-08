@@ -69,7 +69,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
   private int waitForOMToBeReadyTimeout = 120000; // 2 min
 
   private static final Random RANDOM = new Random();
-  private static final int RATIS_LEADER_ELECTION_TIMEOUT = 1000; // 1 second
+  private static final int RATIS_RPC_TIMEOUT = 1000; // 1 second
   public static final int NODE_FAILURE_TIMEOUT = 2000; // 2 seconds
 
   /**
@@ -171,7 +171,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
   public OzoneManager getOMLeader() {
     OzoneManager res = null;
     for (OzoneManager ozoneManager : this.ozoneManagers) {
-      if (ozoneManager.isLeader()) {
+      if (ozoneManager.isLeaderReady()) {
         if (res != null) {
           // Found more than one leader
           // Return null, expect the caller to retry in a while
@@ -250,7 +250,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
    */
   public static class Builder extends MiniOzoneClusterImpl.Builder {
 
-    private final String nodeIdBaseStr = "omNode-";
+    private static final String NODE_ID_PREFIX = "omNode-";
     private List<OzoneManager> activeOMs = new ArrayList<>();
     private List<OzoneManager> inactiveOMs = new ArrayList<>();
 
@@ -308,19 +308,18 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     protected void initOMRatisConf() {
       conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, true);
       conf.setInt(OMConfigKeys.OZONE_OM_HANDLER_COUNT_KEY, numOfOmHandlers);
+      
       // If test change the following config values we will respect,
       // otherwise we will set lower timeout values.
-      long defaultDuration =
-          OMConfigKeys.OZONE_OM_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_DEFAULT
+      long defaultDuration = OMConfigKeys.OZONE_OM_RATIS_MINIMUM_TIMEOUT_DEFAULT
               .getDuration();
-      long curLeaderElectionTimeout = conf.getTimeDuration(
-          OMConfigKeys.OZONE_OM_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY,
+      long curRatisRpcTimeout = conf.getTimeDuration(
+          OMConfigKeys.OZONE_OM_RATIS_MINIMUM_TIMEOUT_KEY,
               defaultDuration, TimeUnit.MILLISECONDS);
-      conf.setTimeDuration(
-          OMConfigKeys.OZONE_OM_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY,
-          defaultDuration == curLeaderElectionTimeout ?
-              RATIS_LEADER_ELECTION_TIMEOUT : curLeaderElectionTimeout,
-          TimeUnit.MILLISECONDS);
+      conf.setTimeDuration(OMConfigKeys.OZONE_OM_RATIS_MINIMUM_TIMEOUT_KEY,
+          defaultDuration == curRatisRpcTimeout ?
+              RATIS_RPC_TIMEOUT : curRatisRpcTimeout, TimeUnit.MILLISECONDS);
+
       long defaultNodeFailureTimeout =
           OMConfigKeys.OZONE_OM_RATIS_SERVER_FAILURE_TIMEOUT_DURATION_DEFAULT.
               getDuration();
@@ -354,7 +353,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
           for (int i = 1; i<= numOfOMs; i++) {
             // Set nodeId
-            String nodeId = nodeIdBaseStr + i;
+            String nodeId = NODE_ID_PREFIX + i;
             OzoneConfiguration config = new OzoneConfiguration(conf);
             config.set(OMConfigKeys.OZONE_OM_NODE_ID_KEY, nodeId);
             // Set the OM http(s) address to null so that the cluster picks
@@ -425,7 +424,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       int port = basePort;
 
       for (int i = 1; i <= numOfOMs; i++, port+=6) {
-        String omNodeId = nodeIdBaseStr + i;
+        String omNodeId = NODE_ID_PREFIX + i;
         omNodesKeyValue.append(",").append(omNodeId);
         String omAddrKey = OmUtils.addKeySuffixes(
             OMConfigKeys.OZONE_OM_ADDRESS_KEY, omServiceId, omNodeId);

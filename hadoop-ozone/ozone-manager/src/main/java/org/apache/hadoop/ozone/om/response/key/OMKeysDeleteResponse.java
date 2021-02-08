@@ -23,7 +23,6 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
@@ -41,16 +40,13 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 @CleanupTableInfo(cleanupTables = KEY_TABLE)
 public class OMKeysDeleteResponse extends AbstractOMKeyDeleteResponse {
   private List<OmKeyInfo> omKeyInfoList;
-  private OmVolumeArgs omVolumeArgs;
   private OmBucketInfo omBucketInfo;
 
   public OMKeysDeleteResponse(@Nonnull OMResponse omResponse,
       @Nonnull List<OmKeyInfo> keyDeleteList,
-      boolean isRatisEnabled, @Nonnull OmVolumeArgs omVolumeArgs,
-      @Nonnull OmBucketInfo omBucketInfo) {
+      boolean isRatisEnabled, @Nonnull OmBucketInfo omBucketInfo) {
     super(omResponse, isRatisEnabled);
     this.omKeyInfoList = keyDeleteList;
-    this.omVolumeArgs = omVolumeArgs;
     this.omBucketInfo = omBucketInfo;
   }
 
@@ -62,6 +58,7 @@ public class OMKeysDeleteResponse extends AbstractOMKeyDeleteResponse {
     super(omResponse);
   }
 
+  @Override
   public void checkAndUpdateDB(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
     if (getOMResponse().getStatus() == OK ||
@@ -91,7 +88,7 @@ public class OMKeysDeleteResponse extends AbstractOMKeyDeleteResponse {
 
     // update bucket usedBytes.
     omMetadataManager.getBucketTable().putWithBatch(batchOperation,
-        omMetadataManager.getBucketKey(omVolumeArgs.getVolume(),
+        omMetadataManager.getBucketKey(omBucketInfo.getVolumeName(),
             omBucketInfo.getBucketName()), omBucketInfo);
   }
 }

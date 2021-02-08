@@ -49,6 +49,8 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+
 /**
  * Test Container calls.
  */
@@ -101,7 +103,7 @@ public class TestGetCommittedBlockLengthAndPutKey {
 
     BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
     byte[] data =
-        RandomStringUtils.random(RandomUtils.nextInt(0, 1024)).getBytes();
+        RandomStringUtils.random(RandomUtils.nextInt(0, 1024)).getBytes(UTF_8);
     ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
         ContainerTestHelper
             .getWriteChunkRequest(container.getPipeline(), blockID,
@@ -159,7 +161,7 @@ public class TestGetCommittedBlockLengthAndPutKey {
 
     BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
     byte[] data =
-        RandomStringUtils.random(RandomUtils.nextInt(0, 1024)).getBytes();
+        RandomStringUtils.random(RandomUtils.nextInt(0, 1024)).getBytes(UTF_8);
     ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
         ContainerTestHelper
             .getWriteChunkRequest(container.getPipeline(), blockID,

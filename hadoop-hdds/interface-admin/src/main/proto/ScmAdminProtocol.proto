@@ -40,6 +40,7 @@ message ScmContainerLocationRequest {
   // A string that identifies this command, we generate  Trace ID in Ozone
   // frontend and this allows us to trace that command all over ozone.
   optional string traceID = 2;
+  optional uint32 version = 3;
 
   optional ContainerRequestProto containerRequest = 6;
   optional GetContainerRequestProto getContainerRequest = 7;
@@ -62,9 +63,12 @@ message ScmContainerLocationRequest {
   optional GetPipelineRequestProto getPipelineRequest = 24;
   optional GetContainerWithPipelineBatchRequestProto getContainerWithPipelineBatchRequest = 25;
   optional GetSafeModeRuleStatusesRequestProto getSafeModeRuleStatusesRequest = 26;
-  optional FinalizeScmUpgradeRequestProto finalizeScmUpgradeRequest = 27;
+  optional DecommissionNodesRequestProto decommissionNodesRequest = 27;
+  optional RecommissionNodesRequestProto recommissionNodesRequest = 28;
+  optional StartMaintenanceNodesRequestProto startMaintenanceNodesRequest = 29;
+  optional FinalizeScmUpgradeRequestProto finalizeScmUpgradeRequest = 30;
   optional QueryUpgradeFinalizationProgressRequestProto
-  queryUpgradeFinalizationProgressRequest = 28;
+  queryUpgradeFinalizationProgressRequest = 31;
 }
 
 message ScmContainerLocationResponse {
@@ -99,9 +103,12 @@ message ScmContainerLocationResponse {
   optional GetPipelineResponseProto getPipelineResponse = 24;
   optional GetContainerWithPipelineBatchResponseProto getContainerWithPipelineBatchResponse = 25;
   optional GetSafeModeRuleStatusesResponseProto getSafeModeRuleStatusesResponse = 26;
-  optional FinalizeScmUpgradeResponseProto finalizeScmUpgradeResponse = 27;
+  optional DecommissionNodesResponseProto decommissionNodesResponse = 27;
+  optional RecommissionNodesResponseProto recommissionNodesResponse = 28;
+  optional StartMaintenanceNodesResponseProto startMaintenanceNodesResponse = 29;
+  optional FinalizeScmUpgradeResponseProto finalizeScmUpgradeResponse = 30;
   optional QueryUpgradeFinalizationProgressResponseProto
-  queryUpgradeFinalizationProgressResponse = 28;
+  queryUpgradeFinalizationProgressResponse = 31;
   enum Status {
     OK = 1;
     CONTAINER_ALREADY_EXISTS = 2;
@@ -132,8 +139,11 @@ enum Type {
   GetPipeline = 19;
   GetContainerWithPipelineBatch = 20;
   GetSafeModeRuleStatuses = 21;
-  FinalizeScmUpgrade = 22;
-  QueryUpgradeFinalizationProgress = 23;
+  DecommissionNodes = 22;
+  RecommissionNodes = 23;
+  StartMaintenanceNodes = 24;
+  FinalizeScmUpgrade = 25;
+  QueryUpgradeFinalizationProgress = 26;
 }
 
 /**
@@ -237,14 +247,49 @@ message SCMCloseContainerResponseProto {
  match the NodeState that we are requesting.
 */
 message NodeQueryRequestProto {
-  required NodeState state = 1;
+  optional NodeState state = 1;
   required QueryScope scope = 2;
   optional string poolName = 3; // if scope is pool, then pool name is needed.
   optional string traceID = 4;
+  optional NodeOperationalState opState = 5;
 }
 
 message NodeQueryResponseProto {
   repeated Node datanodes = 1;
+}
+
+/*
+  Decommission a list of hosts
+*/
+message DecommissionNodesRequestProto {
+  repeated string hosts = 1;
+}
+
+message DecommissionNodesResponseProto {
+  // empty response
+}
+
+/*
+  Recommission a list of hosts in maintenance or decommission states
+*/
+message RecommissionNodesRequestProto {
+  repeated string hosts = 1;
+}
+
+message RecommissionNodesResponseProto {
+  // empty response
+}
+
+/*
+  Place a list of hosts into maintenance mode
+*/
+message StartMaintenanceNodesRequestProto {
+  repeated string hosts = 1;
+  optional int64 endInHours = 2;
+}
+
+message StartMaintenanceNodesResponseProto {
+  // empty response
 }
 
 /**
@@ -371,5 +416,4 @@ message QueryUpgradeFinalizationProgressResponseProto {
  */
 service StorageContainerLocationProtocolService {
   rpc submitRequest (ScmContainerLocationRequest) returns (ScmContainerLocationResponse);
-
 }

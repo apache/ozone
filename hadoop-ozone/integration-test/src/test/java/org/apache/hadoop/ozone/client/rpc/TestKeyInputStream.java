@@ -18,20 +18,30 @@
 package org.apache.hadoop.ozone.client.rpc;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientMetrics;
+import org.apache.hadoop.hdds.scm.container.ReplicationManager.ReplicationManagerConfiguration;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -45,33 +55,51 @@ import org.apache.hadoop.ozone.container.keyvalue.ChunkLayoutTestInfo;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.apache.hadoop.ozone.container.TestHelper.countReplicas;
+import static org.junit.Assert.fail;
+
+import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
+import org.junit.Assume;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Tests {@link KeyInputStream}.
  */
 @RunWith(Parameterized.class)
 public class TestKeyInputStream {
-  private static MiniOzoneCluster cluster;
-  private static OzoneConfiguration conf = new OzoneConfiguration();
-  private static OzoneClient client;
-  private static ObjectStore objectStore;
-  private static int chunkSize;
-  private static int flushSize;
-  private static int maxFlushSize;
-  private static int blockSize;
-  private static String volumeName;
-  private static String bucketName;
-  private static String keyString;
-  private static ChunkLayoutTestInfo chunkLayout;
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TestKeyInputStream.class);
+
+  private static final int TIMEOUT = 300_000;
+
+  private MiniOzoneCluster cluster;
+  private OzoneConfiguration conf = new OzoneConfiguration();
+  private OzoneClient client;
+  private ObjectStore objectStore;
+  private int chunkSize;
+  private int flushSize;
+  private int maxFlushSize;
+  private int blockSize;
+  private String volumeName;
+  private String bucketName;
+  private String keyString;
+  private ChunkLayoutTestInfo chunkLayout;
 
   @Parameterized.Parameters
   public static Collection<Object[]> layouts() {
@@ -105,12 +133,20 @@ public class TestKeyInputStream {
 
     conf.setTimeDuration(HDDS_SCM_WATCHER_TIMEOUT, 1000, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, TimeUnit.SECONDS);
+    conf.setTimeDuration(OZONE_SCM_DEADNODE_INTERVAL, 6, TimeUnit.SECONDS);
+    conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 1);
     conf.setQuietMode(false);
     conf.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 64,
         StorageUnit.MB);
     conf.set(ScmConfigKeys.OZONE_SCM_CHUNK_LAYOUT_KEY, chunkLayout.name());
+
+    ReplicationManagerConfiguration repConf =
+        conf.getObject(ReplicationManagerConfiguration.class);
+    repConf.setInterval(Duration.ofSeconds(1));
+    conf.setFromObject(repConf);
+
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(3)
+        .setNumDatanodes(4)
         .setTotalPipelineNumLimit(5)
         .setBlockSize(blockSize)
         .setChunkSize(chunkSize)
@@ -130,7 +166,7 @@ public class TestKeyInputStream {
   }
 
   @Rule
-  public Timeout timeout = new Timeout(300_000);
+  public Timeout timeout = new Timeout(TIMEOUT);
 
   /**
    * Shutdown MiniDFSCluster.
@@ -156,12 +192,7 @@ public class TestKeyInputStream {
     // write data of more than 2 blocks.
     int dataLength = (2 * blockSize) + (chunkSize);
 
-    Random rd = new Random();
-    byte[] inputData = new byte[dataLength];
-    rd.nextBytes(inputData);
-    key.write(inputData);
-    key.close();
-
+    byte[] inputData = writeRandomBytes(key, dataLength);
 
     KeyInputStream keyInputStream = (KeyInputStream) objectStore
         .getVolume(volumeName).getBucket(bucketName).readKey(keyName)
@@ -304,40 +335,23 @@ public class TestKeyInputStream {
     OzoneOutputStream key = TestHelper.createKey(keyName,
         ReplicationType.RATIS, 0, objectStore, volumeName, bucketName);
 
-    // write data spanning multiple chunks
+    // write data spanning multiple blocks/chunks
     int dataLength = 2 * blockSize + (blockSize / 2);
-    byte[] originData = new byte[dataLength];
-    Random r = new Random();
-    r.nextBytes(originData);
-    key.write(originData);
-    key.close();
+    byte[] data = writeRandomBytes(key, dataLength);
 
     // read chunk data
-    KeyInputStream keyInputStream = (KeyInputStream) objectStore
+    try (KeyInputStream keyInputStream = (KeyInputStream) objectStore
         .getVolume(volumeName).getBucket(bucketName).readKey(keyName)
-        .getInputStream();
+        .getInputStream()) {
 
-    int[] bufferSizeList = {chunkSize / 4, chunkSize / 2, chunkSize - 1,
-        chunkSize, chunkSize + 1, blockSize - 1, blockSize, blockSize + 1,
-        blockSize * 2};
-    for (int bufferSize : bufferSizeList) {
-      byte[] data = new byte[bufferSize];
-      int totalRead = 0;
-      while (totalRead < dataLength) {
-        int numBytesRead = keyInputStream.read(data);
-        if (numBytesRead == -1 || numBytesRead == 0) {
-          break;
-        }
-        byte[] tmp1 =
-            Arrays.copyOfRange(originData, totalRead, totalRead + numBytesRead);
-        byte[] tmp2 =
-            Arrays.copyOfRange(data, 0, numBytesRead);
-        Assert.assertArrayEquals(tmp1, tmp2);
-        totalRead += numBytesRead;
+      int[] bufferSizeList = {chunkSize / 4, chunkSize / 2, chunkSize - 1,
+          chunkSize, chunkSize + 1, blockSize - 1, blockSize, blockSize + 1,
+          blockSize * 2};
+      for (int bufferSize : bufferSizeList) {
+        assertReadFully(data, keyInputStream, bufferSize, 0);
+        keyInputStream.seek(0);
       }
-      keyInputStream.seek(0);
     }
-    keyInputStream.close();
   }
 
   @Test
@@ -397,4 +411,114 @@ public class TestKeyInputStream {
       Assert.assertEquals(inputData[chunkSize + 50 + i], readData[i]);
     }
   }
+
+  @Test
+  public void readAfterReplication() throws Exception {
+    testReadAfterReplication(false);
+  }
+
+  @Test
+  public void readAfterReplicationWithUnbuffering() throws Exception {
+    testReadAfterReplication(true);
+  }
+
+  private void testReadAfterReplication(boolean doUnbuffer) throws Exception {
+    Assume.assumeTrue(cluster.getHddsDatanodes().size() > 3);
+
+    int dataLength = 2 * chunkSize;
+    String keyName = getKeyName();
+    OzoneOutputStream key = TestHelper.createKey(keyName,
+        ReplicationType.RATIS, dataLength, objectStore, volumeName, bucketName);
+
+    byte[] data = writeRandomBytes(key, dataLength);
+
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setType(HddsProtos.ReplicationType.RATIS)
+        .setFactor(HddsProtos.ReplicationFactor.THREE)
+        .build();
+    OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
+
+    OmKeyLocationInfoGroup locations = keyInfo.getLatestVersionLocations();
+    Assert.assertNotNull(locations);
+    List<OmKeyLocationInfo> locationInfoList = locations.getLocationList();
+    Assert.assertEquals(1, locationInfoList.size());
+    OmKeyLocationInfo loc = locationInfoList.get(0);
+    long containerID = loc.getContainerID();
+    Assert.assertEquals(3, countReplicas(containerID, cluster));
+
+    TestHelper.waitForContainerClose(cluster, containerID);
+
+    List<DatanodeDetails> pipelineNodes = loc.getPipeline().getNodes();
+
+    // read chunk data
+    try (KeyInputStream keyInputStream = (KeyInputStream) objectStore
+        .getVolume(volumeName).getBucket(bucketName)
+        .readKey(keyName).getInputStream()) {
+
+      int b = keyInputStream.read();
+      Assert.assertNotEquals(-1, b);
+
+      if (doUnbuffer) {
+        keyInputStream.unbuffer();
+      }
+
+      cluster.shutdownHddsDatanode(pipelineNodes.get(0));
+
+      // check that we can still read it
+      assertReadFully(data, keyInputStream, dataLength - 1, 1);
+    }
+  }
+
+  private void waitForNodeToBecomeDead(
+      DatanodeDetails datanode) throws TimeoutException, InterruptedException {
+    GenericTestUtils.waitFor(() ->
+        HddsProtos.NodeState.DEAD == getNodeHealth(datanode),
+        100, 30000);
+    LOG.info("Node {} is {}", datanode.getUuidString(),
+        getNodeHealth(datanode));
+  }
+
+  private HddsProtos.NodeState getNodeHealth(DatanodeDetails dn) {
+    HddsProtos.NodeState health = null;
+    try {
+      NodeManager nodeManager =
+          cluster.getStorageContainerManager().getScmNodeManager();
+      health = nodeManager.getNodeStatus(dn).getHealth();
+    } catch (NodeNotFoundException e) {
+      fail("Unexpected NodeNotFound exception");
+    }
+    return health;
+  }
+
+  private byte[] writeRandomBytes(OutputStream key, int size)
+      throws IOException {
+    byte[] data = new byte[size];
+    Random r = new Random();
+    r.nextBytes(data);
+    key.write(data);
+    key.close();
+    return data;
+  }
+
+  private static void assertReadFully(byte[] data, InputStream in,
+      int bufferSize, int totalRead) throws IOException {
+
+    byte[] buffer = new byte[bufferSize];
+    while (totalRead < data.length) {
+      int numBytesRead = in.read(buffer);
+      if (numBytesRead == -1 || numBytesRead == 0) {
+        break;
+      }
+      byte[] tmp1 =
+          Arrays.copyOfRange(data, totalRead, totalRead + numBytesRead);
+      byte[] tmp2 =
+          Arrays.copyOfRange(buffer, 0, numBytesRead);
+      Assert.assertArrayEquals(tmp1, tmp2);
+      totalRead += numBytesRead;
+    }
+    Assert.assertEquals(data.length, totalRead);
+  }
+
 }

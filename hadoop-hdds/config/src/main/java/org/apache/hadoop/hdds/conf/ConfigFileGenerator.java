@@ -67,6 +67,7 @@ public class ConfigFileGenerator extends AbstractProcessor {
     try {
 
       //load existing generated config (if exists)
+      boolean resourceExists = true;
       ConfigFileAppender appender = new ConfigFileAppender();
       try (InputStream input = filer
           .getResource(StandardLocation.CLASS_OUTPUT, "",
@@ -74,6 +75,7 @@ public class ConfigFileGenerator extends AbstractProcessor {
         appender.load(input);
       } catch (FileNotFoundException | NoSuchFileException ex) {
         appender.init();
+        resourceExists = false;
       }
 
       Set<? extends Element> annotatedElements =
@@ -100,13 +102,16 @@ public class ConfigFileGenerator extends AbstractProcessor {
         }
 
       }
-      FileObject resource = filer
-          .createResource(StandardLocation.CLASS_OUTPUT, "",
-              OUTPUT_FILE_NAME);
 
-      try (Writer writer = new OutputStreamWriter(
-          resource.openOutputStream(), StandardCharsets.UTF_8)) {
-        appender.write(writer);
+      if (!resourceExists) {
+        FileObject resource = filer
+            .createResource(StandardLocation.CLASS_OUTPUT, "",
+                OUTPUT_FILE_NAME);
+
+        try (Writer writer = new OutputStreamWriter(
+            resource.openOutputStream(), StandardCharsets.UTF_8)) {
+          appender.write(writer);
+        }
       }
 
     } catch (IOException e) {

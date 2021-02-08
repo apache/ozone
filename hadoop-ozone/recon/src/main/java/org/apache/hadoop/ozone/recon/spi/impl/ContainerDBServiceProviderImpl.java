@@ -22,11 +22,16 @@ import static org.apache.hadoop.ozone.recon.ReconConstants.CONTAINER_COUNT_KEY;
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconContainerDBProvider.getNewDBStore;
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.CONTAINER_KEY;
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.CONTAINER_KEY_COUNT;
+import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.REPLICA_HISTORY;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -34,9 +39,12 @@ import javax.inject.Singleton;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
+import org.apache.hadoop.ozone.recon.scm.ContainerReplicaHistory;
+import org.apache.hadoop.ozone.recon.scm.ContainerReplicaHistoryList;
 import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -60,6 +68,8 @@ public class ContainerDBServiceProviderImpl
 
   private Table<ContainerKeyPrefix, Integer> containerKeyTable;
   private Table<Long, Long> containerKeyCountTable;
+  private Table<Long, ContainerReplicaHistoryList>
+      containerReplicaHistoryTable;
   private GlobalStatsDao globalStatsDao;
 
   @Inject
@@ -138,6 +148,8 @@ public class ContainerDBServiceProviderImpl
       this.containerKeyTable = CONTAINER_KEY.getTable(containerDbStore);
       this.containerKeyCountTable =
           CONTAINER_KEY_COUNT.getTable(containerDbStore);
+      this.containerReplicaHistoryTable =
+          REPLICA_HISTORY.getTable(containerDbStore);
     } catch (IOException e) {
       LOG.error("Unable to create Container Key tables.", e);
     }
@@ -172,6 +184,55 @@ public class ContainerDBServiceProviderImpl
   }
 
   /**
+   * Store the ContainerID -> ContainerReplicaHistory (container first and last
+   * seen time) mapping to the container DB store.
+   *
+   * @param containerID the containerID.
+   * @param tsMap A map from Datanode UUID to ContainerReplicaHistory.
+   * @throws IOException
+   */
+  @Override
+  public void storeContainerReplicaHistory(Long containerID,
+      Map<UUID, ContainerReplicaHistory> tsMap) throws IOException {
+    List<ContainerReplicaHistory> tsList = new ArrayList<>();
+    for (Map.Entry<UUID, ContainerReplicaHistory> e : tsMap.entrySet()) {
+      tsList.add(e.getValue());
+    }
+
+    containerReplicaHistoryTable.put(containerID,
+        new ContainerReplicaHistoryList(tsList));
+  }
+
+  /**
+   * Batch version of storeContainerReplicaHistory.
+   *
+   * @param replicaHistoryMap Replica history map
+   * @throws IOException
+   */
+  @Override
+  public void batchStoreContainerReplicaHistory(
+      Map<Long, Map<UUID, ContainerReplicaHistory>> replicaHistoryMap)
+      throws IOException {
+    BatchOperation batchOperation = containerDbStore.initBatchOperation();
+
+    for (Map.Entry<Long, Map<UUID, ContainerReplicaHistory>> entry :
+        replicaHistoryMap.entrySet()) {
+      final long containerId = entry.getKey();
+      final Map<UUID, ContainerReplicaHistory> tsMap = entry.getValue();
+
+      List<ContainerReplicaHistory> tsList = new ArrayList<>();
+      for (Map.Entry<UUID, ContainerReplicaHistory> e : tsMap.entrySet()) {
+        tsList.add(e.getValue());
+      }
+
+      containerReplicaHistoryTable.putWithBatch(batchOperation, containerId,
+          new ContainerReplicaHistoryList(tsList));
+    }
+
+    containerDbStore.commitBatchOperation(batchOperation);
+  }
+
+  /**
    * Get the total count of keys within the given containerID.
    *
    * @param containerID the given containerID.
@@ -182,6 +243,34 @@ public class ContainerDBServiceProviderImpl
   public long getKeyCountForContainer(Long containerID) throws IOException {
     Long keyCount = containerKeyCountTable.get(containerID);
     return keyCount == null ? 0L : keyCount;
+  }
+
+  /**
+   * Get the container replica history of the given containerID.
+   *
+   * @param containerID the given containerId.
+   * @return A map of ContainerReplicaWithTimestamp of the given containerID.
+   * @throws IOException
+   */
+  @Override
+  public Map<UUID, ContainerReplicaHistory> getContainerReplicaHistory(
+      Long containerID) throws IOException {
+
+    final ContainerReplicaHistoryList tsList =
+        containerReplicaHistoryTable.get(containerID);
+    if (tsList == null) {
+      // DB doesn't have an existing entry for the containerID, return empty map
+      return new HashMap<>();
+    }
+
+    Map<UUID, ContainerReplicaHistory> res = new HashMap<>();
+    // Populate result map with entries from the DB.
+    // The list should be fairly short (< 10 entries).
+    for (ContainerReplicaHistory ts : tsList.getList()) {
+      final UUID uuid = ts.getUuid();
+      res.put(uuid, ts);
+    }
+    return res;
   }
 
   /**

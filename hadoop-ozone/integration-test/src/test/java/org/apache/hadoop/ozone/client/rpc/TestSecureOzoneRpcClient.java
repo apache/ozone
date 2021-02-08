@@ -62,20 +62,13 @@ import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.UUID;
 
-import org.junit.Rule;
-import org.junit.rules.Timeout;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 
 /**
  * This class is to test all the public facing APIs of Ozone Client.
  */
 public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
-
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public Timeout timeout = new Timeout(300000);
 
   private static MiniOzoneCluster cluster = null;
   private static OzoneClient ozClient = null;
@@ -159,23 +152,23 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
       String keyName = UUID.randomUUID().toString();
 
       try (OzoneOutputStream out = bucket.createKey(keyName,
-          value.getBytes().length, ReplicationType.STAND_ALONE,
+          value.getBytes(UTF_8).length, ReplicationType.STAND_ALONE,
           ReplicationFactor.ONE, new HashMap<>())) {
-        out.write(value.getBytes());
+        out.write(value.getBytes(UTF_8));
       }
 
       OzoneKey key = bucket.getKey(keyName);
       Assert.assertEquals(keyName, key.getName());
       byte[] fileContent;
       try(OzoneInputStream is = bucket.readKey(keyName)) {
-        fileContent = new byte[value.getBytes().length];
+        fileContent = new byte[value.getBytes(UTF_8).length];
         is.read(fileContent);
       }
 
       Assert.assertTrue(verifyRatisReplication(volumeName, bucketName,
           keyName, ReplicationType.STAND_ALONE,
           ReplicationFactor.ONE));
-      Assert.assertEquals(value, new String(fileContent));
+      Assert.assertEquals(value, new String(fileContent, UTF_8));
       Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
       Assert.assertFalse(key.getModificationTime().isBefore(testStartTime));
     }
@@ -203,11 +196,11 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
       String keyName = UUID.randomUUID().toString();
 
       try (OzoneOutputStream out = bucket.createKey(keyName,
-          value.getBytes().length, ReplicationType.STAND_ALONE,
+          value.getBytes(UTF_8).length, ReplicationType.STAND_ALONE,
           ReplicationFactor.ONE, new HashMap<>())) {
         LambdaTestUtils.intercept(IOException.class, "UNAUTHENTICATED: Fail " +
                 "to find any token ",
-            () -> out.write(value.getBytes()));
+            () -> out.write(value.getBytes(UTF_8)));
       }
 
       OzoneKey key = bucket.getKey(keyName);

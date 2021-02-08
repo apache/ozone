@@ -62,6 +62,7 @@ public enum ChunkLayoutTestInfo {
   },
 
   FILE_PER_CHUNK {
+    @Override
     public ChunkManager createChunkManager(boolean sync, BlockManager manager) {
       return new FilePerChunkStrategy(sync, manager);
     }
@@ -78,6 +79,7 @@ public enum ChunkLayoutTestInfo {
   },
 
   FILE_PER_BLOCK {
+    @Override
     public ChunkManager createChunkManager(boolean sync, BlockManager manager) {
       return new FilePerBlockStrategy(sync);
     }

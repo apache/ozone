@@ -88,4 +88,10 @@ public class DatanodeSchemaOneDBDefinition
       getDeletedBlocksColumnFamily() {
     return DELETED_BLOCKS;
   }
+
+  @Override
+  public DBColumnFamilyDefinition[] getColumnFamilies() {
+    return new DBColumnFamilyDefinition[] {getBlockDataColumnFamily(),
+        getMetadataColumnFamily(), getDeletedBlocksColumnFamily() };
+  }
 }
