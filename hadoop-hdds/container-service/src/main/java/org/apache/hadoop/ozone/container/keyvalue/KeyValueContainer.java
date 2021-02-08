@@ -51,6 +51,7 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
+import org.apache.hadoop.ozone.container.upgrade.DatanodeMetadataFeatures;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 
 import com.google.common.base.Preconditions;
@@ -129,7 +130,8 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
       // This method is only called when creating new containers.
       // Therefore, always use the newest schema version.
-      containerData.setSchemaVersion(OzoneConsts.SCHEMA_LATEST);
+      containerData.setSchemaVersion(
+          DatanodeMetadataFeatures.getSchemaVersion());
       KeyValueContainerUtil.createContainerMetaData(containerID,
               containerMetaDataPath, chunksPath, dbFile,
               containerData.getSchemaVersion(), config);
