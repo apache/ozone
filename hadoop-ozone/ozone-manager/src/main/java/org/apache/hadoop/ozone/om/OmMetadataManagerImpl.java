@@ -144,7 +144,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   public static final String TRANSACTION_INFO_TABLE =
       "transactionInfoTable";
 
-  public static final String[] ALL_TABLES = new String[] {
+  static final String[] ALL_TABLES = new String[] {
       USER_TABLE,
       VOLUME_TABLE,
       BUCKET_TABLE,

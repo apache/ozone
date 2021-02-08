@@ -76,8 +76,7 @@ public class TestOMVersionManager {
         OMLayoutFeature.values()[OMLayoutFeature.values().length - 1]
             .layoutVersion() + 1);
     try {
-      OMLayoutVersionManager omVersionManager =
-          new OMLayoutVersionManager(omStorage);
+      new OMLayoutVersionManager(omStorage);
       Assert.fail();
     } catch (OMException ex) {
       assertEquals(NOT_SUPPORTED_OPERATION, ex.getResult());

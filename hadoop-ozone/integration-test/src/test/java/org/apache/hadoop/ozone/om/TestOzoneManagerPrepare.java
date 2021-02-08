@@ -269,9 +269,12 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     File logDir = Paths.get(ratisDir, groupIdDirName, "current")
         .toFile();
 
-    for (File file : logDir.listFiles()) {
-      if (file.getName().startsWith("log")) {
-        return true;
+    File[] files = logDir.listFiles();
+    if (files != null) {
+      for (File file : files) {
+        if (file.getName().startsWith("log")) {
+          return true;
+        }
       }
     }
     return false;
