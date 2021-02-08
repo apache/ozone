@@ -514,7 +514,6 @@ public class ContainerOperationClient implements ScmClient {
    * @return returns true if operation is successful.
    * @throws IOException
    */
-  @Override
   public boolean forceExitSafeMode() throws IOException {
     return storageContainerLocationClient.forceExitSafeMode();
   }
@@ -532,6 +531,14 @@ public class ContainerOperationClient implements ScmClient {
   @Override
   public boolean getReplicationManagerStatus() throws IOException {
     return storageContainerLocationClient.getReplicationManagerStatus();
+  }
+
+
+  @Override
+  public HddsProtos.DatanodeDiskInfo getDatanodeDiskInfo(String ipaddress,
+                                                         String uuid)
+      throws IOException {
+    return storageContainerLocationClient.getDatanodeDiskInfo(ipaddress, uuid);
   }
 
 }

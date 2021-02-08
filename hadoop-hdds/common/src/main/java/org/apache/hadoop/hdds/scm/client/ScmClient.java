@@ -283,5 +283,13 @@ public interface ScmClient extends Closeable {
    */
   boolean getReplicationManagerStatus() throws IOException;
 
-
+  /**
+   * Get disk usage information of the requested datanode.
+   * @param ipaddress datanode ipaddress
+   * @param uuid datanode uuid
+   * @return datanode disk info
+   */
+  HddsProtos.DatanodeDiskInfo getDatanodeDiskInfo(String ipaddress,
+                                                  String uuid)
+      throws IOException;
 }
