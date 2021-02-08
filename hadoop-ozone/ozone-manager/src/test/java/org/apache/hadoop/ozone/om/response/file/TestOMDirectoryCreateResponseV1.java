@@ -59,9 +59,7 @@ public class TestOMDirectoryCreateResponseV1 {
   @Test
   public void testAddToDBBatch() throws Exception {
 
-    String volumeName = UUID.randomUUID().toString();
     String keyName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
 
     long parentID = 100;
     OmDirectoryInfo omDirInfo =

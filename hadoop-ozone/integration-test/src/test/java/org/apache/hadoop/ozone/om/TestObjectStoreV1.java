@@ -50,6 +50,7 @@ import org.junit.Test;
 import org.junit.rules.Timeout;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.UUID;
 
@@ -175,7 +176,8 @@ public class TestObjectStoreV1 {
     verifyKeyInOpenFileTable(openFileTable, clientID, file,
             dirPathC.getObjectID(), false);
 
-    ozoneOutputStream.write(data.getBytes(), 0, data.length());
+    ozoneOutputStream.write(data.getBytes(StandardCharsets.UTF_8), 0,
+            data.length());
     ozoneOutputStream.close();
 
     Table<String, OmKeyInfo> fileTable =
@@ -227,7 +229,8 @@ public class TestObjectStoreV1 {
     verifyKeyInOpenFileTable(openFileTable, clientID, fileName,
             dirPathC.getObjectID(), false);
 
-    ozoneOutputStream.write(data.getBytes(), 0, data.length());
+    ozoneOutputStream.write(data.getBytes(StandardCharsets.UTF_8), 0,
+            data.length());
 
     // open key
     try {
@@ -356,20 +359,19 @@ public class TestObjectStoreV1 {
   }
 
   private void assertKeyRenamedEx(OzoneBucket bucket, String keyName)
-      throws Exception {
-    OMException oe = null;
+          throws Exception {
     try {
       bucket.getKey(keyName);
-    } catch (OMException e) {
-      oe = e;
+      fail("Should throw KeyNotFound as the key got renamed!");
+    } catch (OMException ome) {
+      Assert.assertEquals(KEY_NOT_FOUND, ome.getResult());
     }
-    Assert.assertEquals(KEY_NOT_FOUND, oe.getResult());
   }
 
   private void createTestKey(OzoneBucket bucket, String keyName,
       String keyValue) throws IOException {
     OzoneOutputStream out = bucket.createKey(keyName,
-            keyValue.getBytes().length, STAND_ALONE,
+            keyValue.getBytes(StandardCharsets.UTF_8).length, STAND_ALONE,
             ONE, new HashMap<>());
     out.write(keyValue.getBytes());
     out.close();
