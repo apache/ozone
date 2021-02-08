@@ -48,16 +48,16 @@ public class GetS3SecretHandler extends S3Handler {
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
     String userName = UserGroupInformation.getCurrentUser().getUserName();
-    final S3SecretValue secret =
-        client.getObjectStore().getS3Secret(userName);
-    String prefix = "";
+
+    final S3SecretValue secret = client.getObjectStore().getS3Secret(userName);
     if (export) {
-      prefix = "export ";
+      System.out
+          .println("export AWS_ACCESS_KEY_ID=" + secret.getAwsAccessKey());
+      System.out
+          .println("export AWS_SECRET_ACCESS_KEY=" + secret.getAwsSecret());
+    } else {
+      out().println(secret);
     }
-    System.out
-        .println(prefix + "AWS_ACCESS_KEY_ID=" + secret.getAwsAccessKey());
-    System.out
-        .println(prefix + "AWS_SECRET_ACCESS_KEY=" + secret.getAwsSecret());
   }
 
 }

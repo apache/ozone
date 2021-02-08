@@ -62,9 +62,9 @@ Setup v4 headers
 
 Setup secure v4 headers
     ${result} =         Execute                    ozone s3 getsecret
-    ${accessKey} =      Get Regexp Matches         ${result}     (?<=AWS_ACCESS_KEY_ID=).*
+    ${accessKey} =      Get Regexp Matches         ${result}     (?<=awsAccessKey=).*
     ${accessKey} =      Get Variable Value         ${accessKey}  sdsdasaasdasd
-    ${secret} =         Get Regexp Matches         ${result}     (?<=AWS_SECRET_ACCESS_KEY=).*
+    ${secret} =         Get Regexp Matches         ${result}     (?<=awsSecret=).*
     ${accessKey} =      Set Variable               ${accessKey[0]}
     ${secret} =         Set Variable               ${secret[0]}
                         Execute                    aws configure set default.s3.signature_version s3v4
