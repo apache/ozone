@@ -239,8 +239,8 @@ public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
       assertNotNull("Should be able to create file: "
               + dir1Dir2Dir1Dir2Key1, outputStream);
     }
-    RemoteIterator<LocatedFileStatus> fileStatusItr = getFs().listFiles(new Path(
-            "/"), true);
+    RemoteIterator<LocatedFileStatus> fileStatusItr = getFs().listFiles(
+            new Path("/"), true);
     String uriPrefix = "o3fs://" + getBucketName() + "." + getVolumeName();
     ArrayList<String> expectedPaths = new ArrayList<>();
     expectedPaths.add(uriPrefix + dir1Dir1Dir2Key1.toString());
@@ -356,7 +356,8 @@ public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
     getFs().mkdirs(dir2SourcePath);
 
     // (a) parent of dst does not exist.  /root_dir/b/c
-    final Path destinPath = new Path(getFs().getUri().toString() + root + "/b/c");
+    final Path destinPath = new Path(getFs().getUri().toString()
+            + root + "/b/c");
     try {
       getFs().rename(dir2SourcePath, destinPath);
       Assert.fail("Should fail as parent of dst does not exist!");

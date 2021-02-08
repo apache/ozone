@@ -373,7 +373,7 @@ public class TestObjectStoreV1 {
     OzoneOutputStream out = bucket.createKey(keyName,
             keyValue.getBytes(StandardCharsets.UTF_8).length, STAND_ALONE,
             ONE, new HashMap<>());
-    out.write(keyValue.getBytes());
+    out.write(keyValue.getBytes(StandardCharsets.UTF_8));
     out.close();
     OzoneKey key = bucket.getKey(keyName);
     Assert.assertEquals(keyName, key.getName());

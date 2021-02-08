@@ -438,7 +438,6 @@ public class TestOMDirectoryCreateRequestV1 {
     OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo(volumeName,
             bucketName, keyName, HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.THREE, objID);
-    objID++;
 
     String ozoneKey = parentID + "/" + dirs.get(1);
     ++txnID;
@@ -523,8 +522,6 @@ public class TestOMDirectoryCreateRequestV1 {
     TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
             omMetadataManager);
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
-    OmBucketInfo omBucketInfo =
-            omMetadataManager.getBucketTable().get(bucketKey);
 
     OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
             OzoneFSUtils.addTrailingSlashIfNeeded(keyName));
@@ -591,11 +588,10 @@ public class TestOMDirectoryCreateRequestV1 {
   private String createDirKey(List<String> dirs, int depth) {
     String keyName = RandomStringUtils.randomAlphabetic(5);
     dirs.add(keyName);
-    StringBuffer buf = new StringBuffer();
+    StringBuffer buf = new StringBuffer(keyName);
     for (int i = 0; i < depth; i++) {
       String dirName = RandomStringUtils.randomAlphabetic(5);
       dirs.add(dirName);
-      buf.append(keyName);
       buf.append(OzoneConsts.OM_KEY_PREFIX);
       buf.append(dirName);
     }
