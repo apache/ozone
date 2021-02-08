@@ -87,11 +87,11 @@ public class TestReadRetries {
   @Rule
   public ExpectedException thrown = ExpectedException.none();
 
-  private static MiniOzoneCluster cluster = null;
-  private static OzoneClient ozClient = null;
-  private static ObjectStore store = null;
-  private static OzoneManager ozoneManager;
-  private static StorageContainerLocationProtocolClientSideTranslatorPB
+  private MiniOzoneCluster cluster = null;
+  private OzoneClient ozClient = null;
+  private ObjectStore store = null;
+  private OzoneManager ozoneManager;
+  private StorageContainerLocationProtocolClientSideTranslatorPB
       storageContainerLocationClient;
 
   private static final String SCM_ID = UUID.randomUUID().toString();
