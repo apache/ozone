@@ -77,6 +77,9 @@ public class BenchMarkCRCBatch {
       return crcImpl;
     }
 
+    @edu.umd.cs.findbugs.annotations.SuppressFBWarnings(
+        value="EI_EXPOSE_REP",
+        justification="The intent is to expose this variable")
     public byte[] checksumBuffer() {
       return checksumBuffer;
     }
