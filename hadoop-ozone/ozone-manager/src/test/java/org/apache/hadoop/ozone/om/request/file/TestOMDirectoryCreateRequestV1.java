@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -369,8 +370,9 @@ public class TestOMDirectoryCreateRequestV1 {
             bucketName, keyName, HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.THREE, objID++);
     String ozoneFileName = parentID + "/" + dirs.get(dirs.size() - 1);
+    ++txnID;
     omMetadataManager.getKeyTable().addCacheEntry(new CacheKey<>(ozoneFileName),
-            new CacheValue<>(Optional.of(omKeyInfo), ++txnID));
+            new CacheValue<>(Optional.of(omKeyInfo), txnID));
     omMetadataManager.getKeyTable().put(ozoneFileName, omKeyInfo);
 
     OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
@@ -435,10 +437,12 @@ public class TestOMDirectoryCreateRequestV1 {
     // Add a key in second level.
     OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo(volumeName,
             bucketName, keyName, HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, objID++);
+            HddsProtos.ReplicationFactor.THREE, objID);
+
     String ozoneKey = parentID + "/" + dirs.get(1);
+    ++txnID;
     omMetadataManager.getKeyTable().addCacheEntry(new CacheKey<>(ozoneKey),
-            new CacheValue<>(Optional.of(omKeyInfo), ++txnID));
+            new CacheValue<>(Optional.of(omKeyInfo), txnID));
     omMetadataManager.getKeyTable().put(ozoneKey, omKeyInfo);
 
     OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
@@ -517,10 +521,6 @@ public class TestOMDirectoryCreateRequestV1 {
     // Add volume and bucket entries to DB.
     TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
             omMetadataManager);
-    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
-    OmBucketInfo omBucketInfo =
-            omMetadataManager.getBucketTable().get(bucketKey);
-    long bucketID = omBucketInfo.getObjectID();
 
     OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
             OzoneFSUtils.addTrailingSlashIfNeeded(keyName));
@@ -587,12 +587,14 @@ public class TestOMDirectoryCreateRequestV1 {
   private String createDirKey(List<String> dirs, int depth) {
     String keyName = RandomStringUtils.randomAlphabetic(5);
     dirs.add(keyName);
+    StringBuffer buf = new StringBuffer(keyName);
     for (int i = 0; i < depth; i++) {
       String dirName = RandomStringUtils.randomAlphabetic(5);
       dirs.add(dirName);
-      keyName += "/" + dirName;
+      buf.append(OzoneConsts.OM_KEY_PREFIX);
+      buf.append(dirName);
     }
-    return keyName;
+    return buf.toString();
   }
 
   private void verifyDirectoriesInDB(List<String> dirs, long bucketID)
