@@ -23,13 +23,16 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateApprover.ApprovalType;
+import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 
 import java.io.IOException;
+import java.math.BigInteger;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.Future;
 
 /**
@@ -46,7 +49,7 @@ public interface CertificateServer {
    * @throws SCMSecurityException - Throws if the init fails.
    */
   void init(SecurityConfig securityConfig, CAType type)
-      throws SCMSecurityException;
+      throws IOException;
 
   /**
    * Returns the CA Certificate for this CA.
@@ -101,14 +104,15 @@ public interface CertificateServer {
   /**
    * Revokes a Certificate issued by this CertificateServer.
    *
-   * @param certificates - List of Certificates to revoke.
-   * @param reason - Reason for revocation.
-   * @param securityConfig - Security Configuration.
-   * @return Future that tells us what happened.
+   * @param serialIDs       - List of serial IDs of Certificates to be revoked.
+   * @param reason          - Reason for revocation.
+   * @param securityConfig  - Security Configuration.
+   * @return Future that gives a list of certificates that were revoked.
    */
-  Future<Boolean> revokeCertificates(List<X509Certificate> certificates,
-                                     int reason,
-                                     SecurityConfig securityConfig);
+  Future<Optional<Long>> revokeCertificates(
+      List<BigInteger> serialIDs,
+      CRLReason reason,
+      SecurityConfig securityConfig);
 
   /**
    * List certificates.

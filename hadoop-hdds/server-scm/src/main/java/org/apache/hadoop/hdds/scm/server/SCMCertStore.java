@@ -21,8 +21,6 @@ package org.apache.hadoop.hdds.scm.server;
 
 import java.io.IOException;
 import java.math.BigInteger;
-import java.security.KeyPair;
-import java.security.PrivateKey;
 import java.security.cert.CRLException;
 import java.security.cert.X509CRL;
 import java.security.cert.X509Certificate;
@@ -30,6 +28,7 @@ import java.util.ArrayList;
 
 import java.util.List;
 import java.util.Date;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -37,17 +36,15 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.CRLApprover;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
-import org.apache.hadoop.hdds.security.x509.certificate.utils.CRLCodec;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.bouncycastle.cert.X509CRLHolder;
+import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.X509v2CRLBuilder;
 import org.bouncycastle.operator.OperatorCreationException;
-import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -88,10 +85,11 @@ public class SCMCertStore implements CertificateStore {
   }
 
   @Override
-  public void revokeCertificates(List<X509Certificate> certificates,
-                                 X509CertificateHolder caCertificateHolder,
-                                 int reason,
-                                 SecurityConfig securityConfig, KeyPair keyPair)
+  public Optional<Long> revokeCertificates(
+      List<BigInteger> serialIDs,
+      X509CertificateHolder caCertificateHolder,
+      CRLReason reason,
+      CRLApprover crlApprover)
       throws IOException {
     lock.lock();
     Date now = new Date();
@@ -100,34 +98,27 @@ public class SCMCertStore implements CertificateStore {
         new X509v2CRLBuilder(caCertificateHolder.getIssuer(), now);
     List<X509Certificate> certsToRevoke = new ArrayList<>();
     X509CRL crl;
+    Optional<Long> sequenceId = Optional.empty();
     try {
-      for (X509Certificate certificate: certificates) {
-        BigInteger serialID = certificate.getSerialNumber();
+      for (BigInteger serialID: serialIDs) {
         X509Certificate cert =
             getCertificateByID(serialID, CertType.VALID_CERTS);
         if (cert == null && LOG.isWarnEnabled()) {
           LOG.warn("Trying to revoke a certificate that is not valid. " +
-              "Serial ID: {}", certificate.getSerialNumber().toString());
+              "Serial ID: {}", serialID.toString());
         } else if (getCertificateByID(serialID, CertType.REVOKED_CERTS)
             != null) {
           LOG.warn("Trying to revoke a certificate that is already revoked.");
         } else {
-          builder.addCRLEntry(serialID, now, reason);
+          builder.addCRLEntry(serialID, now, reason.getValue().intValue());
           certsToRevoke.add(cert);
         }
       }
       if (!certsToRevoke.isEmpty()) {
         try {
-          JcaContentSignerBuilder contentSignerBuilder =
-              new JcaContentSignerBuilder(securityConfig.getSignatureAlgo());
-
-          contentSignerBuilder.setProvider(securityConfig.getProvider());
-          PrivateKey privateKey = keyPair.getPrivate();
-          X509CRLHolder crlHolder =
-              builder.build(contentSignerBuilder.build(privateKey));
-
-          crl = CRLCodec.getX509CRL(crlHolder);
+          crl = crlApprover.sign(builder);
         } catch (OperatorCreationException | CRLException e) {
+          lock.unlock();
           throw new SCMSecurityException("Unable to create Certificate " +
               "Revocation List.", e);
         }
@@ -140,23 +131,25 @@ public class SCMCertStore implements CertificateStore {
             scmMetadataStore.getValidCertsTable()
                 .deleteWithBatch(batch, cert.getSerialNumber());
           }
-          long sequenceId = crlSequenceId.incrementAndGet();
+          long id = crlSequenceId.incrementAndGet();
           CRLInfo crlInfo = new CRLInfo.Builder()
               .setX509CRL(crl)
               .setCreationTimestamp(now.getTime())
               .build();
           scmMetadataStore.getCRLInfoTable().putWithBatch(
-              batch, sequenceId, crlInfo);
+              batch, id, crlInfo);
 
           // Update the CRL Sequence Id Table with the last sequence id.
           scmMetadataStore.getCRLSequenceIdTable().putWithBatch(batch,
-              CRL_SEQUENCE_ID_KEY, sequenceId);
+              CRL_SEQUENCE_ID_KEY, id);
           scmMetadataStore.getStore().commitBatchOperation(batch);
+          sequenceId = Optional.of(id);
         }
       }
     } finally {
       lock.unlock();
     }
+    return sequenceId;
   }
 
   @Override

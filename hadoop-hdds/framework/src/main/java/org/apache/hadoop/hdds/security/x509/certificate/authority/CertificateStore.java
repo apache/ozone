@@ -20,14 +20,14 @@
 package org.apache.hadoop.hdds.security.x509.certificate.authority;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.cert.X509CertificateHolder;
 
 import java.io.IOException;
 import java.math.BigInteger;
-import java.security.KeyPair;
 import java.security.cert.X509Certificate;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * This interface allows the DefaultCA to be portable and use different DB
@@ -53,17 +53,16 @@ public interface CertificateStore {
    * Adds the certificates to be revoked to a new CRL and moves all the
    * certificates in a transactional manner from valid certificate to
    * revoked certificate state.
-   * @param certificates - List of X509 Certificates to be revoked.
+   * @param serialIDs - List of Serial IDs of Certificates to be revoked.
    * @param caCertificateHolder - X509 Certificate Holder of the CA.
    * @param reason - CRLReason for revocation.
-   * @param securityConfig - Security Configuration.
-   * @param keyPair - Public and Private key of the CA.
-   * @throws IOException
+   * @param approver - CRL approver to sign the CRL.
+   * @return CRL sequence ID.
+   * @throws IOException - on failure.
    */
-  void revokeCertificates(List<X509Certificate> certificates,
-                          X509CertificateHolder caCertificateHolder,
-                          int reason, SecurityConfig securityConfig,
-                          KeyPair keyPair)
+  Optional<Long> revokeCertificates(List<BigInteger> serialIDs,
+                                    X509CertificateHolder caCertificateHolder,
+                                    CRLReason reason, CRLApprover approver)
       throws IOException;
 
   /**
@@ -79,7 +78,7 @@ public interface CertificateStore {
    * @param serialID - ID of the certificate.
    * @param certType - Whether its Valid or Revoked certificate.
    * @return X509Certificate
-   * @throws IOException
+   * @throws IOException - on failure.
    */
   X509Certificate getCertificateByID(BigInteger serialID, CertType certType)
       throws IOException;
@@ -91,7 +90,7 @@ public interface CertificateStore {
    * @param count - max number of certs returned.
    * @param certType cert type (valid/revoked).
    * @return list of X509 certificates.
-   * @throws IOException
+   * @throws IOException - on failure.
    */
   List<X509Certificate> listCertificate(HddsProtos.NodeType role,
       BigInteger startSerialID, int count, CertType certType)

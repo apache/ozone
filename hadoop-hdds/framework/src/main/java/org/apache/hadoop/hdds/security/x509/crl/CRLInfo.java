@@ -111,7 +111,7 @@ public class CRLInfo implements Comparator<CRLInfo>,
    */
   @Override
   public int compare(CRLInfo o1, CRLInfo o2) {
-    return 0;
+    return Long.compare(o1.getCreationTimestamp(), o2.getCreationTimestamp());
   }
 
   @Override
@@ -132,7 +132,15 @@ public class CRLInfo implements Comparator<CRLInfo>,
 
   @Override
   public int hashCode() {
-    return Objects.hash(x509CRL);
+    return Objects.hash(getX509CRL(), getCreationTimestamp());
+  }
+
+  @Override
+  public String toString() {
+    return "CRLInfo{" +
+        "x509CRL=" + x509CRL.toString() +
+        ", creationTimestamp=" + creationTimestamp +
+        '}';
   }
 
   /**

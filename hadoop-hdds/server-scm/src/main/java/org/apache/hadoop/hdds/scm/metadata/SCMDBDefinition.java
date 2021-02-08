@@ -82,9 +82,9 @@ public class SCMDBDefinition implements DBDefinition {
           ContainerInfo.class,
           new ContainerInfoCodec());
 
-  public static final DBColumnFamilyDefinition<Long, CRLInfo> CRL_INFO =
+  public static final DBColumnFamilyDefinition<Long, CRLInfo> CRLS =
       new DBColumnFamilyDefinition<>(
-          "crlInfo",
+          "crls",
           Long.class,
           new LongCodec(),
           CRLInfo.class,
@@ -112,6 +112,6 @@ public class SCMDBDefinition implements DBDefinition {
   @Override
   public DBColumnFamilyDefinition[] getColumnFamilies() {
     return new DBColumnFamilyDefinition[] {DELETED_BLOCKS, VALID_CERTS,
-        REVOKED_CERTS, PIPELINES, CONTAINERS, CRL_INFO, CRL_SEQUENCE_ID};
+        REVOKED_CERTS, PIPELINES, CONTAINERS, CRLS, CRL_SEQUENCE_ID};
   }
 }

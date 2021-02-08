@@ -23,7 +23,9 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.CRLApprover;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.DefaultCRLApprover;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -32,7 +34,6 @@ import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.junit.After;
-import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -47,8 +48,14 @@ import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.apache.hadoop.ozone.OzoneConsts.CRL_SEQUENCE_ID_KEY;
 
 /**
@@ -65,6 +72,7 @@ public class TestSCMCertStore {
   private SecurityConfig securityConfig;
   private X509Certificate x509Certificate;
   private KeyPair keyPair;
+  private CRLApprover crlApprover;
 
   @Rule
   public final TemporaryFolder tempDir = new TemporaryFolder();
@@ -77,6 +85,7 @@ public class TestSCMCertStore {
         tempDir.newFolder().getAbsolutePath());
 
     securityConfig = new SecurityConfig(config);
+    keyPair = KeyStoreTestUtil.generateKeyPair("RSA");
   }
 
   @Before
@@ -88,7 +97,13 @@ public class TestSCMCertStore {
   @Before
   public void generateCertificate() throws Exception {
     Files.createDirectories(securityConfig.getKeyLocation(COMPONENT_NAME));
-    x509Certificate = generateX509Cert(null);
+    x509Certificate = generateX509Cert();
+  }
+
+  @Before
+  public void initCRLApprover() {
+    crlApprover = new DefaultCRLApprover(securityConfig,
+        keyPair.getPrivate());
   }
 
   @After
@@ -104,51 +119,53 @@ public class TestSCMCertStore {
     BigInteger serialID = x509Certificate.getSerialNumber();
     scmCertStore.storeValidCertificate(serialID, x509Certificate);
 
-    Assert.assertNotNull(
+    assertNotNull(
         scmCertStore.getCertificateByID(serialID,
         CertificateStore.CertType.VALID_CERTS));
 
     X509CertificateHolder caCertificateHolder =
-        new X509CertificateHolder(generateX509Cert(keyPair).getEncoded());
-    List<X509Certificate> certs = new ArrayList<>();
-    certs.add(x509Certificate);
-    scmCertStore.revokeCertificates(certs,
+        new X509CertificateHolder(generateX509Cert().getEncoded());
+    List<BigInteger> certs = new ArrayList<>();
+    certs.add(x509Certificate.getSerialNumber());
+    Optional<Long> sequenceId = scmCertStore.revokeCertificates(certs,
         caCertificateHolder,
-        CRLReason.unspecified, securityConfig,
-        keyPair);
+        CRLReason.lookup(CRLReason.keyCompromise), crlApprover);
 
-    Assert.assertNull(
+    assertTrue(sequenceId.isPresent());
+    assertEquals(INITIAL_SEQUENCE_ID + 1L, (long) sequenceId.get());
+
+    assertNull(
         scmCertStore.getCertificateByID(serialID,
             CertificateStore.CertType.VALID_CERTS));
 
-    Assert.assertNotNull(
+    assertNotNull(
         scmCertStore.getCertificateByID(serialID,
             CertificateStore.CertType.REVOKED_CERTS));
 
     // CRL Info table should have a CRL with sequence id
-    Assert.assertEquals(
-        INITIAL_SEQUENCE_ID + 1L,
-        (long) scmMetadataStore.getCRLInfoTable().iterator().next().getKey());
+    assertNotNull(scmMetadataStore.getCRLInfoTable()
+        .get(sequenceId.get()));
 
     // Check the sequence ID table for latest sequence id
-    Assert.assertEquals(INITIAL_SEQUENCE_ID + 1L, (long)
+    assertEquals(INITIAL_SEQUENCE_ID + 1L, (long)
         scmMetadataStore.getCRLSequenceIdTable().get(CRL_SEQUENCE_ID_KEY));
 
     CRLInfo crlInfo =
-        scmMetadataStore.getCRLInfoTable().iterator().next().getValue();
+        scmMetadataStore.getCRLInfoTable().get(sequenceId.get());
 
     Set<? extends X509CRLEntry> revokedCertificates =
         crlInfo.getX509CRL().getRevokedCertificates();
-    Assert.assertEquals(1L, revokedCertificates.size());
-    Assert.assertEquals(x509Certificate.getSerialNumber(),
+    assertEquals(1L, revokedCertificates.size());
+    assertEquals(x509Certificate.getSerialNumber(),
         revokedCertificates.iterator().next().getSerialNumber());
 
     // Now trying to revoke the already revoked certificate should result in
     // a warning message and no-op. It should not create a new CRL.
-    scmCertStore.revokeCertificates(certs,
+    sequenceId = scmCertStore.revokeCertificates(certs,
         caCertificateHolder,
-        CRLReason.unspecified, securityConfig,
-        keyPair);
+        CRLReason.lookup(CRLReason.unspecified), crlApprover);
+
+    assertFalse(sequenceId.isPresent());
 
     int size = 0;
     TableIterator<Long, ? extends Table.KeyValue<Long, CRLInfo>> iter =
@@ -159,43 +176,42 @@ public class TestSCMCertStore {
       iter.next();
     }
 
-    Assert.assertEquals(1, size);
+    assertEquals(1, size);
 
     // Generate 3 more certificates and revoke 2 of them
-    List<X509Certificate> newCerts = new ArrayList<>();
+    List<BigInteger> newSerialIDs = new ArrayList<>();
     for (int i = 0; i<3; i++) {
-      X509Certificate cert = generateX509Cert(keyPair);
+      X509Certificate cert = generateX509Cert();
       scmCertStore.storeValidCertificate(cert.getSerialNumber(), cert);
-      newCerts.add(cert);
+      newSerialIDs.add(cert.getSerialNumber());
     }
 
     // Add the first 2 certificates to the revocation list
-    scmCertStore.revokeCertificates(newCerts.subList(0, 2),
+    sequenceId = scmCertStore.revokeCertificates(newSerialIDs.subList(0, 2),
         caCertificateHolder,
-        CRLReason.unspecified, securityConfig,
-        keyPair);
+        CRLReason.lookup(CRLReason.aACompromise), crlApprover);
 
     // This should create a CRL with sequence id INITIAL_SEQUENCE_ID + 2
     // And contain 2 certificates in it
-    iter = scmMetadataStore.getCRLInfoTable().iterator();
-    iter.seekToLast();
-    Assert.assertEquals(INITIAL_SEQUENCE_ID + 2L, (long) iter.key());
+    assertTrue(sequenceId.isPresent());
+    assertEquals(INITIAL_SEQUENCE_ID + 2L, (long) sequenceId.get());
 
     // Check the sequence ID table for latest sequence id
-    Assert.assertEquals(INITIAL_SEQUENCE_ID + 2L, (long)
+    assertEquals(INITIAL_SEQUENCE_ID + 2L, (long)
         scmMetadataStore.getCRLSequenceIdTable().get(CRL_SEQUENCE_ID_KEY));
 
-    CRLInfo newCrlInfo = iter.value().getValue();
+    CRLInfo newCrlInfo = scmMetadataStore.getCRLInfoTable()
+        .get(sequenceId.get());
     revokedCertificates = newCrlInfo.getX509CRL().getRevokedCertificates();
-    Assert.assertEquals(2L, revokedCertificates.size());
-    Assert.assertNotNull(
+    assertEquals(2L, revokedCertificates.size());
+    assertNotNull(
         revokedCertificates.stream().filter(c ->
-            c.getSerialNumber().equals(newCerts.get(0).getSerialNumber()))
+            c.getSerialNumber().equals(newSerialIDs.get(0)))
             .findAny());
 
-    Assert.assertNotNull(
+    assertNotNull(
         revokedCertificates.stream().filter(c ->
-            c.getSerialNumber().equals(newCerts.get(1).getSerialNumber()))
+            c.getSerialNumber().equals(newSerialIDs.get(1)))
             .findAny());
 
     // Valid certs table should have 1 cert
@@ -207,10 +223,10 @@ public class TestSCMCertStore {
       iterator.next();
       size++;
     }
-    Assert.assertEquals(1L, size);
+    assertEquals(1L, size);
     // Make sure that the last certificate that was not revoked is the one
     // in the valid certs table.
-    Assert.assertEquals(newCerts.get(2).getSerialNumber(),
+    assertEquals(newSerialIDs.get(2),
         scmMetadataStore.getValidCertsTable().iterator().next().getKey());
 
     // Revoked certs table should have 3 certs
@@ -220,13 +236,10 @@ public class TestSCMCertStore {
       size++;
       iterator1.next();
     }
-    Assert.assertEquals(3L, size);
+    assertEquals(3L, size);
   }
 
-  private X509Certificate generateX509Cert(KeyPair keypair) throws Exception {
-    if (keypair == null) {
-      keyPair = KeyStoreTestUtil.generateKeyPair("RSA");
-    }
+  private X509Certificate generateX509Cert() throws Exception {
     return CertificateCodec.getX509Certificate(
         CertificateCodec.getPEMEncodedString(
             KeyStoreTestUtil.generateCertificate("CN=Test", keyPair, 30,

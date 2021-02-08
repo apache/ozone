@@ -37,6 +37,7 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import java.io.IOException;
+import java.math.BigInteger;
 import java.security.KeyPair;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
@@ -45,6 +46,7 @@ import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.function.Consumer;
@@ -253,21 +255,23 @@ public class TestDefaultCAServer {
 
     X509Certificate certificate =
         new JcaX509CertificateConverter().getCertificate(holder.get());
-    List<X509Certificate> certs = new ArrayList<>();
-    certs.add(certificate);
-    Future<Boolean> revoked = testCA.revokeCertificates(certs,
-        CRLReason.keyCompromise, new SecurityConfig(conf));
+    List<BigInteger> serialIDs = new ArrayList<>();
+    serialIDs.add(certificate.getSerialNumber());
+    Future<Optional<Long>> revoked = testCA.revokeCertificates(serialIDs,
+        CRLReason.lookup(CRLReason.keyCompromise),
+        new SecurityConfig(conf));
 
-    // Revoking a valid certificate should return true.
-    assertTrue(revoked.get());
+    // Revoking a valid certificate complete successfully without errors.
+    assertTrue(revoked.isDone());
 
     // Revoking empty list of certificates should throw an error.
     LambdaTestUtils.intercept(ExecutionException.class, "Certificates " +
         "cannot be null",
         () -> {
-          Future<Boolean> result =
+          Future<Optional<Long>> result =
               testCA.revokeCertificates(Collections.emptyList(),
-              CRLReason.keyCompromise, new SecurityConfig(conf));
+              CRLReason.lookup(CRLReason.keyCompromise),
+                  new SecurityConfig(conf));
           result.isDone();
           result.get();
         });

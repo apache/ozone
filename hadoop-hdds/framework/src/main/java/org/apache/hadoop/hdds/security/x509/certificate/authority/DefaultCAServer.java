@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.security.x509.certificate.authority;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.validator.routines.DomainValidator;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
@@ -32,6 +33,7 @@ import org.apache.hadoop.hdds.security.x509.certificates.utils.SelfSignedCertifi
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
+import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
@@ -53,11 +55,12 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
 import java.util.function.Consumer;
 
-import static org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest.*;
+import static org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest.getCertificationRequest;
 import static org.apache.hadoop.hdds.security.x509.exceptions.CertificateException.ErrorCode.CSR_ERROR;
 
 /**
@@ -121,6 +124,7 @@ public class DefaultCAServer implements CertificateServer {
    */
   private PKIProfile profile;
   private CertificateApprover approver;
+  private CRLApprover crlApprover;
   private CertificateStore store;
 
   /**
@@ -140,7 +144,7 @@ public class DefaultCAServer implements CertificateServer {
 
   @Override
   public void init(SecurityConfig securityConfig, CAType type)
-      throws SCMSecurityException {
+      throws IOException {
     caKeysPath = securityConfig.getKeyLocation(componentName);
     caRootX509Path = securityConfig.getCertificateLocation(componentName);
     this.config = securityConfig;
@@ -150,7 +154,7 @@ public class DefaultCAServer implements CertificateServer {
     profile = new DefaultProfile();
     this.approver = new DefaultApprover(profile, this.config);
 
-    /* In future we will spilt this code to have different kind of CAs.
+    /* In future we will split this code to have different kind of CAs.
      * Right now, we have only self-signed CertificateServer.
      */
 
@@ -159,6 +163,8 @@ public class DefaultCAServer implements CertificateServer {
       Consumer<SecurityConfig> caInitializer =
           processVerificationStatus(status);
       caInitializer.accept(securityConfig);
+      crlApprover = new DefaultCRLApprover(securityConfig,
+          getCAKeys().getPrivate());
       return;
     }
 
@@ -272,19 +278,21 @@ public class DefaultCAServer implements CertificateServer {
   }
 
   @Override
-  public Future<Boolean> revokeCertificates(List<X509Certificate> certificates,
-                                            int reason,
-                                            SecurityConfig securityConfig) {
-    CompletableFuture<Boolean> revoked = new CompletableFuture<>();
-    if (certificates == null || certificates.isEmpty()) {
+  public Future<Optional<Long>> revokeCertificates(
+      List<BigInteger> certificates,
+      CRLReason reason,
+      SecurityConfig securityConfig) {
+    CompletableFuture<Optional<Long>> revoked = new CompletableFuture<>();
+    if (CollectionUtils.isEmpty(certificates)) {
       revoked.completeExceptionally(new SCMSecurityException(
           "Certificates cannot be null or empty"));
       return revoked;
     }
     try {
-      store.revokeCertificates(certificates,
-          getCACertificate(), reason, securityConfig, getCAKeys());
-      revoked.complete(true);
+      revoked.complete(
+          store.revokeCertificates(certificates,
+              getCACertificate(), reason, crlApprover)
+      );
     } catch (IOException ex) {
       LOG.error("Revoking the certificate failed.", ex.getCause());
       revoked.completeExceptionally(new SCMSecurityException(ex));

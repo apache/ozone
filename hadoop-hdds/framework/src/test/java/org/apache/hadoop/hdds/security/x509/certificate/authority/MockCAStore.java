@@ -20,14 +20,14 @@
 package org.apache.hadoop.hdds.security.x509.certificate.authority;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.cert.X509CertificateHolder;
 import java.io.IOException;
 import java.math.BigInteger;
-import java.security.KeyPair;
 import java.security.cert.X509Certificate;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
 /**
  *
@@ -41,11 +41,11 @@ public class MockCAStore implements CertificateStore {
   }
 
   @Override
-  public void revokeCertificates(List<X509Certificate> certificates,
-                                 X509CertificateHolder caCertificateHolder,
-                                 int reason, SecurityConfig securityConfig,
-                                 KeyPair keyPair) throws IOException {
-
+  public Optional<Long> revokeCertificates(
+      List<BigInteger> serialIDs,
+      X509CertificateHolder caCertificateHolder,
+      CRLReason reason, CRLApprover approver) throws IOException {
+    return Optional.empty();
   }
 
   @Override

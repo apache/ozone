@@ -36,7 +36,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.CONTAINERS;
-import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.CRL_INFO;
+import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.CRLS;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.CRL_SEQUENCE_ID;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.DELETED_BLOCKS;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.PIPELINES;
@@ -107,7 +107,7 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
 
       containerTable = CONTAINERS.getTable(store);
 
-      crlInfoTable = CRL_INFO.getTable(store);
+      crlInfoTable = CRLS.getTable(store);
 
       crlSequenceIdTable = CRL_SEQUENCE_ID.getTable(store);
     }
