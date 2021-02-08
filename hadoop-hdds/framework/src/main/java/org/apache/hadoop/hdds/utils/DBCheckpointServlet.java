@@ -64,8 +64,8 @@ public class DBCheckpointServlet extends HttpServlet {
   private transient DBStore dbStore;
   private transient DBCheckpointMetrics dbMetrics;
 
-  private boolean omAclEnabled;
-  private Collection<String> ozoneAdmins;
+  private boolean aclEnabled;
+  private Collection<String> ozAdmins;
 
   public void initialize(DBStore store, DBCheckpointMetrics metrics,
       boolean omAclEnabled, Collection<String> ozoneAdmins)
@@ -78,16 +78,16 @@ public class DBCheckpointServlet extends HttpServlet {
           "Unable to set metadata snapshot request. DB Store is null");
     }
 
-    this.omAclEnabled = omAclEnabled;
-    this.ozoneAdmins = ozoneAdmins;
+    this.aclEnabled = omAclEnabled;
+    this.ozAdmins = ozoneAdmins;
   }
 
   private boolean hasPermission(String username) {
     // Check ACL for dbCheckpoint only when global Ozone ACL is enabled
-    if (omAclEnabled) {
+    if (aclEnabled) {
       // Only Ozone admins are allowed
-      return ozoneAdmins.contains(OZONE_ADMINISTRATORS_WILDCARD)
-          || ozoneAdmins.contains(username);
+      return ozAdmins.contains(OZONE_ADMINISTRATORS_WILDCARD)
+          || ozAdmins.contains(username);
     } else {
       return true;
     }
@@ -111,7 +111,7 @@ public class DBCheckpointServlet extends HttpServlet {
     }
 
     // Check ACL for dbCheckpoint only when global Ozone ACL is enable
-    if (omAclEnabled) {
+    if (aclEnabled) {
       final java.security.Principal userPrincipal = request.getUserPrincipal();
       if (userPrincipal == null) {
         final String remoteUser = request.getRemoteUser();

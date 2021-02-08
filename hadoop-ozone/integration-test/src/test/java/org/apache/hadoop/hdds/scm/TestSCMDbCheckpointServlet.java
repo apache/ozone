@@ -33,6 +33,7 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMMetrics;
 import org.apache.hadoop.hdds.scm.server.SCMDBCheckpointServlet;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 
@@ -58,6 +59,7 @@ import static org.mockito.Mockito.when;
  */
 public class TestSCMDbCheckpointServlet {
   private MiniOzoneCluster cluster = null;
+  private StorageContainerManager scm;
   private SCMMetrics scmMetrics;
   private OzoneConfiguration conf;
   private String clusterId;
@@ -90,7 +92,8 @@ public class TestSCMDbCheckpointServlet {
         .setOmId(omId)
         .build();
     cluster.waitForClusterToBeReady();
-    scmMetrics = cluster.getStorageContainerManager().getMetrics();
+    scm = cluster.getStorageContainerManager();
+    scmMetrics = StorageContainerManager.getMetrics();
   }
 
   /**
@@ -113,9 +116,8 @@ public class TestSCMDbCheckpointServlet {
 
       doCallRealMethod().when(scmDbCheckpointServletMock).init();
       doCallRealMethod().when(scmDbCheckpointServletMock).initialize(
-          cluster.getStorageContainerManager().getScmMetadataStore().getStore(),
-          cluster.getStorageContainerManager().getMetrics()
-              .getDBCheckpointMetrics(),
+          scm.getScmMetadataStore().getStore(),
+          scmMetrics.getDBCheckpointMetrics(),
           false,
           Collections.emptyList());
 
