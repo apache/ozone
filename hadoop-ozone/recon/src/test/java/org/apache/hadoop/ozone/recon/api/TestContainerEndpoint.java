@@ -52,7 +52,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -73,6 +72,7 @@ import org.apache.hadoop.ozone.recon.persistence.ContainerHistory;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
+import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
@@ -88,7 +88,6 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
-import org.mockito.Mockito;
 
 /**
  * Test for container endpoint.
@@ -100,6 +99,7 @@ public class TestContainerEndpoint {
 
   private OzoneStorageContainerManager ozoneStorageContainerManager;
   private ReconContainerManager reconContainerManager;
+  private ReconPipelineManager reconPipelineManager;
   private ContainerDBServiceProvider containerDbServiceProvider;
   private ContainerEndpoint containerEndpoint;
   private boolean isSetupDone = false;
@@ -119,26 +119,6 @@ public class TestContainerEndpoint {
     reconOMMetadataManager = getTestReconOmMetadataManager(
         initializeNewOmMetadataManager(temporaryFolder.newFolder()),
         temporaryFolder.newFolder());
-
-    pipeline = getRandomPipeline();
-    pipelineID = pipeline.getId();
-
-    // Mock ReconStorageContainerManagerFacade and other SCM related methods
-    OzoneStorageContainerManager mockReconSCM =
-        mock(ReconStorageContainerManagerFacade.class);
-    ContainerManagerV2 mockContainerManager =
-        mock(ContainerManagerV2.class);
-
-    when(mockContainerManager.getContainer(Mockito.any(ContainerID.class)))
-        .thenReturn(
-        new ContainerInfo.Builder()
-            .setContainerID(containerID.getId())
-            .setNumberOfKeys(keyCount)
-            .setReplicationFactor(ReplicationFactor.THREE)
-            .setPipelineID(pipelineID)
-            .build());
-    when(mockReconSCM.getContainerManager())
-        .thenReturn(mockContainerManager);
 
     ReconTestInjector reconTestInjector =
         new ReconTestInjector.Builder(temporaryFolder)
@@ -160,11 +140,17 @@ public class TestContainerEndpoint {
         reconTestInjector.getInstance(OzoneStorageContainerManager.class);
     reconContainerManager = (ReconContainerManager)
         ozoneStorageContainerManager.getContainerManager();
+    reconPipelineManager = (ReconPipelineManager)
+        ozoneStorageContainerManager.getPipelineManager();
     containerDbServiceProvider =
         reconTestInjector.getInstance(ContainerDBServiceProvider.class);
     containerEndpoint = reconTestInjector.getInstance(ContainerEndpoint.class);
     containerHealthSchemaManager =
         reconTestInjector.getInstance(ContainerHealthSchemaManager.class);
+
+    pipeline = getRandomPipeline();
+    pipelineID = pipeline.getId();
+    reconPipelineManager.addPipeline(pipeline);
   }
 
   @Before
@@ -174,8 +160,6 @@ public class TestContainerEndpoint {
       initializeInjector();
       isSetupDone = true;
     }
-    //Write Data to OM
-    pipeline = getRandomPipeline();
 
     List<OmKeyLocationInfo> omKeyLocationInfoList = new ArrayList<>();
     BlockID blockID1 = new BlockID(1, 101);
