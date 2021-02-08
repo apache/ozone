@@ -132,7 +132,7 @@ public class ReconPipelineManager extends SCMPipelineManager {
    * @throws IOException
    */
   @VisibleForTesting
-  void addPipeline(Pipeline pipeline) throws IOException {
+  public void addPipeline(Pipeline pipeline) throws IOException {
     getLock().writeLock().lock();
     try {
       getPipelineStore().put(pipeline.getId(), pipeline);
