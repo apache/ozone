@@ -429,11 +429,7 @@ public class TestObjectStoreV1 {
       GenericTestUtils.waitFor(() -> {
         try {
           OmKeyInfo omKeyInfo = openFileTable.get(dbOpenFileKey);
-          if (omKeyInfo == null) {
-            return true;
-          } else {
-            return false;
-          }
+          return omKeyInfo == null;
         } catch (IOException e) {
           Assert.fail("DB failure!");
           return false;
