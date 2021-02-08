@@ -54,7 +54,7 @@ public final class Genesis {
           + "BenchMarkOzoneManager, BenchMarkOMClient, "
           + "BenchMarkSCM, BenchMarkMetadataStoreReads, "
           + "BenchMarkMetadataStoreWrites, BenchMarkDatanodeDispatcher, "
-          + "BenchMarkRocksDbStore}")
+          + "BenchMarkRocksDbStore, BenchMarkCRCStreaming, BenchMarkCRCBatch}")
   private static String[] benchmarks;
 
   @Option(names = "-t", defaultValue = "4",
