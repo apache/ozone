@@ -20,6 +20,7 @@ package org.apache.hadoop.fs.ozone;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -125,26 +126,16 @@ public class TestOzoneFileSystem {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOzoneFileSystem.class);
 
-  @SuppressWarnings("checkstyle:VisibilityModifier")
-  protected static boolean isBucketFSOptimized = false;
-  @SuppressWarnings("checkstyle:VisibilityModifier")
-  protected static boolean enabledFileSystemPaths;
-  @SuppressWarnings("checkstyle:VisibilityModifier")
-  protected static boolean omRatisEnabled;
-  @SuppressWarnings("checkstyle:VisibilityModifier")
-  protected static MiniOzoneCluster cluster;
-  @SuppressWarnings("checkstyle:VisibilityModifier")
-  protected static FileSystem fs;
-  @SuppressWarnings("checkstyle:VisibilityModifier")
-  protected static OzoneFileSystem o3fs;
-  @SuppressWarnings("checkstyle:VisibilityModifier")
-  protected static String volumeName;
-  @SuppressWarnings("checkstyle:VisibilityModifier")
-  protected static String bucketName;
-  @SuppressWarnings("checkstyle:VisibilityModifier")
-  protected static int rootItemCount;
-  @SuppressWarnings("checkstyle:VisibilityModifier")
-  protected static Trash trash;
+  private static boolean isBucketFSOptimized = false;
+  private static boolean enabledFileSystemPaths;
+  private static boolean omRatisEnabled;
+
+  private static MiniOzoneCluster cluster;
+  private static FileSystem fs;
+  private static OzoneFileSystem o3fs;
+  private static String volumeName;
+  private static String bucketName;
+  private static Trash trash;
 
   private void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -201,6 +192,26 @@ public class TestOzoneFileSystem {
     } catch (IOException ex){
       fail("Failed to cleanup files.");
     }
+  }
+
+  public static FileSystem getFs() {
+    return fs;
+  }
+
+  public static boolean isEnabledFileSystemPaths() {
+    return enabledFileSystemPaths;
+  }
+
+  public static void setIsBucketFSOptimized(boolean isBucketFSO) {
+    isBucketFSOptimized = isBucketFSO;
+  }
+
+  public static String getBucketName() {
+    return bucketName;
+  }
+
+  public static String getVolumeName() {
+    return volumeName;
   }
 
   @Test
@@ -606,7 +617,7 @@ public class TestOzoneFileSystem {
     // Added logs for debugging failures, to check any sub-path mismatches.
     Set<String> actualPaths = new TreeSet<>();
     ArrayList<String> actualPathList = new ArrayList<>();
-    if (rootItemCount != fileStatuses.length) {
+    if (numDirs != fileStatuses.length) {
       for (int i = 0; i < fileStatuses.length; i++) {
         boolean duplicate =
                 actualPaths.add(fileStatuses[i].getPath().getName());
@@ -616,7 +627,7 @@ public class TestOzoneFileSystem {
         }
         actualPathList.add(fileStatuses[i].getPath().getName());
       }
-      if (rootItemCount != actualPathList.size()) {
+      if (numDirs != actualPathList.size()) {
         LOG.info("actualPathsSize: {}", actualPaths.size());
         LOG.info("actualPathListSize: {}", actualPathList.size());
         actualPaths.removeAll(paths);
@@ -642,8 +653,6 @@ public class TestOzoneFileSystem {
   protected void deleteRootDir() throws IOException {
     Path root = new Path("/");
     FileStatus[] fileStatuses = fs.listStatus(root);
-
-    rootItemCount = 0; // reset to zero
 
     if (fileStatuses == null) {
       return;
@@ -723,7 +732,7 @@ public class TestOzoneFileSystem {
   public void testAllocateMoreThanOneBlock() throws IOException {
     Path file = new Path("/file");
     String str = "TestOzoneFileSystemV1.testSeekOnFileLength";
-    byte[] strBytes = str.getBytes();
+    byte[] strBytes = str.getBytes(StandardCharsets.UTF_8);
     long numBlockAllocationsOrg =
             cluster.getOzoneManager().getMetrics().getNumBlockAllocates();
 
@@ -1052,7 +1061,6 @@ public class TestOzoneFileSystem {
   @Test
   public void testRenameDir() throws Exception {
     final String dir = "/root_dir/dir1";
-    Path rootDir = new Path(fs.getUri().toString() +  "/root_dir");
     final Path source = new Path(fs.getUri().toString() + dir);
     final Path dest = new Path(source.toString() + ".renamed");
     // Add a sub-dir to the directory to be moved.
