@@ -51,10 +51,8 @@ public class GetS3SecretHandler extends S3Handler {
 
     final S3SecretValue secret = client.getObjectStore().getS3Secret(userName);
     if (export) {
-      System.out
-          .println("export AWS_ACCESS_KEY_ID=" + secret.getAwsAccessKey());
-      System.out
-          .println("export AWS_SECRET_ACCESS_KEY=" + secret.getAwsSecret());
+      out().println("export AWS_ACCESS_KEY_ID=" + secret.getAwsAccessKey());
+      out().println("export AWS_SECRET_ACCESS_KEY=" + secret.getAwsSecret());
     } else {
       out().println(secret);
     }
