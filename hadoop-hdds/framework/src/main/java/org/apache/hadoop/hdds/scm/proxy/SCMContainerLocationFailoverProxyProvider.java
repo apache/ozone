@@ -38,14 +38,15 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 import static org.apache.hadoop.hdds.HddsUtils.getHostName;
+import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
-import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForClients;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY;
 
@@ -94,27 +95,39 @@ public class SCMContainerLocationFailoverProxyProvider implements
 
   @VisibleForTesting
   protected Collection<InetSocketAddress> getSCMAddressList() {
+    final int port = getPortNumberFromConfigKeys(conf,
+        ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY)
+        .orElse(ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT);
+
+    // TODO: modify the logic after SCM HA Conf is ready.
+    // Use ozone.scm.client.address, if not set, fallback to ozone.scm.names.
+    Optional<String> host = getHostNameFromConfigKeys(conf,
+        ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY);
+
+    if (host.isPresent()) {
+      return Collections.singletonList(
+          NetUtils.createSocketAddr(host.get() + ":" + port));
+    }
+
+    // Fallback to ozone.scm.names
     Collection<String> scmAddressList =
         conf.getTrimmedStringCollection(OZONE_SCM_NAMES);
-    Collection<InetSocketAddress> resultList = new ArrayList<>();
-    if (!scmAddressList.isEmpty()) {
-      final int port = getPortNumberFromConfigKeys(conf,
-          ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY)
-          .orElse(ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT);
-      for (String scmAddress : scmAddressList) {
-        LOG.debug("SCM Address for proxy is {}", scmAddress);
 
-        Optional<String> hostname = getHostName(scmAddress);
-        if (hostname.isPresent()) {
-          resultList.add(NetUtils.createSocketAddr(
-              hostname.get() + ":" + port));
-        }
-      }
+    if (scmAddressList.isEmpty()) {
+      throw new IllegalArgumentException(ScmConfigKeys.OZONE_SCM_NAMES
+          + " need to be a set of valid DNS names or IP addresses."
+          + " Empty address list found.");
     }
-    if (resultList.isEmpty()) {
-      // fall back
-      resultList.add(getScmAddressForClients(conf));
+
+    Collection<InetSocketAddress> resultList = new ArrayList<>();
+
+    for (String scmAddress : scmAddressList) {
+      LOG.debug("SCM Address for proxy is {}", scmAddress);
+      Optional<String> hostname = getHostName(scmAddress);
+      hostname.ifPresent(
+          s -> resultList.add(NetUtils.createSocketAddr(s + ":" + port)));
     }
+
     return resultList;
   }
 
