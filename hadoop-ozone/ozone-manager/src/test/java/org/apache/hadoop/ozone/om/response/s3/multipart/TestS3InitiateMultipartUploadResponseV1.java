@@ -40,11 +40,6 @@ public class TestS3InitiateMultipartUploadResponseV1
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     String prefix = "a/b/c/d/";
-    List<String> dirs = new ArrayList<String>();
-    dirs.add("a");
-    dirs.add("b");
-    dirs.add("c");
-    dirs.add("d");
     String fileName = UUID.randomUUID().toString();
     String keyName = prefix + fileName;
 
