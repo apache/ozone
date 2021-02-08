@@ -17,6 +17,7 @@
 package org.apache.hadoop.hdds.scm.protocolPB;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import org.apache.commons.lang3.tuple.Pair;
@@ -578,6 +579,8 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   public HddsProtos.DatanodeDiskInfo getDatanodeDiskInfo(String ipaddress,
                                                          String uuid)
       throws IOException {
+    ipaddress = Strings.isNullOrEmpty(ipaddress)? "" : ipaddress;
+    uuid = Strings.isNullOrEmpty(uuid)? "" : uuid;
     DatanodeDiskInfoRequestProto request =
         DatanodeDiskInfoRequestProto.newBuilder()
             .setIpaddress(ipaddress)
