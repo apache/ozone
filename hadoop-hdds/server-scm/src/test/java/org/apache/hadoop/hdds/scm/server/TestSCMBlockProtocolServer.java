@@ -51,7 +51,7 @@ public class TestSCMBlockProtocolServer {
   private StorageContainerManager scm;
   private NodeManager nodeManager;
   private ScmBlockLocationProtocolServerSideTranslatorPB service;
-  private final int nodeCount = 10;
+  private static final int NODE_COUNT = 10;
 
   @Before
   public void setUp() throws Exception {
@@ -64,7 +64,7 @@ public class TestSCMBlockProtocolServer {
     scm.exitSafeMode();
     // add nodes to scm node manager
     nodeManager = scm.getScmNodeManager();
-    for (int i = 0; i < nodeCount; i++) {
+    for (int i = 0; i < NODE_COUNT; i++) {
       nodeManager.register(randomDatanodeDetails(), null, null, null);
 
     }
@@ -95,7 +95,7 @@ public class TestSCMBlockProtocolServer {
     System.out.println("client = " + client);
     datanodeDetails.stream().forEach(
         node -> System.out.println(node.toString()));
-    Assert.assertTrue(datanodeDetails.size() == nodeCount);
+    Assert.assertTrue(datanodeDetails.size() == NODE_COUNT);
 
     // illegal client 1
     client += "X";
@@ -103,14 +103,14 @@ public class TestSCMBlockProtocolServer {
     System.out.println("client = " + client);
     datanodeDetails.stream().forEach(
         node -> System.out.println(node.toString()));
-    Assert.assertTrue(datanodeDetails.size() == nodeCount);
+    Assert.assertTrue(datanodeDetails.size() == NODE_COUNT);
     // illegal client 2
     client = "/default-rack";
     datanodeDetails = server.sortDatanodes(nodes, client);
     System.out.println("client = " + client);
     datanodeDetails.stream().forEach(
         node -> System.out.println(node.toString()));
-    Assert.assertTrue(datanodeDetails.size() == nodeCount);
+    Assert.assertTrue(datanodeDetails.size() == NODE_COUNT);
 
     // unknown node to sort
     nodes.add(UUID.randomUUID().toString());
@@ -122,7 +122,7 @@ public class TestSCMBlockProtocolServer {
             .build();
     ScmBlockLocationProtocolProtos.SortDatanodesResponseProto resp =
         service.sortDatanodes(request, CURRENT_VERSION);
-    Assert.assertTrue(resp.getNodeList().size() == nodeCount);
+    Assert.assertTrue(resp.getNodeList().size() == NODE_COUNT);
     System.out.println("client = " + client);
     resp.getNodeList().stream().forEach(
         node -> System.out.println(node.getNetworkName()));

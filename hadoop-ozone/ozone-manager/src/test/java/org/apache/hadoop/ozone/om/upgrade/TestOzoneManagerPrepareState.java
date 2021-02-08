@@ -33,6 +33,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.charset.Charset;
 import java.util.Random;
 
 public class TestOzoneManagerPrepareState {
@@ -41,6 +42,7 @@ public class TestOzoneManagerPrepareState {
 
   private static final int TEST_INDEX = 5;
   private OzoneManagerPrepareState prepareState;
+  private static final Random RANDOM = new Random();
 
   @Before
   public void setup() throws Exception {
@@ -131,7 +133,7 @@ public class TestOzoneManagerPrepareState {
   @Test
   public void testRestoreGarbageMarkerFile() throws Exception {
     byte[] randomBytes = new byte[10];
-    new Random().nextBytes(randomBytes);
+    RANDOM.nextBytes(randomBytes);
     writePrepareMarkerFile(randomBytes);
 
     PrepareStatus status = prepareState.restorePrepare(TEST_INDEX);
@@ -193,12 +195,16 @@ public class TestOzoneManagerPrepareState {
   }
 
   private void writePrepareMarkerFile(long index) throws IOException {
-    writePrepareMarkerFile(Long.toString(index).getBytes());
+    writePrepareMarkerFile(Long.toString(index).getBytes(
+        Charset.defaultCharset()));
   }
 
   private void writePrepareMarkerFile(byte[] bytes) throws IOException {
     File markerFile = prepareState.getPrepareMarkerFile();
-    markerFile.getParentFile().mkdirs();
+    boolean mkdirs = markerFile.getParentFile().mkdirs();
+    if (!mkdirs) {
+      throw new IOException("Unable to create marker file directory.");
+    }
     try(FileOutputStream stream =
             new FileOutputStream(markerFile)) {
       stream.write(bytes);
@@ -212,7 +218,7 @@ public class TestOzoneManagerPrepareState {
 
     try (FileInputStream stream = new FileInputStream(prepareMarkerFile)) {
       stream.read(data);
-      index = Long.parseLong(new String(data));
+      index = Long.parseLong(new String(data, Charset.defaultCharset()));
     }
 
     return index;

@@ -104,7 +104,7 @@ public class TestSCMNodeMetrics {
   public void testHBProcessing() throws InterruptedException {
     long hbProcessed = getCounter("NumHBProcessed");
 
-    NodeReportProto nodeReport = createNodeReport();
+    createNodeReport();
 
     LayoutVersionManager versionManager = nodeManager.getLayoutVersionManager();
     LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()

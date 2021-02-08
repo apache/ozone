@@ -118,7 +118,8 @@ public class TestReconNodeManager {
     // Upon processing the heartbeat, the illegal command should be filtered out
     List<SCMCommand> returnedCmds =
         reconNodeManager.processHeartbeat(datanodeDetails,
-            LayoutVersionProto.newBuilder().build());
+            LayoutVersionProto.newBuilder().setMetadataLayoutVersion(0)
+                .setSoftwareLayoutVersion(0).build());
     assertEquals(1, returnedCmds.size());
     assertEquals(SCMCommandProto.Type.reregisterCommand,
         returnedCmds.get(0).getType());
