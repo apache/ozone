@@ -21,22 +21,24 @@ package org.apache.hadoop.hdds.upgrade;
 import static java.lang.Thread.sleep;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.OPEN;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.QUASI_CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY_READONLY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
+import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.OPEN;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_DONE;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.STARTING_FINALIZATION;
 
 import java.io.IOException;
 import java.util.Iterator;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
@@ -55,6 +57,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.hadoop.test.LambdaTestUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -111,19 +114,6 @@ public class TestHDDSUpgrade {
     scmPipelineManager = scm.getPipelineManager();
     scmVersionManager = scm.getLayoutVersionManager();
 
-    // we will create CONTAINERS_CREATED_FOR_TESTING number of containers.
-    XceiverClientManager xceiverClientManager = new XceiverClientManager(conf);
-    ContainerInfo ci1 = scmContainerManager.allocateContainer(
-        RATIS, THREE, "Owner1");
-    ratisPipeline1 = scmPipelineManager.getPipeline(ci1.getPipelineID());
-    scmPipelineManager.openPipeline(ratisPipeline1.getId());
-    XceiverClientSpi client1 =
-        xceiverClientManager.acquireClient(ratisPipeline1);
-    ContainerProtocolCalls.createContainer(client1,
-        ci1.getContainerID(), null);
-    // At this stage, there should be 1 pipeline one with 1 open container
-    // each.
-    xceiverClientManager.releaseClient(client1, false);
   }
 
   /**
@@ -139,7 +129,7 @@ public class TestHDDSUpgrade {
   private void testPreUpgradeConditionsSCM() {
     Assert.assertEquals(0, scmVersionManager.getMetadataLayoutVersion());
     for (ContainerInfo ci : scmContainerManager.getContainers()) {
-      Assert.assertEquals(ci.getState(), HddsProtos.LifeCycleState.OPEN);
+      Assert.assertEquals(HddsProtos.LifeCycleState.OPEN, ci.getState());
     }
   }
 
@@ -174,7 +164,8 @@ public class TestHDDSUpgrade {
       for (Iterator<Container<?>> it =
            dsm.getContainer().getController().getContainers(); it.hasNext();) {
         Container container = it.next();
-        Assert.assertTrue(container.getContainerState() == OPEN);
+        Assert.assertTrue(container.getContainerState() ==
+            ContainerProtos.ContainerDataProto.State.OPEN);
         countContainers++;
       }
     }
@@ -251,8 +242,31 @@ public class TestHDDSUpgrade {
     Assert.assertEquals(NUM_DATA_NODES, countNodes);
   }
 
+  private void waitForPipelineCreated() throws Exception {
+    LambdaTestUtils.await(10000, 2000, () -> {
+      List<Pipeline> pipelines =
+          scmPipelineManager.getPipelines(RATIS, THREE, OPEN);
+      return pipelines.size() == 1;
+    });
+  }
+
   @Test
-  public void testLayoutUpgrade() throws IOException, InterruptedException {
+  public void testLayoutUpgrade() throws Exception {
+
+    waitForPipelineCreated();
+
+    // we will create CONTAINERS_CREATED_FOR_TESTING number of containers.
+    XceiverClientManager xceiverClientManager = new XceiverClientManager(conf);
+    ContainerInfo ci1 = scmContainerManager.allocateContainer(
+        RATIS, THREE, "Owner1");
+    ratisPipeline1 = scmPipelineManager.getPipeline(ci1.getPipelineID());
+    scmPipelineManager.openPipeline(ratisPipeline1.getId());
+    XceiverClientSpi client1 =
+        xceiverClientManager.acquireClient(ratisPipeline1);
+    ContainerProtocolCalls.createContainer(client1,
+        ci1.getContainerID(), null);
+    xceiverClientManager.releaseClient(client1, false);
+
     // Test the Pre-Upgrade conditions on SCM as well as DataNodes.
     testPreUpgradeConditionsSCM();
     testPreUpgradeConditionsDataNodes();

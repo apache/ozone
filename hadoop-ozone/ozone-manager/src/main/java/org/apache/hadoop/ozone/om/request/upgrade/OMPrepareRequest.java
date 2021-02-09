@@ -94,7 +94,7 @@ public class OMPrepareRequest extends OMClientRequest {
               .setTxnID(prepareIndex)
               .build();
       responseBuilder.setPrepareResponse(omResponse);
-      response = new OMPrepareResponse(responseBuilder.build());
+      response = new OMPrepareResponse(responseBuilder.build(), prepareIndex);
 
       // Add response to double buffer before clearing logs.
       // This guarantees the log index of this request will be the same as
