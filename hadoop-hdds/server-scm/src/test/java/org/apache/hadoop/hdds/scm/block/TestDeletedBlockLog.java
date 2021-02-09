@@ -263,33 +263,29 @@ public class TestDeletedBlockLog {
     OzoneConfiguration testConf = OzoneConfiguration.of(conf);
     testConf.setInt(OZONE_SCM_BLOCK_DELETION_MAX_RETRY, 120);
 
-    deletedBlockLog.addTransactions(generateData(1));
+    deletedBlockLog = new DeletedBlockLogImplV2(testConf, containerManager,
+        MockSCMHAManager.getInstance(true).getRatisServer(),
+        scm.getScmMetadataStore().getDeletedBlocksTXTable(),
+        dbTransactionBuffer, SCMContext.emptyContext());
+
+    addTransactions(generateData(30));
 
     List<DeletedBlocksTransaction> blocks =
         getTransactions(40 * BLOCKS_PER_TXN);
     List<Long> txIDs = blocks.stream().map(DeletedBlocksTransaction::getTxID)
         .collect(Collectors.toList());
 
-    for (int i = 0; i < 50; i++) {
-      deletedBlockLog.incrementCount(txIDs);
+    for (int i = 0; i < 110; i++) {
+      incrementCount(txIDs);
     }
     blocks = getTransactions(40 * BLOCKS_PER_TXN);
     for (DeletedBlocksTransaction block : blocks) {
-      // block count should not be updated as there are only 50 retries.
+      // block count should not be updated as there are only 110 retries.
       Assert.assertEquals(0, block.getCount());
     }
 
-    for (int i = 0; i < 60; i++) {
-      deletedBlockLog.incrementCount(txIDs);
-    }
-    blocks = getTransactions(40 * BLOCKS_PER_TXN);
-    for (DeletedBlocksTransaction block : blocks) {
-      // block count should be updated to 100 as there are already 110 retries.
-      Assert.assertEquals(100, block.getCount());
-    }
-
     for (int i = 0; i < 50; i++) {
-      deletedBlockLog.incrementCount(txIDs);
+      incrementCount(txIDs);
     }
     blocks = getTransactions(40 * BLOCKS_PER_TXN);
     for (DeletedBlocksTransaction block : blocks) {

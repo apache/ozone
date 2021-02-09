@@ -187,17 +187,10 @@ public class DeletedBlockLogStateManagerImpl
         }
         continue;
       }
-      DeletedBlocksTransaction.Builder builder = block.toBuilder();
-      int currentCount = block.getCount();
-      if (currentCount > -1) {
-        builder.setCount(++currentCount);
-      }
       // if the retry time exceeds the maxRetry value
       // then set the retry value to -1, stop retrying, admins can
       // analyze those blocks and purge them manually by SCMCli.
-      if (currentCount > maxRetry) {
-        builder.setCount(-1);
-      }
+      DeletedBlocksTransaction.Builder builder = block.toBuilder().setCount(-1);
       deletedTable.putWithBatch(
           transactionBuffer.getCurrentBatchOperation(), txID, builder.build());
     }
