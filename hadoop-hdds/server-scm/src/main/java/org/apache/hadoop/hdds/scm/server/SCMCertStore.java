@@ -91,14 +91,13 @@ public class SCMCertStore implements CertificateStore {
       CRLReason reason,
       CRLApprover crlApprover)
       throws IOException {
-    lock.lock();
     Date now = new Date();
-
     X509v2CRLBuilder builder =
         new X509v2CRLBuilder(caCertificateHolder.getIssuer(), now);
     List<X509Certificate> certsToRevoke = new ArrayList<>();
     X509CRL crl;
     Optional<Long> sequenceId = Optional.empty();
+    lock.lock();
     try {
       for (BigInteger serialID: serialIDs) {
         X509Certificate cert =
@@ -118,7 +117,6 @@ public class SCMCertStore implements CertificateStore {
         try {
           crl = crlApprover.sign(builder);
         } catch (OperatorCreationException | CRLException e) {
-          lock.unlock();
           throw new SCMSecurityException("Unable to create Certificate " +
               "Revocation List.", e);
         }
