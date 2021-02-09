@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.common.ha.ratis.RatisSnapshotInfo;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.ha.OMNodeDetails;
@@ -104,7 +105,7 @@ public class TestOzoneManagerRatisServer {
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     initialTermIndex = TermIndex.valueOf(0, 0);
-    OMRatisSnapshotInfo omRatisSnapshotInfo = new OMRatisSnapshotInfo();
+    RatisSnapshotInfo omRatisSnapshotInfo = new RatisSnapshotInfo();
     when(ozoneManager.getSnapshotInfo()).thenReturn(omRatisSnapshotInfo);
     omRatisServer = OzoneManagerRatisServer.newOMRatisServer(conf, ozoneManager,
       omNodeDetails, Collections.emptyList());
