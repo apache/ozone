@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.util.StringUtils;
 
 import javax.annotation.Nonnull;
@@ -205,4 +206,25 @@ public final class OzoneFSUtils {
     java.nio.file.Path keyPath = Paths.get(keyName);
     return keyPath.getNameCount();
   }
+
+  /**
+   * Returns true if the bucket is FS Optimised.
+   * @param bucket
+   * @return
+   */
+  public static boolean isFSOptimizedBucket(OmBucketInfo bucket) {
+    // layout version V1 represents optimized FS path
+    boolean layoutVersionEnabled =
+        org.apache.commons.lang3.StringUtils.equalsIgnoreCase(
+            OMConfigKeys.OZONE_OM_LAYOUT_VERSION_V1,
+            bucket.getMetadata()
+                .get(OMConfigKeys.OZONE_OM_LAYOUT_VERSION));
+
+    boolean fsEnabled =
+        Boolean.parseBoolean(bucket.getMetadata()
+            .get(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS));
+
+    return layoutVersionEnabled && fsEnabled;
+  }
+
 }
