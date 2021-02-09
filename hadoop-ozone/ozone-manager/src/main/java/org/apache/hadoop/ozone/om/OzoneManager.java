@@ -703,7 +703,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         .setService(omRpcAddressTxt)
         .setS3SecretManager(s3SecretManager)
         .setCertificateClient(certClient)
-        .setOmServiceId(omNodeDetails.getOMServiceId())
+        .setOmServiceId(omNodeDetails.getServiceId())
         .build();
   }
 
@@ -1445,7 +1445,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     OMHANodeDetails haOMHANodeDetails = OMHANodeDetails.loadOMHAConfig(config);
     String serviceName =
-        haOMHANodeDetails.getLocalNodeDetails().getOMServiceId();
+        haOMHANodeDetails.getLocalNodeDetails().getServiceId();
     if (!StringUtils.isEmpty(serviceName)) {
       builder.addServiceName(serviceName);
     }
@@ -2646,7 +2646,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
                 .build());
 
         OMRoleInfo peerOmRole = OMRoleInfo.newBuilder()
-            .setNodeId(peerNode.getOMNodeId())
+            .setNodeId(peerNode.getNodeId())
             .setServerRole(RaftPeerRole.FOLLOWER.name())
             .build();
         peerOmServiceInfoBuilder.setOmRoleInfo(peerOmRole);
@@ -3458,11 +3458,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   public String getOMNodeId() {
-    return omNodeDetails.getOMNodeId();
+    return omNodeDetails.getNodeId();
   }
 
   public String getOMServiceId() {
-    return omNodeDetails.getOMServiceId();
+    return omNodeDetails.getServiceId();
   }
 
   @VisibleForTesting

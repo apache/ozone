@@ -58,7 +58,6 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
-import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
@@ -74,7 +73,6 @@ import org.apache.hadoop.ozone.audit.SCMAction;
 
 import com.google.protobuf.ProtocolMessageEnum;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StorageContainerLocationProtocolService.newReflectiveBlockingService;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY;
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.startRpcServer;
@@ -120,8 +118,8 @@ public class SCMClientProtocolServer implements
                 scm,
                 protocolMetrics));
 
-    final InetSocketAddress scmAddress = HddsServerUtil
-        .getScmClientBindAddress(conf);
+    final InetSocketAddress scmAddress =
+        scm.getScmNodeDetails().getClientProtocolServerAddress();
     clientRpcServer =
         startRpcServer(
             conf,
@@ -130,7 +128,8 @@ public class SCMClientProtocolServer implements
             storageProtoPbService,
             handlerCount);
     clientRpcAddress =
-        updateRPCListenAddress(conf, OZONE_SCM_CLIENT_ADDRESS_KEY,
+        updateRPCListenAddress(conf,
+            scm.getScmNodeDetails().getClientProtocolServerAddressKey(),
             scmAddress, clientRpcServer);
     if (conf.getBoolean(CommonConfigurationKeys.HADOOP_SECURITY_AUTHORIZATION,
         false)) {

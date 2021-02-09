@@ -135,9 +135,9 @@ public class TestOMRatisSnapshots {
     OzoneManagerRatisServer leaderRatisServer = leaderOM.getOmRatisServer();
 
     // Find the inactive OM
-    String followerNodeId = leaderOM.getPeerNodes().get(0).getOMNodeId();
+    String followerNodeId = leaderOM.getPeerNodes().get(0).getNodeId();
     if (cluster.isOMActive(followerNodeId)) {
-      followerNodeId = leaderOM.getPeerNodes().get(1).getOMNodeId();
+      followerNodeId = leaderOM.getPeerNodes().get(1).getNodeId();
     }
     OzoneManager followerOM = cluster.getOzoneManager(followerNodeId);
 
@@ -200,9 +200,9 @@ public class TestOMRatisSnapshots {
     OzoneManager leaderOM = cluster.getOzoneManager(leaderOMNodeId);
 
     // Find the inactive OM and start it
-    String followerNodeId = leaderOM.getPeerNodes().get(0).getOMNodeId();
+    String followerNodeId = leaderOM.getPeerNodes().get(0).getNodeId();
     if (cluster.isOMActive(followerNodeId)) {
-      followerNodeId = leaderOM.getPeerNodes().get(1).getOMNodeId();
+      followerNodeId = leaderOM.getPeerNodes().get(1).getNodeId();
     }
     cluster.startInactiveOM(followerNodeId);
 
@@ -255,9 +255,9 @@ public class TestOMRatisSnapshots {
     OzoneManagerRatisServer leaderRatisServer = leaderOM.getOmRatisServer();
 
     // Find the inactive OM
-    String followerNodeId = leaderOM.getPeerNodes().get(0).getOMNodeId();
+    String followerNodeId = leaderOM.getPeerNodes().get(0).getNodeId();
     if (cluster.isOMActive(followerNodeId)) {
-      followerNodeId = leaderOM.getPeerNodes().get(1).getOMNodeId();
+      followerNodeId = leaderOM.getPeerNodes().get(1).getNodeId();
     }
     OzoneManager followerOM = cluster.getOzoneManager(followerNodeId);
 

@@ -114,7 +114,7 @@ public class TestOzoneManagerSnapshotProvider {
     OzoneManager leaderOM = cluster.getOzoneManager(leaderOMNodeId);
 
     // Get a follower OM
-    String followerNodeId = leaderOM.getPeerNodes().get(0).getOMNodeId();
+    String followerNodeId = leaderOM.getPeerNodes().get(0).getNodeId();
     OzoneManager followerOM = cluster.getOzoneManager(followerNodeId);
 
     // Download latest checkpoint from leader OM to follower OM

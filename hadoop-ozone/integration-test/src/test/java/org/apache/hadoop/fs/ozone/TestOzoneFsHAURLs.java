@@ -27,11 +27,11 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
-import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -160,7 +160,7 @@ public class TestOzoneFsHAURLs {
         omLeader);
     String omNodeId = omLeader.getOMNodeId();
     // omLeaderAddrKey=ozone.om.address.omServiceId.omNodeId
-    String omLeaderAddrKey = OmUtils.addKeySuffixes(
+    String omLeaderAddrKey = ConfUtils.addKeySuffixes(
         OMConfigKeys.OZONE_OM_ADDRESS_KEY, omServiceId, omNodeId);
     String omLeaderAddr = conf.get(omLeaderAddrKey);
     LOG.info("OM leader: nodeId={}, {}={}", omNodeId, omLeaderAddrKey,

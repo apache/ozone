@@ -505,9 +505,9 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
 
     // Get follower OMs
     OzoneManager followerOM1 = getCluster().getOzoneManager(
-        leaderOM.getPeerNodes().get(0).getOMNodeId());
+        leaderOM.getPeerNodes().get(0).getNodeId());
     OzoneManager followerOM2 = getCluster().getOzoneManager(
-        leaderOM.getPeerNodes().get(1).getOMNodeId());
+        leaderOM.getPeerNodes().get(1).getNodeId());
 
     // Do some transactions so that the log index increases
     String userName = "user" + RandomStringUtils.randomNumeric(5);

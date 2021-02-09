@@ -23,6 +23,7 @@ import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneIllegalArgumentException;
+import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -133,7 +134,7 @@ public class OMHANodeDetails {
         } else {
           isPeer = false;
         }
-        String rpcAddrKey = OmUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY,
+        String rpcAddrKey = ConfUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY,
             serviceId, nodeId);
         String rpcAddrStr = OmUtils.getOmRpcAddress(conf, rpcAddrKey);
         if (rpcAddrStr == null || rpcAddrStr.isEmpty()) {
@@ -147,7 +148,7 @@ public class OMHANodeDetails {
         // default
         isOMAddressSet = true;
 
-        String ratisPortKey = OmUtils.addKeySuffixes(OZONE_OM_RATIS_PORT_KEY,
+        String ratisPortKey = ConfUtils.addKeySuffixes(OZONE_OM_RATIS_PORT_KEY,
             serviceId, nodeId);
         int ratisPort = conf.getInt(ratisPortKey, OZONE_OM_RATIS_PORT_DEFAULT);
 
@@ -166,7 +167,7 @@ public class OMHANodeDetails {
               rpcAddrStr);
         }
 
-        if (!addr.isUnresolved() && !isPeer && OmUtils.isAddressLocal(addr)) {
+        if (!addr.isUnresolved() && !isPeer && ConfUtils.isAddressLocal(addr)) {
           localRpcAddress = addr;
           localOMServiceId = serviceId;
           localOMNodeId = nodeId;
@@ -316,7 +317,7 @@ public class OMHANodeDetails {
           ozoneConfiguration, confKey, omServiceId, omNodeId);
       if (confValue != null) {
         LOG.info("Setting configuration key {} with value of key {}: {}",
-            confKey, OmUtils.addKeySuffixes(confKey, omNodeId), confValue);
+            confKey, ConfUtils.addKeySuffixes(confKey, omNodeId), confValue);
         ozoneConfiguration.set(confKey, confValue);
       }
     }

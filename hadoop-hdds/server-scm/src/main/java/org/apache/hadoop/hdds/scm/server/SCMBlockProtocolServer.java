@@ -33,7 +33,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos;
-import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.DeleteBlockResult;
@@ -62,7 +61,6 @@ import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocolServerSideTra
 import com.google.common.collect.Maps;
 import com.google.protobuf.BlockingService;
 import com.google.protobuf.ProtocolMessageEnum;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY;
 import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.IO_EXCEPTION;
@@ -118,8 +116,8 @@ public class SCMBlockProtocolServer implements
                 new ScmBlockLocationProtocolServerSideTranslatorPB(this, scm,
                     protocolMessageMetrics));
 
-    final InetSocketAddress scmBlockAddress = HddsServerUtil
-        .getScmBlockClientBindAddress(conf);
+    final InetSocketAddress scmBlockAddress =
+        scm.getScmNodeDetails().getBlockProtocolServerAddress();
     blockRpcServer =
         startRpcServer(
             conf,
@@ -129,8 +127,8 @@ public class SCMBlockProtocolServer implements
             handlerCount);
     blockRpcAddress =
         updateRPCListenAddress(
-            conf, OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY, scmBlockAddress,
-            blockRpcServer);
+            conf, scm.getScmNodeDetails().getBlockProtocolServerAddressKey(),
+            scmBlockAddress, blockRpcServer);
     if (conf.getBoolean(CommonConfigurationKeys.HADOOP_SECURITY_AUTHORIZATION,
         false)) {
       blockRpcServer.refreshServiceAcl(conf, SCMPolicyProvider.getInstance());
