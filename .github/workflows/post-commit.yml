@@ -256,6 +256,7 @@ jobs:
         continue-on-error: true
   coverage:
     runs-on: ubuntu-18.04
+    if: github.repository == 'apache/ozone' && github.event_name != 'pull_request'
     needs:
       - acceptance
       - integration
@@ -275,12 +276,10 @@ jobs:
         run: ./hadoop-ozone/dev-support/checks/coverage.sh
       - name: Setup java 11
         uses: actions/setup-java@v1
-        if: github.repository == 'apache/ozone' && github.event_name != 'pull_request'
         with:
           java-version: 11
       - name: Upload coverage to Sonar
         run: ./hadoop-ozone/dev-support/checks/sonar.sh
-        if: github.repository == 'apache/ozone' && github.event_name != 'pull_request'
         env:
           SONAR_TOKEN: ${{ secrets.SONARCLOUD_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
