@@ -15,7 +15,7 @@
  * the License.
  */
 
-package org.apache.hadoop.ozone.om.ratis;
+package org.apache.hadoop.ozone.common.ha.ratis;
 
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.server.storage.FileInfo;
@@ -29,14 +29,14 @@ import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_SPLIT_KEY;
 
 /**
  * This class captures the snapshotIndex and term of the latest snapshot in
- * the OM.
+ * the server.
  * Ratis server loads the snapshotInfo during startup and updates the
- * lastApplied index to this snapshotIndex. OM SnapshotInfo does not contain
+ * lastApplied index to this snapshotIndex. SnapshotInfo does not contain
  * any files. It is used only to store/ update the last applied index and term.
  */
-public class OMRatisSnapshotInfo implements SnapshotInfo {
+public class RatisSnapshotInfo implements SnapshotInfo {
 
-  static final Logger LOG = LoggerFactory.getLogger(OMRatisSnapshotInfo.class);
+  static final Logger LOG = LoggerFactory.getLogger(RatisSnapshotInfo.class);
 
   private volatile long term = 0;
   private volatile long snapshotIndex = -1;
@@ -48,6 +48,13 @@ public class OMRatisSnapshotInfo implements SnapshotInfo {
   public void updateTermIndex(long newTerm, long newIndex) {
     this.term = newTerm;
     this.snapshotIndex = newIndex;
+  }
+
+  public RatisSnapshotInfo() {}
+
+  public RatisSnapshotInfo(long term, long index) {
+    this.term = term;
+    this.snapshotIndex = index;
   }
 
   @Override

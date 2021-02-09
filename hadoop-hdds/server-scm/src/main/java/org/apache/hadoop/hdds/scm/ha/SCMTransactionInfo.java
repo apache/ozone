@@ -18,6 +18,7 @@ package org.apache.hadoop.hdds.scm.ha;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.StringUtils;
+import org.apache.hadoop.ozone.common.ha.ratis.RatisSnapshotInfo;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.statemachine.SnapshotInfo;
 
@@ -99,7 +100,7 @@ public final class SCMTransactionInfo {
   }
 
   public SnapshotInfo toSnapshotInfo() {
-    return new SCMRatisSnapshotInfo(term, transactionIndex);
+    return new RatisSnapshotInfo(term, transactionIndex);
   }
 
   public static Builder builder() {
