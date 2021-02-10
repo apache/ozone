@@ -140,7 +140,7 @@ public class DatanodeStateMachine implements Closeable {
     upgradeFinalizer = new DataNodeUpgradeFinalizer(dataNodeVersionManager,
         datanodeDetails.getUuidString());
     DatanodeMetadataFeatures.
-        setHDDSLayoutVersionManager(dataNodeVersionManager);
+        initialize(dataNodeVersionManager);
 
     executorService = Executors.newFixedThreadPool(
         getEndPointTaskThreadPoolSize(),

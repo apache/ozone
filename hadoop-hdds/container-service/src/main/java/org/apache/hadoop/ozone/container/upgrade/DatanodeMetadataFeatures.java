@@ -17,8 +17,11 @@
  */
 package org.apache.hadoop.ozone.container.upgrade;
 
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.OzoneConsts;
+
+import java.io.IOException;
 
 /**
  * Utility class to retrieve the version of a feature that corresponds to the
@@ -30,14 +33,17 @@ public final class DatanodeMetadataFeatures {
 
   private DatanodeMetadataFeatures() { }
 
-  public static synchronized void setHDDSLayoutVersionManager(
+  public static synchronized void initialize(
       HDDSLayoutVersionManager manager) {
     versionManager = manager;
   }
 
-  public static synchronized String getSchemaVersion() {
-    if (versionManager == null ||
-        versionManager.getMetadataLayoutVersion() < 1) {
+  public static synchronized String getSchemaVersion() throws IOException {
+    if (versionManager == null) {
+      throw new IOException("DatanodeMetadataFeatures must be initialized " +
+          "to determine schema version");
+    } else if (versionManager.getMetadataLayoutVersion() <
+        HDDSLayoutFeature.FIRST_UPGRADE_VERSION.layoutVersion()) {
       return OzoneConsts.SCHEMA_V1;
     } else {
       return OzoneConsts.SCHEMA_V2;
