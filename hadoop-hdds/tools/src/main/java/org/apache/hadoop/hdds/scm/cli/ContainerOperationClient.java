@@ -533,7 +533,14 @@ public class ContainerOperationClient implements ScmClient {
     return storageContainerLocationClient.getReplicationManagerStatus();
   }
 
-
+  /**
+   * Get Datanode disk information by ip or uuid.
+   *
+   * @param ipaddress datanode ipaddress
+   * @param uuid datanode uuid
+   * @return Disk usage info such as capacity, used, remaining.
+   * @throws IOException
+   */
   @Override
   public HddsProtos.DatanodeDiskInfo getDatanodeDiskInfo(String ipaddress,
                                                          String uuid)

@@ -607,10 +607,26 @@ public class SCMClientProtocolServer implements
     return scm.getReplicationManager().isRunning();
   }
 
+  /**
+   * Get disk information(such as capacity, used) of datanode.
+   *
+   * @param ipaddress
+   * @param uuid
+   * @return DatanodeDiskInfo
+   * @throws IOException
+   */
   @Override
   public HddsProtos.DatanodeDiskInfo getDatanodeDiskInfo(String ipaddress,
                                                          String uuid)
       throws IOException {
+
+    String remoteUser = getRpcRemoteUsername();
+    try {
+      getScm().checkAdminAccess(remoteUser);
+    } catch (IOException e) {
+      LOG.error("Authorisation failed", e);
+      throw e;
+    }
 
     DatanodeDetails node = null;
     if (!Strings.isNullOrEmpty(uuid)) {
@@ -618,16 +634,18 @@ public class SCMClientProtocolServer implements
     } else if (!Strings.isNullOrEmpty(ipaddress)) {
       List<DatanodeDetails> nodes = scm.getScmNodeManager()
           .getNodesByAddress(ipaddress);
+      // currently only the first datanode in the list is being queried
+      node = nodes.get(0);
     } else {
       throw new IOException(
-          "ip address or uuid of the required datanode must be specified"
+          "Could not get datanode with the specified parameters."
       );
     }
 
     SCMNodeStat stat = scm.getScmNodeManager().getNodeStat(node).get();
-    String capacity = stat.getCapacity().toString();
-    String used = stat.getScmUsed().toString();
-    String remaining = stat.getRemaining().toString();
+    String capacity = stat.getCapacity().get().toString();
+    String used = stat.getScmUsed().get().toString();
+    String remaining = stat.getRemaining().get().toString();
 
     HddsProtos.DatanodeDiskInfo info = HddsProtos.DatanodeDiskInfo
         .newBuilder()

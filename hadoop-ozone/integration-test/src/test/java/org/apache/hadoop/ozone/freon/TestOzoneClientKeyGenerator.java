@@ -92,9 +92,17 @@ public class TestOzoneClientKeyGenerator {
 //    new GenericCli().execute(new String[] {"-conf",
 //        new File(path, "conf").getAbsolutePath(), "ozone", "admin", "datanode",
 //        "ockg", "-t", "1"});
+
     String uuid =
         cluster.getHddsDatanodes().get(0).getDatanodeDetails().getUuidString();
-    new DatanodeDiskInfo().execute(new ContainerOperationClient(conf));
+    String ip =
+        cluster.getHddsDatanodes().get(0).getDatanodeDetails().getIpAddress();
+
+    DatanodeDiskInfo command = new DatanodeDiskInfo();
+    command.setIpaddress(ip);
+//    command.setUuid(uuid);
+
+    command.execute(new ContainerOperationClient(conf));
 
     shutdown(cluster);
 
