@@ -40,8 +40,9 @@ public final class DatanodeMetadataFeatures {
 
   public static synchronized String getSchemaVersion() throws IOException {
     if (versionManager == null) {
-      throw new IOException("DatanodeMetadataFeatures must be initialized " +
-          "to determine schema version");
+      // version manager can be null for testing. Use the latest version in
+      // this case.
+      return OzoneConsts.SCHEMA_V2;
     } else if (versionManager.getMetadataLayoutVersion() <
         HDDSLayoutFeature.FIRST_UPGRADE_VERSION.layoutVersion()) {
       return OzoneConsts.SCHEMA_V1;
