@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.ozone.om.response.s3.multipart;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -156,6 +157,24 @@ public class TestS3MultipartResponse {
             .setFactor(HddsProtos.ReplicationFactor.ONE).build()).build();
   }
 
+  public PartKeyInfo createPartKeyInfoV1(
+      String volumeName, String bucketName, long parentID, String fileName,
+      int partNumber) {
+    return PartKeyInfo.newBuilder()
+        .setPartNumber(partNumber)
+        .setPartName(omMetadataManager.getMultipartKey(parentID, fileName,
+                UUID.randomUUID().toString()))
+        .setPartKeyInfo(KeyInfo.newBuilder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setKeyName(fileName)
+            .setDataSize(100L) // Just set dummy size for testing
+            .setCreationTime(Time.now())
+            .setModificationTime(Time.now())
+            .setParentID(parentID)
+            .setType(HddsProtos.ReplicationType.RATIS)
+            .setFactor(HddsProtos.ReplicationFactor.ONE).build()).build();
+  }
 
   public S3InitiateMultipartUploadResponse createS3InitiateMPUResponseV1(
       String volumeName, String bucketName, long parentID, String keyName,
@@ -198,4 +217,61 @@ public class TestS3MultipartResponse {
             omKeyInfo, parentDirInfos);
   }
 
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public S3MultipartUploadCommitPartResponse createS3CommitMPUResponseV1(
+          String volumeName, String bucketName, long parentID, String keyName,
+          String multipartUploadID,
+          OzoneManagerProtocolProtos.PartKeyInfo oldPartKeyInfo,
+          OmMultipartKeyInfo multipartKeyInfo,
+          OzoneManagerProtocolProtos.Status status, String openKey)
+          throws IOException {
+    if (multipartKeyInfo == null) {
+      multipartKeyInfo = new OmMultipartKeyInfo.Builder()
+              .setUploadID(multipartUploadID)
+              .setCreationTime(Time.now())
+              .setReplicationType(HddsProtos.ReplicationType.RATIS)
+              .setReplicationFactor(HddsProtos.ReplicationFactor.ONE)
+              .setParentID(parentID)
+              .build();
+    }
+
+    String fileName = OzoneFSUtils.getFileName(keyName);
+
+    String multipartKey = getMultipartKey(parentID, keyName, multipartUploadID);
+    boolean isRatisEnabled = true;
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    OmBucketInfo omBucketInfo =
+            omMetadataManager.getBucketTable().get(bucketKey);
+
+    OmKeyInfo openPartKeyInfoToBeDeleted = new OmKeyInfo.Builder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setKeyName(fileName)
+            .setFileName(fileName)
+            .setCreationTime(Time.now())
+            .setModificationTime(Time.now())
+            .setReplicationType(HddsProtos.ReplicationType.RATIS)
+            .setReplicationFactor(HddsProtos.ReplicationFactor.ONE)
+            .setOmKeyLocationInfos(Collections.singletonList(
+                    new OmKeyLocationInfoGroup(0, new ArrayList<>())))
+            .build();
+
+    OMResponse omResponse = OMResponse.newBuilder()
+            .setCmdType(OzoneManagerProtocolProtos.Type.CommitMultiPartUpload)
+            .setStatus(status).setSuccess(true)
+            .setCommitMultiPartUploadResponse(
+                    OzoneManagerProtocolProtos.MultipartCommitUploadPartResponse
+                            .newBuilder().setPartName(volumeName)).build();
+
+    return new S3MultipartUploadCommitPartResponseV1(omResponse, multipartKey,
+            openKey, multipartKeyInfo, oldPartKeyInfo,
+            openPartKeyInfoToBeDeleted, isRatisEnabled, omBucketInfo);
+  }
+
+  private String getMultipartKey(long parentID, String keyName,
+                                 String multipartUploadID) {
+    String fileName = OzoneFSUtils.getFileName(keyName);
+    return omMetadataManager.getMultipartKey(parentID, fileName,
+            multipartUploadID);
+  }
 }
