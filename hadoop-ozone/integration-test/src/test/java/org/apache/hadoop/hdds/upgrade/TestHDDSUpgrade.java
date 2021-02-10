@@ -58,9 +58,9 @@ import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachin
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.test.LambdaTestUtils;
-import org.junit.AfterClass;
+import org.junit.After;
 import org.junit.Assert;
-import org.junit.BeforeClass;
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
@@ -81,22 +81,22 @@ public class TestHDDSUpgrade {
       LoggerFactory.getLogger(TestHDDSUpgrade.class);
   private static final int NUM_DATA_NODES = 3;
 
-  private static MiniOzoneCluster cluster;
-  private static OzoneConfiguration conf;
-  private static StorageContainerManager scm;
-  private static ContainerManager scmContainerManager;
-  private static PipelineManager scmPipelineManager;
-  private static Pipeline ratisPipeline1;
-  private static final int CONTAINERS_CREATED_FOR_TESTING = 1;
-  private static HDDSLayoutVersionManager scmVersionManager;
+  private MiniOzoneCluster cluster;
+  private OzoneConfiguration conf;
+  private StorageContainerManager scm;
+  private ContainerManager scmContainerManager;
+  private PipelineManager scmPipelineManager;
+  private Pipeline ratisPipeline1;
+  private final int CONTAINERS_CREATED_FOR_TESTING = 1;
+  private HDDSLayoutVersionManager scmVersionManager;
 
   /**
    * Create a MiniDFSCluster for testing.
    *
    * @throws IOException
    */
-  @BeforeClass
-  public static void init() throws Exception {
+  @Before
+  public void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.setTimeDuration(HDDS_PIPELINE_REPORT_INTERVAL, 1000,
             TimeUnit.MILLISECONDS);
@@ -119,8 +119,8 @@ public class TestHDDSUpgrade {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @AfterClass
-  public static void shutdown() {
+  @After
+  public void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
     }
