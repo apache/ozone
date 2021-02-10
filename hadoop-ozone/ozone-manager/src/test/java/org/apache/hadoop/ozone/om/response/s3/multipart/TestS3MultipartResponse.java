@@ -217,6 +217,7 @@ public class TestS3MultipartResponse {
             omKeyInfo, parentDirInfos);
   }
 
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public S3MultipartUploadCommitPartResponse createS3CommitMPUResponseV1(
           String volumeName, String bucketName, long parentID, String keyName,
           String multipartUploadID,
