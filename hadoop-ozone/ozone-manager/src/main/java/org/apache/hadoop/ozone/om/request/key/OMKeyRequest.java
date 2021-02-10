@@ -692,9 +692,17 @@ public abstract class OMKeyRequest extends OMClientRequest {
     // error no such multipart upload.
     String uploadID = args.getMultipartUploadID();
     Preconditions.checkNotNull(uploadID);
-    String multipartKey = omMetadataManager
-            .getMultipartKey(args.getVolumeName(), args.getBucketName(),
-                    args.getKeyName(), uploadID);
+    String multipartKey = "";
+    if (omPathInfo != null) {
+      // FileTable metadata format
+      multipartKey = omMetadataManager.getMultipartKey(
+              omPathInfo.getLastKnownParentId(),
+              omPathInfo.getLeafNodeName(), uploadID);
+    } else {
+      multipartKey = omMetadataManager
+              .getMultipartKey(args.getVolumeName(), args.getBucketName(),
+                      args.getKeyName(), uploadID);
+    }
     OmKeyInfo partKeyInfo = omMetadataManager.getOpenKeyTable().get(
             multipartKey);
     if (partKeyInfo == null) {
