@@ -22,7 +22,6 @@ import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
-import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -228,28 +227,8 @@ public class S3InitiateMultipartUploadRequestV1
             volumeName, bucketName);
       }
     }
-
-    // audit log
-    auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
-        OMAction.INITIATE_MULTIPART_UPLOAD, auditMap,
-        exception, getOmRequest().getUserInfo()));
-
-    switch (result) {
-    case SUCCESS:
-      LOG.debug("S3 InitiateMultipart Upload request for Key {} in " +
-              "Volume/Bucket {}/{} is successfully completed", keyName,
-          volumeName, bucketName);
-      break;
-    case FAILURE:
-      ozoneManager.getMetrics().incNumInitiateMultipartUploadFails();
-      LOG.error("S3 InitiateMultipart Upload request for Key {} in " +
-              "Volume/Bucket {}/{} is failed", keyName, volumeName, bucketName,
-          exception);
-      break;
-    default:
-      LOG.error("Unrecognized Result for S3InitiateMultipartUploadRequest: {}",
-          multipartInfoInitiateRequest);
-    }
+    logResult(ozoneManager, multipartInfoInitiateRequest, auditMap, volumeName,
+            bucketName, keyName, exception, result);
 
     return omClientResponse;
   }
