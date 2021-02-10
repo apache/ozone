@@ -75,8 +75,8 @@ public class TestS3MultipartUploadCommitPartResponseV1
         omMetadataManager.getMultipartInfoTable().get(multipartKey));
 
     // As no parts are created, so no entries should be there in delete table.
-    Assert.assertTrue(omMetadataManager.countRowsInTable(
-            omMetadataManager.getDeletedTable()) == 0);
+    Assert.assertEquals(0, omMetadataManager.countRowsInTable(
+            omMetadataManager.getDeletedTable()));
   }
 
   @Test
@@ -135,8 +135,8 @@ public class TestS3MultipartUploadCommitPartResponseV1
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
     // As 1 parts are created, so 1 entry should be there in delete table.
-    Assert.assertTrue(omMetadataManager.countRowsInTable(
-        omMetadataManager.getDeletedTable()) == 1);
+    Assert.assertEquals(1, omMetadataManager.countRowsInTable(
+        omMetadataManager.getDeletedTable()));
 
     String part1DeletedKeyName =
         omMultipartKeyInfo.getPartKeyInfo(1).getPartName();
@@ -205,9 +205,9 @@ public class TestS3MultipartUploadCommitPartResponseV1
 
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
-    // As 1 parts are created, so 1 entry should be there in delete table.
-    Assert.assertTrue(omMetadataManager.countRowsInTable(
-            omMetadataManager.getDeletedTable()) == 1);
+    // openkey entry should be there in delete table.
+    Assert.assertEquals(1, omMetadataManager.countRowsInTable(
+            omMetadataManager.getDeletedTable()));
 
     Assert.assertNotNull(omMetadataManager.getDeletedTable().get(
             openKey));
