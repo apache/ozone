@@ -534,18 +534,19 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   /**
-   * Get Datanode disk information by ip or uuid.
+   * Get Datanode disk metrics by ip or uuid.
    *
    * @param ipaddress datanode ipaddress
    * @param uuid datanode uuid
-   * @return Disk usage info such as capacity, used, remaining.
+   * @return Disk metrics such as capacity, used, remaining.
    * @throws IOException
    */
   @Override
-  public HddsProtos.DatanodeDiskInfo getDatanodeDiskInfo(String ipaddress,
-                                                         String uuid)
+  public HddsProtos.DatanodeDiskMetrics getDatanodeDiskMetrics(String ipaddress,
+                                                               String uuid)
       throws IOException {
-    return storageContainerLocationClient.getDatanodeDiskInfo(ipaddress, uuid);
+    return storageContainerLocationClient.getDatanodeDiskMetrics(ipaddress,
+        uuid);
   }
 
 }

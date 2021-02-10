@@ -18,8 +18,6 @@ package org.apache.hadoop.ozone.freon;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
-import org.apache.hadoop.hdds.scm.cli.datanode.DatanodeDiskInfo;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.ratis.server.RaftServer;
@@ -86,26 +84,10 @@ public class TestOzoneClientKeyGenerator {
     cluster.getConf().writeXml(out);
     out.getFD().sync();
     out.close();
-//    new Freon().execute(
-//        new String[] {"-conf", new File(path, "conf").getAbsolutePath(),
-//            "ockg", "-t", "1"});
-//    new GenericCli().execute(new String[] {"-conf",
-//        new File(path, "conf").getAbsolutePath(), "ozone", "admin", "datanode",
-//        "ockg", "-t", "1"});
-
-    String uuid =
-        cluster.getHddsDatanodes().get(0).getDatanodeDetails().getUuidString();
-    String ip =
-        cluster.getHddsDatanodes().get(0).getDatanodeDetails().getIpAddress();
-
-    DatanodeDiskInfo command = new DatanodeDiskInfo();
-    command.setIpaddress(ip);
-//    command.setUuid(uuid);
-
-    command.execute(new ContainerOperationClient(conf));
-
+    new Freon().execute(
+        new String[] {"-conf", new File(path, "conf").getAbsolutePath(),
+            "ockg", "-t", "1"});
     shutdown(cluster);
-
   }
 
 }

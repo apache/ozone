@@ -575,30 +575,29 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   /**
-   * Gets disk information(such as capacity, used) of datanode specified by
-   * params.
+   * Builds request for datanode disk metrics and receives response.
    *
    * @param ipaddress
    * @param uuid
-   * @return DatanodeDiskInfo
+   * @return DatanodeDiskMetrics
    * @throws IOException
    */
   @Override
-  public HddsProtos.DatanodeDiskInfo getDatanodeDiskInfo(String ipaddress,
-                                                         String uuid)
+  public HddsProtos.DatanodeDiskMetrics getDatanodeDiskMetrics(String ipaddress,
+                                                               String uuid)
       throws IOException {
 
-    DatanodeDiskInfoRequestProto request =
-        DatanodeDiskInfoRequestProto.newBuilder()
+    DatanodeDiskMetricsRequestProto request =
+        DatanodeDiskMetricsRequestProto.newBuilder()
             .setIpaddress(ipaddress)
             .setUuid(uuid)
             .build();
 
-    DatanodeDiskInfoResponseProto response =
-        submitRequest(Type.DatanodeDiskInfo,
-            builder -> builder.setDatanodeDiskInfoRequest(request))
-            .getDatanodeDiskInfoResponse();
-    return response.getInfo();
+    DatanodeDiskMetricsResponseProto response =
+        submitRequest(Type.DatanodeDiskMetrics,
+            builder -> builder.setDatanodeDiskMetricsRequest(request))
+            .getDatanodeDiskMetricsResponse();
+    return response.getMetrics();
   }
 
   @Override

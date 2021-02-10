@@ -257,12 +257,12 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setStartMaintenanceNodesResponse(startMaintenanceNodes(
                 request.getStartMaintenanceNodesRequest()))
             .build();
-      case DatanodeDiskInfo:
+      case DatanodeDiskMetrics:
         return ScmContainerLocationResponse.newBuilder()
             .setCmdType(request.getCmdType())
             .setStatus(Status.OK)
-            .setDatanodeDiskInfoResponse(getDatanodeDiskInfo(
-                request.getDatanodeDiskInfoRequest()))
+            .setDatanodeDiskMetricsResponse(getDatanodeDiskMetrics(
+                request.getDatanodeDiskMetricsRequest()))
             .build();
       default:
         throw new IllegalArgumentException(
@@ -518,8 +518,8 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
         .build();
   }
 
-  public DatanodeDiskInfoResponseProto getDatanodeDiskInfo(
-      StorageContainerLocationProtocolProtos.DatanodeDiskInfoRequestProto
+  public DatanodeDiskMetricsResponseProto getDatanodeDiskMetrics(
+      StorageContainerLocationProtocolProtos.DatanodeDiskMetricsRequestProto
       request) throws IOException {
     String ipaddress = null;
     String uuid = null;
@@ -533,10 +533,11 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       throw new IOException("No ip or uuid specified");
     }
 
-    HddsProtos.DatanodeDiskInfo info = impl.getDatanodeDiskInfo(ipaddress,
+    HddsProtos.DatanodeDiskMetrics metrics;
+    metrics = impl.getDatanodeDiskMetrics(ipaddress,
         uuid);
-    return DatanodeDiskInfoResponseProto.newBuilder()
-        .setInfo(info)
+    return DatanodeDiskMetricsResponseProto.newBuilder()
+        .setMetrics(metrics)
         .build();
   }
 

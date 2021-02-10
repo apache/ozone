@@ -66,7 +66,7 @@ message ScmContainerLocationRequest {
   optional DecommissionNodesRequestProto decommissionNodesRequest = 27;
   optional RecommissionNodesRequestProto recommissionNodesRequest = 28;
   optional StartMaintenanceNodesRequestProto startMaintenanceNodesRequest = 29;
-  optional DatanodeDiskInfoRequestProto datanodeDiskInfoRequest = 30;
+  optional DatanodeDiskMetricsRequestProto DatanodeDiskMetricsRequest = 30;
 }
 
 message ScmContainerLocationResponse {
@@ -104,7 +104,7 @@ message ScmContainerLocationResponse {
   optional DecommissionNodesResponseProto decommissionNodesResponse = 27;
   optional RecommissionNodesResponseProto recommissionNodesResponse = 28;
   optional StartMaintenanceNodesResponseProto startMaintenanceNodesResponse = 29;
-  optional DatanodeDiskInfoResponseProto datanodeDiskInfoResponse = 30;
+  optional DatanodeDiskMetricsResponseProto DatanodeDiskMetricsResponse = 30;
   enum Status {
     OK = 1;
     CONTAINER_ALREADY_EXISTS = 2;
@@ -138,7 +138,7 @@ enum Type {
   DecommissionNodes = 22;
   RecommissionNodes = 23;
   StartMaintenanceNodes = 24;
-  DatanodeDiskInfo = 25;
+  DatanodeDiskMetrics = 25;
 }
 
 /**
@@ -256,13 +256,13 @@ message NodeQueryResponseProto {
 /*
   Request for disk info of datanode with the specified ipaddress or uuid.
 */
-message DatanodeDiskInfoRequestProto {
+message DatanodeDiskMetricsRequestProto {
   optional string ipaddress = 1;
   optional string uuid = 2;
 }
 
-message DatanodeDiskInfoResponseProto {
-  optional DatanodeDiskInfo info = 1;
+message DatanodeDiskMetricsResponseProto {
+  optional DatanodeDiskMetrics metrics = 1;
 }
 
 /*

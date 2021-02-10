@@ -156,7 +156,7 @@ message NodePool {
     repeated Node nodes = 1;
 }
 
-message DatanodeDiskInfo {
+message DatanodeDiskMetrics {
     optional string capacity = 1;
     optional string used = 2;
     optional string remaining = 3;
