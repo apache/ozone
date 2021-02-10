@@ -21,8 +21,6 @@ package org.apache.hadoop.ozone.om.request.s3.multipart;
 import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
-import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -35,7 +33,7 @@ import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.om.response.s3.multipart.S3MultipartUploadCommitPartResponse;
+import org.apache.hadoop.ozone.om.response.s3.multipart.S3MultipartUploadCommitPartResponseV1;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartCommitUploadPartRequest;
@@ -135,7 +133,7 @@ public class S3MultipartUploadCommitPartRequestV1
 
       if (omKeyInfo == null) {
         throw new OMException("Failed to commit Multipart Upload key, as " +
-            openKey + "entry is not found in the openKey table",
+            openKey + " entry is not found in the openKey table",
             KEY_NOT_FOUND);
       }
 
@@ -186,8 +184,6 @@ public class S3MultipartUploadCommitPartRequestV1
       // S3MultipartUplodaCommitPartResponse before being added to
       // DeletedKeyTable.
 
-      // Add to cache.
-
       // Delete from open key table and add it to multipart info table.
       // No need to add cache entries to delete table, as no
       // read/write requests that info for validation.
@@ -214,7 +210,7 @@ public class S3MultipartUploadCommitPartRequestV1
       omResponse.setCommitMultiPartUploadResponse(
           MultipartCommitUploadPartResponse.newBuilder()
               .setPartName(partName));
-      omClientResponse = new S3MultipartUploadCommitPartResponse(
+      omClientResponse = new S3MultipartUploadCommitPartResponseV1(
           omResponse.build(), multipartKey, openKey,
           multipartKeyInfo, oldPartKeyInfo, omKeyInfo,
           ozoneManager.isRatisEnabled(),
@@ -224,7 +220,7 @@ public class S3MultipartUploadCommitPartRequestV1
     } catch (IOException ex) {
       result = Result.FAILURE;
       exception = ex;
-      omClientResponse = new S3MultipartUploadCommitPartResponse(
+      omClientResponse = new S3MultipartUploadCommitPartResponseV1(
           createErrorOMResponse(omResponse, exception), multipartKey, openKey,
           multipartKeyInfo, oldPartKeyInfo, omKeyInfo,
           ozoneManager.isRatisEnabled(), copyBucketInfo);

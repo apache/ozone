@@ -664,9 +664,9 @@ public abstract class OMKeyRequest extends OMClientRequest {
     String multipartKey = "";
     if (omPathInfo != null) {
       // FileTable metadata format
-      multipartKey =
-              omMetadataManager.getMultipartKey(omPathInfo.getLastKnownParentId(),
-                      omPathInfo.getLeafNodeName(), uploadID);
+      multipartKey = omMetadataManager.getMultipartKey(
+              omPathInfo.getLastKnownParentId(),
+              omPathInfo.getLeafNodeName(), uploadID);
     } else {
       multipartKey = omMetadataManager
               .getMultipartKey(args.getVolumeName(), args.getBucketName(),

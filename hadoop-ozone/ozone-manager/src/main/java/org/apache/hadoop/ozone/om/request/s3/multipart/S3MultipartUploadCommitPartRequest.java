@@ -129,16 +129,16 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
       String uploadID = keyArgs.getMultipartUploadID();
-      multipartKey = omMetadataManager.getMultipartKey(volumeName, bucketName,
-          keyName, uploadID);
+      multipartKey = getMultipartKey(volumeName, bucketName, keyName,
+              omMetadataManager, uploadID);
 
       multipartKeyInfo = omMetadataManager.getMultipartInfoTable()
           .get(multipartKey);
 
       long clientID = multipartCommitUploadPartRequest.getClientID();
 
-      openKey = omMetadataManager.getOpenKey(
-          volumeName, bucketName, keyName, clientID);
+      openKey = getOpenKey(volumeName, bucketName, keyName, omMetadataManager,
+              clientID);
 
       String ozoneKey = omMetadataManager.getOzoneKey(
           volumeName, bucketName, keyName);
@@ -253,6 +253,18 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
             result);
 
     return omClientResponse;
+  }
+
+  private String getOpenKey(String volumeName, String bucketName,
+      String keyName, OMMetadataManager omMetadataManager, long clientID) {
+    return omMetadataManager.getOpenKey(volumeName, bucketName,
+            keyName, clientID);
+  }
+
+  private String getMultipartKey(String volumeName, String bucketName,
+      String keyName, OMMetadataManager omMetadataManager, String uploadID) {
+    return omMetadataManager.getMultipartKey(volumeName, bucketName,
+        keyName, uploadID);
   }
 
   @SuppressWarnings("parameternumber")

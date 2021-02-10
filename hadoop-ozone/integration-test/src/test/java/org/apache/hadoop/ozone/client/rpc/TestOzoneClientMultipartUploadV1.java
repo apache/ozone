@@ -215,7 +215,6 @@ public class TestOzoneClientMultipartUploadV1 {
             .getCommitUploadPartInfo();
 
     assertNotNull(commitUploadPartInfo);
-    String partName = commitUploadPartInfo.getPartName();
     assertNotNull(commitUploadPartInfo.getPartName());
   }
 
