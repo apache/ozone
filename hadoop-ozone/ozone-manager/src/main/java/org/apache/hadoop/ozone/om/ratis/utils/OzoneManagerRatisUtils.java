@@ -59,6 +59,7 @@ import org.apache.hadoop.ozone.om.request.s3.multipart.S3InitiateMultipartUpload
 import org.apache.hadoop.ozone.om.request.s3.multipart.S3InitiateMultipartUploadRequestV1;
 import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadAbortRequest;
 import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadCommitPartRequest;
+import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadCommitPartRequestV1;
 import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadCompleteRequest;
 import org.apache.hadoop.ozone.om.request.s3.security.S3GetSecretRequest;
 import org.apache.hadoop.ozone.om.request.security.OMCancelDelegationTokenRequest;
@@ -184,6 +185,9 @@ public final class OzoneManagerRatisUtils {
       }
       return new S3InitiateMultipartUploadRequest(omRequest);
     case CommitMultiPartUpload:
+      if (isBucketFSOptimized()) {
+        return new S3MultipartUploadCommitPartRequestV1(omRequest);
+      }
       return new S3MultipartUploadCommitPartRequest(omRequest);
     case AbortMultiPartUpload:
       return new S3MultipartUploadAbortRequest(omRequest);

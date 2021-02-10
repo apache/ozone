@@ -225,7 +225,17 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
             volumeName, bucketName);
       }
     }
+    logResult(ozoneManager, multipartInfoInitiateRequest, auditMap, volumeName,
+            bucketName, keyName, exception, result);
 
+    return omClientResponse;
+  }
+
+  @SuppressWarnings("parameternumber")
+  protected void logResult(OzoneManager ozoneManager,
+      MultipartInfoInitiateRequest multipartInfoInitiateRequest,
+      Map<String, String> auditMap, String volumeName, String bucketName,
+      String keyName, IOException exception, Result result) {
     // audit log
     auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
         OMAction.INITIATE_MULTIPART_UPLOAD, auditMap,
@@ -247,7 +257,5 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
       LOG.error("Unrecognized Result for S3InitiateMultipartUploadRequest: {}",
           multipartInfoInitiateRequest);
     }
-
-    return omClientResponse;
   }
 }
