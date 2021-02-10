@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.client.rpc;
 
+import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -24,8 +25,13 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
+
+import static org.apache.hadoop.hdds.StringUtils.string2Bytes;
+import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 
@@ -177,6 +183,93 @@ public class TestOzoneClientMultipartUploadV1 {
     Assert.assertEquals(keyName, multipartInfo.getKeyName());
     assertNotEquals(multipartInfo.getUploadID(), uploadID);
     assertNotNull(multipartInfo.getUploadID());
+  }
+
+  @Test
+  public void testUploadPartWithNoOverride() throws IOException {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+    String sampleData = "sample Value";
+
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+    OmMultipartInfo multipartInfo = bucket.initiateMultipartUpload(keyName,
+            STAND_ALONE, ONE);
+
+    assertNotNull(multipartInfo);
+    String uploadID = multipartInfo.getUploadID();
+    Assert.assertEquals(volumeName, multipartInfo.getVolumeName());
+    Assert.assertEquals(bucketName, multipartInfo.getBucketName());
+    Assert.assertEquals(keyName, multipartInfo.getKeyName());
+    assertNotNull(multipartInfo.getUploadID());
+
+    OzoneOutputStream ozoneOutputStream = bucket.createMultipartKey(keyName,
+            sampleData.length(), 1, uploadID);
+    ozoneOutputStream.write(string2Bytes(sampleData), 0, sampleData.length());
+    ozoneOutputStream.close();
+
+    OmMultipartCommitUploadPartInfo commitUploadPartInfo = ozoneOutputStream
+            .getCommitUploadPartInfo();
+
+    assertNotNull(commitUploadPartInfo);
+    assertNotNull(commitUploadPartInfo.getPartName());
+  }
+
+  @Test
+  public void testUploadPartOverrideWithRatis() throws IOException {
+
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+    String sampleData = "sample Value";
+
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+    OmMultipartInfo multipartInfo = bucket.initiateMultipartUpload(keyName,
+            ReplicationType.RATIS, THREE);
+
+    assertNotNull(multipartInfo);
+    String uploadID = multipartInfo.getUploadID();
+    Assert.assertEquals(volumeName, multipartInfo.getVolumeName());
+    Assert.assertEquals(bucketName, multipartInfo.getBucketName());
+    Assert.assertEquals(keyName, multipartInfo.getKeyName());
+    assertNotNull(multipartInfo.getUploadID());
+
+    int partNumber = 1;
+
+    OzoneOutputStream ozoneOutputStream = bucket.createMultipartKey(keyName,
+            sampleData.length(), partNumber, uploadID);
+    ozoneOutputStream.write(string2Bytes(sampleData), 0, sampleData.length());
+    ozoneOutputStream.close();
+
+    OmMultipartCommitUploadPartInfo commitUploadPartInfo = ozoneOutputStream
+            .getCommitUploadPartInfo();
+
+    assertNotNull(commitUploadPartInfo);
+    String partName = commitUploadPartInfo.getPartName();
+    assertNotNull(commitUploadPartInfo.getPartName());
+
+    //Overwrite the part by creating part key with same part number.
+    sampleData = "sample Data Changed";
+    ozoneOutputStream = bucket.createMultipartKey(keyName,
+            sampleData.length(), partNumber, uploadID);
+    ozoneOutputStream.write(string2Bytes(sampleData), 0, "name".length());
+    ozoneOutputStream.close();
+
+    commitUploadPartInfo = ozoneOutputStream
+            .getCommitUploadPartInfo();
+
+    assertNotNull(commitUploadPartInfo);
+    assertNotNull(commitUploadPartInfo.getPartName());
+
+    // PartName should be different from old part Name.
+    assertNotEquals("Part names should be different", partName,
+            commitUploadPartInfo.getPartName());
   }
 
 }
