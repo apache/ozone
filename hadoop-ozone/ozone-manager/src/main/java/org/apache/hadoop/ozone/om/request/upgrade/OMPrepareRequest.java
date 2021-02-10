@@ -177,10 +177,10 @@ public class OMPrepareRequest extends OMClientRequest {
         // If there are no transactions in the DB, we are prepared to log
         // index 0 only.
         success = (indexToWaitFor == 0)
-            && (ratisTxnIndex >= indexToWaitFor);
+            && (ratisTxnIndex == indexToWaitFor + 1);
       } else {
         success = (dbTxnInfo.getTransactionIndex() == indexToWaitFor)
-            && (ratisTxnIndex >= indexToWaitFor);
+            && (ratisTxnIndex >= indexToWaitFor + 1);
       }
 
       if (!success) {
