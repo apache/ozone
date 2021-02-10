@@ -24,8 +24,6 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
@@ -37,7 +35,6 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.test.GenericTestUtils;
-import org.apache.hadoop.util.StringUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Assert;
@@ -125,34 +122,6 @@ public class TestOzoneFileOps {
             omMgr);
     openFileKey = d2ObjectID + OzoneConsts.OM_KEY_PREFIX + file.getName();
 
-    // verify entries in directory table
-    TableIterator<String, ? extends
-            Table.KeyValue<String, OmDirectoryInfo>> iterator =
-            omMgr.getDirectoryTable().iterator();
-    iterator.seekToFirst();
-    int count = dirKeys.size();
-    Assert.assertEquals("Unexpected directory table entries!", 2, count);
-    while (iterator.hasNext()) {
-      count--;
-      Table.KeyValue<String, OmDirectoryInfo> value = iterator.next();
-      verifyKeyFormat(value.getKey(), dirKeys);
-    }
-    Assert.assertEquals("Unexpected directory table entries!", 0, count);
-
-    // verify entries in open key table
-    TableIterator<String, ? extends
-            Table.KeyValue<String, OmKeyInfo>> keysItr =
-            omMgr.getOpenKeyTable().iterator();
-    keysItr.seekToFirst();
-
-    while (keysItr.hasNext()) {
-      count++;
-      Table.KeyValue<String, OmKeyInfo> value = keysItr.next();
-      verifyOpenKeyFormat(value.getKey(), openFileKey);
-      verifyOMFileInfoFormat(value.getValue(), file.getName(), d2ObjectID);
-    }
-    Assert.assertEquals("Unexpected file table entries!", 1, count);
-
     // trigger CommitKeyRequest
     outputStream.close();
 
@@ -181,42 +150,6 @@ public class TestOzoneFileOps {
     String dbKey = parentID + OzoneConsts.OM_KEY_PREFIX + fileName;
     Assert.assertEquals("Wrong path format", dbKey,
             omKeyInfo.getPath());
-  }
-
-  /**
-   * Verify key name format and the DB key existence in the expected dirKeys
-   * list.
-   *
-   * @param key     table keyName
-   * @param dirKeys expected keyName
-   */
-  private void verifyKeyFormat(String key, ArrayList<String> dirKeys) {
-    String[] keyParts = StringUtils.split(key,
-            OzoneConsts.OM_KEY_PREFIX.charAt(0));
-    Assert.assertEquals("Invalid KeyName", 2, keyParts.length);
-    boolean removed = dirKeys.remove(key);
-    Assert.assertTrue("Key:" + key + " doesn't exists in directory table!",
-            removed);
-  }
-
-  /**
-   * Verify key name format and the DB key existence in the expected
-   * openFileKeys list.
-   *
-   * @param key          table keyName
-   * @param openFileKey expected keyName
-   */
-  private void verifyOpenKeyFormat(String key, String openFileKey) {
-    String[] keyParts = StringUtils.split(key,
-            OzoneConsts.OM_KEY_PREFIX.charAt(0));
-    Assert.assertEquals("Invalid KeyName:" + key, 3, keyParts.length);
-    String[] expectedOpenFileParts = StringUtils.split(openFileKey,
-            OzoneConsts.OM_KEY_PREFIX.charAt(0));
-    Assert.assertEquals("ParentId/Key:" + expectedOpenFileParts[0]
-                    + " doesn't exists in openFileTable!",
-            expectedOpenFileParts[0] + OzoneConsts.OM_KEY_PREFIX
-                    + expectedOpenFileParts[1],
-            keyParts[0] + OzoneConsts.OM_KEY_PREFIX + keyParts[1]);
   }
 
   long verifyDirKey(long parentId, String dirKey, String absolutePath,

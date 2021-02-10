@@ -152,8 +152,7 @@ public class TestS3MultipartRequest {
         TestOMRequestUtils.createCommitPartMPURequest(volumeName, bucketName,
             keyName, clientID, dataSize, multipartUploadID, partNumber);
     S3MultipartUploadCommitPartRequest s3MultipartUploadCommitPartRequest =
-        new S3MultipartUploadCommitPartRequest(omRequest);
-
+            getS3MultipartUploadCommitReq(omRequest);
 
     OMRequest modifiedRequest =
         s3MultipartUploadCommitPartRequest.preExecute(ozoneManager);
@@ -247,4 +246,15 @@ public class TestS3MultipartRequest {
 
     return modifiedRequest;
   }
+
+  protected S3MultipartUploadCommitPartRequest getS3MultipartUploadCommitReq(
+          OMRequest omRequest) {
+    return new S3MultipartUploadCommitPartRequest(omRequest);
+  }
+
+  protected S3InitiateMultipartUploadRequest getS3InitiateMultipartUploadReq(
+          OMRequest initiateMPURequest) {
+    return new S3InitiateMultipartUploadRequest(initiateMPURequest);
+  }
+
 }
