@@ -54,10 +54,10 @@ public class SCMStateMachine extends BaseStateMachine {
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMStateMachine.class);
 
-  private final StorageContainerManager scm;
-  private final SCMRatisServer ratisServer;
-  private final Map<RequestType, Object> handlers;
-  private final DBTransactionBuffer transactionBuffer;
+  private StorageContainerManager scm;
+  private SCMRatisServer ratisServer;
+  private Map<RequestType, Object> handlers;
+  private DBTransactionBuffer transactionBuffer;
 
   public SCMStateMachine(final StorageContainerManager scm,
       final SCMRatisServer ratisServer, DBTransactionBuffer buffer)
@@ -80,13 +80,18 @@ public class SCMStateMachine extends BaseStateMachine {
     }
   }
 
+  public SCMStateMachine() {
+  }
   public void registerHandler(RequestType type, Object handler) {
     handlers.put(type, handler);
   }
 
   @Override
   public SnapshotInfo getLatestSnapshot() {
-    return transactionBuffer.getLatestSnapshot();
+    // Transaction buffer will be null during scm initlialization phase
+    return transactionBuffer == null ?
+        null :
+        transactionBuffer.getLatestSnapshot();
   }
 
   @Override

@@ -59,7 +59,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMHANodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
-import org.apache.hadoop.hdds.scm.ha.SCMHAConfiguration;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -128,10 +128,7 @@ import org.apache.hadoop.util.JvmPauseMonitor;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT_DEFAULT;
 import org.apache.ratis.grpc.GrpcTlsConfig;
-import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.server.RaftServer;
-import org.apache.ratis.server.storage.RaftStorage;
-import org.apache.ratis.server.storage.RaftStorageDirectory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -613,12 +610,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     LOG.info("SCM login successful.");
   }
 
-
-  // TODO: Ratis is always enabled now. In case, ratis gets disabled, this
-  // switch should be adjusted accordingly.
-  public static boolean isRatisEnabled(OzoneConfiguration conf) {
-    return true;
-  }
   /**
    * This function creates/initializes a certificate server as needed.
    * This function is idempotent, so calling this again and again after the
@@ -713,9 +704,12 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
             scmStorageConfig.getLayoutVersion());
         //TODO: this check need not be done if ratis is not used.
         // Initialize the raft group Id withe cluster Id.
-        if (isRatisEnabled(conf)) {
-          SCMRatisServerImpl.newRaftServer(clusterId, haDetails,
-              conf.getObject(SCMHAConfiguration.class), conf).build();
+        if (SCMHAUtils.isSCMHAEnabled(conf)) {
+          RaftServer server = SCMRatisServerImpl
+              .newRaftServer(clusterId, scmStorageConfig.getScmId(), haDetails,
+                  conf).build();
+          server.start();
+          server.close();
         }
         return true;
       } catch (IOException ioe) {
@@ -727,6 +721,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           + ";cid={};layoutVersion={}", scmStorageConfig.getStorageDir(),
           scmStorageConfig.getClusterID(),
           scmStorageConfig.getLayoutVersion());
+      if (SCMHAUtils.isSCMHAEnabled(conf)) {
+        SCMRatisServerImpl.validateRatisGroupExists(conf, clusterId);
+      }
       return true;
     }
   }
