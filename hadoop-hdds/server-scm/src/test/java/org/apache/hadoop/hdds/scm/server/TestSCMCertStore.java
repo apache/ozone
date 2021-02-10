@@ -28,8 +28,6 @@ import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateSto
 import org.apache.hadoop.hdds.security.x509.certificate.authority.DefaultCRLApprover;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.cert.X509CertificateHolder;
@@ -46,6 +44,7 @@ import java.security.KeyPair;
 import java.security.cert.X509CRLEntry;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
@@ -118,6 +117,7 @@ public class TestSCMCertStore {
 
     BigInteger serialID = x509Certificate.getSerialNumber();
     scmCertStore.storeValidCertificate(serialID, x509Certificate);
+    Date now = new Date();
 
     assertNotNull(
         scmCertStore.getCertificateByID(serialID,
@@ -129,7 +129,7 @@ public class TestSCMCertStore {
     certs.add(x509Certificate.getSerialNumber());
     Optional<Long> sequenceId = scmCertStore.revokeCertificates(certs,
         caCertificateHolder,
-        CRLReason.lookup(CRLReason.keyCompromise), crlApprover);
+        CRLReason.lookup(CRLReason.keyCompromise), now, crlApprover);
 
     assertTrue(sequenceId.isPresent());
     assertEquals(INITIAL_SEQUENCE_ID + 1L, (long) sequenceId.get());
@@ -163,20 +163,12 @@ public class TestSCMCertStore {
     // a warning message and no-op. It should not create a new CRL.
     sequenceId = scmCertStore.revokeCertificates(certs,
         caCertificateHolder,
-        CRLReason.lookup(CRLReason.unspecified), crlApprover);
+        CRLReason.lookup(CRLReason.unspecified), now, crlApprover);
 
     assertFalse(sequenceId.isPresent());
 
-    int size = 0;
-    TableIterator<Long, ? extends Table.KeyValue<Long, CRLInfo>> iter =
-        scmMetadataStore.getCRLInfoTable().iterator();
-
-    while(iter.hasNext()) {
-      size++;
-      iter.next();
-    }
-
-    assertEquals(1, size);
+    assertEquals(1L,
+        getTableSize(scmMetadataStore.getCRLInfoTable().iterator()));
 
     // Generate 3 more certificates and revoke 2 of them
     List<BigInteger> newSerialIDs = new ArrayList<>();
@@ -189,7 +181,7 @@ public class TestSCMCertStore {
     // Add the first 2 certificates to the revocation list
     sequenceId = scmCertStore.revokeCertificates(newSerialIDs.subList(0, 2),
         caCertificateHolder,
-        CRLReason.lookup(CRLReason.aACompromise), crlApprover);
+        CRLReason.lookup(CRLReason.aACompromise), now, crlApprover);
 
     // This should create a CRL with sequence id INITIAL_SEQUENCE_ID + 2
     // And contain 2 certificates in it
@@ -215,28 +207,16 @@ public class TestSCMCertStore {
             .findAny());
 
     // Valid certs table should have 1 cert
-    size = 0;
-    TableIterator<BigInteger,
-        ? extends Table.KeyValue<BigInteger, X509Certificate>> iterator =
-        scmMetadataStore.getValidCertsTable().iterator();
-    while (iterator.hasNext()) {
-      iterator.next();
-      size++;
-    }
-    assertEquals(1L, size);
+    assertEquals(1L,
+        getTableSize(scmMetadataStore.getValidCertsTable().iterator()));
     // Make sure that the last certificate that was not revoked is the one
     // in the valid certs table.
     assertEquals(newSerialIDs.get(2),
         scmMetadataStore.getValidCertsTable().iterator().next().getKey());
 
     // Revoked certs table should have 3 certs
-    size = 0;
-    Iterator iterator1 = scmMetadataStore.getRevokedCertsTable().iterator();
-    while (iterator1.hasNext()) {
-      size++;
-      iterator1.next();
-    }
-    assertEquals(3L, size);
+    assertEquals(3L,
+        getTableSize(scmMetadataStore.getRevokedCertsTable().iterator()));
   }
 
   private X509Certificate generateX509Cert() throws Exception {
@@ -244,5 +224,16 @@ public class TestSCMCertStore {
         CertificateCodec.getPEMEncodedString(
             KeyStoreTestUtil.generateCertificate("CN=Test", keyPair, 30,
         "SHA256withRSA")));
+  }
+
+  private long getTableSize(Iterator iterator) {
+    long size = 0;
+
+    while(iterator.hasNext()) {
+      size++;
+      iterator.next();
+    }
+
+    return size;
   }
 }

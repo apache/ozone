@@ -89,6 +89,7 @@ public class SCMCertStore implements CertificateStore {
       List<BigInteger> serialIDs,
       X509CertificateHolder caCertificateHolder,
       CRLReason reason,
+      Date revocationTime,
       CRLApprover crlApprover)
       throws IOException {
     Date now = new Date();
@@ -109,7 +110,8 @@ public class SCMCertStore implements CertificateStore {
             != null) {
           LOG.warn("Trying to revoke a certificate that is already revoked.");
         } else {
-          builder.addCRLEntry(serialID, now, reason.getValue().intValue());
+          builder.addCRLEntry(serialID, revocationTime,
+              reason.getValue().intValue());
           certsToRevoke.add(cert);
         }
       }

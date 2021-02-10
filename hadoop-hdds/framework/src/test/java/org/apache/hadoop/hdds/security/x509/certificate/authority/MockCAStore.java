@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
 import java.util.Collections;
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 
@@ -44,7 +45,9 @@ public class MockCAStore implements CertificateStore {
   public Optional<Long> revokeCertificates(
       List<BigInteger> serialIDs,
       X509CertificateHolder caCertificateHolder,
-      CRLReason reason, CRLApprover approver) throws IOException {
+      CRLReason reason,
+      Date revocationTime,
+      CRLApprover approver) throws IOException {
     return Optional.empty();
   }
 

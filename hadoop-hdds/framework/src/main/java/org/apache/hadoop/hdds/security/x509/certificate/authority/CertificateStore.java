@@ -26,6 +26,7 @@ import org.bouncycastle.cert.X509CertificateHolder;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 
@@ -52,17 +53,23 @@ public interface CertificateStore {
   /**
    * Adds the certificates to be revoked to a new CRL and moves all the
    * certificates in a transactional manner from valid certificate to
-   * revoked certificate state.
+   * revoked certificate state. Returns an empty {@code Optional} instance if
+   * the certificates were invalid / not found / already revoked and no CRL
+   * was generated. Otherwise, returns the newly generated CRL sequence ID.
    * @param serialIDs - List of Serial IDs of Certificates to be revoked.
    * @param caCertificateHolder - X509 Certificate Holder of the CA.
    * @param reason - CRLReason for revocation.
+   * @param revocationTime - Revocation Time for the certificates.
    * @param approver - CRL approver to sign the CRL.
-   * @return CRL sequence ID.
+   * @return An empty {@code Optional} instance if no CRL was generated.
+   * Otherwise, returns the newly generated CRL sequence ID.
    * @throws IOException - on failure.
    */
   Optional<Long> revokeCertificates(List<BigInteger> serialIDs,
                                     X509CertificateHolder caCertificateHolder,
-                                    CRLReason reason, CRLApprover approver)
+                                    CRLReason reason,
+                                    Date revocationTime,
+                                    CRLApprover approver)
       throws IOException;
 
   /**

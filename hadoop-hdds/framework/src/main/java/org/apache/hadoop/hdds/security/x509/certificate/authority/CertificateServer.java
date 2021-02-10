@@ -31,6 +31,7 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.Future;
@@ -107,11 +108,13 @@ public interface CertificateServer {
    * @param serialIDs       - List of serial IDs of Certificates to be revoked.
    * @param reason          - Reason for revocation.
    * @param securityConfig  - Security Configuration.
+   * @param revocationTime  - Revocation time for the certificates.
    * @return Future that gives a list of certificates that were revoked.
    */
   Future<Optional<Long>> revokeCertificates(
       List<BigInteger> serialIDs,
       CRLReason reason,
+      Date revocationTime,
       SecurityConfig securityConfig);
 
   /**

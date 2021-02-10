@@ -45,6 +45,7 @@ import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
@@ -230,6 +231,7 @@ public class TestDefaultCAServer {
   public void testRevokeCertificates() throws Exception {
     String scmId =  RandomStringUtils.randomAlphabetic(4);
     String clusterId =  RandomStringUtils.randomAlphabetic(4);
+    Date now = new Date();
 
     CertificateServer testCA = new DefaultCAServer("testCA",
         clusterId, scmId, caStore);
@@ -258,7 +260,7 @@ public class TestDefaultCAServer {
     List<BigInteger> serialIDs = new ArrayList<>();
     serialIDs.add(certificate.getSerialNumber());
     Future<Optional<Long>> revoked = testCA.revokeCertificates(serialIDs,
-        CRLReason.lookup(CRLReason.keyCompromise),
+        CRLReason.lookup(CRLReason.keyCompromise), now,
         new SecurityConfig(conf));
 
     // Revoking a valid certificate complete successfully without errors.
@@ -270,7 +272,7 @@ public class TestDefaultCAServer {
         () -> {
           Future<Optional<Long>> result =
               testCA.revokeCertificates(Collections.emptyList(),
-              CRLReason.lookup(CRLReason.keyCompromise),
+              CRLReason.lookup(CRLReason.keyCompromise), now,
                   new SecurityConfig(conf));
           result.isDone();
           result.get();

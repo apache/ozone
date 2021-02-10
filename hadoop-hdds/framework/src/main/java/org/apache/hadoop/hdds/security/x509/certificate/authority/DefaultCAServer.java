@@ -54,6 +54,7 @@ import java.security.spec.InvalidKeySpecException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -281,6 +282,7 @@ public class DefaultCAServer implements CertificateServer {
   public Future<Optional<Long>> revokeCertificates(
       List<BigInteger> certificates,
       CRLReason reason,
+      Date revocationTime,
       SecurityConfig securityConfig) {
     CompletableFuture<Optional<Long>> revoked = new CompletableFuture<>();
     if (CollectionUtils.isEmpty(certificates)) {
@@ -291,7 +293,7 @@ public class DefaultCAServer implements CertificateServer {
     try {
       revoked.complete(
           store.revokeCertificates(certificates,
-              getCACertificate(), reason, crlApprover)
+              getCACertificate(), reason, revocationTime, crlApprover)
       );
     } catch (IOException ex) {
       LOG.error("Revoking the certificate failed.", ex.getCause());
