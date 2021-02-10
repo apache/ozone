@@ -125,11 +125,15 @@ public class SCMCertStore implements CertificateStore {
         // let us do this in a transaction.
         try (BatchOperation batch =
                  scmMetadataStore.getStore().initBatchOperation()) {
-          for (X509Certificate cert : certsToRevoke) {
-            scmMetadataStore.getRevokedCertsTable()
-                .putWithBatch(batch, cert.getSerialNumber(), cert);
-            scmMetadataStore.getValidCertsTable()
-                .deleteWithBatch(batch, cert.getSerialNumber());
+          // Move the certificates from Valid Certs table to Revoked Certs Table
+          // only if the revocation time has passed.
+          if (now.after(revocationTime) || now.equals(revocationTime)) {
+            for (X509Certificate cert : certsToRevoke) {
+              scmMetadataStore.getRevokedCertsTable()
+                  .putWithBatch(batch, cert.getSerialNumber(), cert);
+              scmMetadataStore.getValidCertsTable()
+                  .deleteWithBatch(batch, cert.getSerialNumber());
+            }
           }
           long id = crlSequenceId.incrementAndGet();
           CRLInfo crlInfo = new CRLInfo.Builder()

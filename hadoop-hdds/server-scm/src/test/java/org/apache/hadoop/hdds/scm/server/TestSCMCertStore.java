@@ -219,6 +219,36 @@ public class TestSCMCertStore {
         getTableSize(scmMetadataStore.getRevokedCertsTable().iterator()));
   }
 
+  @Test
+  public void testRevokeCertificatesForFutureTime() throws Exception {
+    BigInteger serialID = x509Certificate.getSerialNumber();
+    scmCertStore.storeValidCertificate(serialID, x509Certificate);
+    Date now = new Date();
+    // Set revocation time in the future
+    Date revocationTime = new Date(now.getTime()+500);
+
+
+    X509CertificateHolder caCertificateHolder =
+        new X509CertificateHolder(generateX509Cert().getEncoded());
+    List<BigInteger> certs = new ArrayList<>();
+    certs.add(x509Certificate.getSerialNumber());
+    Optional<Long> sequenceId = scmCertStore.revokeCertificates(certs,
+        caCertificateHolder,
+        CRLReason.lookup(CRLReason.keyCompromise), revocationTime,
+        crlApprover);
+
+    assertTrue(sequenceId.isPresent());
+    assertEquals(INITIAL_SEQUENCE_ID + 1L, (long) sequenceId.get());
+
+    assertNotNull(
+        scmCertStore.getCertificateByID(serialID,
+            CertificateStore.CertType.VALID_CERTS));
+
+    assertNull(
+        scmCertStore.getCertificateByID(serialID,
+            CertificateStore.CertType.REVOKED_CERTS));
+  }
+
   private X509Certificate generateX509Cert() throws Exception {
     return CertificateCodec.getX509Certificate(
         CertificateCodec.getPEMEncodedString(
