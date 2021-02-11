@@ -289,7 +289,7 @@ public class TestOzoneAtRestEncryption extends TestOzoneRpcClient {
       try {
         return omMetadataManager.getDeletedTable().isExist(objectKey);
       } catch (IOException e) {
-        return null;
+        return false;
       }
     }, 500, 100000);
     RepeatedOmKeyInfo deletedKeys =
