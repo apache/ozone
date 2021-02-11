@@ -87,7 +87,7 @@ public class TestHDDSUpgrade {
   private ContainerManager scmContainerManager;
   private PipelineManager scmPipelineManager;
   private Pipeline ratisPipeline1;
-  private final int CONTAINERS_CREATED_FOR_TESTING = 1;
+  private final int numContainersCreated = 1;
   private HDDSLayoutVersionManager scmVersionManager;
 
   /**
@@ -145,7 +145,7 @@ public class TestHDDSUpgrade {
           (ciState == HddsProtos.LifeCycleState.QUASI_CLOSED));
       countContainers++;
     }
-    Assert.assertEquals(CONTAINERS_CREATED_FOR_TESTING, countContainers);
+    Assert.assertEquals(numContainersCreated, countContainers);
   }
 
   private void testPreUpgradeConditionsDataNodes() {
