@@ -100,7 +100,7 @@ public class HeartbeatEndpointTask
   public HeartbeatEndpointTask(EndpointStateMachine rpcEndpoint,
                                ConfigurationSource conf, StateContext context) {
     this(rpcEndpoint, conf, context,
-        context.getParent().getDataNodeVersionManager());
+        context.getParent().getLayoutVersionManager());
   }
 
   /**
@@ -124,8 +124,7 @@ public class HeartbeatEndpointTask
     if (versionManager != null) {
       this.layoutVersionManager = versionManager;
     } else {
-      this.layoutVersionManager =
-         context.getParent().getDataNodeVersionManager();
+      this.layoutVersionManager = context.getParent().getLayoutVersionManager();
     }
   }
 

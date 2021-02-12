@@ -88,10 +88,10 @@ public class DataNodeUpgradeFinalizer extends
         for (HDDSLayoutFeature f : versionManager.unfinalizedFeatures()) {
           Optional<? extends LayoutFeature.UpgradeAction> action =
               f.onFinalizeDataNodeAction();
-          finalizeFeature(f, datanodeStateMachine.getDataNodeStorageConfig(),
+          finalizeFeature(f, datanodeStateMachine.getLayoutStorage(),
               action);
           updateLayoutVersionInVersionFile(f,
-              datanodeStateMachine.getDataNodeStorageConfig());
+              datanodeStateMachine.getLayoutStorage());
           versionManager.finalized(f);
         }
         versionManager.completeFinalization();

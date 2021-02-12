@@ -152,7 +152,7 @@ public class TestHDDSUpgrade {
     for (HddsDatanodeService dataNode : cluster.getHddsDatanodes()) {
       DatanodeStateMachine dsm = dataNode.getDatanodeStateMachine();
       HDDSLayoutVersionManager dnVersionManager =
-          dsm.getDataNodeVersionManager();
+          dsm.getLayoutVersionManager();
       Assert.assertEquals(0, dnVersionManager.getMetadataLayoutVersion());
 
     }
@@ -179,7 +179,7 @@ public class TestHDDSUpgrade {
         for (HddsDatanodeService dataNode : cluster.getHddsDatanodes()) {
           DatanodeStateMachine dsm = dataNode.getDatanodeStateMachine();
           HDDSLayoutVersionManager dnVersionManager =
-              dsm.getDataNodeVersionManager();
+              dsm.getLayoutVersionManager();
           try {
             if (dsm.queryUpgradeStatus().status() != FINALIZATION_DONE) {
               return false;
@@ -199,7 +199,7 @@ public class TestHDDSUpgrade {
     for (HddsDatanodeService dataNode : cluster.getHddsDatanodes()) {
       DatanodeStateMachine dsm = dataNode.getDatanodeStateMachine();
       HDDSLayoutVersionManager dnVersionManager =
-          dsm.getDataNodeVersionManager();
+          dsm.getLayoutVersionManager();
       Assert.assertEquals(dnVersionManager.getSoftwareLayoutVersion(),
           dnVersionManager.getMetadataLayoutVersion());
       Assert.assertTrue(dnVersionManager.getMetadataLayoutVersion() >= 1);

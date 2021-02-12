@@ -21,11 +21,11 @@ package org.apache.hadoop.ozone.container.common;
  * Datanode layout version which describes information about the layout version
  * on the datanode.
  */
-public final class DataNodeLayoutVersion {
+public final class DataNodeVolumeLayoutVersion {
 
   // We will just be normal and use positive counting numbers for versions.
-  private static final DataNodeLayoutVersion[] VERSION_INFOS =
-      {new DataNodeLayoutVersion(1, "HDDS Datanode LayOut Version 1")};
+  private static final DataNodeVolumeLayoutVersion[] VERSION_INFOS =
+      {new DataNodeVolumeLayoutVersion(1, "HDDS Datanode LayOut Version 1")};
 
   private final String description;
   private final int version;
@@ -36,7 +36,7 @@ public final class DataNodeLayoutVersion {
    * @param description -- description
    * @param version     -- version number
    */
-  private DataNodeLayoutVersion(int version, String description) {
+  private DataNodeVolumeLayoutVersion(int version, String description) {
     this.description = description;
     this.version = version;
   }
@@ -46,7 +46,7 @@ public final class DataNodeLayoutVersion {
    *
    * @return Version info array.
    */
-  public static DataNodeLayoutVersion[] getAllVersions() {
+  public static DataNodeVolumeLayoutVersion[] getAllVersions() {
     return VERSION_INFOS.clone();
   }
 
@@ -55,7 +55,7 @@ public final class DataNodeLayoutVersion {
    *
    * @return versionInfo
    */
-  public static DataNodeLayoutVersion getLatestVersion() {
+  public static DataNodeVolumeLayoutVersion getLatestVersion() {
     return VERSION_INFOS[VERSION_INFOS.length - 1];
   }
 

@@ -49,7 +49,7 @@ public class OMLayoutFeatureAspect {
     String featureName = ((MethodSignature) joinPoint.getSignature())
         .getMethod().getAnnotation(DisallowedUntilLayoutVersion.class)
         .value().name();
-    LayoutVersionManager lvm = null;
+    OMLayoutVersionManager lvm = null;
     if (joinPoint.getTarget() instanceof OzoneManagerRequestHandler) {
       OzoneManager ozoneManager = ((OzoneManagerRequestHandler)
           joinPoint.getTarget()).getOzoneManager();
@@ -58,7 +58,7 @@ public class OMLayoutFeatureAspect {
       try {
         Method method = joinPoint.getTarget().getClass()
             .getMethod(GET_VERSION_MANAGER_METHOD_NAME);
-        lvm = (LayoutVersionManager) method.invoke(joinPoint.getTarget());
+        lvm = (OMLayoutVersionManager) method.invoke(joinPoint.getTarget());
       } catch (Exception ex) {
         lvm = new OMLayoutVersionManager();
       }

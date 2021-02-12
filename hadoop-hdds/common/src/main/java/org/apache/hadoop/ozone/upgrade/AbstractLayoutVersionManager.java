@@ -44,25 +44,20 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
   protected int softwareLayoutVersion; // SLV.
   protected TreeMap<Integer, T> features = new TreeMap<>();
   protected Map<String, T> featureMap = new HashMap<>();
-  protected volatile boolean isInitialized = false;
-  protected volatile Status currentUpgradeState =
-      FINALIZATION_REQUIRED;
+  protected volatile Status currentUpgradeState = FINALIZATION_REQUIRED;
 
   protected void init(int version, T[] lfs) throws IOException {
 
-    if (!isInitialized) {
-      metadataLayoutVersion = version;
-      initializeFeatures(lfs);
-      softwareLayoutVersion = features.lastKey();
-      isInitialized = true;
-      if (softwareIsBehindMetaData()) {
-        throw new IOException(
-            String.format("Cannot initialize VersionManager. Metadata " +
-                    "layout version (%d) > software layout version (%d)",
-                metadataLayoutVersion, softwareLayoutVersion));
-      } else if (metadataLayoutVersion == softwareLayoutVersion) {
-        currentUpgradeState = ALREADY_FINALIZED;
-      }
+    metadataLayoutVersion = version;
+    initializeFeatures(lfs);
+    softwareLayoutVersion = features.lastKey();
+    if (softwareIsBehindMetaData()) {
+      throw new IOException(
+          String.format("Cannot initialize VersionManager. Metadata " +
+                  "layout version (%d) > software layout version (%d)",
+              metadataLayoutVersion, softwareLayoutVersion));
+    } else if (metadataLayoutVersion == softwareLayoutVersion) {
+      currentUpgradeState = ALREADY_FINALIZED;
     }
 
     MBeans.register("LayoutVersionManager",
@@ -84,15 +79,6 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
       features.put(f.layoutVersion(), f);
       featureMap.put(f.name(), f);
     });
-  }
-
-  protected void reset() {
-    metadataLayoutVersion = 0;
-    softwareLayoutVersion = 0;
-    featureMap.clear();
-    features.clear();
-    isInitialized = false;
-    currentUpgradeState = ALREADY_FINALIZED;
   }
 
   public void finalized(T layoutFeature) {

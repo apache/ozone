@@ -70,7 +70,7 @@ public class FinalizeNewLayoutVersionCommandHandler implements CommandHandler {
     try {
       if (finalizeCommand.getFinalizeNewLayoutVersion()) {
         // SCM is asking datanode to finalize
-        if (dsm.getDataNodeVersionManager().getUpgradeState() ==
+        if (dsm.getLayoutVersionManager().getUpgradeState() ==
             FINALIZATION_REQUIRED) {
           // SCM will keep sending Finalize command until datanode mlv == slv
           // we need to avoid multiple invocations of finalizeUpgrade.

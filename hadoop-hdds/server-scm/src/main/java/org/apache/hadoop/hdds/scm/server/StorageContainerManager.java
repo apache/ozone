@@ -267,7 +267,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
 
     loadSCMUpgradeActions();
-    scmLayoutVersionManager = new HDDSLayoutVersionManager(scmStorageConfig);
+    scmLayoutVersionManager = new HDDSLayoutVersionManager(
+        scmStorageConfig.getLayoutVersion());
     upgradeFinalizer = new SCMUpgradeFinalizer(scmLayoutVersionManager);
 
     /**

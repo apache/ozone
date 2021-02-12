@@ -54,7 +54,8 @@ public class OMLayoutFeatureUtil {
     return "basic";
   }
 
-  // Needed for the Aspect.
+  // A method named 'getOmVersionManager' needed for the Aspect to get
+  // instance of the layout version manager.
   public LayoutVersionManager getOmVersionManager() throws IOException {
     OzoneConfiguration configuration = new OzoneConfiguration();
     Path tempDirWithPrefix = Files.createTempDirectory("TestAspect");

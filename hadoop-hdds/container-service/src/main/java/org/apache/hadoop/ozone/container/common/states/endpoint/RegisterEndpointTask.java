@@ -75,7 +75,7 @@ public final class RegisterEndpointTask implements
                               OzoneContainer ozoneContainer,
                               StateContext context) {
     this(rpcEndPoint, conf, ozoneContainer, context,
-        context.getParent().getDataNodeVersionManager());
+        context.getParent().getLayoutVersionManager());
   }
 
   /**
@@ -99,7 +99,7 @@ public final class RegisterEndpointTask implements
       this.layoutVersionManager = versionManager;
     } else {
       this.layoutVersionManager =
-          context.getParent().getDataNodeVersionManager();
+          context.getParent().getLayoutVersionManager();
     }
   }
 

@@ -33,7 +33,8 @@ public class DataNodeUpgradeActionFirstUpgradeVersion
       LoggerFactory.getLogger(DataNodeUpgradeActionFirstUpgradeVersion.class);
   @Override
   public void executeAction(DatanodeStateMachine arg) throws Exception {
-    LOG.info("Executing datanode upgrade action for the very First Upgrade " +
-        "Version.");
+    LOG.info("Executing datanode 'onFinalize' action for the first " +
+        "version with upgrade support. New containers will be " +
+        "created with Schema Version 2 henceforth.");
   }
 }

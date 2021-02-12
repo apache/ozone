@@ -38,8 +38,6 @@ import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
-import org.apache.hadoop.ozone.om.request.UnsupportedMockNewOMRequest;
-import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -122,30 +120,5 @@ public class TestOMVersionManager {
             nsmEx.getMessage());
       }
     }
-  }
-
-  @Test
-  public void testCannotGetUnsupportedOmRequest() throws OMException {
-    OMStorage omStorage = mock(OMStorage.class);
-    when(omStorage.getLayoutVersion()).thenReturn(0);
-    OMLayoutVersionManager omVersionManager =
-        new OMLayoutVersionManager(omStorage);
-    OzoneManager om = mock(OzoneManager.class);
-    when(om.getOmStorage()).thenReturn(omStorage);
-
-    Class<? extends OMClientRequest> requestHandler;
-    try {
-      requestHandler = omVersionManager.getHandler(
-              UnsupportedMockNewOMRequest.class.getSimpleName());
-      Assert.fail();
-    } catch (IllegalArgumentException ex) {
-      GenericTestUtils.assertExceptionContains(
-          "No suitable instance found", ex);
-    }
-
-    omVersionManager.unfinalizedFeatures().forEach(omVersionManager::finalized);
-    requestHandler = omVersionManager.getHandler(
-        UnsupportedMockNewOMRequest.class.getSimpleName());
-    Assert.assertNotNull(requestHandler);
   }
 }

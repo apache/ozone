@@ -48,7 +48,6 @@ public abstract class Storage {
   public static final String STORAGE_DIR_CURRENT = "current";
   protected static final String STORAGE_FILE_VERSION = "VERSION";
   public static final String CONTAINER_DIR = "containerDir";
-  private static final int LAYOUT_VERSION = 0;
 
   private final NodeType nodeType;
   private final File root;
@@ -65,7 +64,14 @@ public abstract class Storage {
     NON_EXISTENT, NOT_INITIALIZED, INITIALIZED
   }
 
-  public Storage(NodeType type, File root, String sdName)
+  public Storage(NodeType type, File root, String sdName,
+                 int defaultLayoutVersion)
+      throws IOException {
+    this(type, root, sdName, StorageInfo.newClusterID(), defaultLayoutVersion);
+  }
+
+  public Storage(NodeType type, File root, String sdName,
+                 String id, int defaultLayoutVersion)
       throws IOException {
     this.nodeType = type;
     this.root = root;
@@ -74,8 +80,8 @@ public abstract class Storage {
     if (state == StorageState.INITIALIZED) {
       this.storageInfo = new StorageInfo(type, getVersionFile());
     } else {
-      this.storageInfo = new StorageInfo(
-          nodeType, StorageInfo.newClusterID(), Time.now(), LAYOUT_VERSION);
+      this.storageInfo = new StorageInfo(nodeType, id, Time.now(),
+          defaultLayoutVersion);
       setNodeProperties();
     }
   }

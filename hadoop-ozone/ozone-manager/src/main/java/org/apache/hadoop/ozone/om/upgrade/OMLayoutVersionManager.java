@@ -87,11 +87,6 @@ public final class OMLayoutVersionManager
     registerOzoneManagerRequests();
   }
 
-  public void reset() {
-    requestFactory = null;
-    super.reset();
-  }
-
   private void registerOzoneManagerRequests() {
     try {
       for (Class<? extends OMClientRequest> reqClass : getRequestClasses()) {
@@ -162,4 +157,10 @@ public final class OMLayoutVersionManager
     super.finalized(layoutFeature);
     requestFactory.finalizeFeature(layoutFeature);
   }
+
+  public static int maxLayoutVersion() {
+    OMLayoutFeature[] features = OMLayoutFeature.values();
+    return features[features.length - 1].layoutVersion();
+  }
+
 }

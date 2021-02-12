@@ -127,10 +127,7 @@ public class StorageInfo {
 
   private void verifyLayoutVersion() {
     String layout = getProperty(LAYOUT_VERSION);
-    if (layout == null) {
-      // For now, default it to "0"
-      setProperty(LAYOUT_VERSION, "0");
-    }
+    Preconditions.checkNotNull(layout);
   }
 
   public String getProperty(String key) {

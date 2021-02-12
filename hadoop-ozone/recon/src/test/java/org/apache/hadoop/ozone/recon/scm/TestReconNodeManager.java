@@ -70,7 +70,8 @@ public class TestReconNodeManager {
         temporaryFolder.newFolder().getAbsolutePath());
     conf.set(OZONE_SCM_NAMES, "localhost");
     reconStorageConfig = new ReconStorageConfig(conf);
-    versionManager = new HDDSLayoutVersionManager(reconStorageConfig);
+    versionManager = new HDDSLayoutVersionManager(
+        reconStorageConfig.getLayoutVersion());
     store = DBStoreBuilder.createDBStore(conf, new ReconSCMDBDefinition());
   }
 

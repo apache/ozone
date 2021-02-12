@@ -494,7 +494,7 @@ public class TestEndPoint {
 
       HeartbeatEndpointTask endpointTask =
           new HeartbeatEndpointTask(rpcEndPoint, conf, stateContext,
-              stateMachine.getDataNodeVersionManager());
+              stateMachine.getLayoutVersionManager());
       endpointTask.setDatanodeDetailsProto(datanodeDetailsProto);
       endpointTask.call();
       Assert.assertNotNull(endpointTask.getDatanodeDetailsProto());

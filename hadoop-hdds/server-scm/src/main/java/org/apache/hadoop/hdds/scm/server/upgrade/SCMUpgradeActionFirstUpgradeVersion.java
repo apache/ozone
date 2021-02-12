@@ -32,6 +32,7 @@ public class SCMUpgradeActionFirstUpgradeVersion implements
       LoggerFactory.getLogger(SCMUpgradeActionFirstUpgradeVersion.class);
   @Override
   public void executeAction(StorageContainerManager arg) throws Exception {
-    LOG.info("Executing SCM Upgrade action for Very first Upgrade Version");
+    LOG.info("Executing SCM 'onFinalize' action for first version with " +
+        "upgrade support.");
   }
 }
