@@ -1456,14 +1456,14 @@
 
   <property>
     <name>hdds.scm.kerberos.keytab.file</name>
-    <value/>
+    <value>/path/to/SCM.keytab</value>
     <tag>SCM, SECURITY, KERBEROS</tag>
     <description> The keytab file used by SCM daemon to login as its service principal.
     </description>
   </property>
   <property>
     <name>hdds.scm.kerberos.principal</name>
-    <value/>
+    <value>SCM/_HOST@REALM</value>
     <tag>SCM, SECURITY, KERBEROS</tag>
     <description>The SCM service principal. e.g. scm/_HOST@REALM.COM</description>
   </property>
@@ -1801,7 +1801,7 @@
   </property>
   <property>
     <name>ozone.om.kerberos.keytab.file</name>
-    <value/>
+    <value>/path/to/OM.keytab</value>
     <tag>OZONE, SECURITY, KERBEROS</tag>
     <description> The keytab file used by OzoneManager daemon to login as its
       service principal. The principal name is configured with
@@ -1810,7 +1810,7 @@
   </property>
   <property>
     <name>ozone.om.kerberos.principal</name>
-    <value/>
+    <value>OM/_HOST@REALM</value>
     <tag>OZONE, SECURITY, KERBEROS</tag>
     <description>The OzoneManager service principal. Ex om/_HOST@REALM.COM</description>
   </property>
