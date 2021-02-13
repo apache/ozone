@@ -62,7 +62,8 @@ public final class GenerateOzoneRequiredConfigurations extends GenericCli {
       description = "Directory path where ozone-site file should be generated.")
   private String path;
 
-  @Option(names = "--security", description = "Generate security config.")
+  @Option(names = "--security", description = "Generates security config " +
+      "template, update Kerberos principal and keytab file before use.")
   private boolean genSecurityConf;
 
   /**
@@ -126,7 +127,8 @@ public final class GenerateOzoneRequiredConfigurations extends GenericCli {
 
     for (OzoneConfiguration.Property p : allProperties) {
       if (p.getTag() != null && (p.getTag().contains("REQUIRED") ||
-          (genSecurityConf && p.getTag().contains("SECURITY")))) {
+          (genSecurityConf && p.getTag().contains("KERBEROS")))) {
+        // Set default value for common required configs
         if (p.getName().equalsIgnoreCase(
             OzoneConfigKeys.OZONE_METADATA_DIRS)) {
           p.setValue(System.getProperty(OzoneConsts.JAVA_TMP_DIR));
@@ -136,6 +138,20 @@ public final class GenerateOzoneRequiredConfigurations extends GenericCli {
             || p.getName().equalsIgnoreCase(
               ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY)) {
           p.setValue(OzoneConsts.LOCALHOST);
+        }
+
+        // Set default value for KERBEROS configs
+        if (p.getName().equalsIgnoreCase(
+            OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY)) {
+          p.setValue(OzoneConsts.OZONE_SECURITY_ENABLED_SECURE);
+        } else if (p.getName().equalsIgnoreCase(
+            OzoneConfigKeys.OZONE_HTTP_SECURITY_ENABLED_KEY)) {
+          p.setValue(OzoneConsts.OZONE_HTTP_SECURITY_ENABLED_SECURE);
+        } else if (p.getName().equalsIgnoreCase(
+            OzoneConfigKeys.OZONE_HTTP_FILTER_INITIALIZERS_KEY)) {
+          p.setValue(OzoneConsts.OZONE_HTTP_FILTER_INITIALIZERS_SECURE);
+        } else if (p.getName().endsWith(OzoneConsts.HTTP_AUTH_TYPE_SUFFIX)) {
+          p.setValue(OzoneConsts.KERBEROS_CONFIG_VALUE);
         }
 
         requiredProperties.add(p);
