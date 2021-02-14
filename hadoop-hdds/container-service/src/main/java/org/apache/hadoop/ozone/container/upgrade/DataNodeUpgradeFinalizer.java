@@ -42,6 +42,7 @@ public class DataNodeUpgradeFinalizer extends
                                   String optionalClientID) {
     super(versionManager);
     clientID = optionalClientID;
+    loadDataNodeUpgradeActions();
   }
 
   @Override
@@ -104,4 +105,14 @@ public class DataNodeUpgradeFinalizer extends
       }
     }
   }
+
+  private void loadDataNodeUpgradeActions() {
+    // we just need to iterate through the enum list to load
+    // the actions.
+    for (DataNodeLayoutAction action : DataNodeLayoutAction.values()) {
+      LOG.debug("Loading datanode action for {}",
+          action.getHddsFeature().description());
+    }
+  }
+
 }

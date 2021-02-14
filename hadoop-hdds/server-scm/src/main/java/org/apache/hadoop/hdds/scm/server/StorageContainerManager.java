@@ -266,7 +266,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           "failure.", ResultCodes.SCM_NOT_INITIALIZED);
     }
 
-    loadSCMUpgradeActions();
     scmLayoutVersionManager = new HDDSLayoutVersionManager(
         scmStorageConfig.getLayoutVersion());
     upgradeFinalizer = new SCMUpgradeFinalizer(scmLayoutVersionManager);
@@ -1321,14 +1320,5 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       String upgradeClientID, boolean takeover
   ) throws IOException {
     return upgradeFinalizer.reportStatus(upgradeClientID, takeover);
-  }
-
-  private void loadSCMUpgradeActions() {
-    // we just need to iterate through the enum list to load
-    // the actions.
-    for (SCMLayoutAction action : SCMLayoutAction.values()) {
-      LOG.info("Loading datanode action for {}",
-          action.getHddsFeature().description());
-    }
   }
 }
