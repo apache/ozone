@@ -168,8 +168,8 @@ public class SCMHANodeDetails {
         }
 
         if (addr.isUnresolved()) {
-          LOG.error("Address for SCM {} : {} couldn't be resolved. Proceeding " +
-                  "with unresolved host to create Ratis ring.", nodeId,
+          LOG.error("Address for SCM {} : {} couldn't be resolved. Proceeding "
+                  + "with unresolved host to create Ratis ring.", nodeId,
               rpcAddrStr);
         }
 

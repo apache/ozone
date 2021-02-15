@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
@@ -697,32 +698,36 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         if (clusterId != null && !clusterId.isEmpty()) {
           scmStorageConfig.setClusterId(clusterId);
         }
-        scmStorageConfig.initialize();
-        LOG.info("SCM initialization succeeded. Current cluster id for sd={}"
-            + ";cid={};layoutVersion={}", scmStorageConfig.getStorageDir(),
-            scmStorageConfig.getClusterID(),
-            scmStorageConfig.getLayoutVersion());
-        //TODO: this check need not be done if ratis is not used.
-        // Initialize the raft group Id withe cluster Id.
+        // TODO: set the scm node info in the version file during upgrade
+        //  from non-HA SCM to SCM HA set up.
         if (SCMHAUtils.isSCMHAEnabled(conf)) {
           RaftServer server = SCMRatisServerImpl
               .newRaftServer(clusterId, scmStorageConfig.getScmId(), haDetails,
                   conf).build();
+          // ensure the ratis group exists
           server.start();
           server.close();
+          scmStorageConfig
+              .setScmNodeInfo(haDetails.getLocalNodeDetails().getHostName());
         }
+        scmStorageConfig.initialize();
+        LOG.info("SCM initialization succeeded. Current cluster id for sd={}"
+                + ";cid={};layoutVersion={}", scmStorageConfig.getStorageDir(),
+            scmStorageConfig.getClusterID(),
+            scmStorageConfig.getLayoutVersion());
         return true;
       } catch (IOException ioe) {
         LOG.error("Could not initialize SCM version file", ioe);
         return false;
       }
     } else {
+      clusterId = scmStorageConfig.getClusterID();
       LOG.info("SCM already initialized. Reusing existing cluster id for sd={}"
-          + ";cid={};layoutVersion={}", scmStorageConfig.getStorageDir(),
-          scmStorageConfig.getClusterID(),
-          scmStorageConfig.getLayoutVersion());
+              + ";cid={};layoutVersion={}", scmStorageConfig.getStorageDir(),
+          clusterId, scmStorageConfig.getLayoutVersion());
       if (SCMHAUtils.isSCMHAEnabled(conf)) {
         SCMRatisServerImpl.validateRatisGroupExists(conf, clusterId);
+        Preconditions.checkNotNull(scmStorageConfig.getScmNodeInfo());
       }
       return true;
     }

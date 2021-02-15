@@ -659,6 +659,9 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         scmId = Optional.of(UUID.randomUUID().toString());
       }
       scmStore.setScmId(scmId.get());
+      // TODO : Ratis is enabled by default for mini ozone cluster. Set scm node
+      //  to local host in the beginning. Fix it MiniozoneSCM HA cluster
+      scmStore.setScmNodeInfo("localhost");
       scmStore.initialize();
     }
 
