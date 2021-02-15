@@ -472,7 +472,7 @@ public class TrashOzoneFileSystem extends FileSystem {
           ozoneManager.getMetrics().incNumTrashFilesRenames();
           submitRequest(omRequest);
         } catch (Throwable e) {
-          LOG.error("Couldn't send rename request.", e);
+          LOG.error("Couldn't send rename request", e);
         }
 
       }
