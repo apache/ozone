@@ -81,6 +81,7 @@ import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRe
 import org.apache.hadoop.hdds.server.ServiceRuntimeInfoImpl;
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.hdds.utils.RetriableTask;
@@ -839,12 +840,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   private static ScmBlockLocationProtocol getScmBlockClient(
       OzoneConfiguration conf) throws IOException {
-    ScmBlockLocationProtocolClientSideTranslatorPB scmBlockLocationClient =
-        new ScmBlockLocationProtocolClientSideTranslatorPB(
-            new SCMBlockLocationFailoverProxyProvider(conf));
-    return TracingUtil
-        .createProxy(scmBlockLocationClient, ScmBlockLocationProtocol.class,
-            conf);
+    return HAUtils.getScmBlockClient(conf);
   }
 
   /**
@@ -1025,18 +1021,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   private static ScmInfo getScmInfo(OzoneConfiguration conf)
       throws IOException {
-    try {
-      RetryPolicy retryPolicy = retryUpToMaximumCountWithFixedSleep(
-          10, 5, TimeUnit.SECONDS);
-      RetriableTask<ScmInfo> retriable = new RetriableTask<>(
-          retryPolicy, "OM#getScmInfo",
-          () -> getScmBlockClient(conf).getScmInfo());
-      return retriable.call();
-    } catch (IOException e) {
-      throw e;
-    } catch (Exception e) {
-      throw new IOException("Failed to get SCM info", e);
-    }
+    return HAUtils.getScmInfo(conf);
   }
 
   /**

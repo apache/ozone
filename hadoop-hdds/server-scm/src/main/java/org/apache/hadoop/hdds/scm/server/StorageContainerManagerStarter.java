@@ -113,6 +113,25 @@ public class StorageContainerManagerStarter extends GenericCli {
   }
 
   /**
+   * This function implements a sub-command to allow the SCM to be
+   * initialized from the command line.
+   */
+  @CommandLine.Command(name = "--bootstrap",
+      customSynopsis = "ozone scm [global options] --bootstrap",
+      hidden = false,
+      description = "Bootstrap SCM if not already done",
+      mixinStandardHelpOptions = true,
+      versionProvider = HddsVersionProvider.class)
+  public void bootStrapScm()
+      throws Exception {
+    commonInit();
+    boolean result = receiver.bootStrap(conf);
+    if (!result) {
+      throw new IOException("scm bootstrap failed");
+    }
+  }
+
+  /**
    * This function is used by the command line to start the SCM.
    */
   private void startScm() throws Exception {
@@ -150,6 +169,12 @@ public class StorageContainerManagerStarter extends GenericCli {
         throws IOException{
       return StorageContainerManager.scmInit(conf, clusterId);
     }
+
+    public boolean bootStrap(OzoneConfiguration conf)
+        throws IOException{
+      return StorageContainerManager.scmBootstrap(conf);
+    }
+
 
     public String generateClusterId() {
       return StorageInfo.newClusterID();
