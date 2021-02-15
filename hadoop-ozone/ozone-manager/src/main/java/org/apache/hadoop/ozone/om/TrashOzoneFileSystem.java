@@ -75,8 +75,6 @@ public class TrashOzoneFileSystem extends FileSystem {
 
   private final String userName;
 
-  private String ofsPathPrefix;
-
   private final AtomicLong runCount;
 
   private static final ClientId CLIENT_ID = ClientId.randomId();
@@ -192,6 +190,10 @@ public class TrashOzoneFileSystem extends FileSystem {
    * converts OzoneFileStatus object to FileStatus.
    */
   private FileStatus convertToFileStatus(OzoneFileStatus status) {
+    String ofsPathPrefix = OZONE_URI_DELIMITER +
+        status.getKeyInfo().getVolumeName() +
+        OZONE_URI_DELIMITER +
+        status.getKeyInfo().getBucketName();
     Path temp = new Path(ofsPathPrefix +
         OZONE_URI_DELIMITER + status.getKeyInfo().getKeyName());
     return new FileStatus(
@@ -243,8 +245,6 @@ public class TrashOzoneFileSystem extends FileSystem {
         .setBucketName(bucket)
         .setKeyName(key)
         .build();
-    this.ofsPathPrefix = OZONE_URI_DELIMITER +
-        volume + OZONE_URI_DELIMITER + bucket;
     return keyArgs;
   }
 
