@@ -37,10 +37,26 @@ import java.util.Collections;
 import java.util.List;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_BIND_HOST_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_BIND_HOST_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_BIND_HOST_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DB_DIRS;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HTTPS_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HTTPS_BIND_HOST_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HTTP_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HTTP_BIND_HOST_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INTERNAL_SERVICE_ID;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PORT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_BIND_HOST_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY;
 
 public class SCMHANodeDetails {
@@ -49,6 +65,28 @@ public class SCMHANodeDetails {
 
   private final SCMNodeDetails localNodeDetails;
   private final List<SCMNodeDetails> peerNodeDetails;
+
+  private static String[] nodeSpecificConfigKeys = new String[] {
+      OZONE_SCM_DATANODE_ADDRESS_KEY,
+      OZONE_SCM_DATANODE_PORT_KEY,
+      OZONE_SCM_DATANODE_BIND_HOST_KEY,
+      OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY,
+      OZONE_SCM_BLOCK_CLIENT_PORT_KEY,
+      OZONE_SCM_BLOCK_CLIENT_BIND_HOST_KEY,
+      OZONE_SCM_CLIENT_ADDRESS_KEY,
+      OZONE_SCM_CLIENT_PORT_KEY,
+      OZONE_SCM_CLIENT_BIND_HOST_KEY,
+      OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY,
+      OZONE_SCM_SECURITY_SERVICE_PORT_KEY,
+      OZONE_SCM_SECURITY_SERVICE_BIND_HOST_KEY,
+      OZONE_SCM_RATIS_PORT_KEY,
+      OZONE_SCM_HTTP_BIND_HOST_KEY,
+      OZONE_SCM_HTTPS_BIND_HOST_KEY,
+      OZONE_SCM_HTTP_ADDRESS_KEY,
+      OZONE_SCM_HTTPS_ADDRESS_KEY,
+      OZONE_SCM_DB_DIRS,
+      OZONE_SCM_ADDRESS_KEY
+  };
 
   public SCMHANodeDetails(SCMNodeDetails localNodeDetails,
       List<SCMNodeDetails> peerNodeDetails) {
@@ -148,7 +186,6 @@ public class SCMHANodeDetails {
           throwConfException("Configuration does not have any value set for " +
               "%s. SCM RPC Address should be set for all nodes in a SCM " +
               "service.", rpcAddrKey);
-          return null;
         }
         isSCMddressSet = true;
 
@@ -189,6 +226,10 @@ public class SCMHANodeDetails {
             localScmServiceId, localScmNodeId,
             NetUtils.getHostPortString(localRpcAddress), localRatisPort);
 
+        // Set SCM node specific config keys.
+        ConfUtils.setNodeSpecificConfigs(nodeSpecificConfigKeys, conf,
+            localScmServiceId, localScmNodeId, LOG);
+
         return new SCMHANodeDetails(getHASCMNodeDetails(conf, localScmServiceId,
             localScmNodeId, localRpcAddress, localRatisPort), peerNodesList);
 
@@ -197,17 +238,20 @@ public class SCMHANodeDetails {
                 "match local node's address. Please configure the system " +
                 "with %s and %s", OZONE_SCM_ADDRESS_KEY,
             OZONE_SCM_SERVICE_IDS_KEY, OZONE_SCM_ADDRESS_KEY);
-        return null;
       }
     }
 
     if (!isSCMddressSet) {
-      // If HA config is not set properly, fall back to default configuration
+      // If HA config is not set, fall back to default configuration
       return loadDefaultConfig(conf);
     } else {
       return null;
     }
   }
+
+
+
+
 
   public static SCMNodeDetails getHASCMNodeDetails(OzoneConfiguration conf,
       String localScmServiceId, String localScmNodeId,
