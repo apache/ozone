@@ -385,5 +385,4 @@ public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
   @Ignore("TODO:HDDS-2939")
   public void testListStatusWithIntermediateDir() throws Exception {
   }
-
 }
