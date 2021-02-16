@@ -211,19 +211,19 @@ public final class OzoneFSUtils {
 
   /**
    * Returns true if the bucket is FS Optimised.
-   * @param buckeMetadata
+   * @param bucketMetadata
    * @return
    */
-  public static boolean isFSOptimizedBucket(Map<String, String> buckeMetadata) {
+  public static boolean isFSOptimizedBucket(Map<String, String> bucketMetadata) {
     // layout version V1 represents optimized FS path
     boolean layoutVersionEnabled =
         org.apache.commons.lang3.StringUtils.equalsIgnoreCase(
             OMConfigKeys.OZONE_OM_LAYOUT_VERSION_V1,
-            buckeMetadata
+            bucketMetadata
                 .get(OMConfigKeys.OZONE_OM_LAYOUT_VERSION));
 
     boolean fsEnabled =
-        Boolean.parseBoolean(buckeMetadata
+        Boolean.parseBoolean(bucketMetadata
             .get(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS));
 
     return layoutVersionEnabled && fsEnabled;
