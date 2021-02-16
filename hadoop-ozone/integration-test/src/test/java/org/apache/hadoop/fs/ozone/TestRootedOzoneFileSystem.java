@@ -1260,6 +1260,18 @@ public class TestRootedOzoneFileSystem {
     Assert.assertTrue(getOMMetrics()
         .getNumTrashFilesRenames() > prevNumTrashFileRenames);
 
+    // wait for deletion of checkpoint dir
+    GenericTestUtils.waitFor(()-> {
+      try {
+        return ofs.listStatus(userTrash).length==0 &&
+            ofs.listStatus(userTrash2).length==0;
+      } catch (IOException e) {
+        LOG.error("Delete from Trash Failed", e);
+        Assert.fail("Delete from Trash Failed");
+        return false;
+      }
+    }, 1000, 120000);
+
     // This condition should succeed once the checkpoint directory is deleted
     GenericTestUtils.waitFor(
         () -> getOMMetrics().getNumTrashDeletes() > prevNumTrashDeletes
