@@ -57,6 +57,7 @@ import org.apache.commons.codec.digest.DigestUtils;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_MULTIPART_MIN_SIZE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -170,119 +171,21 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         }
 
         // First Check for Invalid Part Order.
-        int prevPartNumber = partsList.get(0).getPartNumber();
         List< Integer > partNumbers = new ArrayList<>();
-        int partsListSize = partsList.size();
-        partNumbers.add(prevPartNumber);
-        for (int i = 1; i < partsListSize; i++) {
-          int currentPartNumber = partsList.get(i).getPartNumber();
-          if (prevPartNumber >= currentPartNumber) {
-            LOG.error("PartNumber at index {} is {}, and its previous " +
-                    "partNumber at index {} is {} for ozonekey is " +
-                    "{}", i, currentPartNumber, i - 1, prevPartNumber,
-                ozoneKey);
-            throw new OMException(
-                failureMessage(requestedVolume, requestedBucket, keyName) +
-                " because parts are in Invalid order.",
-                OMException.ResultCodes.INVALID_PART_ORDER);
-          }
-          prevPartNumber = currentPartNumber;
-          partNumbers.add(prevPartNumber);
-        }
-
+        int partsListSize = getPartsListSize(requestedVolume,
+                requestedBucket, keyName, ozoneKey, partNumbers, partsList);
 
         List<OmKeyLocationInfo> partLocationInfos = new ArrayList<>();
-        long dataSize = 0;
-        int currentPartCount = 0;
-        // Now do actual logic, and check for any Invalid part during this.
-        for (OzoneManagerProtocolProtos.Part part : partsList) {
-          currentPartCount++;
-          int partNumber = part.getPartNumber();
-          String partName = part.getPartName();
-
-          PartKeyInfo partKeyInfo = partKeyInfoMap.get(partNumber);
-
-          if (partKeyInfo == null ||
-              !partName.equals(partKeyInfo.getPartName())) {
-            String omPartName = partKeyInfo == null ? null :
-                partKeyInfo.getPartName();
-            throw new OMException(
-                failureMessage(requestedVolume, requestedBucket, keyName) +
-                ". Provided Part info is { " + partName + ", " + partNumber +
-                "}, whereas OM has partName " + omPartName,
-                OMException.ResultCodes.INVALID_PART);
-          }
-
-          OmKeyInfo currentPartKeyInfo = OmKeyInfo
-              .getFromProtobuf(partKeyInfo.getPartKeyInfo());
-
-          // Except for last part all parts should have minimum size.
-          if (currentPartCount != partsListSize) {
-            if (currentPartKeyInfo.getDataSize() < OM_MULTIPART_MIN_SIZE) {
-              LOG.error("MultipartUpload: {} Part number: {} size {}  is less "
-                              + "than minimum part size {}", ozoneKey,
-                      partKeyInfo.getPartNumber(),
-                      currentPartKeyInfo.getDataSize(),
-                      OzoneConsts.OM_MULTIPART_MIN_SIZE);
-              throw new OMException(
-                  failureMessage(requestedVolume, requestedBucket, keyName) +
-                  ". Entity too small.",
-                  OMException.ResultCodes.ENTITY_TOO_SMALL);
-            }
-          }
-
-          // As all part keys will have only one version.
-          OmKeyLocationInfoGroup currentKeyInfoGroup = currentPartKeyInfo
-              .getKeyLocationVersions().get(0);
-          partLocationInfos.addAll(currentKeyInfoGroup.getLocationList());
-          dataSize += currentPartKeyInfo.getDataSize();
-        }
+        long dataSize = getMultipartDataSize(requestedVolume,requestedBucket,
+                keyName, ozoneKey, partKeyInfoMap, partsListSize,
+                partLocationInfos, partsList);
 
         // All parts have same replication information. Here getting from last
         // part.
-        HddsProtos.ReplicationType type = partKeyInfoMap.lastEntry().getValue()
-            .getPartKeyInfo().getType();
-        HddsProtos.ReplicationFactor factor =
-            partKeyInfoMap.lastEntry().getValue().getPartKeyInfo().getFactor();
-
-        OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable().get(ozoneKey);
-        if (omKeyInfo == null) {
-          // This is a newly added key, it does not have any versions.
-          OmKeyLocationInfoGroup keyLocationInfoGroup = new
-              OmKeyLocationInfoGroup(0, partLocationInfos);
-
-          // Get the objectID of the key from OpenKeyTable
-          OmKeyInfo dbOpenKeyInfo = omMetadataManager.getOpenKeyTable()
-              .get(multipartKey);
-
-          // A newly created key, this is the first version.
-          OmKeyInfo.Builder builder =
-              new OmKeyInfo.Builder().setVolumeName(volumeName)
-              .setBucketName(bucketName).setKeyName(keyName)
-              .setReplicationFactor(factor).setReplicationType(type)
-              .setCreationTime(keyArgs.getModificationTime())
-              .setModificationTime(keyArgs.getModificationTime())
-              .setDataSize(dataSize)
-              .setOmKeyLocationInfos(
-                  Collections.singletonList(keyLocationInfoGroup))
-              .setAcls(OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()));
-          // Check if db entry has ObjectID. This check is required because
-          // it is possible that between multipart key uploads and complete,
-          // we had an upgrade.
-          if (dbOpenKeyInfo.getObjectID() != 0) {
-            builder.setObjectID(dbOpenKeyInfo.getObjectID());
-          }
-          omKeyInfo = builder.build();
-        } else {
-          // Already a version exists, so we should add it as a new version.
-          // But now as versioning is not supported, just following the commit
-          // key approach. When versioning support comes, then we can uncomment
-          // below code keyInfo.addNewVersion(locations);
-          omKeyInfo.updateLocationInfoList(partLocationInfos);
-          omKeyInfo.setModificationTime(keyArgs.getModificationTime());
-          omKeyInfo.setDataSize(dataSize);
-        }
-        omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
+        OmKeyInfo omKeyInfo = getOmKeyInfo(ozoneManager, trxnLogIndex, keyArgs,
+                volumeName, bucketName, keyName, multipartKey,
+                omMetadataManager, ozoneKey, partKeyInfoMap, partLocationInfos,
+                dataSize);
 
         //Find all unused parts.
         List< OmKeyInfo > unUsedParts = new ArrayList<>();
@@ -329,6 +232,18 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       }
     }
 
+    logResult(ozoneManager, multipartUploadCompleteRequest, partsList,
+            auditMap, volumeName, bucketName, keyName, exception, result);
+
+    return omClientResponse;
+  }
+
+  protected void logResult(OzoneManager ozoneManager,
+      MultipartUploadCompleteRequest multipartUploadCompleteRequest,
+      List<OzoneManagerProtocolProtos.Part> partsList,
+      Map<String, String> auditMap, String volumeName,
+      String bucketName, String keyName, IOException exception,
+      Result result) {
     auditMap.put(OzoneConsts.MULTIPART_LIST, partsList.toString());
 
     // audit log
@@ -351,8 +266,151 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       LOG.error("Unrecognized Result for S3MultipartUploadCommitRequest: {}",
           multipartUploadCompleteRequest);
     }
+  }
 
-    return omClientResponse;
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  protected OmKeyInfo getOmKeyInfo(OzoneManager ozoneManager, long trxnLogIndex,
+      KeyArgs keyArgs, String volumeName, String bucketName, String keyName,
+      String multipartKey, OMMetadataManager omMetadataManager,
+      String ozoneKey, TreeMap<Integer, PartKeyInfo> partKeyInfoMap,
+      List<OmKeyLocationInfo> partLocationInfos, long dataSize)
+          throws IOException {
+    HddsProtos.ReplicationType type = partKeyInfoMap.lastEntry().getValue()
+        .getPartKeyInfo().getType();
+    HddsProtos.ReplicationFactor factor =
+        partKeyInfoMap.lastEntry().getValue().getPartKeyInfo().getFactor();
+
+    OmKeyInfo omKeyInfo = getOmKeyInfoFromKeyTable(ozoneKey, keyName,
+            omMetadataManager);
+    if (omKeyInfo == null) {
+      // This is a newly added key, it does not have any versions.
+      OmKeyLocationInfoGroup keyLocationInfoGroup = new
+          OmKeyLocationInfoGroup(0, partLocationInfos);
+
+      // Get the objectID of the key from OpenKeyTable
+      OmKeyInfo dbOpenKeyInfo = getOmKeyInfoFromOpenKeyTable(multipartKey,
+              keyName, omMetadataManager);
+
+      // A newly created key, this is the first version.
+      OmKeyInfo.Builder builder =
+          new OmKeyInfo.Builder().setVolumeName(volumeName)
+          .setBucketName(bucketName).setKeyName(dbOpenKeyInfo.getKeyName())
+          .setReplicationFactor(factor).setReplicationType(type)
+          .setCreationTime(keyArgs.getModificationTime())
+          .setModificationTime(keyArgs.getModificationTime())
+          .setDataSize(dataSize)
+          .setOmKeyLocationInfos(
+              Collections.singletonList(keyLocationInfoGroup))
+          .setAcls(OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()));
+      // Check if db entry has ObjectID. This check is required because
+      // it is possible that between multipart key uploads and complete,
+      // we had an upgrade.
+      if (dbOpenKeyInfo.getObjectID() != 0) {
+        builder.setObjectID(dbOpenKeyInfo.getObjectID());
+      }
+      builder.setParentObjectID(dbOpenKeyInfo.getParentObjectID());
+      builder.setFileName(dbOpenKeyInfo.getFileName());
+      omKeyInfo = builder.build();
+    } else {
+      // Already a version exists, so we should add it as a new version.
+      // But now as versioning is not supported, just following the commit
+      // key approach. When versioning support comes, then we can uncomment
+      // below code keyInfo.addNewVersion(locations);
+      omKeyInfo.updateLocationInfoList(partLocationInfos);
+      omKeyInfo.setModificationTime(keyArgs.getModificationTime());
+      omKeyInfo.setDataSize(dataSize);
+    }
+    omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
+    return omKeyInfo;
+  }
+
+  protected OmKeyInfo getOmKeyInfoFromKeyTable(String dbOzoneKey,
+      String keyName, OMMetadataManager omMetadataManager) throws IOException {
+    return omMetadataManager.getKeyTable().get(dbOzoneKey);
+  }
+
+  protected OmKeyInfo getOmKeyInfoFromOpenKeyTable(String dbMultipartKey,
+      String keyName, OMMetadataManager omMetadataManager) throws IOException {
+    return omMetadataManager.getOpenKeyTable().get(dbMultipartKey);
+  }
+
+  protected int getPartsListSize(String requestedVolume,
+      String requestedBucket, String keyName, String ozoneKey,
+      List<Integer> partNumbers,
+      List<OzoneManagerProtocolProtos.Part> partsList) throws OMException {
+    int prevPartNumber = partsList.get(0).getPartNumber();
+    int partsListSize = partsList.size();
+    partNumbers.add(prevPartNumber);
+    for (int i = 1; i < partsListSize; i++) {
+      int currentPartNumber = partsList.get(i).getPartNumber();
+      if (prevPartNumber >= currentPartNumber) {
+        LOG.error("PartNumber at index {} is {}, and its previous " +
+                "partNumber at index {} is {} for ozonekey is " +
+                "{}", i, currentPartNumber, i - 1, prevPartNumber,
+            ozoneKey);
+        throw new OMException(
+            failureMessage(requestedVolume, requestedBucket, keyName) +
+            " because parts are in Invalid order.",
+            OMException.ResultCodes.INVALID_PART_ORDER);
+      }
+      prevPartNumber = currentPartNumber;
+      partNumbers.add(prevPartNumber);
+    }
+    return partsListSize;
+  }
+
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  protected long getMultipartDataSize(String requestedVolume,
+          String requestedBucket, String keyName, String ozoneKey,
+          TreeMap<Integer, PartKeyInfo> partKeyInfoMap,
+          int partsListSize, List<OmKeyLocationInfo> partLocationInfos,
+          List<OzoneManagerProtocolProtos.Part> partsList) throws OMException {
+    long dataSize = 0;
+    int currentPartCount = 0;
+    // Now do actual logic, and check for any Invalid part during this.
+    for (OzoneManagerProtocolProtos.Part part : partsList) {
+      currentPartCount++;
+      int partNumber = part.getPartNumber();
+      String partName = part.getPartName();
+
+      PartKeyInfo partKeyInfo = partKeyInfoMap.get(partNumber);
+
+      if (partKeyInfo == null ||
+          !partName.equals(partKeyInfo.getPartName())) {
+        String omPartName = partKeyInfo == null ? null :
+            partKeyInfo.getPartName();
+        throw new OMException(
+            failureMessage(requestedVolume, requestedBucket, keyName) +
+            ". Provided Part info is { " + partName + ", " + partNumber +
+            "}, whereas OM has partName " + omPartName,
+            OMException.ResultCodes.INVALID_PART);
+      }
+
+      OmKeyInfo currentPartKeyInfo = OmKeyInfo
+          .getFromProtobuf(partKeyInfo.getPartKeyInfo());
+
+      // Except for last part all parts should have minimum size.
+      if (currentPartCount != partsListSize) {
+        if (currentPartKeyInfo.getDataSize() < OM_MULTIPART_MIN_SIZE) {
+          LOG.error("MultipartUpload: {} Part number: {} size {}  is less "
+                          + "than minimum part size {}", ozoneKey,
+                  partKeyInfo.getPartNumber(),
+                  currentPartKeyInfo.getDataSize(),
+                  OzoneConsts.OM_MULTIPART_MIN_SIZE);
+          throw new OMException(
+              failureMessage(requestedVolume, requestedBucket, keyName) +
+              ". Entity too small.",
+              OMException.ResultCodes.ENTITY_TOO_SMALL);
+        }
+      }
+
+      // As all part keys will have only one version.
+      OmKeyLocationInfoGroup currentKeyInfoGroup = currentPartKeyInfo
+          .getKeyLocationVersions().get(0);
+      partLocationInfos.addAll(currentKeyInfoGroup.getLocationList());
+      dataSize += currentPartKeyInfo.getDataSize();
+    }
+    return dataSize;
   }
 
   private static String failureMessage(String volume, String bucket,
@@ -361,7 +419,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         volume + " bucket: " + bucket + " key: " + keyName;
   }
 
-  private void updateCache(OMMetadataManager omMetadataManager,
+  protected void updateCache(OMMetadataManager omMetadataManager,
       String ozoneKey, String multipartKey, OmKeyInfo omKeyInfo,
       long transactionLogIndex) {
     // Update cache.

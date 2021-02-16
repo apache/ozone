@@ -268,6 +268,27 @@ public class TestS3MultipartResponse {
             openPartKeyInfoToBeDeleted, isRatisEnabled, omBucketInfo);
   }
 
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public S3MultipartUploadCompleteResponse createS3CompleteMPUResponseV1(
+          String volumeName, String bucketName, long parentID, String keyName,
+          String multipartUploadID, OmKeyInfo omKeyInfo,
+          OzoneManagerProtocolProtos.Status status,
+          List<OmKeyInfo> unUsedParts) {
+
+    String multipartKey = getMultipartKey(parentID, keyName, multipartUploadID);
+
+    OMResponse omResponse = OMResponse.newBuilder()
+            .setCmdType(OzoneManagerProtocolProtos.Type.CompleteMultiPartUpload)
+            .setStatus(status).setSuccess(true)
+            .setCompleteMultiPartUploadResponse(
+                    OzoneManagerProtocolProtos.MultipartUploadCompleteResponse
+                            .newBuilder().setBucket(bucketName)
+                            .setVolume(volumeName).setKey(keyName)).build();
+
+    return new S3MultipartUploadCompleteResponseV1(omResponse, multipartKey,
+            omKeyInfo, unUsedParts);
+  }
+
   private String getMultipartKey(long parentID, String keyName,
                                  String multipartUploadID) {
     String fileName = OzoneFSUtils.getFileName(keyName);
