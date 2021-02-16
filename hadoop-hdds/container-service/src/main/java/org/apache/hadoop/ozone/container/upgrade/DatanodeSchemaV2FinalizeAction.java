@@ -26,11 +26,11 @@ import org.slf4j.LoggerFactory;
 /**
  * Upgrade Action for DataNode for the very first first Upgrade Version.
  */
-public class DataNodeUpgradeActionFirstUpgradeVersion
+public class DatanodeSchemaV2FinalizeAction
     implements HDDSUpgradeAction<DatanodeStateMachine> {
 
   public static final Logger LOG =
-      LoggerFactory.getLogger(DataNodeUpgradeActionFirstUpgradeVersion.class);
+      LoggerFactory.getLogger(DatanodeSchemaV2FinalizeAction.class);
   @Override
   public void executeAction(DatanodeStateMachine arg) throws Exception {
     LOG.info("Executing datanode 'onFinalize' action for the first " +

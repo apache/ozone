@@ -399,7 +399,4 @@ public final class OzoneConsts {
 
   public static final long DEFAULT_OM_UPDATE_ID = -1L;
 
-  public static final String METADATA_LAYOUT_VERSION = "metadataLayoutVersion";
-  public static final String SOFTWARE_LAYOUT_VERSION = "softwareLayoutVersion";
-
 }
