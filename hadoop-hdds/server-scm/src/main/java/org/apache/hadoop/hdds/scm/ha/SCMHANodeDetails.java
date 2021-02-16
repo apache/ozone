@@ -162,11 +162,13 @@ public class SCMHANodeDetails {
     for (String serviceId : scmServiceIds) {
       Collection<String> scmNodeIds = ScmUtils.getSCMNodeIds(conf, serviceId);
 
+      // TODO: need to fall back to ozone.scm.names in case scm node ids are
+      // not defined.
       if (scmNodeIds.size() == 0) {
         throw new IllegalArgumentException(
             String.format("Configuration does not have any value set for %s " +
-                "for the service %s. List of OM Node ID's should be " +
-                "specified for an OM service",
+                "for the service %s. List of SCM Node ID's should be " +
+                "specified for an SCM service",
                 ScmConfigKeys.OZONE_SCM_NODES_KEY, serviceId));
       }
       // TODO: load Ratis peers configuration
@@ -203,8 +205,8 @@ public class SCMHANodeDetails {
         }
 
         if (addr.isUnresolved()) {
-          LOG.error("Address for OM {} : {} couldn't be resolved. Proceeding " +
-                  "with unresolved host to create Ratis ring.", nodeId,
+          LOG.error("Address for SCM {} : {} couldn't be resolved. Proceeding "
+                  + "with unresolved host to create Ratis ring.", nodeId,
               rpcAddrStr);
         }
 

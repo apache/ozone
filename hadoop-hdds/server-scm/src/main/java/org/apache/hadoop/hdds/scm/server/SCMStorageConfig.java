@@ -28,6 +28,9 @@ import java.util.Properties;
 
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.STORAGE_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.SCM_NODES_INFO;
+import static org.apache.hadoop.ozone.OzoneConsts.SCM_NODES_SEPARATOR;
+
 
 /**
  * SCMStorageConfig is responsible for management of the
@@ -56,12 +59,31 @@ public class SCMStorageConfig extends Storage {
     }
   }
 
+  public void setScmNodeInfo(String hostname) throws IOException {
+    if (getState() == StorageState.INITIALIZED) {
+      throw new IOException("SCM is already initialized.");
+    } else {
+      final StringBuilder b =
+          new StringBuilder(hostname).append(SCM_NODES_SEPARATOR)
+              .append(getScmId());
+      getStorageInfo().setProperty(SCM_NODES_INFO, b.toString());
+    }
+  }
+
   /**
    * Retrieves the SCM ID from the version file.
    * @return SCM_ID
    */
   public String getScmId() {
     return getStorageInfo().getProperty(SCM_ID);
+  }
+
+  /**
+   * Retrieves the SCM Node info from the version file.
+   * @return SCM_NODES
+   */
+  public String getScmNodeInfo() {
+    return getStorageInfo().getProperty(SCM_NODES_INFO);
   }
 
   @Override
@@ -76,6 +98,11 @@ public class SCMStorageConfig extends Storage {
     }
     Properties scmProperties = new Properties();
     scmProperties.setProperty(SCM_ID, scmId);
+    String scmNodeInfo = getScmNodeInfo();
+    if (scmNodeInfo != null) {
+      // FOR NON-HA setup, SCM_NODES can be null
+      scmProperties.setProperty(SCM_NODES_INFO, getScmNodeInfo());
+    }
     return scmProperties;
   }
 

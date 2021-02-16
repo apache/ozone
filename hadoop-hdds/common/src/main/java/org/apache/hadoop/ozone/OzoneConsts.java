@@ -38,6 +38,8 @@ public final class OzoneConsts {
 
   public static final String STORAGE_DIR = "scm";
   public static final String SCM_ID = "scmUuid";
+  public static final String SCM_NODES_INFO = "scmNodesInfo";
+  public static final String SCM_NODES_SEPARATOR = "-";
 
   public static final String OZONE_SIMPLE_ROOT_USER = "root";
   public static final String OZONE_SIMPLE_HDFS_USER = "hdfs";
