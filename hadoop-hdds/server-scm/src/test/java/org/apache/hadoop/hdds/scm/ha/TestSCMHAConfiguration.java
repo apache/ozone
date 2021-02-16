@@ -24,6 +24,24 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_BIND_HOST_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_BIND_HOST_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_BIND_HOST_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DB_DIRS;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HTTP_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HTTP_BIND_HOST_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PORT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_BIND_HOST_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_KEY;
+
 public class TestSCMHAConfiguration {
   private OzoneConfiguration conf;
 
@@ -69,46 +87,47 @@ public class TestSCMHAConfiguration {
     int port = 9880;
     int i = 1;
     for (String nodeId : nodes) {
-      conf.set(ConfUtils.addKeySuffixes(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY,
+      conf.set(ConfUtils.addKeySuffixes(OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY,
           scmServiceId, nodeId), "localhost:"+port++);
-      conf.setInt(ConfUtils.addKeySuffixes(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_KEY,
+      conf.setInt(ConfUtils.addKeySuffixes(OZONE_SCM_BLOCK_CLIENT_PORT_KEY,
           scmServiceId, nodeId), port);
-      conf.set(ConfUtils.addKeySuffixes(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_BIND_HOST_KEY,
+      conf.set(ConfUtils.addKeySuffixes(OZONE_SCM_BLOCK_CLIENT_BIND_HOST_KEY,
           scmServiceId, nodeId), "172.28.9.1");
 
-      conf.set(ConfUtils.addKeySuffixes(ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY,
+      conf.set(ConfUtils.addKeySuffixes(OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY,
           scmServiceId, nodeId), "localhost:"+port++);
-      conf.setInt(ConfUtils.addKeySuffixes(ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_KEY,
+      conf.setInt(ConfUtils.addKeySuffixes(OZONE_SCM_SECURITY_SERVICE_PORT_KEY,
           scmServiceId, nodeId), port);
-      conf.set(ConfUtils.addKeySuffixes(ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_BIND_HOST_KEY,
-          scmServiceId, nodeId), "172.28.9.1");
+      conf.set(ConfUtils.addKeySuffixes(
+          OZONE_SCM_SECURITY_SERVICE_BIND_HOST_KEY, scmServiceId, nodeId),
+          "172.28.9.1");
 
-      conf.set(ConfUtils.addKeySuffixes(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY,
+      conf.set(ConfUtils.addKeySuffixes(OZONE_SCM_CLIENT_ADDRESS_KEY,
           scmServiceId, nodeId), "localhost:"+port++);
-      conf.setInt(ConfUtils.addKeySuffixes(ScmConfigKeys.OZONE_SCM_CLIENT_PORT_KEY,
+      conf.setInt(ConfUtils.addKeySuffixes(OZONE_SCM_CLIENT_PORT_KEY,
           scmServiceId, nodeId), port);
-      conf.set(ConfUtils.addKeySuffixes(ScmConfigKeys.OZONE_SCM_CLIENT_BIND_HOST_KEY,
+      conf.set(ConfUtils.addKeySuffixes(OZONE_SCM_CLIENT_BIND_HOST_KEY,
           scmServiceId, nodeId), "172.28.9.1");
 
-      conf.set(ConfUtils.addKeySuffixes(ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY,
+      conf.set(ConfUtils.addKeySuffixes(OZONE_SCM_DATANODE_ADDRESS_KEY,
           scmServiceId, nodeId), "localhost:"+port++);
-      conf.setInt(ConfUtils.addKeySuffixes(ScmConfigKeys.OZONE_SCM_DATANODE_PORT_KEY,
+      conf.setInt(ConfUtils.addKeySuffixes(OZONE_SCM_DATANODE_PORT_KEY,
           scmServiceId, nodeId), port);
-      conf.set(ConfUtils.addKeySuffixes(ScmConfigKeys.OZONE_SCM_DATANODE_BIND_HOST_KEY,
+      conf.set(ConfUtils.addKeySuffixes(OZONE_SCM_DATANODE_BIND_HOST_KEY,
           scmServiceId, nodeId), "172.28.9.1");
 
-      conf.set(ConfUtils.addKeySuffixes(ScmConfigKeys.OZONE_SCM_HTTP_ADDRESS_KEY,
+      conf.set(ConfUtils.addKeySuffixes(OZONE_SCM_HTTP_ADDRESS_KEY,
           scmServiceId, nodeId), "localhost:"+port++);
-      conf.set(ConfUtils.addKeySuffixes(ScmConfigKeys.OZONE_SCM_HTTP_BIND_HOST_KEY,
+      conf.set(ConfUtils.addKeySuffixes(OZONE_SCM_HTTP_BIND_HOST_KEY,
           scmServiceId, nodeId), "172.28.9.1");
 
-      conf.set(ConfUtils.addKeySuffixes(ScmConfigKeys.OZONE_SCM_DB_DIRS,
+      conf.set(ConfUtils.addKeySuffixes(OZONE_SCM_DB_DIRS,
           scmServiceId, nodeId), "/var/scm-metadata"+ i++);
 
-      conf.set(ConfUtils.addKeySuffixes(ScmConfigKeys.OZONE_SCM_ADDRESS_KEY,
+      conf.set(ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY,
           scmServiceId, nodeId), "localhost");
 
-      conf.setInt(ConfUtils.addKeySuffixes(ScmConfigKeys.OZONE_SCM_RATIS_PORT_KEY,
+      conf.setInt(ConfUtils.addKeySuffixes(OZONE_SCM_RATIS_PORT_KEY,
           scmServiceId, nodeId), port++);
     }
 
@@ -119,65 +138,65 @@ public class TestSCMHAConfiguration {
 
     // Validate configs.
     Assert.assertEquals("localhost:"+port++,
-        conf.get(ConfUtils.addKeySuffixes(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY,
+        conf.get(ConfUtils.addKeySuffixes(OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY,
         scmServiceId, "scm1")));
     Assert.assertEquals(port,
-        conf.getInt(ConfUtils.addKeySuffixes(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_KEY,
+        conf.getInt(ConfUtils.addKeySuffixes(OZONE_SCM_BLOCK_CLIENT_PORT_KEY,
         scmServiceId, "scm1"), 9999));
-    Assert.assertEquals("172.28.9.1", conf.get(ConfUtils.addKeySuffixes(
-        ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_BIND_HOST_KEY, scmServiceId,
-        "scm1")));
+    Assert.assertEquals("172.28.9.1",
+        conf.get(ConfUtils.addKeySuffixes(OZONE_SCM_BLOCK_CLIENT_BIND_HOST_KEY,
+            scmServiceId, "scm1")));
 
 
     Assert.assertEquals("localhost:"+port++,
-        conf.get(ConfUtils.addKeySuffixes(ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY,
+        conf.get(ConfUtils.addKeySuffixes(
+            OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY, scmServiceId, "scm1")));
+    Assert.assertEquals(port,
+        conf.getInt(ConfUtils.addKeySuffixes(OZONE_SCM_SECURITY_SERVICE_PORT_KEY,
+            scmServiceId, "scm1"), 9999));
+    Assert.assertEquals("172.28.9.1",
+        conf.get(ConfUtils.addKeySuffixes(
+            OZONE_SCM_SECURITY_SERVICE_BIND_HOST_KEY, scmServiceId, "scm1")));
+
+
+    Assert.assertEquals("localhost:"+port++,
+        conf.get(ConfUtils.addKeySuffixes(OZONE_SCM_CLIENT_ADDRESS_KEY,
             scmServiceId, "scm1")));
     Assert.assertEquals(port,
-        conf.getInt(ConfUtils.addKeySuffixes(ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_KEY,
+        conf.getInt(ConfUtils.addKeySuffixes(OZONE_SCM_CLIENT_PORT_KEY,
             scmServiceId, "scm1"), 9999));
-    Assert.assertEquals("172.28.9.1", conf.get(ConfUtils.addKeySuffixes(
-        ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_BIND_HOST_KEY, scmServiceId,
+    Assert.assertEquals("172.28.9.1", conf.get(
+        ConfUtils.addKeySuffixes(OZONE_SCM_CLIENT_BIND_HOST_KEY, scmServiceId,
         "scm1")));
 
-
     Assert.assertEquals("localhost:"+port++,
-        conf.get(ConfUtils.addKeySuffixes(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY,
+        conf.get(ConfUtils.addKeySuffixes(OZONE_SCM_DATANODE_ADDRESS_KEY,
             scmServiceId, "scm1")));
     Assert.assertEquals(port,
-        conf.getInt(ConfUtils.addKeySuffixes(ScmConfigKeys.OZONE_SCM_CLIENT_PORT_KEY,
+        conf.getInt(ConfUtils.addKeySuffixes(OZONE_SCM_DATANODE_PORT_KEY,
             scmServiceId, "scm1"), 9999));
-    Assert.assertEquals("172.28.9.1", conf.get(ConfUtils.addKeySuffixes(
-        ScmConfigKeys.OZONE_SCM_CLIENT_BIND_HOST_KEY, scmServiceId,
-        "scm1")));
-
-    Assert.assertEquals("localhost:"+port++,
-        conf.get(ConfUtils.addKeySuffixes(ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY,
-            scmServiceId, "scm1")));
-    Assert.assertEquals(port,
-        conf.getInt(ConfUtils.addKeySuffixes(ScmConfigKeys.OZONE_SCM_DATANODE_PORT_KEY,
-            scmServiceId, "scm1"), 9999));
-    Assert.assertEquals("172.28.9.1", conf.get(ConfUtils.addKeySuffixes(
-        ScmConfigKeys.OZONE_SCM_DATANODE_BIND_HOST_KEY, scmServiceId,
+    Assert.assertEquals("172.28.9.1", conf.get(
+        ConfUtils.addKeySuffixes(OZONE_SCM_DATANODE_BIND_HOST_KEY, scmServiceId,
         "scm1")));
 
 
     Assert.assertEquals("localhost:"+port++,
-        conf.get(ConfUtils.addKeySuffixes(ScmConfigKeys.OZONE_SCM_HTTP_ADDRESS_KEY,
+        conf.get(ConfUtils.addKeySuffixes(OZONE_SCM_HTTP_ADDRESS_KEY,
         scmServiceId, "scm1")));
     Assert.assertEquals("172.28.9.1",
-        conf.get(ConfUtils.addKeySuffixes(ScmConfigKeys.OZONE_SCM_HTTP_BIND_HOST_KEY,
+        conf.get(ConfUtils.addKeySuffixes(OZONE_SCM_HTTP_BIND_HOST_KEY,
         scmServiceId, "scm1")));
 
     Assert.assertEquals("localhost", conf.get(ConfUtils.addKeySuffixes(
-        ScmConfigKeys.OZONE_SCM_ADDRESS_KEY, scmServiceId,
+        OZONE_SCM_ADDRESS_KEY, scmServiceId,
         "scm1")));
 
-    Assert.assertEquals("/var/scm-metadata1", conf.get(ConfUtils.addKeySuffixes(
-        ScmConfigKeys.OZONE_SCM_DB_DIRS, scmServiceId,
+    Assert.assertEquals("/var/scm-metadata1",
+        conf.get(ConfUtils.addKeySuffixes(OZONE_SCM_DB_DIRS, scmServiceId,
         "scm1")));
 
     Assert.assertEquals(port++,
-        conf.getInt(ConfUtils.addKeySuffixes(ScmConfigKeys.OZONE_SCM_RATIS_PORT_KEY,
+        conf.getInt(ConfUtils.addKeySuffixes(OZONE_SCM_RATIS_PORT_KEY,
         scmServiceId, "scm1"), 9999));
 
 
