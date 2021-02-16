@@ -214,7 +214,8 @@ public final class OzoneFSUtils {
    * @param bucketMetadata
    * @return
    */
-  public static boolean isFSOptimizedBucket(Map<String, String> bucketMetadata) {
+  public static boolean isFSOptimizedBucket(
+      Map<String, String> bucketMetadata) {
     // layout version V1 represents optimized FS path
     boolean layoutVersionEnabled =
         org.apache.commons.lang3.StringUtils.equalsIgnoreCase(
