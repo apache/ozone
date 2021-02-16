@@ -17,8 +17,12 @@
 
 package org.apache.hadoop.ozone.om.response.upgrade;
 
+import static org.apache.hadoop.ozone.OzoneConsts.PREPARE_MARKER_KEY;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TRANSACTION_INFO_TABLE;
+
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -28,17 +32,29 @@ import java.io.IOException;
 /**
  * Response for prepare request.
  */
-@CleanupTableInfo()
+@CleanupTableInfo(cleanupTables = {TRANSACTION_INFO_TABLE})
 public class OMPrepareResponse extends OMClientResponse {
-  public OMPrepareResponse(
-      OzoneManagerProtocolProtos.OMResponse omResponse) {
+
+  private long prepareIndex = -1;
+
+  public OMPrepareResponse(OzoneManagerProtocolProtos.OMResponse omResponse,
+                           long prepareIndex) {
+    super(omResponse);
+    this.prepareIndex = prepareIndex;
+  }
+
+  public OMPrepareResponse(OzoneManagerProtocolProtos.OMResponse omResponse) {
     super(omResponse);
   }
 
   @Override
   protected void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
-    // The Prepare request will create a marker file to indicate the OM is
-    // prepared, so there is no DB update for the prepare operation.
+    if (prepareIndex != -1) {
+      omMetadataManager.getTransactionInfoTable().putWithBatch(batchOperation,
+          PREPARE_MARKER_KEY,
+          new OMTransactionInfo.Builder()
+              .setTransactionIndex(prepareIndex).build());
+    }
   }
 }

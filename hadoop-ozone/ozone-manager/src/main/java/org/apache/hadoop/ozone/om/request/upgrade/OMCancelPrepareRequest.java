@@ -48,7 +48,7 @@ public class OMCancelPrepareRequest extends OMClientRequest {
       OzoneManager ozoneManager, long transactionLogIndex,
       OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
 
-    LOG.info("OM {} Received cancel request with log index {}",
+    LOG.info("OM {} Received cancel prepare request with log index {}",
         ozoneManager.getOMNodeId(), transactionLogIndex);
 
     OMRequest omRequest = getOmRequest();

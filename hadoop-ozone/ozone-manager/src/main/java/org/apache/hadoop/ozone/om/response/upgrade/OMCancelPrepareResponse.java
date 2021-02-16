@@ -16,6 +16,8 @@
  */
 package org.apache.hadoop.ozone.om.response.upgrade;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TRANSACTION_INFO_TABLE;
+
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
@@ -27,7 +29,7 @@ import java.io.IOException;
 /**
  * Response for cancel prepare.
  */
-@CleanupTableInfo()
+@CleanupTableInfo(cleanupTables = {TRANSACTION_INFO_TABLE})
 public class OMCancelPrepareResponse extends OMClientResponse {
   public OMCancelPrepareResponse(
       OzoneManagerProtocolProtos.OMResponse omResponse) {

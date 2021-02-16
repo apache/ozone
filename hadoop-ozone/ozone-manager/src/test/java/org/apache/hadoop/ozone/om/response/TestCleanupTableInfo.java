@@ -43,8 +43,6 @@ import org.apache.hadoop.ozone.om.request.file.OMFileCreateRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyCreateRequest;
 import org.apache.hadoop.ozone.om.response.file.OMFileCreateResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyCreateResponse;
-import org.apache.hadoop.ozone.om.response.upgrade.OMCancelPrepareResponse;
-import org.apache.hadoop.ozone.om.response.upgrade.OMPrepareResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateFileRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
@@ -157,11 +155,6 @@ public class TestCleanupTableInfo {
         Assert.assertTrue(
             Arrays.stream(cleanupTables).allMatch(tables::contains)
         );
-      } else if (aClass != OMPrepareResponse.class &&
-          aClass != OMCancelPrepareResponse.class) {
-        // Prepare and cancel responses are allowed to have no cleanup tables,
-        // since they do not modify the DB.
-        Assert.assertTrue(cleanupAll);
       }
     });
   }
