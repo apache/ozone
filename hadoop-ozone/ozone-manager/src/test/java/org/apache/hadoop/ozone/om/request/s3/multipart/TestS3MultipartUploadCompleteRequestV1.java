@@ -80,6 +80,8 @@ public class TestS3MultipartUploadCompleteRequestV1
             omMetadataManager, volumeName,
             bucketName, keyName, 0);
 
+    Assert.assertNotNull("key not found in DB!", keyStatus);
+
     return omMetadataManager.getMultipartKey(keyStatus.getKeyInfo()
                     .getParentObjectID(), keyStatus.getTrimmedName(),
             multipartUploadID);

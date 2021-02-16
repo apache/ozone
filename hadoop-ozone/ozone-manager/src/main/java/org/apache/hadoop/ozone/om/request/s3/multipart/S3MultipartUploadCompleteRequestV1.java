@@ -159,7 +159,7 @@ public class S3MultipartUploadCompleteRequestV1
                 requestedBucket, keyName, ozoneKey, partNumbers, partsList);
 
         List<OmKeyLocationInfo> partLocationInfos = new ArrayList<>();
-        long dataSize = getMultipartDataSize(requestedVolume,requestedBucket,
+        long dataSize = getMultipartDataSize(requestedVolume, requestedBucket,
                 keyName, ozoneKey, partKeyInfoMap, partsListSize,
                 partLocationInfos, partsList);
 

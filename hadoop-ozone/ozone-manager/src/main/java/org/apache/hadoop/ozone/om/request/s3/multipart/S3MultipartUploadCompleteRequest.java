@@ -176,7 +176,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
                 requestedBucket, keyName, ozoneKey, partNumbers, partsList);
 
         List<OmKeyLocationInfo> partLocationInfos = new ArrayList<>();
-        long dataSize = getMultipartDataSize(requestedVolume,requestedBucket,
+        long dataSize = getMultipartDataSize(requestedVolume, requestedBucket,
                 keyName, ozoneKey, partKeyInfoMap, partsListSize,
                 partLocationInfos, partsList);
 
@@ -238,6 +238,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
     return omClientResponse;
   }
 
+  @SuppressWarnings("checkstyle:ParameterNumber")
   protected void logResult(OzoneManager ozoneManager,
       MultipartUploadCompleteRequest multipartUploadCompleteRequest,
       List<OzoneManagerProtocolProtos.Part> partsList,

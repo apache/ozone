@@ -310,7 +310,7 @@ public class TestOzoneClientMultipartUploadV1 {
 
     // Complete multipart upload
     OzoneTestUtils.expectOmException(OMException.ResultCodes.ENTITY_TOO_SMALL,
-            () -> completeMultipartUpload(bucket, keyName, uploadID, partsMap));
+        () -> completeMultipartUpload(bucket, keyName, uploadID, partsMap));
   }
 
   @Test
@@ -334,7 +334,7 @@ public class TestOzoneClientMultipartUploadV1 {
     partsMap.put(1, UUID.randomUUID().toString());
 
     OzoneTestUtils.expectOmException(OMException.ResultCodes.INVALID_PART,
-            () -> completeMultipartUpload(bucket, keyName, uploadID, partsMap));
+        () -> completeMultipartUpload(bucket, keyName, uploadID, partsMap));
   }
 
   @Test
@@ -360,7 +360,7 @@ public class TestOzoneClientMultipartUploadV1 {
     partsMap.put(1, UUID.randomUUID().toString());
 
     OzoneTestUtils.expectOmException(OMException.ResultCodes.INVALID_PART,
-            () -> completeMultipartUpload(bucket, keyName, uploadID, partsMap));
+        () -> completeMultipartUpload(bucket, keyName, uploadID, partsMap));
   }
 
   @Test
@@ -385,7 +385,7 @@ public class TestOzoneClientMultipartUploadV1 {
     partsMap.put(3, "random");
 
     OzoneTestUtils.expectOmException(OMException.ResultCodes.INVALID_PART,
-            () -> completeMultipartUpload(bucket, keyName, uploadID, partsMap));
+        () -> completeMultipartUpload(bucket, keyName, uploadID, partsMap));
   }
 
   @Test

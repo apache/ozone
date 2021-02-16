@@ -82,7 +82,7 @@ public class TestS3MultipartUploadCompleteRequest
         getS3MultipartUploadCommitReq(commitMultipartRequest);
 
     // Add key to open key table.
-     addKeyToTable(volumeName, bucketName, keyName, clientID);
+    addKeyToTable(volumeName, bucketName, keyName, clientID);
 
     s3MultipartUploadCommitPartRequest.validateAndUpdateCache(ozoneManager,
         2L, ozoneManagerDoubleBufferHelper);

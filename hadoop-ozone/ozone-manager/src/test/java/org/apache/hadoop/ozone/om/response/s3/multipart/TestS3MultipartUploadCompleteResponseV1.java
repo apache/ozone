@@ -58,8 +58,8 @@ public class TestS3MultipartUploadCompleteResponseV1
     long txnId = 50;
     long objectId = parentID + 1;
     String fileName = OzoneFSUtils.getFileName(keyName);
-    String dbMultipartKey = omMetadataManager.getMultipartKey(parentID, fileName,
-            multipartUploadID);
+    String dbMultipartKey = omMetadataManager.getMultipartKey(parentID,
+            fileName, multipartUploadID);
     long clientId = Time.now();
     String dbOpenKey = omMetadataManager.getOpenFileName(parentID, fileName,
             clientId);
@@ -81,8 +81,8 @@ public class TestS3MultipartUploadCompleteResponseV1
 
     List<OmKeyInfo> unUsedParts = new ArrayList<>();
     S3MultipartUploadCompleteResponse s3MultipartUploadCompleteResponse =
-            createS3CompleteMPUResponseV1(volumeName, bucketName, parentID, keyName,
-                    multipartUploadID, omKeyInfoV1,
+            createS3CompleteMPUResponseV1(volumeName, bucketName, parentID,
+                    keyName, multipartUploadID, omKeyInfoV1,
                 OzoneManagerProtocolProtos.Status.OK, unUsedParts);
 
     s3MultipartUploadCompleteResponse.addToDBBatch(omMetadataManager,
@@ -145,8 +145,8 @@ public class TestS3MultipartUploadCompleteResponseV1
     List<OmKeyInfo> unUsedParts = new ArrayList<>();
     unUsedParts.add(omKeyInfo);
     S3MultipartUploadCompleteResponse s3MultipartUploadCompleteResponse =
-            createS3CompleteMPUResponseV1(volumeName, bucketName, parentID, keyName,
-                    multipartUploadID, omKeyInfoV1,
+            createS3CompleteMPUResponseV1(volumeName, bucketName, parentID,
+                    keyName, multipartUploadID, omKeyInfoV1,
                     OzoneManagerProtocolProtos.Status.OK, unUsedParts);
 
     s3MultipartUploadCompleteResponse.addToDBBatch(omMetadataManager,
@@ -245,8 +245,8 @@ public class TestS3MultipartUploadCompleteResponseV1
       String bucketName, String keyName, String multipartUploadID,
       String openKey) throws IOException {
     S3MultipartUploadCommitPartResponse s3MultipartUploadCommitPartResponse =
-            createS3CommitMPUResponseV1(volumeName, bucketName, parentID, keyName,
-                    multipartUploadID, null, null,
+            createS3CommitMPUResponseV1(volumeName, bucketName, parentID,
+                    keyName, multipartUploadID, null, null,
                     OzoneManagerProtocolProtos.Status.OK, openKey);
 
     s3MultipartUploadCommitPartResponse.addToDBBatch(omMetadataManager,
