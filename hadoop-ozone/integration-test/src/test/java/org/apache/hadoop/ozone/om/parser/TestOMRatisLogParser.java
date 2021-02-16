@@ -62,7 +62,7 @@ public class TestOMRatisLogParser {
     String scmId = UUID.randomUUID().toString();
     String omServiceId = "omServiceId1";
     OzoneConfiguration conf = new OzoneConfiguration();
-    cluster =  (MiniOzoneOMHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
+    cluster =  (MiniOzoneOMHAClusterImpl) MiniOzoneCluster.newOMHABuilder(conf)
         .setClusterId(clusterId)
         .setScmId(scmId)
         .setOMServiceId(omServiceId)

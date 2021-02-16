@@ -107,7 +107,7 @@ public class TestOzoneFsHAURLs {
     omStore.initialize();
 
     // Start the cluster
-    cluster = MiniOzoneCluster.newHABuilder(conf)
+    cluster = MiniOzoneCluster.newOMHABuilder(conf)
         .setNumDatanodes(7)
         .setTotalPipelineNumLimit(10)
         .setClusterId(clusterId)
