@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.ozone.container.upgrade;
 
+import static org.apache.hadoop.ozone.OzoneConsts.DATANODE_LAYOUT_VERSION_DIR;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.UUID;
@@ -48,8 +50,7 @@ public class TestDataNodeStartupSlvLessThanMlv {
   public void testStartupSlvLessThanMlv() throws Exception {
     // Add subdirectories under the temporary folder where the version file
     // will be placed.
-    File datanodeSubdir = tempFolder.newFolder("datanodeStorageConfig",
-        "current");
+    File datanodeSubdir = tempFolder.newFolder(DATANODE_LAYOUT_VERSION_DIR);
 
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
