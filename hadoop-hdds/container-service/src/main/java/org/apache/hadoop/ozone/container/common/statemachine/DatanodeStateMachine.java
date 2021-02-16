@@ -58,6 +58,7 @@ import org.apache.hadoop.ozone.container.replication.MeasuredReplicator;
 import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
 import org.apache.hadoop.ozone.container.replication.SimpleContainerDownloader;
 import org.apache.hadoop.ozone.container.upgrade.DataNodeUpgradeFinalizer;
+import org.apache.hadoop.ozone.container.upgrade.DatanodeMetadataFeatures;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.util.JvmPauseMonitor;
@@ -130,6 +131,8 @@ public class DatanodeStateMachine implements Closeable {
         layoutStorage.getLayoutVersion());
     upgradeFinalizer = new DataNodeUpgradeFinalizer(layoutVersionManager,
         datanodeDetails.getUuidString());
+    DatanodeMetadataFeatures.
+        initialize(dataNodeVersionManager);
 
     executorService = Executors.newFixedThreadPool(
         getEndPointTaskThreadPoolSize(),
