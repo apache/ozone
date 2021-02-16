@@ -61,6 +61,7 @@ public final class RatisUtil {
     setRaftLogProperties(properties, haConf);
     setRaftRetryCacheProperties(properties, haConf);
     setRaftSnapshotProperties(properties, haConf);
+    setRaftLeadElectionProperties(properties, haConf);
     return properties;
   }
 
@@ -106,6 +107,18 @@ public final class RatisUtil {
         conf.getLeaderElectionMaxTimeout(), TimeUnit.MILLISECONDS));
     Rpc.setSlownessTimeout(properties, TimeDuration.valueOf(
         conf.getRatisNodeFailureTimeout(), TimeUnit.MILLISECONDS));
+  }
+
+  /**
+   * Set properties related to Raft leader election.
+   *
+   * @param properties RaftProperties instance which will be updated
+   * @param conf SCMHAConfiguration
+   */
+  private static void setRaftLeadElectionProperties(
+      final RaftProperties properties, final SCMHAConfiguration conf) {
+    // Disable the pre vote feature (related to leader election) in Ratis
+    RaftServerConfigKeys.LeaderElection.setPreVote(properties, false);
   }
 
   /**
