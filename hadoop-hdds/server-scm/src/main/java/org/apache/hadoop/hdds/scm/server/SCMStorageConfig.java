@@ -28,7 +28,7 @@ import java.util.Properties;
 
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.STORAGE_DIR;
-import static org.apache.hadoop.ozone.OzoneConsts.SCM_NODES;
+import static org.apache.hadoop.ozone.OzoneConsts.SCM_NODES_INFO;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_NODES_SEPARATOR;
 
 
@@ -66,7 +66,7 @@ public class SCMStorageConfig extends Storage {
       final StringBuilder b =
           new StringBuilder(hostname).append(SCM_NODES_SEPARATOR)
               .append(getScmId());
-      getStorageInfo().setProperty(SCM_NODES, b.toString());
+      getStorageInfo().setProperty(SCM_NODES_INFO, b.toString());
     }
   }
 
@@ -83,7 +83,7 @@ public class SCMStorageConfig extends Storage {
    * @return SCM_NODES
    */
   public String getScmNodeInfo() {
-    return getStorageInfo().getProperty(SCM_NODES);
+    return getStorageInfo().getProperty(SCM_NODES_INFO);
   }
 
   @Override
@@ -101,7 +101,7 @@ public class SCMStorageConfig extends Storage {
     String scmNodeInfo = getScmNodeInfo();
     if (scmNodeInfo != null) {
       // FOR NON-HA setup, SCM_NODES can be null
-      scmProperties.setProperty(SCM_NODES, getScmNodeInfo());
+      scmProperties.setProperty(SCM_NODES_INFO, getScmNodeInfo());
     }
     return scmProperties;
   }

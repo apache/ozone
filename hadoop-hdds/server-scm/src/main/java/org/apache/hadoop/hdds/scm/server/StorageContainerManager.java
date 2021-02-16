@@ -707,14 +707,15 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           // ensure the ratis group exists
           server.start();
           server.close();
+          // TODO: Revisit if we need to set the Node info in SCM version file
           scmStorageConfig
               .setScmNodeInfo(haDetails.getLocalNodeDetails().getHostName());
         }
         scmStorageConfig.initialize();
         LOG.info("SCM initialization succeeded. Current cluster id for sd={}"
-                + ";cid={};layoutVersion={}", scmStorageConfig.getStorageDir(),
-            scmStorageConfig.getClusterID(),
-            scmStorageConfig.getLayoutVersion());
+                + "; cid={}; layoutVersion={}; scmId={}",
+            scmStorageConfig.getStorageDir(), scmStorageConfig.getClusterID(),
+            scmStorageConfig.getLayoutVersion(), scmStorageConfig.getScmId());
         return true;
       } catch (IOException ioe) {
         LOG.error("Could not initialize SCM version file", ioe);
