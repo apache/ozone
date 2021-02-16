@@ -75,15 +75,19 @@ public final class RatisUtil {
   public static void setRaftStorageDir(final RaftProperties properties,
                                        final SCMHAConfiguration haConf,
                                        final ConfigurationSource conf) {
+    RaftServerConfigKeys.setStorageDir(properties,
+        Collections.singletonList(new File(getRatisStorageDir(haConf, conf))));
+  }
+
+  public static String getRatisStorageDir(final SCMHAConfiguration haConf,
+      final ConfigurationSource conf) {
     String storageDir = haConf.getRatisStorageDir();
     if (Strings.isNullOrEmpty(storageDir)) {
       File metaDirPath = ServerUtils.getOzoneMetaDirPath(conf);
       storageDir = (new File(metaDirPath, "scm-ha")).getPath();
     }
-    RaftServerConfigKeys.setStorageDir(properties,
-        Collections.singletonList(new File(storageDir)));
+    return storageDir;
   }
-
   /**
    * Set properties related to Raft RPC.
    *

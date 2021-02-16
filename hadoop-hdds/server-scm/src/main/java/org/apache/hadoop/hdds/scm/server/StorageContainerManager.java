@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
@@ -58,6 +59,8 @@ import org.apache.hadoop.hdds.scm.ha.SCMHAManagerImpl;
 import org.apache.hadoop.hdds.scm.ha.SCMHANodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
+import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -126,6 +129,7 @@ import org.apache.hadoop.util.JvmPauseMonitor;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT_DEFAULT;
 import org.apache.ratis.grpc.GrpcTlsConfig;
+import org.apache.ratis.server.RaftServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -607,7 +611,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     LOG.info("SCM login successful.");
   }
 
-
   /**
    * This function creates/initializes a certificate server as needed.
    * This function is idempotent, so calling this again and again after the
@@ -689,26 +692,44 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       String clusterId) throws IOException {
     SCMStorageConfig scmStorageConfig = new SCMStorageConfig(conf);
     StorageState state = scmStorageConfig.getState();
+    final SCMHANodeDetails haDetails = SCMHANodeDetails.loadSCMHAConfig(conf);
     if (state != StorageState.INITIALIZED) {
       try {
         if (clusterId != null && !clusterId.isEmpty()) {
           scmStorageConfig.setClusterId(clusterId);
         }
+        // TODO: set the scm node info in the version file during upgrade
+        //  from non-HA SCM to SCM HA set up.
+        if (SCMHAUtils.isSCMHAEnabled(conf)) {
+          RaftServer server = SCMRatisServerImpl
+              .newRaftServer(clusterId, scmStorageConfig.getScmId(), haDetails,
+                  conf).build();
+          // ensure the ratis group exists
+          server.start();
+          server.close();
+          // TODO: Revisit if we need to set the Node info in SCM version file
+          scmStorageConfig
+              .setScmNodeInfo(haDetails.getLocalNodeDetails().getHostName());
+        }
         scmStorageConfig.initialize();
         LOG.info("SCM initialization succeeded. Current cluster id for sd={}"
-            + ";cid={};layoutVersion={}", scmStorageConfig.getStorageDir(),
-            scmStorageConfig.getClusterID(),
-            scmStorageConfig.getLayoutVersion());
+                + "; cid={}; layoutVersion={}; scmId={}",
+            scmStorageConfig.getStorageDir(), scmStorageConfig.getClusterID(),
+            scmStorageConfig.getLayoutVersion(), scmStorageConfig.getScmId());
         return true;
       } catch (IOException ioe) {
         LOG.error("Could not initialize SCM version file", ioe);
         return false;
       }
     } else {
+      clusterId = scmStorageConfig.getClusterID();
       LOG.info("SCM already initialized. Reusing existing cluster id for sd={}"
-          + ";cid={};layoutVersion={}", scmStorageConfig.getStorageDir(),
-          scmStorageConfig.getClusterID(),
-          scmStorageConfig.getLayoutVersion());
+              + ";cid={};layoutVersion={}", scmStorageConfig.getStorageDir(),
+          clusterId, scmStorageConfig.getLayoutVersion());
+      if (SCMHAUtils.isSCMHAEnabled(conf)) {
+        SCMRatisServerImpl.validateRatisGroupExists(conf, clusterId);
+        Preconditions.checkNotNull(scmStorageConfig.getScmNodeInfo());
+      }
       return true;
     }
   }
@@ -827,6 +848,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   @Override
   public SCMNodeDetails getScmNodeDetails() {
     return scmHANodeDetails.getLocalNodeDetails();
+  }
+
+  public SCMHANodeDetails getSCMHANodeDetails() {
+    return scmHANodeDetails;
   }
 
   @Override
