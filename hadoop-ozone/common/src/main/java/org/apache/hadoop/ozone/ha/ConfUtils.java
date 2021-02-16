@@ -17,7 +17,11 @@
 package org.apache.hadoop.ozone.ha;
 
 import com.google.common.base.Joiner;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.net.NetUtils;
+import org.slf4j.Logger;
 
 import java.net.InetSocketAddress;
 
@@ -50,7 +54,7 @@ public final class ConfUtils {
   /**
    * Concatenate list of suffix strings '.' separated.
    */
-  private static String concatSuffixes(String... suffixes) {
+  public static String concatSuffixes(String... suffixes) {
     if (suffixes == null) {
       return null;
     }
@@ -63,5 +67,46 @@ public final class ConfUtils {
    */
   public static boolean isAddressLocal(InetSocketAddress addr) {
     return NetUtils.isLocalAddress(addr.getAddress());
+  }
+
+  /**
+   * Get the conf key value appended with serviceId and nodeId.
+   * @param conf
+   * @param confKey
+   * @param omServiceID
+   * @param omNodeId
+   * @return conf value.
+   */
+  public static String getConfSuffixedWithServiceId(ConfigurationSource conf,
+      String confKey, String omServiceID, String omNodeId) {
+    String suffixedConfKey = ConfUtils.addKeySuffixes(
+        confKey, omServiceID, omNodeId);
+    String confValue = conf.getTrimmed(suffixedConfKey);
+    if (StringUtils.isNotEmpty(confValue)) {
+      return confValue;
+    }
+    return null;
+  }
+
+  /**
+   * Set Node Specific config keys to generic config keys.
+   * @param nodeSpecificConfigKeys
+   * @param ozoneConfiguration
+   * @param serviceId
+   * @param nodeId
+   */
+  public static void setNodeSpecificConfigs(
+      String[] nodeSpecificConfigKeys, OzoneConfiguration ozoneConfiguration,
+      String serviceId, String nodeId, Logger logger) {
+    for (String confKey : nodeSpecificConfigKeys) {
+      String confValue = getConfSuffixedWithServiceId(
+          ozoneConfiguration, confKey, serviceId, nodeId);
+      if (confValue != null) {
+        logger.info("Setting configuration key {} with value of key {}: {}",
+            confKey, ConfUtils.addKeySuffixes(confKey, serviceId, nodeId),
+            confValue);
+        ozoneConfiguration.set(confKey, confValue);
+      }
+    }
   }
 }
