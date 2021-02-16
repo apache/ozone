@@ -82,15 +82,15 @@ public class TestSCMInstallSnapshot {
     SCMNodeDetails scmNodeDetails = new SCMNodeDetails.Builder()
         .setRpcAddress(new InetSocketAddress("0.0.0.0", 0)).build();
     Map<String, SCMNodeDetails> peerMap = new HashMap<>();
-    peerMap.put(scmNodeDetails.getSCMNodeId(), scmNodeDetails);
+    peerMap.put(scmNodeDetails.getNodeId(), scmNodeDetails);
     SCMSnapshotProvider provider =
         scm.getScmHAManager().getSCMSnapshotProvider();
     provider.setPeerNodesMap(peerMap);
-    provider.getSCMDBSnapshot(scmNodeDetails.getSCMNodeId());
+    provider.getSCMDBSnapshot(scmNodeDetails.getNodeId());
     final File[] files = FileUtil.listFiles(provider.getScmSnapshotDir());
     Assert.assertEquals(1, files.length);
     Assert.assertTrue(files[0].getName().startsWith(
-        OzoneConsts.SCM_DB_NAME + "-" + scmNodeDetails.getSCMNodeId()));
+        OzoneConsts.SCM_DB_NAME + "-" + scmNodeDetails.getNodeId()));
   }
 
   @AfterClass

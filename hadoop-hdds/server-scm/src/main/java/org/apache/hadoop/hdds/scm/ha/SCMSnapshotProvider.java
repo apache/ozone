@@ -78,7 +78,7 @@ public class SCMSnapshotProvider {
     if (peerNodes != null) {
       this.peerNodesMap = new HashMap<>();
       for (SCMNodeDetails peerNode : peerNodes) {
-        this.peerNodesMap.put(peerNode.getSCMNodeId(), peerNode);
+        this.peerNodesMap.put(peerNode.getNodeId(), peerNode);
       }
     }
     this.client = null;
@@ -106,7 +106,7 @@ public class SCMSnapshotProvider {
     // notification from ratis leader will be received.
     if (client == null) {
       client = new InterSCMGrpcClient(
-          peerNodesMap.get(leaderSCMNodeID).getAddress().getHostAddress(),
+          peerNodesMap.get(leaderSCMNodeID).getInetAddress().getHostAddress(),
           conf);
     }
     try {
