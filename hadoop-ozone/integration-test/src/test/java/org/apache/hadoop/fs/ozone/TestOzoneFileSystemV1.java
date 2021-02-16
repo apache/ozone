@@ -383,18 +383,6 @@ public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
   @Override
   @Test
   @Ignore("TODO:HDDS-2939")
-  public void testTrash() throws Exception {
-  }
-
-  @Override
-  @Test
-  @Ignore("TODO:HDDS-2939")
-  public void testRenameToTrashEnabled() throws Exception {
-  }
-
-  @Override
-  @Test
-  @Ignore("TODO:HDDS-2939")
   public void testListStatusWithIntermediateDir() throws Exception {
   }
 }
