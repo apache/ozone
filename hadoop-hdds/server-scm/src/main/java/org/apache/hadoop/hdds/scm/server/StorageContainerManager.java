@@ -119,6 +119,8 @@ import com.google.common.cache.RemovalListener;
 import com.google.protobuf.BlockingService;
 import org.apache.commons.lang3.tuple.Pair;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
+
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -1024,7 +1026,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   }
 
   public void checkAdminAccess(String remoteUser) throws IOException {
-    if (remoteUser != null && !scmAdminUsernames.contains(remoteUser)) {
+    if (remoteUser != null && !scmAdminUsernames.contains(remoteUser) &&
+        !scmAdminUsernames.contains(OZONE_ADMINISTRATORS_WILDCARD)) {
       throw new IOException(
           "Access denied for user " + remoteUser + ". Superuser privilege " +
               "is required.");
