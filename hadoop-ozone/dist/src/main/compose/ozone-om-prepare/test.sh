@@ -36,6 +36,8 @@ if [[ -n "${OZONE_VOLUME_OWNER}" ]]; then
 fi
 
 export OZONE_DIR=/opt/hadoop
+export OM_SERVICE_ID=omservice
+
 # shellcheck source=/dev/null
 source "${COMPOSE_DIR}/../testlib.sh"
 
