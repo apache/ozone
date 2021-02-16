@@ -159,7 +159,7 @@ public class TrashOzoneFileSystem extends FileSystem {
     OFSPath dstPath = new OFSPath(dst);
     OmBucketInfo bucket = ozoneManager.getBucketInfo(srcPath.getVolumeName(),
         srcPath.getBucketName());
-    if (OzoneFSUtils.isFSOptimizedBucket(bucket)) {
+    if (OzoneFSUtils.isFSOptimizedBucket(bucket.getMetadata())) {
       return renameV1(srcPath, dstPath);
     }
     Preconditions.checkArgument(srcPath.getBucketName().
@@ -175,12 +175,15 @@ public class TrashOzoneFileSystem extends FileSystem {
     OzoneManagerProtocolProtos.OMRequest omRequest =
         getRenameKeyRequest(srcPath, dstPath);
     try {
-      submitRequest(omRequest);
+      if(omRequest != null) {
+        submitRequest(omRequest);
+        return true;
+      }
+      return false;
     } catch (Exception e){
       LOG.error("couldnt send rename requestV1", e);
+      return false;
     }
-    return true;
-
   }
 
   @Override
@@ -189,7 +192,7 @@ public class TrashOzoneFileSystem extends FileSystem {
     OFSPath srcPath = new OFSPath(path);
     OmBucketInfo bucket = ozoneManager.getBucketInfo(srcPath.getVolumeName(),
         srcPath.getBucketName());
-    if (OzoneFSUtils.isFSOptimizedBucket(bucket)) {
+    if (OzoneFSUtils.isFSOptimizedBucket(bucket.getMetadata())) {
       return deleteV1(srcPath);
     }
     DeleteIterator iterator = new DeleteIterator(path, true);
@@ -201,11 +204,15 @@ public class TrashOzoneFileSystem extends FileSystem {
     OzoneManagerProtocolProtos.OMRequest omRequest =
         getDeleteKeyRequest(srcPath);
     try {
-      submitRequest(omRequest);
+      if(omRequest != null) {
+        submitRequest(omRequest);
+        return true;
+      }
+      return false;
     } catch (Throwable e) {
       LOG.error("Couldn't send delete request.", e);
+      return false;
     }
-    return true;
   }
 
   @Override

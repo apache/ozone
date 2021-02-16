@@ -23,6 +23,7 @@ import org.apache.hadoop.util.StringUtils;
 
 import javax.annotation.Nonnull;
 import java.nio.file.Paths;
+import java.util.Map;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
@@ -207,21 +208,22 @@ public final class OzoneFSUtils {
     return keyPath.getNameCount();
   }
 
+
   /**
    * Returns true if the bucket is FS Optimised.
-   * @param bucket
+   * @param buckeMetadata
    * @return
    */
-  public static boolean isFSOptimizedBucket(OmBucketInfo bucket) {
+  public static boolean isFSOptimizedBucket(Map<String, String> buckeMetadata) {
     // layout version V1 represents optimized FS path
     boolean layoutVersionEnabled =
         org.apache.commons.lang3.StringUtils.equalsIgnoreCase(
             OMConfigKeys.OZONE_OM_LAYOUT_VERSION_V1,
-            bucket.getMetadata()
+            buckeMetadata
                 .get(OMConfigKeys.OZONE_OM_LAYOUT_VERSION));
 
     boolean fsEnabled =
-        Boolean.parseBoolean(bucket.getMetadata()
+        Boolean.parseBoolean(buckeMetadata
             .get(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS));
 
     return layoutVersionEnabled && fsEnabled;
