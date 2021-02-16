@@ -81,7 +81,8 @@ public class TestSCMHAConfiguration {
     conf.set(ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY, scmServiceId);
 
     String[] nodes = new String[] {"scm1", "scm2", "scm3"};
-    conf.set(ScmConfigKeys.OZONE_SCM_NODES_KEY+"."+scmServiceId, "scm1,scm2,scm3");
+    conf.set(ScmConfigKeys.OZONE_SCM_NODES_KEY+"."+scmServiceId,
+        "scm1,scm2,scm3");
     conf.set(ScmConfigKeys.OZONE_SCM_NODE_ID_KEY, "scm1");
 
     int port = 9880;
@@ -151,9 +152,8 @@ public class TestSCMHAConfiguration {
     Assert.assertEquals("localhost:"+port++,
         conf.get(ConfUtils.addKeySuffixes(
             OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY, scmServiceId, "scm1")));
-    Assert.assertEquals(port,
-        conf.getInt(ConfUtils.addKeySuffixes(OZONE_SCM_SECURITY_SERVICE_PORT_KEY,
-            scmServiceId, "scm1"), 9999));
+    Assert.assertEquals(port, conf.getInt(ConfUtils.addKeySuffixes(
+        OZONE_SCM_SECURITY_SERVICE_PORT_KEY, scmServiceId, "scm1"), 9999));
     Assert.assertEquals("172.28.9.1",
         conf.get(ConfUtils.addKeySuffixes(
             OZONE_SCM_SECURITY_SERVICE_BIND_HOST_KEY, scmServiceId, "scm1")));

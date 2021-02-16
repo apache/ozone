@@ -70,7 +70,7 @@ public final class ConfUtils {
   }
 
   /**
-   * Get the conf key value appended with serviceId and nodeId
+   * Get the conf key value appended with serviceId and nodeId.
    * @param conf
    * @param confKey
    * @param omServiceID
