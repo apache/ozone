@@ -190,12 +190,12 @@ public class TrashOzoneFileSystem extends FileSystem {
    * converts OzoneFileStatus object to FileStatus.
    */
   private FileStatus convertToFileStatus(OzoneFileStatus status) {
-    String ofsPathPrefix = OZONE_URI_DELIMITER +
+    Path temp = new Path(OZONE_URI_DELIMITER +
         status.getKeyInfo().getVolumeName() +
         OZONE_URI_DELIMITER +
-        status.getKeyInfo().getBucketName();
-    Path temp = new Path(ofsPathPrefix +
-        OZONE_URI_DELIMITER + status.getKeyInfo().getKeyName());
+        status.getKeyInfo().getBucketName() +
+        OZONE_URI_DELIMITER +
+        status.getKeyInfo().getKeyName());
     return new FileStatus(
         status.getKeyInfo().getDataSize(),
         status.isDirectory(),
