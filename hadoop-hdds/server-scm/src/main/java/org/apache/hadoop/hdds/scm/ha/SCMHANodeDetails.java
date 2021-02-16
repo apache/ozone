@@ -180,7 +180,7 @@ public class SCMHANodeDetails {
         }
 
         String rpcAddrKey = ConfUtils.addKeySuffixes(
-            OZONE_SCM_ADDRESS_KEY, localScmNodeId, nodeId);
+            OZONE_SCM_ADDRESS_KEY, serviceId, nodeId);
         String rpcAddrStr = conf.get(rpcAddrKey);
         if (rpcAddrStr == null || rpcAddrStr.isEmpty()) {
           throwConfException("Configuration does not have any value set for " +
@@ -195,7 +195,7 @@ public class SCMHANodeDetails {
 
         InetSocketAddress addr = null;
         try {
-          addr = NetUtils.createSocketAddr(rpcAddrStr);
+          addr = NetUtils.createSocketAddr(rpcAddrStr, ratisPort);
         } catch (Exception e) {
           LOG.error("Couldn't create socket address for SCM {} : {}", nodeId,
               rpcAddrStr, e);
@@ -248,10 +248,6 @@ public class SCMHANodeDetails {
       return null;
     }
   }
-
-
-
-
 
   public static SCMNodeDetails getHASCMNodeDetails(OzoneConfiguration conf,
       String localScmServiceId, String localScmNodeId,
