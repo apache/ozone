@@ -220,6 +220,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
 import static org.apache.hadoop.ozone.OzoneConsts.DEFAULT_OM_UPDATE_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_FILE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_TEMP_FILE;
+import static org.apache.hadoop.ozone.OzoneConsts.PREPARE_MARKER_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_RATIS_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.RPC_PORT;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
@@ -456,7 +457,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       blockTokenMgr = createBlockTokenSecretManager(configuration);
     }
 
-    instantiateServices();
+    instantiateServices(false);
 
     // Create special volume s3v which is required for S3G.
     addS3GVolumeToDB();
@@ -534,7 +535,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * When OM state is reloaded, these services are re-initialized with the
    * new OM state.
    */
-  private void instantiateServices() throws IOException {
+  private void instantiateServices(boolean withNewSnapshot) throws IOException {
 
     metadataManager = new OmMetadataManagerImpl(configuration);
     volumeManager = new VolumeManagerImpl(metadataManager, configuration);
@@ -551,7 +552,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     // Prepare state depends on the transaction ID of metadataManager after a
     // restart.
-    instantiatePrepareState();
+    instantiatePrepareState(withNewSnapshot);
 
     if (isAclEnabled) {
       accessAuthorizer = getACLAuthorizerInstance(configuration);
@@ -1234,7 +1235,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     HddsServerUtil.initializeMetrics(configuration, "OzoneManager");
 
-    instantiateServices();
+    instantiateServices(false);
 
     startSecretManagerIfNecessary();
 
@@ -3475,7 +3476,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   void reloadOMState(long newSnapshotIndex, long newSnapshotTermIndex)
       throws IOException {
 
-    instantiateServices();
+    instantiateServices(true);
 
     // Restart required services
     metadataManager.start(configuration);
@@ -3831,7 +3832,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return prepareState;
   }
 
-  private void instantiatePrepareState() throws IOException {
+  private void instantiatePrepareState(boolean withNewSnapshot)
+      throws IOException {
     // If the prepare marker file is present and its index matches the last
     // transaction index in the OM DB, turn on the in memory flag to
     // put the ozone manager in prepare mode, disallowing write requests.
@@ -3852,6 +3854,19 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (status == PrepareStatus.PREPARE_COMPLETED) {
         LOG.info("Ozone Manager {} restarted in prepare mode.",
             getOMNodeId());
+      } else if (withNewSnapshot) {
+        OMTransactionInfo prepareInfo =
+            metadataManager.getTransactionInfoTable().get(PREPARE_MARKER_KEY);
+        if (prepareInfo != null &&
+            prepareInfo.getTransactionIndex() ==
+                txnInfo.getTransactionIndex()) {
+          LOG.info("Prepare Index matches last applied index, but the prepare" +
+              " marker file is not found. A snapshot is being installed in " +
+              " this OM. Enabling prepare gate.");
+          prepareState.finishPrepare(prepareInfo.getTransactionIndex());
+        } else {
+          prepareState.cancelPrepare();
+        }
       }
     } else {
       // Make sure OM prepare state is clean before proceeding.
