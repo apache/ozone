@@ -43,7 +43,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRE
  */
 public class TestMiniOzoneHACluster {
 
-  private MiniOzoneHAClusterImpl cluster = null;
+  private MiniOzoneOMHAClusterImpl cluster = null;
   private OzoneConfiguration conf;
   private String clusterId;
   private String scmId;
@@ -71,7 +71,7 @@ public class TestMiniOzoneHACluster {
     conf.set(OzoneConfigKeys.OZONE_ADMINISTRATORS,
         OZONE_ADMINISTRATORS_WILDCARD);
     conf.setInt(OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS, 2);
-    cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
+    cluster = (MiniOzoneOMHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
         .setClusterId(clusterId)
         .setScmId(scmId)
         .setOMServiceId(omServiceId)
