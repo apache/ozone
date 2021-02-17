@@ -34,7 +34,6 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyCreateRequest;
-import org.apache.hadoop.ozone.om.request.key.OMMockECKeyCreateRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -65,14 +64,6 @@ public class TestOmVersionManagerRequestFactory {
     Class<? extends OMClientRequest> requestType =
         omVersionManager.getHandler(CreateKey.name());
     Assert.assertEquals(requestType, OMKeyCreateRequest.class);
-
-    // Finalize the version manager.
-    OMUpgradeFinalizer f = new OMUpgradeFinalizer(omVersionManager);
-    f.finalize("random", om);
-
-    // Try getting 'CreateKey' again. Should return CreateECKey.
-    requestType = omVersionManager.getHandler(CreateKey.name());
-    Assert.assertEquals(requestType, OMMockECKeyCreateRequest.class);
   }
 
   @Test
