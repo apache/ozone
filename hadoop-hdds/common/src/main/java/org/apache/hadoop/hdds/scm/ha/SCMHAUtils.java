@@ -18,11 +18,9 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.slf4j.Logger;
 
 import java.util.Collection;

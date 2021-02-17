@@ -111,7 +111,8 @@ public class SCMBlockLocationFailoverProxyProvider implements
         scmServiceId = scmNodeInfo.getServiceId();
         String scmNodeId = scmNodeInfo.getNodeId();
         SCMProxyInfo scmProxyInfo = new SCMProxyInfo(
-            scmNodeInfo.getServiceId(), scmNodeInfo.getNodeId(), scmBlockClientAddress);
+            scmNodeInfo.getServiceId(), scmNodeInfo.getNodeId(),
+            scmBlockClientAddress);
         ProxyInfo<ScmBlockLocationProtocolPB> proxy
             = new ProxyInfo<>(null, scmProxyInfo.toString());
         scmProxies.put(scmNodeId, proxy);
