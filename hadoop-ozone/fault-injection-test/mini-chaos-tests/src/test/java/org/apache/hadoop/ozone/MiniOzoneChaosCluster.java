@@ -51,7 +51,7 @@ import org.slf4j.LoggerFactory;
 /**
  * This class causes random failures in the chaos cluster.
  */
-public class MiniOzoneChaosCluster extends MiniOzoneOMHAClusterImpl {
+public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
 
   static final Logger LOG =
       LoggerFactory.getLogger(MiniOzoneChaosCluster.class);
@@ -91,10 +91,10 @@ public class MiniOzoneChaosCluster extends MiniOzoneOMHAClusterImpl {
   }
 
   public MiniOzoneChaosCluster(OzoneConfiguration conf,
-      List<OzoneManager> ozoneManagers, StorageContainerManager scm,
+      List<OzoneManager> ozoneManagers, List<StorageContainerManager> scms,
       List<HddsDatanodeService> hddsDatanodes, String omServiceID,
-      Set<Class<? extends Failures>> clazzes) {
-    super(conf, ozoneManagers, scm, hddsDatanodes, omServiceID);
+      String scmServiceId, Set<Class<? extends Failures>> clazzes) {
+    super(conf, ozoneManagers, scms, hddsDatanodes, omServiceID, scmServiceId);
     this.numDatanodes = getHddsDatanodes().size();
     this.numOzoneManagers = ozoneManagers.size();
 
@@ -267,11 +267,17 @@ public class MiniOzoneChaosCluster extends MiniOzoneOMHAClusterImpl {
         initOMRatisConf();
       }
 
-      StorageContainerManager scm;
       List<OzoneManager> omList;
+      List<StorageContainerManager> scmList;
       try {
-        scm = createSCM();
-        scm.start();
+        if (numOfSCMs > 1) {
+          throw new IOException("no implemented now");
+          // TODO: do later
+        } else {
+          StorageContainerManager scm = createSCM();
+          scm.start();
+          scmList = Arrays.asList(scm);
+        }
         if (numOfOMs > 1) {
           omList = createOMService();
         } else {
@@ -284,11 +290,11 @@ public class MiniOzoneChaosCluster extends MiniOzoneOMHAClusterImpl {
       }
 
       final List<HddsDatanodeService> hddsDatanodes = createHddsDatanodes(
-          scm, null);
+          scmList, null);
 
       MiniOzoneChaosCluster cluster =
-          new MiniOzoneChaosCluster(conf, omList, scm, hddsDatanodes,
-              omServiceId, clazzes);
+          new MiniOzoneChaosCluster(conf, omList, scmList, hddsDatanodes,
+              omServiceId, scmServiceId, clazzes);
 
       if (startDataNodes) {
         cluster.startHddsDatanodes();
