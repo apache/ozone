@@ -542,9 +542,10 @@ public final class OMFileRequest {
    * @param omMetadataMgr
    * @param batchOp
    * @param omFileInfo
+   * @return db file key
    * @throws IOException
    */
-  public static void addToFileTable(OMMetadataManager omMetadataMgr,
+  public static String addToFileTable(OMMetadataManager omMetadataMgr,
                                     BatchOperation batchOp,
                                     OmKeyInfo omFileInfo)
           throws IOException {
@@ -554,6 +555,7 @@ public final class OMFileRequest {
 
     omMetadataMgr.getKeyTable().putWithBatch(batchOp,
             dbFileKey, omFileInfo);
+    return dbFileKey;
   }
 
   /**
