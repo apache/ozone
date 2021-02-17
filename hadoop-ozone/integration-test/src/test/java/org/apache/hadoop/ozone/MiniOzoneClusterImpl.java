@@ -139,7 +139,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
   /**
    * Creates a new MiniOzoneCluster without the OzoneManager. This is used by
-   * {@link MiniOzoneHAClusterImpl} for starting multiple OzoneManagers.
+   * {@link MiniOzoneOMHAClusterImpl} for starting multiple OzoneManagers.
    *
    * @param conf
    * @param scm

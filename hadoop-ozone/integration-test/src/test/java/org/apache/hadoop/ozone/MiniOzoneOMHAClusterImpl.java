@@ -50,14 +50,14 @@ import java.util.concurrent.TimeUnit;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 
 /**
- * MiniOzoneHAClusterImpl creates a complete in-process Ozone cluster
+ * MiniOzoneOMHAClusterImpl creates a complete in-process Ozone cluster
  * with OM HA suitable for running tests.  The cluster consists of a set of
  * OzoneManagers, StorageContainerManager and multiple DataNodes.
  */
-public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
+public class MiniOzoneOMHAClusterImpl extends MiniOzoneClusterImpl {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(MiniOzoneHAClusterImpl.class);
+      LoggerFactory.getLogger(MiniOzoneOMHAClusterImpl.class);
 
   private Map<String, OzoneManager> ozoneManagerMap;
   private List<OzoneManager> ozoneManagers;
@@ -79,7 +79,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
    * @throws IOException if there is an I/O error
    */
   @SuppressWarnings("checkstyle:ParameterNumber")
-  private MiniOzoneHAClusterImpl(
+  private MiniOzoneOMHAClusterImpl(
       OzoneConfiguration conf,
       List<OzoneManager> activeOMList,
       List<OzoneManager> inactiveOMList,
@@ -115,7 +115,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
    * Creates a new MiniOzoneCluster with all OMs active.
    * This is used by MiniOzoneChaosCluster.
    */
-  protected MiniOzoneHAClusterImpl(
+  protected MiniOzoneOMHAClusterImpl(
       OzoneConfiguration conf,
       List<OzoneManager> omList,
       StorageContainerManager scm,
@@ -297,7 +297,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       final List<HddsDatanodeService> hddsDatanodes = createHddsDatanodes(
           scm, reconServer);
 
-      MiniOzoneHAClusterImpl cluster = new MiniOzoneHAClusterImpl(conf,
+      MiniOzoneOMHAClusterImpl cluster = new MiniOzoneOMHAClusterImpl(conf,
           activeOMs, inactiveOMs, scm, hddsDatanodes, omServiceId, reconServer);
 
       if (startDataNodes) {
@@ -401,7 +401,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
           }
           omList.clear();
           ++retryCount;
-          LOG.info("MiniOzoneHACluster port conflicts, retried {} times",
+          LOG.info("MiniOzoneOMHACluster port conflicts, retried {} times",
                   retryCount);
         }
       }
