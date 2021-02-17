@@ -109,13 +109,13 @@ public class OzoneClientConfig {
   private String checksumType = ChecksumType.CRC32.name();
 
   @Config(key = "bytes.per.checksum",
-      defaultValue = "1MB",
+      defaultValue = "256KB",
       type = ConfigType.SIZE,
       description = "Checksum will be computed for every bytes per checksum "
           + "number of bytes and stored sequentially. The minimum value for "
-          + "this config is 256KB.",
+          + "this config is 16KB.",
       tags = ConfigTag.CLIENT)
-  private int bytesPerChecksum = 1024 * 1024;
+  private int bytesPerChecksum = 256 * 1024;
 
   @Config(key = "verify.checksum",
       defaultValue = "true",
