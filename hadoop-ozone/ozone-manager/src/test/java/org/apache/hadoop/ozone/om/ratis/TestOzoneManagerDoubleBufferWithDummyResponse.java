@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.junit.After;
 import org.junit.Assert;
@@ -133,13 +134,13 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
     assertEquals(bucketCount, lastAppliedIndex);
 
 
-    OMTransactionInfo omTransactionInfo =
+    TransactionInfo transactionInfo =
         omMetadataManager.getTransactionInfoTable().get(TRANSACTION_INFO_KEY);
-    assertNotNull(omTransactionInfo);
+    assertNotNull(transactionInfo);
 
     Assert.assertEquals(lastAppliedIndex,
-        omTransactionInfo.getTransactionIndex());
-    Assert.assertEquals(term, omTransactionInfo.getTerm());
+        transactionInfo.getTransactionIndex());
+    Assert.assertEquals(term, transactionInfo.getTerm());
   }
 
   /**

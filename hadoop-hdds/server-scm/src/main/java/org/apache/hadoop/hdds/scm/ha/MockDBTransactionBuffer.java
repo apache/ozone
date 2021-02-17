@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.hdds.scm.ha;
 
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
@@ -47,12 +48,12 @@ public class MockDBTransactionBuffer implements DBTransactionBuffer {
   }
 
   @Override
-  public void updateLatestTrxInfo(SCMTransactionInfo info) {
+  public void updateLatestTrxInfo(TransactionInfo info) {
 
   }
 
   @Override
-  public SCMTransactionInfo getLatestTrxInfo() {
+  public TransactionInfo getLatestTrxInfo() {
     return null;
   }
 

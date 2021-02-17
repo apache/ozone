@@ -17,7 +17,8 @@
 
 package org.apache.hadoop.ozone.om.codec;
 
-import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.hdds.utils.TransactionInfoCodec;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.Before;
@@ -30,29 +31,29 @@ import java.nio.charset.StandardCharsets;
 import static org.junit.Assert.fail;
 
 /**
- * Class to test {@link OMTransactionInfoCodec}.
+ * Class to test {@link TransactionInfoCodec}.
  */
-public class TestOMTransactionInfoCodec {
+public class TestTransactionInfoCodec {
   @Rule
   public ExpectedException thrown = ExpectedException.none();
 
 
-  private OMTransactionInfoCodec codec;
+  private TransactionInfoCodec codec;
 
   @Before
   public void setUp() {
-    codec = new OMTransactionInfoCodec();
+    codec = new TransactionInfoCodec();
   }
   @Test
   public void toAndFromPersistedFormat() throws Exception {
-    OMTransactionInfo omTransactionInfo =
-        new OMTransactionInfo.Builder().setTransactionIndex(100)
+    TransactionInfo transactionInfo =
+        new TransactionInfo.Builder().setTransactionIndex(100)
             .setCurrentTerm(11).build();
 
-    OMTransactionInfo convertedTransactionInfo =
-        codec.fromPersistedFormat(codec.toPersistedFormat(omTransactionInfo));
+    TransactionInfo convertedTransactionInfo =
+        codec.fromPersistedFormat(codec.toPersistedFormat(transactionInfo));
 
-    Assert.assertEquals(omTransactionInfo, convertedTransactionInfo);
+    Assert.assertEquals(transactionInfo, convertedTransactionInfo);
 
   }
   @Test

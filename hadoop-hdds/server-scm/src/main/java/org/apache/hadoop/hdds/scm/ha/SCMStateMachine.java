@@ -31,6 +31,7 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImplV2;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftGroupMemberId;
 import org.apache.ratis.protocol.RaftPeerId;
@@ -66,7 +67,7 @@ public class SCMStateMachine extends BaseStateMachine {
     this.ratisServer = ratisServer;
     this.handlers = new EnumMap<>(RequestType.class);
     this.transactionBuffer = buffer;
-    SCMTransactionInfo latestTrxInfo =
+    TransactionInfo latestTrxInfo =
         this.transactionBuffer.getLatestTrxInfo();
     if (!latestTrxInfo.isInitialized()) {
       if (!updateLastAppliedTermIndex(latestTrxInfo.getTerm(),
@@ -103,7 +104,7 @@ public class SCMStateMachine extends BaseStateMachine {
       final SCMRatisRequest request = SCMRatisRequest.decode(
           Message.valueOf(trx.getStateMachineLogEntry().getLogData()));
       applyTransactionFuture.complete(process(request));
-      transactionBuffer.updateLatestTrxInfo(SCMTransactionInfo.builder()
+      transactionBuffer.updateLatestTrxInfo(TransactionInfo.builder()
           .setCurrentTerm(trx.getLogEntry().getTerm())
           .setTransactionIndex(trx.getLogEntry().getIndex())
           .build());
@@ -178,12 +179,12 @@ public class SCMStateMachine extends BaseStateMachine {
     long startTime = Time.monotonicNow();
     TermIndex lastTermIndex = getLastAppliedTermIndex();
     long lastAppliedIndex = lastTermIndex.getIndex();
-    SCMTransactionInfo lastAppliedTrxInfo =
-        SCMTransactionInfo.fromTermIndex(lastTermIndex);
+    TransactionInfo lastAppliedTrxInfo =
+        TransactionInfo.fromTermIndex(lastTermIndex);
     if (transactionBuffer.getLatestTrxInfo()
         .compareTo(lastAppliedTrxInfo) < 0) {
       transactionBuffer.updateLatestTrxInfo(
-          SCMTransactionInfo.builder()
+          TransactionInfo.builder()
               .setCurrentTerm(lastTermIndex.getTerm())
               .setTransactionIndex(lastTermIndex.getIndex())
               .build());
