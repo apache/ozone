@@ -293,6 +293,12 @@ public class ContainerStateMap {
     lock.writeLock().lock();
     try {
       checkIfContainerExist(containerID);
+      // Return if updating state not changed
+      if (currentState == newState) {
+        LOG.debug("CurrentState and NewState are the same, return from " +
+            "updateState directly.");
+        return;
+      }
       final ContainerInfo currentInfo = containerMap.get(containerID);
       try {
         currentInfo.setState(newState);
