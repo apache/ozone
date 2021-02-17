@@ -39,7 +39,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDC
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS;
 
 /**
- * This class tests MiniOzoneHAClusterImpl.
+ * This class tests MiniOzoneOMHAClusterImpl.
  */
 public class TestMiniOzoneOMHACluster {
 

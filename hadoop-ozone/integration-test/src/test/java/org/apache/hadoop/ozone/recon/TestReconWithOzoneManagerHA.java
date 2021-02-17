@@ -49,7 +49,7 @@ import org.junit.Test;
 import org.junit.rules.Timeout;
 
 /**
- * This class sets up a MiniOzoneHACluster to test with Recon.
+ * This class sets up a MiniOzoneOMHACluster to test with Recon.
  */
 public class TestReconWithOzoneManagerHA {
   @Rule

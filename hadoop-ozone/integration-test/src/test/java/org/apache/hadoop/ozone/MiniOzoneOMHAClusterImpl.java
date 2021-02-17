@@ -50,7 +50,7 @@ import java.util.concurrent.TimeUnit;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 
 /**
- * MiniOzoneHAClusterImpl creates a complete in-process Ozone cluster
+ * MiniOzoneOMHAClusterImpl creates a complete in-process Ozone cluster
  * with OM HA suitable for running tests.  The cluster consists of a set of
  * OzoneManagers, StorageContainerManager and multiple DataNodes.
  */
@@ -401,7 +401,7 @@ public class MiniOzoneOMHAClusterImpl extends MiniOzoneClusterImpl {
           }
           omList.clear();
           ++retryCount;
-          LOG.info("MiniOzoneHACluster port conflicts, retried {} times",
+          LOG.info("MiniOzoneOMHACluster port conflicts, retried {} times",
                   retryCount);
         }
       }
