@@ -51,7 +51,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.SCM_DUMMY_SERVICE_ID;
  */
 public class SCMNodeInfo {
 
-  private static Logger LOG = LoggerFactory.getLogger(SCMNodeInfo.class);
+  private static final Logger LOG = LoggerFactory.getLogger(SCMNodeInfo.class);
   private String serviceId;
   private String nodeId;
   private String blockClientAddress;
