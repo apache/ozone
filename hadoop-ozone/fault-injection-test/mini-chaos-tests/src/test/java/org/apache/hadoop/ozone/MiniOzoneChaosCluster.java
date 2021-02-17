@@ -51,7 +51,7 @@ import org.slf4j.LoggerFactory;
 /**
  * This class causes random failures in the chaos cluster.
  */
-public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
+public class MiniOzoneChaosCluster extends MiniOzoneOMHAClusterImpl {
 
   static final Logger LOG =
       LoggerFactory.getLogger(MiniOzoneChaosCluster.class);
@@ -147,7 +147,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
   /**
    * Builder for configuring the MiniOzoneChaosCluster to run.
    */
-  public static class Builder extends MiniOzoneHAClusterImpl.Builder {
+  public static class Builder extends MiniOzoneOMHAClusterImpl.Builder {
 
     private final Set<Class<? extends Failures>> clazzes = new HashSet<>();
 

@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.om.parser;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
+import org.apache.hadoop.ozone.MiniOzoneOMHAClusterImpl;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
@@ -52,7 +52,7 @@ public class TestOMRatisLogParser {
   @Rule
   public Timeout timeout = new Timeout(300000);
 
-  private MiniOzoneHAClusterImpl cluster = null;
+  private MiniOzoneOMHAClusterImpl cluster = null;
   private final ByteArrayOutputStream out = new ByteArrayOutputStream();
   private final ByteArrayOutputStream err = new ByteArrayOutputStream();
 
@@ -62,7 +62,7 @@ public class TestOMRatisLogParser {
     String scmId = UUID.randomUUID().toString();
     String omServiceId = "omServiceId1";
     OzoneConfiguration conf = new OzoneConfiguration();
-    cluster =  (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
+    cluster =  (MiniOzoneOMHAClusterImpl) MiniOzoneCluster.newOMHABuilder(conf)
         .setClusterId(clusterId)
         .setScmId(scmId)
         .setOMServiceId(omServiceId)

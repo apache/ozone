@@ -60,8 +60,8 @@ public interface MiniOzoneCluster {
    *
    * @return MiniOzoneCluster builder
    */
-  static Builder newHABuilder(OzoneConfiguration conf) {
-    return new MiniOzoneHAClusterImpl.Builder(conf);
+  static Builder newOMHABuilder(OzoneConfiguration conf) {
+    return new MiniOzoneOMHAClusterImpl.Builder(conf);
   }
 
   /**
