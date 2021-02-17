@@ -132,8 +132,8 @@ public class TestS3MultipartUploadCompleteRequest
             getS3InitiateMultipartUploadReq(initiateMPURequest);
 
     OMClientResponse omClientResponse =
-            s3InitiateMultipartUploadRequest.validateAndUpdateCache(ozoneManager,
-                    1L, ozoneManagerDoubleBufferHelper);
+            s3InitiateMultipartUploadRequest.validateAndUpdateCache(
+                    ozoneManager, 1L, ozoneManagerDoubleBufferHelper);
 
     long clientID = Time.now();
     String multipartUploadID = omClientResponse.getOMResponse()
@@ -166,8 +166,8 @@ public class TestS3MultipartUploadCompleteRequest
             getS3MultipartUploadCompleteReq(completeMultipartRequest);
 
     omClientResponse =
-            s3MultipartUploadCompleteRequest.validateAndUpdateCache(ozoneManager,
-                    3L, ozoneManagerDoubleBufferHelper);
+            s3MultipartUploadCompleteRequest.validateAndUpdateCache(
+                    ozoneManager, 3L, ozoneManagerDoubleBufferHelper);
 
     Assert.assertEquals(OzoneManagerProtocolProtos.Status.INVALID_PART_ORDER,
             omClientResponse.getOMResponse().getStatus());
