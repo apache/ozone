@@ -557,10 +557,9 @@ public abstract class OMKeyRequest extends OMClientRequest {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
     if (ozoneManager.getKmsProvider() != null) {
+      acquireLock = omMetadataManager.getLock().acquireReadLock(
+          BUCKET_LOCK, volumeName, bucketName);
       try {
-        acquireLock = omMetadataManager.getLock().acquireReadLock(
-            BUCKET_LOCK, volumeName, bucketName);
-
         OmKeyInfo omKeyInfo = omMetadataManager.getOpenKeyTable().get(
             omMetadataManager.getMultipartKey(volumeName, bucketName,
                 keyArgs.getKeyName(), keyArgs.getMultipartUploadID()));
@@ -568,7 +567,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
         if (omKeyInfo != null && omKeyInfo.getFileEncryptionInfo() != null) {
           newKeyArgs.setFileEncryptionInfo(
               OMPBHelper.convert(omKeyInfo.getFileEncryptionInfo()));
-
         }
       } finally {
         if (acquireLock) {
