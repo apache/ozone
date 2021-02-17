@@ -1,0 +1,211 @@
+package org.apache.hadoop.hdds.scm.ha;
+
+import org.apache.hadoop.hdds.conf.ConfigurationException;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.ozone.ha.ConfUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
+import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NODES_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_KEY;
+import static org.apache.hadoop.ozone.OzoneConsts.SCM_DUMMY_NODEID;
+import static org.apache.hadoop.ozone.OzoneConsts.SCM_DUMMY_SERVICE_ID;
+
+/**
+ * SCM Node Info.
+ */
+public class SCMNodeInfo {
+
+  public static Logger LOG = LoggerFactory.getLogger(SCMNodeInfo.class);
+  private String serviceId;
+  private String nodeId;
+  private String blockClientAddress;
+  private String scmClientAddress;
+  private String scmSecurityAddress;
+  private String scmDatanodeAddress;
+
+  /**
+   * Build SCM Node information from configuration.
+   * @param conf
+   * @return
+   */
+  public static List<SCMNodeInfo> buildNodeInfo(ConfigurationSource conf) {
+
+    // First figure out scm client address from HA style config.
+    // If service Id is not defined, fall back to non-HA config.
+
+    List<SCMNodeInfo> scmNodeInfoList = new ArrayList<>();
+    String scmServiceId = SCMHAUtils.getScmServiceId(conf, LOG);
+    if (scmServiceId != null) {
+      ArrayList< String > scmNodeIds = new ArrayList<>(
+          SCMHAUtils.getSCMNodeIds(conf, scmServiceId));
+      if (scmNodeIds.size() == 0) {
+        throw new ConfigurationException(
+            String.format("Configuration does not have any value set for %s " +
+                    "for the SCM serviceId %s. List of SCM Node ID's should " +
+                    "be specified for an SCM HA service", OZONE_SCM_NODES_KEY,
+                scmServiceId));
+      }
+
+      for (String scmNodeId : scmNodeIds) {
+        String addressKey = ConfUtils.addKeySuffixes(
+            OZONE_SCM_ADDRESS_KEY, scmServiceId, scmNodeId);
+        String scmAddress = conf.get(addressKey);
+        if (scmAddress == null) {
+          throw new ConfigurationException(addressKey + "is not defined");
+        }
+
+        // Get port from Address Key if defined, else fall back to port key.
+        int scmClientPort = getPortNumberFromConfigKeys(conf,
+            OZONE_SCM_CLIENT_ADDRESS_KEY, scmServiceId, scmNodeId)
+            .orElse(conf.getInt(
+                ConfUtils.addKeySuffixes(OZONE_SCM_CLIENT_PORT_KEY,
+                    scmServiceId, scmNodeId), OZONE_SCM_CLIENT_PORT_DEFAULT));
+
+        int scmBlockClientPort = getPortNumberFromConfigKeys(conf,
+            OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY, scmServiceId, scmNodeId)
+            .orElse(conf.getInt(
+                ConfUtils.addKeySuffixes(OZONE_SCM_BLOCK_CLIENT_PORT_KEY,
+                    scmServiceId, scmNodeId),
+                OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT));
+
+        int scmSecurityPort = getPortNumberFromConfigKeys(conf,
+            OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY, scmServiceId, scmNodeId)
+            .orElse(conf.getInt(
+                ConfUtils.addKeySuffixes(OZONE_SCM_SECURITY_SERVICE_PORT_KEY,
+                    scmServiceId, scmNodeId),
+                OZONE_SCM_SECURITY_SERVICE_PORT_DEFAULT));
+
+        int scmDatanodePort = getPortNumberFromConfigKeys(conf,
+            OZONE_SCM_DATANODE_ADDRESS_KEY, scmServiceId, scmNodeId)
+            .orElse(conf.getInt(
+                ConfUtils.addKeySuffixes(OZONE_SCM_DATANODE_PORT_KEY,
+                    scmServiceId, scmNodeId), OZONE_SCM_DATANODE_PORT_DEFAULT));
+
+        scmNodeInfoList.add(new SCMNodeInfo(scmServiceId, scmNodeId,
+            buildAddress(scmAddress, scmBlockClientPort),
+            buildAddress(scmAddress, scmClientPort),
+            buildAddress(scmAddress, scmSecurityPort),
+            buildAddress(scmAddress, scmDatanodePort)));
+      }
+      return scmNodeInfoList;
+    } else {
+      scmServiceId = SCM_DUMMY_SERVICE_ID;
+
+      String scmBlockClientAddress = getHostNameFromConfigKeys(conf,
+          OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY).orElse(null);
+
+      String scmClientAddress = getHostNameFromConfigKeys(conf,
+          OZONE_SCM_CLIENT_ADDRESS_KEY).orElse(null);
+
+      String scmSecurityClientAddress =
+          getHostNameFromConfigKeys(conf,
+              OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY).orElse(null);
+
+      String scmDatanodeAddress =
+          getHostNameFromConfigKeys(conf,
+              OZONE_SCM_DATANODE_ADDRESS_KEY).orElse(null);
+
+      int scmBlockClientPort = getPortNumberFromConfigKeys(conf,
+          OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY)
+          .orElse(conf.getInt(OZONE_SCM_BLOCK_CLIENT_PORT_KEY,
+              OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT));
+
+      int scmClientPort = getPortNumberFromConfigKeys(conf,
+          OZONE_SCM_CLIENT_ADDRESS_KEY)
+          .orElse(conf.getInt(OZONE_SCM_CLIENT_PORT_KEY,
+              OZONE_SCM_CLIENT_PORT_DEFAULT));
+
+      int scmSecurityPort = getPortNumberFromConfigKeys(conf,
+          OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY)
+          .orElse(conf.getInt(OZONE_SCM_SECURITY_SERVICE_PORT_KEY,
+              OZONE_SCM_SECURITY_SERVICE_PORT_DEFAULT));
+
+      int scmDatanodePort = getPortNumberFromConfigKeys(conf,
+          OZONE_SCM_DATANODE_ADDRESS_KEY)
+          .orElse(conf.getInt(OZONE_SCM_DATANODE_PORT_KEY,
+              OZONE_SCM_DATANODE_PORT_DEFAULT));
+
+      scmNodeInfoList.add(new SCMNodeInfo(scmServiceId,
+          SCM_DUMMY_NODEID,
+          scmBlockClientAddress == null ? null :
+              buildAddress(scmBlockClientAddress, scmBlockClientPort),
+          scmClientAddress == null ? null :
+              buildAddress(scmClientAddress, scmClientPort),
+          scmSecurityClientAddress == null ? null :
+              buildAddress(scmSecurityClientAddress, scmSecurityPort),
+          scmDatanodeAddress == null ? null :
+              buildAddress(scmDatanodeAddress, scmDatanodePort)));
+
+      return scmNodeInfoList;
+
+    }
+
+  }
+
+  private static String buildAddress(String address, int port) {
+    return new StringBuilder().append(address).append(":")
+        .append(port).toString();
+  }
+
+  /**
+   * SCM Node Info which contains information about scm service address.
+   * @param serviceId
+   * @param nodeId
+   * @param blockClientAddress
+   * @param scmClientAddress
+   * @param scmSecurityAddress
+   * @param scmDatanodeAddress
+   */
+  public SCMNodeInfo(String serviceId, String nodeId,
+      String blockClientAddress, String scmClientAddress,
+      String scmSecurityAddress, String scmDatanodeAddress) {
+    this.serviceId = serviceId;
+    this.nodeId = nodeId;
+    this.blockClientAddress = blockClientAddress;
+    this.scmClientAddress = scmClientAddress;
+    this.scmSecurityAddress = scmSecurityAddress;
+    this.scmDatanodeAddress = scmDatanodeAddress;
+  }
+
+  public String getServiceId() {
+    return serviceId;
+  }
+
+  public String getNodeId() {
+    return nodeId;
+  }
+
+  public String getBlockClientAddress() {
+    return blockClientAddress;
+  }
+
+  public String getScmClientAddress() {
+    return scmClientAddress;
+  }
+
+  public String getScmSecurityAddress() {
+    return scmSecurityAddress;
+  }
+
+  public String getScmDatanodeAddress() {
+    return scmDatanodeAddress;
+  }
+}

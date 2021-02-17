@@ -143,7 +143,8 @@ public final class HddsServerUtil {
 
     final int port = getPortNumberFromConfigKeys(conf,
         ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY)
-        .orElse(ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT);
+        .orElse(conf.getInt(ScmConfigKeys.OZONE_SCM_CLIENT_PORT_KEY,
+            ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT));
 
     return NetUtils.createSocketAddr(host + ":" + port);
   }
@@ -163,7 +164,8 @@ public final class HddsServerUtil {
 
     final int port = getPortNumberFromConfigKeys(conf,
         ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY)
-        .orElse(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT);
+        .orElse(conf.getInt(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_KEY,
+            ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT));
 
     return NetUtils.createSocketAddr(host + ":" + port);
   }

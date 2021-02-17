@@ -19,10 +19,16 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.ozone.ha.ConfUtils;
+import org.slf4j.Logger;
 
 import java.util.Collection;
+
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEFAULT_SERVICE_ID;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY;
 
 /**
  * Utility class used by SCM HA.
@@ -41,7 +47,7 @@ public final class SCMHAUtils {
   /**
    * Get a collection of all scmNodeIds for the given scmServiceId.
    */
-  public static Collection<String> getSCMNodeIds(Configuration conf,
+  public static Collection<String> getSCMNodeIds(ConfigurationSource conf,
                                                  String scmServiceId) {
     String key = addSuffix(ScmConfigKeys.OZONE_SCM_NODES_KEY, scmServiceId);
     return conf.getTrimmedStringCollection(key);
@@ -61,5 +67,41 @@ public final class SCMHAUtils {
     assert !suffix.startsWith(".") :
         "suffix '" + suffix + "' should not already have '.' prepended.";
     return key + "." + suffix;
+  }
+
+  /**
+   * Get SCM ServiceId from OzoneConfiguration.
+   * @param conf
+   * @param logger
+   * @return SCM service id if defined, else null.
+   */
+  public static String getScmServiceId(ConfigurationSource conf,
+      Logger logger) {
+
+    String localScmServiceId = conf.getTrimmed(
+        ScmConfigKeys.OZONE_SCM_DEFAULT_SERVICE_ID);
+
+    Collection<String> scmServiceIds;
+
+    if (localScmServiceId == null) {
+      // There is no default scm service id is being set, fall back to ozone
+      // .scm.service.ids.
+      logger.info("{} is not defined, falling back to {} to find serviceID for "
+              + "StorageContainerManager if it is HA enabled cluster",
+          OZONE_SCM_DEFAULT_SERVICE_ID, OZONE_SCM_SERVICE_IDS_KEY);
+      scmServiceIds = conf.getTrimmedStringCollection(
+          OZONE_SCM_SERVICE_IDS_KEY);
+      if (scmServiceIds.size() > 1) {
+        throw new ConfigurationException("When multiple SCM Service Ids are " +
+            "configured," + OZONE_SCM_DEFAULT_SERVICE_ID + " need to be " +
+            "defined");
+      } else if (scmServiceIds.size() == 1) {
+        localScmServiceId = scmServiceIds.iterator().next();
+      } else {
+        logger.info("SCM ServiceId is not defined");
+      }
+    }
+
+    return localScmServiceId;
   }
 }
