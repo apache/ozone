@@ -57,8 +57,8 @@ public class SCMHAManagerImpl implements SCMHAManager {
         new SCMDBTransactionBuffer(scm);
     this.ratisServer = new SCMRatisServerImpl(
         conf.getObject(SCMHAConfiguration.class), conf, scm, transactionBuffer);
-    // TODO: build SCM Node detail peer map and pass it to SCM SnapshotManager
-    this.scmSnapshotProvider = new SCMSnapshotProvider(conf, null);
+    this.scmSnapshotProvider = new SCMSnapshotProvider(conf,
+        scm.getSCMHANodeDetails().getPeerNodeDetails());
     grpcServer = new InterSCMGrpcProtocolService(conf, scm);
 
   }
