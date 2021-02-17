@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
@@ -36,7 +37,9 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -58,6 +61,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_MULTIPART_MIN_SIZE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -178,7 +182,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         List<OmKeyLocationInfo> partLocationInfos = new ArrayList<>();
         long dataSize = getMultipartDataSize(requestedVolume, requestedBucket,
                 keyName, ozoneKey, partKeyInfoMap, partsListSize,
-                partLocationInfos, partsList);
+                partLocationInfos, partsList, omMetadataManager);
 
         // All parts have same replication information. Here getting from last
         // part.
@@ -309,8 +313,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       if (dbOpenKeyInfo.getObjectID() != 0) {
         builder.setObjectID(dbOpenKeyInfo.getObjectID());
       }
-      builder.setParentObjectID(dbOpenKeyInfo.getParentObjectID());
-      builder.setFileName(dbOpenKeyInfo.getFileName());
+      updatePrefixFSOInfo(dbOpenKeyInfo, builder);
       omKeyInfo = builder.build();
     } else {
       // Already a version exists, so we should add it as a new version.
@@ -323,6 +326,11 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
     }
     omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
     return omKeyInfo;
+  }
+
+  protected void updatePrefixFSOInfo(OmKeyInfo dbOpenKeyInfo,
+      OmKeyInfo.Builder builder) {
+    // FSOBucket is disabled. Do nothing.
   }
 
   protected OmKeyInfo getOmKeyInfoFromKeyTable(String dbOzoneKey,
@@ -365,7 +373,8 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
           String requestedBucket, String keyName, String ozoneKey,
           TreeMap<Integer, PartKeyInfo> partKeyInfoMap,
           int partsListSize, List<OmKeyLocationInfo> partLocationInfos,
-          List<OzoneManagerProtocolProtos.Part> partsList) throws OMException {
+          List<OzoneManagerProtocolProtos.Part> partsList,
+          OMMetadataManager omMetadataManager) throws OMException {
     long dataSize = 0;
     int currentPartCount = 0;
     // Now do actual logic, and check for any Invalid part during this.
@@ -376,10 +385,13 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
 
       PartKeyInfo partKeyInfo = partKeyInfoMap.get(partNumber);
 
-      if (partKeyInfo == null ||
-          !partName.equals(partKeyInfo.getPartName())) {
-        String omPartName = partKeyInfo == null ? null :
-            partKeyInfo.getPartName();
+      String dbPartName = null;
+      if (partKeyInfo != null) {
+        dbPartName = preparePartName(requestedVolume, requestedBucket, keyName,
+                partKeyInfo, omMetadataManager);
+      }
+      if (!StringUtils.equals(partName, dbPartName)) {
+        String omPartName = partKeyInfo == null ? null : dbPartName;
         throw new OMException(
             failureMessage(requestedVolume, requestedBucket, keyName) +
             ". Provided Part info is { " + partName + ", " + partNumber +
@@ -412,6 +424,24 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       dataSize += currentPartKeyInfo.getDataSize();
     }
     return dataSize;
+  }
+
+  private String preparePartName(String requestedVolume,
+      String requestedBucket, String keyName, PartKeyInfo partKeyInfo,
+      OMMetadataManager omMetadataManager) {
+
+    String partName;
+    if (OzoneManagerRatisUtils.isBucketFSOptimized()) {
+      String parentPath = OzoneFSUtils.getParent(keyName);
+      StringBuffer keyPath = new StringBuffer(parentPath);
+      keyPath.append(partKeyInfo.getPartName());
+
+      partName = omMetadataManager.getOzoneKey(requestedVolume,
+              requestedBucket, keyPath.toString());
+    } else {
+      partName = partKeyInfo.getPartName();
+    }
+    return partName;
   }
 
   private static String failureMessage(String volume, String bucket,

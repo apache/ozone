@@ -354,8 +354,7 @@ public class TestOzoneClientMultipartUploadV1 {
 
     uploadPart(bucket, keyName, uploadID, 1, "data".getBytes(UTF_8));
 
-    // We have not uploaded any parts, but passing some list it should throw
-    // error.
+    // passing with an incorrect part name, should throw INVALID_PART error.
     TreeMap<Integer, String> partsMap = new TreeMap<>();
     partsMap.put(1, UUID.randomUUID().toString());
 
@@ -379,8 +378,7 @@ public class TestOzoneClientMultipartUploadV1 {
 
     uploadPart(bucket, keyName, uploadID, 1, "data".getBytes(UTF_8));
 
-    // We have not uploaded any parts, but passing some list it should throw
-    // error.
+    // passing with an incorrect part number, should throw INVALID_PART error.
     TreeMap<Integer, String> partsMap = new TreeMap<>();
     partsMap.put(3, "random");
 

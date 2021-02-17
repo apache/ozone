@@ -24,11 +24,13 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.util.Time;
 import org.junit.Assert;
+import org.junit.BeforeClass;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -41,6 +43,11 @@ import java.util.UUID;
  */
 public class TestS3MultipartUploadCompleteRequestV1
     extends TestS3MultipartUploadCompleteRequest {
+
+  @BeforeClass
+  public static void init() {
+    OzoneManagerRatisUtils.setBucketFSOptimized(true);
+  }
 
   protected String getKeyName() {
     String parentDir = UUID.randomUUID().toString() + "/a/b/c";
@@ -85,17 +92,6 @@ public class TestS3MultipartUploadCompleteRequestV1
     return omMetadataManager.getMultipartKey(keyStatus.getKeyInfo()
                     .getParentObjectID(), keyStatus.getTrimmedName(),
             multipartUploadID);
-  }
-
-  protected String getPartName(String volumeName, String bucketName,
-      String keyName, long clientID) throws IOException {
-
-    long parentID = getParentID(volumeName, bucketName, keyName);
-    String fileName = OzoneFSUtils.getFileName(keyName);
-    String ozoneKey = omMetadataManager.getOzonePathKey(parentID, fileName);
-
-    String partName = ozoneKey + clientID;
-    return partName;
   }
 
   private long getParentID(String volumeName, String bucketName,

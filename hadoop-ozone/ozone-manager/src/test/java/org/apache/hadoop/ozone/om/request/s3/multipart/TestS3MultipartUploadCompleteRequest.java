@@ -117,6 +117,63 @@ public class TestS3MultipartUploadCompleteRequest
   }
 
   @Test
+  public void testInvalidPartOrderError() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = getKeyName();
+
+    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+            omMetadataManager);
+
+    OMRequest initiateMPURequest = doPreExecuteInitiateMPU(volumeName,
+            bucketName, keyName);
+
+    S3InitiateMultipartUploadRequest s3InitiateMultipartUploadRequest =
+            getS3InitiateMultipartUploadReq(initiateMPURequest);
+
+    OMClientResponse omClientResponse =
+            s3InitiateMultipartUploadRequest.validateAndUpdateCache(ozoneManager,
+                    1L, ozoneManagerDoubleBufferHelper);
+
+    long clientID = Time.now();
+    String multipartUploadID = omClientResponse.getOMResponse()
+            .getInitiateMultiPartUploadResponse().getMultipartUploadID();
+
+    OMRequest commitMultipartRequest = doPreExecuteCommitMPU(volumeName,
+            bucketName, keyName, clientID, multipartUploadID, 1);
+
+    S3MultipartUploadCommitPartRequest s3MultipartUploadCommitPartRequest =
+            getS3MultipartUploadCommitReq(commitMultipartRequest);
+
+    // Add key to open key table.
+    addKeyToTable(volumeName, bucketName, keyName, clientID);
+
+    s3MultipartUploadCommitPartRequest.validateAndUpdateCache(ozoneManager,
+            2L, ozoneManagerDoubleBufferHelper);
+
+    List<Part> partList = new ArrayList<>();
+
+    String partName = getPartName(volumeName, bucketName, keyName, clientID);
+    partList.add(Part.newBuilder().setPartName(partName).setPartNumber(23)
+            .build());
+    partList.add(Part.newBuilder().setPartName(partName).setPartNumber(1)
+            .build());
+
+    OMRequest completeMultipartRequest = doPreExecuteCompleteMPU(volumeName,
+            bucketName, keyName, multipartUploadID, partList);
+
+    S3MultipartUploadCompleteRequest s3MultipartUploadCompleteRequest =
+            getS3MultipartUploadCompleteReq(completeMultipartRequest);
+
+    omClientResponse =
+            s3MultipartUploadCompleteRequest.validateAndUpdateCache(ozoneManager,
+                    3L, ozoneManagerDoubleBufferHelper);
+
+    Assert.assertEquals(OzoneManagerProtocolProtos.Status.INVALID_PART_ORDER,
+            omClientResponse.getOMResponse().getStatus());
+  }
+
+  @Test
   public void testValidateAndUpdateCacheVolumeNotFound() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
@@ -204,10 +261,12 @@ public class TestS3MultipartUploadCompleteRequest
             bucketName, keyName, multipartUploadID);
   }
 
-  protected String getPartName(String volumeName, String bucketName,
+  private String getPartName(String volumeName, String bucketName,
       String keyName, long clientID) throws IOException {
-    return getOzoneDBKey(volumeName, bucketName, keyName) +
-            clientID;
+
+    String dbOzoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
+            keyName);
+    return dbOzoneKey + clientID;
   }
 
   protected String getOzoneDBKey(String volumeName, String bucketName,

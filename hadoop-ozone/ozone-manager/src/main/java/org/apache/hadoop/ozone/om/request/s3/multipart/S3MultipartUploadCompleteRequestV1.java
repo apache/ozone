@@ -99,7 +99,7 @@ public class S3MultipartUploadCompleteRequestV1
         getOmRequest());
     OMClientResponse omClientResponse = null;
     IOException exception = null;
-    Result result = null;
+    Result result;
     try {
       keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
       volumeName = keyArgs.getVolumeName();
@@ -161,7 +161,7 @@ public class S3MultipartUploadCompleteRequestV1
         List<OmKeyLocationInfo> partLocationInfos = new ArrayList<>();
         long dataSize = getMultipartDataSize(requestedVolume, requestedBucket,
                 keyName, ozoneKey, partKeyInfoMap, partsListSize,
-                partLocationInfos, partsList);
+                partLocationInfos, partsList, omMetadataManager);
 
         // All parts have same replication information. Here getting from last
         // part.
@@ -250,6 +250,13 @@ public class S3MultipartUploadCompleteRequestV1
     omMetadataManager.getMultipartInfoTable().addCacheEntry(
             new CacheKey<>(multipartKey),
             new CacheValue<>(Optional.absent(), transactionLogIndex));
+  }
+
+  protected void updatePrefixFSOInfo(OmKeyInfo dbOpenKeyInfo,
+                                     OmKeyInfo.Builder builder) {
+    // updates parentID and fileName
+    builder.setParentObjectID(dbOpenKeyInfo.getParentObjectID());
+    builder.setFileName(dbOpenKeyInfo.getFileName());
   }
 
   private static String failureMessage(String volume, String bucket,
