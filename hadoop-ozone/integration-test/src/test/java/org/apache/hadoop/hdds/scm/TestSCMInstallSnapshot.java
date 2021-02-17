@@ -60,15 +60,19 @@ public class TestSCMInstallSnapshot {
         .newBuilder(conf)
         .setNumDatanodes(3)
         .build();
-   // cluster.getStorageContainerManager().exitSafeMode();
     cluster.waitForClusterToBeReady();
+  }
+
+  @AfterClass
+  public static void shutdown() throws Exception {
+    if (cluster != null) {
+      cluster.shutdown();
+    }
   }
 
   @Test
   public void testInstallSnapshot() throws Exception {
     StorageContainerManager scm = cluster.getStorageContainerManager();
-    long snapshotInfo1 = scm.getScmHAManager().getDBTransactionBuffer()
-        .getLatestTrxInfo().getTransactionIndex();
     ContainerManagerV2 containerManager = scm.getContainerManager();
     PipelineManager pipelineManager = scm.getPipelineManager();
     Pipeline ratisPipeline1 = pipelineManager.getPipeline(
@@ -80,7 +84,8 @@ public class TestSCMInstallSnapshot {
             RATIS, ONE, "Owner2").getPipelineID());
     pipelineManager.openPipeline(ratisPipeline2.getId());
     SCMNodeDetails scmNodeDetails = new SCMNodeDetails.Builder()
-        .setRpcAddress(new InetSocketAddress("0.0.0.0", 0)).build();
+        .setRpcAddress(new InetSocketAddress("0.0.0.0", 0)).setSCMNodeId("scm1")
+        .build();
     Map<String, SCMNodeDetails> peerMap = new HashMap<>();
     peerMap.put(scmNodeDetails.getNodeId(), scmNodeDetails);
     SCMSnapshotProvider provider =
@@ -91,12 +96,5 @@ public class TestSCMInstallSnapshot {
     Assert.assertEquals(1, files.length);
     Assert.assertTrue(files[0].getName().startsWith(
         OzoneConsts.SCM_DB_NAME + "-" + scmNodeDetails.getNodeId()));
-  }
-
-  @AfterClass
-  public static void shutdown() throws Exception {
-    if (cluster != null) {
-      cluster.shutdown();
-    }
   }
 }

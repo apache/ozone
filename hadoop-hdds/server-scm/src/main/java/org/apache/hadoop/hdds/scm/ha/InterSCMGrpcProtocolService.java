@@ -53,7 +53,8 @@ public class InterSCMGrpcProtocolService {
             .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE);
 
     InterSCMGrpcService service = new InterSCMGrpcService(scm);
-    nettyServerBuilder.addService(service);
+    ServerBuilder b = nettyServerBuilder.addService(service);
+    Preconditions.checkNotNull(b);
     server = nettyServerBuilder.build();
   }
 
@@ -65,6 +66,8 @@ public class InterSCMGrpcProtocolService {
     if (!isStarted.compareAndSet(false, true)) {
       LOG.info("Ignore. already started.");
       return;
+    } else {
+      server.start();
     }
   }
 
@@ -76,7 +79,7 @@ public class InterSCMGrpcProtocolService {
       } catch (Exception e) {
         LOG.error("failed to shutdown XceiverServerGrpc", e);
       }
-     isStarted.set(false);
+      isStarted.set(false);
     }
   }
 }

@@ -43,8 +43,8 @@ class SCMGrpcOutputStream extends OutputStream {
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMGrpcOutputStream.class);
 
-  private final StreamObserver<InterSCMProtocolProtos.CopyDBCheckpointResponseProto>
-      responseObserver;
+  private final StreamObserver<InterSCMProtocolProtos.
+      CopyDBCheckpointResponseProto> responseObserver;
 
   private final ByteString.Output buffer;
 
@@ -55,7 +55,8 @@ class SCMGrpcOutputStream extends OutputStream {
   private long writtenBytes;
 
   SCMGrpcOutputStream(
-      StreamObserver<InterSCMProtocolProtos.CopyDBCheckpointResponseProto> responseObserver,
+      StreamObserver<InterSCMProtocolProtos.
+          CopyDBCheckpointResponseProto> responseObserver,
       String clusterId, int bufferSize) {
     this.responseObserver = responseObserver;
     this.clusterId = clusterId;

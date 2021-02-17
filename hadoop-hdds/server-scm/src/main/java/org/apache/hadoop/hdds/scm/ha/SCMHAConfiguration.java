@@ -254,6 +254,10 @@ public class SCMHAConfiguration {
     this.raftLogPurgeEnabled = enabled;
   }
 
+  public void setGrpcBindPort(int port) {
+    this.grpcBindPort = port;
+  }
+
   public int getRaftLogPurgeGap() {
     return raftLogPurgeGap;
   }

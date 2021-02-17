@@ -99,7 +99,8 @@ public class SCMSnapshotProvider {
     String snapshotFileName =
         OzoneConsts.SCM_DB_NAME + "-" + leaderSCMNodeID + "-" + snapshotTime;
     String snapshotFilePath =
-        Paths.get(scmSnapshotDir.getAbsolutePath(), snapshotFileName).toFile().getAbsolutePath();
+        Paths.get(scmSnapshotDir.getAbsolutePath(), snapshotFileName).toFile()
+            .getAbsolutePath();
     File targetFile = new File(snapshotFileName + ".tar.gz");
 
     // the client instance will be initialized only when first install snapshot
