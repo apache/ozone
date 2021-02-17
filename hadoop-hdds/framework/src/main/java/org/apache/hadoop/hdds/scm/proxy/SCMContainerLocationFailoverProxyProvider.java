@@ -42,8 +42,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.apache.hadoop.ozone.OzoneConsts.SCM_DUMMY_SERVICE_ID;
-
 /**
  * Failover proxy provider for SCM container location.
  */
