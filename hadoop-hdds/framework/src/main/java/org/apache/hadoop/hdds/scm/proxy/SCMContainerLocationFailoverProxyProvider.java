@@ -74,9 +74,6 @@ public class SCMContainerLocationFailoverProxyProvider implements
     this.conf = conf;
     this.scmVersion = RPC.getProtocolVersion(
         StorageContainerLocationProtocolPB.class);
-    this.scmServiceId = SCMHAUtils.getScmServiceId(conf, LOG);
-    this.scmNodeIds = new ArrayList<>(SCMHAUtils.getSCMNodeIds(conf,
-        scmServiceId));
 
     // Set some constant for non-HA.
     if (scmServiceId == null) {
@@ -108,6 +105,7 @@ public class SCMContainerLocationFailoverProxyProvider implements
 
         scmServiceId = scmNodeInfo.getServiceId();
         String scmNodeId = scmNodeInfo.getNodeId();
+        scmNodeIds.add(scmNodeId);
         SCMProxyInfo scmProxyInfo = new SCMProxyInfo(scmServiceId, scmNodeId,
             scmClientAddress);
         ProxyInfo< StorageContainerLocationProtocolPB > proxy
