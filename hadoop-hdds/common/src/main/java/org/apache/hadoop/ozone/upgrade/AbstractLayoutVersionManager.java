@@ -32,6 +32,8 @@ import java.util.stream.Collectors;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Layout Version Manager containing generic method implementations.
@@ -39,6 +41,9 @@ import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status;
 @SuppressWarnings("visibilitymodifier")
 public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
     implements LayoutVersionManager, LayoutVersionManagerMXBean {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(AbstractLayoutVersionManager.class);
 
   protected int metadataLayoutVersion; // MLV.
   protected int softwareLayoutVersion; // SLV.
@@ -60,8 +65,12 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
       currentUpgradeState = ALREADY_FINALIZED;
     }
 
+    LOG.info("Initializing Layout version manager with metadata layout " +
+        " = {}, software layout = {}", features.get(metadataLayoutVersion),
+        features.get(softwareLayoutVersion));
+
     MBeans.register("LayoutVersionManager",
-        "AbstractLayoutVersionManager", this);
+        getClass().getName(), this);
   }
 
   public Status getUpgradeState() {

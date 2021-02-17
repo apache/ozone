@@ -59,7 +59,7 @@ public class TestOMLayoutFeatureAspect {
   public void testCheckLayoutFeature() throws Exception {
     OMLayoutFeatureUtil testObj = new OMLayoutFeatureUtil();
     try {
-      testObj.ecMethod();
+      String s = testObj.ecMethod();
       Assert.fail();
     } catch (Exception ex) {
       OMException omEx = (OMException) ex;
