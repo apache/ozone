@@ -37,6 +37,7 @@ import org.slf4j.LoggerFactory;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -73,11 +74,6 @@ public class SCMContainerLocationFailoverProxyProvider implements
     this.scmVersion = RPC.getProtocolVersion(
         StorageContainerLocationProtocolPB.class);
 
-    // Set some constant for non-HA.
-    if (scmServiceId == null) {
-      scmServiceId = SCM_DUMMY_SERVICE_ID;
-    }
-
     this.scmProxies = new HashMap<>();
     this.scmProxyInfoMap = new HashMap<>();
     loadConfigs();
@@ -93,6 +89,8 @@ public class SCMContainerLocationFailoverProxyProvider implements
   protected void loadConfigs() {
     List<SCMNodeInfo> scmNodeInfoList = SCMNodeInfo.buildNodeInfo(conf);
 
+    scmNodeIds = new ArrayList<>();
+
     for (SCMNodeInfo scmNodeInfo : scmNodeInfoList) {
       if (scmNodeInfo.getScmClientAddress() == null) {
         throw new ConfigurationException("SCM Client Address could not " +
@@ -103,6 +101,7 @@ public class SCMContainerLocationFailoverProxyProvider implements
 
         scmServiceId = scmNodeInfo.getServiceId();
         String scmNodeId = scmNodeInfo.getNodeId();
+
         scmNodeIds.add(scmNodeId);
         SCMProxyInfo scmProxyInfo = new SCMProxyInfo(scmServiceId, scmNodeId,
             scmClientAddress);

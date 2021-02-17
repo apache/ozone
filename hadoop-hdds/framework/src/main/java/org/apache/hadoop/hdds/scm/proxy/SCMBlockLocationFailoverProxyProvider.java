@@ -38,6 +38,7 @@ import org.slf4j.LoggerFactory;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -93,6 +94,7 @@ public class SCMBlockLocationFailoverProxyProvider implements
 
   private void loadConfigs() {
 
+    scmNodeIds = new ArrayList<>();
     List<SCMNodeInfo> scmNodeInfoList = SCMNodeInfo.buildNodeInfo(conf);
 
     for (SCMNodeInfo scmNodeInfo : scmNodeInfoList) {
@@ -105,7 +107,7 @@ public class SCMBlockLocationFailoverProxyProvider implements
 
         scmServiceId = scmNodeInfo.getServiceId();
         String scmNodeId = scmNodeInfo.getNodeId();
-        this.scmNodeIds.add(scmNodeId);
+        scmNodeIds.add(scmNodeId);
         SCMProxyInfo scmProxyInfo = new SCMProxyInfo(
             scmNodeInfo.getServiceId(), scmNodeInfo.getNodeId(),
             scmBlockClientAddress);
