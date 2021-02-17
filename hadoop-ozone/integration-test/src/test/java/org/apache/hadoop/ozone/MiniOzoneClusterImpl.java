@@ -184,7 +184,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     return null;
   }
 
-  public void waitForSCMToBeReady()  throws TimeoutException, InterruptedException{
+  public void waitForSCMToBeReady() throws TimeoutException,
+      InterruptedException {
     // Nothing implemented here
   }
 

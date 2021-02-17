@@ -546,8 +546,8 @@ public interface MiniOzoneCluster {
       return this;
     }
 
-    public Builder setNumOfActiveSCMs(int numOfActiveSCMs) {
-      this.numOfActiveSCMs = numOfActiveSCMs;
+    public Builder setNumOfActiveSCMs(int numActiveSCMs) {
+      this.numOfActiveSCMs = numActiveSCMs;
       return this;
     }
 

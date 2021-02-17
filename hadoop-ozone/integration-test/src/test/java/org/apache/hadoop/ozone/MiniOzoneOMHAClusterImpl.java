@@ -34,7 +34,7 @@ import java.util.Collections;
  * with OM HA suitable for running tests.  The cluster consists of a set of
  * OzoneManagers, StorageContainerManager and multiple DataNodes.
  */
-public class MiniOzoneOMHAClusterImpl extends MiniOzoneHAClusterImpl {
+public final class MiniOzoneOMHAClusterImpl extends MiniOzoneHAClusterImpl {
   public static final int NODE_FAILURE_TIMEOUT = 2000; // 2 seconds
 
   /**
@@ -51,7 +51,8 @@ public class MiniOzoneOMHAClusterImpl extends MiniOzoneHAClusterImpl {
       List<HddsDatanodeService> hddsDatanodes,
       String omServiceId,
       ReconServer reconServer) {
-    super(conf, activeOMList, inactiveOMList, Collections.singletonList(scm), null, hddsDatanodes, omServiceId, null, reconServer);
+    super(conf, activeOMList, inactiveOMList, Collections.singletonList(scm),
+        null, hddsDatanodes, omServiceId, null, reconServer);
   }
 
   /**

@@ -507,7 +507,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       return scmList;
     }
 
-//    protected void configureSCM() {
+    protected void configureSCM() {
 //      conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "127.0.0.1:0");
 //      conf.set(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY, "127.0.0.1:0");
 //      conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY, "127.0.0.1:0");
@@ -516,7 +516,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 //      conf.set(HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
 //          "3s");
 //      configureSCMheartbeat();
-//    }
+    }
 
     /**
      * Initialize HA related configurations.
