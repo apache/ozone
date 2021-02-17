@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.ozone.om.upgrade;
 
-import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.ERASURE_CODING;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -39,7 +37,7 @@ public class OMLayoutFeatureUtil {
    * "disallowed" by just adding the following annotation, thereby keeping the
    * method logic and upgrade logic separate.
    */
-  @DisallowedUntilLayoutVersion(ERASURE_CODING)
+  //@DisallowedUntilLayoutVersion(ERASURE_CODING)
   public String ecMethod() {
     // Blah Blah EC Blah....
     return "ec";

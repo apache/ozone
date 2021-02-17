@@ -26,6 +26,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerRequestHandler;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
+import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Before;
@@ -48,7 +49,7 @@ public class OMLayoutFeatureAspect {
     String featureName = ((MethodSignature) joinPoint.getSignature())
         .getMethod().getAnnotation(DisallowedUntilLayoutVersion.class)
         .value().name();
-    OMLayoutVersionManager lvm = null;
+    LayoutVersionManager lvm = null;
     if (joinPoint.getTarget() instanceof OzoneManagerRequestHandler) {
       OzoneManager ozoneManager = ((OzoneManagerRequestHandler)
           joinPoint.getTarget()).getOzoneManager();
@@ -57,7 +58,7 @@ public class OMLayoutFeatureAspect {
       try {
         Method method = joinPoint.getTarget().getClass()
             .getMethod(GET_VERSION_MANAGER_METHOD_NAME);
-        lvm = (OMLayoutVersionManager) method.invoke(joinPoint.getTarget());
+        lvm = (LayoutVersionManager) method.invoke(joinPoint.getTarget());
       } catch (Exception ex) {
         lvm = new OMLayoutVersionManager();
       }
