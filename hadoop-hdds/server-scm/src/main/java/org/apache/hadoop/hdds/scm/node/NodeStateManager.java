@@ -651,9 +651,9 @@ public class NodeStateManager implements Runnable, Closeable {
               node);
         }
       }
+
     } catch (NodeNotFoundException ex) {
       LOG.error("Inconsistent NodeStateMap! {}", nodeStateMap);
-      ex.printStackTrace();
     }
   }
 

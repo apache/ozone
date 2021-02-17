@@ -131,8 +131,7 @@ public class DatanodeStateMachine implements Closeable {
         layoutStorage.getLayoutVersion());
     upgradeFinalizer = new DataNodeUpgradeFinalizer(layoutVersionManager,
         datanodeDetails.getUuidString());
-    DatanodeMetadataFeatures.
-        initialize(dataNodeVersionManager);
+    DatanodeMetadataFeatures.initialize(layoutVersionManager);
 
     executorService = Executors.newFixedThreadPool(
         getEndPointTaskThreadPoolSize(),

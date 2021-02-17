@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.hdds.scm.server.upgrade;
 
-import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.DATANODE_SCHEMA_V2;
-
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSUpgradeAction;
@@ -29,10 +27,7 @@ import org.apache.hadoop.hdds.upgrade.HDDSUpgradeAction;
  * It is OK to skip HDDS features from the catalog that do not have
  * any specific SCMActions.
  */
-public enum SCMLayoutAction {
-  SCMUpgradeFirstAction(DATANODE_SCHEMA_V2,
-      new SCMUpgradeActionFirstUpgradeVersion());
-
+public enum SCMLayoutAction {; // semi-colon has to be here for checkstyle!
   //////////////////////////////  //////////////////////////////
 
   private HDDSLayoutFeature hddsFeature;
