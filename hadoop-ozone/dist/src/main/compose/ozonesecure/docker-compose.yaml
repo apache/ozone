@@ -48,18 +48,6 @@ services:
     environment:
       KERBEROS_KEYTABS: dn HTTP
       OZONE_OPTS:
-  extradn:
-    image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
-    volumes:
-      - ../..:/opt/hadoop
-    ports:
-      - 9864
-    command: ["/opt/hadoop/bin/ozone","datanode"]
-    env_file:
-      - docker-config
-    environment:
-      KERBEROS_KEYTABS: dn HTTP
-      OZONE_OPTS:
   om:
     image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
     hostname: om

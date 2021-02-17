@@ -21,12 +21,12 @@ Test Timeout        5 minutes
 
 *** Variables ***
 ${container}    1
-${datanode}     extradn
+${count}        3
 
 *** Keywords ***
 Check Container Replicated
-    ${output} =         Execute          ozone admin --verbose container info "${container}"
-                        Should contain   ${output}   ${datanode}
+    ${output} =    Execute    ozone admin container info --json "${container}" | jq '.pipeline.nodes | length'
+    Should Be Equal    ${output}   ${count}
 
 *** Test Cases ***
 Wait Until Container Replicated

@@ -130,14 +130,11 @@ wait_for_om_leader() {
 ## @param number of datanodes to start and wait for (default: 3)
 start_docker_env(){
   local -i datanode_count=${1:-3}
-  if [[ $# -ge 1 ]]; then
-    shift
-  fi
 
   create_results_dir
   export OZONE_SAFEMODE_MIN_DATANODES="${datanode_count}"
   docker-compose --no-ansi down
-  if ! { docker-compose --no-ansi up -d --scale datanode="${datanode_count}" "$@" \
+  if ! { docker-compose --no-ansi up -d --scale datanode="${datanode_count}" \
       && wait_for_safemode_exit \
       && wait_for_om_leader ; }; then
     OUTPUT_NAME="$COMPOSE_ENV_NAME"

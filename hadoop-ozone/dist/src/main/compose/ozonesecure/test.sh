@@ -27,7 +27,7 @@ export SECURITY_ENABLED=true
 
 : ${OZONE_BUCKET_KEY_NAME:=key1}
 
-start_docker_env 3 --scale extradn=0
+start_docker_env
 
 execute_command_in_container kms hadoop key create ${OZONE_BUCKET_KEY_NAME}
 
@@ -53,9 +53,10 @@ execute_robot_test scm recon
 
 # test replication; must be run before admincli,
 # which stops replication manager
-docker-compose up -d --scale datanode=2 --scale extradn=1
-wait_for_port extradn 9858 60
-execute_robot_test scm -v container:1 -v datanode:extradn replication/wait.robot
+docker-compose up -d --scale datanode=2
+execute_robot_test scm -v container:1 -v count:2 replication/wait.robot
+docker-compose up -d --scale datanode=3
+execute_robot_test scm -v container:1 -v count:3 replication/wait.robot
 
 execute_robot_test scm admincli
 execute_robot_test scm spnego

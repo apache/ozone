@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.collect.ImmutableSet;
 import org.apache.hadoop.hdds.DatanodeVersions;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -369,6 +370,7 @@ public class DatanodeDetails extends NodeImpl implements
    * Returns a DatanodeDetails protobuf message from a datanode ID.
    * @return HddsProtos.DatanodeDetailsProto
    */
+  @JsonIgnore
   public HddsProtos.DatanodeDetailsProto getProtoBufMessage() {
     return toProto(CURRENT_VERSION);
   }
@@ -431,6 +433,7 @@ public class DatanodeDetails extends NodeImpl implements
    * Returns a ExtendedDatanodeDetails protobuf message from a datanode ID.
    * @return HddsProtos.ExtendedDatanodeDetailsProto
    */
+  @JsonIgnore
   public HddsProtos.ExtendedDatanodeDetailsProto getExtendedProtoBufMessage() {
     HddsProtos.ExtendedDatanodeDetailsProto.Builder extendedBuilder =
         HddsProtos.ExtendedDatanodeDetailsProto.newBuilder()
