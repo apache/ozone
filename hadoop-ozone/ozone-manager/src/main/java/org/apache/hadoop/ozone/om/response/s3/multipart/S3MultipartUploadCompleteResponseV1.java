@@ -18,93 +18,74 @@
 
 package org.apache.hadoop.ozone.om.response.s3.multipart;
 
-import java.io.IOException;
-import java.util.List;
-
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
-import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMResponse;
-import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
 import javax.annotation.Nonnull;
+import java.io.IOException;
+import java.util.List;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.MULTIPARTINFO_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.MULTIPARTFILEINFO_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
 
 /**
  * Response for Multipart Upload Complete request.
  */
-@CleanupTableInfo(cleanupTables = {OPEN_KEY_TABLE, KEY_TABLE, DELETED_TABLE,
-    MULTIPARTINFO_TABLE})
-public class S3MultipartUploadCompleteResponse extends OMClientResponse {
-  private String multipartKey;
-  private OmKeyInfo omKeyInfo;
-  private List<OmKeyInfo> partsUnusedList;
+@CleanupTableInfo(cleanupTables = {OPEN_FILE_TABLE, FILE_TABLE, DELETED_TABLE,
+    MULTIPARTFILEINFO_TABLE})
+public class S3MultipartUploadCompleteResponseV1
+        extends S3MultipartUploadCompleteResponse {
 
-  public S3MultipartUploadCompleteResponse(
+  public S3MultipartUploadCompleteResponseV1(
       @Nonnull OMResponse omResponse,
       @Nonnull String multipartKey,
       @Nonnull OmKeyInfo omKeyInfo,
       @Nonnull List<OmKeyInfo> unUsedParts) {
-    super(omResponse);
-    this.partsUnusedList = unUsedParts;
-    this.multipartKey = multipartKey;
-    this.omKeyInfo = omKeyInfo;
+    super(omResponse, multipartKey, omKeyInfo, unUsedParts);
   }
 
   /**
    * For when the request is not successful.
    * For a successful request, the other constructor should be used.
    */
-  public S3MultipartUploadCompleteResponse(@Nonnull OMResponse omResponse) {
+  public S3MultipartUploadCompleteResponseV1(@Nonnull OMResponse omResponse) {
     super(omResponse);
     checkStatusNotOK();
   }
+
 
   @Override
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
     omMetadataManager.getOpenKeyTable().deleteWithBatch(batchOperation,
-        multipartKey);
+            getMultipartKey());
     omMetadataManager.getMultipartInfoTable().deleteWithBatch(batchOperation,
-        multipartKey);
+            getMultipartKey());
 
-    String ozoneKey = omMetadataManager.getOzoneKey(omKeyInfo.getVolumeName(),
-        omKeyInfo.getBucketName(), omKeyInfo.getKeyName());
-    omMetadataManager.getKeyTable().putWithBatch(batchOperation, ozoneKey,
-        omKeyInfo);
+    String dbFileKey = OMFileRequest.addToFileTable(omMetadataManager,
+            batchOperation, getOmKeyInfo());
 
-    if (!partsUnusedList.isEmpty()) {
+    if (!getPartsUnusedList().isEmpty()) {
       // Add unused parts to deleted key table.
       RepeatedOmKeyInfo repeatedOmKeyInfo = omMetadataManager.getDeletedTable()
-          .get(ozoneKey);
+              .get(dbFileKey);
       if (repeatedOmKeyInfo == null) {
-        repeatedOmKeyInfo = new RepeatedOmKeyInfo(partsUnusedList);
+        repeatedOmKeyInfo = new RepeatedOmKeyInfo(getPartsUnusedList());
       } else {
-        repeatedOmKeyInfo.addOmKeyInfo(omKeyInfo);
+        repeatedOmKeyInfo.addOmKeyInfo(getOmKeyInfo());
       }
 
       omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
-          ozoneKey, repeatedOmKeyInfo);
+              dbFileKey, repeatedOmKeyInfo);
     }
   }
-
-  protected String getMultipartKey() {
-    return multipartKey;
-  }
-
-  protected OmKeyInfo getOmKeyInfo() {
-    return omKeyInfo;
-  }
-
-  protected List<OmKeyInfo> getPartsUnusedList() {
-    return partsUnusedList;
-  }
 }
+

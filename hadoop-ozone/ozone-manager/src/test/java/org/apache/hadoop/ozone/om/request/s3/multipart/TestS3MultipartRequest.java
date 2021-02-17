@@ -115,7 +115,7 @@ public class TestS3MultipartRequest {
             keyName);
 
     S3InitiateMultipartUploadRequest s3InitiateMultipartUploadRequest =
-        new S3InitiateMultipartUploadRequest(omRequest);
+        getS3InitiateMultipartUploadReq(omRequest);
 
     OMRequest modifiedRequest =
         s3InitiateMultipartUploadRequest.preExecute(ozoneManager);
@@ -204,7 +204,7 @@ public class TestS3MultipartRequest {
             keyName, multipartUploadID, partList);
 
     S3MultipartUploadCompleteRequest s3MultipartUploadCompleteRequest =
-        new S3MultipartUploadCompleteRequest(omRequest);
+            getS3MultipartUploadCompleteReq(omRequest);
 
     OMRequest modifiedRequest =
         s3MultipartUploadCompleteRequest.preExecute(ozoneManager);
@@ -245,6 +245,11 @@ public class TestS3MultipartRequest {
             .getKeyArgs().getModificationTime() > 0);
 
     return modifiedRequest;
+  }
+
+  protected S3MultipartUploadCompleteRequest getS3MultipartUploadCompleteReq(
+          OMRequest omRequest) {
+    return new S3MultipartUploadCompleteRequest(omRequest);
   }
 
   protected S3MultipartUploadCommitPartRequest getS3MultipartUploadCommitReq(
