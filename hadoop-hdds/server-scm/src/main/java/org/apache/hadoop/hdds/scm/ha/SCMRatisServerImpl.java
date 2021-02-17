@@ -76,6 +76,8 @@ public class SCMRatisServerImpl implements SCMRatisServer {
       final DBTransactionBuffer buffer) throws IOException {
     this.scm = scm;
     this.address = haConf.getRatisBindAddress();
+
+    LOG.info("starting Raft server for scm:{}", scm.getScmId());
     RaftServer server = newRaftServer(scm.getClusterId(), scm.getScmId(),
         scm.getSCMHANodeDetails(), conf)
         .setStateMachine(new SCMStateMachine(scm, this, buffer)).build();
@@ -261,7 +263,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
 
       final List<RaftPeer> raftPeers = new ArrayList<>();
       for (int i = 0; i < hosts.size(); ++i) {
-        String nodeId = "scm" + i;
+        String nodeId = "scmNode-" + i;
         RaftPeerId peerId = RaftPeerId.getRaftPeerId(nodeId);
 
         String host = hosts.get(i);
@@ -291,6 +293,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
           UUID.nameUUIDFromBytes(groupId.getBytes(StandardCharsets.UTF_8)));
 
       raftGroup = RaftGroup.valueOf(raftGroupId, raftPeers);
+      LOG.info("Raft grup is :{} gid:is{}", raftGroup, raftGroupId);
     }
 
     SCMHAGroupBuilder(final SCMHANodeDetails details, final String clusterId,
