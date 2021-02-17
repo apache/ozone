@@ -313,6 +313,13 @@ public class SCMRatisServerImpl implements SCMRatisServer {
       List<RaftPeer> raftPeers = new ArrayList<>();
       // Add this Ratis server to the Ratis ring
       raftPeers.add(localRaftPeer);
+      for (SCMNodeDetails nodeDetails : details.getPeerNodeDetails()) {
+        raftPeers.add(
+            RaftPeer.newBuilder()
+                .setId(nodeDetails.getNodeId())
+                .build()
+        );
+      }
       // always start as a standalone server
       raftGroup = RaftGroup.valueOf(raftGroupId, raftPeers);
     }
