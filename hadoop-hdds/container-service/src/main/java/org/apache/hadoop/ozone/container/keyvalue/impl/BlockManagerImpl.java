@@ -130,8 +130,10 @@ public class BlockManagerImpl implements BlockManager {
               .initBatchOperation()) {
         db.getStore().getBlockDataTable().putWithBatch(
             batch, Long.toString(data.getLocalID()), data);
-        db.getStore().getMetadataTable().putWithBatch(
-            batch, OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID, bcsId);
+        if (bcsId != 0) {
+          db.getStore().getMetadataTable().putWithBatch(
+              batch, OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID, bcsId);
+        }
 
         // Set Bytes used, this bytes used will be updated for every write and
         // only get committed for every put block. In this way, when datanode
@@ -153,7 +155,9 @@ public class BlockManagerImpl implements BlockManager {
         db.getStore().getBatchHandler().commitBatchOperation(batch);
       }
 
-      container.updateBlockCommitSequenceId(bcsId);
+      if (bcsId != 0) {
+        container.updateBlockCommitSequenceId(bcsId);
+      }
       // Increment block count finally here for in-memory.
       if (incrKeyCount) {
         container.getContainerData().incrKeyCount();

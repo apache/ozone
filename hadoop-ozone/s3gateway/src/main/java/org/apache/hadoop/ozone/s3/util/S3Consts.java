@@ -40,6 +40,13 @@ public final class S3Consts {
   public static final String ENCODING_TYPE = "url";
 
   // Constants related to Range Header
+  public static final String COPY_SOURCE_IF_PREFIX = "x-amz-copy-source-if-";
+  public static final String COPY_SOURCE_IF_MODIFIED_SINCE =
+      COPY_SOURCE_IF_PREFIX + "modified-since";
+  public static final String COPY_SOURCE_IF_UNMODIFIED_SINCE =
+      COPY_SOURCE_IF_PREFIX + "unmodified-since";
+
+  // Constants related to Range Header
   public static final String RANGE_HEADER_SUPPORTED_UNIT = "bytes";
   public static final String RANGE_HEADER = "Range";
   public static final String ACCEPT_RANGE_HEADER = "Accept-Ranges";
