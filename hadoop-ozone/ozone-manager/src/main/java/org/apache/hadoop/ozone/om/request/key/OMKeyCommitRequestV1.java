@@ -143,7 +143,7 @@ public class OMKeyCommitRequestV1 extends OMKeyCommitRequest {
       omKeyInfo.setModificationTime(commitKeyArgs.getModificationTime());
 
       // Update the block length for each block
-      omKeyInfo.updateLocationInfoList(locationInfoList);
+      omKeyInfo.updateLocationInfoList(locationInfoList, false);
 
       // Set the UpdateID to current transactionLogIndex
       omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());

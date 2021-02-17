@@ -86,7 +86,8 @@ public class S3MultipartUploadCommitPartRequestV1
     boolean acquiredLock = false;
 
     IOException exception = null;
-    String partName = null;
+    String dbPartName;
+    String fullKeyPartName = null;
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
     OMClientResponse omClientResponse = null;
@@ -95,8 +96,8 @@ public class S3MultipartUploadCommitPartRequestV1
     OmKeyInfo omKeyInfo = null;
     String multipartKey = null;
     OmMultipartKeyInfo multipartKeyInfo = null;
-    Result result = null;
-    OmBucketInfo omBucketInfo = null;
+    Result result;
+    OmBucketInfo omBucketInfo;
     OmBucketInfo copyBucketInfo = null;
     try {
       keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
@@ -141,14 +142,24 @@ public class S3MultipartUploadCommitPartRequestV1
       omKeyInfo.setDataSize(keyArgs.getDataSize());
       omKeyInfo.updateLocationInfoList(keyArgs.getKeyLocationsList().stream()
           .map(OmKeyLocationInfo::getFromProtobuf)
-          .collect(Collectors.toList()));
+          .collect(Collectors.toList()), true);
       // Set Modification time
       omKeyInfo.setModificationTime(keyArgs.getModificationTime());
       // Set the UpdateID to current transactionLogIndex
       omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
-      String ozoneKey = omMetadataManager.getOzonePathKey(parentID, fileName);
-      partName = ozoneKey + clientID;
+      /**
+       * Format of PartName stored into MultipartInfoTable is,
+       * "fileName + ClientID".
+       *
+       * Contract is that all part names present in a multipart info will
+       * have same key prefix path.
+       *
+       * For example:
+       *        /vol1/buck1/a/b/c/part-1, /vol1/buck1/a/b/c/part-2,
+       *        /vol1/buck1/a/b/c/part-n
+       */
+      dbPartName = fileName + clientID;
 
       if (multipartKeyInfo == null) {
         // This can occur when user started uploading part by the time commit
@@ -168,9 +179,9 @@ public class S3MultipartUploadCommitPartRequestV1
       // Build this multipart upload part info.
       OzoneManagerProtocolProtos.PartKeyInfo.Builder partKeyInfo =
           OzoneManagerProtocolProtos.PartKeyInfo.newBuilder();
-      partKeyInfo.setPartName(partName);
+      partKeyInfo.setPartName(dbPartName);
       partKeyInfo.setPartNumber(partNumber);
-      partKeyInfo.setPartKeyInfo(omKeyInfo.getProtobuf(
+      partKeyInfo.setPartKeyInfo(omKeyInfo.getProtobuf(fileName,
           getOmRequest().getVersion()));
 
       // Add this part information in to multipartKeyInfo.
@@ -207,9 +218,15 @@ public class S3MultipartUploadCommitPartRequestV1
           keyArgs.getKeyLocationsList().size() * scmBlockSize * factor;
       omBucketInfo.incrUsedBytes(correctedSpace);
 
+      // Prepare response. Sets user given full key part name in 'partName'
+      // attribute in response object.
+      String fullOzoneKeyName = omMetadataManager.getOzoneKey(
+              volumeName, bucketName, keyName);
+      fullKeyPartName = fullOzoneKeyName + clientID;
       omResponse.setCommitMultiPartUploadResponse(
           MultipartCommitUploadPartResponse.newBuilder()
-              .setPartName(partName));
+              .setPartName(fullKeyPartName));
+
       omClientResponse = new S3MultipartUploadCommitPartResponseV1(
           omResponse.build(), multipartKey, openKey,
           multipartKeyInfo, oldPartKeyInfo, omKeyInfo,
@@ -234,8 +251,8 @@ public class S3MultipartUploadCommitPartRequestV1
     }
 
     logResult(ozoneManager, multipartCommitUploadPartRequest, keyArgs,
-            auditMap, volumeName, bucketName, keyName, exception, partName,
-            result);
+            auditMap, volumeName, bucketName, keyName, exception,
+            fullKeyPartName, result);
 
     return omClientResponse;
   }
