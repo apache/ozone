@@ -28,11 +28,11 @@ public class TestDatanodeLayOutVersion {
   @Test
   public void testDatanodeLayOutVersion() {
     // Check Latest Version and description
-    Assert.assertEquals(1, DataNodeVolumeLayoutVersion.getLatestVersion()
+    Assert.assertEquals(1, HDDSVolumeLayoutVersion.getLatestVersion()
         .getVersion());
     Assert.assertEquals("HDDS Datanode LayOut Version 1",
-        DataNodeVolumeLayoutVersion.getLatestVersion().getDescription());
-    Assert.assertEquals(DataNodeVolumeLayoutVersion.getAllVersions().length,
-        DataNodeVolumeLayoutVersion.getAllVersions().length);
+        HDDSVolumeLayoutVersion.getLatestVersion().getDescription());
+    Assert.assertEquals(HDDSVolumeLayoutVersion.getAllVersions().length,
+        HDDSVolumeLayoutVersion.getAllVersions().length);
   }
 }

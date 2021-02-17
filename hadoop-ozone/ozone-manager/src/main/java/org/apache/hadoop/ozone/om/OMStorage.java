@@ -49,6 +49,11 @@ public class OMStorage extends Storage {
     super(NodeType.OM, getOmDbDir(conf), STORAGE_DIR, maxLayoutVersion());
   }
 
+  public OMStorage(OzoneConfiguration conf, int defaultLayoutVersion)
+      throws IOException {
+    super(NodeType.OM, getOmDbDir(conf), STORAGE_DIR, defaultLayoutVersion);
+  }
+
   public void setScmId(String scmId) throws IOException {
     if (getState() == StorageState.INITIALIZED) {
       throw new IOException("OM is already initialized.");

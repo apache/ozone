@@ -16,6 +16,8 @@
  */
 package org.apache.hadoop.ozone.container.common.statemachine;
 
+import static org.apache.hadoop.ozone.common.Storage.StorageState.INITIALIZED;
+
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.Iterator;
@@ -127,6 +129,9 @@ public class DatanodeStateMachine implements Closeable {
 
     layoutStorage = new DatanodeLayoutStorage(conf,
         datanodeDetails.getUuidString());
+    if (layoutStorage.getState() != INITIALIZED) {
+      layoutStorage.initialize();
+    }
     layoutVersionManager = new HDDSLayoutVersionManager(
         layoutStorage.getLayoutVersion());
     upgradeFinalizer = new DataNodeUpgradeFinalizer(layoutVersionManager,

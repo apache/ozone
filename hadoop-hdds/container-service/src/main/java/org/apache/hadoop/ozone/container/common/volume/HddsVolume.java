@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
-import static org.apache.hadoop.ozone.container.common.DataNodeVolumeLayoutVersion.getLatestVersion;
+import static org.apache.hadoop.ozone.container.common.HDDSVolumeLayoutVersion.getLatestVersion;
 
 import javax.annotation.Nullable;
 import java.io.File;

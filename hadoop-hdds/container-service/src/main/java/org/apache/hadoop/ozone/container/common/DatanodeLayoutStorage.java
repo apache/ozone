@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.container.common;
 
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.apache.hadoop.ozone.OzoneConsts.DATANODE_LAYOUT_VERSION_DIR;
-import static org.apache.hadoop.ozone.common.Storage.StorageState.INITIALIZED;
 
 import java.io.File;
 import java.io.IOException;
@@ -44,9 +43,13 @@ public class DatanodeLayoutStorage extends Storage {
       throws IOException {
     super(NodeType.DATANODE, ServerUtils.getOzoneMetaDirPath(conf),
         DATANODE_LAYOUT_VERSION_DIR, dataNodeId, maxLayoutVersion());
-    if (getState() != INITIALIZED) {
-      initialize();
-    }
+  }
+
+  public DatanodeLayoutStorage(OzoneConfiguration conf, String dataNodeId,
+                               int layoutVersion)
+      throws IOException {
+    super(NodeType.DATANODE, ServerUtils.getOzoneMetaDirPath(conf),
+        DATANODE_LAYOUT_VERSION_DIR, dataNodeId, layoutVersion);
   }
 
   @Override

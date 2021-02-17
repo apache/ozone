@@ -22,7 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.InconsistentStorageStateException;
-import org.apache.hadoop.ozone.container.common.DataNodeVolumeLayoutVersion;
+import org.apache.hadoop.ozone.container.common.HDDSVolumeLayoutVersion;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
@@ -143,11 +143,11 @@ public final class HddsVolumeUtil {
     String lvStr = getProperty(props, OzoneConsts.LAYOUTVERSION, versionFile);
 
     int lv = Integer.parseInt(lvStr);
-    if(DataNodeVolumeLayoutVersion.getLatestVersion().getVersion() != lv) {
+    if(HDDSVolumeLayoutVersion.getLatestVersion().getVersion() != lv) {
       throw new InconsistentStorageStateException("Invalid layOutVersion. " +
           "Version file has layOutVersion as " + lv + " and latest Datanode " +
           "layOutVersion is " +
-          DataNodeVolumeLayoutVersion.getLatestVersion().getVersion());
+          HDDSVolumeLayoutVersion.getLatestVersion().getVersion());
     }
     return lv;
   }

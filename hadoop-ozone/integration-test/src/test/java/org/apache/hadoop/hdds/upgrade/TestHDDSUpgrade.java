@@ -27,6 +27,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.OPEN;
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.INITIAL_VERSION;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_DONE;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.STARTING_FINALIZATION;
 
@@ -107,6 +108,8 @@ public class TestHDDSUpgrade {
         .setTotalPipelineNumLimit(numOfNodes + 1)
         .setHbInterval(1000)
         .setHbProcessorInterval(1000)
+        .setScmLayoutVersion(INITIAL_VERSION.layoutVersion())
+        .setDnLayoutVersion(INITIAL_VERSION.layoutVersion())
         .build();
     cluster.waitForClusterToBeReady();
     scm = cluster.getStorageContainerManager();

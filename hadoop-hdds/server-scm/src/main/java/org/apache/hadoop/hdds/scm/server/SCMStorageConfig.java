@@ -46,6 +46,12 @@ public class SCMStorageConfig extends Storage {
         maxLayoutVersion());
   }
 
+  public SCMStorageConfig(OzoneConfiguration conf, int defaultLayoutVersion)
+      throws IOException {
+    super(NodeType.SCM, ServerUtils.getScmDbDir(conf), STORAGE_DIR,
+        defaultLayoutVersion);
+  }
+
   public SCMStorageConfig(NodeType type, File root, String sdName)
       throws IOException {
     super(type, root, sdName, maxLayoutVersion());
