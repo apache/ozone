@@ -37,7 +37,7 @@ public interface SCMSnapshotDownloader {
    * @return Future task for download progress
    * @throws IOException
    */
-  CompletableFuture<Path> download(final Path destination) throws IOException;
+  CompletableFuture<Path> download(Path destination) throws IOException;
 
   void close() throws Exception;
 }
