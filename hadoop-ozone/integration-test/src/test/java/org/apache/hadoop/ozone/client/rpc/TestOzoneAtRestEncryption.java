@@ -80,7 +80,7 @@ import org.junit.Test;
 /**
  * This class is to test all the public facing APIs of Ozone Client.
  */
-public class TestOzoneAtRestEncryption extends TestOzoneRpcClient {
+public class TestOzoneAtRestEncryption {
 
   private static MiniOzoneCluster cluster = null;
   private static MiniKMS miniKMS;
