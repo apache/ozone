@@ -61,6 +61,9 @@ public class ChecksumByteBufferImpl implements ChecksumByteBuffer {
   }
 
   @Override
+  // TODO - when we eventually move to a minimum Java version >= 9 this method
+  //        should be refactored to simply call checksum.update(buffer), as the
+  //        Checksum interface has been enhanced to allow this since Java 9.
   public void update(ByteBuffer buffer) {
     if (buffer.hasArray()) {
       checksum.update(buffer.array(), buffer.position() + buffer.arrayOffset(),
