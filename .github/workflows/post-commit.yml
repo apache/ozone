@@ -75,25 +75,6 @@ jobs:
           name: unit
           path: target/unit
         continue-on-error: true
-  findbugs:
-    runs-on: ubuntu-18.04
-    steps:
-      - name: Checkout project
-        uses: actions/checkout@v2
-      - name: Execute tests
-        uses: ./.github/buildenv
-        with:
-          args: ./hadoop-ozone/dev-support/checks/findbugs.sh
-      - name: Summary of failures
-        run: cat target/${{ github.job }}/summary.txt
-        if: always()
-      - name: Archive build results
-        uses: actions/upload-artifact@v2
-        if: always()
-        with:
-          name: findbugs
-          path: target/findbugs
-        continue-on-error: true
   integration:
     runs-on: ubuntu-18.04
     strategy:
