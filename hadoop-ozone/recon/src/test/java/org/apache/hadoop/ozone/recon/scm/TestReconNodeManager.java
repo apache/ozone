@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.recon.scm;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_DIRS;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -97,7 +98,7 @@ public class TestReconNodeManager {
     String uuidString = datanodeDetails.getUuidString();
 
     // Register a random datanode.
-    reconNodeManager.register(datanodeDetails, null, null, null);
+    reconNodeManager.register(datanodeDetails, null, null);
     reconNewNodeHandler.onMessage(reconNodeManager.getNodeByUuid(uuidString),
         null);
 
@@ -119,8 +120,9 @@ public class TestReconNodeManager {
     // Upon processing the heartbeat, the illegal command should be filtered out
     List<SCMCommand> returnedCmds =
         reconNodeManager.processHeartbeat(datanodeDetails,
-            LayoutVersionProto.newBuilder().setMetadataLayoutVersion(0)
-                .setSoftwareLayoutVersion(0).build());
+            LayoutVersionProto.newBuilder()
+                .setMetadataLayoutVersion(maxLayoutVersion())
+                .setSoftwareLayoutVersion(maxLayoutVersion()).build());
     assertEquals(1, returnedCmds.size());
     assertEquals(SCMCommandProto.Type.reregisterCommand,
         returnedCmds.get(0).getType());

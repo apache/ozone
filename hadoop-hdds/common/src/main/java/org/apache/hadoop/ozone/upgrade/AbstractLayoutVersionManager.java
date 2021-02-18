@@ -65,12 +65,15 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
       currentUpgradeState = ALREADY_FINALIZED;
     }
 
-    LOG.info("Initializing Layout version manager with metadata layout " +
-        " = {}, software layout = {}", features.get(metadataLayoutVersion),
-        features.get(softwareLayoutVersion));
+    LayoutFeature mlvFeature = features.get(metadataLayoutVersion);
+    LayoutFeature slvFeature = features.get(softwareLayoutVersion);
+    LOG.info("Initializing Layout version manager with metadata layout" +
+        " = {} (version = {}), software layout = {} (version = {})",
+        mlvFeature, mlvFeature.layoutVersion(),
+        slvFeature, slvFeature.layoutVersion());
 
     MBeans.register("LayoutVersionManager",
-        getClass().getName(), this);
+        getClass().getSimpleName(), this);
   }
 
   public Status getUpgradeState() {

@@ -1081,8 +1081,7 @@ public class TestSCMNodeManager {
         String storagePath = testDir.getAbsolutePath() + "/" + dnId;
         StorageReportProto report = TestUtils
             .createStorageReport(dnId, storagePath, capacity, used, free, null);
-        nodeManager.register(dn, TestUtils.createNodeReport(report), null,
-            null);
+        nodeManager.register(dn, TestUtils.createNodeReport(report), null);
         nodeManager.processHeartbeat(dn, layoutInfo);
       }
       //TODO: wait for EventQueue to be processed
@@ -1137,7 +1136,7 @@ public class TestSCMNodeManager {
                 used, free, null, failed));
         failed = !failed;
       }
-      nodeManager.register(dn, TestUtils.createNodeReport(reports), null, null);
+      nodeManager.register(dn, TestUtils.createNodeReport(reports), null);
       LayoutVersionManager versionManager =
           nodeManager.getLayoutVersionManager();
       LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
@@ -1329,9 +1328,8 @@ public class TestSCMNodeManager {
     try (SCMNodeManager nodemanager = createNodeManager(conf)) {
       eq.addHandler(DATANODE_COMMAND, nodemanager);
 
-      nodemanager
-          .register(datanodeDetails, TestUtils.createNodeReport(report),
-              getRandomPipelineReports(), null);
+      nodemanager.register(datanodeDetails, TestUtils.createNodeReport(report),
+              getRandomPipelineReports());
       eq.fireEvent(DATANODE_COMMAND,
           new CommandForDatanode<>(datanodeDetails.getUuid(),
               new CloseContainerCommand(1L,
@@ -1424,7 +1422,7 @@ public class TestSCMNodeManager {
       for (int i = 0; i < nodeCount; i++) {
         DatanodeDetails node = createDatanodeDetails(
             UUID.randomUUID().toString(), hostNames[i], ipAddress[i], null);
-        nodeManager.register(node, null, null, null);
+        nodeManager.register(node, null, null);
       }
 
       // verify network topology cluster has all the registered nodes
@@ -1467,7 +1465,7 @@ public class TestSCMNodeManager {
       for (int i = 0; i < nodeCount; i++) {
         DatanodeDetails node = createDatanodeDetails(
             UUID.randomUUID().toString(), hostNames[i], ipAddress[i], null);
-        nodeManager.register(node, null, null, null);
+        nodeManager.register(node, null, null);
       }
 
       // verify network topology cluster has all the registered nodes
@@ -1574,7 +1572,7 @@ public class TestSCMNodeManager {
       for (int i = 0; i < nodeCount; i++) {
         DatanodeDetails node = createDatanodeDetails(
             UUID.randomUUID().toString(), hostNames[i], ipAddress[i], null);
-        nodeManager.register(node, null, null, null);
+        nodeManager.register(node, null, null);
       }
       // test get node
       Assert.assertEquals(0, nodeManager.getNodesByAddress(null).size());

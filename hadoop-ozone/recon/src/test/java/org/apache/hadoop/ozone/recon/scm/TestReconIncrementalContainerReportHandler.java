@@ -94,7 +94,7 @@ public class TestReconIncrementalContainerReportHandler
     NodeManager nodeManager =
         new SCMNodeManager(conf, storageConfig, eventQueue, clusterMap,
             versionManager);
-    nodeManager.register(datanodeDetails, null, null, null);
+    nodeManager.register(datanodeDetails, null, null);
 
     ReconContainerManager containerManager = getContainerManager();
     ReconIncrementalContainerReportHandler reconIcr =

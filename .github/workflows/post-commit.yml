@@ -19,43 +19,6 @@ on:
   schedule:
     - cron: 30 0,12 * * *
 jobs:
-  compile:
-    runs-on: ubuntu-18.04
-    strategy:
-      matrix:
-        java: [ 8, 11 ]
-      fail-fast: false
-    steps:
-      - name: Checkout project
-        uses: actions/checkout@v2
-      - name: Cache for npm dependencies
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/.pnpm-store
-            **/node_modules
-          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-
-      - name: Cache for maven dependencies
-        uses: actions/cache@v2
-        with:
-          path: ~/.m2/repository
-          key: maven-repo-${{ hashFiles('**/pom.xml') }}
-          restore-keys: maven-repo-
-      - name: Setup java
-        uses: actions/setup-java@v1
-        with:
-          java-version: ${{ matrix.java }}
-      - name: Run a full build
-        run: hadoop-ozone/dev-support/checks/build.sh -Pcoverage -Pdist
-      - name: Store binaries for tests
-        uses: actions/upload-artifact@v2
-        if: matrix.java == '8'
-        with:
-          name: ozone-bin
-          path: hadoop-ozone/dist/target/hadoop-ozone*.tar.gz
-          retention-days: 1
   unit:
     runs-on: ubuntu-18.04
     steps:
@@ -74,6 +37,44 @@ jobs:
         with:
           name: unit
           path: target/unit
+        continue-on-error: true
+  checkstyle:
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v2
+      - name: Execute tests
+        uses: ./.github/buildenv
+        with:
+          args: ./hadoop-ozone/dev-support/checks/checkstyle.sh
+      - name: Summary of failures
+        run: cat target/${{ github.job }}/summary.txt
+        if: always()
+      - name: Archive build results
+        uses: actions/upload-artifact@v2
+        if: always()
+        with:
+          name: checkstyle
+          path: target/checkstyle
+        continue-on-error: true
+  findbugs:
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v2
+      - name: Execute tests
+        uses: ./.github/buildenv
+        with:
+          args: ./hadoop-ozone/dev-support/checks/findbugs.sh
+      - name: Summary of failures
+        run: cat target/${{ github.job }}/summary.txt
+        if: always()
+      - name: Archive build results
+        uses: actions/upload-artifact@v2
+        if: always()
+        with:
+          name: findbugs
+          path: target/findbugs
         continue-on-error: true
   integration:
     runs-on: ubuntu-18.04

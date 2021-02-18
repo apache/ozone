@@ -134,9 +134,9 @@ public class TestIncrementalContainerReportHandler {
     final DatanodeDetails datanodeOne = randomDatanodeDetails();
     final DatanodeDetails datanodeTwo = randomDatanodeDetails();
     final DatanodeDetails datanodeThree = randomDatanodeDetails();
-    nodeManager.register(datanodeOne, null, null, null);
-    nodeManager.register(datanodeTwo, null, null, null);
-    nodeManager.register(datanodeThree, null, null, null);
+    nodeManager.register(datanodeOne, null, null);
+    nodeManager.register(datanodeTwo, null, null);
+    nodeManager.register(datanodeThree, null, null);
     final Set<ContainerReplica> containerReplicas = getReplicas(
         container.containerID(),
         ContainerReplicaProto.State.CLOSING,
@@ -171,9 +171,9 @@ public class TestIncrementalContainerReportHandler {
     final DatanodeDetails datanodeOne = randomDatanodeDetails();
     final DatanodeDetails datanodeTwo = randomDatanodeDetails();
     final DatanodeDetails datanodeThree = randomDatanodeDetails();
-    nodeManager.register(datanodeOne, null, null, null);
-    nodeManager.register(datanodeTwo, null, null, null);
-    nodeManager.register(datanodeThree, null, null, null);
+    nodeManager.register(datanodeOne, null, null);
+    nodeManager.register(datanodeTwo, null, null);
+    nodeManager.register(datanodeThree, null, null);
     final Set<ContainerReplica> containerReplicas = getReplicas(
         container.containerID(),
         ContainerReplicaProto.State.CLOSING,
@@ -209,9 +209,9 @@ public class TestIncrementalContainerReportHandler {
     final DatanodeDetails datanodeOne = randomDatanodeDetails();
     final DatanodeDetails datanodeTwo = randomDatanodeDetails();
     final DatanodeDetails datanodeThree = randomDatanodeDetails();
-    nodeManager.register(datanodeOne, null, null, null);
-    nodeManager.register(datanodeTwo, null, null, null);
-    nodeManager.register(datanodeThree, null, null, null);
+    nodeManager.register(datanodeOne, null, null);
+    nodeManager.register(datanodeTwo, null, null);
+    nodeManager.register(datanodeThree, null, null);
     final Set<ContainerReplica> containerReplicas = getReplicas(
         container.containerID(),
         ContainerReplicaProto.State.CLOSING,
@@ -250,9 +250,9 @@ public class TestIncrementalContainerReportHandler {
     final DatanodeDetails datanodeOne = randomDatanodeDetails();
     final DatanodeDetails datanodeTwo = randomDatanodeDetails();
     final DatanodeDetails datanodeThree = randomDatanodeDetails();
-    nodeManager.register(datanodeOne, null, null, null);
-    nodeManager.register(datanodeTwo, null, null, null);
-    nodeManager.register(datanodeThree, null, null, null);
+    nodeManager.register(datanodeOne, null, null);
+    nodeManager.register(datanodeTwo, null, null);
+    nodeManager.register(datanodeThree, null, null);
     final Set<ContainerReplica> containerReplicas = getReplicas(
         container.containerID(),
         ContainerReplicaProto.State.CLOSED,

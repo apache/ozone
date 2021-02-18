@@ -47,6 +47,7 @@ import com.google.common.collect.ImmutableSet;
 
 import static java.util.stream.Collectors.toList;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.reregisterCommand;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -87,7 +88,10 @@ public class ReconNodeManager extends SCMNodeManager {
           iterator = nodeDB.iterator();
       while (iterator.hasNext()) {
         DatanodeDetails datanodeDetails = iterator.next().getValue();
-        register(datanodeDetails, null, null, null);
+        register(datanodeDetails, null, null,
+            LayoutVersionProto.newBuilder()
+                .setMetadataLayoutVersion(0)
+                .setSoftwareLayoutVersion(0).build());
         nodeCount++;
       }
       LOG.info("Loaded {} nodes from node DB.", nodeCount);

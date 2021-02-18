@@ -87,7 +87,7 @@ public class TestSCMNodeMetrics {
         .build();
 
     nodeManager.register(registeredDatanode, createNodeReport(),
-        PipelineReportsProto.newBuilder().build(), null);
+        PipelineReportsProto.newBuilder().build());
 
   }
 

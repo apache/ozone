@@ -116,7 +116,7 @@ public final class TestUtils {
       SCMNodeManager nodeManager) {
     return getDatanodeDetails(
         nodeManager.register(MockDatanodeDetails.randomDatanodeDetails(), null,
-                getRandomPipelineReports(), null));
+                getRandomPipelineReports()));
   }
 
   /**
