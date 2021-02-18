@@ -264,7 +264,8 @@ public final class HddsUtils {
         int port = getHostPort(address)
             .orElse(conf.getInt(OZONE_SCM_DATANODE_PORT_KEY,
                 OZONE_SCM_DATANODE_PORT_DEFAULT));
-        InetSocketAddress addr = NetUtils.createSocketAddr(hostname.get(), port);
+        InetSocketAddress addr = NetUtils.createSocketAddr(hostname.get(),
+            port);
         addresses.add(addr);
       }
 
