@@ -714,4 +714,9 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
   public List<StorageContainerManager> getStorageContainerManagers() {
     return this.scmhaService.getServices();
   }
+
+  public StorageContainerManager getStorageContainerManager() {
+    return getStorageContainerManagers().get(0);
+  }
+
 }
