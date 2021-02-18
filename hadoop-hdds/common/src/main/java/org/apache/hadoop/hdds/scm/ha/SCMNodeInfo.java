@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm.ha;
 
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,7 +71,7 @@ public class SCMNodeInfo {
     // If service Id is not defined, fall back to non-HA config.
 
     List<SCMNodeInfo> scmNodeInfoList = new ArrayList<>();
-    String scmServiceId = SCMHAUtils.getScmServiceId(conf, LOG);
+    String scmServiceId = SCMHAUtils.getScmServiceId(conf);
     if (scmServiceId != null) {
       ArrayList< String > scmNodeIds = new ArrayList<>(
           SCMHAUtils.getSCMNodeIds(conf, scmServiceId));
@@ -109,7 +108,7 @@ public class SCMNodeInfo {
 
         int scmDatanodePort = getPort(conf, scmServiceId, scmNodeId,
             OZONE_SCM_DATANODE_ADDRESS_KEY, OZONE_SCM_DATANODE_PORT_KEY,
-            OZONE_SCM_DATANODE_PORT_DEFAULT));
+            OZONE_SCM_DATANODE_PORT_DEFAULT);
 
         scmNodeInfoList.add(new SCMNodeInfo(scmServiceId, scmNodeId,
             buildAddress(scmAddress, scmBlockClientPort),

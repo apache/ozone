@@ -21,7 +21,6 @@ package org.apache.hadoop.hdds.scm.ha;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.slf4j.Logger;
 
 import java.util.Collection;
 
@@ -70,11 +69,9 @@ public final class SCMHAUtils {
   /**
    * Get SCM ServiceId from OzoneConfiguration.
    * @param conf
-   * @param logger
    * @return SCM service id if defined, else null.
    */
-  public static String getScmServiceId(ConfigurationSource conf,
-      Logger logger) {
+  public static String getScmServiceId(ConfigurationSource conf) {
 
     String localScmServiceId = conf.getTrimmed(
         ScmConfigKeys.OZONE_SCM_DEFAULT_SERVICE_ID);
