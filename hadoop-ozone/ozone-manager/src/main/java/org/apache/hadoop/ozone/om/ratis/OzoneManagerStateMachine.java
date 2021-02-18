@@ -32,6 +32,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.common.ha.ratis.RatisSnapshotInfo;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -506,15 +507,15 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     // This is done, as we have a check in Ratis for not throwing
     // LeaderNotReadyException, it checks stateMachineIndex >= raftLog
     // nextIndex (placeHolderIndex).
-    OMTransactionInfo omTransactionInfo =
-        OMTransactionInfo.readTransactionInfo(
+    TransactionInfo transactionInfo =
+        TransactionInfo.readTransactionInfo(
             ozoneManager.getMetadataManager());
-    if (omTransactionInfo != null) {
+    if (transactionInfo != null) {
       setLastAppliedTermIndex(TermIndex.valueOf(
-          omTransactionInfo.getTerm(),
-          omTransactionInfo.getTransactionIndex()));
-      snapshotInfo.updateTermIndex(omTransactionInfo.getTerm(),
-          omTransactionInfo.getTransactionIndex());
+          transactionInfo.getTerm(),
+          transactionInfo.getTransactionIndex()));
+      snapshotInfo.updateTermIndex(transactionInfo.getTerm(),
+          transactionInfo.getTransactionIndex());
     }
     LOG.info("LastAppliedIndex is set from TransactionInfo from OM DB as {}",
         getLastAppliedTermIndex());

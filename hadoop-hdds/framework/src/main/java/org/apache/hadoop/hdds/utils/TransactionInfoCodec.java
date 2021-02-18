@@ -15,36 +15,35 @@
  * the License.
  */
 
-package org.apache.hadoop.ozone.om.codec;
+package org.apache.hadoop.hdds.utils;
 
 import org.apache.hadoop.hdds.utils.db.Codec;
-import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
 
 import java.io.IOException;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
- * Codec to convert {@link OMTransactionInfo} to byte array and from byte array
- * to {@link OMTransactionInfo}.
+ * Codec to convert {@link TransactionInfo} to byte array and from byte array
+ * to {@link TransactionInfo}.
  */
-public class OMTransactionInfoCodec implements Codec<OMTransactionInfo> {
+public class TransactionInfoCodec implements Codec<TransactionInfo> {
   @Override
-  public byte[] toPersistedFormat(OMTransactionInfo object) throws IOException {
+  public byte[] toPersistedFormat(TransactionInfo object) throws IOException {
     checkNotNull(object, "Null object can't be converted to byte array.");
     return object.convertToByteArray();
   }
 
   @Override
-  public OMTransactionInfo fromPersistedFormat(byte[] rawData)
+  public TransactionInfo fromPersistedFormat(byte[] rawData)
       throws IOException {
     checkNotNull(rawData, "Null byte array can't be converted to " +
         "real object.");
-    return OMTransactionInfo.getFromByteArray(rawData);
+    return TransactionInfo.getFromByteArray(rawData);
   }
 
   @Override
-  public OMTransactionInfo copyObject(OMTransactionInfo object) {
+  public TransactionInfo copyObject(TransactionInfo object) {
     return object;
   }
 }

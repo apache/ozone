@@ -137,7 +137,7 @@ import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.common.ha.ratis.RatisSnapshotInfo;
-import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
@@ -1323,18 +1323,18 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   @VisibleForTesting
   long getLastTrxnIndexForNonRatis() throws IOException {
-    OMTransactionInfo omTransactionInfo =
-        OMTransactionInfo.readTransactionInfo(metadataManager);
+    TransactionInfo transactionInfo =
+        TransactionInfo.readTransactionInfo(metadataManager);
     // If the OMTransactionInfo does not exist in DB or if the term is not -1
     // (corresponding to non-Ratis cluster), return 0 so that new incoming
     // requests can have transaction index starting from 1.
-    if (omTransactionInfo == null || omTransactionInfo.getTerm() != -1) {
+    if (transactionInfo == null || transactionInfo.getTerm() != -1) {
       return 0;
     }
     // If there exists a last transaction index in DB, the new incoming
     // requests in non-Ratis cluster must have transaction index
     // incrementally increasing from the stored transaction index onwards.
-    return omTransactionInfo.getTransactionIndex();
+    return transactionInfo.getTransactionIndex();
   }
 
   public RatisSnapshotInfo getSnapshotInfo() {
@@ -1343,7 +1343,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   @VisibleForTesting
   public long getRatisSnapshotIndex() throws IOException {
-    return OMTransactionInfo.readTransactionInfo(metadataManager)
+    return TransactionInfo.readTransactionInfo(metadataManager)
         .getTransactionIndex();
   }
 
@@ -3231,7 +3231,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throws Exception {
 
     Path checkpointLocation = omDBCheckpoint.getCheckpointLocation();
-    OMTransactionInfo checkpointTrxnInfo = OzoneManagerRatisUtils
+    TransactionInfo checkpointTrxnInfo = OzoneManagerRatisUtils
         .getTrxnInfoFromCheckpoint(configuration, checkpointLocation);
 
     LOG.info("Installing checkpoint with OMTransactionInfo {}",
@@ -3241,7 +3241,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   TermIndex installCheckpoint(String leaderId, Path checkpointLocation,
-      OMTransactionInfo checkpointTrxnInfo) throws Exception {
+      TransactionInfo checkpointTrxnInfo) throws Exception {
 
     File oldDBLocation = metadataManager.getStore().getDbLocation();
     try {

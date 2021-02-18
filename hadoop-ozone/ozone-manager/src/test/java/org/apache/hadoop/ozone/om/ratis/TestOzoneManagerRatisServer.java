@@ -28,6 +28,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.ha.ratis.RatisSnapshotInfo;
@@ -141,7 +142,7 @@ public class TestOzoneManagerRatisServer {
         snapshotInfo.getTerm(), snapshotInfo.getIndex() + 100);
 
     omMetadataManager.getTransactionInfoTable().put(TRANSACTION_INFO_KEY,
-        new OMTransactionInfo.Builder()
+        new TransactionInfo.Builder()
             .setCurrentTerm(snapshotInfo.getTerm())
             .setTransactionIndex(snapshotInfo.getIndex() + 100)
             .build());

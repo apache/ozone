@@ -47,7 +47,7 @@ import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.BlockGroup;
-import org.apache.hadoop.ozone.om.codec.OMTransactionInfoCodec;
+import org.apache.hadoop.hdds.utils.TransactionInfoCodec;
 import org.apache.hadoop.ozone.om.codec.OmBucketInfoCodec;
 import org.apache.hadoop.ozone.om.codec.OmKeyInfoCodec;
 import org.apache.hadoop.ozone.om.codec.OmMultipartKeyInfoCodec;
@@ -70,7 +70,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
-import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.storage.proto
     .OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
@@ -345,7 +345,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         .addCodec(OmMultipartKeyInfo.class, new OmMultipartKeyInfoCodec())
         .addCodec(S3SecretValue.class, new S3SecretValueCodec())
         .addCodec(OmPrefixInfo.class, new OmPrefixInfoCodec())
-        .addCodec(OMTransactionInfo.class, new OMTransactionInfoCodec());
+        .addCodec(TransactionInfo.class, new TransactionInfoCodec());
   }
 
   /**
@@ -400,7 +400,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     checkTableStatus(prefixTable, PREFIX_TABLE);
 
     transactionInfoTable = this.store.getTable(TRANSACTION_INFO_TABLE,
-        String.class, OMTransactionInfo.class);
+        String.class, TransactionInfo.class);
     checkTableStatus(transactionInfoTable, TRANSACTION_INFO_TABLE);
   }
 
@@ -1130,7 +1130,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   }
 
   @Override
-  public Table<String, OMTransactionInfo> getTransactionInfoTable() {
+  public Table<String, TransactionInfo> getTransactionInfoTable() {
     return transactionInfoTable;
   }
 

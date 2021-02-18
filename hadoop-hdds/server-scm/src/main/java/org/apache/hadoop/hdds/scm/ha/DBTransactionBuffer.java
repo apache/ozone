@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.hdds.scm.ha;
 
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.ratis.statemachine.SnapshotInfo;
 
@@ -31,9 +32,9 @@ public interface DBTransactionBuffer extends Closeable {
 
   BatchOperation getCurrentBatchOperation();
 
-  void updateLatestTrxInfo(SCMTransactionInfo info);
+  void updateLatestTrxInfo(TransactionInfo info);
 
-  SCMTransactionInfo getLatestTrxInfo();
+  TransactionInfo getLatestTrxInfo();
 
   SnapshotInfo getLatestSnapshot();
 

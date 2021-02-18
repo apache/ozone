@@ -24,7 +24,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketCreateRequest;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketDeleteRequest;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketSetPropertyRequest;
@@ -233,7 +233,7 @@ public final class OzoneManagerRatisUtils {
   /**
    * Obtain OMTransactionInfo from Checkpoint.
    */
-  public static OMTransactionInfo getTrxnInfoFromCheckpoint(
+  public static TransactionInfo getTrxnInfoFromCheckpoint(
       OzoneConfiguration conf, Path dbPath) throws Exception {
 
     if (dbPath != null) {
@@ -255,25 +255,25 @@ public final class OzoneManagerRatisUtils {
    * @return OMTransactionInfo
    * @throws Exception
    */
-  private static OMTransactionInfo getTransactionInfoFromDB(
+  private static TransactionInfo getTransactionInfoFromDB(
       OzoneConfiguration tempConfig, Path dbDir, String dbName)
       throws Exception {
     DBStore dbStore = OmMetadataManagerImpl.loadDB(tempConfig, dbDir.toFile(),
         dbName);
 
-    Table<String, OMTransactionInfo> transactionInfoTable =
+    Table<String, TransactionInfo> transactionInfoTable =
         dbStore.getTable(TRANSACTION_INFO_TABLE,
-            String.class, OMTransactionInfo.class);
+            String.class, TransactionInfo.class);
 
-    OMTransactionInfo omTransactionInfo =
+    TransactionInfo transactionInfo =
         transactionInfoTable.get(TRANSACTION_INFO_KEY);
     dbStore.close();
 
-    if (omTransactionInfo == null) {
+    if (transactionInfo == null) {
       throw new IOException("Failed to read OMTransactionInfo from DB " +
           dbName + " at " + dbDir);
     }
-    return omTransactionInfo;
+    return transactionInfo;
   }
 
   /**
@@ -281,22 +281,22 @@ public final class OzoneManagerRatisUtils {
    *
    * If transaction info transaction Index is less than or equal to
    * lastAppliedIndex, return false, else return true.
-   * @param omTransactionInfo
+   * @param transactionInfo
    * @param lastAppliedIndex
    * @param leaderId
    * @param newDBlocation
    * @return boolean
    */
   public static boolean verifyTransactionInfo(
-      OMTransactionInfo omTransactionInfo,
+      TransactionInfo transactionInfo,
       long lastAppliedIndex,
       String leaderId, Path newDBlocation) {
-    if (omTransactionInfo.getTransactionIndex() <= lastAppliedIndex) {
+    if (transactionInfo.getTransactionIndex() <= lastAppliedIndex) {
       OzoneManager.LOG.error("Failed to install checkpoint from OM leader: {}" +
               ". The last applied index: {} is greater than or equal to the " +
               "checkpoint's applied index: {}. Deleting the downloaded " +
               "checkpoint {}", leaderId, lastAppliedIndex,
-          omTransactionInfo.getTransactionIndex(), newDBlocation);
+          transactionInfo.getTransactionIndex(), newDBlocation);
       try {
         FileUtils.deleteFully(newDBlocation);
       } catch (IOException e) {
