@@ -24,9 +24,10 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.ha.SCMTransactionInfo;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.utils.TransactionInfoCodec;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
@@ -82,14 +83,14 @@ public class SCMDBDefinition implements DBDefinition {
           ContainerInfo.class,
           new ContainerInfoCodec());
 
-  public static final DBColumnFamilyDefinition<String, SCMTransactionInfo>
+  public static final DBColumnFamilyDefinition<String, TransactionInfo>
       TRANSACTIONINFO =
       new DBColumnFamilyDefinition<>(
           "scmTransactionInfos",
           String.class,
           new StringCodec(),
-          SCMTransactionInfo.class,
-          new SCMTransactionInfoCodec());
+          TransactionInfo.class,
+          new TransactionInfoCodec());
 
   @Override
   public String getName() {

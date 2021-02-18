@@ -29,7 +29,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.ha.SCMTransactionInfo;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.scm.metadata.PipelineCodec;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
@@ -108,7 +108,7 @@ public class TestSCMStoreImplWithOldPipelineIDKeyFormat
   }
 
   @Override
-  public Table<String, SCMTransactionInfo> getTransactionInfoTable() {
+  public Table<String, TransactionInfo> getTransactionInfoTable() {
     return null;
   }
 

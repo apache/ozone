@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImplV2;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.ratis.statemachine.SnapshotInfo;
@@ -39,7 +40,7 @@ public class SCMDBTransactionBuffer implements DBTransactionBuffer {
   private final StorageContainerManager scm;
   private final SCMMetadataStore metadataStore;
   private BatchOperation currentBatchOperation;
-  private SCMTransactionInfo latestTrxInfo;
+  private TransactionInfo latestTrxInfo;
   private SnapshotInfo latestSnapshot;
 
   public SCMDBTransactionBuffer(StorageContainerManager scm)
@@ -54,7 +55,7 @@ public class SCMDBTransactionBuffer implements DBTransactionBuffer {
     if (latestTrxInfo == null) {
       // transaction table is empty
       latestTrxInfo =
-          SCMTransactionInfo
+          TransactionInfo
               .builder()
               .setTransactionIndex(-1)
               .setCurrentTerm(0)
@@ -69,7 +70,7 @@ public class SCMDBTransactionBuffer implements DBTransactionBuffer {
   }
 
   @Override
-  public void updateLatestTrxInfo(SCMTransactionInfo info) {
+  public void updateLatestTrxInfo(TransactionInfo info) {
     if (info.compareTo(this.latestTrxInfo) <= 0) {
       throw new IllegalArgumentException(
           "Updating DB buffer transaction info by an older transaction info, "
@@ -79,7 +80,7 @@ public class SCMDBTransactionBuffer implements DBTransactionBuffer {
   }
 
   @Override
-  public SCMTransactionInfo getLatestTrxInfo() {
+  public TransactionInfo getLatestTrxInfo() {
     return this.latestTrxInfo;
   }
 
@@ -96,7 +97,7 @@ public class SCMDBTransactionBuffer implements DBTransactionBuffer {
   @Override
   public void flush() throws IOException {
     // write latest trx info into trx table in the same batch
-    Table<String, SCMTransactionInfo> transactionInfoTable
+    Table<String, TransactionInfo> transactionInfoTable
         = metadataStore.getTransactionInfoTable();
     transactionInfoTable.putWithBatch(currentBatchOperation,
         TRANSACTION_INFO_KEY, latestTrxInfo);

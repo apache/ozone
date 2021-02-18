@@ -33,7 +33,7 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
-import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.util.ExitManager;
@@ -145,11 +145,11 @@ public class TestOMRatisSnapshots {
     List<String> keys = writeKeysToIncreaseLogIndex(leaderRatisServer, 200);
 
     // Get the latest db checkpoint from the leader OM.
-    OMTransactionInfo omTransactionInfo =
-        OMTransactionInfo.readTransactionInfo(leaderOM.getMetadataManager());
+    TransactionInfo transactionInfo =
+        TransactionInfo.readTransactionInfo(leaderOM.getMetadataManager());
     TermIndex leaderOMTermIndex =
-        TermIndex.valueOf(omTransactionInfo.getTerm(),
-            omTransactionInfo.getTransactionIndex());
+        TermIndex.valueOf(transactionInfo.getTerm(),
+            transactionInfo.getTransactionIndex());
     long leaderOMSnaphsotIndex = leaderOMTermIndex.getIndex();
     long leaderOMSnapshotTermIndex = leaderOMTermIndex.getTerm();
 
@@ -267,7 +267,7 @@ public class TestOMRatisSnapshots {
     DBCheckpoint leaderDbCheckpoint = leaderOM.getMetadataManager().getStore()
         .getCheckpoint(false);
     Path leaderCheckpointLocation = leaderDbCheckpoint.getCheckpointLocation();
-    OMTransactionInfo leaderCheckpointTrxnInfo = OzoneManagerRatisUtils
+    TransactionInfo leaderCheckpointTrxnInfo = OzoneManagerRatisUtils
         .getTrxnInfoFromCheckpoint(conf, leaderCheckpointLocation);
 
     // Corrupt the leader checkpoint and install that on the OM. The

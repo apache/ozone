@@ -20,7 +20,7 @@ package org.apache.hadoop.hdds.scm;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.ha.SCMHAConfiguration;
-import org.apache.hadoop.hdds.scm.ha.SCMTransactionInfo;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
@@ -78,17 +78,17 @@ public class TestSCMSnapshot {
             "index 1 {}", snapshotInfo2, snapshotInfo1),
         snapshotInfo2 > snapshotInfo1);
 
-    Table<String, SCMTransactionInfo> trxInfo =
+    Table<String, TransactionInfo> trxInfo =
         scm.getScmMetadataStore().getTransactionInfoTable();
-    SCMTransactionInfo scmTransactionInfo = trxInfo.get(TRANSACTION_INFO_KEY);
+    TransactionInfo transactionInfo = trxInfo.get(TRANSACTION_INFO_KEY);
 
     Assert.assertTrue(
-        "DB trx info:" + scmTransactionInfo.getTransactionIndex()
+        "DB trx info:" + transactionInfo.getTransactionIndex()
         + ", latestSnapshotInfo:" + snapshotInfo2,
-        scmTransactionInfo.getTransactionIndex() >= snapshotInfo2);
+        transactionInfo.getTransactionIndex() >= snapshotInfo2);
 
     cluster.restartStorageContainerManager(false);
-    SCMTransactionInfo trxInfoAfterRestart =
+    TransactionInfo trxInfoAfterRestart =
         scm.getScmHAManager().getDBTransactionBuffer().getLatestTrxInfo();
     Assert.assertTrue(
         trxInfoAfterRestart.getTransactionIndex() >= snapshotInfo2);
