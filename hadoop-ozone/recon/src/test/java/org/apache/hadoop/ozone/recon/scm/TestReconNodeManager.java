@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.recon.scm;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
-import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
+import static org.apache.hadoop.hdds.scm.server.upgrade.UpgradeUtils.defaultLayoutVersionProto;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_DIRS;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -33,7 +33,6 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
@@ -120,9 +119,7 @@ public class TestReconNodeManager {
     // Upon processing the heartbeat, the illegal command should be filtered out
     List<SCMCommand> returnedCmds =
         reconNodeManager.processHeartbeat(datanodeDetails,
-            LayoutVersionProto.newBuilder()
-                .setMetadataLayoutVersion(maxLayoutVersion())
-                .setSoftwareLayoutVersion(maxLayoutVersion()).build());
+            defaultLayoutVersionProto());
     assertEquals(1, returnedCmds.size());
     assertEquals(SCMCommandProto.Type.reregisterCommand,
         returnedCmds.get(0).getType());

@@ -80,7 +80,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
-import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
+import static org.apache.hadoop.hdds.scm.server.upgrade.UpgradeUtils.defaultLayoutVersionProto;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
@@ -325,9 +325,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         NodeReportProto.newBuilder()
             .addStorageReport(storageReportProto3)
             .addStorageReport(storageReportProto4).build();
-    LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
-        .setMetadataLayoutVersion(maxLayoutVersion())
-        .setSoftwareLayoutVersion(maxLayoutVersion()).build();
+    LayoutVersionProto layoutInfo = defaultLayoutVersionProto();
 
     try {
       reconScm.getDatanodeProtocolServer()
@@ -336,7 +334,8 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
       reconScm.getDatanodeProtocolServer()
           .register(extendedDatanodeDetailsProto2, nodeReportProto2,
               ContainerReportsProto.newBuilder().build(),
-              PipelineReportsProto.newBuilder().build(), layoutInfo);
+              PipelineReportsProto.newBuilder().build(),
+              defaultLayoutVersionProto());
       // Process all events in the event queue
       reconScm.getEventQueue().processAll(1000);
     } catch (Exception ex) {

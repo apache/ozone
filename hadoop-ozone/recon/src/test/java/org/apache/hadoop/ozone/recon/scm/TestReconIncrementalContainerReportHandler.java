@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.recon.scm;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.OPEN;
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -87,9 +88,9 @@ public class TestReconIncrementalContainerReportHandler
     this.versionManager =
         Mockito.mock(HDDSLayoutVersionManager.class);
     Mockito.when(versionManager.getMetadataLayoutVersion())
-        .thenReturn(METADATA_LAYOUT_VERSION);
+        .thenReturn(maxLayoutVersion());
     Mockito.when(versionManager.getSoftwareLayoutVersion())
-        .thenReturn(SOFTWARE_LAYOUT_VERSION);
+        .thenReturn(maxLayoutVersion());
 
     NodeManager nodeManager =
         new SCMNodeManager(conf, storageConfig, eventQueue, clusterMap,

@@ -311,7 +311,6 @@ public class SCMNodeManager implements NodeManager {
   public RegisteredCommand register(
       DatanodeDetails datanodeDetails, NodeReportProto nodeReport,
       PipelineReportsProto pipelineReportsProto) {
-    LOG.info("!!!! In Register1");
     return register(datanodeDetails, nodeReport, pipelineReportsProto,
         LayoutVersionProto.newBuilder()
             .setMetadataLayoutVersion(

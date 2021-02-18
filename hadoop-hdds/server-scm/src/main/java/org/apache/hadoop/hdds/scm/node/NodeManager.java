@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.node;
 
-import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
+import static org.apache.hadoop.hdds.scm.server.upgrade.UpgradeUtils.defaultLayoutVersionProto;
 
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
@@ -84,10 +84,7 @@ public interface NodeManager extends StorageContainerNodeProtocol,
       DatanodeDetails datanodeDetails, NodeReportProto nodeReport,
       PipelineReportsProto pipelineReportsProto) {
     return register(datanodeDetails, nodeReport, pipelineReportsProto,
-        LayoutVersionProto.newBuilder()
-            .setMetadataLayoutVersion(maxLayoutVersion())
-            .setSoftwareLayoutVersion(maxLayoutVersion())
-            .getDefaultInstanceForType());
+        defaultLayoutVersionProto());
   }
 
   /**
