@@ -27,8 +27,9 @@ import org.apache.hadoop.ozone.upgrade.LayoutFeature;
  */
 public enum OMLayoutFeature implements LayoutFeature {
   //////////////////////////////  //////////////////////////////
-  INITIAL_VERSION(0, "Initial Layout Version");
-
+  INITIAL_VERSION(0, "Initial Layout Version"),
+  ERASURE_CODING(1, "", new ECFeatureOnFinalizeAction()); // Mock Feature. To
+  // be removed later.
   //////////////////////////////  //////////////////////////////
 
   private int layoutVersion;
