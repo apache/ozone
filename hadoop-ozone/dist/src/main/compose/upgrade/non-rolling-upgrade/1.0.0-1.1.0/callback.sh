@@ -15,10 +15,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-_mydir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+setup() {
+  # OM preparation is not implemnted in 1.0.0.
+  export OZONE_OM_PREPARE=
+  export OZONE_SAFEMODE_STATUS_COMMAND='ozone admin safemode status --verbose'
+}
 
-export OZONE_UPGRADE_FROM="$(basename ${_mydir})"
-export RESULT_DIR="${_mydir}/result"
+with_old_version() {
 
-cd "${_mydir}/.."
-source upgrade_to_current.sh
+}
+
+with_new_version_pre_finalized() {
+
+}
+
+with_old_version_rollback() {
+
+}
+
+with_new_version_finalized() {
+
+}

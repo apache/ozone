@@ -33,48 +33,21 @@ create_data_dir() {
   fi
 
   rm -fr "${OZONE_VOLUME}" 2> /dev/null || sudo rm -fr "${OZONE_VOLUME}"
-  mkdir -p "${OZONE_VOLUME}"/{dn1,dn2,dn3,om,recon,s3g,scm}
+  mkdir -p "${OZONE_VOLUME}"/{dn1,dn2,dn3,om1,om2.om3,recon,s3g,scm}
   fix_data_dir_permissions
 }
 
-## @description Run upgrade steps required for going from one logical version to another.
-## @param Starting logical version
-## @param Target logical version
-execute_upgrade_steps() {
-  local -i from=$1
-  local -i to=$2
+prepare_for_image() {
+    local image_version="$1"
 
-  if [[ ${from} -ge ${to} ]]; then
-    return
-  fi
-
-  pushd ${_testlib_dir}/../libexec/upgrade
-
-  local v
-  for v in $(seq ${from} $((to-1))); do
-    if [[ -e "v$v.sh" ]]; then
-      source "v$v.sh"
+    if [[ "$image_version" = "$OZONE_CURRENT_VERSION" ]]; then
+        prepare_for_runner_image "$image_version"
+    else
+        prepare_for_binary_image "$image_version"
     fi
-  done
-
-  popd
 }
 
-## @description Pre-upgrade test steps
-first_run() {
-  start_docker_env
-  execute_robot_test scm -v PREFIX:pre freon/generate.robot
-  execute_robot_test scm -v PREFIX:pre freon/validate.robot
-  KEEP_RUNNING=false stop_docker_env
-}
-
-## @description Post-upgrade test steps
-second_run() {
-  export OZONE_KEEP_RESULTS=true
-  start_docker_env
-  execute_robot_test scm -v PREFIX:pre freon/validate.robot
-  # test write key to old bucket after upgrade
-  execute_robot_test scm -v PREFIX:post freon/generate.robot
-  execute_robot_test scm -v PREFIX:post freon/validate.robot
-  stop_docker_env
+callback() {
+    local hook="$1"
+    type -t "$hook" > /dev/null && "$hook"
 }

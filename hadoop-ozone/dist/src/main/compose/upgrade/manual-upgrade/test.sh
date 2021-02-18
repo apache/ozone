@@ -20,32 +20,28 @@
 
 set -e -o pipefail
 
-COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-export COMPOSE_DIR
-
 : "${OZONE_REPLICATION_FACTOR:=3}"
+: "${OZONE_CURRENT_VERSION:="1.1.0"}"
 : "${OZONE_UPGRADE_FROM:="0.5.0"}"
-: "${OZONE_UPGRADE_TO:="1.0.0"}"
-: "${OZONE_VOLUME:="${COMPOSE_DIR}/data"}"
+: "${OZONE_UPGRADE_TO:="$OZONE_CURRENT_VERSION"}"
 
-export OZONE_REPLICATION_FACTOR OZONE_UPGRADE_FROM OZONE_UPGRADE_TO OZONE_VOLUME
+prepare_for_image "${OZONE_UPGRADE_FROM}"
+# Load version specifics
+callback setup_old_version
+start_docker_env
+callback with_old_version
 
-source "${COMPOSE_DIR}/testlib.sh"
+stop_docker_env
 
-create_data_dir
-
-prepare_for_binary_image "${OZONE_UPGRADE_FROM}"
-load_version_specifics "${OZONE_UPGRADE_FROM}"
-first_run
-unload_version_specifics
-
-from=$(get_logical_version "${OZONE_UPGRADE_FROM}")
-to=$(get_logical_version "${OZONE_UPGRADE_TO}")
-execute_upgrade_steps "$from" "$to"
+# Unload version specifics, execute upgrade steps, load version specifics.
+# from=$(get_logical_version "${OZONE_UPGRADE_FROM}")
+# to=$(get_logical_version "${OZONE_UPGRADE_TO}")
+# execute_upgrade_steps "$from" "$to"
+callback setup_new_version
 
 prepare_for_binary_image "${OZONE_UPGRADE_TO}"
-load_version_specifics "${OZONE_UPGRADE_TO}"
-second_run
-unload_version_specifics
+OZONE_KEEP_RESULTS=true start_docker_env
+callback with_new_version
 
+stop_docker_env
 generate_report
