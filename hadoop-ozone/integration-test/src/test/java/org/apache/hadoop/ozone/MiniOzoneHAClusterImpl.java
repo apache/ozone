@@ -224,7 +224,8 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     return null;
   }
 
-  public void waitForSCMToBeReady()  throws TimeoutException, InterruptedException  {
+  public void waitForSCMToBeReady()
+      throws TimeoutException, InterruptedException  {
     GenericTestUtils.waitFor(() -> {
       for (StorageContainerManager scm : scmhaService.getServices()) {
         if (scm.checkLeader()) {
@@ -439,9 +440,8 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     /**
      * Start OM service with multiple OMs.
      */
-    protected List<StorageContainerManager> createSCMService() throws IOException,
-        AuthenticationException {
-
+    protected List<StorageContainerManager> createSCMService()
+        throws IOException, AuthenticationException {
       List<StorageContainerManager> scmList = Lists.newArrayList();
 
       int retryCount = 0;
@@ -471,8 +471,9 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
             HealthyPipelineSafeModeRule rule =
                 scm.getScmSafeModeManager().getHealthyPipelineSafeModeRule();
             if (rule != null) {
-              // Set threshold to wait for safe mode exit - this is needed since a
-              // pipeline is marked open only after leader election.
+              // Set threshold to wait for safe mode exit -
+              // this is needed since a pipeline is marked open only after
+              // leader election.
               rule.setHealthyPipelineThresholdCount(numOfDatanodes / 3);
             }
             scmList.add(scm);
@@ -509,10 +510,12 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
     protected void configureSCM() {
 //      conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "127.0.0.1:0");
-//      conf.set(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY, "127.0.0.1:0");
+//      conf.set(
+//      ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY, "127.0.0.1:0");
 //      conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY, "127.0.0.1:0");
 //      conf.set(ScmConfigKeys.OZONE_SCM_HTTP_ADDRESS_KEY, "127.0.0.1:0");
-//      conf.setInt(ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY, numOfScmHandlers);
+//      conf.setInt(
+//      ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY, numOfScmHandlers);
 //      conf.set(HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
 //          "3s");
 //      configureSCMheartbeat();
@@ -531,7 +534,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       String omNodesKey = ConfUtils.addKeySuffixes(
           ScmConfigKeys.OZONE_SCM_NODES_KEY, scmServiceId);
       StringBuilder omNodesKeyValue = new StringBuilder();
-      StringBuilder scm_names = new StringBuilder();
+      StringBuilder scmNames = new StringBuilder();
 
       int port = basePort;
 
@@ -564,12 +567,13 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
         conf.set(dnPortKey, "127.0.0.1:" + (port + 5));
         conf.set(blockClientKey, "127.0.0.1:" + (port + 6));
         conf.set(ssClientKey, "127.0.0.1:" + (port + 7));
-        scm_names.append(",").append("localhost:" + (port + 5));
-        conf.set(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY, "127.0.0.1:" + (port + 6));
+        scmNames.append(",").append("localhost:" + (port + 5));
+        conf.set(ScmConfigKeys.
+            OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY, "127.0.0.1:" + (port + 6));
       }
 
       conf.set(omNodesKey, omNodesKeyValue.substring(1));
-      conf.set(ScmConfigKeys.OZONE_SCM_NAMES, scm_names.substring(1));
+      conf.set(ScmConfigKeys.OZONE_SCM_NAMES, scmNames.substring(1));
     }
 
     /**
@@ -697,7 +701,8 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     }
   }
 
-  static class SCMHAService extends MiniOzoneHAService<StorageContainerManager> {
+  static class SCMHAService extends
+      MiniOzoneHAService<StorageContainerManager> {
     SCMHAService(List<StorageContainerManager> activeList,
                  List<StorageContainerManager> inactiveList,
                  String serviceId) {
