@@ -195,7 +195,8 @@ public class SCMNodeInfo {
           "and nodeId", configKey, portKey);
       return port.getAsInt();
     } else {
-      return conf.getInt(suffixKey, defaultPort);
+      return conf.getInt(ConfUtils.addKeySuffixes(portKey, scmServiceId,
+          scmNodeId), defaultPort);
     }
   }
 
