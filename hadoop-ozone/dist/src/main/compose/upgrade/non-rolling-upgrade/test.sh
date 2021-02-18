@@ -21,31 +21,33 @@
 
 set -e -o pipefail
 
-COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-export COMPOSE_DIR
-
 : "${OZONE_REPLICATION_FACTOR:=3}"
+: "${OZONE_CURRENT_VERSION:="1.1.0"}"
+: "${OZONE_PREPARE_OMS:=}"
 : "${OZONE_UPGRADE_FROM:="0.5.0"}"
-: "${OZONE_VOLUME:="${COMPOSE_DIR}/data"}"
+: "${OZONE_UPGRADE_TO:="$OZONE_CURRENT_VERSION"}"
 
-export OZONE_REPLICATION_FACTOR OZONE_UPGRADE_FROM OZONE_VOLUME
+prepare_for_image "$OZONE_UPGRADE_FROM"
+start_docker_env
+run_upgrade_hook with_old_version
+if [[ "$OZONE_PREPARE_OMS" ]]; then
+    execute_robot_test upgrade/om-prepare.robot
+fi
 
-current_version=1.1.0
+prepare_for_image "$OZONE_CURRENT_VERSION"
+restart_docker_env
+run_upgrade_hook with_new_versino_pre_finalized
 
-source "${COMPOSE_DIR}/testlib.sh"
+prepare_for_image "$OZONE_UPGRADE_FROM"
+restart_docker_env
+run_upgrade_hook with_old_version_rollback
 
-create_data_dir
+prepare_for_image "$OZONE_CURRENT_VERSION"
+restart_docker_env
+execute_robot_test upgrade/finalize-scm.robot
+execute_robot_test upgrade/finalize-om.robot
+run_upgrade_hook with_new_version_finalized
 
-prepare_for_binary_image "${OZONE_UPGRADE_FROM}"
-load_version_specifics "${OZONE_UPGRADE_FROM}"
-first_run
-unload_version_specifics
-
-from=$(get_logical_version "${OZONE_UPGRADE_FROM}")
-to=$(get_logical_version "${current_version}")
-execute_upgrade_steps "$from" "$to"
-
-prepare_for_runner_image
-second_run
-
+stop_docker_env
 generate_report
+

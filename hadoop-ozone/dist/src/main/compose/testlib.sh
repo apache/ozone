@@ -146,6 +146,11 @@ start_docker_env(){
   fi
 }
 
+restart_docker_env() {
+  start_docker_env
+  OZONE_KEEP_RESULTS=true stop_docker_env
+}
+
 ## @description  Execute robot tests in a specific container.
 ## @param        Name of the container in the docker-compose file
 ## @param        robot test file or directory relative to the smoketest dir

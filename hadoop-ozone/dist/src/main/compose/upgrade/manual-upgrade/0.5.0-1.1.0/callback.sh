@@ -15,10 +15,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-_mydir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+setup_old_version() {
+  export OZONE_SAFEMODE_STATUS_COMMAND='ozone scmcli safemode status'
+}
 
-export OZONE_UPGRADE_FROM="$(basename ${_mydir})"
-export RESULT_DIR="${_mydir}/result"
+with_old_version() {
 
-cd "${_mydir}/.."
-source upgrade_to_current.sh
+}
+
+setup_new_version() {
+  export OZONE_SAFEMODE_STATUS_COMMAND='ozone admin safemode status --verbose'
+}
+
+with_new_version() {
+
+}

@@ -14,27 +14,39 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-SCRIPT_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )
-ALL_RESULT_DIR="$SCRIPT_DIR/result"
+set -x
+COMPOSE_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )
+ALL_RESULT_DIR="$COMPOSE_DIR/result"
 mkdir -p "$ALL_RESULT_DIR"
 rm "$ALL_RESULT_DIR"/* || true
-source "$SCRIPT_DIR/../testlib.sh"
-
-tests=$(find_tests)
-cd "$SCRIPT_DIR"
+export COMPOSE_DIR
+source "$COMPOSE_DIR/testlib.sh"
+source "$COMPOSE_DIR/../testlib.sh"
+OZONE_CURRENT_VERSION=1.1.0
 
 RESULT=0
-# shellcheck disable=SC2044
-for t in ${tests}; do
-  d="$(dirname "${t}")"
+run_test() {
+  local test_dir="$COMPOSE_DIR"/"$1"
+  OZONE_UPGRADE_FROM="$2"
+  OZONE_UPGRADE_TO="$3"
 
-  if ! run_test_script "${d}"; then
+  local test_subdir="$test_dir"/"$OZONE_UPGRADE_FROM"-"$OZONE_UPGRADE_TO"
+
+  OZONE_VOLUME="$test_subdir"/data
+  create_data_dir
+  RESULT_DIR="$test_subdir"/result
+  source "$test_subdir"/callback.sh
+
+  if ! run_test_script "${test_dir}"; then
     RESULT=1
   fi
 
-  copy_results "${d}" "${ALL_RESULT_DIR}"
-done
+  copy_results "${result_parent_dir}" "${ALL_RESULT_DIR}"
+}
+
+# Upgrade tests to be run:
+run_test manual-upgrade 0.5.0 1.0.0
+run_test non-rolling-upgrade 1.0.0 1.1.0
 
 generate_report "upgrade" "${ALL_RESULT_DIR}"
 
