@@ -20,12 +20,14 @@ package org.apache.hadoop.hdds.scm.ha;
 
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.OptionalInt;
 
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
@@ -91,31 +93,23 @@ public class SCMNodeInfo {
         }
 
         // Get port from Address Key if defined, else fall back to port key.
-        int scmClientPort = getPortNumberFromConfigKeys(conf,
-            OZONE_SCM_CLIENT_ADDRESS_KEY, scmServiceId, scmNodeId)
-            .orElse(conf.getInt(
-                ConfUtils.addKeySuffixes(OZONE_SCM_CLIENT_PORT_KEY,
-                    scmServiceId, scmNodeId), OZONE_SCM_CLIENT_PORT_DEFAULT));
+        int scmClientPort = getPort(conf, scmServiceId, scmNodeId,
+            OZONE_SCM_CLIENT_ADDRESS_KEY, OZONE_SCM_CLIENT_PORT_KEY,
+            OZONE_SCM_CLIENT_PORT_DEFAULT);
 
-        int scmBlockClientPort = getPortNumberFromConfigKeys(conf,
-            ConfUtils.addKeySuffixes(OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY,
-                scmServiceId, scmNodeId)).orElse(conf.getInt(
-                ConfUtils.addKeySuffixes(OZONE_SCM_BLOCK_CLIENT_PORT_KEY,
-                    scmServiceId, scmNodeId),
-                OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT));
+        int scmBlockClientPort = getPort(conf, scmServiceId, scmNodeId,
+            OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY,
+            OZONE_SCM_BLOCK_CLIENT_PORT_KEY,
+            OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT);
 
-        int scmSecurityPort = getPortNumberFromConfigKeys(conf,
-            ConfUtils.addKeySuffixes(OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY,
-                scmServiceId, scmNodeId)).orElse(conf.getInt(
-                ConfUtils.addKeySuffixes(OZONE_SCM_SECURITY_SERVICE_PORT_KEY,
-                    scmServiceId, scmNodeId),
-                OZONE_SCM_SECURITY_SERVICE_PORT_DEFAULT));
+        int scmSecurityPort = getPort(conf, scmServiceId, scmNodeId,
+            OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY,
+            OZONE_SCM_SECURITY_SERVICE_PORT_KEY,
+            OZONE_SCM_SECURITY_SERVICE_PORT_DEFAULT);
 
-        int scmDatanodePort = getPortNumberFromConfigKeys(conf,
-            ConfUtils.addKeySuffixes(OZONE_SCM_DATANODE_ADDRESS_KEY,
-                scmServiceId, scmNodeId)).orElse(conf.getInt(
-                ConfUtils.addKeySuffixes(OZONE_SCM_DATANODE_PORT_KEY,
-                    scmServiceId, scmNodeId), OZONE_SCM_DATANODE_PORT_DEFAULT));
+        int scmDatanodePort = getPort(conf, scmServiceId, scmNodeId,
+            OZONE_SCM_DATANODE_ADDRESS_KEY, OZONE_SCM_DATANODE_PORT_KEY,
+            OZONE_SCM_DATANODE_PORT_DEFAULT));
 
         scmNodeInfoList.add(new SCMNodeInfo(scmServiceId, scmNodeId,
             buildAddress(scmAddress, scmBlockClientPort),
@@ -187,6 +181,23 @@ public class SCMNodeInfo {
   private static String buildAddress(String address, int port) {
     return new StringBuilder().append(address).append(":")
         .append(port).toString();
+  }
+
+  private static int getPort(ConfigurationSource conf,
+      String scmServiceId, String scmNodeId, String configKey,
+      String portKey, int defaultPort) {
+    String suffixKey = ConfUtils.addKeySuffixes(configKey, scmServiceId,
+        scmNodeId);
+    OptionalInt port = getPortNumberFromConfigKeys(conf, suffixKey);
+
+    if (port.isPresent()) {
+      LOG.info("ConfigKey {} is deprecated, For configuring different " +
+          "ports for each SCM use PortConfigKey {} appended with serviceId " +
+          "and nodeId", configKey, portKey);
+      return port.getAsInt();
+    } else {
+      return conf.getInt(suffixKey, defaultPort);
+    }
   }
 
   /**

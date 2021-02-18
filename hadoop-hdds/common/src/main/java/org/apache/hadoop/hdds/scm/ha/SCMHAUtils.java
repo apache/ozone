@@ -84,9 +84,6 @@ public final class SCMHAUtils {
     if (localScmServiceId == null) {
       // There is no default scm service id is being set, fall back to ozone
       // .scm.service.ids.
-      logger.info("{} is not defined, falling back to {} to find serviceID for "
-              + "StorageContainerManager if it is HA enabled cluster",
-          OZONE_SCM_DEFAULT_SERVICE_ID, OZONE_SCM_SERVICE_IDS_KEY);
       scmServiceIds = conf.getTrimmedStringCollection(
           OZONE_SCM_SERVICE_IDS_KEY);
       if (scmServiceIds.size() > 1) {
@@ -95,8 +92,6 @@ public final class SCMHAUtils {
             "defined");
       } else if (scmServiceIds.size() == 1) {
         localScmServiceId = scmServiceIds.iterator().next();
-      } else {
-        logger.info("SCM ServiceId is not defined");
       }
     }
 
