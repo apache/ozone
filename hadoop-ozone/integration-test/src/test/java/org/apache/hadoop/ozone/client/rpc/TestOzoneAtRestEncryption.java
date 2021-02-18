@@ -402,13 +402,18 @@ public class TestOzoneAtRestEncryption extends TestOzoneRpcClient {
 
     // Read different data lengths and starting from different offsets and
     // verify the data matches.
+    Random random = new Random();
+    int randomSize = random.nextInt(keySize/2);
+    int randomOffset = random.nextInt(keySize - randomSize);
+
     int[] readDataSizes = {keySize, keySize / 3 + 1, BLOCK_SIZE,
         BLOCK_SIZE * 2 + 1, CHUNK_SIZE, CHUNK_SIZE / 4 - 1,
-        DEFAULT_CRYPTO_BUFFER_SIZE, DEFAULT_CRYPTO_BUFFER_SIZE / 2, 1};
+        DEFAULT_CRYPTO_BUFFER_SIZE, DEFAULT_CRYPTO_BUFFER_SIZE / 2, 1,
+        randomSize};
 
     int[] readFromPositions = {0, DEFAULT_CRYPTO_BUFFER_SIZE + 10, CHUNK_SIZE,
         BLOCK_SIZE - DEFAULT_CRYPTO_BUFFER_SIZE + 1, BLOCK_SIZE, keySize / 3,
-        keySize - 1};
+        keySize - 1, randomOffset};
 
     // Create an input stream to read the data
     OzoneInputStream inputStream = bucket.readKey(keyName);
