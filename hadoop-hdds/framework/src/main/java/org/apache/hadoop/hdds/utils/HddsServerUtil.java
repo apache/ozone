@@ -18,15 +18,28 @@
 package org.apache.hadoop.hdds.utils;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import com.google.protobuf.BlockingService;
+import org.apache.commons.compress.archivers.ArchiveEntry;
+import org.apache.commons.compress.archivers.ArchiveOutputStream;
+import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
+import org.apache.commons.compress.compressors.CompressorException;
+import org.apache.commons.compress.compressors.CompressorOutputStream;
+import org.apache.commons.compress.compressors.CompressorStreamFactory;
+import org.apache.commons.compress.utils.IOUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -39,6 +52,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolPB;
 import org.apache.hadoop.hdds.server.ServerUtils;
+import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ipc.Client;
@@ -486,5 +500,50 @@ public final class HddsServerUtil {
       LOG.info("Metrics source JvmMetrics already added to DataNode.");
     }
     return metricsSystem;
+  }
+
+  /**
+   * Write DB Checkpoint to an output stream as a compressed file (tgz).
+   *
+   * @param checkpoint  checkpoint file
+   * @param destination destination output stream.
+   * @throws IOException
+   */
+  public static void writeDBCheckpointToStream(DBCheckpoint checkpoint,
+      OutputStream destination)
+      throws IOException {
+    try (CompressorOutputStream gzippedOut = new CompressorStreamFactory()
+        .createCompressorOutputStream(CompressorStreamFactory.GZIP,
+            destination);
+        ArchiveOutputStream archiveOutputStream =
+            new TarArchiveOutputStream(gzippedOut);
+        Stream<Path> files =
+            Files.list(checkpoint.getCheckpointLocation())) {
+      for (Path path : files.collect(Collectors.toList())) {
+        if (path != null) {
+          Path fileName = path.getFileName();
+          if (fileName != null) {
+            includeFile(path.toFile(), fileName.toString(),
+                archiveOutputStream);
+          }
+        }
+      }
+    } catch (CompressorException e) {
+      throw new IOException(
+          "Can't compress the checkpoint: " +
+              checkpoint.getCheckpointLocation(), e);
+    }
+  }
+
+  private static void includeFile(File file, String entryName,
+      ArchiveOutputStream archiveOutputStream)
+      throws IOException {
+    ArchiveEntry archiveEntry =
+        archiveOutputStream.createArchiveEntry(file, entryName);
+    archiveOutputStream.putArchiveEntry(archiveEntry);
+    try (FileInputStream fis = new FileInputStream(file)) {
+      IOUtils.copy(fis, archiveOutputStream);
+    }
+    archiveOutputStream.closeArchiveEntry();
   }
 }

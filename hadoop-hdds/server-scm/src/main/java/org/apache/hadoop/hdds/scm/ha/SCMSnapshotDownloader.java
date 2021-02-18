@@ -14,38 +14,30 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
-
 package org.apache.hadoop.hdds.scm.ha;
 
 import java.io.IOException;
+import java.nio.file.Path;
+import java.util.concurrent.CompletableFuture;
 
 /**
- * SCMHAManager provides HA service for SCM.
+ * Contract to download a SCM Snapshot from remote server..
+ * <p>
+ *
+ * The underlying implementation is supposed to download SCM snapshot via
+ * any chosen protocol(for now its Grpc).
+ * images.
  */
-public interface SCMHAManager {
+public interface SCMSnapshotDownloader {
 
   /**
-   * Starts HA service.
+   * Downloads the contents to the target file path.
+   *
+   * @param destination
+   * @return Future task for download progress
+   * @throws IOException
    */
-  void start() throws IOException;
+  CompletableFuture<Path> download(Path destination) throws IOException;
 
-  /**
-   * Returns RatisServer instance associated with the SCM instance.
-   */
-  SCMRatisServer getRatisServer();
-
-  /**
-   * Returns SCM snapshot provider.
-   */
-  SCMSnapshotProvider getSCMSnapshotProvider();
-
-  /**
-   * Returns DB transaction buffer.
-   */
-  DBTransactionBuffer getDBTransactionBuffer();
-
-  /**
-   * Stops the HA service.
-   */
-  void shutdown() throws IOException;
+  void close() throws Exception;
 }
