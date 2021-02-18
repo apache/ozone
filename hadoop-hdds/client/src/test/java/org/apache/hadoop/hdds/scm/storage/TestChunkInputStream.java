@@ -19,6 +19,8 @@
 package org.apache.hadoop.hdds.scm.storage;
 
 import java.io.EOFException;
+import java.nio.ByteBuffer;
+import java.util.List;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -216,8 +218,8 @@ public class TestChunkInputStream {
     ChunkInputStream subject = new ChunkInputStream(chunkInfo, null,
         clientFactory, pipelineRef::get, false, null) {
       @Override
-      protected ByteString readChunk(ChunkInfo readChunkInfo) {
-        return ByteString.copyFrom(chunkData);
+      protected List<ByteBuffer> readChunk(ChunkInfo readChunkInfo) {
+        return ByteString.copyFrom(chunkData).asReadOnlyByteBufferList();
       }
     };
 

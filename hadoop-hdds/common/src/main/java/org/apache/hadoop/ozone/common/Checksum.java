@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumTy
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.primitives.Ints;
+import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -238,6 +239,46 @@ public class Checksum {
     int bytesPerChecksum = checksumData.getBytesPerChecksum();
     Checksum checksum = new Checksum(checksumType, bytesPerChecksum);
     final ChecksumData computed = checksum.computeChecksum(data);
+    return checksumData.verifyChecksumDataMatches(computed, startIndex);
+  }
+
+  /**
+   * Computes the ChecksumData for the input byteStrings and verifies that
+   * the checksums match with that of the input checksumData.
+   * @param byteStrings input data buffers list. Each byteString should
+   *                    correspond to one checksum.
+   * @param checksumData checksumData to match with
+   * @param startIndex index of first checksum in checksumData to match with
+   *                   data's computed checksum.
+   * @param isSingleByteString if true, there is only one byteString in the
+   *                           input list and it should be processes
+   *                           accordingly
+   * @throws OzoneChecksumException is thrown if checksums do not match
+   */
+  public static boolean verifyChecksum(List<ByteString> byteStrings,
+      ChecksumData checksumData, int startIndex, boolean isSingleByteString)
+      throws OzoneChecksumException {
+    ChecksumType checksumType = checksumData.getChecksumType();
+    if (checksumType == ChecksumType.NONE) {
+      // Checksum is set to NONE. No further verification is required.
+      return true;
+    }
+
+    if (isSingleByteString) {
+      // The data is a single ByteString (old format).
+      return verifyChecksum(byteStrings.get(0), checksumData, startIndex);
+    }
+
+    // The data is a list of ByteStrings. Each ByteString length should be
+    // the same as the number of bytes per checksum (except the last
+    // ByteString which could be smaller).
+    final List<ByteBuffer> buffers =
+        BufferUtils.getReadOnlyByteBuffers(byteStrings);
+
+    int bytesPerChecksum = checksumData.getBytesPerChecksum();
+    Checksum checksum = new Checksum(checksumType, bytesPerChecksum);
+    final ChecksumData computed = checksum.computeChecksum(
+        ChunkBuffer.wrap(buffers));
     return checksumData.verifyChecksumDataMatches(computed, startIndex);
   }
 

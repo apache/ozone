@@ -226,7 +226,8 @@ public final class ContainerProtocolCalls  {
     ReadChunkRequestProto.Builder readChunkRequest =
         ReadChunkRequestProto.newBuilder()
             .setBlockID(blockID.getDatanodeBlockIDProtobuf())
-            .setChunkData(chunk);
+            .setChunkData(chunk)
+            .setReadChunkVersion(ContainerProtos.ReadChunkVersion.V1);
     String id = xceiverClient.getPipeline().getClosestNode().getUuidString();
     ContainerCommandRequestProto.Builder builder =
         ContainerCommandRequestProto.newBuilder().setCmdType(Type.ReadChunk)

@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -49,6 +50,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
+import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
@@ -92,6 +94,8 @@ import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuil
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.malformedRequest;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.putBlockResponseSuccess;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.unsupportedRequest;
+import static org.apache.hadoop.hdds.scm.utils.ClientCommandsUtils.getReadChunkVersion;
+
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -601,8 +605,18 @@ public class KeyValueHandler extends Handler {
         dispatcherContext = new DispatcherContext.Builder().build();
       }
 
-      data = chunkManager
-          .readChunk(kvContainer, blockID, chunkInfo, dispatcherContext);
+      boolean isReadChunkV0 = getReadChunkVersion(request.getReadChunk())
+          .equals(ContainerProtos.ReadChunkVersion.V0);
+      if (isReadChunkV0) {
+        // For older clients, set ReadDataIntoSingleBuffer to true so that
+        // all the data read from chunk file is returned as a single
+        // ByteString. Older clients cannot process data returned as a list
+        // of ByteStrings.
+        chunkInfo.setReadDataIntoSingleBuffer(true);
+      }
+
+      data = chunkManager.readChunk(kvContainer, blockID, chunkInfo,
+          dispatcherContext);
       metrics.incContainerBytesStats(Type.ReadChunk, chunkInfo.getLen());
     } catch (StorageContainerException ex) {
       return ContainerUtils.logAndReturnError(LOG, ex, request);
@@ -614,8 +628,7 @@ public class KeyValueHandler extends Handler {
 
     Preconditions.checkNotNull(data, "Chunk data is null");
 
-    ByteString byteString = data.toByteString(byteBufferToByteString);
-    return getReadChunkResponse(request, byteString);
+    return getReadChunkResponse(request, data, byteBufferToByteString);
   }
 
   /**
@@ -833,21 +846,32 @@ public class KeyValueHandler extends Handler {
           .getBlockID());
       BlockData responseData = blockManager.getBlock(kvContainer, blockID);
 
-      ContainerProtos.ChunkInfo chunkInfo = null;
-      ByteString dataBuf = ByteString.EMPTY;
+      ContainerProtos.ChunkInfo chunkInfoProto = null;
+      List<ByteString> dataBuffers = new ArrayList<>();
       DispatcherContext dispatcherContext =
           new DispatcherContext.Builder().build();
       for (ContainerProtos.ChunkInfo chunk : responseData.getChunks()) {
         // if the block is committed, all chunks must have been committed.
         // Tmp chunk files won't exist here.
+        ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(chunk);
+        boolean isReadChunkV0 = getReadChunkVersion(request.getGetSmallFile())
+            .equals(ContainerProtos.ReadChunkVersion.V0);
+        if (isReadChunkV0) {
+          // For older clients, set ReadDataIntoSingleBuffer to true so that
+          // all the data read from chunk file is returned as a single
+          // ByteString. Older clients cannot process data returned as a list
+          // of ByteStrings.
+           chunkInfo.setReadDataIntoSingleBuffer(true);
+        }
         ChunkBuffer data = chunkManager.readChunk(kvContainer, blockID,
-            ChunkInfo.getFromProtoBuf(chunk), dispatcherContext);
-        ByteString current = data.toByteString(byteBufferToByteString);
-        dataBuf = dataBuf.concat(current);
-        chunkInfo = chunk;
+            chunkInfo, dispatcherContext);
+        dataBuffers.addAll(data.toByteStringList(byteBufferToByteString));
+        chunkInfoProto = chunk;
       }
-      metrics.incContainerBytesStats(Type.GetSmallFile, dataBuf.size());
-      return getGetSmallFileResponseSuccess(request, dataBuf, chunkInfo);
+      metrics.incContainerBytesStats(Type.GetSmallFile,
+          BufferUtils.getBuffersLen(dataBuffers));
+      return getGetSmallFileResponseSuccess(request, dataBuffers,
+          chunkInfoProto);
     } catch (StorageContainerException e) {
       return ContainerUtils.logAndReturnError(LOG, e, request);
     } catch (IOException ex) {

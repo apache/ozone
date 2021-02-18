@@ -20,12 +20,15 @@ package org.apache.hadoop.ozone.container.keyvalue.impl;
 
 import com.google.common.base.Preconditions;
 
+import com.google.common.collect.Lists;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
+import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
@@ -65,10 +68,13 @@ public class FilePerChunkStrategy implements ChunkManager {
 
   private final boolean doSyncWrite;
   private final BlockManager blockManager;
+  private final long defaultReadBufferCapacity;
 
   public FilePerChunkStrategy(boolean sync, BlockManager manager) {
     doSyncWrite = sync;
     blockManager = manager;
+    this.defaultReadBufferCapacity = manager == null ? 0 :
+        manager.getDefaultReadBufferCapacity();
   }
 
   private static void checkLayoutVersion(Container container) {
@@ -222,7 +228,30 @@ public class FilePerChunkStrategy implements ChunkManager {
     }
 
     long len = info.getLen();
-    ByteBuffer data = ByteBuffer.allocate((int) len);
+
+    long bufferCapacity;
+    if (info.isReadDataIntoSingleBuffer()) {
+      // Older client - read all chunk data into one single buffer.
+      bufferCapacity = len;
+    } else {
+      // Set buffer capacity to checksum boundary size so that each buffer
+      // corresponds to one checksum. If checksum is NONE, then set buffer
+      // capacity to default (OZONE_CHUNK_READ_BUFFER_DEFAULT_SIZE_KEY = 64KB).
+      ChecksumData checksumData = info.getChecksumData();
+
+      if (checksumData.getChecksumType() == ContainerProtos.ChecksumType.NONE) {
+        bufferCapacity = defaultReadBufferCapacity;
+      } else {
+        bufferCapacity = checksumData.getBytesPerChecksum();
+      }
+    }
+    // If the buffer capacity is 0, set all the data into one ByteBuffer
+    if (bufferCapacity == 0) {
+      bufferCapacity = len;
+    }
+
+    ByteBuffer[] dataBuffers = BufferUtils.assignByteBuffers(len,
+        bufferCapacity);
 
     long chunkFileOffset = 0;
     if (info.getOffset() != 0) {
@@ -255,8 +284,8 @@ public class FilePerChunkStrategy implements ChunkManager {
         if (file.exists()) {
           long offset = info.getOffset() - chunkFileOffset;
           Preconditions.checkState(offset >= 0);
-          ChunkUtils.readData(file, data, offset, len, volumeIOStats);
-          return ChunkBuffer.wrap(data);
+          ChunkUtils.readData(file, dataBuffers, offset, len, volumeIOStats);
+          return ChunkBuffer.wrap(Lists.newArrayList(dataBuffers));
         }
       } catch (StorageContainerException ex) {
         //UNABLE TO FIND chunk is not a problem as we will try with the
@@ -264,7 +293,7 @@ public class FilePerChunkStrategy implements ChunkManager {
         if (ex.getResult() != UNABLE_TO_FIND_CHUNK) {
           throw ex;
         }
-        data.clear();
+        dataBuffers = null;
       }
     }
     throw new StorageContainerException(

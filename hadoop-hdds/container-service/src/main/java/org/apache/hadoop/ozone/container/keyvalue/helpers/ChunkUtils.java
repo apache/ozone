@@ -167,11 +167,11 @@ public final class ChunkUtils {
   }
 
   /**
-   * Reads data from an existing chunk file.
+   * Reads data from an existing chunk file into a list of ByteBuffers.
    *
    * @param file file where data lives
    */
-  public static void readData(File file, ByteBuffer buf,
+  public static void readData(File file, ByteBuffer[] buffers,
       long offset, long len, VolumeIOStats volumeIOStats)
       throws StorageContainerException {
 
@@ -184,7 +184,7 @@ public final class ChunkUtils {
         try (FileChannel channel = open(path, READ_OPTIONS, NO_ATTRIBUTES);
              FileLock ignored = channel.lock(offset, len, true)) {
 
-          return channel.read(buf, offset);
+          return channel.position(offset).read(buffers);
         } catch (IOException e) {
           throw new UncheckedIOException(e);
         }
@@ -204,7 +204,9 @@ public final class ChunkUtils {
 
     validateReadSize(len, bytesRead);
 
-    buf.flip();
+    for (ByteBuffer buf : buffers) {
+      buf.flip();
+    }
   }
 
   /**
@@ -347,5 +349,4 @@ public final class ChunkUtils {
 
     return CONTAINER_INTERNAL_ERROR;
   }
-
 }

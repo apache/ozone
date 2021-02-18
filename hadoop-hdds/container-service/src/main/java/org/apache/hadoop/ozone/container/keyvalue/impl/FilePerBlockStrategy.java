@@ -22,11 +22,15 @@ import com.google.common.base.Preconditions;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
+import com.google.common.collect.Lists;
+
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
+import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
@@ -35,6 +39,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeIOStats;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
+import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 
@@ -67,9 +72,12 @@ public class FilePerBlockStrategy implements ChunkManager {
 
   private final boolean doSyncWrite;
   private final OpenFiles files = new OpenFiles();
+  private final long defaultReadBufferCapacity;
 
-  public FilePerBlockStrategy(boolean sync) {
+  public FilePerBlockStrategy(boolean sync, BlockManager manager) {
     doSyncWrite = sync;
+    this.defaultReadBufferCapacity = manager == null ? 0 :
+        manager.getDefaultReadBufferCapacity();
   }
 
   private static void checkLayoutVersion(Container container) {
@@ -145,10 +153,34 @@ public class FilePerBlockStrategy implements ChunkManager {
 
     long len = info.getLen();
     long offset = info.getOffset();
-    ByteBuffer data = ByteBuffer.allocate((int) len);
-    ChunkUtils.readData(chunkFile, data, offset, len, volumeIOStats);
 
-    return ChunkBuffer.wrap(data);
+    long bufferCapacity;
+    if (info.isReadDataIntoSingleBuffer()) {
+      // Older client - read all chunk data into one single buffer.
+      bufferCapacity = len;
+    } else {
+      // Set buffer capacity to checksum boundary size so that each buffer
+      // corresponds to one checksum. If checksum is NONE, then set buffer
+      // capacity to default (OZONE_CHUNK_READ_BUFFER_DEFAULT_SIZE_KEY = 64KB).
+      ChecksumData checksumData = info.getChecksumData();
+
+      if (checksumData.getChecksumType() == ContainerProtos.ChecksumType.NONE) {
+        bufferCapacity = defaultReadBufferCapacity;
+      } else {
+        bufferCapacity = checksumData.getBytesPerChecksum();
+      }
+    }
+    // If the buffer capacity is 0, set all the data into one ByteBuffer
+    if (bufferCapacity == 0) {
+      bufferCapacity = len;
+    }
+
+    ByteBuffer[] dataBuffers = BufferUtils.assignByteBuffers(len,
+        bufferCapacity);
+
+    ChunkUtils.readData(chunkFile, dataBuffers, offset, len, volumeIOStats);
+
+    return ChunkBuffer.wrap(Lists.newArrayList(dataBuffers));
   }
 
   @Override
