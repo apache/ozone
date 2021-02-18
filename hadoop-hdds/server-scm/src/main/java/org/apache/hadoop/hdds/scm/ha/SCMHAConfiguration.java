@@ -177,8 +177,45 @@ public class SCMHAConfiguration {
   )
   private long ratisRoleCheckerInterval = 15 * 1000L;
 
+  @Config(key = "ratis.snapshot.dir",
+      type = ConfigType.STRING,
+      defaultValue = "",
+      tags = {SCM, OZONE, HA, RATIS},
+      description = "The ratis snapshot dir location"
+  )
+  private String ratisSnapshotDir;
+
+  @Config(key = "grpc.bind.port",
+      type = ConfigType.INT,
+      defaultValue = "9899",
+      tags = {OZONE, SCM, HA, RATIS},
+      description = "Port used by SCM for Grpc Server."
+  )
+  // TODO: fix the default grpc port
+  private int grpcBindPort = 9899;
+
+  @Config(key = "grpc.deadline.interval",
+      type = ConfigType.TIME,
+      defaultValue = "30m",
+      tags = {OZONE, SCM, HA, RATIS},
+      description = "Deadline for SCM DB checkpoint interval."
+  )
+  private long grpcDeadlineInterval = 30 * 60 * 1000L;
+
+  public long getGrpcDeadlineInterval() {
+    return grpcDeadlineInterval;
+  }
+
+  public int getGrpcBindPort() {
+    return grpcBindPort;
+  }
+
   public String getRatisStorageDir() {
     return ratisStorageDir;
+  }
+
+  public String getRatisSnapshotDir() {
+    return ratisSnapshotDir;
   }
 
   public void setRatisStorageDir(String dir) {
@@ -215,6 +252,10 @@ public class SCMHAConfiguration {
 
   public void setRaftLogPurgeEnabled(boolean enabled) {
     this.raftLogPurgeEnabled = enabled;
+  }
+
+  public void setGrpcBindPort(int port) {
+    this.grpcBindPort = port;
   }
 
   public int getRaftLogPurgeGap() {

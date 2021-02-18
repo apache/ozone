@@ -18,16 +18,27 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
+import com.google.common.base.Strings;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.server.ServerUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.io.File;
+import java.nio.file.Paths;
 import java.util.Collection;
+
+import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_RATIS_SNAPSHOT_DIR;
 
 /**
  * Utility class used by SCM HA.
  */
 public final class SCMHAUtils {
+  public static final Logger LOG =
+      LoggerFactory.getLogger(SCMHAUtils.class);
   private SCMHAUtils() {
     // not used
   }
@@ -61,5 +72,33 @@ public final class SCMHAUtils {
     assert !suffix.startsWith(".") :
         "suffix '" + suffix + "' should not already have '.' prepended.";
     return key + "." + suffix;
+  }
+
+  /**
+   * Get the local directory where ratis logs will be stored.
+   */
+  public static String getSCMRatisDirectory(ConfigurationSource conf) {
+    String scmRatisDirectory =
+        conf.getObject(SCMHAConfiguration.class).getRatisStorageDir();
+
+    if (Strings.isNullOrEmpty(scmRatisDirectory)) {
+      scmRatisDirectory = ServerUtils.getDefaultRatisDirectory(conf);
+    }
+    return scmRatisDirectory;
+  }
+
+  public static String getSCMRatisSnapshotDirectory(ConfigurationSource conf) {
+    String snapshotDir =
+        conf.getObject(SCMHAConfiguration.class).getRatisStorageDir();
+
+    // If ratis snapshot directory is not set, fall back to ozone.metadata.dir.
+    if (Strings.isNullOrEmpty(snapshotDir)) {
+      LOG.warn("SCM snapshot dir is not configured. Falling back to {} config",
+          OZONE_METADATA_DIRS);
+      File metaDirPath = ServerUtils.getOzoneMetaDirPath(conf);
+      snapshotDir =
+          Paths.get(metaDirPath.getPath(), OM_RATIS_SNAPSHOT_DIR).toString();
+    }
+    return snapshotDir;
   }
 }

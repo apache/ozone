@@ -195,6 +195,10 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_HTTPS_ADDRESS_KEY =
       "ozone.scm.https-address";
 
+  public static final String OZONE_SCM_ADDRESS_KEY =
+      "ozone.scm.address";
+  public static final String OZONE_SCM_BIND_HOST_DEFAULT =
+      "0.0.0.0";
   public static final String OZONE_SCM_HTTP_BIND_HOST_DEFAULT = "0.0.0.0";
   public static final int OZONE_SCM_HTTP_BIND_PORT_DEFAULT = 9876;
   public static final int OZONE_SCM_HTTPS_BIND_PORT_DEFAULT = 9877;
@@ -282,9 +286,6 @@ public final class ScmConfigKeys {
       "ozone.scm.nodes";
   public static final String OZONE_SCM_NODE_ID_KEY =
       "ozone.scm.node.id";
-
-  public static final String OZONE_SCM_ADDRESS_KEY =
-      "ozone.scm.address";
 
   public static final int OZONE_SCM_DEFAULT_PORT =
       OZONE_SCM_DATANODE_PORT_DEFAULT;

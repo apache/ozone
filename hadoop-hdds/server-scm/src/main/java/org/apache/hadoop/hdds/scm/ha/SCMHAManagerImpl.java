@@ -19,6 +19,8 @@ package org.apache.hadoop.hdds.scm.ha;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,6 +42,10 @@ public class SCMHAManagerImpl implements SCMHAManager {
   private final SCMRatisServer ratisServer;
   private final ConfigurationSource conf;
   private final SCMDBTransactionBuffer transactionBuffer;
+  private final SCMSnapshotProvider scmSnapshotProvider;
+
+  // this should ideally be started only in a ratis leader
+  private final InterSCMGrpcProtocolService grpcServer;
 
   /**
    * Creates SCMHAManager instance.
@@ -51,6 +57,10 @@ public class SCMHAManagerImpl implements SCMHAManager {
         new SCMDBTransactionBuffer(scm);
     this.ratisServer = new SCMRatisServerImpl(
         conf.getObject(SCMHAConfiguration.class), conf, scm, transactionBuffer);
+    this.scmSnapshotProvider = new SCMSnapshotProvider(conf,
+        scm.getSCMHANodeDetails().getPeerNodeDetails());
+    grpcServer = new InterSCMGrpcProtocolService(conf, scm);
+
   }
 
   /**
@@ -59,6 +69,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
   @Override
   public void start() throws IOException {
     ratisServer.start();
+    grpcServer.start();
   }
 
   public SCMRatisServer getRatisServer() {
@@ -70,11 +81,76 @@ public class SCMHAManagerImpl implements SCMHAManager {
     return transactionBuffer;
   }
 
+  @Override
+  public SCMSnapshotProvider getSCMSnapshotProvider() {
+    return scmSnapshotProvider;
+  }
+
+  /**
+   * Download and install latest checkpoint from leader OM.
+   *
+   * @param leaderId peerNodeID of the leader OM
+   * @return If checkpoint is installed successfully, return the
+   *         corresponding termIndex. Otherwise, return null.
+   */
+  public TermIndex installSnapshotFromLeader(String leaderId) {
+    if(scmSnapshotProvider == null) {
+      LOG.error("OM Snapshot Provider is not configured as there are no peer " +
+          "nodes.");
+      return null;
+    }
+
+    DBCheckpoint omDBCheckpoint = getDBCheckpointFromLeader(leaderId);
+    LOG.info("Downloaded checkpoint from Leader {} to the location {}",
+        leaderId, omDBCheckpoint.getCheckpointLocation());
+
+    TermIndex termIndex = null;
+    try {
+      termIndex = installCheckpoint(leaderId, omDBCheckpoint);
+    } catch (Exception ex) {
+      LOG.error("Failed to install snapshot from Leader OM.", ex);
+    }
+    return termIndex;
+  }
+
+  /**
+   * Install checkpoint. If the checkpoints snapshot index is greater than
+   * SCM's last applied transaction index, then re-initialize the OM
+   * state via this checkpoint. Before re-initializing OM state, the OM Ratis
+   * server should be stopped so that no new transactions can be applied.
+   */
+  TermIndex installCheckpoint(String leaderId, DBCheckpoint omDBCheckpoint)
+      throws Exception {
+    // TODO : implement install checkpoint
+    return null;
+  }
+
+
+  /**
+   * Download the latest SCM DB checkpoint from the leader OM.
+   *
+   * @param leaderId OMNodeID of the leader OM node.
+   * @return latest DB checkpoint from leader OM.
+   */
+  private DBCheckpoint getDBCheckpointFromLeader(String leaderId) {
+    LOG.info("Downloading checkpoint from leader SCM {} and reloading state " +
+        "from the checkpoint.", leaderId);
+
+    try {
+      return scmSnapshotProvider.getSCMDBSnapshot(leaderId);
+    } catch (IOException e) {
+      LOG.error("Failed to download checkpoint from OM leader {}", leaderId, e);
+    }
+    return null;
+  }
+
+
   /**
    * {@inheritDoc}
    */
   @Override
   public void shutdown() throws IOException {
     ratisServer.stop();
+    grpcServer.stop();
   }
 }
