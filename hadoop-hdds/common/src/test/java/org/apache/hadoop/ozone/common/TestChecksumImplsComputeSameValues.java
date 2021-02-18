@@ -60,7 +60,12 @@ public class TestChecksumImplsComputeSameValues {
       List<ChecksumByteBuffer> impls = new ArrayList<>();
       impls.add(new PureJavaCrc32CByteBuffer());
       impls.add(new ChecksumByteBufferImpl(new PureJavaCrc32C()));
-      // TODO - optional loaded java.util.zip.CRC32C if >= Java 9
+      try {
+        impls.add(new ChecksumByteBufferImpl(
+            ChecksumByteBufferImpl.Java9Crc32CFactory.createChecksum()));
+      } catch (Throwable e) {
+        // NOOP
+      }
       // impls.add(new ChecksumByteBufferImpl(new CRC32C())));
       if (NativeCRC32Wrapper.isAvailable()) {
         impls.add(new ChecksumByteBufferImpl(new NativeCheckSumCRC32(2, bpc)));
