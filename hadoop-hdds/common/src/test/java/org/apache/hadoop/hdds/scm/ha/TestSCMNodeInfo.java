@@ -136,7 +136,7 @@ public class TestSCMNodeInfo {
     conf.set(ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY,
         scmServiceId, "scm1"), "localhost");
 
-    List< SCMNodeInfo > scmNodeInfos = SCMNodeInfo.buildNodeInfo(conf);
+    SCMNodeInfo.buildNodeInfo(conf);
   }
 
   @Test
