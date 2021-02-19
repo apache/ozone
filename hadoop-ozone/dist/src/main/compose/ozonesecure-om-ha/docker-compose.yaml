@@ -32,6 +32,9 @@ services:
       - 9600:9600
     env_file:
       - ./docker-config
+    volumes:
+      - ./keytabs:/etc/security/keytabs
+      - ./krb5.conf:/etc/krb5.conf
     environment:
       HADOOP_CONF_DIR: /opt/hadoop/etc/hadoop
     command: ["hadoop", "kms"]
@@ -190,6 +193,8 @@ services:
     hostname: scm
     volumes:
       - ../..:/opt/hadoop
+      - ./keytabs:/etc/security/keytabs
+      - ./krb5.conf:/etc/krb5.conf
     ports:
       - 9876:9876
       - 9860:9860

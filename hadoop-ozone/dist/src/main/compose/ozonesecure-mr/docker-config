@@ -133,7 +133,6 @@ CAPACITY-SCHEDULER.XML_yarn.scheduler.capacity.queue-mappings-override.enable=fa
 #BYTEMAN_SCRIPT_URL=https://raw.githubusercontent.com/apache/hadoop/trunk/dev-support/byteman/hadooprpc.btm
 
 OZONE_DATANODE_SECURE_USER=root
-KERBEROS_KEYSTORES=hadoop
 JAVA_HOME=/usr/lib/jvm/jre
 JSVC_HOME=/usr/bin
 SLEEP_SECONDS=5
