@@ -19,29 +19,42 @@
 package org.apache.hadoop.fs.ozone.contract;
 
 import java.io.IOException;
+import java.util.Collection;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.contract.AbstractContractGetFileStatusTest;
 import org.apache.hadoop.fs.contract.AbstractFSContract;
 
 import org.junit.AfterClass;
-import org.junit.BeforeClass;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Ozone contract tests covering getFileStatus.
  */
+@RunWith(Parameterized.class)
 public class ITestOzoneContractGetFileStatus
     extends AbstractContractGetFileStatusTest {
+
+  private static boolean fsOptimisedClient;
+  private static boolean fsOptimisedServer;
+
+  public ITestOzoneContractGetFileStatus(boolean fsOptimClient,
+       boolean fsOptimServer) throws IOException {
+    if (fsOptimisedClient != fsOptimClient ||
+        fsOptimisedServer != fsOptimServer) {
+      fsOptimisedClient = fsOptimClient;
+      fsOptimisedServer = fsOptimServer;
+      ITestOzoneContractUtils.restartCluster(fsOptimisedClient,
+          fsOptimisedServer);
+    }
+  }
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ITestOzoneContractGetFileStatus.class);
 
-  @BeforeClass
-  public static void createCluster() throws IOException {
-    OzoneContract.createCluster();
-  }
 
   @AfterClass
   public static void teardownCluster() throws IOException {
@@ -62,5 +75,10 @@ public class ITestOzoneContractGetFileStatus
   @Override
   protected Configuration createConfiguration() {
     return super.createConfiguration();
+  }
+
+  @Parameterized.Parameters
+  public static Collection data() {
+    return ITestOzoneContractUtils.getFsoCombinations();
   }
 }

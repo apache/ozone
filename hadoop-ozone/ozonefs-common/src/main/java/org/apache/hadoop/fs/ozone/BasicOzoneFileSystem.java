@@ -416,7 +416,9 @@ public class BasicOzoneFileSystem extends FileSystem {
     } catch (OMException ome) {
       LOG.error("rename key failed: {}. source:{}, destin:{}",
               ome.getMessage(), srcPath, dstPath);
-      if (OMException.ResultCodes.KEY_ALREADY_EXISTS == ome.getResult()) {
+      if (OMException.ResultCodes.KEY_ALREADY_EXISTS == ome.getResult() ||
+          OMException.ResultCodes.KEY_RENAME_ERROR  == ome.getResult() ||
+          OMException.ResultCodes.KEY_NOT_FOUND == ome.getResult()) {
         return false;
       } else {
         throw ome;
@@ -508,6 +510,9 @@ public class BasicOzoneFileSystem extends FileSystem {
 
     if (adapter.isFSOptimizedBucket()) {
       if (f.isRoot()) {
+        if (!recursive && listStatus(f).length!=0){
+          throw new PathIsNotEmptyDirectoryException(f.toString());
+        }
         LOG.warn("Cannot delete root directory.");
         return false;
       }

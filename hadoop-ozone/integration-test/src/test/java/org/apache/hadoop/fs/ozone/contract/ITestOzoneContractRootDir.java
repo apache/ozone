@@ -19,23 +19,35 @@
 package org.apache.hadoop.fs.ozone.contract;
 
 import java.io.IOException;
+import java.util.Collection;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.contract.AbstractContractRootDirectoryTest;
 import org.apache.hadoop.fs.contract.AbstractFSContract;
 
 import org.junit.AfterClass;
-import org.junit.BeforeClass;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
 /**
  * Ozone contract test for ROOT directory operations.
  */
+@RunWith(Parameterized.class)
 public class ITestOzoneContractRootDir extends
     AbstractContractRootDirectoryTest {
 
-  @BeforeClass
-  public static void createCluster() throws IOException {
-    OzoneContract.createCluster();
+  private static boolean fsOptimisedClient;
+  private static boolean fsOptimisedServer;
+
+  public ITestOzoneContractRootDir(boolean fsOptimClient,
+      boolean fsOptimServer) throws IOException {
+    if (fsOptimisedClient != fsOptimClient ||
+        fsOptimisedServer != fsOptimServer) {
+      fsOptimisedClient = fsOptimClient;
+      fsOptimisedServer = fsOptimServer;
+      ITestOzoneContractUtils.restartCluster(fsOptimisedClient,
+          fsOptimisedServer);
+    }
   }
 
   @AfterClass
@@ -46,6 +58,11 @@ public class ITestOzoneContractRootDir extends
   @Override
   protected AbstractFSContract createContract(Configuration conf) {
     return new OzoneContract(conf);
+  }
+
+  @Parameterized.Parameters
+  public static Collection data() {
+    return ITestOzoneContractUtils.getFsoCombinations();
   }
 
 }

@@ -46,6 +46,9 @@ class OzoneContract extends AbstractFSContract {
   private static MiniOzoneCluster cluster;
   private static final String CONTRACT_XML = "contract/ozone.xml";
 
+  private static boolean fsOptmisedClient;
+  private static boolean fsOptimisedServer;
+
   OzoneContract(Configuration conf) {
     super(conf);
     //insert the base features
@@ -63,6 +66,12 @@ class OzoneContract extends AbstractFSContract {
     return path;
   }
 
+  public static void initOzoneConfiguration(
+      boolean fsOptimClient, boolean fsOptimServer){
+    fsOptimisedServer = fsOptimServer;
+    fsOptmisedClient = fsOptimClient;
+  }
+
   public static void createCluster() throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
     DatanodeRatisServerConfig ratisServerConfig =
@@ -78,6 +87,13 @@ class OzoneContract extends AbstractFSContract {
     conf.setFromObject(raftClientConfig);
 
     conf.addResource(CONTRACT_XML);
+
+    if (fsOptimisedServer){
+      conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
+          true);
+      conf.set(OMConfigKeys.OZONE_OM_LAYOUT_VERSION,
+          OMConfigKeys.OZONE_OM_LAYOUT_VERSION_V1);
+    }
 
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(5).build();
     try {
@@ -105,6 +121,12 @@ class OzoneContract extends AbstractFSContract {
     getConf().set("fs.defaultFS", uri);
     copyClusterConfigs(OMConfigKeys.OZONE_OM_ADDRESS_KEY);
     copyClusterConfigs(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY);
+    if(fsOptmisedClient){
+      getConf().setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
+          true);
+      getConf().set(OMConfigKeys.OZONE_OM_LAYOUT_VERSION,
+          OMConfigKeys.OZONE_OM_LAYOUT_VERSION_V1);
+    }
     return FileSystem.get(getConf());
   }
 

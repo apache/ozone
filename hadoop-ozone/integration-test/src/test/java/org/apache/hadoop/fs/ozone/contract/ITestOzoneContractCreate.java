@@ -19,23 +19,38 @@
 package org.apache.hadoop.fs.ozone.contract;
 
 import java.io.IOException;
+import java.util.Collection;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.contract.AbstractContractCreateTest;
 import org.apache.hadoop.fs.contract.AbstractFSContract;
 
 import org.junit.AfterClass;
-import org.junit.BeforeClass;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
 /**
  * Ozone contract tests creating files.
  */
+@RunWith(Parameterized.class)
 public class ITestOzoneContractCreate extends AbstractContractCreateTest {
 
-  @BeforeClass
-  public static void createCluster() throws IOException {
-    OzoneContract.createCluster();
+  private static boolean fsOptimisedClient;
+  private static boolean fsOptimisedServer;
+
+  public ITestOzoneContractCreate(
+      boolean fsOptimClient,
+      boolean fsOptimServer) throws IOException {
+    if (fsOptimisedClient != fsOptimClient ||
+        fsOptimisedServer != fsOptimServer) {
+      fsOptimisedClient = fsOptimClient;
+      fsOptimisedServer = fsOptimServer;
+      ITestOzoneContractUtils.restartCluster(fsOptimisedClient,
+          fsOptimisedServer);
+    }
   }
+
+
 
   @AfterClass
   public static void teardownCluster() throws IOException {
@@ -45,5 +60,10 @@ public class ITestOzoneContractCreate extends AbstractContractCreateTest {
   @Override
   protected AbstractFSContract createContract(Configuration conf) {
     return new OzoneContract(conf);
+  }
+
+  @Parameterized.Parameters
+  public static Collection data() {
+    return ITestOzoneContractUtils.getFsoCombinations();
   }
 }
