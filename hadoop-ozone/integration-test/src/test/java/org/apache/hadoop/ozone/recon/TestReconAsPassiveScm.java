@@ -53,6 +53,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.junit.rules.Timeout;
+import org.slf4j.event.Level;
 
 /**
  * Recon's passive SCM integration tests.
@@ -139,6 +140,7 @@ public class TestReconAsPassiveScm {
 
     GenericTestUtils.LogCapturer logCapturer =
         GenericTestUtils.LogCapturer.captureLogs(ReconNodeManager.LOG);
+    GenericTestUtils.setLogLevel(ReconNodeManager.LOG, Level.DEBUG);
     reconScm.getEventQueue().fireEvent(CLOSE_CONTAINER,
         containerInfo.containerID());
     GenericTestUtils.waitFor(() -> logCapturer.getOutput()
