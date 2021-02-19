@@ -27,7 +27,17 @@ import org.slf4j.LoggerFactory;
 import java.util.Collections;
 
 /**
- * Provides the current checkpoint Snapshot of the OM DB. (tar.gz)
+ * Provides the current checkpoint Snapshot of the SCM DB. (tar.gz)
+ *
+ * When Ozone ACL is enabled (`ozone.acl.enabled`=`true`), only users/principals
+ * configured in `ozone.administrator` (along with the user that starts OM,
+ * which automatically becomes an Ozone administrator but not necessarily in
+ * the config) are allowed to access this endpoint.
+ *
+ * If Kerberos is enabled, the principal should be appended to
+ * `ozone.administrator`, e.g. `scm/scm@EXAMPLE.COM`
+ * If Kerberos is not enabled, simply append the login user name to
+ * `ozone.administrator`, e.g. `scm`
  */
 public class SCMDBCheckpointServlet extends DBCheckpointServlet {
 
@@ -35,12 +45,10 @@ public class SCMDBCheckpointServlet extends DBCheckpointServlet {
       LoggerFactory.getLogger(SCMDBCheckpointServlet.class);
   private static final long serialVersionUID = 1L;
 
-  private transient StorageContainerManager scm;
-
   @Override
   public void init() throws ServletException {
 
-    scm = (StorageContainerManager) getServletContext()
+    StorageContainerManager scm = (StorageContainerManager) getServletContext()
         .getAttribute(OzoneConsts.SCM_CONTEXT_ATTRIBUTE);
 
     if (scm == null) {

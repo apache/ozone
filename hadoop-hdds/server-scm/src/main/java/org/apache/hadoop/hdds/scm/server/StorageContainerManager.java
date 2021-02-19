@@ -171,7 +171,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   /*
    * HTTP endpoint for JMX access.
    */
-  private final StorageContainerManagerHttpServer httpServer;
+  private StorageContainerManagerHttpServer httpServer;
   /**
    * SCM super user.
    */
@@ -329,7 +329,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         eventQueue);
     blockProtocolServer = new SCMBlockProtocolServer(conf, this);
     clientProtocolServer = new SCMClientProtocolServer(conf, this);
-    httpServer = new StorageContainerManagerHttpServer(conf, this);
     eventQueue.addHandler(SCMEvents.DATANODE_COMMAND, scmNodeManager);
     eventQueue.addHandler(SCMEvents.RETRIABLE_DATANODE_COMMAND, scmNodeManager);
     eventQueue.addHandler(SCMEvents.NODE_REPORT, nodeReportHandler);
@@ -359,9 +358,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     eventQueue
         .addHandler(SCMEvents.DELAYED_SAFE_MODE_STATUS, pipelineManager);
 
-
     // Emit initial safe mode status, as now handlers are registered.
     scmSafeModeManager.emitSafeModeStatus();
+
     registerMXBean();
     registerMetricsSource(this);
   }
@@ -815,13 +814,20 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       getSecurityProtocolServer().start();
     }
 
-    httpServer.start();
     scmBlockManager.start();
 
     // Start jvm monitor
     jvmPauseMonitor = new JvmPauseMonitor();
     jvmPauseMonitor.init(configuration);
     jvmPauseMonitor.start();
+
+    try {
+      httpServer = new StorageContainerManagerHttpServer(configuration, this);
+      httpServer.start();
+    } catch (Exception ex) {
+      // SCM HttpServer start-up failure should be non-fatal
+      LOG.error("SCM HttpServer failed to start.", ex);
+    }
 
     setStartTime();
   }
