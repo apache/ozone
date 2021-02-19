@@ -62,8 +62,9 @@ public final class KeyValueContainerLocationUtil {
    */
   public static File getChunksLocationPath(String baseDir, String clusterId,
                                            long containerId) {
-    String chunksPath = getBaseContainerLocation(baseDir, clusterId, containerId)
-        + File.separator + OzoneConsts.STORAGE_DIR_CHUNKS;
+    String chunksPath =
+        getBaseContainerLocation(baseDir, clusterId, containerId)
+            + File.separator + OzoneConsts.STORAGE_DIR_CHUNKS;
     return new File(chunksPath);
   }
 

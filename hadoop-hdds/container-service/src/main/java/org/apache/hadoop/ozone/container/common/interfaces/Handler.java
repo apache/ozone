@@ -186,8 +186,8 @@ public abstract class Handler {
   public abstract void deleteBlock(Container container, BlockData blockData)
       throws IOException;
 
-  public void setClusterID(String clusterId) {
-    this.clusterId = clusterId;
+  public void setClusterID(String clusterID) {
+    this.clusterId = clusterID;
   }
 
 }
