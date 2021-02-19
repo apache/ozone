@@ -19,35 +19,54 @@
 # binaries.  Docker image with Ozone binaries is required for the
 # initial version, while the snapshot version uses Ozone runner image.
 
-set -e -o pipefail
+set -u -e -o pipefail
 
-: "${OZONE_REPLICATION_FACTOR:=3}"
-: "${OZONE_CURRENT_VERSION:="1.1.0"}"
-: "${OZONE_PREPARE_OMS:=}"
-: "${OZONE_UPGRADE_FROM:="0.5.0"}"
-: "${OZONE_UPGRADE_TO:="$OZONE_CURRENT_VERSION"}"
+# Prepare OMs before upgrade unless this variable is unset.
+: "${OZONE_PREPARE_OMS:='1'}"
+# Fail if required vars are not set.
+: "${OZONE_UPGRADE_FROM}"
+: "${OZONE_UPGRADE_TO}"
+: "${OZONE_UPGRADE_CALLBACK}"
+: "$COMPOSE_DIR"
+
+source "$COMPOSE_DIR"/testlib.sh
+source "$OZONE_UPGRADE_CALLBACK"
+
+prepare_oms() {
+  if [[ "$OZONE_PREPARE_OMS" ]]; then
+    execute_robot_test scm upgrade/om-prepare.robot
+  fi
+}
+
+cancel_prepare_oms() {
+  if [[ "$OZONE_PREPARE_OMS" ]]; then
+    execute_robot_test scm upgrade/om-cancel-prepare.robot
+  fi
+}
 
 prepare_for_image "$OZONE_UPGRADE_FROM"
 start_docker_env
-run_upgrade_hook with_old_version
-if [[ "$OZONE_PREPARE_OMS" ]]; then
-    execute_robot_test upgrade/om-prepare.robot
-fi
+callback with_old_version
+prepare_oms
 
 prepare_for_image "$OZONE_CURRENT_VERSION"
 restart_docker_env
-run_upgrade_hook with_new_versino_pre_finalized
+cancel_prepare_oms
+callback with_new_version_pre_finalized
+prepare_oms
 
 prepare_for_image "$OZONE_UPGRADE_FROM"
 restart_docker_env
-run_upgrade_hook with_old_version_rollback
+cancel_prepare_oms
+callback with_old_version_rollback
+prepare_oms
 
 prepare_for_image "$OZONE_CURRENT_VERSION"
 restart_docker_env
-execute_robot_test upgrade/finalize-scm.robot
-execute_robot_test upgrade/finalize-om.robot
-run_upgrade_hook with_new_version_finalized
+cancel_prepare_oms
+execute_robot_test scm upgrade/finalize-scm.robot
+execute_robot_test scm upgrade/finalize-om.robot
+callback with_new_version_finalized
 
 stop_docker_env
 generate_report
-

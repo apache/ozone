@@ -15,18 +15,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+source "$COMPOSE_DIR"/testlib.sh
+
 setup_old_version() {
-  export OZONE_SAFEMODE_STATUS_COMMAND='ozone scmcli safemode status'
+  OZONE_SAFEMODE_STATUS_COMMAND='ozone scmcli safemode status'
 }
 
-with_old_version() {
-
-}
+# with_old_version() { }
 
 setup_new_version() {
-  export OZONE_SAFEMODE_STATUS_COMMAND='ozone admin safemode status --verbose'
+  OZONE_SAFEMODE_STATUS_COMMAND='ozone admin safemode status --verbose'
+
+  local v100_libexec="$COMPOSE_DIR"/../libexec/upgrade/1.0.0
+  for script in "$v100_libexec"/*; do
+    "$script"
+  done
 }
 
-with_new_version() {
-
-}
+# with_new_version() { }

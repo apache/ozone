@@ -15,6 +15,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+source "$COMPOSE_DIR"/testlib.sh
+
 setup() {
   # OM preparation is not implemnted in 1.0.0.
   export OZONE_OM_PREPARE=
