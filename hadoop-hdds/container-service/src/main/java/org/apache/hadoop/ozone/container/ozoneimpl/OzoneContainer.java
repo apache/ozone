@@ -255,7 +255,7 @@ public class OzoneContainer {
    *
    * @throws IOException
    */
-  public void start(String scmId) throws IOException {
+  public void start(String clusterId) throws IOException {
     if (!isStarted.compareAndSet(false, true)) {
       LOG.info("Ignore. OzoneContainer already started.");
       return;
@@ -269,7 +269,7 @@ public class OzoneContainer {
     writeChannel.start();
     readChannel.start();
     hddsDispatcher.init();
-    hddsDispatcher.setScmId(scmId);
+    hddsDispatcher.setClusterId(clusterId);
     blockDeletingService.start();
   }
 

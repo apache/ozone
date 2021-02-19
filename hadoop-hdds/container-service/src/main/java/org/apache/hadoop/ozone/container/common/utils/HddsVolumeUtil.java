@@ -175,6 +175,7 @@ public final class HddsVolumeUtil {
       clusterId, Logger logger) {
     File hddsRoot = hddsVolume.getHddsRootDir();
     String volumeRoot = hddsRoot.getPath();
+    File clusterDir = new File(hddsRoot, clusterId);
     File scmDir = new File(hddsRoot, scmId);
 
     try {
@@ -194,18 +195,24 @@ public final class HddsVolumeUtil {
     } else if (hddsFiles.length == 1) {
       // DN started for first time or this is a newly added volume.
       // So we create scm directory.
-      if (!scmDir.mkdir()) {
-        logger.error("Unable to create scmDir {}", scmDir);
+      if (!clusterDir.mkdir()) {
+        logger.error("Unable to create scmDir {}", clusterDir);
         return false;
       }
       return true;
     } else if(hddsFiles.length == 2) {
-      // The files should be Version and SCM directory
       if (scmDir.exists()) {
+        logger.error("Volume {} is in Inconsistent state, and contains the" +
+            "SCM Directory:{} which is in previous format, please upgrade" +
+            " the volume.", volumeRoot, scmDir.getAbsolutePath());
+        return false;
+      }
+      // The files should be Version and SCM directory
+      if (clusterDir.exists()) {
         return true;
       } else {
-        logger.error("Volume {} is in Inconsistent state, expected scm " +
-                "directory {} does not exist", volumeRoot, scmDir
+        logger.error("Volume {} is in Inconsistent state, expected cluster " +
+                "directory {} does not exist", volumeRoot, clusterDir
             .getAbsolutePath());
         return false;
       }
@@ -213,7 +220,7 @@ public final class HddsVolumeUtil {
       // The hdds root dir should always have 2 files. One is Version file
       // and other is SCM directory.
       logger.error("The hdds root dir {} should always have 2 files. " +
-              "One is Version file and other is SCM directory. " +
+              "One is Version file and other is Cluster directory. " +
               "Please remove any other extra files from the directory " +
               "so that DataNode startup can proceed.",
               hddsRoot.getAbsolutePath());

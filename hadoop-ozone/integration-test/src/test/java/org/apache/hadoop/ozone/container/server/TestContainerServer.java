@@ -217,7 +217,7 @@ public class TestContainerServer {
       }
       HddsDispatcher dispatcher = new HddsDispatcher(
           conf, containerSet, volumeSet, handlers, context, metrics, null);
-      dispatcher.setScmId(scmId.toString());
+      dispatcher.setClusterId(scmId.toString());
       dispatcher.init();
 
       server = new XceiverServerGrpc(datanodeDetails, conf, dispatcher,
@@ -274,7 +274,7 @@ public class TestContainerServer {
     }
 
     @Override
-    public void setScmId(String scmId) {
+    public void setClusterId(String scmId) {
 
     }
 
