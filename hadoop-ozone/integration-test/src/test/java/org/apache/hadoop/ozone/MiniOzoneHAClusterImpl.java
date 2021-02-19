@@ -272,8 +272,8 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
   public static class Builder extends MiniOzoneClusterImpl.Builder {
 
     private static final String OM_NODE_ID_PREFIX = "omNode-";
-    protected List<OzoneManager> activeOMs = new ArrayList<>();
-    protected List<OzoneManager> inactiveOMs = new ArrayList<>();
+    private List<OzoneManager> activeOMs = new ArrayList<>();
+    private List<OzoneManager> inactiveOMs = new ArrayList<>();
 
     private static final String SCM_NODE_ID_PREFIX = "scmNode-";
     private List<StorageContainerManager> activeSCMs = new ArrayList<>();
@@ -286,6 +286,14 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
      */
     public Builder(OzoneConfiguration conf) {
       super(conf);
+    }
+
+    public List<OzoneManager> getActiveOMs() {
+      return activeOMs;
+    }
+
+    public List<OzoneManager> getInactiveOMs() {
+      return inactiveOMs;
     }
 
     @Override

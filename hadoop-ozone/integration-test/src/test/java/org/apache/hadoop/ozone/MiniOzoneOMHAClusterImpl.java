@@ -103,7 +103,8 @@ public final class MiniOzoneOMHAClusterImpl extends MiniOzoneHAClusterImpl {
           Collections.singletonList(scm), reconServer);
 
       MiniOzoneClusterImpl cluster = new MiniOzoneOMHAClusterImpl(conf,
-          activeOMs, inactiveOMs, scm, hddsDatanodes, omServiceId, reconServer);
+          getActiveOMs(), getInactiveOMs(), scm, hddsDatanodes,
+          omServiceId, reconServer);
 
       if (startDataNodes) {
         cluster.startHddsDatanodes();
