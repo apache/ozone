@@ -130,8 +130,7 @@ public class DatanodeStateMachine implements Closeable {
     ContainerReplicator replicator =
         new DownloadAndImportReplicator(container.getContainerSet(),
             container.getController(),
-            new SimpleContainerDownloader(conf,
-                dnCertClient != null ? dnCertClient.getCACertificate() : null),
+            new SimpleContainerDownloader(conf, dnCertClient),
             new TarContainerPacker());
 
     replicatorMetrics = new MeasuredReplicator(replicator);

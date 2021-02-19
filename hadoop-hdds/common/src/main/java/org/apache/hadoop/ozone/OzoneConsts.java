@@ -392,4 +392,8 @@ public final class OzoneConsts {
   public static final String OM_RATIS_SNAPSHOT_DIR = "snapshot";
 
   public static final long DEFAULT_OM_UPDATE_ID = -1L;  
+
+  // CRL Sequence Id
+  public static final String CRL_SEQUENCE_ID_KEY = "CRL_SEQUENCE_ID";
+
 }
