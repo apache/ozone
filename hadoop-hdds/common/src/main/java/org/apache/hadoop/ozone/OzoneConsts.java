@@ -404,5 +404,11 @@ public final class OzoneConsts {
   public static final String OM_RATIS_SNAPSHOT_DIR = "snapshot";
   public static final String SCM_RATIS_SNAPSHOT_DIR = "snapshot";
 
-  public static final long DEFAULT_OM_UPDATE_ID = -1L;  
+  public static final long DEFAULT_OM_UPDATE_ID = -1L;
+
+
+  // SCM default service Id and node Id in non-HA where config is not defined
+  // in non-HA style.
+  public static final String SCM_DUMMY_NODEID = "scmNodeId";
+  public static final String SCM_DUMMY_SERVICE_ID = "scmServiceId";
 }

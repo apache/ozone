@@ -51,7 +51,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HTTPS_ADDRESS_K
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HTTPS_BIND_HOST_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HTTP_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HTTP_BIND_HOST_KEY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INTERNAL_SERVICE_ID;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEFAULT_SERVICE_ID;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY;
@@ -137,7 +137,7 @@ public class SCMHANodeDetails {
     Collection<String> scmServiceIds;
 
     localScmServiceId = conf.getTrimmed(
-        ScmConfigKeys.OZONE_SCM_INTERNAL_SERVICE_ID);
+        ScmConfigKeys.OZONE_SCM_DEFAULT_SERVICE_ID);
 
     LOG.info("ServiceID for StorageContainerManager is {}", localScmServiceId);
 
@@ -146,7 +146,7 @@ public class SCMHANodeDetails {
       // .scm.service.ids.
       LOG.info("{} is not defined, falling back to {} to find serviceID for "
               + "StorageContainerManager if it is HA enabled cluster",
-          OZONE_SCM_INTERNAL_SERVICE_ID, OZONE_SCM_SERVICE_IDS_KEY);
+          OZONE_SCM_DEFAULT_SERVICE_ID, OZONE_SCM_SERVICE_IDS_KEY);
       scmServiceIds = conf.getTrimmedStringCollection(
           OZONE_SCM_SERVICE_IDS_KEY);
     } else {
@@ -160,7 +160,7 @@ public class SCMHANodeDetails {
     boolean isSCMddressSet = false;
 
     for (String serviceId : scmServiceIds) {
-      Collection<String> scmNodeIds = ScmUtils.getSCMNodeIds(conf, serviceId);
+      Collection<String> scmNodeIds = SCMHAUtils.getSCMNodeIds(conf, serviceId);
 
       // TODO: need to fall back to ozone.scm.names in case scm node ids are
       // not defined.
