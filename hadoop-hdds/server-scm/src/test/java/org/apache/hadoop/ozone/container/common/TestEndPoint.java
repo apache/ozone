@@ -195,8 +195,6 @@ public class TestEndPoint {
       List<HddsVolume> volumesList = ozoneContainer.getVolumeSet()
           .getFailedVolumesList();
       Assert.assertTrue(volumesList.size() == 1);
-      File expectedClusterDir = new File(volumesList.get(0).getHddsRootDir(),
-          scmServerImpl.getClusterId());
       Assert.assertTrue(logCapturer.getOutput()
           .contains("org.apache.hadoop.ozone.common" +
               ".InconsistentStorageStateException: Mismatched ClusterIDs"));
