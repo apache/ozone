@@ -19,9 +19,20 @@ set -e -o pipefail
 
 _upgrade_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
+# The version that corresponds to the current build.
+: "${OZONE_CURRENT_VERSION:=1.1.0}"
+# Cumulative result of all tests run with run_test function.
+# 0 if all passed, 1 if any failed.
+: "${RESULT:=0}"
 : "${OZONE_REPLICATION_FACTOR:=3}"
+# TODO: Compose dir must be set or remove this.
 : "${OZONE_VOLUME:="${COMPOSE_DIR}/data"}"
 : "${OZONE_VOLUME_OWNER:=}"
+: "${ALL_RESULT_DIR:="$_upgrade_dir"/result}"
+
+# export for docker-compose
+export OZONE_VOLUME
+export OZONE_REPLICATION_FACTOR
 
 source "${_upgrade_dir}/../testlib.sh"
 
@@ -33,7 +44,7 @@ create_data_dir() {
   fi
 
   rm -fr "${OZONE_VOLUME}" 2> /dev/null || sudo rm -fr "${OZONE_VOLUME}"
-  mkdir -p "${OZONE_VOLUME}"/{dn1,dn2,dn3,om1,om2.om3,recon,s3g,scm}
+  mkdir -p "${OZONE_VOLUME}"/{dn1,dn2,dn3,om1,om2,om3,recon,s3g,scm}
   fix_data_dir_permissions
 }
 
@@ -48,6 +59,31 @@ prepare_for_image() {
 }
 
 callback() {
-    local hook="$1"
-    type -t "$hook" > /dev/null && "$hook"
+    local func="$1"
+    type -t "$func" > /dev/null && "$func"
+}
+
+reset_all_results() {
+  mkdir -p "$ALL_RESULT_DIR"
+  rm -f "$ALL_RESULT_DIR"/*
+}
+
+run_test() {
+    # Export variables needed by test, since it is run in a subshell.
+  local test_dir="$COMPOSE_DIR"/"$1"
+  export OZONE_UPGRADE_FROM="$2"
+  export OZONE_UPGRADE_TO="$3"
+  local test_subdir="$test_dir"/"$OZONE_UPGRADE_FROM"-"$OZONE_UPGRADE_TO"
+  export OZONE_UPGRADE_CALLBACK="$test_subdir"/callback.sh
+
+  OZONE_VOLUME="$test_subdir"/data
+  RESULT_DIR="$test_subdir"/result
+
+  create_data_dir
+
+  if ! run_test_script "${test_dir}"; then
+    RESULT=1
+  fi
+
+  copy_results "${result_parent_dir}" "${ALL_RESULT_DIR}"
 }

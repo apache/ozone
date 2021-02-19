@@ -19,27 +19,25 @@
 # image with Ozone binaries are required for both versions.
 
 set -e -o pipefail
+# Fail if required vars are not set.
+[[ "$OZONE_UPGRADE_FROM" ]]
+[[ "$OZONE_UPGRADE_TO" ]]
+[[ "$COMPOSE_DIR" ]]
+[[ "$OZONE_UPGRADE_CALLBACK" ]]
 
-: "${OZONE_REPLICATION_FACTOR:=3}"
-: "${OZONE_CURRENT_VERSION:="1.1.0"}"
-: "${OZONE_UPGRADE_FROM:="0.5.0"}"
-: "${OZONE_UPGRADE_TO:="$OZONE_CURRENT_VERSION"}"
+source "$COMPOSE_DIR"/testlib.sh
+source "$OZONE_UPGRADE_CALLBACK"
 
-prepare_for_image "${OZONE_UPGRADE_FROM}"
-# Load version specifics
+prepare_for_image "$OZONE_UPGRADE_FROM"
 callback setup_old_version
 start_docker_env
 callback with_old_version
 
 stop_docker_env
 
-# Unload version specifics, execute upgrade steps, load version specifics.
-# from=$(get_logical_version "${OZONE_UPGRADE_FROM}")
-# to=$(get_logical_version "${OZONE_UPGRADE_TO}")
-# execute_upgrade_steps "$from" "$to"
 callback setup_new_version
 
-prepare_for_binary_image "${OZONE_UPGRADE_TO}"
+prepare_for_binary_image "$OZONE_UPGRADE_TO"
 OZONE_KEEP_RESULTS=true start_docker_env
 callback with_new_version
 
