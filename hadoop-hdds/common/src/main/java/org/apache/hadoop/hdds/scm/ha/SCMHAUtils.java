@@ -126,9 +126,8 @@ public final class SCMHAUtils {
             "configured," + OZONE_SCM_DEFAULT_SERVICE_ID + " need to be " +
             "defined");
       } else if (scmServiceIds.size() == 1) {
-          localScmServiceId = scmServiceIds.iterator().next();
-        }
-      return localScmServiceId;
+        localScmServiceId = scmServiceIds.iterator().next();
+      }
     }
     return localScmServiceId;
   }
