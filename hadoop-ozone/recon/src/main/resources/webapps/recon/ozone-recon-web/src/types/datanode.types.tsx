@@ -16,9 +16,15 @@
  * limitations under the License.
  */
 
-export const DatanodeStatusList = ['HEALTHY', 'STALE', 'DEAD', 'DECOMMISSIONING', 'DECOMMISSIONED'] as const;
+// Corresponds to HddsProtos.NodeState
+export const DatanodeStatusList = ['HEALTHY', 'STALE', 'DEAD'] as const;
 type DatanodeStatusTuple = typeof DatanodeStatusList;
-export type DatanodeStatus = DatanodeStatusTuple[number]; // 'HEALTHY' | 'STALE' | 'DEAD' | 'DECOMMISSIONING' | 'DECOMMISSIONED';
+export type DatanodeStatus = DatanodeStatusTuple[number];
+
+// Corresponds to HddsProtos.NodeOperationalState
+export const DatanodeOpStatusList = ['IN_SERVICE', 'DECOMMISSIONING', 'DECOMMISSIONED', 'ENTERING_MAINTENANCE', 'IN_MAINTENANCE'] as const;
+type DatanodeOpStatusTypes = typeof DatanodeOpStatusList;
+export type DatanodeOpStatus = DatanodeOpStatusTypes[number];
 
 export interface IStorageReport {
   capacity: number;

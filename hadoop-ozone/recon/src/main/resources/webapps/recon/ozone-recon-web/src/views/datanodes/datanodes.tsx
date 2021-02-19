@@ -23,7 +23,13 @@ import {PaginationConfig} from 'antd/lib/pagination';
 import moment from 'moment';
 import {ReplicationIcon} from 'utils/themeIcons';
 import StorageBar from 'components/storageBar/storageBar';
-import {DatanodeStatus, DatanodeStatusList, IStorageReport} from 'types/datanode.types';
+import {
+  DatanodeStatus,
+  DatanodeStatusList,
+  DatanodeOpStatus,
+  DatanodeOpStatusList,
+  IStorageReport
+} from 'types/datanode.types';
 import './datanodes.less';
 import {AutoReloadHelper} from 'utils/autoReloadHelper';
 import AutoReloadPanel from 'components/autoReloadPanel/autoReloadPanel';
@@ -35,6 +41,7 @@ import {ColumnSearch} from 'utils/columnSearch';
 interface IDatanodeResponse {
   hostname: string;
   state: DatanodeStatus;
+  opState: DatanodeOpStatus;
   lastHeartbeat: number;
   storageReport: IStorageReport;
   pipelines: IPipeline[];
@@ -55,6 +62,7 @@ interface IDatanodesResponse {
 interface IDatanode {
   hostname: string;
   state: DatanodeStatus;
+  opState: DatanodeOpStatus;
   lastHeartbeat: number;
   storageUsed: number;
   storageTotal: number;
@@ -97,6 +105,18 @@ const renderDatanodeStatus = (status: DatanodeStatus) => {
   return <span>{icon} {status}</span>;
 };
 
+const renderDatanodeOpStatus = (status: DatanodeOpStatus) => {
+  const opStatusIconMap = {
+    IN_SERVICE: <Icon type='check-circle' theme='filled' twoToneColor='#1da57a' className='icon-success'/>,
+    DECOMMISSIONING: <Icon type='hourglass' theme='filled' className='icon-warning'/>,
+    DECOMMISSIONED: <Icon type='check-circle' theme='filled' className='icon-success'/>,
+    ENTERING_MAINTENANCE: <Icon type='hourglass' theme='filled' className='icon-warning'/>,
+    IN_MAINTENANCE: <Icon type='check-circle' theme='filled' className='icon-success'/>
+  };
+  const icon = status in opStatusIconMap ? opStatusIconMap[status] : '';
+  return <span>{icon} {status}</span>;
+};
+
 const COLUMNS = [
   {
     title: 'Status',
@@ -107,6 +127,18 @@ const COLUMNS = [
     filters: DatanodeStatusList.map(status => ({text: status, value: status})),
     onFilter: (value: DatanodeStatus, record: IDatanode) => record.state === value,
     render: (text: DatanodeStatus) => renderDatanodeStatus(text),
+    sorter: (a: IDatanode, b: IDatanode) => a.state.localeCompare(b.state),
+    fixed: 'left'
+  },
+  {
+    title: 'Operational Status',
+    dataIndex: 'opState',
+    key: 'opState',
+    isVisible: true,
+    filterMultiple: true,
+    filters: DatanodeOpStatusList.map(status => ({text: status, value: status})),
+    onFilter: (value: DatanodeOpStatus, record: IDatanode) => record.opState === value,
+    render: (text: DatanodeOpStatus) => renderDatanodeOpStatus(text),
     sorter: (a: IDatanode, b: IDatanode) => a.state.localeCompare(b.state),
     fixed: 'left'
   },
@@ -290,6 +322,7 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
           hostname: datanode.hostname,
           uuid: datanode.uuid,
           state: datanode.state,
+          opState: datanode.opState,
           lastHeartbeat: datanode.lastHeartbeat,
           storageUsed: datanode.storageReport.used,
           storageTotal: datanode.storageReport.capacity,
