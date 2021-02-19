@@ -490,6 +490,7 @@ public final class ContainerProtocolCalls  {
     ContainerProtos.GetSmallFileRequestProto getSmallFileRequest =
         GetSmallFileRequestProto
             .newBuilder().setBlock(getBlock)
+            .setReadChunkVersion(ContainerProtos.ReadChunkVersion.V1)
             .build();
     String id = client.getPipeline().getClosestNode().getUuidString();
 

@@ -18,6 +18,7 @@ package org.apache.hadoop.ozone.client.rpc.read;
 
 import java.io.IOException;
 import java.time.Duration;
+import java.util.List;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -28,6 +29,8 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager.ReplicationManagerConfiguration;
+import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
+import org.apache.hadoop.hdds.scm.storage.ChunkInputStream;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -35,6 +38,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
@@ -43,6 +47,7 @@ import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
+import org.junit.Test;
 import org.junit.rules.Timeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -55,13 +60,13 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTER
 @RunWith(Parameterized.class)
 public class TestInputStreamBase {
 
-  protected MiniOzoneCluster cluster;
-  protected OzoneConfiguration conf = new OzoneConfiguration();
-  protected OzoneClient client;
-  protected ObjectStore objectStore;
+  private MiniOzoneCluster cluster;
+  private OzoneConfiguration conf = new OzoneConfiguration();
+  private OzoneClient client;
+  private ObjectStore objectStore;
 
-  protected String volumeName;
-  protected String bucketName;
+  private String volumeName;
+  private String bucketName;
   private String keyString;
 
   private ChunkLayOutVersion chunkLayout;
@@ -141,6 +146,18 @@ public class TestInputStreamBase {
     }
   }
 
+  MiniOzoneCluster getCluster() {
+    return cluster;
+  }
+
+  String getVolumeName() {
+    return volumeName;
+  }
+
+  String getBucketName() {
+    return bucketName;
+  }
+
   KeyInputStream getKeyInputStream(String keyName) throws IOException {
     return (KeyInputStream) objectStore
         .getVolume(volumeName)
@@ -185,6 +202,45 @@ public class TestInputStreamBase {
     for (int i=0; i < readDataLen; i++) {
       Assert.assertEquals("Read data at does not match the input data at " +
               "position " + (offset + i), expectedData[i], readData[i]);
+    }
+  }
+
+  @Test
+  public void testInputStreams() throws Exception {
+    String keyName = getNewKeyName();
+    int dataLength = (2 * BLOCK_SIZE) + (CHUNK_SIZE) + 1;
+    byte[] inputData = writeRandomBytes(keyName, dataLength);
+
+    KeyInputStream keyInputStream = getKeyInputStream(keyName);
+
+    // Verify BlockStreams and ChunkStreams
+    int expectedNumBlockStreams = BufferUtils.getNumberOfBins(
+        dataLength, BLOCK_SIZE);
+    List<BlockInputStream> blockStreams = keyInputStream.getBlockStreams();
+    Assert.assertEquals(expectedNumBlockStreams, blockStreams.size());
+
+    int readBlockLength = 0;
+    for (BlockInputStream blockStream : blockStreams) {
+      int blockStreamLength = Math.min(BLOCK_SIZE,
+          dataLength - readBlockLength);
+      Assert.assertEquals(blockStreamLength, blockStream.getLength());
+
+      int expectedNumChunkStreams =
+          BufferUtils.getNumberOfBins(blockStreamLength, CHUNK_SIZE);
+      blockStream.initialize();
+      List<ChunkInputStream> chunkStreams = blockStream.getChunkStreams();
+      Assert.assertEquals(expectedNumChunkStreams, chunkStreams.size());
+
+      int readChunkLength = 0;
+      for (ChunkInputStream chunkStream : chunkStreams) {
+        int chunkStreamLength = Math.min(CHUNK_SIZE,
+            blockStreamLength - readChunkLength);
+        Assert.assertEquals(chunkStreamLength, chunkStream.getRemaining());
+
+        readChunkLength += chunkStreamLength;
+      }
+
+      readBlockLength += blockStreamLength;
     }
   }
 }

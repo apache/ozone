@@ -43,8 +43,7 @@ public final class BufferUtils {
     Preconditions.checkArgument(bufferCapacity > 0, "Buffer Capacity should " +
         "be a positive integer.");
 
-    int numBuffers =
-        (int) Math.ceil((double) totalLen / (double) bufferCapacity);
+    int numBuffers = getNumberOfBins(totalLen, bufferCapacity);
 
     ByteBuffer[] dataBuffers = new ByteBuffer[numBuffers];
     int buffersAllocated = 0;
@@ -81,5 +80,16 @@ public final class BufferUtils {
       length += buffer.size();
     }
     return length;
+  }
+
+  /**
+   * Return the number of bins required to hold all the elements given a max
+   * capacity for each bin.
+   * @param numElements total number of elements to put in bin
+   * @param maxElementsPerBin max number of elements per bin
+   * @return number of bins
+   */
+  public static int getNumberOfBins(long numElements, long maxElementsPerBin) {
+    return (int) Math.ceil((double) numElements / (double) maxElementsPerBin);
   }
 }

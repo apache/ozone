@@ -229,7 +229,7 @@ public class FilePerChunkStrategy implements ChunkManager {
 
     long len = info.getLen();
 
-    long bufferCapacity;
+    long bufferCapacity = 0;
     if (info.isReadDataIntoSingleBuffer()) {
       // Older client - read all chunk data into one single buffer.
       bufferCapacity = len;
@@ -239,10 +239,13 @@ public class FilePerChunkStrategy implements ChunkManager {
       // capacity to default (OZONE_CHUNK_READ_BUFFER_DEFAULT_SIZE_KEY = 64KB).
       ChecksumData checksumData = info.getChecksumData();
 
-      if (checksumData.getChecksumType() == ContainerProtos.ChecksumType.NONE) {
-        bufferCapacity = defaultReadBufferCapacity;
-      } else {
-        bufferCapacity = checksumData.getBytesPerChecksum();
+      if (checksumData != null) {
+        if (checksumData.getChecksumType() ==
+            ContainerProtos.ChecksumType.NONE) {
+          bufferCapacity = defaultReadBufferCapacity;
+        } else {
+          bufferCapacity = checksumData.getBytesPerChecksum();
+        }
       }
     }
     // If the buffer capacity is 0, set all the data into one ByteBuffer

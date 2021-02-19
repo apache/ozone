@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientMetrics;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
 import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
@@ -55,8 +56,11 @@ public class TestKeyInputStream extends TestInputStreamBase {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestKeyInputStream.class);
 
+  private MiniOzoneCluster cluster;
+
   public TestKeyInputStream(ChunkLayOutVersion layout) {
     super(layout);
+    this.cluster = getCluster();
   }
 
   /**
@@ -275,8 +279,8 @@ public class TestKeyInputStream extends TestInputStreamBase {
     String keyName = getNewKeyName();
     byte[] data = writeRandomBytes(keyName, dataLength);
 
-    OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
-        .setBucketName(bucketName)
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(getVolumeName())
+        .setBucketName(getBucketName())
         .setKeyName(keyName)
         .setType(HddsProtos.ReplicationType.RATIS)
         .setFactor(HddsProtos.ReplicationFactor.THREE)
