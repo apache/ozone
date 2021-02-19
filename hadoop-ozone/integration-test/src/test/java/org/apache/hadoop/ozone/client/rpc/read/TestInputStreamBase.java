@@ -209,7 +209,7 @@ public class TestInputStreamBase {
   public void testInputStreams() throws Exception {
     String keyName = getNewKeyName();
     int dataLength = (2 * BLOCK_SIZE) + (CHUNK_SIZE) + 1;
-    byte[] inputData = writeRandomBytes(keyName, dataLength);
+    writeRandomBytes(keyName, dataLength);
 
     KeyInputStream keyInputStream = getKeyInputStream(keyName);
 

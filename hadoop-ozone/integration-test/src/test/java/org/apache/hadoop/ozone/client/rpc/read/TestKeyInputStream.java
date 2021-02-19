@@ -56,11 +56,8 @@ public class TestKeyInputStream extends TestInputStreamBase {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestKeyInputStream.class);
 
-  private MiniOzoneCluster cluster;
-
   public TestKeyInputStream(ChunkLayOutVersion layout) {
     super(layout);
-    this.cluster = getCluster();
   }
 
   /**
@@ -273,7 +270,7 @@ public class TestKeyInputStream extends TestInputStreamBase {
   }
 
   private void testReadAfterReplication(boolean doUnbuffer) throws Exception {
-    Assume.assumeTrue(cluster.getHddsDatanodes().size() > 3);
+    Assume.assumeTrue(getCluster().getHddsDatanodes().size() > 3);
 
     int dataLength = 2 * CHUNK_SIZE;
     String keyName = getNewKeyName();
@@ -285,7 +282,7 @@ public class TestKeyInputStream extends TestInputStreamBase {
         .setType(HddsProtos.ReplicationType.RATIS)
         .setFactor(HddsProtos.ReplicationFactor.THREE)
         .build();
-    OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
+    OmKeyInfo keyInfo = getCluster().getOzoneManager().lookupKey(keyArgs);
 
     OmKeyLocationInfoGroup locations = keyInfo.getLatestVersionLocations();
     Assert.assertNotNull(locations);
@@ -293,9 +290,9 @@ public class TestKeyInputStream extends TestInputStreamBase {
     Assert.assertEquals(1, locationInfoList.size());
     OmKeyLocationInfo loc = locationInfoList.get(0);
     long containerID = loc.getContainerID();
-    Assert.assertEquals(3, countReplicas(containerID, cluster));
+    Assert.assertEquals(3, countReplicas(containerID, getCluster()));
 
-    TestHelper.waitForContainerClose(cluster, containerID);
+    TestHelper.waitForContainerClose(getCluster(), containerID);
 
     List<DatanodeDetails> pipelineNodes = loc.getPipeline().getNodes();
 
@@ -309,7 +306,7 @@ public class TestKeyInputStream extends TestInputStreamBase {
         keyInputStream.unbuffer();
       }
 
-      cluster.shutdownHddsDatanode(pipelineNodes.get(0));
+      getCluster().shutdownHddsDatanode(pipelineNodes.get(0));
 
       // check that we can still read it
       assertReadFully(data, keyInputStream, dataLength - 1, 1);
@@ -329,7 +326,7 @@ public class TestKeyInputStream extends TestInputStreamBase {
     HddsProtos.NodeState health = null;
     try {
       NodeManager nodeManager =
-          cluster.getStorageContainerManager().getScmNodeManager();
+          getCluster().getStorageContainerManager().getScmNodeManager();
       health = nodeManager.getNodeStatus(dn).getHealth();
     } catch (NodeNotFoundException e) {
       fail("Unexpected NodeNotFound exception");
