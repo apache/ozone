@@ -125,11 +125,11 @@ public final class SCMHAUtils {
         throw new ConfigurationException("When multiple SCM Service Ids are " +
             "configured," + OZONE_SCM_DEFAULT_SERVICE_ID + " need to be " +
             "defined");
-      } else
-        if (scmServiceIds.size() == 1) {
+      } else if (scmServiceIds.size() == 1) {
           localScmServiceId = scmServiceIds.iterator().next();
         }
       return localScmServiceId;
     }
+    return localScmServiceId;
   }
 }
