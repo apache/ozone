@@ -74,6 +74,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys
     .HDDS_PIPELINE_ACTION_MAX_LIMIT;
 import static org.apache.hadoop.hdds.HddsConfigKeys
     .HDDS_PIPELINE_ACTION_MAX_LIMIT_DEFAULT;
+import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVersionProto;
 
 /**
  * Heartbeat class for SCMs.
@@ -160,12 +161,9 @@ public class HeartbeatEndpointTask
     try {
       Preconditions.checkState(this.datanodeDetailsProto != null);
 
-      LayoutVersionProto layoutinfo = LayoutVersionProto.newBuilder()
-          .setSoftwareLayoutVersion(
-              layoutVersionManager.getSoftwareLayoutVersion())
-          .setMetadataLayoutVersion(
-              layoutVersionManager.getMetadataLayoutVersion())
-          .build();
+      LayoutVersionProto layoutinfo = toLayoutVersionProto(
+          layoutVersionManager.getMetadataLayoutVersion(),
+          layoutVersionManager.getSoftwareLayoutVersion());
 
       requestBuilder = SCMHeartbeatRequestProto.newBuilder()
           .setDatanodeDetails(datanodeDetailsProto)

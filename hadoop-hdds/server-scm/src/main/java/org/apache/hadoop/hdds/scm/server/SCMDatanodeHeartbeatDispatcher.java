@@ -111,11 +111,12 @@ public final class SCMDatanodeHeartbeatDispatcher {
         // SCM.
         layoutVersion = toLayoutVersionProto(INITIAL_VERSION.layoutVersion(),
             INITIAL_VERSION.layoutVersion());
+      } else {
+        layoutVersion = heartbeat.getDataNodeLayoutVersion();
       }
 
       LOG.debug("Processing DataNode Layout Report.");
-      nodeManager.processLayoutVersionReport(datanodeDetails,
-          heartbeat.getDataNodeLayoutVersion());
+      nodeManager.processLayoutVersionReport(datanodeDetails, layoutVersion);
 
       // should we dispatch heartbeat through eventPublisher?
       commands = nodeManager.processHeartbeat(datanodeDetails,
