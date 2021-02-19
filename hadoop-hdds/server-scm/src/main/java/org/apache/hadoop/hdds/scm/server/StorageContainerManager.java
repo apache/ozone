@@ -717,10 +717,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     StorageState state = scmStorageConfig.getState();
     if (state != StorageState.INITIALIZED) {
       Preconditions.checkNotNull(scmStorageConfig.getScmId());
-      if (fetchedId != persistedClusterId) {
+      if (!fetchedId.equals(persistedClusterId)) {
         LOG.error(
             "Could not bootstrap as SCM is already initialized with cluster "
-                + "id {} but cluster id for existing running SCM instance "
+                + "id {} but cluster id for existing leader SCM instance "
                 + "is {}", persistedClusterId, fetchedId);
         return false;
       }
