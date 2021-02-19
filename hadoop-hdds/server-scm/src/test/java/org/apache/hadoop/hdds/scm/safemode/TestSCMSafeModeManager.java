@@ -63,9 +63,9 @@ import org.mockito.Mockito;
  */
 public class TestSCMSafeModeManager {
 
-  private static EventQueue queue;
+  private EventQueue queue;
   private SCMSafeModeManager scmSafeModeManager;
-  private static OzoneConfiguration config;
+  private OzoneConfiguration config;
   private List<ContainerInfo> containers = Collections.emptyList();
 
   @Rule

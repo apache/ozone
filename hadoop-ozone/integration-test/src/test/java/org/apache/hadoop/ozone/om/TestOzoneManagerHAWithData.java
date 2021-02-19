@@ -45,6 +45,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.MiniOzoneHAClusterImpl.NODE_FAILURE_TIMEOUT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DIRECTORY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_ALREADY_EXISTS;
@@ -167,7 +168,6 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
     testCreateFile(ozoneBucket, keyName2, data, true, false);
     testCreateFile(ozoneBucket, keyName3, data, true, false);
     testCreateFile(ozoneBucket, keyName4, data, true, false);
-    ozoneBucket.getKey("dir/file1").getName();
 
     // Delete keyName1 use deleteKey api.
     ozoneBucket.deleteKey(keyName1);
@@ -335,7 +335,7 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
     String value = "random data";
     OzoneOutputStream ozoneOutputStream = ozoneBucket.createMultipartKey(
         keyName, value.length(), 1, uploadID);
-    ozoneOutputStream.write(value.getBytes(), 0, value.length());
+    ozoneOutputStream.write(value.getBytes(UTF_8), 0, value.length());
     ozoneOutputStream.close();
 
 
@@ -350,9 +350,9 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
 
     OzoneInputStream ozoneInputStream = ozoneBucket.readKey(keyName);
 
-    byte[] fileContent = new byte[value.getBytes().length];
+    byte[] fileContent = new byte[value.getBytes(UTF_8).length];
     ozoneInputStream.read(fileContent);
-    Assert.assertEquals(value, new String(fileContent));
+    Assert.assertEquals(value, new String(fileContent, UTF_8));
   }
 
 
@@ -388,14 +388,14 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
       OzoneOutputStream ozoneOutputStream = ozoneBucket.createKey(keyName,
           value.length(), ReplicationType.STAND_ALONE,
           ReplicationFactor.ONE, new HashMap<>());
-      ozoneOutputStream.write(value.getBytes(), 0, value.length());
+      ozoneOutputStream.write(value.getBytes(UTF_8), 0, value.length());
       ozoneOutputStream.close();
 
       OzoneInputStream ozoneInputStream = ozoneBucket.readKey(keyName);
 
-      byte[] fileContent = new byte[value.getBytes().length];
+      byte[] fileContent = new byte[value.getBytes(UTF_8).length];
       ozoneInputStream.read(fileContent);
-      Assert.assertEquals(value, new String(fileContent));
+      Assert.assertEquals(value, new String(fileContent, UTF_8));
 
     } catch (ConnectException | RemoteException e) {
       if (!checkSuccess) {
@@ -652,7 +652,7 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
     String value = "random data";
     OzoneOutputStream ozoneOutputStream = ozoneBucket.createMultipartKey(
         keyName, value.length(), partNumber, uploadID);
-    ozoneOutputStream.write(value.getBytes(), 0, value.length());
+    ozoneOutputStream.write(value.getBytes(UTF_8), 0, value.length());
     ozoneOutputStream.close();
 
     return ozoneOutputStream.getCommitUploadPartInfo().getPartName();

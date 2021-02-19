@@ -17,10 +17,12 @@
  */
 package org.apache.hadoop.ozone.recon;
 
+import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.util.List;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
@@ -58,6 +60,7 @@ import com.google.inject.Singleton;
 import com.google.inject.multibindings.Multibinder;
 import static org.apache.hadoop.hdds.scm.cli.ContainerOperationClient.newContainerRpcClient;
 import static org.apache.hadoop.ozone.OmUtils.getOzoneManagerServiceId;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
 
 import org.apache.ratis.protocol.ClientId;
 import org.hadoop.ozone.recon.codegen.ReconSqlDbConfig;
@@ -183,6 +186,14 @@ public class ReconControllerModule extends AbstractModule {
 
     ReconSqlDbConfig sqlDbConfig =
         ozoneConfiguration.getObject(ReconSqlDbConfig.class);
+
+    if (StringUtils.contains(sqlDbConfig.getJdbcUrl(), OZONE_RECON_DB_DIR)) {
+      ReconUtils reconUtils = new ReconUtils();
+      File reconDbDir =
+          reconUtils.getReconDbDir(ozoneConfiguration, OZONE_RECON_DB_DIR);
+      sqlDbConfig.setJdbcUrl(
+          "jdbc:derby:" + reconDbDir.getPath() + "/ozone_recon_derby.db");
+    }
 
     return new DataSourceConfiguration() {
       @Override

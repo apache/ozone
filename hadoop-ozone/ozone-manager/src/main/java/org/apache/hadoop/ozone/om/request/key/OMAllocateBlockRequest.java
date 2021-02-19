@@ -123,7 +123,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
 
     // Add allocated block info.
     newAllocatedBlockRequest.setKeyLocation(
-        omKeyLocationInfoList.get(0).getProtobuf());
+        omKeyLocationInfoList.get(0).getProtobuf(getOmRequest().getVersion()));
 
     return getOmRequest().toBuilder().setUserInfo(getUserInfo())
         .setAllocateBlockRequest(newAllocatedBlockRequest).build();

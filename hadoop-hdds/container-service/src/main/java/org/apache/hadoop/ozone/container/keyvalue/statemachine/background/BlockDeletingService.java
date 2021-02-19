@@ -94,9 +94,9 @@ public class BlockDeletingService extends BackgroundService {
   private final int containerLimitPerInterval;
 
   // Task priority is useful when a to-delete block has weight.
-  private final static int TASK_PRIORITY_DEFAULT = 1;
+  private static final int TASK_PRIORITY_DEFAULT = 1;
   // Core pool size for container tasks
-  private final static int BLOCK_DELETING_SERVICE_CORE_POOL_SIZE = 10;
+  private static final int BLOCK_DELETING_SERVICE_CORE_POOL_SIZE = 10;
 
   public BlockDeletingService(OzoneContainer ozoneContainer,
       long serviceInterval, long serviceTimeout, TimeUnit timeUnit,

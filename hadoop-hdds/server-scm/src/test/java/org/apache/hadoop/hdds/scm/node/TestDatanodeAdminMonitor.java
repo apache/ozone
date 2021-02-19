@@ -512,7 +512,7 @@ public class TestDatanodeAdminMonitor {
    * This simple internal class is used to track and handle any DatanodeAdmin
    * events fired by the DatanodeAdminMonitor during tests.
    */
-  private class DatanodeAdminHandler implements
+  private static class DatanodeAdminHandler implements
       EventHandler<DatanodeDetails> {
 
     private AtomicInteger invocation = new AtomicInteger(0);

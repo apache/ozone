@@ -226,8 +226,6 @@ public class TestKeyValueBlockIterator {
   public void testKeyValueBlockIteratorWithOnlyDeletedBlocks() throws
       Exception {
     createContainerWithBlocks(CONTAINER_ID, 0, 5);
-    String containerPath = new File(containerData.getMetadataPath())
-        .getParent();
     try(BlockIterator<BlockData> keyValueBlockIterator =
                 db.getStore().getBlockIterator()) {
       //As all blocks are deleted blocks, blocks does not match with normal key

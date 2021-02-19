@@ -58,7 +58,7 @@ public class OzoneManagerDoubleBufferMetrics {
       "iteration")
   private MutableGaugeFloat avgFlushTransactionsInOneIteration;
 
-  public synchronized static OzoneManagerDoubleBufferMetrics create() {
+  public static synchronized OzoneManagerDoubleBufferMetrics create() {
     if (instance != null) {
       return instance;
     } else {

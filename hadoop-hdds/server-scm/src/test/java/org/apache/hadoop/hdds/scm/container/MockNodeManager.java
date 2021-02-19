@@ -70,8 +70,8 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
  * Test Helper for testing container Mapping.
  */
 public class MockNodeManager implements NodeManager {
-  public final static int NUM_PIPELINE_PER_METADATA_DISK = 2;
-  private final static NodeData[] NODES = {
+  public static final int NUM_PIPELINE_PER_METADATA_DISK = 2;
+  private static final NodeData[] NODES = {
       new NodeData(10L * OzoneConsts.TB, OzoneConsts.GB),
       new NodeData(64L * OzoneConsts.TB, 100 * OzoneConsts.GB),
       new NodeData(128L * OzoneConsts.TB, 256 * OzoneConsts.GB),
@@ -299,6 +299,7 @@ public class MockNodeManager implements NodeManager {
    * @param datanodeDetails The datanode to set the new state for
    * @param newState The new operational state for the node
    */
+  @Override
   public void setNodeOperationalState(DatanodeDetails datanodeDetails,
       HddsProtos.NodeOperationalState newState) throws NodeNotFoundException {
   }
@@ -308,6 +309,7 @@ public class MockNodeManager implements NodeManager {
    * @param datanodeDetails The datanode to set the new state for
    * @param newState The new operational state for the node
    */
+  @Override
   public void setNodeOperationalState(DatanodeDetails datanodeDetails,
       HddsProtos.NodeOperationalState newState, long opStateExpiryEpocSec)
       throws NodeNotFoundException {
@@ -542,7 +544,7 @@ public class MockNodeManager implements NodeManager {
   @Override
   public Boolean isNodeRegistered(
       DatanodeDetails datanodeDetails) {
-    return null;
+    return false;
   }
 
   @Override

@@ -35,9 +35,7 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.jooq.DSLContext;
 import org.junit.Before;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -62,9 +60,6 @@ public class TestTableCountTask extends AbstractReconSqlDBTest {
   private TableCountTask tableCountTask;
   private DSLContext dslContext;
   private boolean isSetupDone = false;
-
-  @Rule
-  public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
   private void initializeInjector() throws IOException {
     ReconOMMetadataManager omMetadataManager = getTestReconOmMetadataManager(

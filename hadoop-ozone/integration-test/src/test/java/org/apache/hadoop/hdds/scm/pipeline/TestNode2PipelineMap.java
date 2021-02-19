@@ -54,12 +54,12 @@ public class TestNode2PipelineMap {
   @Rule
   public Timeout timeout = new Timeout(300000);
 
-  private static MiniOzoneCluster cluster;
-  private static OzoneConfiguration conf;
-  private static StorageContainerManager scm;
-  private static ContainerWithPipeline ratisContainer;
-  private static ContainerManager containerManager;
-  private static PipelineManager pipelineManager;
+  private MiniOzoneCluster cluster;
+  private OzoneConfiguration conf;
+  private StorageContainerManager scm;
+  private ContainerWithPipeline ratisContainer;
+  private ContainerManager containerManager;
+  private PipelineManager pipelineManager;
 
   /**
    * Create a MiniDFSCluster for testing.

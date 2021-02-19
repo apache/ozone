@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.conf;
 
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.nio.charset.StandardCharsets;
 import java.util.Scanner;
 
 import org.junit.Assert;
@@ -36,7 +37,8 @@ public class TestConfigFileGenerator {
   @Test
   public void testGeneratedXml() throws FileNotFoundException {
     String generatedXml =
-        new Scanner(new File("target/test-classes/ozone-default-generated.xml"))
+        new Scanner(new File("target/test-classes/ozone-default-generated.xml"),
+            StandardCharsets.UTF_8.name())
             .useDelimiter("//Z")
             .next();
 

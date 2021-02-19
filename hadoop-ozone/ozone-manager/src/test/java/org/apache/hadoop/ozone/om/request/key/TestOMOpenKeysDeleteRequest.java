@@ -22,7 +22,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
-import java.util.Random;
 
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -265,7 +264,7 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
 
     for (int i = 0; i < numKeys; i++) {
       String keyName = UUID.randomUUID().toString();
-      long clientID = new Random().nextLong();
+      long clientID = random.nextLong();
 
       OpenKey openKey = OpenKey.newBuilder()
           .setName(keyName)
@@ -299,7 +298,7 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
             .setBucketName(bucket);
 
     for (int i = 0; i < numKeys; i++) {
-      long clientID = new Random().nextLong();
+      long clientID = random.nextLong();
 
       OpenKey openKey = OpenKey.newBuilder()
           .setName(key)

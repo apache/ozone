@@ -207,8 +207,8 @@ public class OMHANodeDetails {
       int ratisPort = conf.getInt(OZONE_OM_RATIS_PORT_KEY,
           OZONE_OM_RATIS_PORT_DEFAULT);
 
-      LOG.info("Configuration either no {} set. Falling back to the default " +
-          "OM address {}", OZONE_OM_ADDRESS_KEY, omAddress);
+      LOG.info("Configuration does not have {} set. Falling back to the " +
+          "default OM address {}", OZONE_OM_ADDRESS_KEY, omAddress);
 
       return new OMHANodeDetails(getOMNodeDetails(conf, null,
           null, omAddress, ratisPort), new ArrayList<>());
@@ -237,6 +237,13 @@ public class OMHANodeDetails {
       serviceId = OzoneConsts.OM_SERVICE_ID_DEFAULT;
       LOG.info("OM Service ID is not set. Setting it to the default ID: {}",
           serviceId);
+    }
+
+    if (nodeId == null) {
+      // If no nodeId is provided, set the default nodeID - om1
+      nodeId = OzoneConsts.OM_DEFAULT_NODE_ID;
+      LOG.info("OM Node ID is not set. Setting it to the default ID: {}",
+          nodeId);
     }
 
     // We need to pass null for serviceID and nodeID as this is set for

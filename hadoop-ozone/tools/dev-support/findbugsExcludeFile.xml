@@ -13,7 +13,21 @@
   limitations under the License. See accompanying LICENSE file.
 -->
 <FindBugsFilter>
-     <Match>
-       <Package name="org.apache.hadoop.ozone.genesis.generated" />
-     </Match>
+    <Match>
+      <Package name="org.apache.hadoop.ozone.genesis.generated" />
+    </Match>
+
+    <!-- Test -->
+    <Match>
+      <Class name="org.apache.hadoop.ozone.recon.TestReconUtils"/>
+      <Bug pattern="OBL_UNSATISFIED_OBLIGATION_EXCEPTION_EDGE" />
+    </Match>
+    <Match>
+      <Class name="org.apache.hadoop.ozone.genconf.TestGenerateOzoneRequiredConfigurations"/>
+      <Bug pattern="RV_RETURN_VALUE_IGNORED_BAD_PRACTICE" />
+    </Match>
+    <Match>
+      <Class name="org.apache.hadoop.ozone.genconf.TestGenerateOzoneRequiredConfigurations"/>
+      <Bug pattern="DLS_DEAD_LOCAL_STORE" />
+    </Match>
  </FindBugsFilter>

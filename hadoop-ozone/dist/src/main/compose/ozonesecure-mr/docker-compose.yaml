@@ -33,6 +33,8 @@ services:
       - 9600:9600
     env_file:
       - ./docker-config
+    volumes:
+      - ../../libexec/transformation.py:/opt/transformation.py
     command: ["hadoop", "kms"]
   datanode:
     image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
@@ -48,7 +50,7 @@ services:
     env_file:
       - docker-config
     environment:
-      HADOOP_OPTS: ${HADOOP_OPTS}
+      OZONE_OPTS:
   om:
     image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
     hostname: om
@@ -63,7 +65,7 @@ services:
       - 9862:9862
     environment:
       ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
-      HADOOP_OPTS: ${HADOOP_OPTS}
+      OZONE_OPTS:
     env_file:
       - docker-config
     command: ["/opt/hadoop/bin/ozone","om"]
@@ -81,7 +83,7 @@ services:
     env_file:
       - ./docker-config
     environment:
-      HADOOP_OPTS: ${HADOOP_OPTS}
+      OZONE_OPTS:
     command: ["/opt/hadoop/bin/ozone","s3g"]
   scm:
     image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
@@ -100,7 +102,7 @@ services:
     environment:
       ENSURE_SCM_INITIALIZED: /data/metadata/scm/current/VERSION
       OZONE-SITE.XML_hdds.scm.safemode.min.datanode: "${OZONE_SAFEMODE_MIN_DATANODES:-1}"
-      HADOOP_OPTS: ${HADOOP_OPTS}
+      OZONE_OPTS:
     command: ["/opt/hadoop/bin/ozone","scm"]
   rm:
     image: ${HADOOP_IMAGE}:${HADOOP_VERSION}
@@ -111,6 +113,7 @@ services:
       - ../..:/opt/ozone
       - ./keytabs:/etc/security/keytabs
       - ./krb5.conf:/etc/krb5.conf
+      - ../../libexec/transformation.py:/opt/transformation.py
     ports:
       - 8088:8088
     env_file:
@@ -127,6 +130,7 @@ services:
       - ../..:/opt/ozone
       - ./keytabs:/etc/security/keytabs
       - ./krb5.conf:/etc/krb5.conf
+      - ../../libexec/transformation.py:/opt/transformation.py
     env_file:
       - ./docker-config
     environment:
@@ -142,6 +146,7 @@ services:
       - ../..:/opt/ozone
       - ./keytabs:/etc/security/keytabs
       - ./krb5.conf:/etc/krb5.conf
+      - ../../libexec/transformation.py:/opt/transformation.py
     ports:
       - 8188:8188
     env_file:

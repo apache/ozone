@@ -43,7 +43,7 @@ public final class OzonePBHelper {
    * This map should not be accessed directly. Used the getFixedByteString
    * methods instead.
    */
-  private final static ConcurrentHashMap<Object, ByteString>
+  private static final ConcurrentHashMap<Object, ByteString>
           FIXED_BYTESTRING_CACHE = new ConcurrentHashMap<>();
 
   /**

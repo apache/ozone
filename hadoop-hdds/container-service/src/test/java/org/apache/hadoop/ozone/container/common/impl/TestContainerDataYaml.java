@@ -47,7 +47,7 @@ import static org.junit.Assert.fail;
 @RunWith(Parameterized.class)
 public class TestContainerDataYaml {
 
-  private static long testContainerID = 1234;
+  private long testContainerID = 1234;
 
   private static String testRoot = new FileSystemTestHelper().getTestRootDir();
 

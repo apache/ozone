@@ -24,14 +24,16 @@ services:
       - ./keytabs:/etc/security/keytabs
     command: ["krb5kdc","-n"]
   kms:
-      image: apache/hadoop:${HADOOP_VERSION}
-      ports:
-      - 9600:9600
-      env_file:
-      - ./docker-config
-      environment:
-        HADOOP_CONF_DIR: /opt/hadoop/etc/hadoop
-      command: ["hadoop", "kms"]
+    image: apache/hadoop:${HADOOP_VERSION}
+    ports:
+    - 9600:9600
+    env_file:
+    - ./docker-config
+    environment:
+      HADOOP_CONF_DIR: /opt/hadoop/etc/hadoop
+    volumes:
+      - ../../libexec/transformation.py:/opt/transformation.py
+    command: ["hadoop", "kms"]
   datanode:
     image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
     volumes:
@@ -44,7 +46,7 @@ services:
     env_file:
       - docker-config
     environment:
-      HADOOP_OPTS: ${HADOOP_OPTS}
+      OZONE_OPTS:
   om:
     image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
     hostname: om
@@ -57,7 +59,7 @@ services:
       - 9862:9862
     environment:
       ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
-      HADOOP_OPTS: ${HADOOP_OPTS}
+      OZONE_OPTS:
     env_file:
       - docker-config
     command: ["/opt/hadoop/bin/ozone","om"]
@@ -75,7 +77,7 @@ services:
       - ./docker-config
     command: ["/opt/hadoop/bin/ozone","s3g"]
     environment:
-      HADOOP_OPTS: ${HADOOP_OPTS}
+      OZONE_OPTS:
   recon:
     image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
     hostname: recon
@@ -88,7 +90,7 @@ services:
     env_file:
       - ./docker-config
     environment:
-      HADOOP_OPTS: ${HADOOP_OPTS}
+      OZONE_OPTS:
     command: ["/opt/hadoop/bin/ozone","recon"]
   scm:
     image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
@@ -105,5 +107,5 @@ services:
     environment:
       ENSURE_SCM_INITIALIZED: /data/metadata/scm/current/VERSION
       OZONE-SITE.XML_hdds.scm.safemode.min.datanode: "${OZONE_SAFEMODE_MIN_DATANODES:-1}"
-      HADOOP_OPTS: ${HADOOP_OPTS}
+      OZONE_OPTS:
     command: ["/opt/hadoop/bin/ozone","scm"]

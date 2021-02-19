@@ -41,7 +41,7 @@ public class OpenKeyCleanupService extends BackgroundService {
   private static final Logger LOG =
       LoggerFactory.getLogger(OpenKeyCleanupService.class);
 
-  private final static int OPEN_KEY_DELETING_CORE_POOL_SIZE = 2;
+  private static final int OPEN_KEY_DELETING_CORE_POOL_SIZE = 2;
 
   private final KeyManager keyManager;
   private final ScmBlockLocationProtocol scmClient;

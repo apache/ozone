@@ -88,18 +88,18 @@ public class TestKeyInputStream {
 
   private static final int TIMEOUT = 300_000;
 
-  private static MiniOzoneCluster cluster;
-  private static OzoneConfiguration conf = new OzoneConfiguration();
-  private static OzoneClient client;
-  private static ObjectStore objectStore;
-  private static int chunkSize;
-  private static int flushSize;
-  private static int maxFlushSize;
-  private static int blockSize;
-  private static String volumeName;
-  private static String bucketName;
-  private static String keyString;
-  private static ChunkLayoutTestInfo chunkLayout;
+  private MiniOzoneCluster cluster;
+  private OzoneConfiguration conf = new OzoneConfiguration();
+  private OzoneClient client;
+  private ObjectStore objectStore;
+  private int chunkSize;
+  private int flushSize;
+  private int maxFlushSize;
+  private int blockSize;
+  private String volumeName;
+  private String bucketName;
+  private String keyString;
+  private ChunkLayoutTestInfo chunkLayout;
 
   @Parameterized.Parameters
   public static Collection<Object[]> layouts() {
@@ -471,7 +471,7 @@ public class TestKeyInputStream {
     }
   }
 
-  private static void waitForNodeToBecomeDead(
+  private void waitForNodeToBecomeDead(
       DatanodeDetails datanode) throws TimeoutException, InterruptedException {
     GenericTestUtils.waitFor(() ->
         HddsProtos.NodeState.DEAD == getNodeHealth(datanode),
@@ -480,7 +480,7 @@ public class TestKeyInputStream {
         getNodeHealth(datanode));
   }
 
-  private static HddsProtos.NodeState getNodeHealth(DatanodeDetails dn) {
+  private HddsProtos.NodeState getNodeHealth(DatanodeDetails dn) {
     HddsProtos.NodeState health = null;
     try {
       NodeManager nodeManager =

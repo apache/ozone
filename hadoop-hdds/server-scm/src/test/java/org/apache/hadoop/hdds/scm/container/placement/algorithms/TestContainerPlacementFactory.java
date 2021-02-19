@@ -55,7 +55,7 @@ public class TestContainerPlacementFactory {
   // datanodes array list
   private List<DatanodeDetails> datanodes = new ArrayList<>();
   // node storage capacity
-  private final long storageCapacity = 100L;
+  private static final long STORAGE_CAPACITY = 100L;
   // configuration
   private OzoneConfiguration conf;
   // node manager
@@ -93,13 +93,13 @@ public class TestContainerPlacementFactory {
     when(nodeManager.getNodes(NodeStatus.inServiceHealthy()))
         .thenReturn(new ArrayList<>(datanodes));
     when(nodeManager.getNodeStat(anyObject()))
-        .thenReturn(new SCMNodeMetric(storageCapacity, 0L, 100L));
+        .thenReturn(new SCMNodeMetric(STORAGE_CAPACITY, 0L, 100L));
     when(nodeManager.getNodeStat(datanodes.get(2)))
-        .thenReturn(new SCMNodeMetric(storageCapacity, 90L, 10L));
+        .thenReturn(new SCMNodeMetric(STORAGE_CAPACITY, 90L, 10L));
     when(nodeManager.getNodeStat(datanodes.get(3)))
-        .thenReturn(new SCMNodeMetric(storageCapacity, 80L, 20L));
+        .thenReturn(new SCMNodeMetric(STORAGE_CAPACITY, 80L, 20L));
     when(nodeManager.getNodeStat(datanodes.get(4)))
-        .thenReturn(new SCMNodeMetric(storageCapacity, 70L, 30L));
+        .thenReturn(new SCMNodeMetric(STORAGE_CAPACITY, 70L, 30L));
 
     PlacementPolicy policy = ContainerPlacementPolicyFactory
         .getPolicy(conf, nodeManager, cluster, true,

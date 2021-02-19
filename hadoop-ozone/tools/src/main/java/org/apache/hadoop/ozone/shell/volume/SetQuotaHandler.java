@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.shell.volume;
 
+import com.google.common.base.Strings;
 import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
@@ -27,6 +28,8 @@ import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
 import java.io.IOException;
+
+import static org.apache.hadoop.ozone.OzoneConsts.OLD_QUOTA_DEFAULT;
 
 /**
  * Executes set volume quota calls.
@@ -46,14 +49,21 @@ public class SetQuotaHandler extends VolumeHandler {
 
     long spaceQuota = volume.getQuotaInBytes();
     long namespaceQuota = volume.getQuotaInNamespace();
-
-    if (quotaOptions.getQuotaInBytes() != null
-        && !quotaOptions.getQuotaInBytes().isEmpty()) {
-      spaceQuota = OzoneQuota.parseQuota(quotaOptions.getQuotaInBytes(),
-          quotaOptions.getQuotaInNamespace()).getQuotaInBytes();
+    if (!Strings.isNullOrEmpty(quotaOptions.getQuotaInBytes())) {
+      spaceQuota = OzoneQuota.parseSpaceQuota(
+          quotaOptions.getQuotaInBytes()).getQuotaInBytes();
     }
-    if (quotaOptions.getQuotaInNamespace() >= 0) {
-      namespaceQuota = quotaOptions.getQuotaInNamespace();
+
+    if (!Strings.isNullOrEmpty(quotaOptions.getQuotaInNamespace())) {
+      namespaceQuota = OzoneQuota.parseNameSpaceQuota(
+          quotaOptions.getQuotaInNamespace()).getQuotaInNamespace();
+    }
+
+    if (volume.getQuotaInNamespace() == OLD_QUOTA_DEFAULT) {
+      String msg = "Volume " + volumeName + " is created before version " +
+          "1.1.0, usedNamespace may be inaccurate and it is not recommended" +
+          " to enable quota.";
+      printMsg(msg);
     }
 
     volume.setQuota(OzoneQuota.getOzoneQuota(spaceQuota, namespaceQuota));

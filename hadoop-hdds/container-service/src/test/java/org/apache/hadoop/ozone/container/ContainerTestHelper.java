@@ -590,9 +590,8 @@ public final class ContainerTestHelper {
     XceiverServerRatis server =
         (XceiverServerRatis) (dn.getDatanodeStateMachine().
         getContainer().getWriteChannel());
-    return pipeline == null ? server.getServerDivision() :
-        server.getServerDivision(
-            RatisHelper.newRaftGroup(pipeline).getGroupId());
+    return server.getServerDivision(
+        RatisHelper.newRaftGroup(pipeline).getGroupId());
   }
 
   public static StateMachine getStateMachine(HddsDatanodeService dn,

@@ -44,6 +44,8 @@ import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.rules.Timeout;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+
 /**
  * Test Container calls.
  */
@@ -98,7 +100,7 @@ public class TestContainerSmallFile {
     BlockID blockID = ContainerTestHelper.getTestBlockID(
         container.getContainerInfo().getContainerID());
     ContainerProtocolCalls.writeSmallFile(client, blockID,
-        "data123".getBytes(), null);
+        "data123".getBytes(UTF_8), null);
     ContainerProtos.GetSmallFileResponseProto response =
         ContainerProtocolCalls.readSmallFile(client, blockID, null);
     String readData = response.getData().getData().toStringUtf8();
@@ -142,7 +144,7 @@ public class TestContainerSmallFile {
     BlockID blockID = ContainerTestHelper.getTestBlockID(
         container.getContainerInfo().getContainerID());
     ContainerProtocolCalls.writeSmallFile(client, blockID,
-        "data123".getBytes(), null);
+        "data123".getBytes(UTF_8), null);
 
     thrown.expect(StorageContainerException.class);
     thrown.expectMessage("ContainerID 8888 does not exist");
@@ -170,7 +172,7 @@ public class TestContainerSmallFile {
         container.getContainerInfo().getContainerID());
     ContainerProtos.PutSmallFileResponseProto responseProto =
         ContainerProtocolCalls
-            .writeSmallFile(client, blockID1, "data123".getBytes(), null);
+            .writeSmallFile(client, blockID1, "data123".getBytes(UTF_8), null);
     long bcsId = responseProto.getCommittedBlockLength().getBlockID()
         .getBlockCommitSequenceId();
     try {
@@ -188,7 +190,7 @@ public class TestContainerSmallFile {
     BlockID blockID2 = ContainerTestHelper
         .getTestBlockID(container.getContainerInfo().getContainerID());
     ContainerProtocolCalls
-        .writeSmallFile(client, blockID2, "data123".getBytes(), null);
+        .writeSmallFile(client, blockID2, "data123".getBytes(UTF_8), null);
 
     try {
       blockID1.setBlockCommitSequenceId(bcsId + 1);

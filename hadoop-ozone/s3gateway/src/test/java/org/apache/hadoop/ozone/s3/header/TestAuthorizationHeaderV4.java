@@ -65,7 +65,7 @@ public class TestAuthorizationHeaderV4 {
       String auth = "AWS4-HMAC-SHA256 " +
           "Credential=ozone/" + curDate + "/us-east-1/s3/aws4_request, " +
           "SignedHeaders=host;range;x-amz-date,";
-      AuthorizationHeaderV4 v4 = new AuthorizationHeaderV4(auth);
+      new AuthorizationHeaderV4(auth);
       fail("Exception is expected in case of malformed header");
     } catch (OS3Exception ex) {
       assertEquals("AuthorizationHeaderMalformed", ex.getCode());
@@ -79,7 +79,7 @@ public class TestAuthorizationHeaderV4 {
           "Credential=" + curDate + "/us-east-1/s3/aws4_request, " +
           "SignedHeaders=host;range;x-amz-date, " +
           "Signature=fe5f80f77d5fa3beca038a248ff027";
-      AuthorizationHeaderV4 v4 = new AuthorizationHeaderV4(auth);
+      new AuthorizationHeaderV4(auth);
       fail("Exception is expected in case of malformed header");
     } catch (OS3Exception ex) {
       assertEquals("AuthorizationHeaderMalformed", ex.getCode());

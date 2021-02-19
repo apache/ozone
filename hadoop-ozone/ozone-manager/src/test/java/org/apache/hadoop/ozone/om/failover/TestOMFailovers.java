@@ -79,9 +79,12 @@ public class TestOMFailovers {
           "om3", ex);
       Assert.assertTrue(ex.getCause() instanceof AccessControlException);
 
-      logCapturer.getOutput().contains(getRetryProxyDebugMsg("om1"));
-      logCapturer.getOutput().contains(getRetryProxyDebugMsg("om2"));
-      logCapturer.getOutput().contains(getRetryProxyDebugMsg("om3"));
+      Assert.assertTrue(
+          logCapturer.getOutput().contains(getRetryProxyDebugMsg("om1")));
+      Assert.assertTrue(
+          logCapturer.getOutput().contains(getRetryProxyDebugMsg("om2")));
+      Assert.assertTrue(
+          logCapturer.getOutput().contains(getRetryProxyDebugMsg("om3")));
     }
   }
 
@@ -90,7 +93,7 @@ public class TestOMFailovers {
         "Permission denied.";
   }
 
-  private final class MockOzoneManagerProtocol
+  private static final class MockOzoneManagerProtocol
       implements OzoneManagerProtocolPB {
 
     private final String omNodeId;

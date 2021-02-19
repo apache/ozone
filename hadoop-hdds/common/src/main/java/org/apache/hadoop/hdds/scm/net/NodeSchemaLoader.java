@@ -65,7 +65,7 @@ public final class NodeSchemaLoader {
   private static final String LAYER_DEFAULT_NAME = "default";
 
   private static final int LAYOUT_VERSION = 1;
-  private volatile static NodeSchemaLoader instance = null;
+  private static volatile NodeSchemaLoader instance = null;
   private NodeSchemaLoader() {}
 
   public static NodeSchemaLoader getInstance() {

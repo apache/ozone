@@ -73,22 +73,22 @@ import org.slf4j.LoggerFactory;
 public class StateContext {
 
   @VisibleForTesting
-  final static String CONTAINER_REPORTS_PROTO_NAME =
+  static final String CONTAINER_REPORTS_PROTO_NAME =
       ContainerReportsProto.getDescriptor().getFullName();
   @VisibleForTesting
-  final static String NODE_REPORT_PROTO_NAME =
+  static final String NODE_REPORT_PROTO_NAME =
       NodeReportProto.getDescriptor().getFullName();
   @VisibleForTesting
-  final static String PIPELINE_REPORTS_PROTO_NAME =
+  static final String PIPELINE_REPORTS_PROTO_NAME =
       PipelineReportsProto.getDescriptor().getFullName();
   @VisibleForTesting
-  final static String COMMAND_STATUS_REPORTS_PROTO_NAME =
+  static final String COMMAND_STATUS_REPORTS_PROTO_NAME =
       CommandStatusReportsProto.getDescriptor().getFullName();
   @VisibleForTesting
-  final static String INCREMENTAL_CONTAINER_REPORT_PROTO_NAME =
+  static final String INCREMENTAL_CONTAINER_REPORT_PROTO_NAME =
       IncrementalContainerReportProto.getDescriptor().getFullName();
   // Accepted types of reports that can be queued to incrementalReportsQueue
-  private final static Set<String> ACCEPTED_INCREMENTAL_REPORT_TYPE_SET =
+  private static final Set<String> ACCEPTED_INCREMENTAL_REPORT_TYPE_SET =
       Sets.newHashSet(COMMAND_STATUS_REPORTS_PROTO_NAME,
           INCREMENTAL_CONTAINER_REPORT_PROTO_NAME);
 
@@ -412,6 +412,24 @@ public class StateContext {
   }
 
   /**
+   * Helper function for addPipelineActionIfAbsent that check if inputs are the
+   * same close pipeline action.
+   *
+   * Important Note: Make sure to double check for correctness before using this
+   * helper function for other purposes!
+   *
+   * @return true if a1 and a2 are the same close pipeline action,
+   *         false otherwise
+   */
+  boolean isSameClosePipelineAction(PipelineAction a1, PipelineAction a2) {
+    return a1.getAction() == a2.getAction()
+        && a1.hasClosePipeline()
+        && a2.hasClosePipeline()
+        && a1.getClosePipeline().getPipelineID()
+        .equals(a2.getClosePipeline().getPipelineID());
+  }
+
+  /**
    * Add PipelineAction to PipelineAction queue if it's not present.
    *
    * @param pipelineAction PipelineAction to be added
@@ -427,18 +445,12 @@ public class StateContext {
        * multiple times here.
        */
       for (InetSocketAddress endpoint : endpoints) {
-        Queue<PipelineAction> actionsForEndpoint =
-            this.pipelineActions.get(endpoint);
-        for (PipelineAction pipelineActionIter : actionsForEndpoint) {
-          if (pipelineActionIter.getAction() == pipelineAction.getAction()
-              && pipelineActionIter.hasClosePipeline() && pipelineAction
-              .hasClosePipeline()
-              && pipelineActionIter.getClosePipeline().getPipelineID()
-              .equals(pipelineAction.getClosePipeline().getPipelineID())) {
-            break;
-          }
+        final Queue<PipelineAction> actionsForEndpoint =
+            pipelineActions.get(endpoint);
+        if (actionsForEndpoint.stream().noneMatch(
+            action -> isSameClosePipelineAction(action, pipelineAction))) {
+          actionsForEndpoint.add(pipelineAction);
         }
-        actionsForEndpoint.add(pipelineAction);
       }
     }
   }

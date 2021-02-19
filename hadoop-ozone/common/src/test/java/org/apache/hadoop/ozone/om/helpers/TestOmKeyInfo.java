@@ -36,6 +36,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
+import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 
 /**
@@ -59,7 +60,7 @@ public class TestOmKeyInfo {
         .build();
 
     OmKeyInfo keyAfterSerialization =
-        OmKeyInfo.getFromProtobuf(key.getProtobuf());
+        OmKeyInfo.getFromProtobuf(key.getProtobuf(CURRENT_VERSION));
 
     Assert.assertEquals(key, keyAfterSerialization);
   }

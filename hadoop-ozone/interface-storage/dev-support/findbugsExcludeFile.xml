@@ -18,4 +18,18 @@
   <Match>
     <Package name="org.apache.hadoop.ozone.storage.proto"/>
   </Match>
+
+  <!-- Test -->
+  <Match>
+    <Class name="org.apache.hadoop.ozone.om.codec.TestOMTransactionInfoCodec"/>
+    <Bug pattern="NP_NULL_PARAM_DEREF_ALL_TARGETS_DANGEROUS" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.ozone.om.codec.TestOmPrefixInfoCodec"/>
+    <Bug pattern="NP_NULL_PARAM_DEREF_ALL_TARGETS_DANGEROUS" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.ozone.om.codec.TestS3SecretValueCodec"/>
+    <Bug pattern="NP_NULL_PARAM_DEREF_ALL_TARGETS_DANGEROUS" />
+  </Match>
 </FindBugsFilter>

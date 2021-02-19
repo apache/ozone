@@ -57,6 +57,7 @@ public class TestOMDBUpdatesHandler {
   public TemporaryFolder folder = new TemporaryFolder();
 
   private OMDBDefinition omdbDefinition = new OMDBDefinition();
+  private Random random = new Random();
 
   private OzoneConfiguration createNewTestPath() throws IOException {
     OzoneConfiguration configuration = new OzoneConfiguration();
@@ -231,8 +232,6 @@ public class TestOMDBUpdatesHandler {
   public void testGetKeyType() throws IOException {
     OzoneConfiguration configuration = createNewTestPath();
     OmMetadataManagerImpl metaMgr = new OmMetadataManagerImpl(configuration);
-    OMDBUpdatesHandler omdbUpdatesHandler =
-        new OMDBUpdatesHandler(metaMgr);
 
     assertEquals(String.class, omdbDefinition.getKeyType(
         metaMgr.getKeyTable().getName()).get());
@@ -244,8 +243,6 @@ public class TestOMDBUpdatesHandler {
   public void testGetValueType() throws IOException {
     OzoneConfiguration configuration = createNewTestPath();
     OmMetadataManagerImpl metaMgr = new OmMetadataManagerImpl(configuration);
-    OMDBUpdatesHandler omdbUpdatesHandler =
-        new OMDBUpdatesHandler(metaMgr);
 
     assertEquals(OmKeyInfo.class, omdbDefinition.getValueType(
         metaMgr.getKeyTable().getName()).get());
@@ -263,7 +260,7 @@ public class TestOMDBUpdatesHandler {
         .setKeyName(keyName)
         .setReplicationFactor(HddsProtos.ReplicationFactor.ONE)
         .setReplicationType(HddsProtos.ReplicationType.STAND_ALONE)
-        .setDataSize(new Random().nextLong())
+        .setDataSize(random.nextLong())
         .build();
   }
 }

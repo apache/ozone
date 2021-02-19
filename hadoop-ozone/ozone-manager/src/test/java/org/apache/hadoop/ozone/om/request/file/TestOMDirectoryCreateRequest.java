@@ -128,10 +128,7 @@ public class TestOMDirectoryCreateRequest {
   public void testValidateAndUpdateCache() throws Exception {
     String volumeName = "vol1";
     String bucketName = "bucket1";
-    String keyName = RandomStringUtils.randomAlphabetic(5);
-    for (int i =0; i< 3; i++) {
-      keyName += "/" + RandomStringUtils.randomAlphabetic(5);
-    }
+    String keyName = genRandomKeyName();
 
     // Add volume and bucket entries to DB.
     TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
@@ -163,10 +160,7 @@ public class TestOMDirectoryCreateRequest {
   public void testValidateAndUpdateCacheWithVolumeNotFound() throws Exception {
     String volumeName = "vol1";
     String bucketName = "bucket1";
-    String keyName = RandomStringUtils.randomAlphabetic(5);
-    for (int i =0; i< 3; i++) {
-      keyName += "/" + RandomStringUtils.randomAlphabetic(5);
-    }
+    String keyName = genRandomKeyName();
 
     OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
         keyName);
@@ -195,10 +189,7 @@ public class TestOMDirectoryCreateRequest {
   public void testValidateAndUpdateCacheWithBucketNotFound() throws Exception {
     String volumeName = "vol1";
     String bucketName = "bucket1";
-    String keyName = RandomStringUtils.randomAlphabetic(5);
-    for (int i =0; i< 3; i++) {
-      keyName += "/" + RandomStringUtils.randomAlphabetic(5);
-    }
+    String keyName = genRandomKeyName();
 
     OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
         keyName);
@@ -229,10 +220,7 @@ public class TestOMDirectoryCreateRequest {
       throws Exception {
     String volumeName = "vol1";
     String bucketName = "bucket1";
-    String keyName = RandomStringUtils.randomAlphabetic(5);
-    for (int i =0; i< 3; i++) {
-      keyName += "/" + RandomStringUtils.randomAlphabetic(5);
-    }
+    String keyName = genRandomKeyName();
 
     // Add volume and bucket entries to DB.
     TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
@@ -273,10 +261,7 @@ public class TestOMDirectoryCreateRequest {
       throws Exception {
     String volumeName = "vol1";
     String bucketName = "bucket1";
-    String keyName = RandomStringUtils.randomAlphabetic(5);
-    for (int i =0; i< 3; i++) {
-      keyName += "/" + RandomStringUtils.randomAlphabetic(5);
-    }
+    String keyName = genRandomKeyName();
 
     // Add volume and bucket entries to DB.
     TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
@@ -319,10 +304,7 @@ public class TestOMDirectoryCreateRequest {
   public void testValidateAndUpdateCacheWithFilesInPath() throws Exception {
     String volumeName = "vol1";
     String bucketName = "bucket1";
-    String keyName = RandomStringUtils.randomAlphabetic(5);
-    for (int i =0; i< 3; i++) {
-      keyName += "/" + RandomStringUtils.randomAlphabetic(5);
-    }
+    String keyName = genRandomKeyName();
 
     // Add volume and bucket entries to DB.
     TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
@@ -360,10 +342,7 @@ public class TestOMDirectoryCreateRequest {
       throws Exception {
     String volumeName = "vol1";
     String bucketName = "bucket1";
-    String keyName = RandomStringUtils.randomAlphabetic(5);
-    for (int i =0; i< 3; i++) {
-      keyName += "/" + RandomStringUtils.randomAlphabetic(5);
-    }
+    String keyName = genRandomKeyName();
 
     // Add volume and bucket entries to DB.
     TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
@@ -411,4 +390,12 @@ public class TestOMDirectoryCreateRequest {
         .setClientId(UUID.randomUUID().toString()).build();
   }
 
+  private String genRandomKeyName() {
+    StringBuilder keyNameBuilder = new StringBuilder();
+    keyNameBuilder.append(RandomStringUtils.randomAlphabetic(5));
+    for (int i =0; i< 3; i++) {
+      keyNameBuilder.append("/").append(RandomStringUtils.randomAlphabetic(5));
+    }
+    return keyNameBuilder.toString();
+  }
 }

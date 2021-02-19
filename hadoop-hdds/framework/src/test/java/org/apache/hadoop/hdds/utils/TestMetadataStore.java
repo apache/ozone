@@ -62,7 +62,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 @RunWith(Parameterized.class)
 public class TestMetadataStore {
 
-  private final static int MAX_GETRANGE_LENGTH = 100;
+  private static final int MAX_GETRANGE_LENGTH = 100;
   private final String storeImpl;
   @Rule
   public ExpectedException expectedException = ExpectedException.none();
@@ -220,7 +220,7 @@ public class TestMetadataStore {
       store.close();
       store.destroy();
     } else {
-      System.out.println("--- Store already closed: " + store.getClass());
+      System.out.println("--- Store already closed.");
     }
     if (testDir != null) {
       FileUtils.deleteDirectory(testDir);

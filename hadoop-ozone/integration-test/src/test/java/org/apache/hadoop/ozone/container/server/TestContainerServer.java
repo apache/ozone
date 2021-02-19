@@ -58,7 +58,6 @@ import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverSe
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
-import org.apache.hadoop.ozone.web.utils.OzoneUtils;
 import org.apache.hadoop.test.GenericTestUtils;
 
 import com.google.common.collect.Maps;
@@ -85,7 +84,7 @@ public class TestContainerServer {
   private static CertificateClient caClient;
 
   @BeforeClass
-  static public void setup() {
+  public static void setup() {
     CONF.set(HddsConfigKeys.HDDS_METADATA_DIR_NAME, TEST_DIR);
     caClient = new DNCertificateClient(new SecurityConfig(CONF));
   }
@@ -93,9 +92,6 @@ public class TestContainerServer {
   @Test
   public void testClientServer() throws Exception {
     DatanodeDetails datanodeDetails = randomDatanodeDetails();
-    ContainerSet containerSet = new ContainerSet();
-    ContainerController controller = new ContainerController(
-        containerSet, null);
     runTestClientServer(1, (pipeline, conf) -> conf
             .setInt(OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
                 pipeline.getFirstNode()
@@ -156,7 +152,6 @@ public class TestContainerServer {
       throws Exception {
     final List<XceiverServerSpi> servers = new ArrayList<>();
     XceiverClientSpi client = null;
-    String containerName = OzoneUtils.getRequestID();
     try {
       final Pipeline pipeline =
           MockPipeline.createPipeline(numDatanodes);
@@ -178,7 +173,7 @@ public class TestContainerServer {
                   ContainerTestHelper.getTestContainerID(), pipeline);
       Assert.assertNotNull(request.getTraceID());
 
-      ContainerCommandResponseProto response = client.sendCommand(request);
+      client.sendCommand(request);
     } finally {
       if (client != null) {
         client.close();

@@ -123,11 +123,12 @@ public interface StorageContainerLocationProtocol extends Closeable {
    *  state acts like a wildcard returning all nodes in that state.
    * @param opState The node operational state
    * @param state The node health
+   * @param clientVersion
    * @return List of Datanodes.
    */
   List<HddsProtos.Node> queryNode(HddsProtos.NodeOperationalState opState,
       HddsProtos.NodeState state, HddsProtos.QueryScope queryScope,
-      String poolName) throws IOException;
+      String poolName, int clientVersion) throws IOException;
 
   void decommissionNodes(List<String> nodes) throws IOException;
 

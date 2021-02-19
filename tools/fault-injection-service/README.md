@@ -27,8 +27,43 @@ Dependencies
 	built/installed from sources
 - cppunit & cppunit-devel
 
+Building Dependencies
+======================
+
+Building libfuse3 from the sources
+------------------------------------
+    - You can get it from https://github.com/libfuse/libfuse/releases/
+        * https://github.com/libfuse/libfuse/releases/tag/fuse-3.10.2
+    - follow the README.md for building libfuse
+    - you may need to get "meson-0.42.0" or above to build this.
+
+CMAKE
+======
+    - this will need cmake-3.14.0 or higher
+    - if required build from the sources. (tested with cmake-3.14.0 and
+       cmake-3.6.2)
+    
+Building grpc from the sources
+------------------------------------
+    - https://grpc.io/docs/languages/cpp/quickstart/
+    - sudo apt install -y build-essential autoconf libtool pkg-config
+    - git clone --recurse-submodules -b v1.35.0 https://github.com/grpc/grpc
+    - Follow build instructions
+        - mkdir -p cmake/build
+        - pushd cmake/build
+        - cmake -DgRPC_INSTALL=ON -DgRPC_BUILD_TESTS=OFF\
+                 -DCMAKE_INSTALL_PREFIX=$MY_INSTALL_DIR  ../..
+        - make -j
+        - make install 
+
+Finally
+-------
+    - Make sure all the dependencies are in $PATH.
+    - This build was last tested on (debian 4.18.5-1.el7.elrepo.x86_64
+       GNU/Linux) and Ubuntu 18:0.1.0.0-4.
+
 Installation                                                                    
------------- 
+=============
 mkdir Build 
 cd Build
 do 'cmake ..'

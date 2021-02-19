@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.client;
 
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.OzoneConsts;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -125,6 +126,13 @@ public final class VolumeArgs {
     private List<OzoneAcl> listOfAcls;
     private Map<String, String> metadata = new HashMap<>();
 
+    /**
+     * Constructs a builder.
+     */
+    public Builder() {
+      quotaInBytes = OzoneConsts.QUOTA_RESET;
+      quotaInNamespace = OzoneConsts.QUOTA_RESET;
+    }
 
     public VolumeArgs.Builder setAdmin(String admin) {
       this.adminName = admin;

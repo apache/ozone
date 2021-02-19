@@ -47,6 +47,8 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Set;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+
 /**
  * This class tests container report with DN container state info.
  */
@@ -107,7 +109,7 @@ public class TestContainerReportWithKeys {
             .createKey(keyName, keySize, ReplicationType.STAND_ALONE,
                 ReplicationFactor.ONE, new HashMap<>());
     String dataString = RandomStringUtils.randomAlphabetic(keySize);
-    key.write(dataString.getBytes());
+    key.write(dataString.getBytes(UTF_8));
     key.close();
 
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()

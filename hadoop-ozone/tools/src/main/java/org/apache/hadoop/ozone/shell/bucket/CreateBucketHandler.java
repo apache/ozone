@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.shell.bucket;
 
+import com.google.common.base.Strings;
 import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -80,13 +81,15 @@ public class CreateBucketHandler extends BucketHandler {
       }
     }
 
-    if (quotaOptions.getQuotaInBytes() != null) {
-      bb.setQuotaInBytes(OzoneQuota.parseQuota(quotaOptions.getQuotaInBytes(),
-          quotaOptions.getQuotaInNamespace()).getQuotaInBytes());
+    if (!Strings.isNullOrEmpty(quotaOptions.getQuotaInBytes())) {
+      bb.setQuotaInBytes(OzoneQuota.parseSpaceQuota(
+          quotaOptions.getQuotaInBytes()).getQuotaInBytes());
     }
 
-    bb.setQuotaInNamespace(quotaOptions.getQuotaInNamespace());
-
+    if (!Strings.isNullOrEmpty(quotaOptions.getQuotaInNamespace())) {
+      bb.setQuotaInNamespace(OzoneQuota.parseNameSpaceQuota(
+          quotaOptions.getQuotaInNamespace()).getQuotaInNamespace());
+    }
     String volumeName = address.getVolumeName();
     String bucketName = address.getBucketName();
 

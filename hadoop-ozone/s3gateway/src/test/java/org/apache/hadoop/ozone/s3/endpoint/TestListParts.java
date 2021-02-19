@@ -33,6 +33,7 @@ import javax.ws.rs.core.Response;
 
 import java.io.ByteArrayInputStream;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -44,7 +45,7 @@ import static org.mockito.Mockito.when;
 public class TestListParts {
 
 
-  private final static ObjectEndpoint REST = new ObjectEndpoint();
+  private static final ObjectEndpoint REST = new ObjectEndpoint();
   private static String uploadID;
 
   @BeforeClass
@@ -70,7 +71,8 @@ public class TestListParts {
     assertEquals(200, response.getStatus());
 
     String content = "Multipart Upload";
-    ByteArrayInputStream body = new ByteArrayInputStream(content.getBytes());
+    ByteArrayInputStream body =
+        new ByteArrayInputStream(content.getBytes(UTF_8));
     response = REST.put(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
         content.length(), 1, uploadID, body);
 
@@ -123,7 +125,7 @@ public class TestListParts {
   @Test
   public void testListPartsWithUnknownUploadID() throws Exception {
     try {
-      Response response = REST.get(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
+      REST.get(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
           uploadID, 2, "0", null);
     } catch (OS3Exception ex) {
       Assert.assertEquals(S3ErrorTable.NO_SUCH_UPLOAD.getErrorMessage(),

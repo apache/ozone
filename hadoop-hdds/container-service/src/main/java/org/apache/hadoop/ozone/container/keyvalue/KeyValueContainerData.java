@@ -168,6 +168,7 @@ public class KeyValueContainerData extends ContainerData {
    * Returns the path to base dir of the container.
    * @return Path to base dir
    */
+  @Override
   public String getContainerPath() {
     return new File(metadataPath).getParent();
   }
@@ -175,6 +176,7 @@ public class KeyValueContainerData extends ContainerData {
   /**
    * Returns the blockCommitSequenceId.
    */
+  @Override
   public long getBlockCommitSequenceId() {
     return blockCommitSequenceId;
   }
@@ -248,6 +250,7 @@ public class KeyValueContainerData extends ContainerData {
    *
    * @return Protocol Buffer Message
    */
+  @Override
   public ContainerDataProto getProtoBufMessage() {
     ContainerDataProto.Builder builder = ContainerDataProto.newBuilder();
     builder.setContainerID(this.getContainerID());

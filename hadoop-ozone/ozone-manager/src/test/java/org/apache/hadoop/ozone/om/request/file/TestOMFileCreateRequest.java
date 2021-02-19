@@ -77,10 +77,10 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
 
     // KeyLocation should be set.
     Assert.assertTrue(keyLocations.size() == 1);
-    Assert.assertEquals(containerID,
+    Assert.assertEquals(CONTAINER_ID,
         keyLocations.get(0).getBlockID().getContainerBlockID()
             .getContainerID());
-    Assert.assertEquals(localID,
+    Assert.assertEquals(LOCAL_ID,
         keyLocations.get(0).getBlockID().getContainerBlockID()
             .getLocalID());
     Assert.assertTrue(keyLocations.get(0).hasPipeline());

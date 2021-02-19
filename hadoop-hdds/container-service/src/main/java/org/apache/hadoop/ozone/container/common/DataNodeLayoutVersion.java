@@ -24,7 +24,7 @@ package org.apache.hadoop.ozone.container.common;
 public final class DataNodeLayoutVersion {
 
   // We will just be normal and use positive counting numbers for versions.
-  private final static DataNodeLayoutVersion[] VERSION_INFOS =
+  private static final DataNodeLayoutVersion[] VERSION_INFOS =
       {new DataNodeLayoutVersion(1, "HDDS Datanode LayOut Version 1")};
 
   private final String description;

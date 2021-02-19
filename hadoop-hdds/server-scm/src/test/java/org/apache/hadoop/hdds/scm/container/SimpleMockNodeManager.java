@@ -317,7 +317,7 @@ public class SimpleMockNodeManager implements NodeManager {
 
   @Override
   public Boolean isNodeRegistered(DatanodeDetails datanodeDetails) {
-    return null;
+    return false;
   }
 
 }

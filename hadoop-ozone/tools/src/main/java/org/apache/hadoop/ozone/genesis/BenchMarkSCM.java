@@ -118,7 +118,7 @@ public class BenchMarkSCM {
   @Benchmark
   public void allocateBlockBenchMark(BenchMarkSCM state,
       Blackhole bh) throws IOException {
-    state.blockManager
+    BenchMarkSCM.blockManager
         .allocateBlock(50, ReplicationType.RATIS, ReplicationFactor.THREE,
             "Genesis", new ExcludeList());
   }

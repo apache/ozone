@@ -51,6 +51,7 @@ import java.time.Duration;
 import java.util.UUID;
 import java.util.HashMap;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IPC_CLIENT_CONNECT_MAX_RETRIES_KEY;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IPC_CLIENT_CONNECT_RETRY_INTERVAL_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
@@ -194,7 +195,7 @@ public abstract class TestOzoneManagerHA {
     OzoneOutputStream ozoneOutputStream = ozoneBucket.createKey(keyName,
         data.length(), ReplicationType.STAND_ALONE,
         ReplicationFactor.ONE, new HashMap<>());
-    ozoneOutputStream.write(data.getBytes(), 0, data.length());
+    ozoneOutputStream.write(data.getBytes(UTF_8), 0, data.length());
     ozoneOutputStream.close();
     return keyName;
   }
@@ -304,7 +305,7 @@ public abstract class TestOzoneManagerHA {
         data.length(), ReplicationType.RATIS, ReplicationFactor.ONE,
         overwrite, recursive);
 
-    ozoneOutputStream.write(data.getBytes(), 0, data.length());
+    ozoneOutputStream.write(data.getBytes(UTF_8), 0, data.length());
     ozoneOutputStream.close();
 
     OzoneKeyDetails ozoneKeyDetails = ozoneBucket.getKey(keyName);
@@ -317,9 +318,9 @@ public abstract class TestOzoneManagerHA {
 
     OzoneInputStream ozoneInputStream = ozoneBucket.readKey(keyName);
 
-    byte[] fileContent = new byte[data.getBytes().length];
+    byte[] fileContent = new byte[data.getBytes(UTF_8).length];
     ozoneInputStream.read(fileContent);
-    Assert.assertEquals(data, new String(fileContent));
+    Assert.assertEquals(data, new String(fileContent, UTF_8));
   }
 
 }

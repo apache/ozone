@@ -50,7 +50,7 @@ import org.slf4j.LoggerFactory;
 @RequestScoped
 public class OzoneClientProducer {
 
-  private final static Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(OzoneClientProducer.class);
   private OzoneClient client;
 

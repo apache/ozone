@@ -68,8 +68,8 @@ import static org.mockito.Mockito.when;
 public class TestBlockInputStream {
 
   private static final int CHUNK_SIZE = 100;
-  private static Checksum checksum;
 
+  private Checksum checksum;
   private BlockInputStream blockStream;
   private byte[] blockData;
   private int blockSize;
@@ -231,11 +231,15 @@ public class TestBlockInputStream {
             MockPipeline.createSingleNodePipeline(), null,
             false, null, chunks, chunkDataMap, isRefreshed);
 
-    Assert.assertFalse(isRefreshed.get());
-    seekAndVerify(50);
-    byte[] b = new byte[200];
-    blockInputStreamWithRetry.read(b, 0, 200);
-    Assert.assertTrue(isRefreshed.get());
+    try {
+      Assert.assertFalse(isRefreshed.get());
+      seekAndVerify(50);
+      byte[] b = new byte[200];
+      blockInputStreamWithRetry.read(b, 0, 200);
+      Assert.assertTrue(isRefreshed.get());
+    } finally {
+      blockInputStreamWithRetry.close();
+    }
   }
 
   @Test
@@ -263,15 +267,19 @@ public class TestBlockInputStream {
         return stream;
       }
     };
-    subject.initialize();
+    try {
+      subject.initialize();
 
-    // WHEN
-    byte[] b = new byte[len];
-    int bytesRead = subject.read(b, 0, len);
+      // WHEN
+      byte[] b = new byte[len];
+      int bytesRead = subject.read(b, 0, len);
 
-    // THEN
-    Assert.assertEquals(len, bytesRead);
-    verify(refreshPipeline).apply(blockID);
+      // THEN
+      Assert.assertEquals(len, bytesRead);
+      verify(refreshPipeline).apply(blockID);
+    } finally {
+      subject.close();
+    }
   }
 
   @Test
@@ -297,15 +305,20 @@ public class TestBlockInputStream {
         return stream;
       }
     };
-    subject.initialize();
 
-    // WHEN
-    byte[] b = new byte[len];
-    LambdaTestUtils.intercept(StorageContainerException.class,
-        () -> subject.read(b, 0, len));
+    try {
+      subject.initialize();
 
-    // THEN
-    verify(refreshPipeline).apply(blockID);
+      // WHEN
+      byte[] b = new byte[len];
+      LambdaTestUtils.intercept(StorageContainerException.class,
+          () -> subject.read(b, 0, len));
+
+      // THEN
+      verify(refreshPipeline).apply(blockID);
+    } finally {
+      subject.close();
+    }
   }
 
   @Test
@@ -328,15 +341,20 @@ public class TestBlockInputStream {
         return stream;
       }
     };
-    subject.initialize();
 
-    // WHEN
-    byte[] b = new byte[len];
-    LambdaTestUtils.intercept(OzoneChecksumException.class,
-        () -> subject.read(b, 0, len));
+    try {
+      subject.initialize();
 
-    // THEN
-    verify(refreshPipeline, never()).apply(blockID);
+      // WHEN
+      byte[] b = new byte[len];
+      LambdaTestUtils.intercept(OzoneChecksumException.class,
+          () -> subject.read(b, 0, len));
+
+      // THEN
+      verify(refreshPipeline, never()).apply(blockID);
+    } finally {
+      subject.close();
+    }
   }
 
   private Pipeline samePipelineWithNewId(Pipeline pipeline) {
@@ -380,17 +398,22 @@ public class TestBlockInputStream {
         return stream;
       }
     };
-    subject.initialize();
-    subject.unbuffer();
 
-    // WHEN
-    byte[] b = new byte[len];
-    int bytesRead = subject.read(b, 0, len);
+    try {
+      subject.initialize();
+      subject.unbuffer();
 
-    // THEN
-    Assert.assertEquals(len, bytesRead);
-    verify(refreshPipeline).apply(blockID);
-    verify(clientFactory).acquireClientForReadData(pipeline);
-    verify(clientFactory).releaseClient(client, false);
+      // WHEN
+      byte[] b = new byte[len];
+      int bytesRead = subject.read(b, 0, len);
+
+      // THEN
+      Assert.assertEquals(len, bytesRead);
+      verify(refreshPipeline).apply(blockID);
+      verify(clientFactory).acquireClientForReadData(pipeline);
+      verify(clientFactory).releaseClient(client, false);
+    } finally {
+      subject.close();
+    }
   }
 }

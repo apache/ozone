@@ -98,11 +98,13 @@ public class TestContainerPersistence {
       LoggerFactory.getLogger(TestContainerPersistence.class);
   private static String hddsPath;
   private static OzoneConfiguration conf;
-  private static ContainerSet containerSet;
-  private static VolumeSet volumeSet;
   private static VolumeChoosingPolicy volumeChoosingPolicy;
-  private static BlockManager blockManager;
-  private static ChunkManager chunkManager;
+
+  private ContainerSet containerSet;
+  private VolumeSet volumeSet;
+  private BlockManager blockManager;
+  private ChunkManager chunkManager;
+
   @Rule
   public ExpectedException exception = ExpectedException.none();
   /**

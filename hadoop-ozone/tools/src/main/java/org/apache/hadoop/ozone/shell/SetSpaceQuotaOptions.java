@@ -32,13 +32,13 @@ public class SetSpaceQuotaOptions {
   @CommandLine.Option(names = {"--namespace-quota"},
       description = "For volume this parameter represents the number of " +
           "buckets, and for buckets represents the number of keys (eg. 5)")
-  private long quotaInNamespace;
+  private String quotaInNamespace;
 
   public String getQuotaInBytes() {
     return quotaInBytes;
   }
 
-  public long getQuotaInNamespace() {
+  public String getQuotaInNamespace() {
     return quotaInNamespace;
   }
 

@@ -49,7 +49,6 @@ import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.Client;
-import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -63,7 +62,6 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransportFactory;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
-import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.security.KerberosAuthException;
 import org.apache.hadoop.security.SaslRpcServer.AuthMethod;
@@ -411,7 +409,6 @@ public final class TestSecureOzoneCluster {
     LogCapturer logs = LogCapturer.captureLogs(OzoneManager.getLogger());
     GenericTestUtils.setLogLevel(OzoneManager.getLogger(), INFO);
     setupOm(conf);
-    long omVersion = RPC.getProtocolVersion(OzoneManagerProtocolPB.class);
     try {
       om.setCertClient(new CertificateClientTestImpl(conf));
       om.start();
@@ -475,8 +472,6 @@ public final class TestSecureOzoneCluster {
     int tokenMaxLifetime = 1000;
     newConf.setLong(DELEGATION_TOKEN_MAX_LIFETIME_KEY, tokenMaxLifetime);
     setupOm(newConf);
-    long omVersion =
-        RPC.getProtocolVersion(OzoneManagerProtocolPB.class);
     OzoneManager.setTestSecureOmFlag(true);
     // Start OM
 
@@ -564,8 +559,6 @@ public final class TestSecureOzoneCluster {
 
     // Setup secure OM for start
     setupOm(conf);
-    long omVersion =
-        RPC.getProtocolVersion(OzoneManagerProtocolPB.class);
     try {
       // Start OM
       om.setCertClient(new CertificateClientTestImpl(conf));
