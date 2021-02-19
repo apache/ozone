@@ -96,6 +96,19 @@ public class TestChunkInputStream {
     }
   }
 
+  private void matchWithInputData(List<ByteString> byteStrings,
+      int inputDataStartIndex, int length) {
+    int offset = inputDataStartIndex;
+    int totalBufferLen = 0;
+    for (ByteString byteString : byteStrings) {
+      int bufferLen = byteString.size();
+      matchWithInputData(byteString.toByteArray(), offset, bufferLen);
+      offset += bufferLen;
+      totalBufferLen += bufferLen;
+    }
+    Assert.assertEquals(length, totalBufferLen);
+  }
+
   /**
    * Seek to a position and verify through getPos().
    */
@@ -125,10 +138,9 @@ public class TestChunkInputStream {
     // To read chunk data from index 0 to 49 (len = 50), we need to read
     // chunk from offset 0 to 60 as the checksum boundary is at every 20
     // bytes. Verify that 60 bytes of chunk data are read and stored in the
-    // buffers.
-    matchWithInputData(chunkStream.getReadByteBuffers().get(0).toByteArray(),
-        0, 60);
-
+    // buffers. Since checksum boundary is at every 20 bytes, there should be
+    // 60/20 number of buffers.
+    matchWithInputData(chunkStream.getReadByteBuffers(), 0, 60);
   }
 
   @Test
@@ -154,8 +166,7 @@ public class TestChunkInputStream {
     byte[] b = new byte[30];
     chunkStream.read(b, 0, 30);
     matchWithInputData(b, 25, 30);
-    matchWithInputData(chunkStream.getReadByteBuffers().get(0).toByteArray(),
-        20, 40);
+    matchWithInputData(chunkStream.getReadByteBuffers(), 20, 40);
 
     // After read, the position of the chunkStream is evaluated from the
     // buffers and the chunkPosition should be reset to -1.

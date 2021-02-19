@@ -386,7 +386,8 @@ public class ChunkInputStream extends InputStream
    * Send RPC call to get the chunk from the container.
    */
   @VisibleForTesting
-  protected List<ByteBuffer> readChunk(ChunkInfo readChunkInfo) throws IOException {
+  protected List<ByteBuffer> readChunk(ChunkInfo readChunkInfo)
+      throws IOException {
     ReadChunkResponseProto readChunkResponse;
 
     try {
@@ -432,10 +433,10 @@ public class ChunkInputStream extends InputStream
               ByteString byteString = readChunkResponse.getData();
               if (byteString.size() != reqChunkInfo.getLen()) {
                 // Bytes read from chunk should be equal to chunk size.
-                throw new OzoneChecksumException(String
-                    .format("Inconsistent read for chunk=%s len=%d bytesRead=%d",
-                        reqChunkInfo.getChunkName(), reqChunkInfo.getLen(),
-                        byteString.size()));
+                throw new OzoneChecksumException(String.format(
+                    "Inconsistent read for chunk=%s len=%d bytesRead=%d",
+                    reqChunkInfo.getChunkName(), reqChunkInfo.getLen(),
+                    byteString.size()));
               }
               byteStrings = new ArrayList<>();
               byteStrings.add(byteString);
@@ -445,10 +446,10 @@ public class ChunkInputStream extends InputStream
               long buffersLen = BufferUtils.getBuffersLen(byteStrings);
               if (buffersLen != reqChunkInfo.getLen()) {
                 // Bytes read from chunk should be equal to chunk size.
-                throw new OzoneChecksumException(String
-                    .format("Inconsistent read for chunk=%s len=%d bytesRead=%d",
-                        reqChunkInfo.getChunkName(), reqChunkInfo.getLen(),
-                        buffersLen));
+                throw new OzoneChecksumException(String.format(
+                    "Inconsistent read for chunk=%s len=%d bytesRead=%d",
+                    reqChunkInfo.getChunkName(), reqChunkInfo.getLen(),
+                    buffersLen));
               }
             }
 

@@ -36,7 +36,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetSmallFi
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutBlockResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutSmallFileResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadChunkResponseProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadChunkVersion;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
@@ -295,7 +294,6 @@ public final class ContainerCommandResponseBuilders {
           .setBlockID(request.getReadChunk().getBlockID());
     } else {
       // V1 splits response data into a list of ByteBuffers
-      List<ByteBuffer> byteBuffers = data.asByteBufferList();
       response = ReadChunkResponseProto.newBuilder()
           .setChunkData(request.getReadChunk().getChunkData())
           .setDataBuffers(DataBuffers.newBuilder()

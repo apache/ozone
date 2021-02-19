@@ -55,23 +55,23 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTER
 @RunWith(Parameterized.class)
 public class TestInputStreamBase {
 
-  MiniOzoneCluster cluster;
-  OzoneConfiguration conf = new OzoneConfiguration();
-  OzoneClient client;
-  ObjectStore objectStore;
+  protected MiniOzoneCluster cluster;
+  protected OzoneConfiguration conf = new OzoneConfiguration();
+  protected OzoneClient client;
+  protected ObjectStore objectStore;
 
-  String volumeName;
-  String bucketName;
-  String keyString;
+  protected String volumeName;
+  protected String bucketName;
+  private String keyString;
 
   private ChunkLayOutVersion chunkLayout;
   private static final Random RAND = new Random();
 
-  static final int CHUNK_SIZE = 1024 * 1024;          // 1MB
-  static final int FLUSH_SIZE = 2 * CHUNK_SIZE;       // 2MB
-  static final int MAX_FLUSH_SIZE = 2 * FLUSH_SIZE;   // 4MB
-  static final int BLOCK_SIZE = 2 * MAX_FLUSH_SIZE;   // 8MB
-  static final int BYTES_PER_CHECKSUM = 256 * 1024;   // 256KB
+  protected static final int CHUNK_SIZE = 1024 * 1024;          // 1MB
+  protected static final int FLUSH_SIZE = 2 * CHUNK_SIZE;       // 2MB
+  protected static final int MAX_FLUSH_SIZE = 2 * FLUSH_SIZE;   // 4MB
+  protected static final int BLOCK_SIZE = 2 * MAX_FLUSH_SIZE;   // 8MB
+  protected static final int BYTES_PER_CHECKSUM = 256 * 1024;   // 256KB
 
   @Rule
   public Timeout timeout = Timeout.seconds(300);

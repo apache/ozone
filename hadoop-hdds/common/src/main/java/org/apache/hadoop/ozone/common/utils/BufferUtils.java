@@ -18,12 +18,18 @@
 
 package org.apache.hadoop.ozone.common.utils;
 
+import com.google.common.base.Preconditions;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
 public final class BufferUtils {
+
+  /** Utility classes should not be constructed. **/
+  private BufferUtils() {
+
+  }
 
   /**
    * Assign an array of ByteBuffers.
@@ -32,7 +38,13 @@ public final class BufferUtils {
    */
   public static ByteBuffer[] assignByteBuffers(long totalLen,
       long bufferCapacity) {
-    int numBuffers = (int) Math.ceil(totalLen / bufferCapacity);
+    Preconditions.checkArgument(totalLen > 0, "Buffer Length should be a " +
+        "positive integer.");
+    Preconditions.checkArgument(bufferCapacity > 0, "Buffer Capacity should " +
+        "be a positive integer.");
+
+    int numBuffers =
+        (int) Math.ceil((double) totalLen / (double) bufferCapacity);
 
     ByteBuffer[] dataBuffers = new ByteBuffer[numBuffers];
     int buffersAllocated = 0;

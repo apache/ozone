@@ -861,7 +861,7 @@ public class KeyValueHandler extends Handler {
           // all the data read from chunk file is returned as a single
           // ByteString. Older clients cannot process data returned as a list
           // of ByteStrings.
-           chunkInfo.setReadDataIntoSingleBuffer(true);
+          chunkInfo.setReadDataIntoSingleBuffer(true);
         }
         ChunkBuffer data = chunkManager.readChunk(kvContainer, blockID,
             chunkInfo, dispatcherContext);

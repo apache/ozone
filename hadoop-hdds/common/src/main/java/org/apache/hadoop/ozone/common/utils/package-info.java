@@ -16,8 +16,8 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.scm.utils;
+package org.apache.hadoop.ozone.common.utils;
 
 /**
- * This package contains utility classes for the SCM and client protocols.
+ * This package contains common utility classes for HDDS.
  */

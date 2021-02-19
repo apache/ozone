@@ -28,7 +28,7 @@ import org.junit.Assert;
 import org.junit.Test;
 
 /**
- * Tests {@link ChunkInputStream}
+ * Tests {@link ChunkInputStream}.
  */
 public class TestChunkInputStream extends TestInputStreamBase {
 
@@ -52,7 +52,6 @@ public class TestChunkInputStream extends TestInputStreamBase {
     block0Stream.initialize();
 
     ChunkInputStream chunk0Stream = block0Stream.getChunkStreams().get(0);
-    ChunkInputStream chunk1Stream = block0Stream.getChunkStreams().get(1);
 
     // To read 1 byte of chunk data, ChunkInputStream should get one full
     // checksum boundary worth of data from Container and store it in buffers.

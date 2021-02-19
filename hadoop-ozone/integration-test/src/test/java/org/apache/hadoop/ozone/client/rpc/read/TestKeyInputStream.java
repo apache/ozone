@@ -225,12 +225,16 @@ public class TestKeyInputStream extends TestInputStreamBase {
     KeyInputStream keyInputStream = getKeyInputStream(keyName);
 
     // skip 150
-    keyInputStream.skip(70);
+    long skipped = keyInputStream.skip(70);
+    Assert.assertEquals(70, skipped);
     Assert.assertEquals(70, keyInputStream.getPos());
-    keyInputStream.skip(0);
-    Assert.assertEquals(70, keyInputStream.getPos());
-    keyInputStream.skip(80);
 
+    skipped = keyInputStream.skip(0);
+    Assert.assertEquals(0, skipped);
+    Assert.assertEquals(70, keyInputStream.getPos());
+
+    skipped = keyInputStream.skip(80);
+    Assert.assertEquals(80, skipped);
     Assert.assertEquals(150, keyInputStream.getPos());
 
     // Skip operation should not result in any readChunk operation.

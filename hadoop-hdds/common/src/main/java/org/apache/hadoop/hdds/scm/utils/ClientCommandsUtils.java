@@ -22,6 +22,11 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 
 public final class ClientCommandsUtils {
 
+  /** Utility classes should not be constructed. **/
+  private ClientCommandsUtils() {
+
+  }
+
   public static ContainerProtos.ReadChunkVersion getReadChunkVersion(
       ContainerProtos.ReadChunkRequestProto readChunkRequest) {
     if (readChunkRequest.hasReadChunkVersion()) {
