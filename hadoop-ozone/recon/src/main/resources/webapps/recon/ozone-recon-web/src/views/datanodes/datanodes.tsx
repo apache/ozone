@@ -24,10 +24,10 @@ import moment from 'moment';
 import {ReplicationIcon} from 'utils/themeIcons';
 import StorageBar from 'components/storageBar/storageBar';
 import {
-  DatanodeStatus,
-  DatanodeStatusList,
-  DatanodeOpStatus,
-  DatanodeOpStatusList,
+  DatanodeState,
+  DatanodeStateList,
+  DatanodeOpState,
+  DatanodeOpStateList,
   IStorageReport
 } from 'types/datanode.types';
 import './datanodes.less';
@@ -40,8 +40,8 @@ import {ColumnSearch} from 'utils/columnSearch';
 
 interface IDatanodeResponse {
   hostname: string;
-  state: DatanodeStatus;
-  opState: DatanodeOpStatus;
+  state: DatanodeState;
+  opState: DatanodeOpState;
   lastHeartbeat: number;
   storageReport: IStorageReport;
   pipelines: IPipeline[];
@@ -61,8 +61,8 @@ interface IDatanodesResponse {
 
 interface IDatanode {
   hostname: string;
-  state: DatanodeStatus;
-  opState: DatanodeOpStatus;
+  state: DatanodeState;
+  opState: DatanodeOpState;
   lastHeartbeat: number;
   storageUsed: number;
   storageTotal: number;
@@ -93,52 +93,50 @@ interface IDatanodesState {
   columnOptions: IOption[];
 }
 
-const renderDatanodeStatus = (status: DatanodeStatus) => {
-  const statusIconMap = {
+const renderDatanodeState = (state: DatanodeState) => {
+  const stateIconMap = {
     HEALTHY: <Icon type='check-circle' theme='filled' twoToneColor='#1da57a' className='icon-success'/>,
     STALE: <Icon type='hourglass' theme='filled' className='icon-warning'/>,
-    DEAD: <Icon type='close-circle' theme='filled' className='icon-failure'/>,
-    DECOMMISSIONING: <Icon type='warning' theme='filled' className='icon-warning'/>,
-    DECOMMISSIONED: <Icon type='exclamation-circle' theme='filled' className='icon-failure'/>
+    DEAD: <Icon type='close-circle' theme='filled' className='icon-failure'/>
   };
-  const icon = status in statusIconMap ? statusIconMap[status] : '';
-  return <span>{icon} {status}</span>;
+  const icon = state in stateIconMap ? stateIconMap[state] : '';
+  return <span>{icon} {state}</span>;
 };
 
-const renderDatanodeOpStatus = (status: DatanodeOpStatus) => {
-  const opStatusIconMap = {
+const renderDatanodeOpState = (opState: DatanodeOpState) => {
+  const opStateIconMap = {
     IN_SERVICE: <Icon type='check-circle' theme='filled' twoToneColor='#1da57a' className='icon-success'/>,
     DECOMMISSIONING: <Icon type='hourglass' theme='filled' className='icon-warning'/>,
     DECOMMISSIONED: <Icon type='check-circle' theme='filled' className='icon-success'/>,
     ENTERING_MAINTENANCE: <Icon type='hourglass' theme='filled' className='icon-warning'/>,
     IN_MAINTENANCE: <Icon type='check-circle' theme='filled' className='icon-success'/>
   };
-  const icon = status in opStatusIconMap ? opStatusIconMap[status] : '';
-  return <span>{icon} {status}</span>;
+  const icon = opState in opStateIconMap ? opStateIconMap[opState] : '';
+  return <span>{icon} {opState}</span>;
 };
 
 const COLUMNS = [
   {
-    title: 'Status',
+    title: 'State',
     dataIndex: 'state',
     key: 'state',
     isVisible: true,
     filterMultiple: true,
-    filters: DatanodeStatusList.map(status => ({text: status, value: status})),
-    onFilter: (value: DatanodeStatus, record: IDatanode) => record.state === value,
-    render: (text: DatanodeStatus) => renderDatanodeStatus(text),
+    filters: DatanodeStateList.map(state => ({text: state, value: state})),
+    onFilter: (value: DatanodeState, record: IDatanode) => record.state === value,
+    render: (text: DatanodeState) => renderDatanodeState(text),
     sorter: (a: IDatanode, b: IDatanode) => a.state.localeCompare(b.state),
     fixed: 'left'
   },
   {
-    title: 'Operational Status',
+    title: 'Operational State',
     dataIndex: 'opState',
     key: 'opState',
     isVisible: true,
     filterMultiple: true,
-    filters: DatanodeOpStatusList.map(status => ({text: status, value: status})),
-    onFilter: (value: DatanodeOpStatus, record: IDatanode) => record.opState === value,
-    render: (text: DatanodeOpStatus) => renderDatanodeOpStatus(text),
+    filters: DatanodeOpStateList.map(status => ({text: status, value: status})),
+    onFilter: (value: DatanodeOpState, record: IDatanode) => record.opState === value,
+    render: (text: DatanodeOpState) => renderDatanodeOpState(text),
     sorter: (a: IDatanode, b: IDatanode) => a.state.localeCompare(b.state),
     fixed: 'left'
   },
