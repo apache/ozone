@@ -116,8 +116,6 @@ public final class OzoneManagerRatisServer {
   public OMResponse submitRequest(OMRequest omRequest) throws ServiceException {
     // In prepare mode, only prepare and cancel requests are allowed to go
     // through.
-    LOG.info("Submitting request with cmdType {}, OM prepare state = {}",
-        omRequest.getCmdType(), ozoneManager.getPrepareState().getState());
     if (ozoneManager.getPrepareState().requestAllowed(omRequest.getCmdType())) {
       RaftClientRequest raftClientRequest =
           createWriteRaftClientRequest(omRequest);

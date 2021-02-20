@@ -21,31 +21,20 @@ package org.apache.hadoop.hdds.scm.server.upgrade;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.DATANODE_SCHEMA_V2;
 
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSUpgradeAction;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
- * Catalog of HDDS features and their corresponding SCM action.
- * It is OK to skip HDDS features from the catalog that do not have
- * any specific SCMActions.
+ * SCM Upgrade Action for the very first Upgrade Version.
  */
-public enum SCMLayoutAction {
-  ScmActionForDatanodeSchemaV2(DATANODE_SCHEMA_V2,
-      new ScmOnFinalizeActionForDatanodeSchemaV2());
-  //////////////////////////////  //////////////////////////////
-
-  private HDDSLayoutFeature hddsFeature;
-  private HDDSUpgradeAction<StorageContainerManager> action;
-
-  SCMLayoutAction(HDDSLayoutFeature feature,
-                  HDDSUpgradeAction<StorageContainerManager> action) {
-    this.hddsFeature = feature;
-    this.action = action;
-    hddsFeature.setSCMUpgradeAction(action);
-  }
-
-  public HDDSLayoutFeature getHddsFeature() {
-    return hddsFeature;
+public class ScmOnFinalizeActionForDatanodeSchemaV2 implements
+    HDDSUpgradeAction<StorageContainerManager> {
+  public static final Logger LOG =
+      LoggerFactory.getLogger(ScmOnFinalizeActionForDatanodeSchemaV2.class);
+  @Override
+  public void executeAction(StorageContainerManager arg) throws Exception {
+    LOG.info("Executing SCM On Finalize action for layout feature {}",
+        DATANODE_SCHEMA_V2);
   }
 }
-
