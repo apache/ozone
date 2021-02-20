@@ -19,17 +19,23 @@ source "$COMPOSE_DIR"/testlib.sh
 
 setup_old_version() {
   OZONE_SAFEMODE_STATUS_COMMAND='ozone scmcli safemode status'
+  echo "in setup old version"
 }
 
-# with_old_version() { }
+with_old_version() {
+  echo "in with old version"
+  execute_robot_test scm /freon/generate.robot
+  execute_robot_test scm /freon/validate.robot
+}
 
 setup_new_version() {
+  echo "in setup new version"
   OZONE_SAFEMODE_STATUS_COMMAND='ozone admin safemode status --verbose'
 
-  local v100_libexec="$COMPOSE_DIR"/../libexec/upgrade/1.0.0
-  for script in "$v100_libexec"/*; do
-    "$script"
-  done
+  # Manually reformat scm DB to move to the new version.
+  "$COMPOSE_DIR"/../../libexec/upgrade/1.0.0.sh
 }
 
-# with_new_version() { }
+with_new_version() {
+  echo "in with new version"
+}
