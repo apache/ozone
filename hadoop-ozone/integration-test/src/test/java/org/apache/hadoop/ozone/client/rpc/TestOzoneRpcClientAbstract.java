@@ -162,6 +162,8 @@ public abstract class TestOzoneRpcClientAbstract {
       remoteGroupName, READ, ACCESS);
 
   private static String scmId = UUID.randomUUID().toString();
+  private static String clusterId = UUID.randomUUID().toString();
+
 
   /**
    * Create a MiniOzoneCluster for testing.
@@ -173,6 +175,7 @@ public abstract class TestOzoneRpcClientAbstract {
         .setNumDatanodes(3)
         .setTotalPipelineNumLimit(10)
         .setScmId(scmId)
+        .setClusterId(clusterId)
         .build();
     cluster.waitForClusterToBeReady();
     ozClient = OzoneClientFactory.getRpcClient(conf);
