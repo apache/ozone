@@ -94,7 +94,7 @@ public class ListInfoSubcommand extends ScmSubcommand {
           p -> p.getNodes().contains(datanode)).collect(Collectors.toList());
       if (relatedPipelines.isEmpty()) {
         pipelineListInfo.append("No related pipelines" +
-            " or the node is not in Healthy state.");
+            " or the node is not in Healthy state.\n");
       } else {
         relatedPipelineNum = relatedPipelines.size();
         relatedPipelines.forEach(
