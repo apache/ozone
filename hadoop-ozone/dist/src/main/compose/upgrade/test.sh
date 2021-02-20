@@ -21,7 +21,7 @@ source "$COMPOSE_DIR/testlib.sh"
 # Export variables needed by tests.
 export COMPOSE_DIR
 
-reset_all_results
+RESULT_DIR="$ALL_RESULT_DIR" create_results_dir
 
 # Upgrade tests to be run:
 run_test manual-upgrade 0.5.0 1.0.0

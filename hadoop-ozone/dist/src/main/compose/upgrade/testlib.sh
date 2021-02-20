@@ -44,7 +44,9 @@ create_data_dir() {
   fi
 
   rm -fr "${OZONE_VOLUME}" 2> /dev/null || sudo rm -fr "${OZONE_VOLUME}"
-  mkdir -p "${OZONE_VOLUME}"/{dn1,dn2,dn3,om1,om2,om3,recon,s3g,scm}
+  # TODO: Add HA to docker compose on upgrade branch.
+  # mkdir -p "${OZONE_VOLUME}"/{dn1,dn2,dn3,om1,om2,om3,recon,s3g,scm}
+  mkdir -p "${OZONE_VOLUME}"/{dn1,dn2,dn3,om,recon,s3g,scm}
   fix_data_dir_permissions
 }
 
@@ -63,13 +65,8 @@ callback() {
     type -t "$func" > /dev/null && "$func"
 }
 
-reset_all_results() {
-  mkdir -p "$ALL_RESULT_DIR"
-  rm -f "$ALL_RESULT_DIR"/*
-}
-
 run_test() {
-    # Export variables needed by test, since it is run in a subshell.
+  # Export variables needed by test, since it is run in a subshell.
   local test_dir="$COMPOSE_DIR"/"$1"
   export OZONE_UPGRADE_FROM="$2"
   export OZONE_UPGRADE_TO="$3"
@@ -77,7 +74,7 @@ run_test() {
   export OZONE_UPGRADE_CALLBACK="$test_subdir"/callback.sh
 
   OZONE_VOLUME="$test_subdir"/data
-  RESULT_DIR="$test_subdir"/result
+  export RESULT_DIR="$test_subdir"/result
 
   create_data_dir
 
@@ -85,5 +82,6 @@ run_test() {
     RESULT=1
   fi
 
-  copy_results "${result_parent_dir}" "${ALL_RESULT_DIR}"
+  generate_report 'upgrade' "$RESULT_DIR"
+  copy_results "$test_subdir" "${ALL_RESULT_DIR}"
 }
