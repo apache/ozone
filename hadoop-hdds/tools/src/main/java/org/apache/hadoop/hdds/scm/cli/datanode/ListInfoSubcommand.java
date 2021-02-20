@@ -114,7 +114,7 @@ public class ListInfoSubcommand extends ScmSubcommand {
         + "/" + datanode.getHostName() + "/" + relatedPipelineNum +
         " pipelines)");
     System.out.println("Operational State: " + dna.getOpState());
-    System.out.println("Related pipelines: \n" + pipelineListInfo);
+    System.out.println("Related pipelines:\n" + pipelineListInfo);
   }
 
   private static class DatanodeWithAttributes {
