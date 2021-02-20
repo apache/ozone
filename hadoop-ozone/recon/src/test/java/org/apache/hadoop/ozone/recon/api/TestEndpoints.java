@@ -111,6 +111,7 @@ import java.net.URI;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Test for Recon API endpoints.
@@ -473,9 +474,16 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     // Check if the endpoint response reflects the change
     response = nodeEndpoint.getDatanodes();
     datanodesResponse = (DatanodesResponse) response.getEntity();
-    assertEquals(NodeOperationalState.DECOMMISSIONING,
-        datanodesResponse.getDatanodes().stream().findFirst().get()
-            .getOperationalState());
+    // Order of datanodes in the response is random
+    AtomicInteger count = new AtomicInteger();
+    datanodesResponse.getDatanodes().forEach(metadata -> {
+      if (metadata.getUuid().equals(dnDetailsInternal.getUuidString())) {
+        count.incrementAndGet();
+        assertEquals(NodeOperationalState.DECOMMISSIONING,
+            metadata.getOperationalState());
+      }
+    });
+    assertEquals(1, count.get());
 
     // Restore state
     dnDetailsInternal.setPersistedOpState(backupOpState);
