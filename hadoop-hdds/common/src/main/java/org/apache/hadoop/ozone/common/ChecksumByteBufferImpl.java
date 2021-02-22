@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.common;
 
 import org.apache.hadoop.util.PureJavaCrc32C;
-import org.apache.hadoop.util.Shell;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,8 +33,22 @@ public class ChecksumByteBufferImpl implements ChecksumByteBuffer {
   private static final Logger LOG =
       LoggerFactory.getLogger(ChecksumByteBufferImpl.class);
 
-  private static volatile boolean useJava9Crc32C =
-      Shell.isJavaVersionAtLeast(9);
+  private static volatile boolean useJava9Crc32C = isJavaVersionAtLeast(9);
+
+  // "1.8"->8, "9"->9, "10"->10
+  private static final int JAVA_SPEC_VER = Math.max(8, Integer.parseInt(
+      System.getProperty("java.specification.version").split("\\.")[0]));
+
+  /**
+   * Query to see if major version of Java specification of the system
+   * is equal or greater than the parameter.
+   *
+   * @param version 8, 9, 10 etc.
+   * @return comparison with system property, always true for 8
+   */
+  public static boolean isJavaVersionAtLeast(int version) {
+    return JAVA_SPEC_VER >= version;
+  }
 
   public static class Java9Crc32CFactory {
     private static final MethodHandle NEW_CRC32C_MH;
