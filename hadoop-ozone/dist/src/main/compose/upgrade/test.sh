@@ -16,8 +16,12 @@
 # limitations under the License.
 set -e
 
+# Version that will be run using the local build.
+: "${OZONE_CURRENT_VERSION:=1.1.0}"
+
 COMPOSE_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )
 source "$COMPOSE_DIR/testlib.sh"
+
 # Export variables needed by tests.
 export COMPOSE_DIR
 

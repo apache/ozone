@@ -18,9 +18,9 @@
 source "$COMPOSE_DIR"/testlib.sh
 
 setup() {
-  # OM preparation is not implemnted in 1.0.0.
-  export OZONE_OM_PREPARE=
-  export OZONE_SAFEMODE_STATUS_COMMAND='ozone admin safemode status --verbose'
+  # OM preparation is not implemnted until 1.2.0.
+  export OZONE_OM_PREPARE='false'
+  load_version_specifics "$OZONE_UPGRADE_FROM"
 }
 
 with_old_version() {

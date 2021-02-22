@@ -19,11 +19,14 @@
 # image with Ozone binaries are required for both versions.
 
 set -e -o pipefail
+
 # Fail if required vars are not set.
-[[ "$OZONE_UPGRADE_FROM" ]]
-[[ "$OZONE_UPGRADE_TO" ]]
-[[ "$COMPOSE_DIR" ]]
-[[ "$OZONE_UPGRADE_CALLBACK" ]]
+set -u
+: "${OZONE_UPGRADE_FROM}"
+: "${OZONE_UPGRADE_TO}"
+: "${COMPOSE_DIR}"
+: "${OZONE_UPGRADE_CALLBACK}"
+set +u
 
 source "$COMPOSE_DIR"/testlib.sh
 source "$OZONE_UPGRADE_CALLBACK"

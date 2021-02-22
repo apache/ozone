@@ -51,7 +51,7 @@ Each type of upgrade has a subdirectory under this top level upgrade directory. 
 
 - Note that on the first upgrade after the non-rolling upgrade fraemwork is added, the old version does not have the non-rolling upgrade framework, but the new version does.
     - The non-rolling upgrade framework can still be used, the only difference is that OMs cannot be prepared before moving from the old version to the new version.
-    - Unset the variable `OZONE_PREPARE_OMS` to disable OM preparation as part of the upgrade.
+    - Set the variable `OZONE_PREPARE_OMS` to `false` disable OM preparation as part of the upgrade.
 
 ## Persisting Data
 

@@ -19,27 +19,30 @@
 # binaries.  Docker image with Ozone binaries is required for the
 # initial version, while the snapshot version uses Ozone runner image.
 
-set -u -e -o pipefail
+set -e -o pipefail
 
 # Prepare OMs before upgrade unless this variable is unset.
-: "${OZONE_PREPARE_OMS:='1'}"
+: "${OZONE_PREPARE_OMS:='true'}"
+
 # Fail if required vars are not set.
+set -u
 : "${OZONE_UPGRADE_FROM}"
 : "${OZONE_UPGRADE_TO}"
 : "${OZONE_UPGRADE_CALLBACK}"
-: "$COMPOSE_DIR"
+: "${COMPOSE_DIR}"
+set +u
 
 source "$COMPOSE_DIR"/testlib.sh
 source "$OZONE_UPGRADE_CALLBACK"
 
 prepare_oms() {
-  if [[ "$OZONE_PREPARE_OMS" ]]; then
+  if [[ "$OZONE_PREPARE_OMS" = 'true' ]]; then
     execute_robot_test scm upgrade/om-prepare.robot
   fi
 }
 
 cancel_prepare_oms() {
-  if [[ "$OZONE_PREPARE_OMS" ]]; then
+  if [[ "$OZONE_PREPARE_OMS" = 'true' ]]; then
     execute_robot_test scm upgrade/om-cancel-prepare.robot
   fi
 }
