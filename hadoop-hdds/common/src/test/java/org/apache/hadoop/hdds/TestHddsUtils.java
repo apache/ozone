@@ -204,7 +204,7 @@ public class TestHddsUtils {
         HddsUtils.getSCMAddresses(conf);
 
     Assert.assertNotNull(scmAddressList);
-    Assert.assertEquals(3,scmAddressList.size());
+    Assert.assertEquals(3, scmAddressList.size());
 
     Iterator<InetSocketAddress> it = scmAddressList.iterator();
     while (it.hasNext()) {
