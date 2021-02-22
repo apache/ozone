@@ -20,8 +20,9 @@ package org.apache.hadoop.hdds.scm.proxy;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.io.retry.FailoverProxyProvider;
@@ -37,18 +38,9 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
-
-import static org.apache.hadoop.hdds.HddsUtils.getHostName;
-import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
-import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY;
 
 /**
  * Failover proxy provider for SCM container location.
@@ -60,7 +52,7 @@ public class SCMContainerLocationFailoverProxyProvider implements
 
   private Map<String, ProxyInfo<StorageContainerLocationProtocolPB>> scmProxies;
   private Map<String, SCMProxyInfo> scmProxyInfoMap;
-  private List<String> scmNodeIDList;
+  private List<String> scmNodeIds;
 
   private String currentProxySCMNodeId;
   private int currentProxyIndex;
@@ -69,91 +61,53 @@ public class SCMContainerLocationFailoverProxyProvider implements
   private final SCMClientConfig scmClientConfig;
   private final long scmVersion;
 
-  private final String scmServiceId;
+  private String scmServiceId;
 
   private final int maxRetryCount;
   private final long retryInterval;
 
-  public static final String SCM_DUMMY_NODEID_PREFIX = "scm";
 
   public SCMContainerLocationFailoverProxyProvider(ConfigurationSource conf) {
     this.conf = conf;
     this.scmVersion = RPC.getProtocolVersion(
         StorageContainerLocationProtocolPB.class);
-    this.scmServiceId = conf.getTrimmed(OZONE_SCM_SERVICE_IDS_KEY);
+
     this.scmProxies = new HashMap<>();
     this.scmProxyInfoMap = new HashMap<>();
-    this.scmNodeIDList = new ArrayList<>();
     loadConfigs();
 
     this.currentProxyIndex = 0;
-    currentProxySCMNodeId = scmNodeIDList.get(currentProxyIndex);
+    currentProxySCMNodeId = scmNodeIds.get(currentProxyIndex);
     scmClientConfig = conf.getObject(SCMClientConfig.class);
     this.maxRetryCount = scmClientConfig.getRetryCount();
     this.retryInterval = scmClientConfig.getRetryInterval();
   }
 
   @VisibleForTesting
-  protected Collection<InetSocketAddress> getSCMAddressList() {
-    final int port = getPortNumberFromConfigKeys(conf,
-        ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY)
-        .orElse(ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT);
+  protected void loadConfigs() {
+    List<SCMNodeInfo> scmNodeInfoList = SCMNodeInfo.buildNodeInfo(conf);
 
-    // TODO: modify the logic after SCM HA Conf is ready.
-    // Use ozone.scm.client.address, if not set, fallback to ozone.scm.names.
-    Optional<String> host = getHostNameFromConfigKeys(conf,
-        ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY);
+    scmNodeIds = new ArrayList<>();
 
-    if (host.isPresent()) {
-      return Collections.singletonList(
-          NetUtils.createSocketAddr(host.get() + ":" + port));
-    }
+    for (SCMNodeInfo scmNodeInfo : scmNodeInfoList) {
+      if (scmNodeInfo.getScmClientAddress() == null) {
+        throw new ConfigurationException("SCM Client Address could not " +
+            "be obtained from config. Config is not properly defined");
+      } else {
+        InetSocketAddress scmClientAddress =
+            NetUtils.createSocketAddr(scmNodeInfo.getScmClientAddress());
 
-    // Fallback to ozone.scm.names
-    Collection<String> scmAddressList =
-        conf.getTrimmedStringCollection(OZONE_SCM_NAMES);
+        scmServiceId = scmNodeInfo.getServiceId();
+        String scmNodeId = scmNodeInfo.getNodeId();
 
-    if (scmAddressList.isEmpty()) {
-      throw new IllegalArgumentException(ScmConfigKeys.OZONE_SCM_NAMES
-          + " need to be a set of valid DNS names or IP addresses."
-          + " Empty address list found.");
-    }
-
-    Collection<InetSocketAddress> resultList = new ArrayList<>();
-
-    for (String scmAddress : scmAddressList) {
-      LOG.debug("SCM Address for proxy is {}", scmAddress);
-      Optional<String> hostname = getHostName(scmAddress);
-      hostname.ifPresent(
-          s -> resultList.add(NetUtils.createSocketAddr(s + ":" + port)));
-    }
-
-    return resultList;
-  }
-
-  private void loadConfigs() {
-    Collection<InetSocketAddress> scmAddressList = getSCMAddressList();
-    int scmNodeIndex = 1;
-    for (InetSocketAddress scmAddress : scmAddressList) {
-      String nodeId = SCM_DUMMY_NODEID_PREFIX + scmNodeIndex;
-      if (scmAddress == null) {
-        LOG.error("Failed to create SCM proxy for {}.", nodeId);
-        continue;
+        scmNodeIds.add(scmNodeId);
+        SCMProxyInfo scmProxyInfo = new SCMProxyInfo(scmServiceId, scmNodeId,
+            scmClientAddress);
+        ProxyInfo< StorageContainerLocationProtocolPB > proxy
+            = new ProxyInfo<>(null, scmProxyInfo.toString());
+        scmProxies.put(scmNodeId, proxy);
+        scmProxyInfoMap.put(scmNodeId, scmProxyInfo);
       }
-      scmNodeIndex++;
-      SCMProxyInfo scmProxyInfo = new SCMProxyInfo(
-          scmServiceId, nodeId, scmAddress);
-      ProxyInfo<StorageContainerLocationProtocolPB> proxy
-          = new ProxyInfo<>(null, scmProxyInfo.toString());
-      scmProxies.put(nodeId, proxy);
-      scmProxyInfoMap.put(nodeId, scmProxyInfo);
-      scmNodeIDList.add(nodeId);
-    }
-
-    if (scmProxies.isEmpty()) {
-      throw new IllegalArgumentException("Could not find any configured " +
-          "addresses for SCM. Please configure the system with "
-          + OZONE_SCM_NAMES);
     }
   }
 
@@ -226,7 +180,7 @@ public class SCMContainerLocationFailoverProxyProvider implements
 
     // round robin the next proxy
     currentProxyIndex = (currentProxyIndex + 1) % scmProxies.size();
-    currentProxySCMNodeId =  scmNodeIDList.get(currentProxyIndex);
+    currentProxySCMNodeId =  scmNodeIds.get(currentProxyIndex);
     return currentProxyIndex;
   }
 
@@ -235,7 +189,7 @@ public class SCMContainerLocationFailoverProxyProvider implements
       if (scmProxies.containsKey(newLeaderNodeId)) {
 //        lastAttemptedLeader = currentProxySCMNodeId;
         currentProxySCMNodeId = newLeaderNodeId;
-        currentProxyIndex = scmNodeIDList.indexOf(currentProxySCMNodeId);
+        currentProxyIndex = scmNodeIds.indexOf(currentProxySCMNodeId);
         return true;
       }
     }

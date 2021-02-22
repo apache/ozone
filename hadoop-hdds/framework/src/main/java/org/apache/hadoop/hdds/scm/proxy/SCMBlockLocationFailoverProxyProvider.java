@@ -20,8 +20,9 @@ package org.apache.hadoop.hdds.scm.proxy;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolPB;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.io.retry.FailoverProxyProvider;
@@ -38,17 +39,11 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY;
-import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForBlockClients;
-import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
-import static org.apache.hadoop.hdds.HddsUtils.getHostName;
+import static org.apache.hadoop.ozone.OzoneConsts.SCM_DUMMY_SERVICE_ID;
 
 /**
  * Failover proxy provider for SCM block location.
@@ -60,7 +55,7 @@ public class SCMBlockLocationFailoverProxyProvider implements
 
   private Map<String, ProxyInfo<ScmBlockLocationProtocolPB>> scmProxies;
   private Map<String, SCMProxyInfo> scmProxyInfoMap;
-  private List<String> scmNodeIDList;
+  private List<String> scmNodeIds;
 
   private String currentProxySCMNodeId;
   private int currentProxyIndex;
@@ -68,82 +63,59 @@ public class SCMBlockLocationFailoverProxyProvider implements
   private final ConfigurationSource conf;
   private final long scmVersion;
 
-  private final String scmServiceId;
+  private String scmServiceId;
 
   private String lastAttemptedLeader;
 
   private final int maxRetryCount;
   private final long retryInterval;
 
-  public static final String SCM_DUMMY_NODEID_PREFIX = "scm";
 
   public SCMBlockLocationFailoverProxyProvider(ConfigurationSource conf) {
     this.conf = conf;
     this.scmVersion = RPC.getProtocolVersion(ScmBlockLocationProtocolPB.class);
-    this.scmServiceId = conf.getTrimmed(OZONE_SCM_SERVICE_IDS_KEY);
+
+    // Set some constant for non-HA.
+    if (scmServiceId == null) {
+      scmServiceId = SCM_DUMMY_SERVICE_ID;
+    }
     this.scmProxies = new HashMap<>();
     this.scmProxyInfoMap = new HashMap<>();
-    this.scmNodeIDList = new ArrayList<>();
+
     loadConfigs();
 
-
     this.currentProxyIndex = 0;
-    currentProxySCMNodeId = scmNodeIDList.get(currentProxyIndex);
+    currentProxySCMNodeId = scmNodeIds.get(currentProxyIndex);
 
     SCMClientConfig config = conf.getObject(SCMClientConfig.class);
     this.maxRetryCount = config.getRetryCount();
     this.retryInterval = config.getRetryInterval();
   }
 
-  @VisibleForTesting
-  protected Collection<InetSocketAddress> getSCMAddressList() {
-    Collection<String> scmAddressList =
-        conf.getTrimmedStringCollection(OZONE_SCM_NAMES);
-    Collection<InetSocketAddress> resultList = new ArrayList<>();
-    if (!scmAddressList.isEmpty()) {
-      final int port = getPortNumberFromConfigKeys(conf,
-          ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY)
-          .orElse(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT);
-      for (String scmAddress : scmAddressList) {
-        LOG.info("SCM Address for proxy is {}", scmAddress);
-
-        Optional<String> hostname = getHostName(scmAddress);
-        if (hostname.isPresent()) {
-          resultList.add(NetUtils.createSocketAddr(
-              hostname.get() + ":" + port));
-        }
-      }
-    }
-    if (resultList.isEmpty()) {
-      // fall back
-      resultList.add(getScmAddressForBlockClients(conf));
-    }
-    return resultList;
-  }
-
   private void loadConfigs() {
-    Collection<InetSocketAddress> scmAddressList = getSCMAddressList();
-    int scmNodeIndex = 1;
-    for (InetSocketAddress scmAddress : scmAddressList) {
-      String nodeId = SCM_DUMMY_NODEID_PREFIX + scmNodeIndex;
-      if (scmAddress == null) {
-        LOG.error("Failed to create SCM proxy for {}.", nodeId);
-        continue;
-      }
-      scmNodeIndex++;
-      SCMProxyInfo scmProxyInfo = new SCMProxyInfo(
-          scmServiceId, nodeId, scmAddress);
-      ProxyInfo<ScmBlockLocationProtocolPB> proxy = new ProxyInfo<>(
-          null, scmProxyInfo.toString());
-      scmProxies.put(nodeId, proxy);
-      scmProxyInfoMap.put(nodeId, scmProxyInfo);
-      scmNodeIDList.add(nodeId);
-    }
 
-    if (scmProxies.isEmpty()) {
-      throw new IllegalArgumentException("Could not find any configured " +
-          "addresses for SCM. Please configure the system with "
-          + OZONE_SCM_NAMES);
+    scmNodeIds = new ArrayList<>();
+    List<SCMNodeInfo> scmNodeInfoList = SCMNodeInfo.buildNodeInfo(conf);
+
+    for (SCMNodeInfo scmNodeInfo : scmNodeInfoList) {
+      if (scmNodeInfo.getBlockClientAddress() == null) {
+        throw new ConfigurationException("SCM BlockClient Address could not " +
+            "be obtained from config. Config is not properly defined");
+      } else {
+        InetSocketAddress scmBlockClientAddress =
+            NetUtils.createSocketAddr(scmNodeInfo.getBlockClientAddress());
+
+        scmServiceId = scmNodeInfo.getServiceId();
+        String scmNodeId = scmNodeInfo.getNodeId();
+        scmNodeIds.add(scmNodeId);
+        SCMProxyInfo scmProxyInfo = new SCMProxyInfo(
+            scmNodeInfo.getServiceId(), scmNodeInfo.getNodeId(),
+            scmBlockClientAddress);
+        ProxyInfo<ScmBlockLocationProtocolPB> proxy
+            = new ProxyInfo<>(null, scmProxyInfo.toString());
+        scmProxies.put(scmNodeId, proxy);
+        scmProxyInfoMap.put(scmNodeId, scmProxyInfo);
+      }
     }
   }
 
@@ -211,7 +183,7 @@ public class SCMBlockLocationFailoverProxyProvider implements
 
     // round robin the next proxy
     currentProxyIndex = (currentProxyIndex + 1) % scmProxies.size();
-    currentProxySCMNodeId =  scmNodeIDList.get(currentProxyIndex);
+    currentProxySCMNodeId =  scmNodeIds.get(currentProxyIndex);
     return currentProxyIndex;
   }
 
@@ -220,7 +192,7 @@ public class SCMBlockLocationFailoverProxyProvider implements
       if (scmProxies.containsKey(newLeaderNodeId)) {
         lastAttemptedLeader = currentProxySCMNodeId;
         currentProxySCMNodeId = newLeaderNodeId;
-        currentProxyIndex = scmNodeIDList.indexOf(currentProxySCMNodeId);
+        currentProxyIndex = scmNodeIds.indexOf(currentProxySCMNodeId);
         return true;
       }
     } else {
