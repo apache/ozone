@@ -24,7 +24,7 @@ SCRIPT_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )
 set -ex
 
 ALL_RESULT_DIR="$SCRIPT_DIR/result"
-rm "$ALL_RESULT_DIR/*" || true
+rm "$ALL_RESULT_DIR"/* || true
 mkdir -p "$ALL_RESULT_DIR"
 
 RESULT=0
