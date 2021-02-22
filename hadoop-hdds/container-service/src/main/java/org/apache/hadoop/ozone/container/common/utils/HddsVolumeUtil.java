@@ -24,6 +24,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.InconsistentStorageStateException;
 import org.apache.hadoop.ozone.container.common.DataNodeLayoutVersion;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.util.ExitUtil;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 
@@ -202,9 +203,12 @@ public final class HddsVolumeUtil {
       return true;
     } else if(hddsFiles.length == 2) {
       if (scmDir.exists()) {
-        logger.error("Volume {} is in Inconsistent state, and contains the" +
-            "SCM Directory:{} which is in previous format, please upgrade" +
-            " the volume.", volumeRoot, scmDir.getAbsolutePath());
+        String msg = "Volume " + volumeRoot +
+            " is in Inconsistent state, and contains the" +
+            "SCM Directory:" + scmDir.getAbsolutePath() +
+            " which is a older format, please upgrade the volume.";
+        logger.error(msg);
+        ExitUtil.terminate(-2, msg);
         return false;
       }
       // The files should be Version and SCM directory
