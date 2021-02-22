@@ -31,12 +31,24 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.net.InetSocketAddress;
-import java.util.Collection;
 import java.util.Optional;
 import java.util.OptionalInt;
 
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_BIND_HOST_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_BIND_HOST_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_BIND_HOST_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_BIND_HOST_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_BIND_HOST_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_KEY;
 
 /**
  * SCM utility class.
@@ -72,86 +84,77 @@ public final class ScmUtils {
     return dirFile;
   }
 
-  public static Collection<String> getSCMNodeIds(ConfigurationSource conf,
-      String scmServiceId) {
-    String key = ConfUtils.addSuffix(
-        ScmConfigKeys.OZONE_SCM_NODES_KEY, scmServiceId);
-    return conf.getTrimmedStringCollection(key);
-  }
-
   public static InetSocketAddress getScmBlockProtocolServerAddress(
       OzoneConfiguration conf, String localScmServiceId, String nodeId) {
     String bindHostKey = ConfUtils.addKeySuffixes(
-        ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_BIND_HOST_KEY,
-        localScmServiceId, nodeId);
+        OZONE_SCM_BLOCK_CLIENT_BIND_HOST_KEY, localScmServiceId, nodeId);
     final Optional<String> host = getHostNameFromConfigKeys(conf, bindHostKey);
 
     String addressKey = ConfUtils.addKeySuffixes(
-        ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY,
-        localScmServiceId, nodeId);
+        OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY, localScmServiceId, nodeId);
     final OptionalInt port = getPortNumberFromConfigKeys(conf, addressKey);
 
     return NetUtils.createSocketAddr(
         host.orElse(
             ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_BIND_HOST_DEFAULT) + ":" +
-            port.orElse(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT));
+            port.orElse(conf.getInt(ConfUtils.addKeySuffixes(
+                OZONE_SCM_BLOCK_CLIENT_PORT_KEY, localScmServiceId, nodeId),
+                OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT)));
   }
 
   public static String getScmBlockProtocolServerAddressKey(
       String serviceId, String nodeId) {
-    return ConfUtils.addKeySuffixes(
-        ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY,
+    return ConfUtils.addKeySuffixes(OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY,
         serviceId, nodeId);
   }
 
   public static InetSocketAddress getClientProtocolServerAddress(
       OzoneConfiguration conf, String localScmServiceId, String nodeId) {
     String bindHostKey = ConfUtils.addKeySuffixes(
-        ScmConfigKeys.OZONE_SCM_CLIENT_BIND_HOST_KEY,
-        localScmServiceId, nodeId);
+        OZONE_SCM_CLIENT_BIND_HOST_KEY, localScmServiceId, nodeId);
 
     final String host = getHostNameFromConfigKeys(conf, bindHostKey)
-        .orElse(ScmConfigKeys.OZONE_SCM_CLIENT_BIND_HOST_DEFAULT);
+        .orElse(OZONE_SCM_CLIENT_BIND_HOST_DEFAULT);
 
     String addressKey = ConfUtils.addKeySuffixes(
-        ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY,
-        localScmServiceId, nodeId);
+        OZONE_SCM_CLIENT_ADDRESS_KEY, localScmServiceId, nodeId);
 
     final int port = getPortNumberFromConfigKeys(conf, addressKey)
-        .orElse(ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT);
+        .orElse(conf.getInt(ConfUtils.addKeySuffixes(OZONE_SCM_CLIENT_PORT_KEY,
+            localScmServiceId, nodeId), OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT));
 
     return NetUtils.createSocketAddr(host + ":" + port);
   }
 
   public static String getClientProtocolServerAddressKey(
       String serviceId, String nodeId) {
-    return ConfUtils.addKeySuffixes(
-        ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY,
-        serviceId, nodeId);
+    return ConfUtils.addKeySuffixes(OZONE_SCM_CLIENT_ADDRESS_KEY, serviceId,
+        nodeId);
   }
 
   public static InetSocketAddress getScmDataNodeBindAddress(
       ConfigurationSource conf, String localScmServiceId, String nodeId) {
     String bindHostKey = ConfUtils.addKeySuffixes(
-        ScmConfigKeys.OZONE_SCM_DATANODE_BIND_HOST_KEY,
+        OZONE_SCM_DATANODE_BIND_HOST_KEY,
         localScmServiceId, nodeId
     );
     final Optional<String> host = getHostNameFromConfigKeys(conf, bindHostKey);
     String addressKey = ConfUtils.addKeySuffixes(
-        ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY,
-        localScmServiceId, nodeId
-    );
+        OZONE_SCM_DATANODE_ADDRESS_KEY, localScmServiceId,
+        nodeId);
     final OptionalInt port = getPortNumberFromConfigKeys(conf, addressKey);
 
     return NetUtils.createSocketAddr(
-        host.orElse(ScmConfigKeys.OZONE_SCM_DATANODE_BIND_HOST_DEFAULT) + ":" +
-            port.orElse(ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT));
+        host.orElse(OZONE_SCM_DATANODE_BIND_HOST_DEFAULT) + ":" +
+            port.orElse(conf.getInt(ConfUtils.addKeySuffixes(
+                OZONE_SCM_DATANODE_PORT_KEY, localScmServiceId, nodeId),
+                OZONE_SCM_DATANODE_PORT_DEFAULT)));
   }
 
   public static String getScmDataNodeBindAddressKey(
       String serviceId, String nodeId) {
     return ConfUtils.addKeySuffixes(
-        ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY,
+        OZONE_SCM_DATANODE_ADDRESS_KEY,
         serviceId, nodeId);
   }
 }

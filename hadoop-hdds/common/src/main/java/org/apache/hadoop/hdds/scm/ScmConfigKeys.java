@@ -277,8 +277,8 @@ public final class ScmConfigKeys {
   // able to send back a new list to the datanodes.
   public static final String OZONE_SCM_NAMES = "ozone.scm.names";
 
-  public static final String OZONE_SCM_INTERNAL_SERVICE_ID =
-      "ozone.scm.internal.service.id";
+  public static final String OZONE_SCM_DEFAULT_SERVICE_ID =
+      "ozone.scm.default.service.id";
 
   public static final String OZONE_SCM_SERVICE_IDS_KEY =
       "ozone.scm.service.ids";

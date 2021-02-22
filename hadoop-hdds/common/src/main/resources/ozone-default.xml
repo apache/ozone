@@ -1840,7 +1840,7 @@
     </description>
   </property>
   <property>
-    <name>ozone.scm.internal.service.id</name>
+    <name>ozone.scm.default.service.id</name>
     <value></value>
     <tag>OZONE, SCM, HA</tag>
     <description>
