@@ -414,8 +414,8 @@ public class BasicOzoneFileSystem extends FileSystem {
     try {
       adapter.renameKey(srcPath, dstPath);
     } catch (OMException ome) {
-      LOG.error("rename key failed: {}. source:{}, destin:{}",
-              ome.getMessage(), srcPath, dstPath);
+      LOG.error("rename key failed: {}. Error code: {} source:{}, destin:{}",
+              ome.getMessage(), ome.getResult(), srcPath, dstPath);
       if (OMException.ResultCodes.KEY_ALREADY_EXISTS == ome.getResult() ||
           OMException.ResultCodes.KEY_RENAME_ERROR  == ome.getResult() ||
           OMException.ResultCodes.KEY_NOT_FOUND == ome.getResult()) {

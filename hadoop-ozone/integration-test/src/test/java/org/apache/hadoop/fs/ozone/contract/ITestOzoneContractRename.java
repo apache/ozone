@@ -35,17 +35,17 @@ import org.junit.runners.Parameterized;
 @RunWith(Parameterized.class)
 public class ITestOzoneContractRename extends AbstractContractRenameTest {
 
-  private static boolean fsOptimisedClient = true;
-  private static boolean fsOptimisedServer = true;
+  private boolean fsOptimizedClient = true;
+  private boolean fsOptimizedServer = true;
 
-  public ITestOzoneContractRename(boolean fsOptimClient,
-      boolean fsOptimServer) throws IOException {
-    if (fsOptimisedClient != fsOptimClient ||
-        fsOptimisedServer != fsOptimServer) {
-      fsOptimisedClient = fsOptimClient;
-      fsOptimisedServer = fsOptimServer;
-      ITestOzoneContractUtils.restartCluster(fsOptimisedClient,
-          fsOptimisedServer);
+  public ITestOzoneContractRename(boolean fsoClient,
+      boolean fsoServer) throws IOException {
+    if (fsOptimizedClient != fsoClient ||
+        fsOptimizedServer != fsoServer) {
+      fsOptimizedClient = fsoClient;
+      fsOptimizedServer = fsoServer;
+      ITestOzoneContractUtils.restartCluster(fsOptimizedClient,
+          fsOptimizedServer);
     }
   }
 

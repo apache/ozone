@@ -44,11 +44,11 @@ public final class ITestOzoneContractUtils {
     return fsoCombinations;
   }
 
-  public static void restartCluster(boolean fsOptimisedClient,
-      boolean fsOptimisedServer) throws IOException {
+  public static void restartCluster(boolean fsOptimizedClient,
+      boolean fsOptimizedServer) throws IOException {
     OzoneContract.destroyCluster();
-    OzoneContract.initOzoneConfiguration(fsOptimisedClient,
-        fsOptimisedServer);
+    OzoneContract.initOzoneConfiguration(fsOptimizedClient,
+        fsOptimizedServer);
     OzoneContract.createCluster();
   }
 }

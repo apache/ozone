@@ -33,17 +33,17 @@ import java.util.Collection;
 @RunWith(Parameterized.class)
 public class ITestOzoneContractUnbuffer extends AbstractContractUnbufferTest {
 
-  private static boolean fsOptimisedClient;
-  private static boolean fsOptimisedServer;
+  private boolean fsOptimizedClient;
+  private boolean fsOptimizedServer;
 
-  public ITestOzoneContractUnbuffer(boolean fsOptimClient,
-      boolean fsOptimServer) throws IOException {
-    if (fsOptimisedClient != fsOptimClient ||
-        fsOptimisedServer != fsOptimServer) {
-      fsOptimisedClient = fsOptimClient;
-      fsOptimisedServer = fsOptimServer;
-      ITestOzoneContractUtils.restartCluster(fsOptimisedClient,
-          fsOptimisedServer);
+  public ITestOzoneContractUnbuffer(boolean fsoClient,
+      boolean fsoServer) throws IOException {
+    if (fsOptimizedClient != fsoClient ||
+        fsOptimizedServer != fsoServer) {
+      fsOptimizedClient = fsoClient;
+      fsOptimizedServer = fsoServer;
+      ITestOzoneContractUtils.restartCluster(fsOptimizedClient,
+          fsOptimizedServer);
     }
   }
 

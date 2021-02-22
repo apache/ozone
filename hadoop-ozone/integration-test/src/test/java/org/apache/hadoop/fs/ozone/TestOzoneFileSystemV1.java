@@ -299,11 +299,10 @@ public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
 
     LOG.info("Rename op-> source:{} to destin:{}}", source, destin);
     try {
-      getFs().rename(source, destin);
-      Assert.fail("Should throw exception : Source doesn't exist!");
+      // rename should fail and return false
+      Assert.assertFalse(getFs().rename(source, destin));
     } catch (OMException ome) {
-      // expected
-      assertEquals(ome.getResult(), OMException.ResultCodes.KEY_NOT_FOUND);
+      Assert.fail("Failed with exception" + ome.getMessage());
     }
   }
 
@@ -328,12 +327,10 @@ public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
     final Path sourceRoot = new Path(getFs().getUri().toString() + root);
     LOG.info("Rename op-> source:{} to destin:{}", sourceRoot, subDir1);
     try {
-      getFs().rename(sourceRoot, subDir1);
-      Assert.fail("Should throw exception : Cannot rename a directory to" +
-              " its own subdirectory");
+      //  rename should fail and return false
+      Assert.assertFalse(getFs().rename(sourceRoot, subDir1));
     } catch (OMException ome) {
-      // expected
-      assertEquals(ome.getResult(), OMException.ResultCodes.KEY_RENAME_ERROR);
+      Assert.fail("Rename failed with exception" + ome.getMessage());
     }
   }
 
@@ -359,11 +356,10 @@ public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
     final Path destinPath = new Path(getFs().getUri().toString()
             + root + "/b/c");
     try {
-      getFs().rename(dir2SourcePath, destinPath);
-      Assert.fail("Should fail as parent of dst does not exist!");
+      // rename should fail and return false
+      Assert.assertFalse(getFs().rename(dir2SourcePath, destinPath));
     } catch (OMException ome) {
-      // expected
-      assertEquals(ome.getResult(), OMException.ResultCodes.KEY_RENAME_ERROR);
+      Assert.fail("Failed with exception" + ome.getMessage());
     }
 
     // (b) parent of dst is a file. /root_dir/file1/c
@@ -372,11 +368,10 @@ public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
 
     Path newDestinPath = new Path(filePath, "c");
     try {
-      getFs().rename(dir2SourcePath, newDestinPath);
-      Assert.fail("Should fail as parent of dst is a file!");
+      // rename should fail and return false
+      Assert.assertFalse(getFs().rename(dir2SourcePath, newDestinPath));
     } catch (OMException ome) {
-      // expected
-      assertEquals(ome.getResult(), OMException.ResultCodes.KEY_RENAME_ERROR);
+      Assert.fail("Failed with exception" + ome.getMessage());
     }
   }
 

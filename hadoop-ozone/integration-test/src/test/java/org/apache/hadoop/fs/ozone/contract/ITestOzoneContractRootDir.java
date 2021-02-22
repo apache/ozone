@@ -36,17 +36,17 @@ import org.junit.runners.Parameterized;
 public class ITestOzoneContractRootDir extends
     AbstractContractRootDirectoryTest {
 
-  private static boolean fsOptimisedClient;
-  private static boolean fsOptimisedServer;
+  private boolean fsOptimizedClient;
+  private boolean fsOptimizedServer;
 
-  public ITestOzoneContractRootDir(boolean fsOptimClient,
-      boolean fsOptimServer) throws IOException {
-    if (fsOptimisedClient != fsOptimClient ||
-        fsOptimisedServer != fsOptimServer) {
-      fsOptimisedClient = fsOptimClient;
-      fsOptimisedServer = fsOptimServer;
-      ITestOzoneContractUtils.restartCluster(fsOptimisedClient,
-          fsOptimisedServer);
+  public ITestOzoneContractRootDir(boolean fsoClient,
+      boolean fsoServer) throws IOException {
+    if (fsOptimizedClient != fsoClient ||
+        fsOptimizedServer != fsoServer) {
+      fsOptimizedClient = fsoClient;
+      fsOptimizedServer = fsoServer;
+      ITestOzoneContractUtils.restartCluster(fsOptimizedClient,
+          fsOptimizedServer);
     }
   }
 
