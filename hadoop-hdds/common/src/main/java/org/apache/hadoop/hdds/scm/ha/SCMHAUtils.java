@@ -114,7 +114,7 @@ public final class SCMHAUtils {
     String localScmServiceId = conf.getTrimmed(
         ScmConfigKeys.OZONE_SCM_DEFAULT_SERVICE_ID);
 
-    Collection< String > scmServiceIds;
+    Collection<String> scmServiceIds;
 
     if (localScmServiceId == null) {
       // There is no default scm service id is being set, fall back to ozone
