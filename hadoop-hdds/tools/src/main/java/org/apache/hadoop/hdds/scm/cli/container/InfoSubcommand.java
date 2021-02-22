@@ -29,8 +29,10 @@ import org.apache.hadoop.hdds.scm.container.common.helpers
     .ContainerWithPipeline;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.server.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Parameters;
@@ -52,6 +54,11 @@ public class InfoSubcommand extends ScmSubcommand {
   @Spec
   private CommandSpec spec;
 
+  @CommandLine.Option(names = { "--json" },
+      defaultValue = "false",
+      description = "Format output as JSON")
+  private boolean json;
+
   @Parameters(description = "Decimal id of the container.")
   private long containerID;
 
@@ -61,22 +68,26 @@ public class InfoSubcommand extends ScmSubcommand {
         getContainerWithPipeline(containerID);
     Preconditions.checkNotNull(container, "Container cannot be null");
 
-    // Print container report info.
-    LOG.info("Container id: {}", containerID);
-    boolean verbose = spec.root().userObject() instanceof GenericParentCommand
-        && ((GenericParentCommand) spec.root().userObject()).isVerbose();
-    if (verbose) {
-      LOG.info("Pipeline Info: {}", container.getPipeline());
+    if (json) {
+      LOG.info(JsonUtils.toJsonStringWithDefaultPrettyPrinter(container));
     } else {
-      LOG.info("Pipeline id: {}", container.getPipeline().getId().getId());
-    }
-    LOG.info("Container State: {}", container.getContainerInfo().getState());
+      // Print container report info.
+      LOG.info("Container id: {}", containerID);
+      boolean verbose = spec.root().userObject() instanceof GenericParentCommand
+          && ((GenericParentCommand) spec.root().userObject()).isVerbose();
+      if (verbose) {
+        LOG.info("Pipeline Info: {}", container.getPipeline());
+      } else {
+        LOG.info("Pipeline id: {}", container.getPipeline().getId().getId());
+      }
+      LOG.info("Container State: {}", container.getContainerInfo().getState());
 
-    // Print pipeline of an existing container.
-    String machinesStr = container.getPipeline().getNodes().stream().map(
-        InfoSubcommand::buildDatanodeDetails)
-        .collect(Collectors.joining(",\n"));
-    LOG.info("Datanodes: [{}]", machinesStr);
+      // Print pipeline of an existing container.
+      String machinesStr = container.getPipeline().getNodes().stream().map(
+          InfoSubcommand::buildDatanodeDetails)
+          .collect(Collectors.joining(",\n"));
+      LOG.info("Datanodes: [{}]", machinesStr);
+    }
   }
 
   private static String buildDatanodeDetails(DatanodeDetails details) {

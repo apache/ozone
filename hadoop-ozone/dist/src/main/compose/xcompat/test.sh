@@ -80,7 +80,7 @@ create_results_dir
 # current cluster with various clients
 COMPOSE_FILE=new-cluster.yaml:clients.yaml cluster_version=${current_version} test_cross_compatibility
 
-for cluster_version in 1.0.0 0.5.0; do
+for cluster_version in 1.0.0; do
   load_version_specifics ${cluster_version}
 
   export OZONE_VERSION=${cluster_version}
