@@ -229,8 +229,8 @@ public abstract class TestOzoneRpcClientAbstract {
     return TestOzoneRpcClientAbstract.store;
   }
 
-  public static void setScmId(String scmId) {
-    TestOzoneRpcClientAbstract.scmId = scmId;
+  public static void setClusterId(String clusterId) {
+    TestOzoneRpcClientAbstract.clusterId = clusterId;
   }
 
   /**
