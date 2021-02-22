@@ -34,11 +34,10 @@ start_docker_env
 callback with_old_version
 
 stop_docker_env
+callback setup_new_version
 
-#callback setup_new_version
+prepare_for_binary_image "$OZONE_UPGRADE_TO"
+OZONE_KEEP_RESULTS=true start_docker_env
+callback with_new_version
 
-#prepare_for_binary_image "$OZONE_UPGRADE_TO"
-#OZONE_KEEP_RESULTS=true start_docker_env
-#callback with_new_version
-
-#stop_docker_env
+stop_docker_env

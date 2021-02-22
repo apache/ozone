@@ -15,11 +15,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# TODO: compose dir, upgrade from and to must be set
 source "$COMPOSE_DIR"/testlib.sh
 
 setup_old_version() {
-  OZONE_SAFEMODE_STATUS_COMMAND='ozone scmcli safemode status'
   echo "in setup old version"
+  load_version_specifics "$OZONE_UPGRADE_FROM"
 }
 
 with_old_version() {
@@ -30,10 +31,8 @@ with_old_version() {
 
 setup_new_version() {
   echo "in setup new version"
-  OZONE_SAFEMODE_STATUS_COMMAND='ozone admin safemode status --verbose'
-
-  # Manually reformat scm DB to move to the new version.
-  "$COMPOSE_DIR"/../../libexec/upgrade/1.0.0.sh
+  unload_version_specifics "$OZONE_UPGRADE_FROM"
+  load_version_specifics "$OZONE_UPGRADE_TO"
 }
 
 with_new_version() {

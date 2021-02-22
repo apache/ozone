@@ -370,15 +370,6 @@ prepare_for_runner_image() {
   export OZONE_IMAGE="apache/ozone-runner:${v}"
 }
 
-## @description Print the logical version for a specific release
-## @param the release for which logical version should be printed
-get_logical_version() {
-  local v="$1"
-
-  # shellcheck source=/dev/null
-  echo $(source "${_testlib_dir}/versions/${v}.sh" && ozone_logical_version)
-}
-
 ## @description Activate the version-specific behavior for a given release
 ## @param the release for which definitions should be loaded
 load_version_specifics() {

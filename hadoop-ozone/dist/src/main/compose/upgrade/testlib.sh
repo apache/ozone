@@ -21,6 +21,7 @@ _upgrade_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
 # The version that corresponds to the current build.
 : "${OZONE_CURRENT_VERSION:=1.1.0}"
+# TODO: ozone upgrade to and from must be set.
 # Cumulative result of all tests run with run_test function.
 # 0 if all passed, 1 if any failed.
 : "${RESULT:=0}"
