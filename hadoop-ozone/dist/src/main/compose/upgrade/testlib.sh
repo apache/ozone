@@ -17,17 +17,19 @@
 
 set -e -o pipefail
 
+# Fail if required variables are not set.
+set -u
+: "${OZONE_UPGRADE_FROM}"
+: "${OZONE_UPGRADE_TO}"
+: "${OZONE_CURRENT_VERSION}"
+set +u
+
 _upgrade_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
-# The version that corresponds to the current build.
-: "${OZONE_CURRENT_VERSION:=1.1.0}"
-# TODO: ozone upgrade to and from must be set.
 # Cumulative result of all tests run with run_test function.
 # 0 if all passed, 1 if any failed.
 : "${RESULT:=0}"
 : "${OZONE_REPLICATION_FACTOR:=3}"
-# TODO: Compose dir must be set or remove this.
-: "${OZONE_VOLUME:="${COMPOSE_DIR}/data"}"
 : "${OZONE_VOLUME_OWNER:=}"
 : "${ALL_RESULT_DIR:="$_upgrade_dir"/result}"
 
