@@ -61,6 +61,8 @@ import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
+import org.apache.hadoop.hdds.scm.ScmInfo;
+import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -263,9 +265,14 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
      */
     scmStorageConfig = new SCMStorageConfig(conf);
     if (scmStorageConfig.getState() != StorageState.INITIALIZED) {
-      LOG.error("Please make sure you have run \'ozone scm --init\' " +
+      String errMsg = "Please make sure you have run \'ozone scm --init\' " +
           "command to generate all the required metadata to " +
-          scmStorageConfig.getStorageDir() + ".");
+          scmStorageConfig.getStorageDir();
+      if (SCMHAUtils.isSCMHAEnabled(conf)) {
+        errMsg += " or make sure you have run \'ozone scm --bootstrap\' cmd to "
+            + "add the SCM to existing SCM HA group";
+      }
+      LOG.error(errMsg + ".");
       throw new SCMException("SCM not initialized due to storage config " +
           "failure.", ResultCodes.SCM_NOT_INITIALIZED);
     }
@@ -679,6 +686,60 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     HddsServerUtil.addPBProtocol(conf, protocol, instance, rpcServer);
     return rpcServer;
+  }
+
+  /**
+   * Routine to bootstrap the StorageContainerManager. Thsi will connect to a
+   * running SCM instance which has valid cluster id and fetch the cluster id
+   * from there. SCM ids will be also be exchanged here.
+   *
+   * TODO: once SCM HA security is enabled, CSR cerificates will be fetched from
+   * running scm leader instance as well.
+   *
+   * @param conf OzoneConfiguration
+   * @return true if SCM bootstrap is successful, false otherwise.
+   * @throws IOException if init fails due to I/O error
+   */
+  public static boolean scmBootstrap(OzoneConfiguration conf)
+      throws IOException {
+    if (!SCMHAUtils.isSCMHAEnabled(conf)) {
+      LOG.error("Bootstrap is not supported without SCM HA.");
+      return false;
+    }
+    // The node here will try to fetch the cluster id from any of existing
+    // running SCM instances.
+    // TODO: need to avoid failover to local SCM Node here
+    final ScmInfo scmInfo = HAUtils.getScmInfo(conf);
+    SCMStorageConfig scmStorageConfig = new SCMStorageConfig(conf);
+    final String persistedClusterId = scmStorageConfig.getClusterID();
+    final String fetchedId = scmInfo.getClusterId();
+    Preconditions.checkNotNull(fetchedId);
+    StorageState state = scmStorageConfig.getState();
+    if (state != StorageState.INITIALIZED) {
+      Preconditions.checkNotNull(scmStorageConfig.getScmId());
+      if (!fetchedId.equals(persistedClusterId)) {
+        LOG.error(
+            "Could not bootstrap as SCM is already initialized with cluster "
+                + "id {} but cluster id for existing leader SCM instance "
+                + "is {}", persistedClusterId, fetchedId);
+        return false;
+      }
+    } else {
+      try {
+        scmStorageConfig.setClusterId(fetchedId);
+        // It will write down the cluster Id fetched from already
+        // running SCM as well as the local SCM Id.
+
+        // SCM Node info containing hostname to scm Id mappings
+        // will be persisted into the version file once this node gets added
+        // to existing SCM ring post node regular start up.
+        scmStorageConfig.initialize();
+      } catch (IOException ioe) {
+        LOG.error("Could not initialize SCM version file", ioe);
+        return false;
+      }
+    }
+    return true;
   }
 
   /**
