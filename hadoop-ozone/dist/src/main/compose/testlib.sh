@@ -303,7 +303,7 @@ copy_results() {
   local result_dir="${test_dir}/result"
   local test_dir_name=$(basename ${test_dir})
   if [[ -n "$(find "${result_dir}" -name "*.xml")" ]]; then
-    rebot --nostatusrc -N "${test_dir_name}" -o "${all_result_dir}/${test_dir_name}.xml" "${result_dir}/*.xml"
+    rebot --nostatusrc -N "${test_dir_name}" -l NONE -r NONE -o "${all_result_dir}/${test_dir_name}.xml" "${result_dir}/*.xml"
   fi
 
   cp "${result_dir}"/docker-*.log "${all_result_dir}"/
