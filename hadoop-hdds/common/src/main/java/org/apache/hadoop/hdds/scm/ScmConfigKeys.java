@@ -384,7 +384,11 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_RATIS_PORT_KEY
       = "ozone.scm.ratis.port";
   public static final int OZONE_SCM_RATIS_PORT_DEFAULT
-      = 9864;
+      = 9865;
+  public static final String OZONE_SCM_GRPC_PORT_KEY
+      = "ozone.scm.grpc.port";
+  public static final int OZONE_SCM_GRPC_PORT_DEFAULT
+      = 9866;
   public static final String OZONE_SCM_RATIS_RPC_TYPE_KEY
       = "ozone.scm.ratis.rpc.type";
   public static final String OZONE_SCM_RATIS_RPC_TYPE_DEFAULT

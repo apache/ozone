@@ -36,7 +36,7 @@ public final class SCMNodeDetails extends NodeDetails {
   private String clientProtocolServerAddressKey;
   private InetSocketAddress datanodeProtocolServerAddress;
   private String datanodeAddressKey;
-
+  private int grpcPort;
   public static final Logger LOG =
       LoggerFactory.getLogger(SCMNodeDetails.class);
 
@@ -45,15 +45,17 @@ public final class SCMNodeDetails extends NodeDetails {
    */
   @SuppressWarnings("checkstyle:ParameterNumber")
   private SCMNodeDetails(String serviceId, String nodeId,
-      InetSocketAddress rpcAddr, int ratisPort, String httpAddress,
-      String httpsAddress, InetSocketAddress blockProtocolServerAddress,
+      InetSocketAddress rpcAddr, int ratisPort, int grpcPort,
+      String httpAddress, String httpsAddress,
+      InetSocketAddress blockProtocolServerAddress,
       InetSocketAddress clientProtocolServerAddress,
-      InetSocketAddress datanodeProtocolServerAddress,
-      RaftGroup group, RaftPeerId selfPeerId, String datanodeAddressKey,
+      InetSocketAddress datanodeProtocolServerAddress, RaftGroup group,
+      RaftPeerId selfPeerId, String datanodeAddressKey,
       String blockProtocolServerAddressKey,
       String clientProtocolServerAddressAddressKey) {
     super(serviceId, nodeId, rpcAddr, ratisPort,
         httpAddress, httpsAddress);
+    this.grpcPort = grpcPort;
     this.blockProtocolServerAddress = blockProtocolServerAddress;
     this.clientProtocolServerAddress = clientProtocolServerAddress;
     this.datanodeProtocolServerAddress = datanodeProtocolServerAddress;
@@ -85,6 +87,7 @@ public final class SCMNodeDetails extends NodeDetails {
     private String scmNodeId;
     private InetSocketAddress rpcAddress;
     private int ratisPort;
+    private int grpcPort;
     private String httpAddr;
     private String httpsAddr;
     private InetSocketAddress blockProtocolServerAddress;
@@ -146,6 +149,11 @@ public final class SCMNodeDetails extends NodeDetails {
       return this;
     }
 
+    public Builder setGrpcPort(int port) {
+      this.grpcPort = port;
+      return this;
+    }
+
     public Builder setSCMServiceId(String serviceId) {
       this.scmServiceId = serviceId;
       return this;
@@ -168,7 +176,7 @@ public final class SCMNodeDetails extends NodeDetails {
 
     public SCMNodeDetails build() {
       return new SCMNodeDetails(scmServiceId, scmNodeId, rpcAddress,
-          ratisPort, httpAddr, httpsAddr, blockProtocolServerAddress,
+          ratisPort, grpcPort, httpAddr, httpsAddr, blockProtocolServerAddress,
           clientProtocolServerAddress, datanodeProtocolServerAddress,
           raftGroup, selfPeerId, datanodeAddressKey,
           blockProtocolServerAddressKey, clientProtocolServerAddressKey);

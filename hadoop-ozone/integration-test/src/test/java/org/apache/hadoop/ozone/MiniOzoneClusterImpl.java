@@ -689,7 +689,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
     protected void initializeScmStorage(SCMStorageConfig scmStore)
         throws IOException {
-      if (scmStore.getState() == StorageState.INITIALIZED) {
+    /*  if (scmStore.getState() == StorageState.INITIALIZED) {
         return;
       }
       scmStore.setClusterId(clusterId);
@@ -700,7 +700,10 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       // TODO : Ratis is enabled by default for mini ozone cluster. Set scm node
       //  to local host in the beginning. Fix it MiniozoneSCM HA cluster
       scmStore.setScmNodeInfo("localhost");
-      scmStore.initialize();
+      scmStore.initialize();*/
+      StorageContainerManager.scmInit(conf, clusterId);
+      scmStore.setScmId(scmId.get());
+     // scmStore.initialize();
     }
 
     void initializeOmStorage(OMStorage omStorage) throws IOException {

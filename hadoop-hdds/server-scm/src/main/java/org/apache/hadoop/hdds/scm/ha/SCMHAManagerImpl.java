@@ -17,14 +17,19 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * SCMHAManagerImpl uses Apache Ratis for HA implementation. We will have 2N+1
@@ -43,6 +48,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
   private final ConfigurationSource conf;
   private final SCMDBTransactionBuffer transactionBuffer;
   private final SCMSnapshotProvider scmSnapshotProvider;
+  private final StorageContainerManager scm;
 
   // this should ideally be started only in a ratis leader
   private final InterSCMGrpcProtocolService grpcServer;
@@ -53,10 +59,10 @@ public class SCMHAManagerImpl implements SCMHAManager {
   public SCMHAManagerImpl(final ConfigurationSource conf,
       final StorageContainerManager scm) throws IOException {
     this.conf = conf;
+    this.scm = scm;
     this.transactionBuffer =
         new SCMDBTransactionBuffer(scm);
-    this.ratisServer = new SCMRatisServerImpl(
-        conf.getObject(SCMHAConfiguration.class), conf, scm, transactionBuffer);
+    this.ratisServer = new SCMRatisServerImpl(conf, scm, transactionBuffer);
     this.scmSnapshotProvider = new SCMSnapshotProvider(conf,
         scm.getSCMHANodeDetails().getPeerNodeDetails());
     grpcServer = new InterSCMGrpcProtocolService(conf, scm);
@@ -69,6 +75,22 @@ public class SCMHAManagerImpl implements SCMHAManager {
   @Override
   public void start() throws IOException {
     ratisServer.start();
+    if (ratisServer.getDivision() == null) {
+      // this is a bootstrapped node
+      // It will first try to add itself to existing ring
+      boolean success = HAUtils.addSCM(OzoneConfiguration.of(conf),
+          new AddSCMRequest.Builder().setClusterId(scm.getClusterId())
+              .setScmId(scm.getScmId()).setRatisAddr(
+              scm.getSCMHANodeDetails().getLocalNodeDetails()
+                  .getRatisAddressPortStr()).build());
+      if (!success) {
+        throw new IOException("Adding SCM to existing HA group failed");
+      }
+    } else {
+      LOG.info(" scm role is {} peers {}",
+          ratisServer.getDivision().getInfo().getCurrentRole(),
+          ratisServer.getDivision().getGroup().getPeers());
+    }
     grpcServer.start();
   }
 
@@ -152,5 +174,19 @@ public class SCMHAManagerImpl implements SCMHAManager {
   public void shutdown() throws IOException {
     ratisServer.stop();
     grpcServer.stop();
+  }
+
+  @Override
+  public boolean addSCM(AddSCMRequest request) throws IOException {
+    String clusterId = scm.getClusterId();
+    if (!request.getClusterId().equals(scm.getClusterId())) {
+      throw new IOException(
+          "SCM " + request.getScmId() + " with addr " + request.getRatisAddr()
+              + " has cluster Id " + request.getClusterId()
+              + " but leader SCM cluster id is " + clusterId);
+    }
+    Preconditions.checkNotNull(
+        getRatisServer().getDivision().getGroup().getGroupId());
+    return getRatisServer().addSCM(request);
   }
 }

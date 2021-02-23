@@ -131,6 +131,8 @@ import org.apache.hadoop.util.JvmPauseMonitor;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT_DEFAULT;
 import org.apache.ratis.grpc.GrpcTlsConfig;
+import org.apache.ratis.protocol.RaftPeer;
+import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.server.RaftServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -689,9 +691,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   }
 
   /**
-   * Routine to bootstrap the StorageContainerManager. Thsi will connect to a
+   * Routine to bootstrap the StorageContainerManager. Thiw will connect to a
    * running SCM instance which has valid cluster id and fetch the cluster id
-   * from there. SCM ids will be also be exchanged here.
+   * from there.
    *
    * TODO: once SCM HA security is enabled, CSR cerificates will be fetched from
    * running scm leader instance as well.
@@ -708,14 +710,14 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
     // The node here will try to fetch the cluster id from any of existing
     // running SCM instances.
-    // TODO: need to avoid failover to local SCM Node here
-    final ScmInfo scmInfo = HAUtils.getScmInfo(conf);
+    OzoneConfiguration config = SCMHAUtils.removeSelfId(conf);
+    final ScmInfo scmInfo = HAUtils.getScmInfo(config);
     SCMStorageConfig scmStorageConfig = new SCMStorageConfig(conf);
     final String persistedClusterId = scmStorageConfig.getClusterID();
     final String fetchedId = scmInfo.getClusterId();
     Preconditions.checkNotNull(fetchedId);
     StorageState state = scmStorageConfig.getState();
-    if (state != StorageState.INITIALIZED) {
+    if (state == StorageState.INITIALIZED) {
       Preconditions.checkNotNull(scmStorageConfig.getScmId());
       if (!fetchedId.equals(persistedClusterId)) {
         LOG.error(
@@ -762,15 +764,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         // TODO: set the scm node info in the version file during upgrade
         //  from non-HA SCM to SCM HA set up.
         if (SCMHAUtils.isSCMHAEnabled(conf)) {
-          RaftServer server = SCMRatisServerImpl
-              .newRaftServer(clusterId, scmStorageConfig.getScmId(), haDetails,
-                  conf).build();
-          // ensure the ratis group exists
-          server.start();
-          server.close();
-          // TODO: Revisit if we need to set the Node info in SCM version file
-          scmStorageConfig
-              .setScmNodeInfo(haDetails.getLocalNodeDetails().getHostName());
+          SCMRatisServerImpl.initialize(clusterId, scmStorageConfig.getScmId(),
+              haDetails.getLocalNodeDetails(), conf);
         }
         scmStorageConfig.initialize();
         LOG.info("SCM initialization succeeded. Current cluster id for sd={}"

@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.ha.SCMHAConfiguration;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
@@ -32,6 +33,8 @@ import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import java.util.UUID;
+
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
@@ -44,6 +47,7 @@ public class TestSCMSnapshot {
   @BeforeClass
   public static void setup() throws Exception {
     conf = new OzoneConfiguration();
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
     SCMHAConfiguration scmhaConfiguration = conf.getObject(
         SCMHAConfiguration.class);
     scmhaConfiguration.setRatisSnapshotThreshold(1L);
@@ -51,6 +55,7 @@ public class TestSCMSnapshot {
     cluster = MiniOzoneCluster
         .newBuilder(conf)
         .setNumDatanodes(3)
+        .setScmId(UUID.randomUUID().toString())
         .build();
     cluster.waitForClusterToBeReady();
   }

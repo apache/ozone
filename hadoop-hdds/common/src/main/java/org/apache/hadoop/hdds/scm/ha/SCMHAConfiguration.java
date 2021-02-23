@@ -149,12 +149,12 @@ public class SCMHAConfiguration {
 
   @Config(key = "ratis.leader.election.timeout",
       type = ConfigType.TIME,
-      defaultValue = "1s",
+      defaultValue = "5s",
       tags = {SCM, OZONE, HA, RATIS},
       description = "The minimum timeout duration for SCM ratis leader" +
           " election. Default is 1s."
   )
-  private long ratisLeaderElectionTimeout = 1 * 1000L;
+  private long ratisLeaderElectionTimeout = 5 * 1000L;
 
   @Config(key = "ratis.server.failure.timeout.duration",
       type = ConfigType.TIME,
@@ -191,8 +191,8 @@ public class SCMHAConfiguration {
       tags = {OZONE, SCM, HA, RATIS},
       description = "Port used by SCM for Grpc Server."
   )
-  // TODO: fix the default grpc port
-  private int grpcBindPort = 9899;
+
+  private int grpcBindPort = 9866;
 
   @Config(key = "grpc.deadline.interval",
       type = ConfigType.TIME,

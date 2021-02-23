@@ -27,6 +27,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.Properties;
+import java.util.UUID;
 
 /**
  * Common class for storage information. This class defines the common
@@ -197,11 +198,7 @@ public class StorageInfo {
    * @return new clusterID
    */
   public static String newClusterID() {
-    // TODO:
-    //  Please check https://issues.apache.org/jira/browse/HDDS-4538
-    //  hard code clusterID and scmUuid on HDDS-2823,
-    //  so that multi SCMs won't cause chaos in Datanode side.
-    return "CID-1df51ed9-19f1-4283-8f61-5d90a84c196c";
+    return "CID-" + UUID.randomUUID().toString();
   }
 
 }

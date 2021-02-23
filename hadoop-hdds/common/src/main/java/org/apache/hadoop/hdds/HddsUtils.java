@@ -311,8 +311,8 @@ public final class HddsUtils {
   public static InetSocketAddress getSingleSCMAddress(
       ConfigurationSource conf) {
     Collection<InetSocketAddress> singleton = getSCMAddresses(conf);
-    Preconditions.checkArgument(singleton.size() == 1,
-        MULTIPLE_SCM_NOT_YET_SUPPORTED);
+   // Preconditions.checkArgument(singleton.size() == 1,
+    //    MULTIPLE_SCM_NOT_YET_SUPPORTED);
     return singleton.iterator().next();
   }
 

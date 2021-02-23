@@ -25,6 +25,7 @@ import org.apache.hadoop.ozone.common.Storage;
 import java.io.File;
 import java.io.IOException;
 import java.util.Properties;
+import java.util.UUID;
 
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.STORAGE_DIR;
@@ -59,17 +60,21 @@ public class SCMStorageConfig extends Storage {
     }
   }
 
-  public void setScmNodeInfo(String hostname) throws IOException {
+  public void setScmNodeInfo(String address) throws IOException {
     if (getState() == StorageState.INITIALIZED) {
       throw new IOException("SCM is already initialized.");
     } else {
-      final StringBuilder b =
-          new StringBuilder(hostname).append(SCM_NODES_SEPARATOR)
-              .append(getScmId());
-      getStorageInfo().setProperty(SCM_NODES_INFO, b.toString());
+      getStorageInfo()
+          .setProperty(SCM_NODES_INFO, buildSCMNodeInfo(address, getScmId()));
     }
   }
 
+  public static String buildSCMNodeInfo(String address, String id) {
+    final StringBuilder b =
+        new StringBuilder(address).append(SCM_NODES_SEPARATOR)
+            .append(id);
+    return b.toString();
+  }
   /**
    * Retrieves the SCM ID from the version file.
    * @return SCM_ID
@@ -90,11 +95,7 @@ public class SCMStorageConfig extends Storage {
   protected Properties getNodeProperties() {
     String scmId = getScmId();
     if (scmId == null) {
-      // TODO:
-      //  Please check https://issues.apache.org/jira/browse/HDDS-4538
-      //  hard code clusterID and scmUuid on HDDS-2823,
-      //  so that multi SCMs won't cause chaos in Datanode side.
-      scmId = "3a11fedb-cce5-46ac-bb0d-cfdf17df9a19";
+      scmId = UUID.randomUUID().toString();
     }
     Properties scmProperties = new Properties();
     scmProperties.setProperty(SCM_ID, scmId);

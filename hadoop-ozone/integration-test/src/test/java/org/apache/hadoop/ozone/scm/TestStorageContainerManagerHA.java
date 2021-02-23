@@ -20,11 +20,17 @@ package org.apache.hadoop.ozone.scm;
 
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
+import org.apache.hadoop.ozone.client.*;
+import org.apache.hadoop.ozone.client.io.OzoneInputStream;
+import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -35,6 +41,10 @@ import org.junit.rules.Timeout;
 
 import java.io.IOException;
 import java.util.UUID;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
+import static org.apache.hadoop.hdds.client.ReplicationType.STAND_ALONE;
 
 /**
  * Base class for Ozone Manager HA tests.
@@ -50,7 +60,7 @@ public class TestStorageContainerManagerHA {
   private String scmServiceId;
   // TODO: 3 servers will not work until SCM HA configs are considered in
   // SCM HA Ratis server init
-  private static int numOfSCMs = 1;
+  private static int numOfSCMs = 3;
 
 
   @Rule
@@ -70,7 +80,6 @@ public class TestStorageContainerManagerHA {
     scmId = UUID.randomUUID().toString();
     omServiceId = "om-service-test1";
     scmServiceId = "scm-service-test1";
-
     cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
         .setClusterId(clusterId)
         .setScmId(scmId)
@@ -96,11 +105,53 @@ public class TestStorageContainerManagerHA {
   public void testAllSCMAreRunning() throws Exception {
     int count = 0;
     List<StorageContainerManager> scms = cluster.getStorageContainerManagers();
+    Assert.assertEquals(numOfSCMs, scms.size());
     for (StorageContainerManager scm : scms) {
       if (scm.checkLeader()) {
         count++;
       }
     }
     Assert.assertEquals(1, count);
+    count = 0;
+    List<OzoneManager> oms = cluster.getOzoneManagersList();
+    Assert.assertEquals(numOfOMs, oms.size());
+    for (OzoneManager om : oms) {
+      if (om.isLeaderReady()) {
+        count++;
+      }
+    }
+    Assert.assertEquals(1, count);
+    testPutKey();
+  }
+
+  public void testPutKey() throws IOException {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    Instant testStartTime = Instant.now();
+    ObjectStore store =
+        OzoneClientFactory.getRpcClient(cluster.getConf()).getObjectStore();
+    String value = "sample value";
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    for (int i = 0; i < 10; i++) {
+      String keyName = UUID.randomUUID().toString();
+
+      OzoneOutputStream out = bucket.createKey(keyName,
+          value.getBytes(UTF_8).length, STAND_ALONE,
+          ONE, new HashMap<>());
+      out.write(value.getBytes(UTF_8));
+      out.close();
+      OzoneKey key = bucket.getKey(keyName);
+      Assert.assertEquals(keyName, key.getName());
+      OzoneInputStream is = bucket.readKey(keyName);
+      byte[] fileContent = new byte[value.getBytes(UTF_8).length];
+      is.read(fileContent);
+      Assert.assertEquals(value, new String(fileContent, UTF_8));
+      Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
+      Assert.assertFalse(key.getModificationTime().isBefore(testStartTime));
+    }
   }
 }

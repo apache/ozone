@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.TestUtils;
@@ -29,6 +30,7 @@ import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.ha.ConfUtils;
@@ -66,6 +68,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
   private final OMHAService omhaService;
   private final SCMHAService scmhaService;
+  private static ObjectStore store = null;
 
   private int waitForClusterToBeReadyTimeout = 120000; // 2 min
 
@@ -398,13 +401,13 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
             // up the address set with service ID and node ID in initHAConfig
             config.set(OMConfigKeys.OZONE_OM_HTTP_ADDRESS_KEY, "");
             config.set(OMConfigKeys.OZONE_OM_HTTPS_ADDRESS_KEY, "");
-
+            
             // Set metadata/DB dir base path
             String metaDirPath = path + "/" + nodeId;
             config.set(OZONE_METADATA_DIRS, metaDirPath);
-            OMStorage omStore = new OMStorage(config);
-            initializeOmStorage(omStore);
-
+           // OMStorage omStore = new OMStorage(config);
+           // initializeOmStorage(omStore);
+            OzoneManager.omInit(config);
             OzoneManager om = OzoneManager.createOm(config);
             if (certClient != null) {
               om.setCertClient(certClient);
@@ -469,12 +472,16 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
             scmConfig.set(ScmConfigKeys.OZONE_SCM_NODE_ID_KEY, nodeId);
             scmConfig.set(ScmConfigKeys.OZONE_SCM_HTTP_ADDRESS_KEY, "");
             scmConfig.set(ScmConfigKeys.OZONE_SCM_HTTPS_ADDRESS_KEY, "");
+            scmConfig.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
 
             // TODO: set SCM HA configs
 
             configureSCM();
-            SCMStorageConfig scmStore = new SCMStorageConfig(scmConfig);
-            initializeScmStorage(scmStore);
+            if (i == 1) {
+              StorageContainerManager.scmInit(scmConfig, clusterId);
+            } else {
+              StorageContainerManager.scmBootstrap(scmConfig);
+            }
             StorageContainerManager scm = TestUtils.getScmSimple(scmConfig);
             HealthyPipelineSafeModeRule rule =
                 scm.getScmSafeModeManager().getHealthyPipelineSafeModeRule();
@@ -538,24 +545,24 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       // Here setting internal service and OZONE_OM_SERVICE_IDS_KEY, in this
       // way in OM start it uses internal service id to find it's service id.
       conf.set(ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY, scmServiceId);
-      conf.set(ScmConfigKeys.OZONE_SCM_INTERNAL_SERVICE_ID, scmServiceId);
-      String omNodesKey = ConfUtils.addKeySuffixes(
+      conf.set(ScmConfigKeys.OZONE_SCM_DEFAULT_SERVICE_ID, scmServiceId);
+      String scmNodesKey = ConfUtils.addKeySuffixes(
           ScmConfigKeys.OZONE_SCM_NODES_KEY, scmServiceId);
-      StringBuilder omNodesKeyValue = new StringBuilder();
+      StringBuilder scmNodesKeyValue = new StringBuilder();
       StringBuilder scmNames = new StringBuilder();
 
       int port = basePort;
 
       for (int i = 1; i <= numOfSCMs; i++, port+=10) {
         String scmNodeId = SCM_NODE_ID_PREFIX + i;
-        omNodesKeyValue.append(",").append(scmNodeId);
-        String omAddrKey = ConfUtils.addKeySuffixes(
+        scmNodesKeyValue.append(",").append(scmNodeId);
+        String scmAddrKey = ConfUtils.addKeySuffixes(
             ScmConfigKeys.OZONE_SCM_ADDRESS_KEY, scmServiceId, scmNodeId);
-        String omHttpAddrKey = ConfUtils.addKeySuffixes(
+        String scmHttpAddrKey = ConfUtils.addKeySuffixes(
             ScmConfigKeys.OZONE_SCM_HTTP_ADDRESS_KEY, scmServiceId, scmNodeId);
-        String omHttpsAddrKey = ConfUtils.addKeySuffixes(
+        String scmHttpsAddrKey = ConfUtils.addKeySuffixes(
             ScmConfigKeys.OZONE_SCM_HTTPS_ADDRESS_KEY, scmServiceId, scmNodeId);
-        String omRatisPortKey = ConfUtils.addKeySuffixes(
+        String scmRatisPortKey = ConfUtils.addKeySuffixes(
             ScmConfigKeys.OZONE_SCM_RATIS_PORT_KEY, scmServiceId, scmNodeId);
         String dnPortKey = ConfUtils.addKeySuffixes(
             ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY,
@@ -566,21 +573,25 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
         String ssClientKey = ConfUtils.addKeySuffixes(
             ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY,
             scmServiceId, scmNodeId);
+        String scmGrpcPortKey = ConfUtils.addKeySuffixes(
+            ScmConfigKeys.OZONE_SCM_GRPC_PORT_KEY, scmServiceId, scmNodeId);
 
-        conf.set(omAddrKey, "127.0.0.1:" + port);
-        conf.set(omHttpAddrKey, "127.0.0.1:" + (port + 2));
-        conf.set(omHttpsAddrKey, "127.0.0.1:" + (port + 3));
-        conf.setInt(omRatisPortKey, port + 4);
-        conf.setInt("ozone.scm.ha.ratis.bind.port", port + 4);
+        conf.set(scmAddrKey, "127.0.0.1");
+        conf.set(scmHttpAddrKey, "127.0.0.1:" + (port + 2));
+        conf.set(scmHttpsAddrKey, "127.0.0.1:" + (port + 3));
+        conf.setInt(scmRatisPortKey, port + 4);
+        //conf.setInt("ozone.scm.ha.ratis.bind.port", port + 4);
         conf.set(dnPortKey, "127.0.0.1:" + (port + 5));
         conf.set(blockClientKey, "127.0.0.1:" + (port + 6));
         conf.set(ssClientKey, "127.0.0.1:" + (port + 7));
+        //conf.setInt("ozone.scm.ha.ratis.grpc.bind.port", port + 8);
+        conf.setInt(scmGrpcPortKey, port + 8);
         scmNames.append(",").append("localhost:" + (port + 5));
         conf.set(ScmConfigKeys.
             OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY, "127.0.0.1:" + (port + 6));
       }
 
-      conf.set(omNodesKey, omNodesKeyValue.substring(1));
+      conf.set(scmNodesKey, scmNodesKeyValue.substring(1));
       conf.set(ScmConfigKeys.OZONE_SCM_NAMES, scmNames.substring(1));
     }
 
