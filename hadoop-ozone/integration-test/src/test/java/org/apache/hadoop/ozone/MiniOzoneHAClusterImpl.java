@@ -401,7 +401,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
             // up the address set with service ID and node ID in initHAConfig
             config.set(OMConfigKeys.OZONE_OM_HTTP_ADDRESS_KEY, "");
             config.set(OMConfigKeys.OZONE_OM_HTTPS_ADDRESS_KEY, "");
-            
+
             // Set metadata/DB dir base path
             String metaDirPath = path + "/" + nodeId;
             config.set(OZONE_METADATA_DIRS, metaDirPath);

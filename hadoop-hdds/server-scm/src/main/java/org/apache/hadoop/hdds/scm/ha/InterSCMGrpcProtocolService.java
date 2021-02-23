@@ -48,7 +48,7 @@ public class InterSCMGrpcProtocolService {
       final StorageContainerManager scm) {
     Preconditions.checkNotNull(conf);
     this.port = conf.getInt(ScmConfigKeys.OZONE_SCM_GRPC_PORT_KEY,
-        ScmConfigKeys.OZONE_SCM_RATIS_PORT_DEFAULT);
+        ScmConfigKeys.OZONE_SCM_GRPC_PORT_DEFAULT);
 
     NettyServerBuilder nettyServerBuilder =
         ((NettyServerBuilder) ServerBuilder.forPort(port))

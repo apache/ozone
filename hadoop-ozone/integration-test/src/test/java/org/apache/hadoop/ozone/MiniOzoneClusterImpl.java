@@ -44,6 +44,9 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.TestUtils;
+import org.apache.hadoop.hdds.scm.ha.SCMHANodeDetails;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
+import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.proxy.SCMContainerLocationFailoverProxyProvider;
@@ -616,6 +619,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       Path metaDir = Paths.get(path, "ozone-meta");
       Files.createDirectories(metaDir);
       conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDir.toString());
+      conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
       if (!chunkSize.isPresent()) {
         //set it to 1MB by default in tests
         chunkSize = Optional.of(1);
@@ -689,7 +693,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
     protected void initializeScmStorage(SCMStorageConfig scmStore)
         throws IOException {
-    /*  if (scmStore.getState() == StorageState.INITIALIZED) {
+     if (scmStore.getState() == StorageState.INITIALIZED) {
         return;
       }
       scmStore.setClusterId(clusterId);
@@ -697,13 +701,11 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         scmId = Optional.of(UUID.randomUUID().toString());
       }
       scmStore.setScmId(scmId.get());
-      // TODO : Ratis is enabled by default for mini ozone cluster. Set scm node
-      //  to local host in the beginning. Fix it MiniozoneSCM HA cluster
-      scmStore.setScmNodeInfo("localhost");
-      scmStore.initialize();*/
-      StorageContainerManager.scmInit(conf, clusterId);
-      scmStore.setScmId(scmId.get());
-     // scmStore.initialize();
+      scmStore.initialize();
+     if (SCMHAUtils.isSCMHAEnabled(conf)) {
+        SCMRatisServerImpl.initialize(clusterId, scmId.get(),
+            SCMHANodeDetails.loadSCMHAConfig(conf).getLocalNodeDetails(), conf);
+      }
     }
 
     void initializeOmStorage(OMStorage omStorage) throws IOException {
@@ -711,7 +713,9 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         return;
       }
       omStorage.setClusterId(clusterId);
-      omStorage.setScmId(scmId.get());
+      if (scmId.isPresent()) {
+        omStorage.setScmId(scmId.get());
+      }
       omStorage.setOmId(omId.orElse(UUID.randomUUID().toString()));
       // Initialize ozone certificate client if security is enabled.
       if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
