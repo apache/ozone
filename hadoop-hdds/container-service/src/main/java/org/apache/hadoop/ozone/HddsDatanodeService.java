@@ -282,7 +282,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   private void startRatisForTest() throws IOException {
     String scmId = "scm-01";
     String clusterId = "clusterId";
-    datanodeStateMachine.getContainer().start(scmId);
+    datanodeStateMachine.getContainer().start(clusterId);
     MutableVolumeSet volumeSet =
         getDatanodeStateMachine().getContainer().getVolumeSet();
 
