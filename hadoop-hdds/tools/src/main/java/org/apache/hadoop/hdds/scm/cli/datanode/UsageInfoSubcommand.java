@@ -27,18 +27,19 @@ import picocli.CommandLine.Command;
 
 import java.io.IOException;
 import java.text.NumberFormat;
+import java.util.List;
 
 /**
- * Command to list the disk metrics of a datanode.
+ * Command to list the usage info of a datanode.
  */
 @Command(
-    name = "disk-metrics",
-    description = "List disk metrics " +
+    name = "usageinfo",
+    description = "List usage information " +
         "(such as Capacity, SCMUsed, Remaining) of a datanode by IP address " +
         "or UUID",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
-public class DiskMetricsSubCommand extends ScmSubcommand {
+public class UsageInfoSubcommand extends ScmSubcommand {
 
   @CommandLine.Option(names = {"--ip"}, paramLabel = "IP", description =
       "Show info by datanode ip address")
@@ -77,21 +78,26 @@ public class DiskMetricsSubCommand extends ScmSubcommand {
           "specified.");
     }
 
-    HddsProtos.DatanodeDiskMetrics metrics =
-        scmClient.getDatanodeDiskMetrics(ipaddress, uuid);
-    Double capacity = Double.parseDouble(metrics.getCapacity());
-    Double used = Double.parseDouble(metrics.getUsed());
-    Double remaining = Double.parseDouble(metrics.getRemaining());
-    Double usedRatio = used / capacity;
-    Double remainingRatio = remaining / capacity;
+    List<HddsProtos.DatanodeUsageInfo> infoList =
+        scmClient.getDatanodeUsageInfo(ipaddress, uuid);
+
+    for (HddsProtos.DatanodeUsageInfo info : infoList) {
+      printInfo(info);
+    }
+  }
+
+  public void printInfo(HddsProtos.DatanodeUsageInfo info) {
+    Double capacity = (double)info.getCapacity();
+    Double usedRatio = info.getUsed() / capacity;
+    Double remainingRatio = info.getRemaining() / capacity;
     NumberFormat percentFormat = NumberFormat.getPercentInstance();
     percentFormat.setMinimumFractionDigits(5);
 
-    System.out.printf("%-10s: %20sB %n", "Capacity", metrics.getCapacity());
-    System.out.printf("%-10s: %20sB (%s) %n", "SCMUsed", metrics.getUsed(),
+    System.out.printf("%-10s: %20sB %n", "Capacity", info.getCapacity());
+    System.out.printf("%-10s: %20sB (%s) %n", "SCMUsed", info.getUsed(),
         percentFormat.format(usedRatio));
-    System.out.printf("%-10s: %20sB (%s) %n",
-        "Remaining", metrics.getRemaining(),
+    System.out.printf("%-10s: %20sB (%s) %n%n",
+        "Remaining", info.getRemaining(),
         percentFormat.format(remainingRatio));
   }
 }

@@ -241,14 +241,15 @@ public interface StorageContainerLocationProtocol extends Closeable {
   boolean getReplicationManagerStatus() throws IOException;
 
   /**
-   * Get Datanode disk metrics by ip or uuid.
+   * Get Datanode usage information by ip or uuid.
    *
-   * @param ipaddress
-   * @param uuid
-   * @return disk metrics such as capacity, used, remaining
+   * @param ipaddress - datanode IP address String
+   * @param uuid - datanode UUID String
+   * @return List of DatanodeUsageInfo. Each element contains info such as
+   * capacity, SCMused, and remaining space.
    * @throws IOException
    */
-  HddsProtos.DatanodeDiskMetrics getDatanodeDiskMetrics(String ipaddress,
-                                                  String uuid)
+  List<HddsProtos.DatanodeUsageInfo> getDatanodeUsageInfo(String ipaddress,
+                                                          String uuid)
       throws IOException;
 }

@@ -62,18 +62,31 @@ import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.Server;
-import org.apache.hadoop.ozone.audit.*;
+import org.apache.hadoop.ozone.audit.AuditAction;
+import org.apache.hadoop.ozone.audit.AuditEventStatus;
+import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.audit.AuditLoggerType;
+import org.apache.hadoop.ozone.audit.AuditMessage;
+import org.apache.hadoop.ozone.audit.Auditor;
+import org.apache.hadoop.ozone.audit.SCMAction;
 import org.apache.ratis.thirdparty.com.google.common.base.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StorageContainerLocationProtocolService.newReflectiveBlockingService;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.*;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY;
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.startRpcServer;
 import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
@@ -608,15 +621,16 @@ public class SCMClientProtocolServer implements
   }
 
   /**
-   * Get Datanode disk metrics (such as capacity, used) by ip or uuid.
+   * Get Datanode usage info (such as capacity, used) by ip or uuid.
    *
-   * @param ipaddress
-   * @param uuid
-   * @return DatanodeDiskMetrics
+   * @param ipaddress - Datanode Address String
+   * @param uuid - Datanode UUID String
+   * @return List of DatanodeUsageInfo. Each element contains usage info such
+   * as capacity, SCMUsed, and remaining space.
    * @throws IOException
    */
   @Override
-  public HddsProtos.DatanodeDiskMetrics getDatanodeDiskMetrics(String ipaddress,
+  public List<HddsProtos.DatanodeUsageInfo> getDatanodeUsageInfo(String ipaddress,
                                                          String uuid)
       throws IOException {
 
@@ -629,35 +643,49 @@ public class SCMClientProtocolServer implements
       throw e;
     }
 
-    // get datanode by ip or uuid
-    DatanodeDetails node = null;
+    // get datanodes by ip or uuid
+    List<DatanodeDetails> nodes = new ArrayList<>();
     if (!Strings.isNullOrEmpty(uuid)) {
-      node = scm.getScmNodeManager().getNodeByUuid(uuid);
+      nodes.add(scm.getScmNodeManager().getNodeByUuid(uuid));
     } else if (!Strings.isNullOrEmpty(ipaddress)) {
-      List<DatanodeDetails> nodes = scm.getScmNodeManager()
-          .getNodesByAddress(ipaddress);
-      // currently only the first datanode in the list is being queried
-      node = nodes.get(0);
+      nodes = scm.getScmNodeManager().getNodesByAddress(ipaddress);
     } else {
       throw new IOException(
           "Could not get datanode with the specified parameters."
       );
     }
 
-    // get metrics of the datanode
-    SCMNodeStat stat = scm.getScmNodeManager().getNodeStat(node).get();
-    String capacity = stat.getCapacity().get().toString();
-    String used = stat.getScmUsed().get().toString();
-    String remaining = stat.getRemaining().get().toString();
+    // get datanode usage info
+    List<HddsProtos.DatanodeUsageInfo> infoList = new ArrayList<>();
+    for (DatanodeDetails node : nodes) {
+      infoList.add(getUsageInfoFromDatanodeDetails(node));
+    }
 
-    HddsProtos.DatanodeDiskMetrics metrics = HddsProtos.DatanodeDiskMetrics
+    return infoList;
+  }
+
+  /**
+   * Get usage details for a specific DatanodeDetails node.
+   *
+   * @param node - DatanodeDetails
+   * @return Usage info such as capacity, SCMUsed, and remaining space.
+   * @throws IOException
+   */
+  public HddsProtos.DatanodeUsageInfo getUsageInfoFromDatanodeDetails(
+      DatanodeDetails node) throws IOException {
+    SCMNodeStat stat = scm.getScmNodeManager().getNodeStat(node).get();
+
+    long capacity = stat.getCapacity().get();
+    long used = stat.getScmUsed().get();
+    long remaining = stat.getRemaining().get();
+
+    HddsProtos.DatanodeUsageInfo info = HddsProtos.DatanodeUsageInfo
         .newBuilder()
         .setCapacity(capacity)
         .setUsed(used)
         .setRemaining(remaining)
         .build();
-
-    return metrics;
+    return info;
   }
 
   /**

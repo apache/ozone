@@ -156,10 +156,10 @@ message NodePool {
     repeated Node nodes = 1;
 }
 
-message DatanodeDiskMetrics {
-    optional string capacity = 1;
-    optional string used = 2;
-    optional string remaining = 3;
+message DatanodeUsageInfo {
+    optional int64 capacity = 1;
+    optional int64 used = 2;
+    optional int64 remaining = 3;
 }
 
 /**
