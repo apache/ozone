@@ -59,8 +59,8 @@ jobs:
       - name: Delete temporary build artifacts before caching
         run: |
           #Never cache local artifacts
-          rm -rfv ~/.m2/repository/org/apache/hadoop/hadoop-hdds*
-          rm -rfv ~/.m2/repository/org/apache/hadoop/hadoop-ozone*
+          rm -rf ~/.m2/repository/org/apache/hadoop/hadoop-hdds*
+          rm -rf ~/.m2/repository/org/apache/hadoop/hadoop-ozone*
         if: always()
   bats:
     runs-on: ubuntu-18.04
