@@ -48,7 +48,10 @@ import static org.apache.hadoop.ozone.OzoneConsts.SCM_DUMMY_NODEID;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_DUMMY_SERVICE_ID;
 
 /**
- * SCM Node Info.
+ * Class which builds SCM Node Information.
+ *
+ * This class is used by SCM clients like OzoneManager, Client, Admin
+ * commands to figure out SCM Node Information to make contact to SCM.
  */
 public class SCMNodeInfo {
 
