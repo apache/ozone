@@ -621,9 +621,8 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
    * @throws IOException
    */
   @Override
-  public List<HddsProtos.DatanodeUsageInfo> getDatanodeUsageInfo(String ipaddress,
-                                                                 String uuid)
-      throws IOException {
+  public List<HddsProtos.DatanodeUsageInfo> getDatanodeUsageInfo(
+      String ipaddress, String uuid) throws IOException {
 
     DatanodeUsageInfoRequestProto request =
         DatanodeUsageInfoRequestProto.newBuilder()

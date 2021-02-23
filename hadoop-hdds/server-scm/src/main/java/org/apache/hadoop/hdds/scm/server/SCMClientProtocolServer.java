@@ -630,9 +630,8 @@ public class SCMClientProtocolServer implements
    * @throws IOException
    */
   @Override
-  public List<HddsProtos.DatanodeUsageInfo> getDatanodeUsageInfo(String ipaddress,
-                                                         String uuid)
-      throws IOException {
+  public List<HddsProtos.DatanodeUsageInfo> getDatanodeUsageInfo(
+      String ipaddress, String uuid) throws IOException {
 
     // check admin authorisation
     String remoteUser = getRpcRemoteUsername();
