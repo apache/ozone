@@ -113,7 +113,7 @@ public class BenchMarkDatanodeDispatcher {
           containerType, conf, "datanodeid",
           containerSet, volumeSet, metrics,
           c -> {});
-      handler.setScmID("scm");
+      handler.setClusterID("scm");
       handlers.put(containerType, handler);
     }
     dispatcher = new HddsDispatcher(conf, containerSet, volumeSet, handlers,

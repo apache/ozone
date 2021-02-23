@@ -46,22 +46,22 @@ import org.slf4j.LoggerFactory;
  * Layout of the container directory on disk is as follows:
  *
  * <p>../hdds/VERSION
- * <p>{@literal ../hdds/<<scmUuid>>/current/<<containerDir>>/<<containerID
+ * <p>{@literal ../hdds/<<clusterUuid>>/current/<<containerDir>>/<<containerID
  * >/metadata/<<containerID>>.container}
- * <p>{@literal ../hdds/<<scmUuid>>/current/<<containerDir>>/<<containerID
+ * <p>{@literal ../hdds/<<clusterUuid>>/current/<<containerDir>>/<<containerID
  * >/<<dataPath>>}
  * <p>
  * Some ContainerTypes will have extra metadata other than the .container
  * file. For example, KeyValueContainer will have a .db file. This .db file
  * will also be stored in the metadata folder along with the .container file.
  * <p>
- * {@literal ../hdds/<<scmUuid>>/current/<<containerDir>>/<<KVcontainerID
+ * {@literal ../hdds/<<clusterUuid>>/current/<<containerDir>>/<<KVcontainerID
  * >/metadata/<<KVcontainerID>>.db}
  * <p>
  * Note that the {@literal <<dataPath>>} is dependent on the ContainerType.
  * For KeyValueContainers, the data is stored in a "chunks" folder. As such,
  * the {@literal <<dataPath>>} layout for KeyValueContainers is:
- * <p>{@literal ../hdds/<<scmUuid>>/current/<<containerDir>>/<<KVcontainerID
+ * <p>{@literal ../hdds/<<clusterUuid>>/current/<<containerDir>>/<<KVcontainerID
  * >/chunks/<<chunksFile>>}
  *
  */
@@ -99,30 +99,30 @@ public class ContainerReader implements Runnable {
     Preconditions.checkNotNull(hddsVolumeRootDir, "hddsVolumeRootDir" +
         "cannot be null");
 
-    //filtering scm directory
-    File[] scmDir = hddsVolumeRootDir.listFiles(new FileFilter() {
+    //filtering storage directory
+    File[] storageDir = hddsVolumeRootDir.listFiles(new FileFilter() {
       @Override
       public boolean accept(File pathname) {
         return pathname.isDirectory();
       }
     });
 
-    if (scmDir == null) {
+    if (storageDir == null) {
       LOG.error("IO error for the volume {}, skipped loading",
           hddsVolumeRootDir);
       volumeSet.failVolume(hddsVolumeRootDir.getPath());
       return;
     }
 
-    if (scmDir.length > 1) {
+    if (storageDir.length > 1) {
       LOG.error("Volume {} is in Inconsistent state", hddsVolumeRootDir);
       volumeSet.failVolume(hddsVolumeRootDir.getPath());
       return;
     }
 
     LOG.info("Start to verify containers on volume {}", hddsVolumeRootDir);
-    for (File scmLoc : scmDir) {
-      File currentDir = new File(scmLoc, Storage.STORAGE_DIR_CURRENT);
+    for (File storageLoc : storageDir) {
+      File currentDir = new File(storageLoc, Storage.STORAGE_DIR_CURRENT);
       File[] containerTopDirs = currentDir.listFiles();
       if (containerTopDirs != null) {
         for (File containerTopDir : containerTopDirs) {

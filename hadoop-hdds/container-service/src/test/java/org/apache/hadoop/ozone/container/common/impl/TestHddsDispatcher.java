@@ -129,7 +129,7 @@ public class TestHddsDispatcher {
       }
       HddsDispatcher hddsDispatcher = new HddsDispatcher(
           conf, containerSet, volumeSet, handlers, context, metrics, null);
-      hddsDispatcher.setScmId(scmId.toString());
+      hddsDispatcher.setClusterId(scmId.toString());
       ContainerCommandResponseProto responseOne = hddsDispatcher
           .dispatch(getWriteChunkRequest(dd.getUuidString(), 1L, 1L), null);
       Assert.assertEquals(ContainerProtos.Result.SUCCESS,
@@ -291,7 +291,7 @@ public class TestHddsDispatcher {
 
     HddsDispatcher hddsDispatcher = new HddsDispatcher(
         conf, containerSet, volumeSet, handlers, context, metrics, null);
-    hddsDispatcher.setScmId(scmId.toString());
+    hddsDispatcher.setClusterId(scmId.toString());
     return hddsDispatcher;
   }
 
