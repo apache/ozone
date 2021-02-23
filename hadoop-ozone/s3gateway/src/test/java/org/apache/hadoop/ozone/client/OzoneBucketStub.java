@@ -297,13 +297,13 @@ public class OzoneBucketStub extends OzoneBucket {
   /**
    * Class used to hold part information in a upload part request.
    */
-  public class Part {
+  public static class Part {
     private String partName;
     private byte[] content;
 
     public Part(String name, byte[] data) {
       this.partName = name;
-      this.content = data;
+      this.content = data.clone();
     }
 
     public String getPartName() {
@@ -311,7 +311,7 @@ public class OzoneBucketStub extends OzoneBucket {
     }
 
     public byte[] getContent() {
-      return content;
+      return content.clone();
     }
   }
 }

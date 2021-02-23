@@ -422,7 +422,7 @@ public class TestCloseContainerHandlingByClient {
     // read the key from OM again and match the length.The length will still
     // be the equal to the original data size.
     OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
-    Assert.assertEquals(5 * chunkSize, keyInfo.getDataSize());
+    Assert.assertEquals((long) 5 * chunkSize, keyInfo.getDataSize());
 
     // Written the same data twice
     String dataString = new String(data1, UTF_8);

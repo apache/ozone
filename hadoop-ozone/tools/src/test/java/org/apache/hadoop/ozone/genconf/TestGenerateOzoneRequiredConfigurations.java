@@ -40,10 +40,13 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
  * Tests GenerateOzoneRequiredConfigurations.
@@ -57,6 +60,7 @@ public class TestGenerateOzoneRequiredConfigurations {
   private final ByteArrayOutputStream err = new ByteArrayOutputStream();
   private static final PrintStream OLD_OUT = System.out;
   private static final PrintStream OLD_ERR = System.err;
+  private static final String DEFAULT_ENCODING = UTF_8.name();
   /**
    * Creates output directory which will be used by the test-cases.
    * If a test-case needs a separate directory, it has to create a random
@@ -73,8 +77,8 @@ public class TestGenerateOzoneRequiredConfigurations {
 
   @Before
   public void setup() throws Exception {
-    System.setOut(new PrintStream(out));
-    System.setErr(new PrintStream(err));
+    System.setOut(new PrintStream(out, false, DEFAULT_ENCODING));
+    System.setErr(new PrintStream(err, false, DEFAULT_ENCODING));
   }
 
   @After
@@ -96,7 +100,8 @@ public class TestGenerateOzoneRequiredConfigurations {
     FileUtils.deleteDirectory(outputBaseDir);
   }
 
-  private void execute(String[] args, String msg) {
+  private void execute(String[] args, String msg)
+      throws UnsupportedEncodingException {
     List<String> arguments = new ArrayList(Arrays.asList(args));
     LOG.info("Executing shell command with args {}", arguments);
     CommandLine cmd = genconfTool.getCmd();
@@ -117,7 +122,7 @@ public class TestGenerateOzoneRequiredConfigurations {
         };
     cmd.parseWithHandlers(new CommandLine.RunLast(),
         exceptionHandler, args);
-    Assert.assertTrue(out.toString().contains(msg));
+    Assert.assertTrue(out.toString(DEFAULT_ENCODING).contains(msg));
   }
 
   private void executeWithException(String[] args, String msg) {

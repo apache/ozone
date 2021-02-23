@@ -325,9 +325,9 @@ public class OzoneManagerServiceProviderImpl
   boolean updateReconOmDBWithNewSnapshot() throws IOException {
     // Obtain the current DB snapshot from OM and
     // update the in house OM metadata managed DB instance.
-    long startTime = Time.monotonicNowNanos();
+    long startTime = Time.monotonicNow();
     DBCheckpoint dbSnapshot = getOzoneManagerDBSnapshot();
-    metrics.updateSnapshotRequestLatency(Time.monotonicNowNanos() - startTime);
+    metrics.updateSnapshotRequestLatency(Time.monotonicNow() - startTime);
     if (dbSnapshot != null && dbSnapshot.getCheckpointLocation() != null) {
       LOG.info("Got new checkpoint from OM : " +
           dbSnapshot.getCheckpointLocation());

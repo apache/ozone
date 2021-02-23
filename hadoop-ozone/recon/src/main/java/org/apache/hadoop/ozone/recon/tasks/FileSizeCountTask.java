@@ -110,7 +110,6 @@ public class FileSizeCountTask implements ReconOmTask {
     return "FileSizeCountTask";
   }
 
-  @Override
   public Collection<String> getTaskTables() {
     return Collections.singletonList(KEY_TABLE);
   }
@@ -126,9 +125,14 @@ public class FileSizeCountTask implements ReconOmTask {
   public Pair<String, Boolean> process(OMUpdateEventBatch events) {
     Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
     Map<FileSizeCountKey, Long> fileSizeCountMap = new HashMap<>();
+    final Collection<String> taskTables = getTaskTables();
 
     while (eventIterator.hasNext()) {
       OMDBUpdateEvent<String, OmKeyInfo> omdbUpdateEvent = eventIterator.next();
+      // Filter event inside process method to avoid duping
+      if (!taskTables.contains(omdbUpdateEvent.getTable())) {
+        continue;
+      }
       String updatedKey = omdbUpdateEvent.getKey();
       OmKeyInfo omKeyInfo = omdbUpdateEvent.getValue();
 

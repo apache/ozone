@@ -49,7 +49,6 @@ public class DummyReconDBTask implements ReconOmTask {
     return taskName;
   }
 
-  @Override
   public Collection<String> getTaskTables() {
     return Collections.singletonList("volumeTable");
   }

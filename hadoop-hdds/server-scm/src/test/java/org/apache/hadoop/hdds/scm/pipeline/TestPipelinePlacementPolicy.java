@@ -285,7 +285,7 @@ public class TestPipelinePlacementPolicy {
         results.get(2).getNetworkLocation());
   }
 
-  private final static Node[] NODES = new NodeImpl[] {
+  private static final Node[] NODES = new NodeImpl[] {
       new NodeImpl("h1", "/r1", NetConstants.NODE_COST_DEFAULT),
       new NodeImpl("h2", "/r1", NetConstants.NODE_COST_DEFAULT),
       new NodeImpl("h3", "/r2", NetConstants.NODE_COST_DEFAULT),
@@ -297,7 +297,7 @@ public class TestPipelinePlacementPolicy {
   };
 
   // 3 racks with single node.
-  private final static Node[] SINGLE_NODE_RACK = new NodeImpl[] {
+  private static final Node[] SINGLE_NODE_RACK = new NodeImpl[] {
       new NodeImpl("h1", "/r1", NetConstants.NODE_COST_DEFAULT),
       new NodeImpl("h2", "/r2", NetConstants.NODE_COST_DEFAULT),
       new NodeImpl("h3", "/r3", NetConstants.NODE_COST_DEFAULT)

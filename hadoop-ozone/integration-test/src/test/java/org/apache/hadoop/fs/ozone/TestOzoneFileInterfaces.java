@@ -87,7 +87,6 @@ public class TestOzoneFileInterfaces {
   public Timeout timeout = new Timeout(300000);
 
   private String rootPath;
-  private String userName;
 
   /**
    * Parameter class to set absolute url/defaultFS handling.

@@ -49,8 +49,8 @@ public class TestChunkInputStream {
   private static final int BYTES_PER_CHECKSUM = 20;
   private static final String CHUNK_NAME = "dummyChunk";
   private static final Random RANDOM = new Random();
-  private static Checksum checksum;
 
+  private Checksum checksum;
   private DummyChunkInputStream chunkStream;
   private ChunkInfo chunkInfo;
   private byte[] chunkData;
@@ -221,13 +221,17 @@ public class TestChunkInputStream {
       }
     };
 
-    // WHEN
-    subject.unbuffer();
-    pipelineRef.set(newPipeline);
-    int b = subject.read();
+    try {
+      // WHEN
+      subject.unbuffer();
+      pipelineRef.set(newPipeline);
+      int b = subject.read();
 
-    // THEN
-    Assert.assertNotEquals(-1, b);
-    verify(clientFactory).acquireClientForReadData(newPipeline);
+      // THEN
+      Assert.assertNotEquals(-1, b);
+      verify(clientFactory).acquireClientForReadData(newPipeline);
+    } finally {
+      subject.close();
+    }
   }
 }

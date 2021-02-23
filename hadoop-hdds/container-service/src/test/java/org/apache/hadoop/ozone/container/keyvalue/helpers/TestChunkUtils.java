@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.container.keyvalue.helpers;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
@@ -40,6 +39,8 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeIOStats;
 import org.apache.hadoop.test.GenericTestUtils;
 
 import org.apache.commons.io.FileUtils;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNABLE_TO_FIND_CHUNK;
 
 import org.apache.hadoop.test.LambdaTestUtils;
@@ -64,7 +65,7 @@ public class TestChunkUtils {
   @Test
   public void concurrentReadOfSameFile() throws Exception {
     String s = "Hello World";
-    byte[] array = s.getBytes();
+    byte[] array = s.getBytes(UTF_8);
     ChunkBuffer data = ChunkBuffer.wrap(ByteBuffer.wrap(array));
     Path tempFile = Files.createTempFile(PREFIX, "concurrent");
     try {
@@ -85,7 +86,7 @@ public class TestChunkUtils {
             ByteBuffer readBuffer = ByteBuffer.allocate((int) len);
             ChunkUtils.readData(file, readBuffer, offset, len, stats);
             LOG.info("Read data ({}): {}", threadNumber,
-                new String(readBuffer.array()));
+                new String(readBuffer.array(), UTF_8));
             if (!Arrays.equals(array, readBuffer.array())) {
               failed.set(true);
             }
@@ -151,7 +152,7 @@ public class TestChunkUtils {
   @Test
   public void serialRead() throws Exception {
     String s = "Hello World";
-    byte[] array = s.getBytes();
+    byte[] array = s.getBytes(UTF_8);
     ChunkBuffer data = ChunkBuffer.wrap(ByteBuffer.wrap(array));
     Path tempFile = Files.createTempFile(PREFIX, "serial");
     try {
@@ -175,7 +176,7 @@ public class TestChunkUtils {
   public void validateChunkForOverwrite() throws IOException {
 
     Path tempFile = Files.createTempFile(PREFIX, "overwrite");
-    FileUtils.write(tempFile.toFile(), "test", StandardCharsets.UTF_8);
+    FileUtils.write(tempFile.toFile(), "test", UTF_8);
 
     Assert.assertTrue(
         ChunkUtils.validateChunkForOverwrite(tempFile.toFile(),

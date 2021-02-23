@@ -36,8 +36,15 @@ public class ReplicationTask {
 
   private final Instant queued = Instant.now();
 
-  public ReplicationTask(long containerId,
-      List<DatanodeDetails> sources) {
+  /**
+   * Counter for the transferred bytes.
+   */
+  private long transferredBytes;
+
+  public ReplicationTask(
+      long containerId,
+      List<DatanodeDetails> sources
+  ) {
     this.containerId = containerId;
     this.sources = sources;
   }
@@ -71,8 +78,7 @@ public class ReplicationTask {
     return status;
   }
 
-  public void setStatus(
-      Status status) {
+  public void setStatus(Status status) {
     this.status = status;
   }
 
@@ -88,6 +94,14 @@ public class ReplicationTask {
 
   public Instant getQueued() {
     return queued;
+  }
+
+  public long getTransferredBytes() {
+    return transferredBytes;
+  }
+
+  public void setTransferredBytes(long transferredBytes) {
+    this.transferredBytes = transferredBytes;
   }
 
   /**

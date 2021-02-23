@@ -19,8 +19,10 @@
 package org.apache.hadoop.ozone.om.request.key.acl.prefix;
 
 import java.io.IOException;
+import java.util.Map;
 
 import com.google.common.base.Optional;
+import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -138,8 +140,10 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
       }
     }
 
+    OzoneObj obj = getOzoneObj();
+    Map<String, String> auditMap = obj.toAuditMap();
     onComplete(opResult, exception, ozoneManager.getMetrics(), result,
-        trxnLogIndex);
+        trxnLogIndex, ozoneManager.getAuditLogger(), auditMap);
 
     return omClientResponse;
   }
@@ -186,7 +190,8 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
    * @param omMetrics
    */
   abstract void onComplete(boolean operationResult, IOException exception,
-      OMMetrics omMetrics, Result result, long trxnLogIndex);
+      OMMetrics omMetrics, Result result, long trxnLogIndex,
+      AuditLogger auditLogger, Map<String, String> auditMap);
 
   /**
    * Apply the acl operation, if successfully completed returns true,

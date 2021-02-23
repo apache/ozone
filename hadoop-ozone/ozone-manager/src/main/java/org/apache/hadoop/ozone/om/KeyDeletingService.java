@@ -72,7 +72,7 @@ public class KeyDeletingService extends BackgroundService {
   // Use only a single thread for KeyDeletion. Multiple threads would read
   // from the same table and can send deletion requests for same key multiple
   // times.
-  private final static int KEY_DELETING_CORE_POOL_SIZE = 1;
+  private static final int KEY_DELETING_CORE_POOL_SIZE = 1;
 
   private final OzoneManager ozoneManager;
   private final ScmBlockLocationProtocol scmClient;

@@ -43,7 +43,7 @@ import org.junit.rules.TemporaryFolder;
 public class TestContainerDBServiceProviderImpl {
 
   @ClassRule
-  public static TemporaryFolder tempFolder = new TemporaryFolder();
+  public static final TemporaryFolder TEMP_FOLDER = new TemporaryFolder();
   private static ContainerDBServiceProvider containerDbServiceProvider;
 
   private String keyPrefix1 = "V3/B1/K1";
@@ -53,7 +53,7 @@ public class TestContainerDBServiceProviderImpl {
   @BeforeClass
   public static void setupOnce() throws Exception {
     ReconTestInjector reconTestInjector =
-        new ReconTestInjector.Builder(tempFolder)
+        new ReconTestInjector.Builder(TEMP_FOLDER)
             .withReconSqlDb()
             .withContainerDB()
             .build();
@@ -104,9 +104,10 @@ public class TestContainerDBServiceProviderImpl {
         "V1/B2/K3", 0);
     prefixCounts.put(ckp3, 3);
 
-    for (ContainerKeyPrefix prefix : prefixCounts.keySet()) {
+    for (Map.Entry<ContainerKeyPrefix, Integer> entry :
+        prefixCounts.entrySet()) {
       containerDbServiceProvider.storeContainerKeyMapping(
-          prefix, prefixCounts.get(prefix));
+          entry.getKey(), prefixCounts.get(entry.getKey()));
     }
 
     assertEquals(1, containerDbServiceProvider
@@ -145,11 +146,11 @@ public class TestContainerDBServiceProviderImpl {
     prefixCounts.put(keyPrefix2, 2);
     prefixCounts.put(keyPrefix3, 3);
 
-    for (String prefix : prefixCounts.keySet()) {
+    for (Map.Entry<String, Integer> entry : prefixCounts.entrySet()) {
       ContainerKeyPrefix containerKeyPrefix = new ContainerKeyPrefix(
-          containerId, prefix, 0);
+          containerId, entry.getKey(), 0);
       containerDbServiceProvider.storeContainerKeyMapping(
-          containerKeyPrefix, prefixCounts.get(prefix));
+          containerKeyPrefix, prefixCounts.get(entry.getKey()));
     }
 
     Assert.assertEquals(1,

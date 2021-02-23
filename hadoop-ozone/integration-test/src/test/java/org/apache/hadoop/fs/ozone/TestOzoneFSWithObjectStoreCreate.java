@@ -93,8 +93,7 @@ public class TestOzoneFSWithObjectStoreCreate {
     cluster.waitForClusterToBeReady();
 
     // create a volume and a bucket to be used by OzoneFileSystem
-    OzoneBucket bucket =
-        TestDataUtil.createVolumeAndBucket(cluster, volumeName, bucketName);
+    TestDataUtil.createVolumeAndBucket(cluster, volumeName, bucketName);
 
     rootPath = String.format("%s://%s.%s/", OZONE_URI_SCHEME, bucketName,
         volumeName);
@@ -431,8 +430,8 @@ public class TestOzoneFSWithObjectStoreCreate {
     ozoneInputStream.read(read, 0, length);
     ozoneInputStream.close();
 
-    String inputString = new String(input);
-    Assert.assertEquals(inputString, new String(read));
+    String inputString = new String(input, UTF_8);
+    Assert.assertEquals(inputString, new String(read, UTF_8));
 
     // Read using filesystem.
     FSDataInputStream fsDataInputStream = o3fs.open(new Path(key));
@@ -440,7 +439,7 @@ public class TestOzoneFSWithObjectStoreCreate {
     fsDataInputStream.read(read, 0, length);
     ozoneInputStream.close();
 
-    Assert.assertEquals(inputString, new String(read));
+    Assert.assertEquals(inputString, new String(read, UTF_8));
   }
 
   private void checkPath(Path path) {

@@ -35,11 +35,28 @@ public class RequestContext {
   private final ACLType aclRights;
   private final String ownerName;
 
+  /**
+   * Represents recursive access check required for all the sub-paths of the
+   * given path. If the given path is not a directory, there is no effect for
+   * this flag. A true value represents recursive check, false represents
+   * non-recursive check.
+   */
+  private final boolean recursiveAccessCheck;
+
   @SuppressWarnings("parameternumber")
   public RequestContext(String host, InetAddress ip,
       UserGroupInformation clientUgi, String serviceId,
       ACLIdentityType aclType, ACLType aclRights,
       String ownerName) {
+    this(host, ip, clientUgi, serviceId, aclType, aclRights, ownerName,
+            false);
+  }
+
+  @SuppressWarnings("parameternumber")
+  public RequestContext(String host, InetAddress ip,
+      UserGroupInformation clientUgi, String serviceId,
+      ACLIdentityType aclType, ACLType aclRights,
+      String ownerName, boolean recursiveAccessCheck) {
     this.host = host;
     this.ip = ip;
     this.clientUgi = clientUgi;
@@ -47,6 +64,7 @@ public class RequestContext {
     this.aclType = aclType;
     this.aclRights = aclRights;
     this.ownerName = ownerName;
+    this.recursiveAccessCheck = recursiveAccessCheck;
   }
 
   /**
@@ -65,6 +83,8 @@ public class RequestContext {
      *  authorizer to honor owner privilege.
      */
     private String ownerName;
+
+    private boolean recursiveAccessCheck;
 
     public Builder setHost(String bHost) {
       this.host = bHost;
@@ -105,9 +125,14 @@ public class RequestContext {
       return this;
     }
 
+    public Builder setRecursiveAccessCheck(boolean recursiveAccessCheckFlag) {
+      this.recursiveAccessCheck = recursiveAccessCheckFlag;
+      return this;
+    }
+
     public RequestContext build() {
       return new RequestContext(host, ip, clientUgi, serviceId, aclType,
-          aclRights, ownerName);
+          aclRights, ownerName, recursiveAccessCheck);
     }
   }
 
@@ -115,16 +140,25 @@ public class RequestContext {
     return new Builder();
   }
 
+
   public static RequestContext.Builder getBuilder(
       UserGroupInformation ugi, InetAddress remoteAddress, String hostName,
       ACLType aclType, String ownerName) {
+    return getBuilder(ugi, remoteAddress, hostName, aclType, ownerName,
+            false);
+  }
+
+  public static RequestContext.Builder getBuilder(
+      UserGroupInformation ugi, InetAddress remoteAddress, String hostName,
+      ACLType aclType, String ownerName, boolean recursiveAccessCheck) {
     RequestContext.Builder contextBuilder = RequestContext.newBuilder()
         .setClientUgi(ugi)
         .setIp(remoteAddress)
         .setHost(hostName)
         .setAclType(ACLIdentityType.USER)
         .setAclRights(aclType)
-        .setOwnerName(ownerName);
+        .setOwnerName(ownerName)
+        .setRecursiveAccessCheck(recursiveAccessCheck);
     return contextBuilder;
   }
 
@@ -162,5 +196,15 @@ public class RequestContext {
 
   public String getOwnerName() {
     return ownerName;
+  }
+
+  /**
+   * A true value represents recursive access check required for all the
+   * sub-paths of the given path, false represents non-recursive check.
+   * <p>
+   * If the given path is not a directory, there is no effect for this flag.
+   */
+  public boolean isRecursiveAccessCheck() {
+    return recursiveAccessCheck;
   }
 }

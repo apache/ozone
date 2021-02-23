@@ -283,7 +283,7 @@ public final class OzoneManagerDoubleBuffer {
                   return null;
                 });
 
-            long startTime = Time.monotonicNowNanos();
+            long startTime = Time.monotonicNow();
             flushBatchWithTrace(lastTraceId.get(), readyBuffer.size(),
                 (SupplierWithIOException<Void>) () -> {
                   omMetadataManager.getStore().commitBatchOperation(
@@ -291,7 +291,7 @@ public final class OzoneManagerDoubleBuffer {
                   return null;
                 });
             ozoneManagerDoubleBufferMetrics.updateFlushTime(
-                Time.monotonicNowNanos() - startTime);
+                Time.monotonicNow() - startTime);
           }
 
           // Complete futures first and then do other things. So, that

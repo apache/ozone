@@ -45,7 +45,7 @@ class TestStringCodec {
         () -> codec.extract(sb));
     sb.append(":66");
     JaegerSpanContext context = codec.extract(sb);
-    String expectedContextString = new String("123:456:789:66");
+    String expectedContextString = "123:456:789:66";
     assertTrue(context.getTraceId().equals("123"));
     assertTrue(context.toString().equals(expectedContextString));
   }

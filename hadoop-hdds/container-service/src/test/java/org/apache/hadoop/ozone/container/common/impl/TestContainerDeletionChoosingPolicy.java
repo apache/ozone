@@ -52,7 +52,7 @@ import org.mockito.Mockito;
  */
 @RunWith(Parameterized.class)
 public class TestContainerDeletionChoosingPolicy {
-  private static String path;
+  private String path;
   private OzoneContainer ozoneContainer;
   private ContainerSet containerSet;
   private OzoneConfiguration conf;

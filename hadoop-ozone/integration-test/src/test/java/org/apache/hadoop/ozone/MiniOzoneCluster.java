@@ -275,6 +275,7 @@ public interface MiniOzoneCluster {
     protected static final int DEFAULT_HB_PROCESSOR_INTERVAL_MS = 100;
     protected static final int ACTIVE_OMS_NOT_SET = -1;
     protected static final int DEFAULT_PIPELIME_LIMIT = 3;
+    protected static final int DEFAULT_RATIS_RPC_TIMEOUT_SEC = 1;
 
     protected final OzoneConfiguration conf;
     protected String path;

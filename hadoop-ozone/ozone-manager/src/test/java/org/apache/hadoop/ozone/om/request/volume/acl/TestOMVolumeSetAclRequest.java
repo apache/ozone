@@ -94,7 +94,6 @@ public class TestOMVolumeSetAclRequest extends TestOMVolumeRequest {
         omMetadataManager.getVolumeTable().get(volumeKey);
     // As request is valid volume table should have entry.
     Assert.assertNotNull(omVolumeArgs);
-    OmOzoneAclMap aclMapBeforeSet = omVolumeArgs.getAclMap();
 
     OMClientResponse omClientResponse =
         omVolumeSetAclRequest.validateAndUpdateCache(ozoneManager, 1,

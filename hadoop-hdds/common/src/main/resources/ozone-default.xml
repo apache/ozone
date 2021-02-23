@@ -167,8 +167,20 @@
   <property>
     <name>dfs.container.ratis.ipc</name>
     <value>9858</value>
+    <tag>OZONE, CONTAINER, PIPELINE, RATIS</tag>
+    <description>The ipc port number of container for clients.</description>
+  </property>
+  <property>
+    <name>dfs.container.ratis.admin.port</name>
+    <value>9857</value>
     <tag>OZONE, CONTAINER, PIPELINE, RATIS, MANAGEMENT</tag>
-    <description>The ipc port number of container.</description>
+    <description>The ipc port number of container for admin requests.</description>
+  </property>
+  <property>
+    <name>dfs.container.ratis.server.port</name>
+    <value>9856</value>
+    <tag>OZONE, CONTAINER, PIPELINE, RATIS, MANAGEMENT</tag>
+    <description>The ipc port number of container for server-server communication.</description>
   </property>
   <property>
     <name>dfs.container.ratis.ipc.random.port</name>
@@ -449,7 +461,7 @@
       with the configured address.
 
       If node ID is not deterministic from the configuration, then it is set
-      to the OmId from the OM version file.
+      to default node id - om1.
     </description>
   </property>
   <property>
@@ -1620,7 +1632,7 @@
 
   <property>
     <name>ozone.om.ratis.minimum.timeout</name>
-    <value>1s</value>
+    <value>5s</value>
     <tag>OZONE, OM, RATIS, MANAGEMENT</tag>
     <description>The minimum timeout duration for OM's Ratis server rpc.
     </description>
@@ -1628,10 +1640,10 @@
 
   <property>
     <name>ozone.om.leader.election.minimum.timeout.duration</name>
-    <value>1s</value>
-    <tag>OZONE, OM, RATIS, MANAGEMENT</tag>
-    <description>The minimum timeout duration for OM ratis leader election.
-      Default is 1s.
+    <value>5s</value>
+    <tag>OZONE, OM, RATIS, MANAGEMENT, DEPRECATED</tag>
+    <description>DEPRECATED. Leader election timeout uses ratis
+      rpc timeout which can be set via ozone.om.ratis.minimum.timeout.
     </description>
   </property>
 

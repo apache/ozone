@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.recon.spi.impl;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeEmptyOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
@@ -43,9 +44,10 @@ import static org.mockito.Mockito.when;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileWriter;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 import java.nio.file.Paths;
 
@@ -151,17 +153,27 @@ public class TestOzoneManagerServiceProviderImpl {
     File file1 = Paths.get(checkpointDir.getAbsolutePath(), "file1")
         .toFile();
     String str = "File1 Contents";
-    BufferedWriter writer = new BufferedWriter(new FileWriter(
-        file1.getAbsolutePath()));
-    writer.write(str);
-    writer.close();
+    BufferedWriter writer = null;
+    try {
+      writer = new BufferedWriter(new OutputStreamWriter(
+          new FileOutputStream(file1), UTF_8));
+      writer.write(str);
+    } finally {
+      if (writer != null) {
+        writer.close();
+      }
+    }
 
     File file2 = Paths.get(checkpointDir.getAbsolutePath(), "file2")
         .toFile();
     str = "File2 Contents";
-    writer = new BufferedWriter(new FileWriter(file2.getAbsolutePath()));
-    writer.write(str);
-    writer.close();
+    try {
+      writer = new BufferedWriter(new OutputStreamWriter(
+          new FileOutputStream(file2), UTF_8));
+      writer.write(str);
+    } finally {
+      writer.close();
+    }
 
     //Create test tar file.
     File tarFile = createTarFile(checkpointDir.toPath());

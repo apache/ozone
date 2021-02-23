@@ -130,7 +130,7 @@ public abstract class Storage {
     return storageInfo;
   }
 
-  abstract protected Properties getNodeProperties();
+  protected abstract Properties getNodeProperties();
 
   /**
    * Sets the Node properties specific to OM/SCM.

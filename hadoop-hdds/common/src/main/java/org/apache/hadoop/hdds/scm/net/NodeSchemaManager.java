@@ -43,7 +43,7 @@ public final class NodeSchemaManager {
   // max level, includes ROOT level
   private int maxLevel = -1;
 
-  private volatile static NodeSchemaManager instance = null;
+  private static volatile NodeSchemaManager instance = null;
 
   private NodeSchemaManager() {
   }

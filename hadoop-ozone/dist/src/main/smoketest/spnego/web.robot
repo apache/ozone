@@ -23,12 +23,12 @@ Resource            ../commonlib.robot
 Test Timeout        5 minutes
 
 *** Variables ***
-${OM_URL}       http://om:9874
-${OM_DB_CHECKPOINT_URL}       http://om:9874/dbCheckpoint
-${OM_SERVICE_LIST_URL}       http://om:9874/serviceList
+${OM_URL}           http://om:9874
+${OM_DB_CHECKPOINT_URL}      ${OM_URL}/dbCheckpoint
+${OM_SERVICE_LIST_URL}       ${OM_URL}/serviceList
 
-${SCM_URL}       http://scm:9876
-${RECON_URL}       http://recon:9888
+${SCM_URL}          http://scm:9876
+${RECON_URL}        http://recon:9888
 
 ${SCM_CONF_URL}     http://scm:9876/conf
 ${SCM_JMX_URL}      http://scm:9876/jmx

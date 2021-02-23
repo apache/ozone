@@ -179,9 +179,9 @@ public class TestSCMMXBean {
     containerStateCount = scm.getContainerStateCount();
 
     containerStateCount.forEach((k, v) -> {
-      if(k == HddsProtos.LifeCycleState.CLOSING.toString()) {
+      if(k.equals(HddsProtos.LifeCycleState.CLOSING.toString())) {
         assertEquals((int)v, 5);
-      } else if (k == HddsProtos.LifeCycleState.CLOSED.toString()) {
+      } else if (k.equals(HddsProtos.LifeCycleState.CLOSED.toString())) {
         assertEquals((int)v, 5);
       } else  {
         // Remaining all container state count should be zero.

@@ -183,7 +183,8 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
           OzoneManagerProtocolProtos.PartKeyInfo.newBuilder();
       partKeyInfo.setPartName(partName);
       partKeyInfo.setPartNumber(partNumber);
-      partKeyInfo.setPartKeyInfo(omKeyInfo.getProtobuf());
+      partKeyInfo.setPartKeyInfo(omKeyInfo.getProtobuf(
+          getOmRequest().getVersion()));
 
       // Add this part information in to multipartKeyInfo.
       multipartKeyInfo.addPartKeyInfo(partNumber, partKeyInfo.build());

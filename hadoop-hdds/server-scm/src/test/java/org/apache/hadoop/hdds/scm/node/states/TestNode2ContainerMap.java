@@ -39,8 +39,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * Test classes for Node2ContainerMap.
  */
 public class TestNode2ContainerMap {
-  private final static int DATANODE_COUNT = 300;
-  private final static int CONTAINER_COUNT = 1000;
+  private static final int DATANODE_COUNT = 300;
+  private static final int CONTAINER_COUNT = 1000;
   private final Map<UUID, TreeSet<ContainerID>> testData = new
       ConcurrentHashMap<>();
 

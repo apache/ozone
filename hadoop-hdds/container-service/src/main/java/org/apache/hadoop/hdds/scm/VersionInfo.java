@@ -23,7 +23,7 @@ package org.apache.hadoop.hdds.scm;
 public final class VersionInfo {
 
   // We will just be normal and use positive counting numbers for versions.
-  private final static VersionInfo[] VERSION_INFOS =
+  private static final VersionInfo[] VERSION_INFOS =
       {new VersionInfo("First version of SCM", 1)};
 
 

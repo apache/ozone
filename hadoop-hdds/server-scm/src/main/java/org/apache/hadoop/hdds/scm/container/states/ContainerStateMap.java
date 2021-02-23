@@ -81,7 +81,7 @@ public class ContainerStateMap {
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerStateMap.class);
 
-  private final static NavigableSet<ContainerID> EMPTY_SET  =
+  private static final NavigableSet<ContainerID> EMPTY_SET  =
       Collections.unmodifiableNavigableSet(new TreeSet<>());
 
   private final ContainerAttribute<LifeCycleState> lifeCycleStateMap;
@@ -293,6 +293,12 @@ public class ContainerStateMap {
     lock.writeLock().lock();
     try {
       checkIfContainerExist(containerID);
+      // Return if updating state not changed
+      if (currentState == newState) {
+        LOG.debug("CurrentState and NewState are the same, return from " +
+            "updateState directly.");
+        return;
+      }
       final ContainerInfo currentInfo = containerMap.get(containerID);
       try {
         currentInfo.setState(newState);
@@ -538,7 +544,7 @@ public class ContainerStateMap {
   private void checkIfContainerExist(ContainerID containerID)
       throws ContainerNotFoundException {
     if (!containerMap.containsKey(containerID)) {
-      throw new ContainerNotFoundException("Container with id #" +
+      throw new ContainerNotFoundException("Container with id " +
           containerID.getId() + " not found.");
     }
   }

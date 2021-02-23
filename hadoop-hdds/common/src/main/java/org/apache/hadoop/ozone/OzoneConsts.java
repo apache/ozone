@@ -108,7 +108,7 @@ public final class OzoneConsts {
 
   public static final String FILE_HASH = "SHA-256";
   public static final String MD5_HASH = "MD5";
-  public final static String CHUNK_OVERWRITE = "OverWriteRequested";
+  public static final String CHUNK_OVERWRITE = "OverWriteRequested";
 
   public static final int CHUNK_SIZE = 1 * 1024 * 1024; // 1 MB
   public static final long KB = 1024L;
@@ -196,11 +196,12 @@ public final class OzoneConsts {
    * Quota RESET default is -1, which means quota is not set.
    */
   public static final long QUOTA_RESET = -1;
+  public static final long OLD_QUOTA_DEFAULT = -2;
 
   /**
    * Quota Units.
    */
-  public enum Units {TB, GB, MB, KB, BYTES}
+  public enum Units {TB, GB, MB, KB, B}
 
   /**
    * Max number of keys returned per list buckets operation.
@@ -343,9 +344,7 @@ public final class OzoneConsts {
 
   // Default OMServiceID for OM Ratis servers to use as RaftGroupId
   public static final String OM_SERVICE_ID_DEFAULT = "omServiceIdDefault";
-
-  // Dummy OMNodeID for OM Clients to use for a non-HA OM setup
-  public static final String OM_NODE_ID_DUMMY = "omNodeIdDummy";
+  public static final String OM_DEFAULT_NODE_ID = "om1";
 
   public static final String JAVA_TMP_DIR = "java.io.tmpdir";
   public static final String LOCALHOST = "localhost";
@@ -393,4 +392,8 @@ public final class OzoneConsts {
   public static final String OM_RATIS_SNAPSHOT_DIR = "snapshot";
 
   public static final long DEFAULT_OM_UPDATE_ID = -1L;  
+
+  // CRL Sequence Id
+  public static final String CRL_SEQUENCE_ID_KEY = "CRL_SEQUENCE_ID";
+
 }

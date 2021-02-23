@@ -1,0 +1,73 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+version: "3.4"
+
+# reusable fragments (see https://docs.docker.com/compose/compose-file/#extension-fields)
+x-common-config:
+  &common-config
+  image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
+  volumes:
+    - ../..:/opt/hadoop
+  env_file:
+    - docker-config
+
+x-replication:
+  &replication
+  OZONE-SITE.XML_ozone.replication: ${OZONE_REPLICATION_FACTOR:-1}
+
+services:
+  datanode:
+    <<: *common-config
+    ports:
+      - 9864
+      - 9882
+    environment:
+      <<: *replication
+    command: ["ozone","datanode"]
+  om:
+    <<: *common-config
+    environment:
+      ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
+      <<: *replication
+    ports:
+      - 9874:9874
+      - 9862:9862
+    command: ["ozone","om"]
+  scm:
+    <<: *common-config
+    ports:
+      - 9876:9876
+      - 9860:9860
+    environment:
+      ENSURE_SCM_INITIALIZED: /data/metadata/scm/current/VERSION
+      OZONE-SITE.XML_hdds.scm.safemode.min.datanode: ${OZONE_SAFEMODE_MIN_DATANODES:-1}
+      <<: *replication
+    command: ["ozone","scm"]
+  s3g:
+    <<: *common-config
+    environment:
+      <<: *replication
+    ports:
+      - 9878:9878
+    command: ["ozone","s3g"]
+  recon:
+    <<: *common-config
+    ports:
+      - 9888:9888
+    environment:
+      <<: *replication
+    command: ["ozone","recon"]

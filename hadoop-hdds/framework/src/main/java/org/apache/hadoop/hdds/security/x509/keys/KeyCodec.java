@@ -62,10 +62,10 @@ import static java.nio.file.attribute.PosixFilePermission.OWNER_WRITE;
  * tools like OpenSSL can be used to read and decode these files.
  */
 public class KeyCodec {
-  public final static String PRIVATE_KEY = "PRIVATE KEY";
-  public final static String PUBLIC_KEY = "PUBLIC KEY";
-  public final static Charset DEFAULT_CHARSET = StandardCharsets.UTF_8;
-  private final static  Logger LOG =
+  public static final String PRIVATE_KEY = "PRIVATE KEY";
+  public static final String PUBLIC_KEY = "PUBLIC KEY";
+  public static final Charset DEFAULT_CHARSET = StandardCharsets.UTF_8;
+  private static final  Logger LOG =
       LoggerFactory.getLogger(KeyCodec.class);
   private final Path location;
   private final SecurityConfig securityConfig;

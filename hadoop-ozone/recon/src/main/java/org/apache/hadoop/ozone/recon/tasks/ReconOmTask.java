@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
-import java.util.Collection;
-
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 
@@ -33,13 +31,6 @@ public interface ReconOmTask {
    * @return task name
    */
   String getTaskName();
-
-  /**
-   * Return the list of tables that the task is listening on.
-   * Empty list means the task is NOT listening on any tables.
-   * @return Collection of Tables.
-   */
-  Collection<String> getTaskTables();
 
   /**
    * Process a set of OM events on tables that the task is listening on.

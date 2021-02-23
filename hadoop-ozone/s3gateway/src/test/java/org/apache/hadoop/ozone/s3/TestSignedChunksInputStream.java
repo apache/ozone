@@ -20,11 +20,12 @@ package org.apache.hadoop.ozone.s3;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 
 import org.apache.commons.io.IOUtils;
 import org.junit.Assert;
 import org.junit.Test;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
  * Test input stream parsing with signatures.
@@ -36,14 +37,14 @@ public class TestSignedChunksInputStream {
     InputStream is = fileContent("0;chunk-signature"
         +
         "=23abb2bd920ddeeaac78a63ed808bc59fa6e7d3ef0e356474b82cdc2f8c93c40");
-    String result = IOUtils.toString(is, StandardCharsets.UTF_8);
+    String result = IOUtils.toString(is, UTF_8);
     Assert.assertEquals("", result);
 
     is = fileContent("0;chunk-signature"
         +
         "=23abb2bd920ddeeaac78a63ed808bc59fa6e7d3ef0e356474b82cdc2f8c93c40\r"
         + "\n");
-    result = IOUtils.toString(is, StandardCharsets.UTF_8);
+    result = IOUtils.toString(is, UTF_8);
     Assert.assertEquals("", result);
   }
 
@@ -54,7 +55,7 @@ public class TestSignedChunksInputStream {
         +
         "=23abb2bd920ddeeaac78a63ed808bc59fa6e7d3ef0e356474b82cdc2f8c93c40\r"
         + "\n1234567890\r\n");
-    String result = IOUtils.toString(is, StandardCharsets.UTF_8);
+    String result = IOUtils.toString(is, UTF_8);
     Assert.assertEquals("1234567890", result);
 
     //test read(byte[],int,int)
@@ -64,7 +65,8 @@ public class TestSignedChunksInputStream {
         + "\n1234567890\r\n");
     byte[] bytes = new byte[10];
     IOUtils.read(is, bytes, 0, 10);
-    Assert.assertEquals("1234567890", new String(bytes));
+    Assert.assertEquals("1234567890",
+        new String(bytes, UTF_8));
   }
 
   @Test
@@ -74,7 +76,7 @@ public class TestSignedChunksInputStream {
         +
         "=23abb2bd920ddeeaac78a63ed808bc59fa6e7d3ef0e356474b82cdc2f8c93c40\r"
         + "\n1234567890");
-    String result = IOUtils.toString(is, StandardCharsets.UTF_8);
+    String result = IOUtils.toString(is, UTF_8);
     Assert.assertEquals("1234567890", result);
 
     //test read(byte[],int,int)
@@ -84,7 +86,8 @@ public class TestSignedChunksInputStream {
         + "\n1234567890");
     byte[] bytes = new byte[10];
     IOUtils.read(is, bytes, 0, 10);
-    Assert.assertEquals("1234567890", new String(bytes));
+    Assert.assertEquals("1234567890",
+        new String(bytes, UTF_8));
   }
 
   @Test
@@ -94,7 +97,7 @@ public class TestSignedChunksInputStream {
         + "1234567890\r\n"
         + "05;chunk-signature=signature\r\n"
         + "abcde\r\n");
-    String result = IOUtils.toString(is, StandardCharsets.UTF_8);
+    String result = IOUtils.toString(is, UTF_8);
     Assert.assertEquals("1234567890abcde", result);
 
     //test read(byte[],int,int)
@@ -104,11 +107,12 @@ public class TestSignedChunksInputStream {
         + "abcde\r\n");
     byte[] bytes = new byte[15];
     IOUtils.read(is, bytes, 0, 15);
-    Assert.assertEquals("1234567890abcde", new String(bytes));
+    Assert.assertEquals("1234567890abcde",
+        new String(bytes, UTF_8));
   }
 
   private InputStream fileContent(String content) {
     return new SignedChunksInputStream(
-        new ByteArrayInputStream(content.getBytes()));
+        new ByteArrayInputStream(content.getBytes(UTF_8)));
   }
 }

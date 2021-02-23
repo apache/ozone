@@ -141,7 +141,8 @@ public class OMFileCreateRequest extends OMKeyRequest {
         .setDataSize(requestedSize);
 
     newKeyArgs.addAllKeyLocations(omKeyLocationInfoList.stream()
-        .map(OmKeyLocationInfo::getProtobuf).collect(Collectors.toList()));
+        .map(info -> info.getProtobuf(getOmRequest().getVersion()))
+        .collect(Collectors.toList()));
 
     generateRequiredEncryptionInfo(keyArgs, newKeyArgs, ozoneManager);
     CreateFileRequest.Builder newCreateFileRequest =
@@ -305,7 +306,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
       numMissingParents = missingParentInfos.size();
       // Prepare response
       omResponse.setCreateFileResponse(CreateFileResponse.newBuilder()
-          .setKeyInfo(omKeyInfo.getProtobuf())
+          .setKeyInfo(omKeyInfo.getProtobuf(getOmRequest().getVersion()))
           .setID(clientID)
           .setOpenVersion(openVersion).build())
           .setCmdType(Type.CreateFile);

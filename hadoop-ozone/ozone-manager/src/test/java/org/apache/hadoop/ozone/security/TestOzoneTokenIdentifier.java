@@ -103,7 +103,7 @@ public class TestOzoneTokenIdentifier {
   }
 
   @AfterClass
-  static public void cleanUp() throws Exception {
+  public static void cleanUp() throws Exception {
     FileUtil.fullyDelete(base);
     KeyStoreTestUtil.cleanupSSLConfig(KEYSTORES_DIR, sslConfsDir);
   }

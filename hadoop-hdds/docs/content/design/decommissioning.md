@@ -36,7 +36,7 @@ Goals:
  * The progress of the decommissioning should be trackable
  * The nodes under decommissioning / maintenance mode should not been used for new pipelines / containers
  * The state of the datanodes should be persisted / replicated by the SCM (in HDFS the decommissioning info exclude/include lists are replicated manually by the admin). If datanode is marked for decommissioning this state be available after SCM and/or Datanode restarts.
- * We need to support validations before decommissioing (but the violations can be ignored by the admin).
+ * We need to support validations before decommissioning (but the violations can be ignored by the admin).
  * The administrator should be notified when a node can be turned off.
  * The maintenance mode can be time constrained: if the node marked for maintenance for 1 week and the node is not up after one week, the containers should be considered as lost (DEAD node) and should be replicated.
 
@@ -128,7 +128,7 @@ One other difference with maintenance mode and decommissioning, is that you must
   STALE                | Some heartbeats were missing for an already missing nodes.
   DEAD                 | The stale node has not been recovered.
   ENTERING_MAINTENANCE | The in-progress state, scheduling is disabled but the node can't not been turned off due to in-progress replication.
-  IN_MAINTENANCE       | Node can be turned off but we expecteed to get it back and have all the replicas.
+  IN_MAINTENANCE       | Node can be turned off but we expected to get it back and have all the replicas.
   DECOMMISSIONING      | The in-progress state, scheduling is disabled, all the containers should be replicated to other nodes.
   DECOMMISSIONED       | The node can be turned off, all the containers are replicated to other machine
 
@@ -148,7 +148,7 @@ The Algorithm is pretty simple from the Decommission or Maintenance point of vie
 
    * Container is closed.
    * We have at least one HEALTHY copy at all times.
-   * For entering DECOMMISSIONED mode `maintenance + healthy` must equal to `expectedeCount`
+   * For entering DECOMMISSIONED mode `maintenance + healthy` must equal to `expectedCount`
 
  5. We will update the node state to DECOMMISSIONED or IN_MAINTENANCE reached state.
 
@@ -186,7 +186,7 @@ Replica count = expectedCount - currentCount
 
 In case the _Replica count_ is positive, it means that we need to make more replicas. If the number is negative, it means that we are over replicated and we need to remove some replicas of this container. If the Replica count for a container is zero; it means that we have the expected number of containers in the cluster.
 
-To support idempontent placement strategies we should substract the in-fligt replications from the result: If there are one in-flight replication process and two replicas we won't start a new replication command unless the original command is timed out. The timeout is configured with `hdds.scm.replication.event.timeout` and the default value is 10 minutes.
+To support idempotent placement strategies we should subtract the in-flight replications from the result: If there are one in-flight replication process and two replicas we won't start a new replication command unless the original command is timed out. The timeout is configured with `hdds.scm.replication.event.timeout` and the default value is 10 minutes.
 
 More preciously the current algorithm is the following:
 
@@ -249,7 +249,7 @@ The following conditions should be true for all the containers and all the conta
 **From DECOMMISSIONING to DECOMMISSIONED**:
 
  * There are at least one healthy replica
- * We have three replicas (both helthy and maintenance)
+ * We have three replicas (both healthy and maintenance)
 
 Which means that our stop condition can be formalized as:
 
