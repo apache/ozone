@@ -105,11 +105,11 @@ const renderDatanodeState = (state: DatanodeState) => {
 
 const renderDatanodeOpState = (opState: DatanodeOpState) => {
   const opStateIconMap = {
-    IN_SERVICE: <Icon type='check-circle' theme='filled' twoToneColor='#1da57a' className='icon-success'/>,
-    DECOMMISSIONING: <Icon type='hourglass' theme='filled' className='icon-warning'/>,
-    DECOMMISSIONED: <Icon type='warning' theme='outlined' className='icon-success'/>,
-    ENTERING_MAINTENANCE: <Icon type='hourglass' theme='filled' className='icon-warning'/>,
-    IN_MAINTENANCE: <Icon type='warning' theme='outlined' className='icon-success'/>
+    IN_SERVICE: <Icon type='check-circle' theme='outlined' twoToneColor='#1da57a' className='icon-success'/>,
+    DECOMMISSIONING: <Icon type='hourglass' theme='outlined' className='icon-warning'/>,
+    DECOMMISSIONED: <Icon type='warning' theme='outlined' className='icon-warning'/>,
+    ENTERING_MAINTENANCE: <Icon type='hourglass' theme='outlined' className='icon-warning'/>,
+    IN_MAINTENANCE: <Icon type='warning' theme='outlined' className='icon-warning'/>
   };
   const icon = opState in opStateIconMap ? opStateIconMap[opState] : '';
   return <span>{icon} {opState}</span>;
