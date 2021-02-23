@@ -19,8 +19,6 @@ set -e -o pipefail
 
 # Fail if required variables are not set.
 set -u
-: "${OZONE_UPGRADE_FROM}"
-: "${OZONE_UPGRADE_TO}"
 : "${OZONE_CURRENT_VERSION}"
 set +u
 
@@ -29,7 +27,7 @@ _upgrade_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 # Cumulative result of all tests run with run_test function.
 # 0 if all passed, 1 if any failed.
 : "${RESULT:=0}"
-: "${OZONE_REPLICATION_FACTOR:=3}"
+: "${OZONE_REPLICATION_FACTOR:=1}"
 : "${OZONE_VOLUME_OWNER:=}"
 : "${ALL_RESULT_DIR:="$_upgrade_dir"/result}"
 
@@ -47,9 +45,7 @@ create_data_dir() {
   fi
 
   rm -fr "${OZONE_VOLUME}" 2> /dev/null || sudo rm -fr "${OZONE_VOLUME}"
-  # TODO: Add HA to docker compose on upgrade branch.
-  # mkdir -p "${OZONE_VOLUME}"/{dn1,dn2,dn3,om1,om2,om3,recon,s3g,scm}
-  mkdir -p "${OZONE_VOLUME}"/{dn1,dn2,dn3,om,recon,s3g,scm}
+  mkdir -p "${OZONE_VOLUME}"/{om1,om2,om3,dn1,dn2,dn3,recon,s3g,scm}
   fix_data_dir_permissions
 }
 
@@ -57,7 +53,7 @@ prepare_for_image() {
     local image_version="$1"
 
     if [[ "$image_version" = "$OZONE_CURRENT_VERSION" ]]; then
-        prepare_for_runner_image "$image_version"
+        prepare_for_runner_image
     else
         prepare_for_binary_image "$image_version"
     fi
@@ -70,7 +66,7 @@ callback() {
 
 run_test() {
   # Export variables needed by test, since it is run in a subshell.
-  local test_dir="$COMPOSE_DIR"/"$1"
+  local test_dir="$_upgrade_dir"/"$1"
   export OZONE_UPGRADE_FROM="$2"
   export OZONE_UPGRADE_TO="$3"
   local test_subdir="$test_dir"/"$OZONE_UPGRADE_FROM"-"$OZONE_UPGRADE_TO"
