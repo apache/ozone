@@ -18,18 +18,20 @@ set -e
 
 # Version that will be run using the local build.
 : "${OZONE_CURRENT_VERSION:=1.1.0}"
+export OZONE_CURRENT_VERSION
 
 COMPOSE_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )
 source "$COMPOSE_DIR/testlib.sh"
 
 # Export variables needed by tests.
 export COMPOSE_DIR
+export OM_SERVICE_ID=omservice
 
 RESULT_DIR="$ALL_RESULT_DIR" create_results_dir
 
 # Upgrade tests to be run:
-run_test manual-upgrade 0.5.0 1.0.0
-# run_test non-rolling-upgrade 1.0.0 1.1.0
+#run_test manual-upgrade 0.5.0 1.0.0
+run_test non-rolling-upgrade 1.0.0 1.1.0
 
 generate_report "upgrade" "${ALL_RESULT_DIR}"
 
