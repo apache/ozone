@@ -64,6 +64,10 @@ public interface MiniOzoneCluster {
     return new MiniOzoneOMHAClusterImpl.Builder(conf);
   }
 
+  static Builder newHABuilder(OzoneConfiguration conf) {
+    return new MiniOzoneHAClusterImpl.Builder(conf);
+  }
+
   /**
    * Returns the configuration object associated with the MiniOzoneCluster.
    *
@@ -115,7 +119,15 @@ public interface MiniOzoneCluster {
    *
    * @return Service ID String
    */
-  String getServiceId();
+  String getOMServiceId();
+
+
+  /**
+   * Returns StorageContainerManager Service ID.
+   *
+   * @return Service ID String
+   */
+  String getSCMServiceId();
 
   /**
    * Returns {@link StorageContainerManager} associated with this
@@ -274,6 +286,7 @@ public interface MiniOzoneCluster {
     protected static final int DEFAULT_HB_INTERVAL_MS = 1000;
     protected static final int DEFAULT_HB_PROCESSOR_INTERVAL_MS = 100;
     protected static final int ACTIVE_OMS_NOT_SET = -1;
+    protected static final int ACTIVE_SCMS_NOT_SET = -1;
     protected static final int DEFAULT_PIPELIME_LIMIT = 3;
     protected static final int DEFAULT_RATIS_RPC_TIMEOUT_SEC = 1;
 
@@ -284,6 +297,10 @@ public interface MiniOzoneCluster {
     protected String omServiceId;
     protected int numOfOMs;
     protected int numOfActiveOMs = ACTIVE_OMS_NOT_SET;
+
+    protected String scmServiceId;
+    protected int numOfSCMs;
+    protected int numOfActiveSCMs = ACTIVE_SCMS_NOT_SET;
 
     protected Optional<Boolean> enableTrace = Optional.of(false);
     protected Optional<Integer> hbInterval = Optional.empty();
@@ -521,6 +538,21 @@ public interface MiniOzoneCluster {
 
     public Builder includeRecon(boolean include) {
       this.includeRecon = include;
+      return this;
+    }
+
+    public Builder setNumOfStorageContainerManagers(int numSCMs) {
+      this.numOfSCMs = numSCMs;
+      return this;
+    }
+
+    public Builder setNumOfActiveSCMs(int numActiveSCMs) {
+      this.numOfActiveSCMs = numActiveSCMs;
+      return this;
+    }
+
+    public Builder setSCMServiceId(String serviceId) {
+      this.scmServiceId = serviceId;
       return this;
     }
 
