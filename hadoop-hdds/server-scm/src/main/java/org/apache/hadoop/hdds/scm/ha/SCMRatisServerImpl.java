@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.protocol.ClientId;
@@ -295,7 +296,8 @@ public class SCMRatisServerImpl implements SCMRatisServer {
 
   private static RaftGroupId buildRaftGroupId(String clusterId) {
     Preconditions.checkNotNull(clusterId);
-    return RaftGroupId.valueOf(UUID.fromString(clusterId));
+    return RaftGroupId.valueOf(
+        UUID.fromString(clusterId.replace(OzoneConsts.CLUSTER_ID_PREFIX, "")));
   }
 
 }

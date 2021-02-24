@@ -23,7 +23,11 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
-import org.apache.hadoop.ozone.client.*;
+import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClientFactory;
+import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -162,11 +166,12 @@ public class TestStorageContainerManagerHA {
       Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
       Assert.assertFalse(key.getModificationTime().isBefore(testStartTime));
       is.close();
-      final OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
-          .setBucketName(bucketName).setType(HddsProtos.ReplicationType.RATIS)
-          .setFactor(HddsProtos.ReplicationFactor.ONE).setKeyName(keyName)
-          .setRefreshPipeline(true)
-          .build();
+      final OmKeyArgs keyArgs =
+          new OmKeyArgs.Builder().setVolumeName(volumeName)
+              .setBucketName(bucketName)
+              .setType(HddsProtos.ReplicationType.RATIS)
+              .setFactor(HddsProtos.ReplicationFactor.ONE).setKeyName(keyName)
+              .setRefreshPipeline(true).build();
       final OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
       final List<OmKeyLocationInfo> keyLocationInfos =
           keyInfo.getKeyLocationVersions().get(0).getBlocksLatestVersionOnly();

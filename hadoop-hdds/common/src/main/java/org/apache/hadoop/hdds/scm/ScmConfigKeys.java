@@ -379,8 +379,10 @@ public final class ScmConfigKeys {
   // SCM Ratis related
   public static final String OZONE_SCM_HA_ENABLE_KEY
       = "ozone.scm.ratis.enable";
+  // setting this value to true, as right now, this switch is not accounted
+  // for spinning up SCM instances with/without SCM HA.
   public static final boolean OZONE_SCM_HA_ENABLE_DEFAULT
-      = false;
+      = true;
   public static final String OZONE_SCM_RATIS_PORT_KEY
       = "ozone.scm.ratis.port";
   public static final int OZONE_SCM_RATIS_PORT_DEFAULT

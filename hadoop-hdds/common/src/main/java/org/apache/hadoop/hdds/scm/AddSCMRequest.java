@@ -74,11 +74,11 @@ public class AddSCMRequest {
 
     /**
      * Set ratis address in Scm HA.
-     * @param   ratisAddr  address in the format of [ip|hostname]:port
+     * @param   addr  address in the format of [ip|hostname]:port
      * @return  Builder for AddSCMRequest
      */
-    public AddSCMRequest.Builder setRatisAddr(String ratisAddr) {
-      this.ratisAddr = ratisAddr;
+    public AddSCMRequest.Builder setRatisAddr(String addr) {
+      this.ratisAddr = addr;
       return this;
     }
 
