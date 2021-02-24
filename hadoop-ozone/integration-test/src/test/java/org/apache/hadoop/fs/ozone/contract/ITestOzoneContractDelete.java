@@ -40,10 +40,14 @@ public class ITestOzoneContractDelete extends AbstractContractDeleteTest {
   public ITestOzoneContractDelete(boolean fsoServer)
       throws IOException {
     if (fsOptimizedServer != fsoServer) {
-      ITestOzoneContractDelete.fsOptimizedServer = fsoServer;
+      setFsOptimizedServer(fsoServer);
       ITestOzoneContractUtils.restartCluster(
           fsOptimizedServer);
     }
+  }
+
+  public static void setFsOptimizedServer(boolean fsOptimizedServer) {
+    ITestOzoneContractDelete.fsOptimizedServer = fsOptimizedServer;
   }
 
   @AfterClass

@@ -38,12 +38,15 @@ public class ITestOzoneContractUnbuffer extends AbstractContractUnbufferTest {
   public ITestOzoneContractUnbuffer(boolean fsoServer)
       throws IOException {
     if (fsOptimizedServer != fsoServer) {
-      ITestOzoneContractUnbuffer.fsOptimizedServer = fsoServer;
+      setFsOptimizedServer(fsoServer);
       ITestOzoneContractUtils.restartCluster(
           fsOptimizedServer);
     }
   }
 
+  public static void setFsOptimizedServer(boolean fsOptimizedServer) {
+    ITestOzoneContractUnbuffer.fsOptimizedServer = fsOptimizedServer;
+  }
 
   @AfterClass
   public static void teardownCluster() throws IOException {

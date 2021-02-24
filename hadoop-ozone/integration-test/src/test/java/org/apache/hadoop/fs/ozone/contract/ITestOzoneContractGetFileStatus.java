@@ -43,7 +43,7 @@ public class ITestOzoneContractGetFileStatus
   public ITestOzoneContractGetFileStatus(boolean fsoServer)
       throws IOException {
     if (fsOptimizedServer != fsoServer) {
-      ITestOzoneContractGetFileStatus.fsOptimizedServer = fsoServer;
+      setFsOptimizedServer(fsoServer);
       ITestOzoneContractUtils.restartCluster(
           fsOptimizedServer);
     }
@@ -52,6 +52,10 @@ public class ITestOzoneContractGetFileStatus
   private static final Logger LOG =
       LoggerFactory.getLogger(ITestOzoneContractGetFileStatus.class);
 
+
+  public static void setFsOptimizedServer(boolean fsOptimizedServer) {
+    ITestOzoneContractGetFileStatus.fsOptimizedServer = fsOptimizedServer;
+  }
 
   @AfterClass
   public static void teardownCluster() throws IOException {

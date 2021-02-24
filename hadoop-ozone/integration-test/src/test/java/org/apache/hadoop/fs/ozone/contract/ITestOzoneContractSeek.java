@@ -40,10 +40,14 @@ public class ITestOzoneContractSeek extends AbstractContractSeekTest {
   public ITestOzoneContractSeek(boolean fsoServer)
       throws IOException {
     if (fsOptimizedServer != fsoServer) {
-      ITestOzoneContractSeek.fsOptimizedServer = fsoServer;
+      setFsOptimizedServer(fsoServer);
       ITestOzoneContractUtils.restartCluster(
           fsOptimizedServer);
     }
+  }
+
+  public static void setFsOptimizedServer(boolean fsOptimizedServer) {
+    ITestOzoneContractSeek.fsOptimizedServer = fsOptimizedServer;
   }
 
   @AfterClass

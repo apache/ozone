@@ -40,12 +40,15 @@ public class ITestOzoneContractMkdir extends AbstractContractMkdirTest {
   public ITestOzoneContractMkdir(boolean fsoServer)
       throws IOException {
     if (fsOptimizedServer != fsoServer) {
-      ITestOzoneContractMkdir.fsOptimizedServer = fsoServer;
+      setFsOptimizedServer(fsoServer);
       ITestOzoneContractUtils.restartCluster(
           fsOptimizedServer);
     }
   }
 
+  public static void setFsOptimizedServer(boolean fsOptimizedServer) {
+    ITestOzoneContractMkdir.fsOptimizedServer = fsOptimizedServer;
+  }
 
   @AfterClass
   public static void teardownCluster() throws IOException {

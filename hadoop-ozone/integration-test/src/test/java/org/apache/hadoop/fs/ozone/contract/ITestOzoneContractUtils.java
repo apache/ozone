@@ -38,7 +38,7 @@ public final class ITestOzoneContractUtils {
       // Presently, OzoneClient checks bucketMetadata then invokes V1 or V0
       // specific code and it makes no sense to add client side configs now.
       // Once the specific client API to set FSO or non-FSO bucket is provided
-      // the contract test can be refactored to include another parameter 
+      // the contract test can be refactored to include another parameter
       // (fsoClient) which sets/unsets the client side configs.
       true, // Server is configured with new layout (V1)
       // and new buckets will be operated on

@@ -40,10 +40,14 @@ public class ITestOzoneContractRename extends AbstractContractRenameTest {
   public ITestOzoneContractRename(boolean fsoServer)
       throws IOException {
     if (fsOptimizedServer != fsoServer) {
-      ITestOzoneContractRename.fsOptimizedServer = fsoServer;
+      setFsOptimizedServer(fsoServer);
       ITestOzoneContractUtils.restartCluster(
           fsOptimizedServer);
     }
+  }
+
+  public static void setFsOptimizedServer(boolean fsOptimizedServer) {
+    ITestOzoneContractRename.fsOptimizedServer = fsOptimizedServer;
   }
 
   @AfterClass

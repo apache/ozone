@@ -41,10 +41,14 @@ public class ITestOzoneContractRootDir extends
   public ITestOzoneContractRootDir(boolean fsoServer)
       throws IOException {
     if (fsOptimizedServer != fsoServer) {
-      ITestOzoneContractRootDir.fsOptimizedServer = fsoServer;
+      setFsOptimizedServer(fsoServer);
       ITestOzoneContractUtils.restartCluster(
           fsOptimizedServer);
     }
+  }
+
+  public static void setFsOptimizedServer(boolean fsOptimizedServer) {
+    ITestOzoneContractRootDir.fsOptimizedServer = fsOptimizedServer;
   }
 
   @AfterClass
