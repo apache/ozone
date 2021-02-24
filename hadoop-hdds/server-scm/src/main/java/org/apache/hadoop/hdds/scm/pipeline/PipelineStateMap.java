@@ -389,6 +389,12 @@ class PipelineStateMap {
     Preconditions.checkNotNull(state, "Pipeline LifeCycleState cannot be null");
 
     final Pipeline pipeline = getPipeline(pipelineID);
+    // Return the old pipeline if updating same state
+    if (pipeline.getPipelineState() == state) {
+      LOG.debug("CurrentState and NewState are the same, return from " +
+          "updatePipelineState directly.");
+      return pipeline;
+    }
     Pipeline updatedPipeline = pipelineMap.compute(pipelineID,
         (id, p) -> Pipeline.newBuilder(pipeline).setState(state).build());
     PipelineQuery query = new PipelineQuery(pipeline);

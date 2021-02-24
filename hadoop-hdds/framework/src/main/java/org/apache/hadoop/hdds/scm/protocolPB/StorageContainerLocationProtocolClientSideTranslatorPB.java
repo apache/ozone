@@ -182,6 +182,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
         response.getContainerWithPipeline());
   }
 
+  @Override
   public ContainerInfo getContainer(long containerID) throws IOException {
     Preconditions.checkState(containerID >= 0,
         "Container ID cannot be negative");
@@ -201,6 +202,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   /**
    * {@inheritDoc}
    */
+  @Override
   public ContainerWithPipeline getContainerWithPipeline(long containerID)
       throws IOException {
     Preconditions.checkState(containerID >= 0,
@@ -223,6 +225,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   /**
    * {@inheritDoc}
    */
+  @Override
   public List<ContainerWithPipeline> getContainerWithPipelineBatch(
       List<Long> containerIDs) throws IOException {
     for (Long containerID: containerIDs) {

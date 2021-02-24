@@ -629,6 +629,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * Class which schedule saving metrics to a file.
    */
   private class ScheduleOMMetricsWriteTask extends TimerTask {
+    @Override
     public void run() {
       saveOmMetrics();
     }
@@ -1287,7 +1288,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         RatisDropwizardExports.
             registerRatisMetricReporters(ratisMetricsMap);
         omRatisServer = OzoneManagerRatisServer.newOMRatisServer(
-            configuration, this, omNodeDetails, peerNodes);
+            configuration, this, omNodeDetails, peerNodes,
+            secConfig, certClient);
       }
       LOG.info("OzoneManager Ratis server initialized at port {}",
           omRatisServer.getServerPort());
@@ -1413,8 +1415,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     String hostname = omRpcAdd.getAddress().getHostName();
     String ip = omRpcAdd.getAddress().getHostAddress();
 
-    String subject = UserGroupInformation.getCurrentUser()
-        .getShortUserName() + "@" + hostname;
+    String subject;
+    if (builder.hasDnsName()) {
+      subject = UserGroupInformation.getCurrentUser().getShortUserName()
+          + "@" + hostname;
+    } else {
+      // With only IP in alt.name, certificate validation would fail if subject
+      // isn't a hostname either, so omit username.
+      subject = hostname;
+    }
 
     builder.setCA(false)
         .setKey(keyPair)
