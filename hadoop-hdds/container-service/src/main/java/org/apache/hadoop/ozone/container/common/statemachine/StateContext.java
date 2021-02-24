@@ -318,14 +318,7 @@ public class StateContext {
     return reportsToReturn;
   }
 
-  /**
-   * Returns available reports from the report queue with a max limit on
-   * list size, or empty list if the queue is empty.
-   *
-   * @return List of reports
-   */
-  public List<GeneratedMessage> getReports(InetSocketAddress endpoint,
-                                           int maxLimit) {
+  List<GeneratedMessage> getNonIncrementalReports() {
     List<GeneratedMessage> nonIncrementalReports = new LinkedList<>();
     GeneratedMessage report = containerReports.get();
     if (report != null) {
@@ -339,10 +332,28 @@ public class StateContext {
     if (report != null) {
       nonIncrementalReports.add(report);
     }
-    List<GeneratedMessage> reportsToReturn = getIncrementalReports(endpoint,
-        maxLimit - nonIncrementalReports.size());
-    reportsToReturn.addAll(nonIncrementalReports);
-    return reportsToReturn;
+    return nonIncrementalReports;
+  }
+
+  /**
+   * Returns available reports from the report queue with a max limit on
+   * list size, or empty list if the queue is empty.
+   *
+   * @return List of reports
+   */
+  public List<GeneratedMessage> getReports(InetSocketAddress endpoint,
+                                           int maxLimit) {
+    if (maxLimit < 0) {
+      throw new IllegalArgumentException("Illegal maxLimit value: " + maxLimit);
+    }
+    List<GeneratedMessage> reports = getNonIncrementalReports();
+    if (maxLimit <= reports.size()) {
+      return reports.subList(0, maxLimit);
+    } else {
+      reports.addAll(getIncrementalReports(endpoint,
+          maxLimit - reports.size()));
+      return reports;
+    }
   }
 
 
