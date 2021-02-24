@@ -463,15 +463,17 @@ public class TestStorageContainerManager {
     Path scmPath = Paths.get(path, "scm-meta");
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, scmPath.toString());
 
+    UUID clusterId = UUID.randomUUID();
+    String testClusterId = clusterId.toString();
     // This will initialize SCM
-    StorageContainerManager.scmInit(conf, "testClusterId");
+    StorageContainerManager.scmInit(conf, testClusterId);
 
     SCMStorageConfig scmStore = new SCMStorageConfig(conf);
     Assert.assertEquals(NodeType.SCM, scmStore.getNodeType());
-    Assert.assertEquals("testClusterId", scmStore.getClusterID());
-    StorageContainerManager.scmInit(conf, "testClusterIdNew");
+    Assert.assertEquals(testClusterId, scmStore.getClusterID());
+    StorageContainerManager.scmInit(conf, testClusterId);
     Assert.assertEquals(NodeType.SCM, scmStore.getNodeType());
-    Assert.assertEquals("testClusterId", scmStore.getClusterID());
+    Assert.assertEquals(testClusterId, scmStore.getClusterID());
   }
 
   @Test

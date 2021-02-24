@@ -758,13 +758,18 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         if (clusterId != null && !clusterId.isEmpty()) {
           scmStorageConfig.setClusterId(clusterId);
         }
-        // TODO: set the scm node info in the version file during upgrade
-        //  from non-HA SCM to SCM HA set up.
-        if (SCMHAUtils.isSCMHAEnabled(conf)) {
-          SCMRatisServerImpl.initialize(clusterId, scmStorageConfig.getScmId(),
-              haDetails.getLocalNodeDetails(), conf);
-        }
         scmStorageConfig.initialize();
+        // TODO: Removing the HA enabled check right now as
+        //  when the SCM starts up it will, it always spins up the ratis
+        //  server irrespective of the check. If the ratis server is not
+        //  initialized here and starts up during the regular start,
+        //  it won't be starting a leader election and hence won't work. The
+        //  check will be re-introduced one we have clear segregation path with
+        //  ratis enable/disable switch.
+       // if (SCMHAUtils.isSCMHAEnabled(conf)) {
+        SCMRatisServerImpl.initialize(scmStorageConfig.getClusterID(),
+            scmStorageConfig.getScmId(), haDetails.getLocalNodeDetails(), conf);
+       // }
         LOG.info("SCM initialization succeeded. Current cluster id for sd={}"
                 + "; cid={}; layoutVersion={}; scmId={}",
             scmStorageConfig.getStorageDir(), scmStorageConfig.getClusterID(),
