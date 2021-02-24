@@ -34,15 +34,19 @@ source "$OZONE_UPGRADE_CALLBACK"
 export OM_HA_ARGS='--'
 
 prepare_for_image "$OZONE_UPGRADE_FROM"
+echo "--- SETTING UP OLD VERSION $OZONE_UPGRADE_FROM ---"
 callback setup_old_version
 start_docker_env
+echo "--- RUNNING WITH OLD VERSION $OZONE_UPGRADE_FROM ---"
 callback with_old_version
 
 stop_docker_env
+echo "--- SETTING UP NEW VERSION $OZONE_UPGRADE_TO ---"
 callback setup_new_version
 
 prepare_for_binary_image "$OZONE_UPGRADE_TO"
 OZONE_KEEP_RESULTS=true start_docker_env
+echo "--- RUNNING WITH NEW VERSION $OZONE_UPGRADE_TO ---"
 callback with_new_version
 
 stop_docker_env

@@ -30,8 +30,8 @@ export OM_SERVICE_ID=omservice
 RESULT_DIR="$ALL_RESULT_DIR" create_results_dir
 
 # Upgrade tests to be run:
-run_test manual-upgrade 0.5.0 1.0.0
-#run_test non-rolling-upgrade 1.0.0 1.1.0
+run_test manual-upgrade 0.5.0 1.1.0
+run_test non-rolling-upgrade 1.0.0 1.1.0
 
 generate_report "upgrade" "${ALL_RESULT_DIR}"
 
