@@ -483,9 +483,10 @@ public class TestStorageContainerManager {
     Path scmPath = Paths.get(path, "scm-meta");
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, scmPath.toString());
 
+    final UUID clusterId = UUID.randomUUID();
     // This will initialize SCM
-    StorageContainerManager.scmInit(conf, "testClusterId");
-    SCMRatisServerImpl.validateRatisGroupExists(conf, "testClusterId");
+    StorageContainerManager.scmInit(conf, clusterId.toString());
+    SCMRatisServerImpl.validateRatisGroupExists(conf, clusterId.toString());
   }
 
   @Test
@@ -500,11 +501,11 @@ public class TestStorageContainerManager {
         MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3).build();
     cluster.waitForClusterToBeReady();
     try {
+      final UUID clusterId = UUID.randomUUID();
       // This will initialize SCM
-      StorageContainerManager.scmInit(conf, "testClusterId");
+      StorageContainerManager.scmInit(conf, clusterId.toString());
       SCMStorageConfig scmStore = new SCMStorageConfig(conf);
-      Assert.assertEquals(NodeType.SCM, scmStore.getNodeType());
-      Assert.assertNotEquals("testClusterId", scmStore.getClusterID());
+      Assert.assertNotEquals(clusterId.toString(), scmStore.getClusterID());
     } finally {
       cluster.shutdown();
     }

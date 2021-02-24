@@ -139,6 +139,7 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
       case AddScm:
         response.setAddScmResponse(
             getAddSCMResponse(request.getAddScmRequestProto()));
+        break;
       case SortDatanodes:
         response.setSortDatanodesResponse(sortDatanodes(
             request.getSortDatanodesRequest(), request.getVersion()

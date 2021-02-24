@@ -693,7 +693,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
     protected void initializeScmStorage(SCMStorageConfig scmStore)
         throws IOException {
-     if (scmStore.getState() == StorageState.INITIALIZED) {
+      if (scmStore.getState() == StorageState.INITIALIZED) {
         return;
       }
       scmStore.setClusterId(clusterId);
@@ -702,7 +702,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       }
       scmStore.setScmId(scmId.get());
       scmStore.initialize();
-     if (SCMHAUtils.isSCMHAEnabled(conf)) {
+      if (SCMHAUtils.isSCMHAEnabled(conf)) {
         SCMRatisServerImpl.initialize(clusterId, scmId.get(),
             SCMHANodeDetails.loadSCMHAConfig(conf).getLocalNodeDetails(), conf);
       }

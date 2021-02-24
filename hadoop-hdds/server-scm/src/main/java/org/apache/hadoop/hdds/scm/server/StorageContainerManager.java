@@ -131,9 +131,6 @@ import org.apache.hadoop.util.JvmPauseMonitor;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT_DEFAULT;
 import org.apache.ratis.grpc.GrpcTlsConfig;
-import org.apache.ratis.protocol.RaftPeer;
-import org.apache.ratis.protocol.RaftPeerId;
-import org.apache.ratis.server.RaftServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -784,7 +781,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           clusterId, scmStorageConfig.getLayoutVersion());
       if (SCMHAUtils.isSCMHAEnabled(conf)) {
         SCMRatisServerImpl.validateRatisGroupExists(conf, clusterId);
-        Preconditions.checkNotNull(scmStorageConfig.getScmNodeInfo());
       }
       return true;
     }

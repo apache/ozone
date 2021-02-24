@@ -18,12 +18,18 @@
 
 package org.apache.hadoop.ozone.scm;
 
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.client.*;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -106,10 +112,13 @@ public class TestStorageContainerManagerHA {
     int count = 0;
     List<StorageContainerManager> scms = cluster.getStorageContainerManagers();
     Assert.assertEquals(numOfSCMs, scms.size());
+    int peerSize = cluster.getStorageContainerManager().getScmHAManager()
+        .getRatisServer().getDivision().getGroup().getPeers().size();
     for (StorageContainerManager scm : scms) {
       if (scm.checkLeader()) {
         count++;
       }
+      Assert.assertTrue(peerSize == numOfSCMs);
     }
     Assert.assertEquals(1, count);
     count = 0;
@@ -152,6 +161,28 @@ public class TestStorageContainerManagerHA {
       Assert.assertEquals(value, new String(fileContent, UTF_8));
       Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
       Assert.assertFalse(key.getModificationTime().isBefore(testStartTime));
+      is.close();
+      final OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
+          .setBucketName(bucketName).setType(HddsProtos.ReplicationType.RATIS)
+          .setFactor(HddsProtos.ReplicationFactor.ONE).setKeyName(keyName)
+          .setRefreshPipeline(true)
+          .build();
+      final OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
+      final List<OmKeyLocationInfo> keyLocationInfos =
+          keyInfo.getKeyLocationVersions().get(0).getBlocksLatestVersionOnly();
+      final long containerID = keyLocationInfos.get(0).getContainerID();
+      for (int k = 0; k < numOfSCMs; k++) {
+        StorageContainerManager scm =
+            cluster.getStorageContainerManagers().get(k);
+        // flush to DB on each SCM
+        ((SCMRatisServerImpl) scm.getScmHAManager().getRatisServer())
+            .getStateMachine().takeSnapshot();
+        Assert.assertTrue(
+            scm.getContainerManager()
+                .containerExist(ContainerID.valueOf(containerID)));
+        Assert.assertNotNull(scm.getScmMetadataStore()
+                .getContainerTable().get(ContainerID.valueOf(containerID)));
+      }
     }
   }
 }

@@ -68,8 +68,9 @@ public class SCMRatisServerImpl implements SCMRatisServer {
 
   // TODO: Refactor and remove ConfigurationSource and use only
   //  SCMHAConfiguration.
-  SCMRatisServerImpl(final ConfigurationSource conf, final StorageContainerManager scm,
-      final DBTransactionBuffer buffer) throws IOException {
+  SCMRatisServerImpl(final ConfigurationSource conf,
+      final StorageContainerManager scm, final DBTransactionBuffer buffer)
+      throws IOException {
     this.scm = scm;
     this.stateMachine = new SCMStateMachine(scm, this, buffer);
     final RaftGroupId groupId = buildRaftGroupId(scm.getClusterId());
@@ -144,6 +145,11 @@ public class SCMRatisServerImpl implements SCMRatisServer {
       LOG.warn("Failed to get RaftServerDivision", e);
       return null;
     }
+  }
+
+  @VisibleForTesting
+  public SCMStateMachine getStateMachine() {
+    return stateMachine;
   }
 
   @Override

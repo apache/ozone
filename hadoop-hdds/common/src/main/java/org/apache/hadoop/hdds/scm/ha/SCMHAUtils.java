@@ -19,7 +19,6 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 
-import com.google.common.base.Predicate;
 import com.google.common.base.Strings;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -27,7 +26,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.ozone.ha.ConfUtils;
-import org.checkerframework.checker.nullness.qual.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -152,7 +150,7 @@ public final class SCMHAUtils {
           partList.add(part);
         }
       }
-      conf.set(ScmConfigKeys.OZONE_SCM_NODES_KEY, scmNodes);
+      conf.set(ScmConfigKeys.OZONE_SCM_NODES_KEY, String.join(",", partList));
     }
     return conf;
   }

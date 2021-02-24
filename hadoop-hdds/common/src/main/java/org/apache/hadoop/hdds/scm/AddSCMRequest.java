@@ -27,10 +27,10 @@ public class AddSCMRequest {
   private final String scmId;
   private final String ratisAddr;
 
-  public AddSCMRequest(String clusterId, String scmId, String ratisAddr) {
+  public AddSCMRequest(String clusterId, String scmId, String addr) {
     this.clusterId = clusterId;
     this.scmId = scmId;
-    this.ratisAddr = ratisAddr;
+    this.ratisAddr = addr;
   }
 
   public static AddSCMRequest getFromProtobuf(

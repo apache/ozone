@@ -29,7 +29,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * SCMHAManagerImpl uses Apache Ratis for HA implementation. We will have 2N+1
@@ -75,7 +74,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
   @Override
   public void start() throws IOException {
     ratisServer.start();
-    if (ratisServer.getDivision() == null) {
+    if (ratisServer.getDivision().getGroup().getPeers().isEmpty()) {
       // this is a bootstrapped node
       // It will first try to add itself to existing ring
       boolean success = HAUtils.addSCM(OzoneConfiguration.of(conf),

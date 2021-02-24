@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.scm.ha;
 
 import com.google.common.base.Strings;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.ratis.RaftConfigKeys;
