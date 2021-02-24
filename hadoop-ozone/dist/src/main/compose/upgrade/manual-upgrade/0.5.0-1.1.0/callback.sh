@@ -18,26 +18,20 @@
 source "$COMPOSE_DIR"/testlib.sh
 
 setup_old_version() {
-  echo "--- SETTING UP OLD VERSION $OZONE_UPGRADE_FROM ---"
   load_version_specifics "$OZONE_UPGRADE_FROM"
 }
 
 with_old_version() {
-  echo "--- RUNNING WITH OLD VERSION $OZONE_UPGRADE_FROM ---"
-
   generate old
   validate old
 }
 
 setup_new_version() {
-  echo "--- SETTING UP NEW VERSION $OZONE_UPGRADE_TO ---"
   unload_version_specifics "$OZONE_UPGRADE_FROM"
   load_version_specifics "$OZONE_UPGRADE_TO"
 }
 
 with_new_version() {
-  echo "--- RUNNING WITH NEW VERSION $OZONE_UPGRADE_TO ---"
-
   validate old
   generate new
   validate new
