@@ -76,9 +76,9 @@ public class Checksum {
   enum Algorithm {
     NONE(() -> data -> ByteString.EMPTY),
     CRC32(() ->
-        newChecksumByteBufferFunction(ChecksumByteBufferImpl::crc32Impl)),
+        newChecksumByteBufferFunction(ChecksumByteBufferFactory::crc32Impl)),
     CRC32C(() ->
-        newChecksumByteBufferFunction(ChecksumByteBufferImpl::crc32Cimpl)),
+        newChecksumByteBufferFunction(ChecksumByteBufferFactory::crc32CImpl)),
     SHA256(() -> newMessageDigestFunction("SHA-256")),
     MD5(() -> newMessageDigestFunction("MD5"));
 
