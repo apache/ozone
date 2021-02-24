@@ -46,6 +46,9 @@ public interface CertificateStore {
   void storeValidCertificate(BigInteger serialID,
                              X509Certificate certificate) throws IOException;
 
+  void storeValidScmCertificate(BigInteger serialID,
+      X509Certificate certificate) throws IOException;
+
   /**
    * Moves a certificate in a transactional manner from valid certificate to
    * revoked certificate state.

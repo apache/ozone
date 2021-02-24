@@ -77,6 +77,9 @@ public interface SCMMetadataStore extends DBStoreHAManager {
    */
   Table<BigInteger, X509Certificate> getValidCertsTable();
 
+
+  Table<BigInteger, X509Certificate> getValidSCMCertsTable();
+
   /**
    * A Table that maintains all revoked certificates until they expire.
    *

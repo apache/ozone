@@ -49,6 +49,8 @@ message SCMSecurityRequest {
     optional SCMGetCertificateRequestProto getCertificateRequest = 5;
     optional SCMGetCACertificateRequestProto getCACertificateRequest = 6;
     optional SCMListCertificateRequestProto listCertificateRequest = 7;
+    optional SCMGenerateSCMCertRequestProto
+    generatePeerSCMCertificateRequest = 8;
 
 }
 
@@ -77,6 +79,7 @@ enum Type {
     GetCertificate = 3;
     GetCACertificate = 4;
     ListCertificate = 5;
+    GeneratePeerSCMCertificate = 6;
 }
 
 enum Status {
@@ -97,6 +100,11 @@ message SCMGetDataNodeCertRequestProto {
 */
 message SCMGetOMCertRequestProto {
     required OzoneManagerDetailsProto omDetails = 1;
+    required string CSR = 2;
+}
+
+message SCMGenerateSCMCertRequestProto {
+    required ScmNodeDetailsProto scmDetails = 1;
     required string CSR = 2;
 }
 

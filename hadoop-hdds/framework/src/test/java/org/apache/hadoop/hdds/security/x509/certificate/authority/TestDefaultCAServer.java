@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.security.x509.certificate.authority;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
@@ -43,6 +44,7 @@ import java.util.concurrent.Future;
 import java.util.function.Consumer;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.OM;
 import static org.junit.Assert.*;
 
 /**
@@ -165,7 +167,7 @@ public class TestDefaultCAServer {
         CertificateServer.CAType.SELF_SIGNED_CA);
 
     Future<X509CertificateHolder> holder = testCA.requestCertificate(csrString,
-        CertificateApprover.ApprovalType.TESTING_AUTOMATIC);
+        CertificateApprover.ApprovalType.TESTING_AUTOMATIC, OM);
     // Right now our calls are synchronous. Eventually this will have to wait.
     assertTrue(holder.isDone());
     assertNotNull(holder.get());
@@ -207,7 +209,7 @@ public class TestDefaultCAServer {
         CertificateServer.CAType.SELF_SIGNED_CA);
 
     Future<X509CertificateHolder> holder = testCA.requestCertificate(csrString,
-        CertificateApprover.ApprovalType.TESTING_AUTOMATIC);
+        CertificateApprover.ApprovalType.TESTING_AUTOMATIC, OM);
     // Right now our calls are synchronous. Eventually this will have to wait.
     assertTrue(holder.isDone());
     assertNotNull(holder.get());
@@ -243,7 +245,7 @@ public class TestDefaultCAServer {
         () -> {
           Future<X509CertificateHolder> holder =
               testCA.requestCertificate(csrString,
-                  CertificateApprover.ApprovalType.TESTING_AUTOMATIC);
+                  CertificateApprover.ApprovalType.TESTING_AUTOMATIC, OM);
           holder.isDone();
           holder.get();
         });

@@ -41,7 +41,7 @@ public class TestSCMSecurityProtocolServer {
     config = new OzoneConfiguration();
     config.set(OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY,
         OZONE_SCM_SECURITY_SERVICE_BIND_HOST_DEFAULT + ":0");
-    securityProtocolServer = new SCMSecurityProtocolServer(config, null);
+    securityProtocolServer = new SCMSecurityProtocolServer(config, null, null);
   }
 
   @After

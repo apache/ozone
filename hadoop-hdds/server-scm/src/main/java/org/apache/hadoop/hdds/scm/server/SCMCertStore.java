@@ -58,14 +58,35 @@ public class SCMCertStore implements CertificateStore {
     lock.lock();
     try {
       // This makes sure that no certificate IDs are reusable.
-      if ((getCertificateByID(serialID, CertType.VALID_CERTS) == null) &&
-          (getCertificateByID(serialID, CertType.REVOKED_CERTS) == null)) {
-        scmMetadataStore.getValidCertsTable().put(serialID, certificate);
-      } else {
-        throw new SCMSecurityException("Conflicting certificate ID");
-      }
+      checkValidCertID(serialID);
+      scmMetadataStore.getValidCertsTable().put(serialID, certificate);
     } finally {
       lock.unlock();
+    }
+  }
+
+  @Override
+  public void storeValidScmCertificate(BigInteger serialID,
+      X509Certificate certificate) throws IOException {
+    lock.lock();
+    try {
+      checkValidCertID(serialID);
+      BatchOperation batchOperation =
+          scmMetadataStore.getBatchHandler().initBatchOperation();
+      scmMetadataStore.getValidSCMCertsTable().putWithBatch(batchOperation,
+          serialID, certificate);
+      scmMetadataStore.getValidCertsTable().putWithBatch(batchOperation,
+          serialID, certificate);
+      scmMetadataStore.getStore().commitBatchOperation(batchOperation);
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  private void checkValidCertID(BigInteger serialID) throws IOException {
+    if ((getCertificateByID(serialID, CertType.VALID_CERTS) != null) ||
+        (getCertificateByID(serialID, CertType.REVOKED_CERTS) != null)) {
+      throw new SCMSecurityException("Conflicting certificate ID");
     }
   }
 
@@ -93,6 +114,10 @@ public class SCMCertStore implements CertificateStore {
                scmMetadataStore.getStore().initBatchOperation();) {
         scmMetadataStore.getRevokedCertsTable()
             .putWithBatch(batch, serialID, cert);
+        if (scmMetadataStore.getValidSCMCertsTable().get(serialID) != null) {
+          scmMetadataStore.getValidSCMCertsTable().deleteWithBatch(batch,
+              serialID);
+        }
         scmMetadataStore.getValidCertsTable().deleteWithBatch(batch, serialID);
         scmMetadataStore.getStore().commitBatchOperation(batch);
       }

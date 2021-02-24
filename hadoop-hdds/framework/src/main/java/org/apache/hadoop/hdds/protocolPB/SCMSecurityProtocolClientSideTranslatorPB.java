@@ -25,7 +25,9 @@ import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.OzoneManagerDetailsProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ScmNodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGenerateSCMCertRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCACertificateRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertificateRequestProto;
@@ -127,6 +129,26 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
   public String getOMCertificate(OzoneManagerDetailsProto omDetails,
       String certSignReq) throws IOException {
     return getOMCertChain(omDetails, certSignReq).getX509Certificate();
+  }
+
+  /**
+   * Get SCM signed certificate and root CA certificate for SCM Peer node.
+   *
+   * @param scmNodeDetails  - SCM Node Details.
+   * @param certSignReq     - Certificate signing request.
+   * @return String         - pem encoded SCM signed
+   *                          certificate.
+   */
+  public String getSCMCertificate(ScmNodeDetailsProto scmNodeDetails,
+      String certSignReq) throws IOException {
+    SCMGenerateSCMCertRequestProto request =
+        SCMGenerateSCMCertRequestProto.newBuilder()
+        .setCSR(certSignReq)
+        .setScmDetails(scmNodeDetails)
+        .build();
+    return submitRequest(Type.GeneratePeerSCMCertificate,
+        builder -> builder.setGeneratePeerSCMCertificateRequest(request))
+        .getGetCertResponseProto().getX509Certificate();
   }
 
   /**
