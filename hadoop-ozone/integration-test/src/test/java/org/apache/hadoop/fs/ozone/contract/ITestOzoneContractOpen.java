@@ -35,16 +35,13 @@ import org.junit.runners.Parameterized;
 @RunWith(Parameterized.class)
 public class ITestOzoneContractOpen extends AbstractContractOpenTest {
 
-  private boolean fsOptimizedClient;
-  private boolean fsOptimizedServer;
+  private static boolean fsOptimizedServer;
 
-  public ITestOzoneContractOpen(boolean fsoClient,
-       boolean fsoServer) throws IOException {
-    if (fsOptimizedClient != fsoClient ||
-        fsOptimizedServer != fsoServer) {
-      fsOptimizedClient = fsoClient;
-      fsOptimizedServer = fsoServer;
-      ITestOzoneContractUtils.restartCluster(fsOptimizedClient,
+  public ITestOzoneContractOpen(boolean fsoServer)
+      throws IOException {
+    if (fsOptimizedServer != fsoServer) {
+      ITestOzoneContractOpen.fsOptimizedServer = fsoServer;
+      ITestOzoneContractUtils.restartCluster(
           fsOptimizedServer);
     }
   }

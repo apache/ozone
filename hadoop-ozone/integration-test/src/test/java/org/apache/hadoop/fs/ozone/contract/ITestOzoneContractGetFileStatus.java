@@ -38,16 +38,13 @@ import org.slf4j.LoggerFactory;
 public class ITestOzoneContractGetFileStatus
     extends AbstractContractGetFileStatusTest {
 
-  private boolean fsOptimizedClient;
-  private boolean fsOptimizedServer;
+  private static boolean fsOptimizedServer;
 
-  public ITestOzoneContractGetFileStatus(boolean fsoClient,
-       boolean fsoServer) throws IOException {
-    if (fsOptimizedClient != fsoClient ||
-        fsOptimizedServer != fsoServer) {
-      fsOptimizedClient = fsoClient;
-      fsOptimizedServer = fsoServer;
-      ITestOzoneContractUtils.restartCluster(fsOptimizedClient,
+  public ITestOzoneContractGetFileStatus(boolean fsoServer)
+      throws IOException {
+    if (fsOptimizedServer != fsoServer) {
+      ITestOzoneContractGetFileStatus.fsOptimizedServer = fsoServer;
+      ITestOzoneContractUtils.restartCluster(
           fsOptimizedServer);
     }
   }

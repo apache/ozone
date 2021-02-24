@@ -29,25 +29,31 @@ public final class ITestOzoneContractUtils {
 
   private ITestOzoneContractUtils(){}
 
-  private static List<Object> fsoCombinations = Arrays.asList(new Object[][] {
-      {true, false}, // V1 client talking to old V0 server
-      // and operating on old buckets.
-      {false, true}, // V0 client talking to new V1 server
-      // and operating on new buckets.
-      {true, true}, // V1  client talking to new V1  server
-      // and operating on new buckets.
-      {false, false} // V0  client talking to old V0 server
-      // and operating on old buckets
+  private static List<Object> fsoCombinations = Arrays.asList(new Object[] {
+      // FSO configuration is a cluster level server side configuration.
+      // If the cluster is configured with V0 layout version,
+      // V0 bucket will created.
+      // If the cluster is configured with V1 layout version,
+      // V1 bucket will be created.
+      // Presently, OzoneClient checks bucketMetadata then invokes V1 or V0
+      // specific code and it makes no sense to add client side configs now.
+      // Once the specific client API to set FSO or non-FSO bucket is provided
+      // the contract test can be refactored to include another parameter 
+      // (fsoClient) which sets/unsets the client side configs.
+      true, // Server is configured with new layout (V1)
+      // and new buckets will be operated on
+      false // Server is configured with old layout (V0)
+      // and old buckets will be operated on
   });
 
   static List<Object> getFsoCombinations(){
     return fsoCombinations;
   }
 
-  public static void restartCluster(boolean fsOptimizedClient,
-      boolean fsOptimizedServer) throws IOException {
+  public static void restartCluster(boolean fsOptimizedServer)
+      throws IOException {
     OzoneContract.destroyCluster();
-    OzoneContract.initOzoneConfiguration(fsOptimizedClient,
+    OzoneContract.initOzoneConfiguration(
         fsOptimizedServer);
     OzoneContract.createCluster();
   }
