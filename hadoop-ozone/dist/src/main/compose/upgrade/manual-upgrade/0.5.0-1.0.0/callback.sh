@@ -15,26 +15,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO: compose dir, upgrade from and to must be set
 source "$COMPOSE_DIR"/testlib.sh
 
 setup_old_version() {
-  echo "in setup old version"
+  echo "--- SETTING UP OLD VERSION $OZONE_UPGRADE_FROM ---"
   load_version_specifics "$OZONE_UPGRADE_FROM"
 }
 
 with_old_version() {
-  echo "in with old version"
-  execute_robot_test scm /freon/generate.robot
-  execute_robot_test scm /freon/validate.robot
+  echo "--- RUNNING WITH OLD VERSION $OZONE_UPGRADE_FROM ---"
+
+  generate old
+  validate old
 }
 
 setup_new_version() {
-  echo "in setup new version"
+  echo "--- SETTING UP NEW VERSION $OZONE_UPGRADE_TO ---"
   unload_version_specifics "$OZONE_UPGRADE_FROM"
   load_version_specifics "$OZONE_UPGRADE_TO"
 }
 
 with_new_version() {
-  echo "in with new version"
+  echo "--- RUNNING WITH NEW VERSION $OZONE_UPGRADE_TO ---"
+
+  validate old
+  generate new
+  validate new
 }

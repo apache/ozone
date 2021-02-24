@@ -28,15 +28,44 @@ set -e -o pipefail
 set -u
 : "${OZONE_UPGRADE_FROM}"
 : "${OZONE_UPGRADE_TO}"
-: "${OZONE_UPGRADE_CALLBACK}"
 : "${COMPOSE_DIR}"
+: "${OZONE_UPGRADE_CALLBACK}"
 set +u
 
 source "$COMPOSE_DIR"/testlib.sh
 source "$OZONE_UPGRADE_CALLBACK"
 
-export OM_HA_ARGS='--'
+prepare_oms() {
+  if [[ "$OZONE_PREPARE_OMS" = 'true' ]]; then
+    execute_robot_test scm upgrade/prepare.robot
+  fi
+}
 
-prepare_for_image '1.1.0'
+callback setup
+
+export OM_HA_ARGS='--'
+prepare_for_image "$OZONE_UPGRADE_FROM"
 start_docker_env
-execute_robot_test scm omha/om-prepare.robot
+callback with_old_version
+prepare_oms
+
+prepare_for_image "$OZONE_CURRENT_VERSION"
+export OM_HA_ARGS='--upgrade'
+restart_docker_env
+callback with_new_version_pre_finalized
+prepare_oms
+
+prepare_for_image "$OZONE_UPGRADE_FROM"
+export OM_HA_ARGS='--downgrade'
+restart_docker_env
+callback with_old_version_downgraded
+prepare_oms
+
+prepare_for_image "$OZONE_CURRENT_VERSION"
+export OM_HA_ARGS='--upgrade'
+restart_docker_env
+execute_robot_test scm upgrade/finalize.robot
+callback with_new_version_finalized
+
+stop_docker_env
+generate_report

@@ -108,7 +108,7 @@ wait_for_om_leader() {
 
   #Don't give it up until 120 seconds
   while [[ $SECONDS -lt 120 ]]; do
-    local command="ozone admin om roles --service-id '${OM_SERVICE_ID}'"
+    local command="ozone admin om getserviceroles --service-id '${OM_SERVICE_ID}'"
     if [[ "${SECURITY_ENABLED}" == 'true' ]]; then
       status=$(docker-compose exec -T scm bash -c "kinit -k scm/scm@EXAMPLE.COM -t /etc/security/keytabs/scm.keytab && $command" | grep LEADER)
     else
