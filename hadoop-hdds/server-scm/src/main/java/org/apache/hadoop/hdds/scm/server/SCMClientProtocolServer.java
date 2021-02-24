@@ -670,7 +670,7 @@ public class SCMClientProtocolServer implements
    * @return Usage info such as capacity, SCMUsed, and remaining space.
    * @throws IOException
    */
-  public HddsProtos.DatanodeUsageInfo getUsageInfoFromDatanodeDetails(
+  private HddsProtos.DatanodeUsageInfo getUsageInfoFromDatanodeDetails(
       DatanodeDetails node) throws IOException {
     SCMNodeStat stat = scm.getScmNodeManager().getNodeStat(node).get();
 
