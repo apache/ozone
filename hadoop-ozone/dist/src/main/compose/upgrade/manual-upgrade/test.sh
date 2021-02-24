@@ -31,6 +31,8 @@ set +u
 source "$COMPOSE_DIR"/testlib.sh
 source "$OZONE_UPGRADE_CALLBACK"
 
+export OM_HA_ARGS='--'
+
 prepare_for_image "$OZONE_UPGRADE_FROM"
 callback setup_old_version
 start_docker_env

@@ -18,23 +18,46 @@
 source "$COMPOSE_DIR"/testlib.sh
 
 setup() {
-  # OM preparation is not in 1.0.0.
+  echo "--- SETTING UP OLD VERSION $OZONE_UPGRADE_FROM ---"
+
+  # OM preparation is not implemented until 1.2.0.
   export OZONE_OM_PREPARE='false'
   load_version_specifics "$OZONE_UPGRADE_FROM"
 }
 
 with_old_version() {
-   echo 'with old version'
+  echo "--- RUNNING WITH OLD VERSION $OZONE_UPGRADE_FROM ---"
+
+  generate old1
+  validate old1
 }
 
 with_new_version_pre_finalized() {
-   echo 'with new version'
+  echo "--- RUNNING WITH NEW VERSION $OZONE_UPGRADE_TO PRE-FINALIZED ---"
+
+  validate old1
+
+  generate new1
+  validate new1
 }
 
-with_old_version_rollback() {
-   echo 'with old version rollback'
+with_old_version_downgraded() {
+  echo "--- RUNNING WITH OLD VERSION $OZONE_UPGRADE_FROM AFTER DOWNGRADE ---"
+
+  validate old1
+  validate new1
+
+  generate old2
+  validate old2
 }
 
 with_new_version_finalized() {
-   echo 'with new version finalized'
+  echo "--- RUNNING WITH NEW VERSION $OZONE_UPGRADE_TO FINALIZED ---"
+
+  validate old1
+  validate new1
+  validate old2
+
+  generate new2
+  validate new2
 }

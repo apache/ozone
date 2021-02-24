@@ -27,7 +27,7 @@ _upgrade_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 # Cumulative result of all tests run with run_test function.
 # 0 if all passed, 1 if any failed.
 : "${RESULT:=0}"
-: "${OZONE_REPLICATION_FACTOR:=1}"
+: "${OZONE_REPLICATION_FACTOR:=3}"
 : "${OZONE_VOLUME_OWNER:=}"
 : "${ALL_RESULT_DIR:="$_upgrade_dir"/result}"
 
@@ -49,6 +49,10 @@ create_data_dir() {
   fix_data_dir_permissions
 }
 
+## @description Prepares to run an image with `start_docker_env`.
+## @param the version of Ozone to be run.
+##   If this is equal to `OZONE_CURRENT_VERSION`, then the ozone runner image wil be used.
+##   Else, a binary image will be used.
 prepare_for_image() {
     local image_version="$1"
 
@@ -59,11 +63,17 @@ prepare_for_image() {
     fi
 }
 
+## @description Runs a callback function only if it exists.
+## @param The name of the function to run.
 callback() {
     local func="$1"
     type -t "$func" > /dev/null && "$func"
 }
 
+## @description Sets up and runs the test defined by "$1"/test.sh.
+## @param The directory for the upgrade type whose test.sh file will be run.
+## @param The version of Ozone to upgrade from.
+## @param The version of Ozone to upgrade to.
 run_test() {
   # Export variables needed by test, since it is run in a subshell.
   local test_dir="$_upgrade_dir"/"$1"
@@ -84,3 +94,16 @@ run_test() {
   generate_report 'upgrade' "$RESULT_DIR"
   copy_results "$test_subdir" "${ALL_RESULT_DIR}"
 }
+
+## @description Generates data on the cluster.
+## @param The prefix to use for data generated.
+generate() {
+    execute_robot_test scm -v PREFIX:"$1" /freon/generate.robot
+}
+
+## @description Validates that data exists on the cluster.
+## @param The prefix of the data to be validated.
+validate() {
+    execute_robot_test scm -v PREFIX:"$1" /freon/validate.robot
+}
+

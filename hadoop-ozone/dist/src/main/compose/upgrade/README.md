@@ -44,9 +44,9 @@ Each type of upgrade has a subdirectory under this top level upgrade directory. 
     1. `setup`: Run before ozone is started in the old version.
     3. `with_old_version`: Run while ozone is running in the old version.
     3. `with_new_version_pre_finalized`: Run after ozone is stopped in the old version, and brought back up and running in the new version pre finalized.
-    4. `with_old_version_rollback`: Run after ozone is stopped in the new version pre finalized, and restarted in the old version again.
-        - This is how a user would do a rollback of an upgrade instead of finalizing to finish the upgrade.
-    5. `with_new_version_finalized`: Run after ozone is stopped in the old version after rollback, started again in the new version pre finalized, and then finalized.
+    4. `with_old_version_downgraded`: Run after ozone is stopped in the new version pre finalized, and restarted in the old version again.
+        - This is how a user would do a downgrade of an upgrade instead of finalizing to finish the upgrade.
+    5. `with_new_version_finalized`: Run after ozone is stopped in the old version after donwgrade, started again in the new version pre finalized, and then finalized.
         - The upgrade will be complete by this point.
 
 - Note that on the first upgrade after the non-rolling upgrade fraemwork is added, the old version does not have the non-rolling upgrade framework, but the new version does.
@@ -67,12 +67,17 @@ Each type of upgrade has a subdirectory under this top level upgrade directory. 
 
 ### Adding New Tests
 
-- To add tests to an existing upgrade type, go into its *compose/upgrade/\<upgrade-type>/\<versions>/callbacj.sh* file and add commands in the callback function when they should be run.
+- To add tests to an existing upgrade type, go into its *compose/upgrade/\<upgrade-type>/\<versions>/callback.sh* file and add commands in the callback function when they should be run.
+
+- Each callback file will have access to the following environment variables:
+    - `OZONE_UPGRADE_FROM`: The version of ozone being upgraded from.
+    - `OZONE_UPGRADE_TO`: The version of ozone being upgraded to.
+    - `COMPOSE_DIR`: The top level directory containing the files *docker-compose.yaml* and *testlib.sh*.
 
 ### Testing New Versions
 
 - To test upgrade between different versions, add a line `run_test <upgrade-type> <old-version> <new-version>` to the top level *test.sh* file.
-    -  The `run_test` function will execute *\<upgrade-type>/test.sh* with the callbacks defined in *\<upgrade-type>/\<versions>/callback.sh*.
+    -  The `run_test` function will execute *\<upgrade-type>/test.sh* with the callbacks defined in *\<upgrade-type>/\<old-version>-\<new-version>/callback.sh*.
 
 - If one of the specified versions does not match the current version defined by `OZONE_CURRENT_VERSION`, it will be pulled from the corresponding *apache/ozone* docker image.
     - Else, the current version will be used, which will run the locally built source code in the `apache/ozone-runner` image.
