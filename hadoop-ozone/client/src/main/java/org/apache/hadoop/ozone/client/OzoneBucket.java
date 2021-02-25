@@ -1090,8 +1090,9 @@ public class OzoneBucket extends WithMetadata {
     private void addKeyPrefixInfoToResultList(String keyPrefix,
         String startKey, List<OzoneKey> keysResultList) throws IOException {
 
-      // not required to addKeyPrefix if startKey is null or empty
-      if (StringUtils.isNotBlank(startKey)) {
+      // not required to addKeyPrefix if keyPrefix is null or empty
+      // not required to addKeyPrefix if startKey is not null or empty
+      if (StringUtils.isBlank(keyPrefix) || StringUtils.isNotBlank(startKey)) {
         // setting flag to true.
         addedKeyPrefix = true;
         return;

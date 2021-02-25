@@ -349,31 +349,18 @@ public class TestObjectStoreV1 {
 
     // Root level listing keys
     Iterator<? extends OzoneKey> ozoneKeyIterator =
-        ozoneBucket.listKeys("/a", null);
+        ozoneBucket.listKeys(null, null);
+    verifyFullTreeStructure(ozoneKeyIterator);
 
-    LinkedList<String> expectedKeys = new LinkedList<>();
-    expectedKeys.add("a/");
-    expectedKeys.add("a/b1/");
-    expectedKeys.add("a/b2/");
-    expectedKeys.add("a/b3/");
-    expectedKeys.add("a/b1/c1/");
-    expectedKeys.add("a/b1/c2/");
-    expectedKeys.add("a/b1/c1/c1.tx");
-    expectedKeys.add("a/b1/c2/c2.tx");
-    expectedKeys.add("a/b2/d1/");
-    expectedKeys.add("a/b2/d2/");
-    expectedKeys.add("a/b2/d3/");
-    expectedKeys.add("a/b2/d1/d11.tx");
-    expectedKeys.add("a/b2/d2/d21.tx");
-    expectedKeys.add("a/b2/d2/d22.tx");
-    expectedKeys.add("a/b2/d3/d31.tx");
-    expectedKeys.add("a/b3/e1/");
-    expectedKeys.add("a/b3/e2/");
-    expectedKeys.add("a/b3/e3/");
-    expectedKeys.add("a/b3/e1/e11.tx");
-    expectedKeys.add("a/b3/e2/e21.tx");
-    expectedKeys.add("a/b3/e3/e31.tx");
-    checkKeyList(ozoneKeyIterator, expectedKeys);
+    ozoneKeyIterator =
+        ozoneBucket.listKeys(null, null);
+    verifyFullTreeStructure(ozoneKeyIterator);
+
+    ozoneKeyIterator =
+        ozoneBucket.listKeys("a/", null);
+    verifyFullTreeStructure(ozoneKeyIterator);
+
+    LinkedList<String> expectedKeys;
 
     // Intermediate level keyPrefix - 2nd level
     ozoneKeyIterator =
@@ -409,6 +396,32 @@ public class TestObjectStoreV1 {
         ozoneBucket.listKeys("a/b3/e3", "a/b3/e3/e31.tx");
     expectedKeys = new LinkedList<>();
     checkKeyList(ozoneKeyIterator, expectedKeys);
+  }
+
+  private void verifyFullTreeStructure(Iterator<? extends OzoneKey> keyItr) {
+    LinkedList<String> expectedKeys = new LinkedList<>();
+    expectedKeys.add("a/");
+    expectedKeys.add("a/b1/");
+    expectedKeys.add("a/b2/");
+    expectedKeys.add("a/b3/");
+    expectedKeys.add("a/b1/c1/");
+    expectedKeys.add("a/b1/c2/");
+    expectedKeys.add("a/b1/c1/c1.tx");
+    expectedKeys.add("a/b1/c2/c2.tx");
+    expectedKeys.add("a/b2/d1/");
+    expectedKeys.add("a/b2/d2/");
+    expectedKeys.add("a/b2/d3/");
+    expectedKeys.add("a/b2/d1/d11.tx");
+    expectedKeys.add("a/b2/d2/d21.tx");
+    expectedKeys.add("a/b2/d2/d22.tx");
+    expectedKeys.add("a/b2/d3/d31.tx");
+    expectedKeys.add("a/b3/e1/");
+    expectedKeys.add("a/b3/e2/");
+    expectedKeys.add("a/b3/e3/");
+    expectedKeys.add("a/b3/e1/e11.tx");
+    expectedKeys.add("a/b3/e2/e21.tx");
+    expectedKeys.add("a/b3/e3/e31.tx");
+    checkKeyList(keyItr, expectedKeys);
   }
 
   @Test

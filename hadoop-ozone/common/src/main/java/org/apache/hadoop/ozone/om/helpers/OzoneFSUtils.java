@@ -179,7 +179,7 @@ public final class OzoneFSUtils {
       return fileName.toString();
     }
     // failed to find a parent directory.
-    return keyName;
+    return "";
   }
 
   /**
