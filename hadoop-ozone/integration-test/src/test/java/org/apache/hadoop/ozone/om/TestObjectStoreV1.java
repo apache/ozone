@@ -353,10 +353,6 @@ public class TestObjectStoreV1 {
     verifyFullTreeStructure(ozoneKeyIterator);
 
     ozoneKeyIterator =
-        ozoneBucket.listKeys(null, null);
-    verifyFullTreeStructure(ozoneKeyIterator);
-
-    ozoneKeyIterator =
         ozoneBucket.listKeys("a/", null);
     verifyFullTreeStructure(ozoneKeyIterator);
 

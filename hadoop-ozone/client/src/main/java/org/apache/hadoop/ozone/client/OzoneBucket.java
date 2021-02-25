@@ -803,7 +803,7 @@ public class OzoneBucket extends WithMetadata {
       return keyPrefix;
     }
 
-    void setKeyprefix(String keyPrefixPath) {
+    void setKeyPrefix(String keyPrefixPath) {
       keyPrefix = keyPrefixPath;
     }
 
@@ -814,7 +814,7 @@ public class OzoneBucket extends WithMetadata {
      * @param keyPrefix
      */
     KeyIterator(String keyPrefix, String prevKey) throws IOException{
-      setKeyprefix(keyPrefix);
+      setKeyPrefix(keyPrefix);
       this.currentValue = null;
       this.currentIterator = getNextListOfKeys(prevKey).iterator();
     }
@@ -914,7 +914,7 @@ public class OzoneBucket extends WithMetadata {
         if (StringUtils.isNotBlank(getKeyPrefix())) {
           keyPrefixName = OmUtils.normalizeKey(getKeyPrefix(), true);
         }
-        setKeyprefix(keyPrefixName);
+        setKeyPrefix(keyPrefixName);
       }
 
       // Get immediate children
@@ -1103,7 +1103,8 @@ public class OzoneBucket extends WithMetadata {
         return;
       }
 
-      // TODO: Handle a case, where startKey not started with keyPrefix.
+      // TODO: HDDS-4859 will fix the case where startKey not started with
+      //  keyPrefix.
 
       OzoneFileStatus status = proxy.getOzoneFileStatus(volumeName, name,
           keyPrefix);
