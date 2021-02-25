@@ -46,6 +46,12 @@ public interface CertificateStore {
   void storeValidCertificate(BigInteger serialID,
                              X509Certificate certificate) throws IOException;
 
+  /**
+   * Writes a new SCM certificate that was issued to the persistent store.
+   * @param serialID - Certificate Serial Number.
+   * @param certificate - Certificate to persist.
+   * @throws IOException - on Failure.
+   */
   void storeValidScmCertificate(BigInteger serialID,
       X509Certificate certificate) throws IOException;
 

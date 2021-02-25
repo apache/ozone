@@ -77,6 +77,7 @@ public interface CertificateServer {
    *
    * @param csr  - Certificate Signing Request.
    * @param type - An Enum which says what kind of approval process to follow.
+   * @param nodeType: OM/SCM/DN
    * @return A future that will have this certificate when this request is
    * approved.
    * @throws SCMSecurityException - on Error.
@@ -92,6 +93,7 @@ public interface CertificateServer {
    *
    * @param csr - Certificate Signing Request as a PEM encoded String.
    * @param type - An Enum which says what kind of approval process to follow.
+   * @param nodeType: OM/SCM/DN
    * @return A future that will have this certificate when this request is
    * approved.
    * @throws SCMSecurityException - on Error.

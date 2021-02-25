@@ -78,6 +78,12 @@ public interface SCMMetadataStore extends DBStoreHAManager {
   Table<BigInteger, X509Certificate> getValidCertsTable();
 
 
+  /**
+   * A table that maintains all the valid certificates of SCM nodes issued by
+   * the SCM CA.
+   *
+   * @return Table
+   */
   Table<BigInteger, X509Certificate> getValidSCMCertsTable();
 
   /**
