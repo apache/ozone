@@ -24,16 +24,7 @@ package org.apache.hadoop.hdds.scm.server;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
 import com.google.protobuf.BlockingService;
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
-import java.util.stream.Collectors;
-
+import com.google.protobuf.ProtocolMessageEnum;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -43,25 +34,26 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ScmOps;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.ScmUtils;
-import org.apache.hadoop.hdds.scm.node.NodeStatus;
-import org.apache.hadoop.hdds.scm.events.SCMEvents;
-import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
-import org.apache.hadoop.hdds.scm.safemode.SafeModePrecheck;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
+import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
+import org.apache.hadoop.hdds.scm.safemode.SafeModePrecheck;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
@@ -77,8 +69,20 @@ import org.apache.hadoop.ozone.audit.AuditLoggerType;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.audit.Auditor;
 import org.apache.hadoop.ozone.audit.SCMAction;
+import org.apache.ratis.thirdparty.com.google.common.base.Strings;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import com.google.protobuf.ProtocolMessageEnum;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.stream.Collectors;
+
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StorageContainerLocationProtocolService.newReflectiveBlockingService;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_DEFAULT;
@@ -86,8 +90,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_K
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.startRpcServer;
 import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * The RPC server that listens to requests from clients.
@@ -616,6 +618,73 @@ public class SCMClientProtocolServer implements
     AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
         SCMAction.GET_REPLICATION_MANAGER_STATUS, null));
     return scm.getReplicationManager().isRunning();
+  }
+
+  /**
+   * Get Datanode usage info (such as capacity, used) by ip or uuid.
+   *
+   * @param ipaddress - Datanode Address String
+   * @param uuid - Datanode UUID String
+   * @return List of DatanodeUsageInfo. Each element contains usage info such
+   * as capacity, SCMUsed, and remaining space.
+   * @throws IOException
+   */
+  @Override
+  public List<HddsProtos.DatanodeUsageInfo> getDatanodeUsageInfo(
+      String ipaddress, String uuid) throws IOException {
+
+    // check admin authorisation
+    String remoteUser = getRpcRemoteUsername();
+    try {
+      getScm().checkAdminAccess(remoteUser);
+    } catch (IOException e) {
+      LOG.error("Authorisation failed", e);
+      throw e;
+    }
+
+    // get datanodes by ip or uuid
+    List<DatanodeDetails> nodes = new ArrayList<>();
+    if (!Strings.isNullOrEmpty(uuid)) {
+      nodes.add(scm.getScmNodeManager().getNodeByUuid(uuid));
+    } else if (!Strings.isNullOrEmpty(ipaddress)) {
+      nodes = scm.getScmNodeManager().getNodesByAddress(ipaddress);
+    } else {
+      throw new IOException(
+          "Could not get datanode with the specified parameters."
+      );
+    }
+
+    // get datanode usage info
+    List<HddsProtos.DatanodeUsageInfo> infoList = new ArrayList<>();
+    for (DatanodeDetails node : nodes) {
+      infoList.add(getUsageInfoFromDatanodeDetails(node));
+    }
+
+    return infoList;
+  }
+
+  /**
+   * Get usage details for a specific DatanodeDetails node.
+   *
+   * @param node - DatanodeDetails
+   * @return Usage info such as capacity, SCMUsed, and remaining space.
+   * @throws IOException
+   */
+  private HddsProtos.DatanodeUsageInfo getUsageInfoFromDatanodeDetails(
+      DatanodeDetails node) throws IOException {
+    SCMNodeStat stat = scm.getScmNodeManager().getNodeStat(node).get();
+
+    long capacity = stat.getCapacity().get();
+    long used = stat.getScmUsed().get();
+    long remaining = stat.getRemaining().get();
+
+    HddsProtos.DatanodeUsageInfo info = HddsProtos.DatanodeUsageInfo
+        .newBuilder()
+        .setCapacity(capacity)
+        .setUsed(used)
+        .setRemaining(remaining)
+        .build();
+    return info;
   }
 
   /**
