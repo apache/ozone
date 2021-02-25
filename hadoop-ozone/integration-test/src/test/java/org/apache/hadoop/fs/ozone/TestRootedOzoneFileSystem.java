@@ -111,6 +111,14 @@ public class TestRootedOzoneFileSystem {
     omRatisEnabled = enableOMRatis;
   }
 
+  public static FileSystem getFs() {
+    return fs;
+  }
+
+  public static Path getBucketPath() {
+    return bucketPath;
+  }
+
   @Rule
   public Timeout globalTimeout = new Timeout(300_000);
 
