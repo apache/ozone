@@ -175,6 +175,7 @@ public class ContainerReader implements Runnable {
 
     System.out.println("Cluster dir" + clusterDir + "doesn't exists");
     try {
+      LOG.info("renaming stLoc:{} to {}", storageLoc, clusterDir);
       NativeIO.renameTo(storageLoc, clusterDir);
       return clusterDir;
     } catch (Throwable t) {
@@ -253,6 +254,7 @@ public class ContainerReader implements Runnable {
         + " path:" + path + " newPath:" + newPath;
     Preconditions.checkArgument(newPath.toFile().exists(), msg);
     Preconditions.checkArgument(newPath.toFile().isDirectory(), msg);
+    LOG.info("new Normalized Path is:{}", newPath);
     return newPath.toAbsolutePath().toString();
   }
 }
