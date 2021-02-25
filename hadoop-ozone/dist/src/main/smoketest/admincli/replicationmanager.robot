@@ -19,6 +19,9 @@ Library             BuiltIn
 Resource            ../commonlib.robot
 Test Timeout        5 minutes
 
+*** Variables ***
+${SCM}       scm
+
 *** Test Cases ***
 Check replicationmanager
     ${output} =         Execute          ozone admin replicationmanager status
@@ -26,7 +29,7 @@ Check replicationmanager
                         Should contain   ${output}   Running
 
 Check replicationmanager with explicit host
-    ${output} =         Execute          ozone admin replicationmanager status --scm scm
+    ${output} =         Execute          ozone admin replicationmanager status --scm ${SCM}
                         Should contain   ${output}   ReplicationManager
                         Should contain   ${output}   Running
 

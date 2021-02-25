@@ -20,13 +20,14 @@ export COMPOSE_DIR
 
 export SECURITY_ENABLED=false
 export OZONE_REPLICATION_FACTOR=3
+export SCM=scm1
 
 # shellcheck source=/dev/null
 source "$COMPOSE_DIR/../testlib.sh"
 
 start_docker_env
 
-execute_robot_test scm basic/ozone-shell-single.robot
+execute_robot_test ${SCM} basic/ozone-shell-single.robot
 
 stop_docker_env
 

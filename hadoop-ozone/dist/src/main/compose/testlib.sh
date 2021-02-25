@@ -27,6 +27,8 @@ else
   OM_SERVICE_ID=om
 fi
 
+: ${SCM:=scm}
+
 ## @description create results directory, purging any prior data
 create_results_dir() {
   #delete previous results
@@ -73,9 +75,9 @@ wait_for_safemode_exit(){
      #This line checks the safemode status in scm
      local command="${OZONE_SAFEMODE_STATUS_COMMAND}"
      if [[ "${SECURITY_ENABLED}" == 'true' ]]; then
-         status=$(docker-compose exec -T scm bash -c "kinit -k HTTP/scm@EXAMPLE.COM -t /etc/security/keytabs/HTTP.keytab && $command" || true)
+         status=$(docker-compose exec -T ${SCM} bash -c "kinit -k HTTP/${SCM}@EXAMPLE.COM -t /etc/security/keytabs/HTTP.keytab && $command" || true)
      else
-         status=$(docker-compose exec -T scm bash -c "$command")
+         status=$(docker-compose exec -T ${SCM} bash -c "$command")
      fi
 
      echo "SECONDS: $SECONDS"
@@ -145,6 +147,7 @@ execute_robot_test(){
       -v OM_SERVICE_ID:"${OM_SERVICE_ID}" \
       -v OZONE_DIR:"${OZONE_DIR}" \
       -v SECURITY_ENABLED:"${SECURITY_ENABLED}" \
+      -v SCM:"${SCM}" \
       ${ARGUMENTS[@]} --log NONE --report NONE "${OZONE_ROBOT_OPTS[@]}" --output "$OUTPUT_PATH" \
       "$SMOKETEST_DIR_INSIDE/$TEST"
   local -i rc=$?
@@ -216,7 +219,7 @@ wait_for_port(){
 
   while [[ $SECONDS -lt $timeout ]]; do
      set +e
-     docker-compose exec -T scm /bin/bash -c "nc -z $host $port"
+     docker-compose exec -T ${SCM} /bin/bash -c "nc -z $host $port"
      status=$?
      set -e
      if [ $status -eq 0 ] ; then
