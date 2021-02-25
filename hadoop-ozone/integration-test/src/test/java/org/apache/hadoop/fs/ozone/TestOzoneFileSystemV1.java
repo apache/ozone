@@ -24,7 +24,6 @@ import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.junit.Assert;
 import org.junit.After;
 import org.junit.BeforeClass;
@@ -278,36 +277,6 @@ public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
   }
 
   /**
-   * Case-1) fromKeyName should exist, otw throws exception.
-   */
-  @Test
-  public void testRenameWithNonExistentSource() throws Exception {
-    // Skip as this will run only in new layout
-    if (!isEnabledFileSystemPaths()) {
-      return;
-    }
-
-    final String root = "/root";
-    final String dir1 = root + "/dir1";
-    final String dir2 = root + "/dir2";
-    final Path source = new Path(getFs().getUri().toString() + dir1);
-    final Path destin = new Path(getFs().getUri().toString() + dir2);
-
-    // creates destin
-    getFs().mkdirs(destin);
-    LOG.info("Created destin dir: {}", destin);
-
-    LOG.info("Rename op-> source:{} to destin:{}}", source, destin);
-    try {
-      getFs().rename(source, destin);
-      Assert.fail("Should throw exception : Source doesn't exist!");
-    } catch (OMException ome) {
-      // expected
-      assertEquals(ome.getResult(), OMException.ResultCodes.KEY_NOT_FOUND);
-    }
-  }
-
-  /**
    * Case-2) Cannot rename a directory to its own subdirectory.
    */
   @Test
@@ -327,14 +296,8 @@ public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
 
     final Path sourceRoot = new Path(getFs().getUri().toString() + root);
     LOG.info("Rename op-> source:{} to destin:{}", sourceRoot, subDir1);
-    try {
-      getFs().rename(sourceRoot, subDir1);
-      Assert.fail("Should throw exception : Cannot rename a directory to" +
-              " its own subdirectory");
-    } catch (OMException ome) {
-      // expected
-      assertEquals(ome.getResult(), OMException.ResultCodes.KEY_RENAME_ERROR);
-    }
+    //  rename should fail and return false
+    Assert.assertFalse(getFs().rename(sourceRoot, subDir1));
   }
 
   /**
@@ -354,30 +317,18 @@ public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
     final String dir2 = dir1 + "/dir2";
     final Path dir2SourcePath = new Path(getFs().getUri().toString() + dir2);
     getFs().mkdirs(dir2SourcePath);
-
     // (a) parent of dst does not exist.  /root_dir/b/c
     final Path destinPath = new Path(getFs().getUri().toString()
             + root + "/b/c");
-    try {
-      getFs().rename(dir2SourcePath, destinPath);
-      Assert.fail("Should fail as parent of dst does not exist!");
-    } catch (OMException ome) {
-      // expected
-      assertEquals(ome.getResult(), OMException.ResultCodes.KEY_RENAME_ERROR);
-    }
 
+    // rename should fail and return false
+    Assert.assertFalse(getFs().rename(dir2SourcePath, destinPath));
     // (b) parent of dst is a file. /root_dir/file1/c
     Path filePath = new Path(getFs().getUri().toString() + root + "/file1");
     ContractTestUtils.touch(getFs(), filePath);
-
     Path newDestinPath = new Path(filePath, "c");
-    try {
-      getFs().rename(dir2SourcePath, newDestinPath);
-      Assert.fail("Should fail as parent of dst is a file!");
-    } catch (OMException ome) {
-      // expected
-      assertEquals(ome.getResult(), OMException.ResultCodes.KEY_RENAME_ERROR);
-    }
+    // rename should fail and return false
+    Assert.assertFalse(getFs().rename(dir2SourcePath, newDestinPath));
   }
 
   @Override
