@@ -60,7 +60,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClient;
 import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -521,7 +520,6 @@ public class ContainerOperationClient implements ScmClient {
    * @return returns true if operation is successful.
    * @throws IOException
    */
-  @Override
   public boolean forceExitSafeMode() throws IOException {
     return storageContainerLocationClient.forceExitSafeMode();
   }
@@ -539,6 +537,22 @@ public class ContainerOperationClient implements ScmClient {
   @Override
   public boolean getReplicationManagerStatus() throws IOException {
     return storageContainerLocationClient.getReplicationManagerStatus();
+  }
+
+  /**
+   * Get Datanode Usage information by ipaddress or uuid.
+   *
+   * @param ipaddress - datanode ipaddress String
+   * @param uuid - datanode uuid String
+   * @return List of DatanodeUsageInfo. Each element contains info such as
+   * capacity, SCMused, and remaining space.
+   * @throws IOException
+   */
+  @Override
+  public List<HddsProtos.DatanodeUsageInfo> getDatanodeUsageInfo(
+      String ipaddress, String uuid) throws IOException {
+    return storageContainerLocationClient.getDatanodeUsageInfo(ipaddress,
+        uuid);
   }
 
 }
