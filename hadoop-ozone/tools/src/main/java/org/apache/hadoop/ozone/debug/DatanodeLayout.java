@@ -35,6 +35,9 @@ import picocli.CommandLine;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 
+import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
+
 /**
  * Parse Ratis Log CLI implementation.
  */
@@ -48,6 +51,11 @@ public class DatanodeLayout extends GenericCli
     implements Callable<Void>, SubcommandWithParent{
   private static UUID dummyDatanodeUuid = UUID.randomUUID();
 
+  @CommandLine.Option(names = {"--path"},
+      required = true,
+      description = "File Path")
+  private String storagePath;
+
   @Spec
   private CommandSpec spec;
 
@@ -55,12 +63,18 @@ public class DatanodeLayout extends GenericCli
   public Void call() throws Exception {
     System.out.println("in datanode layout tool");
     OzoneConfiguration conf = createOzoneConfiguration();
+
+    conf.unset(HDDS_DATANODE_DIR_KEY);
+
+    conf.set(HDDS_DATANODE_DIR_KEY, storagePath);
     conf.setBoolean(ScmConfigKeys.HDDS_DATANODE_UPGRADE_LAYOUT_INLINE, true);
 
     MutableVolumeSet volumeSet =
-        new MutableVolumeSet(dummyDatanodeUuid.toString(), conf);
+        new MutableVolumeSet(null, conf);
     ContainerSet containerSet = new ContainerSet();
     OzoneContainer.buildContainerSet(volumeSet, containerSet, conf);
+
+    volumeSet.shutdown();
     return null;
   }
 

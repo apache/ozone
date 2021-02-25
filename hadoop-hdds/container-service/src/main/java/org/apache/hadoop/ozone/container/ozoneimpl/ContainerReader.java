@@ -44,6 +44,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.yaml.snakeyaml.Yaml;
 
 /**
  * Class used to read .container files from Volume and build container map.
@@ -216,6 +217,7 @@ public class ContainerReader implements Runnable {
         KeyValueContainerData kvContainerData = (KeyValueContainerData)
             containerData;
         containerData.setVolume(hddsVolume);
+        KeyValueContainer kvContainer = null;
         if (isInUpgradeMode) {
           kvContainerData.setMetadataPath(
               findNormalizedPath(storageLoc,
@@ -223,12 +225,19 @@ public class ContainerReader implements Runnable {
           kvContainerData.setChunksPath(
               findNormalizedPath(storageLoc,
                   kvContainerData.getChunksPath()));
-        }
+
+        Yaml yaml = ContainerDataYaml.getYamlForContainerType(
+            containerData.getContainerType());
+        containerData.computeAndSetChecksum(yaml);
+
         KeyValueContainerUtil.parseKVContainerData(kvContainerData, config);
-        KeyValueContainer kvContainer = new KeyValueContainer(
+        kvContainer = new KeyValueContainer(
             kvContainerData, config);
-        if (isInUpgradeMode) {
           kvContainer.update(Collections.emptyMap(), true);
+        } else {
+          KeyValueContainerUtil.parseKVContainerData(kvContainerData, config);
+          kvContainer = new KeyValueContainer(
+              kvContainerData, config);
         }
         containerSet.addContainer(kvContainer);
       } else {
