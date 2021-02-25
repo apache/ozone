@@ -308,6 +308,10 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     if (!ofsSrc.isInSameBucketAs(ofsDst)) {
       throw new IOException("Cannot rename a key to a different bucket");
     }
+    OzoneBucket bucket = adapterImpl.getBucket(ofsSrc, false);
+    if (OzoneFSUtils.isFSOptimizedBucket(bucket.getMetadata())) {
+      return renameV1(bucket, ofsSrc, ofsDst);
+    }
 
     // Cannot rename a directory to its own subdirectory
     Path dstParent = dst.getParent();
@@ -383,6 +387,27 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       createFakeParentDirectory(src);
     }
     return result;
+  }
+
+  private boolean renameV1(OzoneBucket bucket,
+      OFSPath srcPath, OFSPath dstPath) throws IOException {
+    // construct src and dst key paths
+    String srcKeyPath = srcPath.getNonKeyPathNoPrefixDelim() +
+        OZONE_URI_DELIMITER + srcPath.getKeyName();
+    String dstKeyPath = dstPath.getNonKeyPathNoPrefixDelim() +
+        OZONE_URI_DELIMITER + dstPath.getKeyName();
+    try {
+      adapterImpl.rename(bucket, srcKeyPath, dstKeyPath);
+    } catch (OMException ome) {
+      LOG.error("rename key failed: {}. source:{}, destin:{}",
+          ome.getMessage(), srcKeyPath, dstKeyPath);
+      if (OMException.ResultCodes.KEY_ALREADY_EXISTS == ome.getResult()) {
+        return false;
+      } else {
+        throw ome;
+      }
+    }
+    return true;
   }
 
   /**
@@ -501,6 +526,16 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
         return false;
       }
 
+
+      if (!ofsPath.isVolume() && !ofsPath.isBucket()) {
+        OzoneBucket bucket = adapterImpl.getBucket(ofsPath, false);
+        if (OzoneFSUtils.isFSOptimizedBucket(bucket.getMetadata())) {
+          String ofsKeyPath = ofsPath.getNonKeyPathNoPrefixDelim() +
+              OZONE_URI_DELIMITER + ofsPath.getKeyName();
+          return adapterImpl.deleteObject(ofsKeyPath, recursive);
+        }
+      }
+
       // Handle delete volume
       if (ofsPath.isVolume()) {
         String volumeName = ofsPath.getVolumeName();
@@ -511,8 +546,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
           Iterator<? extends OzoneBucket> it = volume.listBuckets("");
           String prefixVolumePathStr = addTrailingSlashIfNeeded(f.toString());
           while (it.hasNext()) {
-            OzoneBucket bucket = it.next();
-            String nextBucket = prefixVolumePathStr + bucket.getName();
+            OzoneBucket buck = it.next();
+            String nextBucket = prefixVolumePathStr + buck.getName();
             delete(new Path(nextBucket), true);
           }
         }

@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.TrashPolicyOzone;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneAclConfig;
@@ -115,6 +116,7 @@ public class TestRootedOzoneFileSystem {
 
   private static boolean enabledFileSystemPaths;
   private static boolean omRatisEnabled;
+  private static boolean isBucketFSOptimized = false;
 
   private static OzoneConfiguration conf;
   private static MiniOzoneCluster cluster = null;
@@ -136,8 +138,13 @@ public class TestRootedOzoneFileSystem {
     conf = new OzoneConfiguration();
     conf.setInt(FS_TRASH_INTERVAL_KEY, 1);
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
-    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
-        enabledFileSystemPaths);
+    if (isBucketFSOptimized) {
+      TestOMRequestUtils.configureFSOptimizedPaths(conf,
+          true, OMConfigKeys.OZONE_OM_LAYOUT_VERSION_V1);
+    } else {
+      conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
+          enabledFileSystemPaths);
+    }
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
         .build();
@@ -177,6 +184,10 @@ public class TestRootedOzoneFileSystem {
 
   private OMMetrics getOMMetrics() {
     return cluster.getOzoneManager().getMetrics();
+  }
+
+  protected static void setIsBucketFSOptimized(boolean isBucketFSO) {
+    isBucketFSOptimized = isBucketFSO;
   }
 
   @Test
@@ -1257,8 +1268,9 @@ public class TestRootedOzoneFileSystem {
     // This condition should pass after the checkpoint
     Assert.assertTrue(getOMMetrics()
         .getNumTrashRenames() > prevNumTrashRenames);
+    // With new layout version, file renames wouldn't be counted
     Assert.assertTrue(getOMMetrics()
-        .getNumTrashFilesRenames() > prevNumTrashFileRenames);
+        .getNumTrashFilesRenames() >= prevNumTrashFileRenames);
 
     // wait for deletion of checkpoint dir
     GenericTestUtils.waitFor(()-> {
@@ -1276,7 +1288,7 @@ public class TestRootedOzoneFileSystem {
     GenericTestUtils.waitFor(
         () -> getOMMetrics().getNumTrashDeletes() > prevNumTrashDeletes
             && getOMMetrics().getNumTrashFilesDeletes()
-            > prevNumTrashFileDeletes, 100, 180000);
+            >= prevNumTrashFileDeletes, 100, 180000);
     // Cleanup
     ofs.delete(trashRoot, true);
     ofs.delete(trashRoot2, true);
