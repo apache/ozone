@@ -152,7 +152,7 @@ public class ContainerReader implements Runnable {
                     containerDir);
                 long containerID = ContainerUtils.getContainerID(containerDir);
                 if (containerFile.exists()) {
-                  verifyContainerFile(location, containerID, containerFile);
+                  verifyContainerFile(storageLoc, containerID, containerFile);
                 } else {
                   LOG.error("Missing .container file for ContainerID: {}",
                       containerDir.getName());
