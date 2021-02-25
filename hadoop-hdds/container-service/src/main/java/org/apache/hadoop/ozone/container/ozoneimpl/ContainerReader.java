@@ -237,7 +237,7 @@ public class ContainerReader implements Runnable {
 
   public String findNormalizedPath(File storageLoc, String path) {
     Path p = Paths.get(path);
-    Path relativePath = p.relativize(storageLoc.toPath());
+    Path relativePath = storageLoc.toPath().relativize(p);
     Path newPath = getClusterDir().toPath().resolve(relativePath);
 
     Preconditions.checkArgument(newPath.toFile().exists());
