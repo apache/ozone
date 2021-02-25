@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import picocli.CommandLine;
 
 import java.io.IOException;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -82,7 +83,7 @@ public class ListInfoSubcommand extends ScmSubcommand {
         .map(p -> new DatanodeWithAttributes(
             DatanodeDetails.getFromProtoBuf(p.getNodeID()),
             p.getNodeOperationalStates(0), p.getNodeStates(0)))
-        .sorted()
+        .sorted((o1, o2) -> o1.healthState.compareTo(o2.healthState))
         .collect(Collectors.toList());
   }
 
@@ -119,7 +120,7 @@ public class ListInfoSubcommand extends ScmSubcommand {
     System.out.println("Related pipelines:\n" + pipelineListInfo);
   }
 
-  private static class DatanodeWithAttributes implements Comparable {
+  private static class DatanodeWithAttributes {
     private DatanodeDetails datanodeDetails;
     private HddsProtos.NodeOperationalState operationalState;
     private HddsProtos.NodeState healthState;
@@ -142,12 +143,6 @@ public class ListInfoSubcommand extends ScmSubcommand {
 
     public HddsProtos.NodeState getHealthState() {
       return healthState;
-    }
-
-    @Override
-    public int compareTo(Object o) {
-      DatanodeWithAttributes other = (DatanodeWithAttributes)o;
-      return healthState.compareTo(other.getHealthState());
     }
   }
 }
