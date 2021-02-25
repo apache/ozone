@@ -21,12 +21,12 @@ import java.util.List;
 
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
-import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGenerateSCMCertRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto.ResponseCode;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertificateRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetDataNodeCertRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetOMCertRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetSCMCertRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMListCertificateRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMListCertificateResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityRequest;
@@ -157,12 +157,12 @@ public class SCMSecurityProtocolServerSideTranslatorPB
   /**
    * Get signed certificate for SCM.
    *
-   * @param request - SCMGenerateSCMCertRequestProto
+   * @param request - SCMGetSCMCertRequestProto
    * @return SCMGetCertResponseProto.
    */
 
   public SCMGetCertResponseProto getSCMCertificate(
-      SCMGenerateSCMCertRequestProto request)
+      SCMGetSCMCertRequestProto request)
       throws IOException {
 
     String certificate = impl.getSCMCertificate(request.getScmDetails(),
