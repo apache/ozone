@@ -185,15 +185,6 @@ public class SCMHAConfiguration {
   )
   private String ratisSnapshotDir;
 
-  @Config(key = "grpc.bind.port",
-      type = ConfigType.INT,
-      defaultValue = "9899",
-      tags = {OZONE, SCM, HA, RATIS},
-      description = "Port used by SCM for Grpc Server."
-  )
-
-  private int grpcBindPort = 9866;
-
   @Config(key = "grpc.deadline.interval",
       type = ConfigType.TIME,
       defaultValue = "30m",
@@ -206,9 +197,6 @@ public class SCMHAConfiguration {
     return grpcDeadlineInterval;
   }
 
-  public int getGrpcBindPort() {
-    return grpcBindPort;
-  }
 
   public String getRatisStorageDir() {
     return ratisStorageDir;
@@ -252,10 +240,6 @@ public class SCMHAConfiguration {
 
   public void setRaftLogPurgeEnabled(boolean enabled) {
     this.raftLogPurgeEnabled = enabled;
-  }
-
-  public void setGrpcBindPort(int port) {
-    this.grpcBindPort = port;
   }
 
   public int getRaftLogPurgeGap() {

@@ -766,7 +766,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
     RaftClientReply reply;
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Received create pipeline request for pipeline {}", pipelineID);
+      LOG.debug("Received addGroup request for pipeline {}", pipelineID);
     }
     try {
       reply = server.groupManagement(request);
@@ -775,7 +775,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     }
     processReply(reply);
     if (LOG.isDebugEnabled()) {
-      LOG.info("Created pipeline {}", pipelineID);
+      LOG.info("Created group {}", pipelineID);
     }
   }
 

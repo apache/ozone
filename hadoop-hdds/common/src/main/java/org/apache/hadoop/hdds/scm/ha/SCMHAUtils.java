@@ -144,13 +144,13 @@ public final class SCMHAUtils {
     if (scmNodes != null) {
       final String selfId = conf.get(ScmConfigKeys.OZONE_SCM_NODE_ID_KEY);
       String[] parts = scmNodes.split(",");
-      List<String> partList = new ArrayList<>();
+      List<String> partsLeft = new ArrayList<>();
       for (String part : parts) {
         if (!part.equals(selfId)) {
-          partList.add(part);
+          partsLeft.add(part);
         }
       }
-      conf.set(ScmConfigKeys.OZONE_SCM_NODES_KEY, String.join(",", partList));
+      conf.set(ScmConfigKeys.OZONE_SCM_NODES_KEY, String.join(",", partsLeft));
     }
     return conf;
   }

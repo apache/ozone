@@ -143,7 +143,7 @@ public class SCMBlockLocationFailoverProxyProvider implements
       nextProxyIndex();
     } else {
       if (!assignLeaderToNode(newLeader)) {
-        LOG.debug("Failing over OM proxy to nodeId: {}", newLeader);
+        LOG.debug("Failing over SCM proxy to nodeId: {}", newLeader);
         nextProxyIndex();
       }
     }

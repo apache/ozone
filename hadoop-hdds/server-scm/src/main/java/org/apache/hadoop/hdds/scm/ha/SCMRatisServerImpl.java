@@ -230,14 +230,14 @@ public class SCMRatisServerImpl implements SCMRatisServer {
       } else {
         LOG.error("Failed to add new SCM: {}. Ratis reply: {}" +
             request.getScmId(), raftClientReply);
+        throw new IOException(raftClientReply.getException());
       }
       return raftClientReply.isSuccess();
     } catch (IOException e) {
       LOG.error("Failed to update Ratis configuration and add new peer. " +
           "Cannot add new SCM: {}.", scm.getScmId(), e);
+      throw e;
     }
-    return false;
-
   }
 
   @VisibleForTesting
