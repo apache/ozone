@@ -35,7 +35,6 @@ import picocli.CommandLine;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 
-import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 
 /**
@@ -49,7 +48,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 @MetaInfServices(SubcommandWithParent.class)
 public class DatanodeLayout extends GenericCli
     implements Callable<Void>, SubcommandWithParent{
-  private static UUID dummyDatanodeUuid = UUID.randomUUID();
 
   @CommandLine.Option(names = {"--path"},
       required = true,

@@ -226,13 +226,13 @@ public class ContainerReader implements Runnable {
               findNormalizedPath(storageLoc,
                   kvContainerData.getChunksPath()));
 
-        Yaml yaml = ContainerDataYaml.getYamlForContainerType(
-            containerData.getContainerType());
-        containerData.computeAndSetChecksum(yaml);
+          Yaml yaml = ContainerDataYaml.getYamlForContainerType(
+              containerData.getContainerType());
+          containerData.computeAndSetChecksum(yaml);
 
-        KeyValueContainerUtil.parseKVContainerData(kvContainerData, config);
-        kvContainer = new KeyValueContainer(
-            kvContainerData, config);
+          KeyValueContainerUtil.parseKVContainerData(kvContainerData, config);
+          kvContainer = new KeyValueContainer(
+              kvContainerData, config);
           kvContainer.update(Collections.emptyMap(), true);
         } else {
           KeyValueContainerUtil.parseKVContainerData(kvContainerData, config);
