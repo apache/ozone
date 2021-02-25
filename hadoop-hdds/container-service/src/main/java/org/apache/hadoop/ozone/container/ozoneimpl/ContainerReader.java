@@ -138,8 +138,8 @@ public class ContainerReader implements Runnable {
 
     LOG.info("Start to verify containers on volume {}", hddsVolumeRootDir);
     for (File storageLoc : storageDir) {
-      preProcessStorageLoc(storageLoc);
-      File currentDir = new File(storageLoc, Storage.STORAGE_DIR_CURRENT);
+      File location = preProcessStorageLoc(storageLoc);
+      File currentDir = new File(location, Storage.STORAGE_DIR_CURRENT);
       File[] containerTopDirs = currentDir.listFiles();
       if (containerTopDirs != null) {
         for (File containerTopDir : containerTopDirs) {
@@ -151,7 +151,7 @@ public class ContainerReader implements Runnable {
                     containerDir);
                 long containerID = ContainerUtils.getContainerID(containerDir);
                 if (containerFile.exists()) {
-                  verifyContainerFile(storageLoc, containerID, containerFile);
+                  verifyContainerFile(location, containerID, containerFile);
                 } else {
                   LOG.error("Missing .container file for ContainerID: {}",
                       containerDir.getName());
@@ -165,17 +165,20 @@ public class ContainerReader implements Runnable {
     LOG.info("Finish verifying containers on volume {}", hddsVolumeRootDir);
   }
 
-  public void preProcessStorageLoc(File storageLoc) {
+  public File preProcessStorageLoc(File storageLoc) {
     File clusterDir = getClusterDir();
     if (!isInUpgradeMode || clusterDir.exists()) {
-      return;
+      Preconditions.checkArgument(storageLoc.equals(clusterDir));
+      return storageLoc;
     }
 
     System.out.println("Cluster dir" + clusterDir + "doesn't exists");
     try {
       NativeIO.renameTo(storageLoc, clusterDir);
+      return clusterDir;
     } catch (Throwable t) {
       LOG.error("DN Layout upgrade failed", t);
+      return null;
     }
   }
 
