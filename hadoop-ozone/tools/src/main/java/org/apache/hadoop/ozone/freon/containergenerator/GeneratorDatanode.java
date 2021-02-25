@@ -63,7 +63,13 @@ import picocli.CommandLine.Option;
  * Container generator for datanode metadata/data.
  */
 @Command(name = "cgdn",
-    description = "Offline container metadata generator for Ozone Datanodes",
+    description = "Offline container metadata generator for Ozone Datanodes.",
+    optionListHeading =
+        "\nExecute this command with different parameters for each datanodes. "
+            + "For example if you have 10 datanodes, use "
+            + "'ozone freon cgdn --index=1 --datanodes=10', 'ozone freon"
+            + " cgdn --index=2 --datanodes=10', 'ozone freon cgdn "
+            + "--index=3 --datanodes=10', ...\n\n",
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
@@ -129,7 +135,15 @@ public class GeneratorDatanode extends BaseGenerator {
         StorageLocation.parse(storageDirs.iterator().next())
             .getUri().getPath();
 
-    final Path scmSpecificDir = Files.list(Paths.get(firstStorageDir, "hdds"))
+    final Path hddsDir = Paths.get(firstStorageDir, "hdds");
+    if (!Files.exists(hddsDir)) {
+      throw new NoSuchFieldException(hddsDir
+          + " doesn't exist. Please start a real cluster to initialize the "
+          + "VERSION descriptors, and re-start this generator after the files"
+          + " are created (but after cluster is stopped).");
+    }
+
+    final Path scmSpecificDir = Files.list(hddsDir)
         .filter(Files::isDirectory)
         .findFirst().get().getFileName();
     if (scmSpecificDir == null) {

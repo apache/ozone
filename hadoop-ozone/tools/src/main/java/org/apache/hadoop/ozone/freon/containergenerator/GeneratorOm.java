@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.freon.containergenerator;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -95,8 +94,9 @@ public class GeneratorOm extends BaseGenerator implements
 
     DBStoreBuilder dbStoreBuilder =
         DBStoreBuilder.newBuilder(config,
-            rocksDBConfiguration).setName(OM_DB_NAME)
-            .setPath(Paths.get(metaDir.getPath()));
+            rocksDBConfiguration)
+            .setName(OM_DB_NAME)
+            .setPath(metaDir.toPath());
 
     OmMetadataManagerImpl.addOMTablesAndCodecs(dbStoreBuilder);
 
