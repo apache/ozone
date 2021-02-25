@@ -21,11 +21,16 @@ package org.apache.hadoop.ozone.container.ozoneimpl;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Collections;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.io.nativeio.NativeIO;
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
@@ -69,11 +74,13 @@ public class ContainerReader implements Runnable {
 
   private static final Logger LOG = LoggerFactory.getLogger(
       ContainerReader.class);
-  private HddsVolume hddsVolume;
-  private final ContainerSet containerSet;
-  private final ConfigurationSource config;
+  protected HddsVolume hddsVolume;
+  protected final ContainerSet containerSet;
+  protected final ConfigurationSource config;
   private final File hddsVolumeDir;
   private final MutableVolumeSet volumeSet;
+  private final boolean isInUpgradeMode;
+  private final File clusterDir;
 
   public ContainerReader(
       MutableVolumeSet volSet, HddsVolume volume, ContainerSet cset,
@@ -85,6 +92,13 @@ public class ContainerReader implements Runnable {
     this.containerSet = cset;
     this.config = conf;
     this.volumeSet = volSet;
+    this.isInUpgradeMode = conf.getBoolean(ScmConfigKeys.HDDS_DATANODE_UPGRADE_LAYOUT_INLINE,
+        ScmConfigKeys.HDDS_DATANODE_UPGRADE_LAYOUT_INLINE_DEFAULT);
+    String clusterId = hddsVolume.getClusterID();
+    LOG.info("clusterId recovered from versionFile is:{}", clusterId);
+
+    File hddsVolumeRootDir = hddsVolume.getHddsRootDir();
+    clusterDir = new File(hddsVolumeRootDir, clusterId);
   }
 
   @Override
@@ -124,6 +138,7 @@ public class ContainerReader implements Runnable {
 
     LOG.info("Start to verify containers on volume {}", hddsVolumeRootDir);
     for (File storageLoc : storageDir) {
+      preProcessStorageLoc(storageLoc);
       File currentDir = new File(storageLoc, Storage.STORAGE_DIR_CURRENT);
       File[] containerTopDirs = currentDir.listFiles();
       if (containerTopDirs != null) {
@@ -136,7 +151,7 @@ public class ContainerReader implements Runnable {
                     containerDir);
                 long containerID = ContainerUtils.getContainerID(containerDir);
                 if (containerFile.exists()) {
-                  verifyContainerFile(containerID, containerFile);
+                  verifyContainerFile(storageLoc, containerID, containerFile);
                 } else {
                   LOG.error("Missing .container file for ContainerID: {}",
                       containerDir.getName());
@@ -150,7 +165,20 @@ public class ContainerReader implements Runnable {
     LOG.info("Finish verifying containers on volume {}", hddsVolumeRootDir);
   }
 
-  private void verifyContainerFile(long containerID, File containerFile) {
+  public void preProcessStorageLoc(File storageLoc) {
+    if (!isInUpgradeMode || clusterDir.exists()) {
+      return;
+    }
+
+    System.out.println("Cluster dir" + clusterDir + "doesn't exists");
+    try {
+      NativeIO.renameTo(storageLoc, clusterDir);
+    } catch (Throwable t) {
+      LOG.error("DN Layout upgrade failed", t);
+    }
+  }
+
+  private void verifyContainerFile(File storageLoc, long containerID, File containerFile) {
     try {
       ContainerData containerData = ContainerDataYaml.readContainerFile(
           containerFile);
@@ -159,7 +187,7 @@ public class ContainerReader implements Runnable {
             "Skipping loading of this container.", containerFile);
         return;
       }
-      verifyAndFixupContainerData(containerData);
+      verifyAndFixupContainerData(storageLoc, containerData);
     } catch (IOException ex) {
       LOG.error("Failed to parse ContainerFile for ContainerID: {}",
           containerID, ex);
@@ -173,7 +201,7 @@ public class ContainerReader implements Runnable {
    * @param containerData
    * @throws IOException
    */
-  public void verifyAndFixupContainerData(ContainerData containerData)
+  public void verifyAndFixupContainerData(File storageLoc, ContainerData containerData)
       throws IOException {
     switch (containerData.getContainerType()) {
     case KeyValueContainer:
@@ -181,11 +209,16 @@ public class ContainerReader implements Runnable {
         KeyValueContainerData kvContainerData = (KeyValueContainerData)
             containerData;
         containerData.setVolume(hddsVolume);
-
+        if (isInUpgradeMode) {
+          kvContainerData.setMetadataPath(findNormalizedPath(storageLoc, kvContainerData.getMetadataPath()));
+          kvContainerData.setChunksPath(findNormalizedPath(storageLoc, kvContainerData.getChunksPath()));
+        }
         KeyValueContainerUtil.parseKVContainerData(kvContainerData, config);
         KeyValueContainer kvContainer = new KeyValueContainer(
             kvContainerData, config);
-
+        if (isInUpgradeMode) {
+          kvContainer.update(Collections.emptyMap(), true);
+        }
         containerSet.addContainer(kvContainer);
       } else {
         throw new StorageContainerException("Container File is corrupted. " +
@@ -199,5 +232,16 @@ public class ContainerReader implements Runnable {
           containerData.getContainerType(),
           ContainerProtos.Result.UNKNOWN_CONTAINER_TYPE);
     }
+  }
+
+  public String findNormalizedPath(File storageLoc, String path) {
+    Path p = Paths.get(path);
+    Path relativePath = p.relativize(storageLoc.toPath());
+    Path newPath = clusterDir.toPath().resolve(relativePath);
+
+    Preconditions.checkArgument(newPath.toFile().exists());
+    Preconditions.checkArgument(newPath.toFile().isDirectory());
+
+    return newPath.toAbsolutePath().toString();
   }
 }
