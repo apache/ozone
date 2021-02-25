@@ -80,7 +80,6 @@ public class ContainerReader implements Runnable {
   private final File hddsVolumeDir;
   private final MutableVolumeSet volumeSet;
   private final boolean isInUpgradeMode;
-  private final File clusterDir;
 
   public ContainerReader(
       MutableVolumeSet volSet, HddsVolume volume, ContainerSet cset,
@@ -94,13 +93,14 @@ public class ContainerReader implements Runnable {
     this.volumeSet = volSet;
     this.isInUpgradeMode = conf.getBoolean(ScmConfigKeys.HDDS_DATANODE_UPGRADE_LAYOUT_INLINE,
         ScmConfigKeys.HDDS_DATANODE_UPGRADE_LAYOUT_INLINE_DEFAULT);
-    String clusterId = hddsVolume.getClusterID();
-    LOG.info("clusterId recovered from versionFile is:{}", clusterId);
-
-    File hddsVolumeRootDir = hddsVolume.getHddsRootDir();
-    clusterDir = new File(hddsVolumeRootDir, clusterId);
   }
 
+
+  private File getClusterDir() {
+    File hddsVolumeRootDir = hddsVolume.getHddsRootDir();
+    File clusterDir = new File(hddsVolumeRootDir, hddsVolume.getClusterID());
+    return clusterDir;
+  }
   @Override
   public void run() {
     try {
@@ -166,6 +166,7 @@ public class ContainerReader implements Runnable {
   }
 
   public void preProcessStorageLoc(File storageLoc) {
+    File clusterDir = getClusterDir();
     if (!isInUpgradeMode || clusterDir.exists()) {
       return;
     }
@@ -237,7 +238,7 @@ public class ContainerReader implements Runnable {
   public String findNormalizedPath(File storageLoc, String path) {
     Path p = Paths.get(path);
     Path relativePath = p.relativize(storageLoc.toPath());
-    Path newPath = clusterDir.toPath().resolve(relativePath);
+    Path newPath = getClusterDir().toPath().resolve(relativePath);
 
     Preconditions.checkArgument(newPath.toFile().exists());
     Preconditions.checkArgument(newPath.toFile().isDirectory());
