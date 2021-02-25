@@ -19,21 +19,35 @@
 package org.apache.hadoop.fs.ozone.contract;
 
 import java.io.IOException;
+import java.util.Collection;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.contract.AbstractContractSeekTest;
 import org.apache.hadoop.fs.contract.AbstractFSContract;
 
 import org.junit.AfterClass;
-import org.junit.BeforeClass;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
 /**
  * Ozone contract tests covering file seek.
  */
+@RunWith(Parameterized.class)
 public class ITestOzoneContractSeek extends AbstractContractSeekTest {
-  @BeforeClass
-  public static void createCluster() throws IOException {
-    OzoneContract.createCluster();
+
+  private static boolean fsOptimizedServer;
+
+  public ITestOzoneContractSeek(boolean fsoServer)
+      throws IOException {
+    if (fsOptimizedServer != fsoServer) {
+      setFsOptimizedServer(fsoServer);
+      ITestOzoneContractUtils.restartCluster(
+          fsOptimizedServer);
+    }
+  }
+
+  public static void setFsOptimizedServer(boolean fsOptimizedServer) {
+    ITestOzoneContractSeek.fsOptimizedServer = fsOptimizedServer;
   }
 
   @AfterClass
@@ -44,5 +58,10 @@ public class ITestOzoneContractSeek extends AbstractContractSeekTest {
   @Override
   protected AbstractFSContract createContract(Configuration conf) {
     return new OzoneContract(conf);
+  }
+
+  @Parameterized.Parameters
+  public static Collection data() {
+    return ITestOzoneContractUtils.getFsoCombinations();
   }
 }
