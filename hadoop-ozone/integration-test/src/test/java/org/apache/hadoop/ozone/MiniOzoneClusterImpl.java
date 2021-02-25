@@ -702,14 +702,26 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     protected OzoneManager createOM()
         throws IOException, AuthenticationException {
       configureOM();
+      OMStorage omStore = newOMStorage(conf);
+      initializeOmStorage(omStore);
+      return OzoneManager.createOm(conf);
+    }
+
+    /**
+     * Create new OM storage based on layout version.
+     * @param conf configuration object.
+     * @return OMStorage instance.
+     * @throws IOException on error.
+     */
+    protected OMStorage newOMStorage(OzoneConfiguration conf)
+        throws IOException {
       OMStorage omStore;
       if (omLayoutVersion.isPresent()) {
         omStore = new OMStorage(conf, omLayoutVersion.get());
       } else {
         omStore = new OMStorage(conf);
       }
-      initializeOmStorage(omStore);
-      return OzoneManager.createOm(conf);
+      return omStore;
     }
 
     /**

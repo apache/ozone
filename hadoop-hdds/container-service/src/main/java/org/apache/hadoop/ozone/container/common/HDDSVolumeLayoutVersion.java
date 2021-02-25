@@ -18,8 +18,8 @@
 package org.apache.hadoop.ozone.container.common;
 
 /**
- * Datanode layout version which describes information about the layout version
- * on the datanode.
+ * Layout version which describes information about the layout version
+ * on the datanode volume.
  */
 public final class HDDSVolumeLayoutVersion {
 

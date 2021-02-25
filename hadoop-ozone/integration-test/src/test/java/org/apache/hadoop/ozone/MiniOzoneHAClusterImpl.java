@@ -364,7 +364,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
             // Set metadata/DB dir base path
             String metaDirPath = path + "/" + nodeId;
             config.set(OZONE_METADATA_DIRS, metaDirPath);
-            OMStorage omStore = new OMStorage(config);
+            OMStorage omStore = newOMStorage(config);
             initializeOmStorage(omStore);
 
             OzoneManager om = OzoneManager.createOm(config);
