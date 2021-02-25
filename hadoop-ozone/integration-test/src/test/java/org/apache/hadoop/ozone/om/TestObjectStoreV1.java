@@ -535,7 +535,7 @@ public class TestObjectStoreV1 {
     fsDataInputStream.read(read, 0, length);
     ozoneInputStream.close();
 
-    Assert.assertEquals(inputString, new String(read));
+    Assert.assertEquals(inputString, new String(read, StandardCharsets.UTF_8));
   }
 
   @Test
