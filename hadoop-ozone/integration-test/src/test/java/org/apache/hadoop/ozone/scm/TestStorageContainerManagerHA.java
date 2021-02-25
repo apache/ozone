@@ -149,45 +149,40 @@ public class TestStorageContainerManagerHA {
     volume.createBucket(bucketName);
     OzoneBucket bucket = volume.getBucket(bucketName);
 
-    for (int i = 0; i < 10; i++) {
-      String keyName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
 
-      OzoneOutputStream out = bucket.createKey(keyName,
-          value.getBytes(UTF_8).length, STAND_ALONE,
-          ONE, new HashMap<>());
-      out.write(value.getBytes(UTF_8));
-      out.close();
-      OzoneKey key = bucket.getKey(keyName);
-      Assert.assertEquals(keyName, key.getName());
-      OzoneInputStream is = bucket.readKey(keyName);
-      byte[] fileContent = new byte[value.getBytes(UTF_8).length];
-      is.read(fileContent);
-      Assert.assertEquals(value, new String(fileContent, UTF_8));
-      Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
-      Assert.assertFalse(key.getModificationTime().isBefore(testStartTime));
-      is.close();
-      final OmKeyArgs keyArgs =
-          new OmKeyArgs.Builder().setVolumeName(volumeName)
-              .setBucketName(bucketName)
-              .setType(HddsProtos.ReplicationType.RATIS)
-              .setFactor(HddsProtos.ReplicationFactor.ONE).setKeyName(keyName)
-              .setRefreshPipeline(true).build();
-      final OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
-      final List<OmKeyLocationInfo> keyLocationInfos =
-          keyInfo.getKeyLocationVersions().get(0).getBlocksLatestVersionOnly();
-      final long containerID = keyLocationInfos.get(0).getContainerID();
-      for (int k = 0; k < numOfSCMs; k++) {
-        StorageContainerManager scm =
-            cluster.getStorageContainerManagers().get(k);
-        // flush to DB on each SCM
-        ((SCMRatisServerImpl) scm.getScmHAManager().getRatisServer())
-            .getStateMachine().takeSnapshot();
-        Assert.assertTrue(
-            scm.getContainerManager()
-                .containerExist(ContainerID.valueOf(containerID)));
-        Assert.assertNotNull(scm.getScmMetadataStore()
-                .getContainerTable().get(ContainerID.valueOf(containerID)));
-      }
+    OzoneOutputStream out = bucket
+        .createKey(keyName, value.getBytes(UTF_8).length, STAND_ALONE, ONE,
+            new HashMap<>());
+    out.write(value.getBytes(UTF_8));
+    out.close();
+    OzoneKey key = bucket.getKey(keyName);
+    Assert.assertEquals(keyName, key.getName());
+    OzoneInputStream is = bucket.readKey(keyName);
+    byte[] fileContent = new byte[value.getBytes(UTF_8).length];
+    is.read(fileContent);
+    Assert.assertEquals(value, new String(fileContent, UTF_8));
+    Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
+    Assert.assertFalse(key.getModificationTime().isBefore(testStartTime));
+    is.close();
+    final OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
+        .setBucketName(bucketName).setType(HddsProtos.ReplicationType.RATIS)
+        .setFactor(HddsProtos.ReplicationFactor.ONE).setKeyName(keyName)
+        .setRefreshPipeline(true).build();
+    final OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
+    final List<OmKeyLocationInfo> keyLocationInfos =
+        keyInfo.getKeyLocationVersions().get(0).getBlocksLatestVersionOnly();
+    final long containerID = keyLocationInfos.get(0).getContainerID();
+    for (int k = 0; k < numOfSCMs; k++) {
+      StorageContainerManager scm =
+          cluster.getStorageContainerManagers().get(k);
+      // flush to DB on each SCM
+      ((SCMRatisServerImpl) scm.getScmHAManager().getRatisServer())
+          .getStateMachine().takeSnapshot();
+      Assert.assertTrue(scm.getContainerManager()
+          .containerExist(ContainerID.valueOf(containerID)));
+      Assert.assertNotNull(scm.getScmMetadataStore().getContainerTable()
+          .get(ContainerID.valueOf(containerID)));
     }
   }
 }

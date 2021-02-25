@@ -329,7 +329,7 @@ public final class TestSecureOzoneCluster {
     scmStore.setScmId(scmId);
     // writes the version file properties
     scmStore.initialize();
-   if (!SCMHAUtils.isSCMHAEnabled(conf)) {
+    if (!SCMHAUtils.isSCMHAEnabled(conf)) {
       SCMRatisServerImpl.initialize(clusterId, scmId,
           SCMHANodeDetails.loadSCMHAConfig(conf).getLocalNodeDetails(), conf);
     }

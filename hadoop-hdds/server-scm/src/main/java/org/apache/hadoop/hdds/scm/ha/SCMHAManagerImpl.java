@@ -82,7 +82,8 @@ public class SCMHAManagerImpl implements SCMHAManager {
           new AddSCMRequest.Builder().setClusterId(scm.getClusterId())
               .setScmId(scm.getScmId()).setRatisAddr(
               scm.getSCMHANodeDetails().getLocalNodeDetails()
-                  .getRatisAddressPortStr()).build());
+                  // TODO : Should we use IP instead of hostname??
+                  .getRatisHostPortStr()).build());
       if (!success) {
         throw new IOException("Adding SCM to existing HA group failed");
       }

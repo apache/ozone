@@ -172,6 +172,9 @@ public class SCMRatisServerImpl implements SCMRatisServer {
         .build();
     final RaftClientReply raftClientReply =
         server.submitClientRequestAsync(raftClientRequest).get();
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("request {} Reply {}", raftClientRequest, raftClientReply);
+    }
     return SCMRatisResponse.decode(raftClientReply);
   }
 
@@ -284,7 +287,8 @@ public class SCMRatisServerImpl implements SCMRatisServer {
     RaftPeerId selfPeerId = RaftPeerId.getRaftPeerId(scmId);
 
     RaftPeer localRaftPeer = RaftPeer.newBuilder().setId(selfPeerId)
-        .setAddress(details.getRatisAddressPortStr()).build();
+        // TODO : Should we use IP instead of hostname??
+        .setAddress(details.getRatisHostPortStr()).build();
 
     List<RaftPeer> raftPeers = new ArrayList<>();
     // Add this Ratis server to the Ratis ring

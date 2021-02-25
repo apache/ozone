@@ -38,6 +38,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 
@@ -756,6 +757,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (state != StorageState.INITIALIZED) {
       try {
         if (clusterId != null && !clusterId.isEmpty()) {
+          // clusterId must be an UUID
+          Preconditions.checkNotNull(UUID.fromString(clusterId));
           scmStorageConfig.setClusterId(clusterId);
         }
         scmStorageConfig.initialize();
@@ -1165,11 +1168,12 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   }
 
   /**
-   * Check if the current scm is the leader.
-   * @return - if the current scm is the leader.
+   * Check if the current scm is the leader and ready for accepting requests.
+   * @return - if the current scm is the leader and is ready.
    */
   public boolean checkLeader() {
-    return scmContext.isLeader();
+    return scmContext.isLeader() && getScmHAManager().getRatisServer()
+        .getDivision().getInfo().isLeaderReady();
   }
 
   public void checkAdminAccess(String remoteUser) throws IOException {
