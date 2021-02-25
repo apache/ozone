@@ -546,8 +546,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
           Iterator<? extends OzoneBucket> it = volume.listBuckets("");
           String prefixVolumePathStr = addTrailingSlashIfNeeded(f.toString());
           while (it.hasNext()) {
-            OzoneBucket buck = it.next();
-            String nextBucket = prefixVolumePathStr + buck.getName();
+            OzoneBucket bucket = it.next();
+            String nextBucket = prefixVolumePathStr + bucket.getName();
             delete(new Path(nextBucket), true);
           }
         }
