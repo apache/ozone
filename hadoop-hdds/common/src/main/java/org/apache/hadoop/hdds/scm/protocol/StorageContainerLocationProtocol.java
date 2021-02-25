@@ -18,19 +18,18 @@
 package org.apache.hadoop.hdds.scm.protocol;
 
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmInfo;
-import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.security.KerberosInfo;
 
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
-
-import org.apache.hadoop.security.KerberosInfo;
 
 /**
  * ContainerLocationProtocol is used by an HDFS node to find the set of nodes
@@ -241,4 +240,16 @@ public interface StorageContainerLocationProtocol extends Closeable {
    */
   boolean getReplicationManagerStatus() throws IOException;
 
+  /**
+   * Get Datanode usage information by ip or uuid.
+   *
+   * @param ipaddress - datanode IP address String
+   * @param uuid - datanode UUID String
+   * @return List of DatanodeUsageInfo. Each element contains info such as
+   * capacity, SCMused, and remaining space.
+   * @throws IOException
+   */
+  List<HddsProtos.DatanodeUsageInfo> getDatanodeUsageInfo(String ipaddress,
+                                                          String uuid)
+      throws IOException;
 }

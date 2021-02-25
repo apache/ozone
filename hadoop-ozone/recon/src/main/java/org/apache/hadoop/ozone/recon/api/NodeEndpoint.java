@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.recon.api;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -85,6 +86,7 @@ public class NodeEndpoint {
       } catch (NodeNotFoundException e) {
         LOG.warn("Cannot get nodeState for datanode {}", datanode, e);
       }
+      final NodeOperationalState nodeOpState = datanode.getPersistedOpState();
       String hostname = datanode.getHostName();
       Set<PipelineID> pipelineIDs = nodeManager.getPipelines(datanode);
       List<DatanodePipeline> pipelines = new ArrayList<>();
@@ -123,6 +125,7 @@ public class NodeEndpoint {
           .withDatanodeStorageReport(storageReport)
           .withLastHeartbeat(nodeManager.getLastHeartbeat(datanode))
           .withState(nodeState)
+          .withOperationalState(nodeOpState)
           .withPipelines(pipelines)
           .withLeaderCount(leaderCount.get())
           .withUUid(datanode.getUuidString())
