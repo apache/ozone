@@ -74,9 +74,9 @@ public class ContainerReader implements Runnable {
 
   private static final Logger LOG = LoggerFactory.getLogger(
       ContainerReader.class);
-  protected HddsVolume hddsVolume;
-  protected final ContainerSet containerSet;
-  protected final ConfigurationSource config;
+  private HddsVolume hddsVolume;
+  private final ContainerSet containerSet;
+  private final ConfigurationSource config;
   private final File hddsVolumeDir;
   private final MutableVolumeSet volumeSet;
   private final boolean isInUpgradeMode;
@@ -91,8 +91,9 @@ public class ContainerReader implements Runnable {
     this.containerSet = cset;
     this.config = conf;
     this.volumeSet = volSet;
-    this.isInUpgradeMode = conf.getBoolean(ScmConfigKeys.HDDS_DATANODE_UPGRADE_LAYOUT_INLINE,
-        ScmConfigKeys.HDDS_DATANODE_UPGRADE_LAYOUT_INLINE_DEFAULT);
+    this.isInUpgradeMode =
+        conf.getBoolean(ScmConfigKeys.HDDS_DATANODE_UPGRADE_LAYOUT_INLINE,
+            ScmConfigKeys.HDDS_DATANODE_UPGRADE_LAYOUT_INLINE_DEFAULT);
   }
 
 
@@ -182,7 +183,8 @@ public class ContainerReader implements Runnable {
     }
   }
 
-  private void verifyContainerFile(File storageLoc, long containerID, File containerFile) {
+  private void verifyContainerFile(File storageLoc, long containerID,
+                                   File containerFile) {
     try {
       ContainerData containerData = ContainerDataYaml.readContainerFile(
           containerFile);
@@ -205,8 +207,8 @@ public class ContainerReader implements Runnable {
    * @param containerData
    * @throws IOException
    */
-  public void verifyAndFixupContainerData(File storageLoc, ContainerData containerData)
-      throws IOException {
+  public void verifyAndFixupContainerData(File storageLoc,
+      ContainerData containerData) throws IOException {
     switch (containerData.getContainerType()) {
     case KeyValueContainer:
       if (containerData instanceof KeyValueContainerData) {
@@ -214,8 +216,12 @@ public class ContainerReader implements Runnable {
             containerData;
         containerData.setVolume(hddsVolume);
         if (isInUpgradeMode) {
-          kvContainerData.setMetadataPath(findNormalizedPath(storageLoc, kvContainerData.getMetadataPath()));
-          kvContainerData.setChunksPath(findNormalizedPath(storageLoc, kvContainerData.getChunksPath()));
+          kvContainerData.setMetadataPath(
+              findNormalizedPath(storageLoc,
+                  kvContainerData.getMetadataPath()));
+          kvContainerData.setChunksPath(
+              findNormalizedPath(storageLoc,
+                  kvContainerData.getChunksPath()));
         }
         KeyValueContainerUtil.parseKVContainerData(kvContainerData, config);
         KeyValueContainer kvContainer = new KeyValueContainer(
@@ -242,10 +248,6 @@ public class ContainerReader implements Runnable {
     Path p = Paths.get(path);
     Path relativePath = storageLoc.toPath().relativize(p);
     Path newPath = getClusterDir().toPath().resolve(relativePath);
-
-    Preconditions.checkArgument(newPath.toFile().exists());
-    Preconditions.checkArgument(newPath.toFile().isDirectory());
-
     return newPath.toAbsolutePath().toString();
   }
 }

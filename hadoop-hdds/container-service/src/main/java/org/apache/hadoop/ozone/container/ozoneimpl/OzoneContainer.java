@@ -182,7 +182,8 @@ public class OzoneContainer {
   /**
    * Build's container map.
    */
-  public static void buildContainerSet(MutableVolumeSet volumeSet, ContainerSet containerSet, ConfigurationSource config) {
+  public static void buildContainerSet(MutableVolumeSet volumeSet,
+        ContainerSet containerSet, ConfigurationSource config) {
     Iterator<HddsVolume> volumeSetIterator = volumeSet.getVolumesList()
         .iterator();
     ArrayList<Thread> volumeThreads = new ArrayList<>();

@@ -235,7 +235,8 @@ public class TestOzoneContainer {
     // we expect an out of space Exception
     StorageContainerException e = LambdaTestUtils.intercept(
         StorageContainerException.class,
-        () -> keyValueContainer.create(volumeSet, volumeChoosingPolicy, clusterId)
+        () -> keyValueContainer.
+            create(volumeSet, volumeChoosingPolicy, clusterId)
     );
     if (!DISK_OUT_OF_SPACE.equals(e.getResult())) {
       LOG.info("Unexpected error during container creation", e);

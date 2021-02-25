@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.dnlayout;
+package org.apache.hadoop.ozone.debug;
 
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
@@ -25,7 +25,6 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
-import org.apache.hadoop.ozone.debug.OzoneDebug;
 
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine.Spec;
@@ -45,7 +44,8 @@ import java.util.concurrent.Callable;
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true)
 @MetaInfServices(SubcommandWithParent.class)
-public class DatanodeLayout extends GenericCli implements Callable<Void>,SubcommandWithParent {
+public class DatanodeLayout extends GenericCli
+    implements Callable<Void>, SubcommandWithParent{
   private static UUID dummyDatanodeUuid = UUID.randomUUID();
 
   @Spec
@@ -57,7 +57,8 @@ public class DatanodeLayout extends GenericCli implements Callable<Void>,Subcomm
     OzoneConfiguration conf = createOzoneConfiguration();
     conf.setBoolean(ScmConfigKeys.HDDS_DATANODE_UPGRADE_LAYOUT_INLINE, true);
 
-    MutableVolumeSet volumeSet = new MutableVolumeSet(dummyDatanodeUuid.toString(), conf);
+    MutableVolumeSet volumeSet =
+        new MutableVolumeSet(dummyDatanodeUuid.toString(), conf);
     ContainerSet containerSet = new ContainerSet();
     OzoneContainer.buildContainerSet(volumeSet, containerSet, conf);
     return null;
