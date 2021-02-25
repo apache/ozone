@@ -76,12 +76,13 @@ public class ListInfoSubcommand extends ScmSubcommand {
   private List<DatanodeWithAttributes> getAllNodes(ScmClient scmClient)
       throws IOException {
     List<HddsProtos.Node> nodes = scmClient.queryNode(null,
-        HddsProtos.NodeState.HEALTHY, HddsProtos.QueryScope.CLUSTER, "");
+        null, HddsProtos.QueryScope.CLUSTER, "");
 
     return nodes.stream()
         .map(p -> new DatanodeWithAttributes(
             DatanodeDetails.getFromProtoBuf(p.getNodeID()),
             p.getNodeOperationalStates(0), p.getNodeStates(0)))
+        .sorted()
         .collect(Collectors.toList());
   }
 
@@ -114,10 +115,11 @@ public class ListInfoSubcommand extends ScmSubcommand {
         + "/" + datanode.getHostName() + "/" + relatedPipelineNum +
         " pipelines)");
     System.out.println("Operational State: " + dna.getOpState());
+    System.out.println("Health State: " + dna.getHealthState());
     System.out.println("Related pipelines:\n" + pipelineListInfo);
   }
 
-  private static class DatanodeWithAttributes {
+  private static class DatanodeWithAttributes implements Comparable {
     private DatanodeDetails datanodeDetails;
     private HddsProtos.NodeOperationalState operationalState;
     private HddsProtos.NodeState healthState;
@@ -140,6 +142,12 @@ public class ListInfoSubcommand extends ScmSubcommand {
 
     public HddsProtos.NodeState getHealthState() {
       return healthState;
+    }
+
+    @Override
+    public int compareTo(Object o) {
+      DatanodeWithAttributes other = (DatanodeWithAttributes)o;
+      return healthState.compareTo(other.getHealthState());
     }
   }
 }
