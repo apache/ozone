@@ -230,4 +230,12 @@ public final class OzoneFSUtils {
     return layoutVersionEnabled && fsEnabled;
   }
 
+  public static String removeTrailingSlashIfNeeded(String key) {
+    if (key.endsWith(OZONE_URI_DELIMITER)) {
+      java.nio.file.Path keyPath = Paths.get(key);
+      return keyPath.toString();
+    } else {
+      return key;
+    }
+  }
 }
