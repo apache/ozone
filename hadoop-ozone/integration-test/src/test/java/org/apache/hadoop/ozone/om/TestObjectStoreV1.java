@@ -523,7 +523,7 @@ public class TestObjectStoreV1 {
     ozoneInputStream.close();
 
     String inputString = new String(input, StandardCharsets.UTF_8);
-    Assert.assertEquals(inputString, new String(read));
+    Assert.assertEquals(inputString, new String(read, StandardCharsets.UTF_8));
 
     // Read using filesystem.
     String rootPath = String.format("%s://%s.%s/", OZONE_URI_SCHEME,
