@@ -113,12 +113,12 @@ public class SCMSecurityProtocolServerSideTranslatorPB
             .setListCertificateResponseProto(
                 listCertificate(request.getListCertificateRequest()))
             .build();
-      case GeneratePeerSCMCertificate:
+      case GetSCMCertificate:
         return SCMSecurityResponse.newBuilder()
             .setCmdType(request.getCmdType())
             .setStatus(Status.OK)
-            .setGetCertResponseProto(generateSCMPeerNodeCertificate(
-                request.getGeneratePeerSCMCertificateRequest()))
+            .setGetCertResponseProto(getSCMCertificate(
+                request.getGetSCMCertificateRequest()))
             .build();
       default:
         throw new IllegalArgumentException(
@@ -161,13 +161,12 @@ public class SCMSecurityProtocolServerSideTranslatorPB
    * @return SCMGetCertResponseProto.
    */
 
-  public SCMGetCertResponseProto generateSCMPeerNodeCertificate(
+  public SCMGetCertResponseProto getSCMCertificate(
       SCMGenerateSCMCertRequestProto request)
       throws IOException {
 
-    String certificate = impl
-        .generateSCMCertificate(request.getScmDetails(),
-            request.getCSR());
+    String certificate = impl.getSCMCertificate(request.getScmDetails(),
+        request.getCSR());
     SCMGetCertResponseProto.Builder builder =
         SCMGetCertResponseProto
             .newBuilder()

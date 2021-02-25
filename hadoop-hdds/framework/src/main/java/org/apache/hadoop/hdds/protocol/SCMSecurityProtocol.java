@@ -67,7 +67,7 @@ public interface SCMSecurityProtocol {
   /**
    * Get signed certificate for SCM.
    *
-   * @param scmNodeDetails       - SCM Node Details.
+   * @param scmNodeDetails  - SCM Node Details.
    * @param certSignReq     - Certificate signing request.
    * @return String         - pem encoded SCM signed
    *                          certificate.

@@ -132,7 +132,7 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
   }
 
   /**
-   * Get SCM signed certificate and root CA certificate for SCM Peer node.
+   * Get SCM signed certificate and root CA certificate for SCM node.
    *
    * @param scmNodeDetails  - SCM Node Details.
    * @param certSignReq     - Certificate signing request.
@@ -146,8 +146,8 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
         .setCSR(certSignReq)
         .setScmDetails(scmNodeDetails)
         .build();
-    return submitRequest(Type.GeneratePeerSCMCertificate,
-        builder -> builder.setGeneratePeerSCMCertificateRequest(request))
+    return submitRequest(Type.GetSCMCertificate,
+        builder -> builder.setGetSCMCertificateRequest(request))
         .getGetCertResponseProto().getX509Certificate();
   }
 
