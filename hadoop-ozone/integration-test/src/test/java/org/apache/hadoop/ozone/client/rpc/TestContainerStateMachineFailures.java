@@ -301,7 +301,7 @@ public class TestContainerStateMachineFailures {
     request.setCloseContainer(
             ContainerProtos.CloseContainerRequestProto.getDefaultInstance());
     request.setDatanodeUuid(dnService.getDatanodeDetails().getUuidString());
-    Assert.assertEquals(ContainerProtos.Result.CONTAINER_UNHEALTHY,
+    Assert.assertEquals(ContainerProtos.Result.CONTAINER_NOT_FOUND,
             dispatcher.dispatch(request.build(), null)
                     .getResult());
   }

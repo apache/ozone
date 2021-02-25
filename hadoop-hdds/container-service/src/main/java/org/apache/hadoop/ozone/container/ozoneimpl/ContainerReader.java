@@ -248,6 +248,11 @@ public class ContainerReader implements Runnable {
     Path p = Paths.get(path);
     Path relativePath = storageLoc.toPath().relativize(p);
     Path newPath = getClusterDir().toPath().resolve(relativePath);
+
+    String msg = "clusterDir:" + getClusterDir() + " storageLoc:" + storageLoc
+        + " path:" + path + " newPath:" + newPath;
+    Preconditions.checkArgument(newPath.toFile().exists(), msg);
+    Preconditions.checkArgument(newPath.toFile().isDirectory(), msg);
     return newPath.toAbsolutePath().toString();
   }
 }
