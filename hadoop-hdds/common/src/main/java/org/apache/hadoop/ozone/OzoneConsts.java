@@ -230,6 +230,8 @@ public final class OzoneConsts {
   // instance gets stored.
   public static final String OM_CONTEXT_ATTRIBUTE = "ozone.om";
 
+  public static final String SCM_CONTEXT_ATTRIBUTE = "ozone.scm";
+
   private OzoneConsts() {
     // Never Constructed
   }
