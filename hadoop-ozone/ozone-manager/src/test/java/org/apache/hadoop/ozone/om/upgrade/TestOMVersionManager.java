@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.om.upgrade;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
-import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.ERASURE_CODING;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.INITIAL_VERSION;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager.getRequestClasses;
 import static org.junit.Assert.assertEquals;
@@ -38,8 +37,6 @@ import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
-import org.apache.hadoop.ozone.om.request.UnsupportedMockNewOMRequest;
-import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -58,15 +55,9 @@ public class TestOMVersionManager {
     when(om.getOmStorage()).thenReturn(omStorage);
 
     assertTrue(omVersionManager.isAllowed(INITIAL_VERSION));
-    assertFalse(omVersionManager.isAllowed(ERASURE_CODING));
     assertEquals(INITIAL_VERSION.layoutVersion(),
         omVersionManager.getMetadataLayoutVersion());
-    assertTrue(omVersionManager.needsFinalization());
-    OMUpgradeFinalizer finalizer = new OMUpgradeFinalizer(omVersionManager);
-    finalizer.finalize("random", om);
     assertFalse(omVersionManager.needsFinalization());
-    assertEquals(ERASURE_CODING.layoutVersion(),
-        omVersionManager.getMetadataLayoutVersion());
   }
 
   @Test
@@ -122,30 +113,5 @@ public class TestOMVersionManager {
             nsmEx.getMessage());
       }
     }
-  }
-
-  @Test
-  public void testCannotGetUnsupportedOmRequest() throws OMException {
-    OMStorage omStorage = mock(OMStorage.class);
-    when(omStorage.getLayoutVersion()).thenReturn(0);
-    OMLayoutVersionManager omVersionManager =
-        new OMLayoutVersionManager(omStorage);
-    OzoneManager om = mock(OzoneManager.class);
-    when(om.getOmStorage()).thenReturn(omStorage);
-
-    Class<? extends OMClientRequest> requestHandler;
-    try {
-      requestHandler = omVersionManager.getHandler(
-              UnsupportedMockNewOMRequest.class.getSimpleName());
-      Assert.fail();
-    } catch (IllegalArgumentException ex) {
-      GenericTestUtils.assertExceptionContains(
-          "No suitable instance found", ex);
-    }
-
-    omVersionManager.unfinalizedFeatures().forEach(omVersionManager::finalized);
-    requestHandler = omVersionManager.getHandler(
-        UnsupportedMockNewOMRequest.class.getSimpleName());
-    Assert.assertNotNull(requestHandler);
   }
 }

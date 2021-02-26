@@ -16,6 +16,8 @@
  */
 package org.apache.hadoop.hdds.scm.node;
 
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
+
 import java.io.IOException;
 import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -50,8 +52,6 @@ public class TestNodeReportHandler implements EventPublisher {
       .getLogger(TestNodeReportHandler.class);
   private NodeReportHandler nodeReportHandler;
   private HDDSLayoutVersionManager versionManager;
-  private static final Integer SOFTWARE_LAYOUT_VERSION = 1;
-  private static final Integer METADATA_LAYOUT_VERSION = 1;
   private SCMNodeManager nodeManager;
   private String storagePath = GenericTestUtils.getRandomizedTempPath()
       .concat("/" + UUID.randomUUID().toString());
@@ -66,9 +66,9 @@ public class TestNodeReportHandler implements EventPublisher {
     this.versionManager =
         Mockito.mock(HDDSLayoutVersionManager.class);
     Mockito.when(versionManager.getMetadataLayoutVersion())
-        .thenReturn(METADATA_LAYOUT_VERSION);
+        .thenReturn(maxLayoutVersion());
     Mockito.when(versionManager.getSoftwareLayoutVersion())
-        .thenReturn(SOFTWARE_LAYOUT_VERSION);
+        .thenReturn(maxLayoutVersion());
     nodeManager =
         new SCMNodeManager(conf, storageConfig, new EventQueue(), clusterMap,
             versionManager);
@@ -84,8 +84,7 @@ public class TestNodeReportHandler implements EventPublisher {
     SCMNodeMetric nodeMetric = nodeManager.getNodeStat(dn);
     Assert.assertNull(nodeMetric);
 
-    nodeManager.register(dn, getNodeReport(dn, storageOne).getReport(), null,
-        null);
+    nodeManager.register(dn, getNodeReport(dn, storageOne).getReport(), null);
     nodeMetric = nodeManager.getNodeStat(dn);
 
     Assert.assertTrue(nodeMetric.get().getCapacity().get() == 100);

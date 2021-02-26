@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
 
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.STORAGE_DIR;
 
@@ -41,12 +42,19 @@ public class SCMStorageConfig extends Storage {
    * @throws IOException if any directories are inaccessible.
    */
   public SCMStorageConfig(OzoneConfiguration conf) throws IOException {
-    super(NodeType.SCM, ServerUtils.getScmDbDir(conf), STORAGE_DIR);
+    super(NodeType.SCM, ServerUtils.getScmDbDir(conf), STORAGE_DIR,
+        maxLayoutVersion());
+  }
+
+  public SCMStorageConfig(OzoneConfiguration conf, int defaultLayoutVersion)
+      throws IOException {
+    super(NodeType.SCM, ServerUtils.getScmDbDir(conf), STORAGE_DIR,
+        defaultLayoutVersion);
   }
 
   public SCMStorageConfig(NodeType type, File root, String sdName)
       throws IOException {
-    super(type, root, sdName);
+    super(type, root, sdName, maxLayoutVersion());
   }
 
   public void setScmId(String scmId) throws IOException {

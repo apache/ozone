@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.server.upgrade;
 
-import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.FIRST_UPGRADE_VERSION;
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.DATANODE_SCHEMA_V2;
 
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
@@ -30,9 +30,8 @@ import org.apache.hadoop.hdds.upgrade.HDDSUpgradeAction;
  * any specific SCMActions.
  */
 public enum SCMLayoutAction {
-  SCMUpgradeFirstAction(FIRST_UPGRADE_VERSION,
-      new SCMUpgradeActionFirstUpgradeVersion());
-
+  ScmActionForDatanodeSchemaV2(DATANODE_SCHEMA_V2,
+      new ScmOnFinalizeActionForDatanodeSchemaV2());
   //////////////////////////////  //////////////////////////////
 
   private HDDSLayoutFeature hddsFeature;

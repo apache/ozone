@@ -307,6 +307,19 @@ public class SCMNodeManager implements NodeManager {
         .build();
   }
 
+  @Override
+  public RegisteredCommand register(
+      DatanodeDetails datanodeDetails, NodeReportProto nodeReport,
+      PipelineReportsProto pipelineReportsProto) {
+    return register(datanodeDetails, nodeReport, pipelineReportsProto,
+        LayoutVersionProto.newBuilder()
+            .setMetadataLayoutVersion(
+                scmLayoutVersionManager.getMetadataLayoutVersion())
+            .setSoftwareLayoutVersion(
+                scmLayoutVersionManager.getSoftwareLayoutVersion())
+            .build());
+  }
+
   /**
    * Register the node if the node finds that it is not registered with any
    * SCM.
@@ -324,17 +337,15 @@ public class SCMNodeManager implements NodeManager {
       DatanodeDetails datanodeDetails, NodeReportProto nodeReport,
       PipelineReportsProto pipelineReportsProto,
       LayoutVersionProto layoutInfo) {
-
-    if (layoutInfo != null) {
-      if (layoutInfo.getSoftwareLayoutVersion() >
-          scmLayoutVersionManager.getSoftwareLayoutVersion()) {
-        return RegisteredCommand.newBuilder()
-            .setErrorCode(ErrorCode.errorNodeNotPermitted)
-            .setDatanode(datanodeDetails)
-            .setClusterID(this.scmStorageConfig.getClusterID())
-            .build();
-      }
+    if (layoutInfo.getSoftwareLayoutVersion() >
+        scmLayoutVersionManager.getSoftwareLayoutVersion()) {
+      return RegisteredCommand.newBuilder()
+          .setErrorCode(ErrorCode.errorNodeNotPermitted)
+          .setDatanode(datanodeDetails)
+          .setClusterID(this.scmStorageConfig.getClusterID())
+          .build();
     }
+
     if (!isNodeRegistered(datanodeDetails)) {
       InetAddress dnAddress = Server.getRemoteIp();
       if (dnAddress != null) {
@@ -358,6 +369,8 @@ public class SCMNodeManager implements NodeManager {
 
         clusterMap.add(datanodeDetails);
         nodeStateManager.addNode(datanodeDetails, layoutInfo);
+        nodeStateManager.updateLastKnownLayoutVersion(datanodeDetails,
+            layoutInfo);
         // Check that datanode in nodeStateManager has topology parent set
         DatanodeDetails dn = nodeStateManager.getNode(datanodeDetails);
         Preconditions.checkState(dn.getParent() != null);

@@ -27,8 +27,6 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CloseContainerCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus.Status;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeleteBlocksCommandProto;
@@ -65,6 +63,8 @@ import org.apache.hadoop.util.Time;
 import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayoutVersionProto;
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createEndpoint;
 import static org.hamcrest.Matchers.lessThanOrEqualTo;
 import org.junit.AfterClass;
@@ -87,8 +87,6 @@ public class TestEndPoint {
   private static ScmTestMock scmServerImpl;
   private static File testDir;
   private static OzoneConfiguration config;
-  private static final int TEST_SOFTWARE_LAYOUT_VERSION = 0;
-  private static final int TEST_METADATA_LAYOUT_VERSION = 0;
 
   @AfterClass
   public static void tearDown() throws Exception {
@@ -273,10 +271,6 @@ public class TestEndPoint {
   @Test
   public void testRegister() throws Exception {
     DatanodeDetails nodeToRegister = randomDatanodeDetails();
-    LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
-        .setMetadataLayoutVersion(TEST_METADATA_LAYOUT_VERSION)
-        .setSoftwareLayoutVersion(TEST_SOFTWARE_LAYOUT_VERSION)
-        .build();
     try (EndpointStateMachine rpcEndPoint = createEndpoint(
         SCMTestUtils.getConf(), serverAddress, 1000)) {
       SCMRegisteredResponseProto responseProto = rpcEndPoint.getEndPoint()
@@ -284,7 +278,8 @@ public class TestEndPoint {
                   .createNodeReport(
                       getStorageReports(nodeToRegister.getUuid())),
               TestUtils.getRandomContainerReports(10),
-              TestUtils.getRandomPipelineReports(), layoutInfo);
+              TestUtils.getRandomPipelineReports(),
+              defaultLayoutVersionProto());
       Assert.assertNotNull(responseProto);
       Assert.assertEquals(nodeToRegister.getUuidString(),
           responseProto.getDatanodeUUID());
@@ -320,9 +315,9 @@ public class TestEndPoint {
     HDDSLayoutVersionManager versionManager =
         Mockito.mock(HDDSLayoutVersionManager.class);
     when(versionManager.getMetadataLayoutVersion())
-        .thenReturn(TEST_METADATA_LAYOUT_VERSION);
+        .thenReturn(maxLayoutVersion());
     when(versionManager.getSoftwareLayoutVersion())
-        .thenReturn(TEST_SOFTWARE_LAYOUT_VERSION);
+        .thenReturn(maxLayoutVersion());
     RegisterEndpointTask endpointTask =
         new RegisterEndpointTask(rpcEndPoint, conf, ozoneContainer,
             mock(StateContext.class), versionManager);
@@ -494,7 +489,7 @@ public class TestEndPoint {
 
       HeartbeatEndpointTask endpointTask =
           new HeartbeatEndpointTask(rpcEndPoint, conf, stateContext,
-              stateMachine.getDataNodeVersionManager());
+              stateMachine.getLayoutVersionManager());
       endpointTask.setDatanodeDetailsProto(datanodeDetailsProto);
       endpointTask.call();
       Assert.assertNotNull(endpointTask.getDatanodeDetailsProto());

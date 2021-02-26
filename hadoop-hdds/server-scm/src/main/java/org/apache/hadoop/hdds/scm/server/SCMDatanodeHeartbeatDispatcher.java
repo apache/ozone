@@ -56,6 +56,8 @@ import static org.apache.hadoop.hdds.scm.events.SCMEvents.NODE_REPORT;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.CMD_STATUS_REPORT;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.PIPELINE_ACTIONS;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.PIPELINE_REPORT;
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.INITIAL_VERSION;
+import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVersionProto;
 
 /**
  * This class is responsible for dispatching heartbeat from datanode to
@@ -102,15 +104,23 @@ public final class SCMDatanodeHeartbeatDispatcher {
       commands = nodeManager.getCommandQueue(dnID);
 
     } else {
-      if (heartbeat.hasDataNodeLayoutVersion()) {
-        LOG.debug("Processing DataNode Layout Report.");
-        nodeManager.processLayoutVersionReport(datanodeDetails,
-            heartbeat.getDataNodeLayoutVersion());
+
+      LayoutVersionProto layoutVersion = null;
+      if (!heartbeat.hasDataNodeLayoutVersion()) {
+        // Backward compatibility to make sure old Datanodes can still talk to
+        // SCM.
+        layoutVersion = toLayoutVersionProto(INITIAL_VERSION.layoutVersion(),
+            INITIAL_VERSION.layoutVersion());
+      } else {
+        layoutVersion = heartbeat.getDataNodeLayoutVersion();
       }
+
+      LOG.debug("Processing DataNode Layout Report.");
+      nodeManager.processLayoutVersionReport(datanodeDetails, layoutVersion);
 
       // should we dispatch heartbeat through eventPublisher?
       commands = nodeManager.processHeartbeat(datanodeDetails,
-          heartbeat.getDataNodeLayoutVersion());
+          layoutVersion);
       if (heartbeat.hasNodeReport()) {
         LOG.debug("Dispatching Node Report.");
         eventPublisher.fireEvent(

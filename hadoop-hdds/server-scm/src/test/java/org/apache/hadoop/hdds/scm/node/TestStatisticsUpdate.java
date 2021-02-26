@@ -97,9 +97,9 @@ public class TestStatisticsUpdate {
         datanode2.getUuid(), storagePath2, 200, 20, 180, null);
 
     nodeManager.register(datanode1,
-        TestUtils.createNodeReport(storageOne), null, null);
+        TestUtils.createNodeReport(storageOne), null);
     nodeManager.register(datanode2,
-        TestUtils.createNodeReport(storageTwo), null, null);
+        TestUtils.createNodeReport(storageTwo), null);
 
     NodeReportProto nodeReportProto1 = TestUtils.createNodeReport(storageOne);
     NodeReportProto nodeReportProto2 = TestUtils.createNodeReport(storageTwo);

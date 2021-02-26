@@ -21,7 +21,6 @@ package org.apache.hadoop.hdds.upgrade;
 
 import java.io.IOException;
 
-import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.upgrade.AbstractLayoutVersionManager;
 
 /**
@@ -32,7 +31,12 @@ import org.apache.hadoop.ozone.upgrade.AbstractLayoutVersionManager;
 public class HDDSLayoutVersionManager extends
     AbstractLayoutVersionManager<HDDSLayoutFeature> {
 
-  public HDDSLayoutVersionManager(Storage hddsStorage) throws IOException {
-    init(hddsStorage.getLayoutVersion(), HDDSLayoutFeature.values());
+  public HDDSLayoutVersionManager(int layoutVersion) throws IOException {
+    init(layoutVersion, HDDSLayoutFeature.values());
+  }
+
+  public static int maxLayoutVersion() {
+    HDDSLayoutFeature[] features = HDDSLayoutFeature.values();
+    return features[features.length - 1].layoutVersion();
   }
 }

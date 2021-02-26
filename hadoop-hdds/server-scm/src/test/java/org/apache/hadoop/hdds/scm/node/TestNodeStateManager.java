@@ -43,6 +43,8 @@ import java.util.List;
 import java.util.UUID;
 
 import static junit.framework.TestCase.assertEquals;
+import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayoutVersionProto;
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 
 /**
  * Class to test the NodeStateManager, which is an internal class used by
@@ -54,8 +56,6 @@ public class TestNodeStateManager {
   private NodeStateManager nsm;
   private ConfigurationSource conf;
   private MockEventPublisher eventPublisher;
-  private static final int TEST_SOFTWARE_LAYOUT_VERSION = 0;
-  private static final int TEST_METADATA_LAYOUT_VERSION = 0;
 
   @Before
   public void setUp() {
@@ -79,9 +79,9 @@ public class TestNodeStateManager {
     LayoutVersionManager mockVersionManager =
         Mockito.mock(HDDSLayoutVersionManager.class);
     Mockito.when(mockVersionManager.getMetadataLayoutVersion())
-        .thenReturn(TEST_METADATA_LAYOUT_VERSION);
+        .thenReturn(maxLayoutVersion());
     Mockito.when(mockVersionManager.getSoftwareLayoutVersion())
-        .thenReturn(TEST_SOFTWARE_LAYOUT_VERSION);
+        .thenReturn(maxLayoutVersion());
     nsm = new NodeStateManager(conf, eventPublisher, mockVersionManager);
   }
 
@@ -141,15 +141,15 @@ public class TestNodeStateManager {
     long deadLimit = HddsServerUtil.getDeadNodeInterval(conf) + 1000;
 
     DatanodeDetails staleDn = generateDatanode();
-    nsm.addNode(staleDn, null);
+    nsm.addNode(staleDn, defaultLayoutVersionProto());
     nsm.getNode(staleDn).updateLastHeartbeatTime(now - staleLimit);
 
     DatanodeDetails deadDn = generateDatanode();
-    nsm.addNode(deadDn, null);
+    nsm.addNode(deadDn, defaultLayoutVersionProto());
     nsm.getNode(deadDn).updateLastHeartbeatTime(now - deadLimit);
 
     DatanodeDetails healthyDn = generateDatanode();
-    nsm.addNode(healthyDn, null);
+    nsm.addNode(healthyDn, defaultLayoutVersionProto());
     nsm.getNode(healthyDn).updateLastHeartbeatTime();
 
     nsm.checkNodesHealth();
@@ -174,7 +174,7 @@ public class TestNodeStateManager {
     long deadLimit = HddsServerUtil.getDeadNodeInterval(conf) + 1000;
 
     DatanodeDetails dn = generateDatanode();
-    nsm.addNode(dn, null);
+    nsm.addNode(dn, defaultLayoutVersionProto());
     assertEquals(SCMEvents.NEW_NODE, eventPublisher.getLastEvent());
     DatanodeInfo dni = nsm.getNode(dn);
     dni.updateLastHeartbeatTime();

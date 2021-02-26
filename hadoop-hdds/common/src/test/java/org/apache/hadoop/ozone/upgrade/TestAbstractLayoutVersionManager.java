@@ -167,7 +167,7 @@ public class TestAbstractLayoutVersionManager {
     MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
     ObjectName bean = new ObjectName(
         "Hadoop:service=LayoutVersionManager," +
-            "name=AbstractLayoutVersionManager");
+            "name=" + versionManager.getClass().getSimpleName());
 
     Object mlv = mbs.getAttribute(bean, "MetadataLayoutVersion");
     assertEquals(metadataLayoutVersion, mlv);

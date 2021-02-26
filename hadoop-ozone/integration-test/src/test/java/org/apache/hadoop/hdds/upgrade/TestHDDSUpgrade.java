@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.hdds.upgrade;
 
-import static java.lang.Thread.sleep;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.QUASI_CLOSED;
@@ -26,7 +25,9 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY_READONLY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.OPEN;
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.INITIAL_VERSION;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_DONE;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.STARTING_FINALIZATION;
 
@@ -100,13 +101,15 @@ public class TestHDDSUpgrade {
     conf = new OzoneConfiguration();
     conf.setTimeDuration(HDDS_PIPELINE_REPORT_INTERVAL, 1000,
             TimeUnit.MILLISECONDS);
-    int numOfNodes = NUM_DATA_NODES;
+    conf.set(OZONE_DATANODE_PIPELINE_LIMIT, "1");
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(numOfNodes)
+        .setNumDatanodes(NUM_DATA_NODES)
         // allow only one FACTOR THREE pipeline.
-        .setTotalPipelineNumLimit(numOfNodes + 1)
+        .setTotalPipelineNumLimit(NUM_DATA_NODES + 1)
         .setHbInterval(1000)
         .setHbProcessorInterval(1000)
+        .setScmLayoutVersion(INITIAL_VERSION.layoutVersion())
+        .setDnLayoutVersion(INITIAL_VERSION.layoutVersion())
         .build();
     cluster.waitForClusterToBeReady();
     scm = cluster.getStorageContainerManager();
@@ -127,7 +130,8 @@ public class TestHDDSUpgrade {
   }
 
   private void testPreUpgradeConditionsSCM() {
-    Assert.assertEquals(0, scmVersionManager.getMetadataLayoutVersion());
+    Assert.assertEquals(INITIAL_VERSION.layoutVersion(),
+        scmVersionManager.getMetadataLayoutVersion());
     for (ContainerInfo ci : scmContainerManager.getContainers()) {
       Assert.assertEquals(HddsProtos.LifeCycleState.OPEN, ci.getState());
     }
@@ -152,7 +156,7 @@ public class TestHDDSUpgrade {
     for (HddsDatanodeService dataNode : cluster.getHddsDatanodes()) {
       DatanodeStateMachine dsm = dataNode.getDatanodeStateMachine();
       HDDSLayoutVersionManager dnVersionManager =
-          dsm.getDataNodeVersionManager();
+          dsm.getLayoutVersionManager();
       Assert.assertEquals(0, dnVersionManager.getMetadataLayoutVersion());
 
     }
@@ -178,19 +182,16 @@ public class TestHDDSUpgrade {
       GenericTestUtils.waitFor(() -> {
         for (HddsDatanodeService dataNode : cluster.getHddsDatanodes()) {
           DatanodeStateMachine dsm = dataNode.getDatanodeStateMachine();
-          HDDSLayoutVersionManager dnVersionManager =
-              dsm.getDataNodeVersionManager();
           try {
             if (dsm.queryUpgradeStatus().status() != FINALIZATION_DONE) {
               return false;
             }
           } catch (IOException e) {
-            e.printStackTrace();
             return false;
           }
         }
         return true;
-      }, 1000, 20000);
+      }, 2000, 20000);
     } catch (TimeoutException | InterruptedException e) {
       Assert.fail("Timeout waiting for Upgrade to complete on Data Nodes.");
     }
@@ -199,7 +200,7 @@ public class TestHDDSUpgrade {
     for (HddsDatanodeService dataNode : cluster.getHddsDatanodes()) {
       DatanodeStateMachine dsm = dataNode.getDatanodeStateMachine();
       HDDSLayoutVersionManager dnVersionManager =
-          dsm.getDataNodeVersionManager();
+          dsm.getLayoutVersionManager();
       Assert.assertEquals(dnVersionManager.getSoftwareLayoutVersion(),
           dnVersionManager.getMetadataLayoutVersion());
       Assert.assertTrue(dnVersionManager.getMetadataLayoutVersion() >= 1);
@@ -251,7 +252,8 @@ public class TestHDDSUpgrade {
   }
 
   @Test
-  public void testLayoutUpgrade() throws Exception {
+  public void testFinalizationFromInitialVersionToLatestVersion()
+      throws Exception {
 
     waitForPipelineCreated();
 
@@ -287,14 +289,18 @@ public class TestHDDSUpgrade {
     testDataNodesStateOnSCM(HEALTHY_READONLY);
 
     // Verify the SCM has driven all the DataNodes through Layout Upgrade.
-    sleep(5000);
     testPostUpgradeConditionsDataNodes();
 
-    // Allow some time for heartbeat exchanges.
-    sleep(5000);
-
-    // All datanodes on the SCM should have moved to HEALTHY-READ-WRITE state.
-    testDataNodesStateOnSCM(HEALTHY);
+    // Need to wait for post finalization heartbeat from DNs.
+    LambdaTestUtils.await(30000, 5000, () -> {
+      try {
+        testDataNodesStateOnSCM(HEALTHY);
+      } catch (Throwable ex) {
+        LOG.info(ex.getMessage());
+        return false;
+      }
+      return true;
+    });
 
     // Verify that new pipeline can be created with upgraded datanodes.
     testPostUpgradePipelineCreation();

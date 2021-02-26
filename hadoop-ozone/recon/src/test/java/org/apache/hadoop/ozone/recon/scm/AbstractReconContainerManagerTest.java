@@ -45,6 +45,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.STAND_ALONE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.CONTAINERS;
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
 import org.junit.After;
@@ -68,8 +69,6 @@ public class AbstractReconContainerManagerTest {
   private ReconContainerManager containerManager;
   private DBStore store;
   private HDDSLayoutVersionManager layoutVersionManager;
-  public static final int SOFTWARE_LAYOUT_VERSION = 1;
-  public static final int METADATA_LAYOUT_VERSION = 1;
 
   @Before
   public void setUp() throws Exception {
@@ -83,9 +82,9 @@ public class AbstractReconContainerManagerTest {
     EventQueue eventQueue = new EventQueue();
     layoutVersionManager = mock(HDDSLayoutVersionManager.class);
     when(layoutVersionManager.getSoftwareLayoutVersion())
-        .thenReturn(SOFTWARE_LAYOUT_VERSION);
+        .thenReturn(maxLayoutVersion());
     when(layoutVersionManager.getMetadataLayoutVersion())
-        .thenReturn(METADATA_LAYOUT_VERSION);
+        .thenReturn(maxLayoutVersion());
     NodeManager nodeManager =
         new SCMNodeManager(conf, scmStorageConfig, eventQueue, clusterMap,
             layoutVersionManager);

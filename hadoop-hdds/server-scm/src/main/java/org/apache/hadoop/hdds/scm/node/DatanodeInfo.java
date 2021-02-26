@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.hdds.scm.node;
 
+import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVersionProto;
+
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto
@@ -61,13 +63,9 @@ public class DatanodeInfo extends DatanodeDetails {
     super(datanodeDetails);
     this.lock = new ReentrantReadWriteLock();
     this.lastHeartbeatTime = Time.monotonicNow();
-    lastKnownLayoutVersion =
-        LayoutVersionProto.newBuilder()
-            .setMetadataLayoutVersion(layoutInfo != null ?
-                layoutInfo.getMetadataLayoutVersion() : 0)
-            .setSoftwareLayoutVersion(layoutInfo != null ?
-                layoutInfo.getSoftwareLayoutVersion() : 0)
-            .build();
+    lastKnownLayoutVersion = toLayoutVersionProto(
+        layoutInfo != null ? layoutInfo.getMetadataLayoutVersion() : 0,
+        layoutInfo != null ? layoutInfo.getSoftwareLayoutVersion() : 0);
     this.storageReports = Collections.emptyList();
     this.nodeStatus = nodeStatus;
     this.metadataStorageReports = Collections.emptyList();
@@ -105,10 +103,9 @@ public class DatanodeInfo extends DatanodeDetails {
     }
     try {
       lock.writeLock().lock();
-      lastKnownLayoutVersion = LayoutVersionProto.newBuilder()
-          .setMetadataLayoutVersion(version.getMetadataLayoutVersion())
-          .setSoftwareLayoutVersion(version.getSoftwareLayoutVersion())
-          .build();
+      lastKnownLayoutVersion = toLayoutVersionProto(
+          version.getMetadataLayoutVersion(),
+          version.getSoftwareLayoutVersion());
     } finally {
       lock.writeLock().unlock();
     }

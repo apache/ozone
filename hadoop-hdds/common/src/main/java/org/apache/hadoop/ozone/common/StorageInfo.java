@@ -17,9 +17,13 @@
  */
 package org.apache.hadoop.ozone.common;
 
+import static org.apache.hadoop.ozone.common.Storage.STORAGE_FILE_VERSION;
+
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -37,6 +41,8 @@ import java.util.UUID;
  */
 @InterfaceAudience.Private
 public class StorageInfo {
+
+  public static final Logger LOG = LoggerFactory.getLogger(StorageInfo.class);
 
   private Properties properties = new Properties();
 
@@ -128,7 +134,9 @@ public class StorageInfo {
   private void verifyLayoutVersion() {
     String layout = getProperty(LAYOUT_VERSION);
     if (layout == null) {
-      // For now, default it to "0"
+      LOG.warn("Found " + STORAGE_FILE_VERSION + " file without any layout " +
+          "version. Defaulting to 0. This should happen only if a cluster is " +
+          "being upgraded from 0.5.0.");
       setProperty(LAYOUT_VERSION, "0");
     }
   }

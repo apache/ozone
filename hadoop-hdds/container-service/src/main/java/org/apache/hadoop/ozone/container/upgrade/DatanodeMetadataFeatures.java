@@ -44,7 +44,7 @@ public final class DatanodeMetadataFeatures {
       // this case.
       return OzoneConsts.SCHEMA_V2;
     } else if (versionManager.getMetadataLayoutVersion() <
-        HDDSLayoutFeature.FIRST_UPGRADE_VERSION.layoutVersion()) {
+        HDDSLayoutFeature.DATANODE_SCHEMA_V2.layoutVersion()) {
       return OzoneConsts.SCHEMA_V1;
     } else {
       return OzoneConsts.SCHEMA_V2;

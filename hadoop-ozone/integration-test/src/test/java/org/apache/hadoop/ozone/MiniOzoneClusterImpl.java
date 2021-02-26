@@ -57,6 +57,7 @@ import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.common.Storage.StorageState;
+import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.common.utils.ContainerCache;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -647,7 +648,12 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     protected StorageContainerManager createSCM()
         throws IOException, AuthenticationException {
       configureSCM();
-      SCMStorageConfig scmStore = new SCMStorageConfig(conf);
+      SCMStorageConfig scmStore;
+      if (scmLayoutVersion.isPresent()) {
+        scmStore = new SCMStorageConfig(conf, scmLayoutVersion.get());
+      } else {
+        scmStore = new SCMStorageConfig(conf);
+      }
       initializeScmStorage(scmStore);
       StorageContainerManager scm = StorageContainerManager.createSCM(conf);
       HealthyPipelineSafeModeRule rule =
@@ -696,9 +702,26 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     protected OzoneManager createOM()
         throws IOException, AuthenticationException {
       configureOM();
-      OMStorage omStore = new OMStorage(conf);
+      OMStorage omStore = newOMStorage(conf);
       initializeOmStorage(omStore);
       return OzoneManager.createOm(conf);
+    }
+
+    /**
+     * Create new OM storage based on layout version.
+     * @param conf configuration object.
+     * @return OMStorage instance.
+     * @throws IOException on error.
+     */
+    protected OMStorage newOMStorage(OzoneConfiguration conf)
+        throws IOException {
+      OMStorage omStore;
+      if (omLayoutVersion.isPresent()) {
+        omStore = new OMStorage(conf, omLayoutVersion.get());
+      } else {
+        omStore = new OMStorage(conf);
+      }
+      return omStore;
     }
 
     /**
@@ -752,7 +775,21 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         datanode.setConfiguration(dnConf);
         hddsDatanodes.add(datanode);
       }
+      if (dnLayoutVersion.isPresent()) {
+        configureLayoutVersionInDatanodes(hddsDatanodes, dnLayoutVersion.get());
+      }
       return hddsDatanodes;
+    }
+
+
+    private void configureLayoutVersionInDatanodes(
+        List<HddsDatanodeService> dns, int layoutVersion) throws IOException {
+      for (HddsDatanodeService dn : dns) {
+        DatanodeLayoutStorage layoutStorage;
+        layoutStorage = new DatanodeLayoutStorage(dn.getConf(),
+            UUID.randomUUID().toString(), layoutVersion);
+        layoutStorage.initialize();
+      }
     }
 
     private void configureSCM() {

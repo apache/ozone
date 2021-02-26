@@ -17,6 +17,9 @@
  */
 package org.apache.hadoop.ozone.container.upgrade;
 
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
+import static org.apache.hadoop.ozone.OzoneConsts.DATANODE_LAYOUT_VERSION_DIR;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.UUID;
@@ -25,9 +28,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
-import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 import org.apache.hadoop.ozone.upgrade.TestUpgradeUtils;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.Assert;
@@ -48,18 +49,14 @@ public class TestDataNodeStartupSlvLessThanMlv {
   public void testStartupSlvLessThanMlv() throws Exception {
     // Add subdirectories under the temporary folder where the version file
     // will be placed.
-    File datanodeSubdir = tempFolder.newFolder("datanodeStorageConfig",
-        "current");
+    File datanodeSubdir = tempFolder.newFolder(DATANODE_LAYOUT_VERSION_DIR);
 
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
         tempFolder.getRoot().getAbsolutePath());
 
     // Set metadata layout version larger then software layout version.
-    int largestSlv = 0;
-    for (LayoutFeature f : HDDSLayoutFeature.values()) {
-      largestSlv = Math.max(largestSlv, f.layoutVersion());
-    }
+    int largestSlv = maxLayoutVersion();
     int mlv = largestSlv + 1;
 
     // Create version file with MLV > SLV, which should fail the

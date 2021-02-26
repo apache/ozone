@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -53,11 +54,12 @@ public class TestOMLayoutFeatureAspect {
    * should fail, and the second one should pass.
    * @throws Exception
    */
+  @Ignore
   @Test
   public void testCheckLayoutFeature() throws Exception {
     OMLayoutFeatureUtil testObj = new OMLayoutFeatureUtil();
     try {
-      testObj.ecMethod();
+      String s = testObj.ecMethod();
       Assert.fail();
     } catch (Exception ex) {
       OMException omEx = (OMException) ex;
