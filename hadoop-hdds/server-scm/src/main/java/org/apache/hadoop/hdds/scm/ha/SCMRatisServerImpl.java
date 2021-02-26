@@ -214,8 +214,6 @@ public class SCMRatisServerImpl implements SCMRatisServer {
     LOG.info("{}: Submitting SetConfiguration request to Ratis server with" +
             " new SCM peers list: {}", scm.getScmId(),
         newRaftPeerList);
-
-    RaftServer.Division division = getDivision();
     SetConfigurationRequest configRequest =
         new SetConfigurationRequest(clientId, division.getPeer().getId(),
             division.getGroup().getGroupId(), nextCallId(), newRaftPeerList);
