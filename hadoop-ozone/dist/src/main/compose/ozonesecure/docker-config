@@ -111,7 +111,6 @@ HDFS-SITE.XML_rpc.metrics.percentiles.intervals=60,300
 #BYTEMAN_SCRIPT_URL=https://raw.githubusercontent.com/apache/hadoop/trunk/dev-support/byteman/hadooprpc.btm
 
 OZONE_DATANODE_SECURE_USER=root
-SECURITY_ENABLED=true
 JAVA_HOME=/usr/lib/jvm/jre
 JSVC_HOME=/usr/bin
 

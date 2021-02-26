@@ -17,11 +17,15 @@
 
 SCRIPT_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )
 
-rm -rf "$SCRIPT_DIR/keytabs"
+set -ex
+
+rm -rf "$SCRIPT_DIR/keytabs" || true
+mkdir -p "$SCRIPT_DIR/keytabs"
+
 docker run -it --entrypoint=/data/export-keytabs.sh -v "$SCRIPT_DIR":/data -v "$SCRIPT_DIR/keytabs":/etc/security/keytabs elek/ozone-devkrb5:latest
 
 sudo chown -R "$(id -u)" "$SCRIPT_DIR/keytabs"
-chmod 755 "$SCRIPT_DIR/keytabs/*.keytab"
+chmod 755 "$SCRIPT_DIR/keytabs/"*.keytab
 
 SECURE_ENVS=( ozonesecure ozonesecure-mr ozonesecure-om-ha )
 

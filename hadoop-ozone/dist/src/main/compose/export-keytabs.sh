@@ -19,12 +19,13 @@ export_keytab() {
    kadmin.local -q "ktadd -norandkey -k /etc/security/keytabs/$2.keytab $1@EXAMPLE.COM"
 }
 
-rm /etc/security/keytabs/*.keytab
-
 export_keytab scm/scm scm
 export_keytab HTTP/scm scm
 export_keytab testuser/scm scm
 export_keytab testuser2/scm scm
+
+export_keytab testuser/scm testuser
+export_keytab testuser2/scm testuser2
 
 export_keytab om/om om
 export_keytab HTTP/om om
