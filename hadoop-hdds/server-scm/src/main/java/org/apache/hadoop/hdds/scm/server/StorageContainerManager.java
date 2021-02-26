@@ -708,6 +708,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
     // The node here will try to fetch the cluster id from any of existing
     // running SCM instances.
+    SCMHANodeDetails.loadSCMHAConfig(conf);
     OzoneConfiguration config = SCMHAUtils.removeSelfId(conf);
     final ScmInfo scmInfo = HAUtils.getScmInfo(config);
     SCMStorageConfig scmStorageConfig = new SCMStorageConfig(conf);

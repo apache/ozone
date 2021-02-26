@@ -66,6 +66,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   private final StorageContainerManager scm;
   private final ClientId clientId = ClientId.randomId();
   private final AtomicLong callId = new AtomicLong();
+  private final RaftServer.Division division;
 
   // TODO: Refactor and remove ConfigurationSource and use only
   //  SCMHAConfiguration.
@@ -88,6 +89,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
     this.server =
         newRaftServer(scm.getScmId(), conf).setStateMachine(stateMachine)
             .setGroup(RaftGroup.valueOf(groupId)).build();
+    this.division = server.getDivision(groupId);
   }
 
   public static void initialize(String clusterId, String scmId,
@@ -96,6 +98,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
     RaftServer server = newRaftServer(scmId, conf)
         .setGroup(group).build();
     server.start();
+    // TODO: Timeout and sleep interval should be made configurable
     waitforLeaderToBeReady(server, 60000, group);
     server.close();
   }
@@ -138,14 +141,9 @@ public class SCMRatisServerImpl implements SCMRatisServer {
     server.start();
   }
 
+  @Override
   public RaftServer.Division getDivision() {
-    try {
-      return server
-          .getDivision(server.getGroups().iterator().next().getGroupId());
-    } catch (Exception e) {
-      LOG.warn("Failed to get RaftServerDivision", e);
-      return null;
-    }
+      return division;
   }
 
   @VisibleForTesting
@@ -189,7 +187,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
 
   @Override
   public List<String> getRatisRoles() {
-    return getDivision().getGroup().getPeers().stream()
+    return division.getGroup().getPeers().stream()
         .map(peer -> peer.getAddress() == null ? "" : peer.getAddress())
         .collect(Collectors.toList());
   }
@@ -200,7 +198,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   @Override
   public NotLeaderException triggerNotLeaderException() {
     return new NotLeaderException(
-        getDivision().getMemberId(), null, getDivision().getGroup().getPeers());
+        division.getMemberId(), null, division.getGroup().getPeers());
   }
 
   @Override
@@ -213,7 +211,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
         .setAddress(request.getRatisAddr()).build();
     newRaftPeerList.add(raftPeer);
 
-    LOG.debug("{}: Submitting SetConfiguration request to Ratis server with" +
+    LOG.info("{}: Submitting SetConfiguration request to Ratis server with" +
             " new SCM peers list: {}", scm.getScmId(),
         newRaftPeerList);
 
