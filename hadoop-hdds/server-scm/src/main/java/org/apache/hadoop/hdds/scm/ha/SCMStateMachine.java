@@ -17,10 +17,13 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
-import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.EnumMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -31,20 +34,18 @@ import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImplV2;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.ratis.proto.RaftProtos;
-import org.apache.ratis.protocol.*;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.util.Time;
-import org.apache.ratis.server.RaftServer;
+import org.apache.ratis.protocol.Message;
+import org.apache.ratis.protocol.RaftGroupMemberId;
+import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.server.protocol.TermIndex;
-import org.apache.ratis.server.raftlog.RaftLog;
-import org.apache.ratis.server.storage.RaftStorage;
 import org.apache.ratis.statemachine.SnapshotInfo;
 import org.apache.ratis.statemachine.TransactionContext;
 import org.apache.ratis.statemachine.impl.BaseStateMachine;
 
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.ratis.statemachine.impl.SimpleStateMachineStorage;
-import org.apache.ratis.statemachine.impl.SingleFileSnapshotInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -216,38 +217,6 @@ public class SCMStateMachine extends BaseStateMachine {
     return lastAppliedIndex;
   }
 
-  @Override
-  public void initialize(
-      RaftServer server, RaftGroupId id, RaftStorage raftStorage)
-      throws IOException {
-    super.initialize(server, id, raftStorage);
-    storage.init(raftStorage);
-    loadSnapshot(storage.getLatestSnapshot());
-  }
-
-  private long loadSnapshot(SingleFileSnapshotInfo snapshot)
-      throws IOException {
-    if (snapshot == null) {
-      TermIndex empty = TermIndex.valueOf(0, RaftLog.INVALID_LOG_INDEX);
-      setLastAppliedTermIndex(empty);
-      return empty.getIndex();
-    }
-    RaftGroupId gid = ratisServer.getDivision().getGroup().getGroupId();
-    final File snapshotFile = snapshot.getFile().getPath().toFile();
-    final TermIndex last =
-        SimpleStateMachineStorage.getTermIndexFromSnapshotFile(snapshotFile);
-    LOG.info("{}: Setting the last applied index to {}", gid, last);
-    setLastAppliedTermIndex(last);
-    return last.getIndex();
-  }
-
-  /**
-   * Notifies the state machine about index updates because of entries
-   * which do not cause state machine update, i.e. conf entries, metadata
-   * entries
-   * @param term term of the log entry
-   * @param index index of the log entry
-   */
   @Override
   public void notifyTermIndexUpdated(long term, long index) {
     if (transactionBuffer != null) {

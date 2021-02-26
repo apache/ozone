@@ -31,7 +31,9 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_RATIS_SNAPSHOT_DIR;
@@ -134,6 +136,13 @@ public final class SCMHAUtils {
     }
     return localScmServiceId;
   }
+
+  /**
+   * Removes the self node from the list of nodes in the
+   * configuration.
+   * @param configuration OzoneConfiguration
+   * @return Updated OzoneConfiguration
+   */
 
   public static OzoneConfiguration removeSelfId(
       OzoneConfiguration configuration) {

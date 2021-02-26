@@ -294,10 +294,8 @@ public class SCMBlockProtocolServer implements
 
   @Override
   public boolean addSCM(AddSCMRequest request) throws IOException {
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Adding SCM {} addr {} with cluster id {}, with {}",
-          request.getScmId(), request.getRatisAddr(), request.getRatisAddr());
-    }
+    LOG.debug("Adding SCM {} addr {} cluster id {}",
+        request.getScmId(), request.getRatisAddr(), request.getClusterId());
 
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("scmId", String.valueOf(request.getScmId()));
@@ -315,7 +313,7 @@ public class SCMBlockProtocolServer implements
     } finally {
       if(auditSuccess) {
         AUDIT.logReadSuccess(
-            buildAuditMessageForSuccess(SCMAction.ADD_SCM, null)
+            buildAuditMessageForSuccess(SCMAction.ADD_SCM, auditMap)
         );
       }
     }

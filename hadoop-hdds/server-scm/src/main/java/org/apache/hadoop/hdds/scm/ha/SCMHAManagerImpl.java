@@ -74,8 +74,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
   @Override
   public void start() throws IOException {
     ratisServer.start();
-    if (SCMHAUtils.isSCMHAEnabled(conf) && ratisServer.getDivision().getGroup()
-        .getPeers().isEmpty()) {
+    if (ratisServer.getDivision().getGroup().getPeers().isEmpty()) {
       // this is a bootstrapped node
       // It will first try to add itself to existing ring
       boolean success = HAUtils.addSCM(OzoneConfiguration.of(conf),

@@ -42,12 +42,7 @@ public final class HAUtils {
   public static ScmInfo getScmInfo(OzoneConfiguration conf)
       throws IOException {
     try {
-      RetryPolicy retryPolicy = retryUpToMaximumCountWithFixedSleep(
-          10, 5, TimeUnit.SECONDS);
-      RetriableTask<ScmInfo> retriable = new RetriableTask<>(
-          retryPolicy, "getScmInfo",
-          () -> getScmBlockClient(conf).getScmInfo());
-      return retriable.call();
+      return getScmBlockClient(conf).getScmInfo();
     } catch (IOException e) {
       throw e;
     } catch (Exception e) {
@@ -59,16 +54,11 @@ public final class HAUtils {
       throws IOException {
     OzoneConfiguration config = SCMHAUtils.removeSelfId(conf);
     try {
-      RetryPolicy retryPolicy = retryUpToMaximumCountWithFixedSleep(
-          10, 5, TimeUnit.SECONDS);
-      RetriableTask<Boolean> retriable = new RetriableTask<>(
-          retryPolicy, "addSCM",
-          () -> getScmBlockClient(config).addSCM(request));
-      return retriable.call();
+      return getScmBlockClient(config).addSCM(request);
     } catch (IOException e) {
       throw e;
     } catch (Exception e) {
-      throw new IOException("Failed to get SCM info", e);
+      throw new IOException("Failed to add SCM", e);
     }
   }
 

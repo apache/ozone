@@ -689,7 +689,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   }
 
   /**
-   * Routine to bootstrap the StorageContainerManager. Thiw will connect to a
+   * Routine to bootstrap the StorageContainerManager. This will connect to a
    * running SCM instance which has valid cluster id and fetch the cluster id
    * from there.
    *
