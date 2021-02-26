@@ -39,6 +39,13 @@ public class MockCAStore implements CertificateStore {
   }
 
   @Override
+  public void storeValidScmCertificate(BigInteger serialID,
+      X509Certificate certificate)
+      throws IOException {
+
+  }
+
+  @Override
   public void revokeCertificate(BigInteger serialID) throws IOException {
 
   }

@@ -31,9 +31,10 @@ import java.util.concurrent.Future;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.OzoneManagerDetailsProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ScmNodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolPB;
 import org.apache.hadoop.hdds.scm.protocol.SCMSecurityProtocolServerSideTranslatorPB;
@@ -69,9 +70,12 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
   private final RPC.Server rpcServer;
   private final InetSocketAddress rpcAddress;
   private final ProtocolMessageMetrics metrics;
+  private final StorageContainerManager storageContainerManager;
 
   SCMSecurityProtocolServer(OzoneConfiguration conf,
-      CertificateServer certificateServer) throws IOException {
+      CertificateServer certificateServer, StorageContainerManager scm)
+      throws IOException {
+    this.storageContainerManager = scm;
     this.certificateServer = certificateServer;
     final int handlerCount =
         conf.getInt(ScmConfigKeys.OZONE_SCM_SECURITY_HANDLER_COUNT_KEY,
@@ -115,18 +119,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
     LOGGER.info("Processing CSR for dn {}, UUID: {}", dnDetails.getHostName(),
         dnDetails.getUuid());
     Objects.requireNonNull(dnDetails);
-    Future<X509CertificateHolder> future =
-        certificateServer.requestCertificate(certSignReq,
-            KERBEROS_TRUSTED);
-
-    try {
-      return CertificateCodec.getPEMEncodedString(future.get());
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new IOException("getDataNodeCertificate operation failed. ", e);
-    } catch (ExecutionException e) {
-      throw new IOException("getDataNodeCertificate operation failed. ", e);
-    }
+    return getEncodedCertToString(certSignReq, NodeType.DATANODE);
   }
 
   /**
@@ -142,17 +135,57 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
     LOGGER.info("Processing CSR for om {}, UUID: {}", omDetails.getHostName(),
         omDetails.getUuid());
     Objects.requireNonNull(omDetails);
+    return getEncodedCertToString(certSignReq, NodeType.OM);
+  }
+
+
+  /**
+   * Get signed certificate for SCM Node.
+   *
+   * @param scmNodeDetails   - SCM Node Details.
+   * @param certSignReq - Certificate signing request.
+   * @return String         - SCM signed pem encoded certificate.
+   */
+  @Override
+  public String getSCMCertificate(ScmNodeDetailsProto scmNodeDetails,
+      String certSignReq) throws IOException {
+    Objects.requireNonNull(scmNodeDetails);
+    LOGGER.info("Processing CSR for scm {}, nodeId: {}",
+        scmNodeDetails.getHostName(), scmNodeDetails.getScmNodeId());
+
+    // Check clusterID
+    if (storageContainerManager.getClusterId().equals(
+        scmNodeDetails.getClusterId())) {
+      throw new IOException("SCM ClusterId mismatch. Peer SCM ClusterId " +
+          scmNodeDetails.getClusterId() + ", primary SCM ClusterId "
+          + storageContainerManager.getClusterId());
+    }
+
+    return getEncodedCertToString(certSignReq, NodeType.SCM);
+
+  }
+
+  /**
+   *  Request certificate for the specified role.
+   * @param certSignReq - Certificate signing request.
+   * @param nodeType - role OM/SCM/DATANODE
+   * @return String         - SCM signed pem encoded certificate.
+   * @throws IOException
+   */
+  private String getEncodedCertToString(String certSignReq, NodeType nodeType)
+      throws IOException {
     Future<X509CertificateHolder> future =
         certificateServer.requestCertificate(certSignReq,
-            KERBEROS_TRUSTED);
-
+            KERBEROS_TRUSTED, nodeType);
     try {
       return CertificateCodec.getPEMEncodedString(future.get());
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
-      throw new IOException("getOMCertificate operation failed. ", e);
+      throw new IOException("generate" + nodeType.toString() + "Certificate " +
+          "operation failed. ", e);
     } catch (ExecutionException e) {
-      throw new IOException("getOMCertificate operation failed. ", e);
+      throw new IOException("generate" + nodeType.toString() + "Certificate " +
+          "operation failed.", e);
     }
   }
 
@@ -205,7 +238,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
    * @throws IOException
    */
   @Override
-  public List<String> listCertificate(HddsProtos.NodeType role,
+  public List<String> listCertificate(NodeType role,
       long startSerialId, int count, boolean isRevoked) throws IOException {
     List<X509Certificate> certificates =
         certificateServer.listCertificate(role, startSerialId, count,

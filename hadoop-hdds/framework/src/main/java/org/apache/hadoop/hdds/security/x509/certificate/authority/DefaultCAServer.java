@@ -22,7 +22,7 @@ package org.apache.hadoop.hdds.security.x509.certificate.authority;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.commons.validator.routines.DomainValidator;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.DefaultProfile;
@@ -206,7 +206,7 @@ public class DefaultCAServer implements CertificateServer {
   @Override
   public Future<X509CertificateHolder> requestCertificate(
       PKCS10CertificationRequest csr,
-      CertificateApprover.ApprovalType approverType) {
+      CertificateApprover.ApprovalType approverType, NodeType nodeType) {
     LocalDate beginDate = LocalDate.now().atStartOfDay().toLocalDate();
     LocalDateTime temp = LocalDateTime.of(beginDate, LocalTime.MIDNIGHT);
     LocalDate endDate =
@@ -231,12 +231,12 @@ public class DefaultCAServer implements CertificateServer {
       case TESTING_AUTOMATIC:
         X509CertificateHolder xcert;
         try {
-          xcert = signAndStoreCertificate(beginDate, endDate, csr);
+          xcert = signAndStoreCertificate(beginDate, endDate, csr, nodeType);
         } catch (SCMSecurityException e) {
           // Certificate with conflicting serial id, retry again may resolve
           // this issue.
           LOG.error("Certificate storage failed, retrying one more time.", e);
-          xcert = signAndStoreCertificate(beginDate, endDate, csr);
+          xcert = signAndStoreCertificate(beginDate, endDate, csr, nodeType);
         }
 
         xcertHolder.complete(xcert);
@@ -252,23 +252,34 @@ public class DefaultCAServer implements CertificateServer {
   }
 
   private X509CertificateHolder signAndStoreCertificate(LocalDate beginDate,
-      LocalDate endDate, PKCS10CertificationRequest csr) throws IOException,
+      LocalDate endDate, PKCS10CertificationRequest csr, NodeType nodeType)
+      throws IOException,
       OperatorCreationException, CertificateException {
     X509CertificateHolder xcert = approver.sign(config,
         getCAKeys().getPrivate(),
         getCACertificate(), java.sql.Date.valueOf(beginDate),
         java.sql.Date.valueOf(endDate), csr, scmID, clusterID);
-    store.storeValidCertificate(xcert.getSerialNumber(),
-        CertificateCodec.getX509Certificate(xcert));
+    if (nodeType.equals(NodeType.SCM)) {
+      // If the role is SCM, store certificate in scm cert table and valid cert
+      // table. This is to help to return scm certs during getCertificate call.
+      store.storeValidScmCertificate(xcert.getSerialNumber(),
+          CertificateCodec.getX509Certificate(xcert));
+    } else {
+      // As we don't have different table for other roles, other role
+      // certificates will go to validCertsTable.
+      store.storeValidCertificate(xcert.getSerialNumber(),
+          CertificateCodec.getX509Certificate(xcert));
+    }
     return xcert;
   }
 
   @Override
   public Future<X509CertificateHolder> requestCertificate(String csr,
-      CertificateApprover.ApprovalType type) throws IOException {
+      CertificateApprover.ApprovalType type, NodeType nodeType)
+      throws IOException {
     PKCS10CertificationRequest request =
         getCertificationRequest(csr);
-    return requestCertificate(request, type);
+    return requestCertificate(request, type, nodeType);
   }
 
   @Override
@@ -300,7 +311,7 @@ public class DefaultCAServer implements CertificateServer {
    * @throws IOException
    */
   @Override
-  public List<X509Certificate> listCertificate(HddsProtos.NodeType role,
+  public List<X509Certificate> listCertificate(NodeType role,
       long startSerialId, int count, boolean isRevoked) throws IOException {
     return store.listCertificate(role, BigInteger.valueOf(startSerialId), count,
         isRevoked? CertificateStore.CertType.REVOKED_CERTS :
