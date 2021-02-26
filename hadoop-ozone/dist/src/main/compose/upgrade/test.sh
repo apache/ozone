@@ -14,22 +14,22 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-set -e
 
 # Version that will be run using the local build.
 : "${OZONE_CURRENT_VERSION:=1.1.0}"
 export OZONE_CURRENT_VERSION
 
-COMPOSE_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )
-source "$COMPOSE_DIR/testlib.sh"
+TEST_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )
+source "$TEST_DIR/testlib.sh"
 
 # Export variables needed by tests.
-export COMPOSE_DIR
-export OM_SERVICE_ID=omservice
+export TEST_DIR
+# Required by ../testlib.sh.
+export COMPOSE_DIR="$TEST_DIR"
 
 RESULT_DIR="$ALL_RESULT_DIR" create_results_dir
 
-# Upgrade tests to be run:
+# Upgrade tests to be run.
 run_test manual-upgrade 0.5.0 1.1.0
 run_test non-rolling-upgrade 1.0.0 1.1.0
 

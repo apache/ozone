@@ -20,8 +20,8 @@ version: "3.4"
 x-common-config:
   &common-config
   env_file:
-    - docker-config
-    - ../common/docker-config
+    - ${TEST_DIR}/compose/common/docker-config
+    - ${TEST_DIR}/compose/om-ha/docker-config
   image: ${OZONE_IMAGE}
 
 x-replication:
@@ -40,8 +40,8 @@ x-om:
     - 9872
 
 x-volumes:
-    - &ozone-dir ${TEST_DIR}../..:${OZONE_DIR}
-    - &transformation ${TEST_DIR}../../libexec/transformation.py:/opt/hadoop/libexec/transformation.py
+    - &ozone-dir ${TEST_DIR}/../..:${OZONE_DIR}
+    - &transformation ${TEST_DIR}/../../libexec/transformation.py:/opt/hadoop/libexec/transformation.py
 
 services:
   om1:
@@ -51,8 +51,8 @@ services:
         ipv4_address: 10.9.0.17
     volumes:
       - ${OZONE_VOLUME}/om1:/data
-      - &ozone_dir
-      - &transformation
+      - *ozone-dir
+      - *transformation
   om2:
     <<: *om
     networks:
@@ -60,8 +60,8 @@ services:
         ipv4_address: 10.9.0.18
     volumes:
       - ${OZONE_VOLUME}/om2:/data
-      - &ozone_dir
-      - &transformation
+      - *ozone-dir
+      - *transformation
   om3:
     <<: *om
     networks:
@@ -69,6 +69,6 @@ services:
         ipv4_address: 10.9.0.19
     volumes:
       - ${OZONE_VOLUME}/om3:/data
-      - &ozone_dir
-      - &transformation
+      - *ozone-dir
+      - *transformation
 

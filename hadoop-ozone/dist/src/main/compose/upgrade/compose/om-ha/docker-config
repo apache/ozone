@@ -23,4 +23,4 @@ OZONE-SITE.XML_ozone.om.address.omservice.om2=om2
 OZONE-SITE.XML_ozone.om.address.omservice.om3=om3
 OZONE-SITE.XML_ozone.om.ratis.enable=true
 
-no_proxy=om1,om2,om3:no_proxy
+no_proxy=om1,om2,om3,scm,s3g,recon,kdc,localhost,127.0.0.1

@@ -24,14 +24,14 @@ set -e -o pipefail
 set -u
 : "${OZONE_UPGRADE_FROM}"
 : "${OZONE_UPGRADE_TO}"
-: "${COMPOSE_DIR}"
+: "${TEST_DIR}"
 : "${OZONE_UPGRADE_CALLBACK}"
 set +u
 
-source "$COMPOSE_DIR"/testlib.sh
-source "$OZONE_UPGRADE_CALLBACK"
+export COMPOSE_FILE="${TEST_DIR}/compose/common/docker-compose.yaml":"${TEST_DIR}/compose/om-non-ha/docker-compose.yaml"
 
-export OM_HA_ARGS='--'
+source "$TEST_DIR"/testlib.sh
+source "$OZONE_UPGRADE_CALLBACK"
 
 prepare_for_image "$OZONE_UPGRADE_FROM"
 echo "--- SETTING UP OLD VERSION $OZONE_UPGRADE_FROM ---"
@@ -44,7 +44,7 @@ stop_docker_env
 echo "--- SETTING UP NEW VERSION $OZONE_UPGRADE_TO ---"
 callback setup_new_version
 
-prepare_for_binary_image "$OZONE_UPGRADE_TO"
+prepare_for_image "$OZONE_UPGRADE_TO"
 OZONE_KEEP_RESULTS=true start_docker_env
 echo "--- RUNNING WITH NEW VERSION $OZONE_UPGRADE_TO ---"
 callback with_new_version
