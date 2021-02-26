@@ -14,22 +14,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-CORE-SITE.XML_fs.defaultFS=ofs://omservice/
+version: "3.4"
 
-OZONE-SITE.XML_ozone.om.service.ids=omservice
-OZONE-SITE.XML_ozone.om.nodes.omservice=om1,om2,om3
-OZONE-SITE.XML_ozone.om.address.omservice.om1=om1
-OZONE-SITE.XML_ozone.om.address.omservice.om2=om2
-OZONE-SITE.XML_ozone.om.address.omservice.om3=om3
-OZONE-SITE.XML_ozone.om.ratis.enable=true
+# reusable fragments (see https://docs.docker.com/compose/compose-file/#extension-fields)
+x-common-config:
+  &common-config
+  env_file:
+    - docker-config
+    - ../common/docker-config
+  image: ${OZONE_IMAGE}
 
-OZONE-SITE.XML_ozone.scm.names=scm
-OZONE-SITE.XML_ozone.scm.datanode.id.dir=/data
-OZONE-SITE.XML_ozone.scm.block.client.address=scm
-OZONE-SITE.XML_ozone.scm.container.size=1GB
-OZONE-SITE.XML_ozone.metadata.dirs=/data/metadata
-OZONE-SITE.XML_ozone.scm.client.address=scm
-OZONE-SITE.XML_ozone.client.failover.max.attempts=6
-OZONE-SITE.XML_hdds.datanode.dir=/data/hdds
+x-replication:
+  &replication
+  OZONE-SITE.XML_ozone.replication: ${OZONE_REPLICATION_FACTOR:-1}
 
-no_proxy=om1,om2,om3,scm,s3g,recon,kdc,localhost,127.0.0.1
+x-volumes:
+  - &ozone-dir ${TEST_DIR}../..:${OZONE_DIR}
+  - &transformation ${TEST_DIR}../../libexec/transformation.py:/opt/hadoop/libexec/transformation.py
+
+services:
+  om:
+    <<: *om
+    networks:
+      net:
+        ipv4_address: 10.9.0.17
+    volumes:
+      - ${OZONE_VOLUME}/om1:/data
+      - &ozone_dir
+      - &transformation
