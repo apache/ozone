@@ -25,7 +25,9 @@ import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.OzoneManagerDetailsProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ScmNodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetSCMCertRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCACertificateRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertificateRequestProto;
@@ -127,6 +129,41 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
   public String getOMCertificate(OzoneManagerDetailsProto omDetails,
       String certSignReq) throws IOException {
     return getOMCertChain(omDetails, certSignReq).getX509Certificate();
+  }
+
+  /**
+   * Get signed certificate for SCM node.
+   *
+   * @param scmNodeDetails  - SCM Node Details.
+   * @param certSignReq     - Certificate signing request.
+   * @return String         - pem encoded SCM signed
+   *                          certificate.
+   */
+  public String getSCMCertificate(ScmNodeDetailsProto scmNodeDetails,
+      String certSignReq) throws IOException {
+    return getSCMCertChain(scmNodeDetails, certSignReq).getX509Certificate();
+  }
+
+
+  /**
+   * Get signed certificate for SCM node and root CA certificate.
+   *
+   * @param scmNodeDetails   - SCM Node Details.
+   * @param certSignReq      - Certificate signing request.
+   * @return SCMGetCertResponseProto  - SCMGetCertResponseProto which holds
+   * signed certificate and root CA certificate.
+   */
+  public SCMGetCertResponseProto getSCMCertChain(
+      ScmNodeDetailsProto scmNodeDetails, String certSignReq)
+      throws IOException {
+    SCMGetSCMCertRequestProto request =
+        SCMGetSCMCertRequestProto.newBuilder()
+            .setCSR(certSignReq)
+            .setScmDetails(scmNodeDetails)
+            .build();
+    return submitRequest(Type.GetSCMCertificate,
+        builder -> builder.setGetSCMCertificateRequest(request))
+        .getGetCertResponseProto();
   }
 
   /**

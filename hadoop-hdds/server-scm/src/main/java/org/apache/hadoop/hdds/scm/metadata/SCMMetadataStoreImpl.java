@@ -41,6 +41,8 @@ import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.PIPELINES;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.REVOKED_CERTS;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.TRANSACTIONINFO;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.VALID_CERTS;
+import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.VALID_SCM_CERTS;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,6 +55,8 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
   private Table<Long, DeletedBlocksTransaction> deletedBlocksTable;
 
   private Table<BigInteger, X509Certificate> validCertsTable;
+
+  private Table<BigInteger, X509Certificate> validSCMCertsTable;
 
   private Table<BigInteger, X509Certificate> revokedCertsTable;
 
@@ -96,6 +100,10 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
 
       checkTableStatus(validCertsTable, VALID_CERTS.getName());
 
+      validSCMCertsTable = VALID_SCM_CERTS.getTable(store);
+
+      checkTableStatus(validSCMCertsTable, VALID_SCM_CERTS.getName());
+
       revokedCertsTable = REVOKED_CERTS.getTable(store);
 
       checkTableStatus(revokedCertsTable, REVOKED_CERTS.getName());
@@ -136,6 +144,11 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
   @Override
   public Table<BigInteger, X509Certificate> getValidCertsTable() {
     return validCertsTable;
+  }
+
+  @Override
+  public Table<BigInteger, X509Certificate> getValidSCMCertsTable() {
+    return validSCMCertsTable;
   }
 
   @Override

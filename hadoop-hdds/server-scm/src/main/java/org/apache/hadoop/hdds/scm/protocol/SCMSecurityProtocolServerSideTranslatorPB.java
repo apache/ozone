@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCer
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertificateRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetDataNodeCertRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetOMCertRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetSCMCertRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMListCertificateRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMListCertificateResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityRequest;
@@ -112,6 +113,13 @@ public class SCMSecurityProtocolServerSideTranslatorPB
             .setListCertificateResponseProto(
                 listCertificate(request.getListCertificateRequest()))
             .build();
+      case GetSCMCertificate:
+        return SCMSecurityResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setGetCertResponseProto(getSCMCertificate(
+                request.getGetSCMCertificateRequest()))
+            .build();
       default:
         throw new IllegalArgumentException(
             "Unknown request type: " + request.getCmdType());
@@ -135,6 +143,30 @@ public class SCMSecurityProtocolServerSideTranslatorPB
     String certificate = impl
         .getDataNodeCertificate(request.getDatanodeDetails(),
             request.getCSR());
+    SCMGetCertResponseProto.Builder builder =
+        SCMGetCertResponseProto
+            .newBuilder()
+            .setResponseCode(ResponseCode.success)
+            .setX509Certificate(certificate)
+            .setX509CACertificate(impl.getCACertificate());
+
+    return builder.build();
+
+  }
+
+  /**
+   * Get signed certificate for SCM.
+   *
+   * @param request - SCMGetSCMCertRequestProto
+   * @return SCMGetCertResponseProto.
+   */
+
+  public SCMGetCertResponseProto getSCMCertificate(
+      SCMGetSCMCertRequestProto request)
+      throws IOException {
+
+    String certificate = impl.getSCMCertificate(request.getScmDetails(),
+        request.getCSR());
     SCMGetCertResponseProto.Builder builder =
         SCMGetCertResponseProto
             .newBuilder()

@@ -19,7 +19,7 @@
 
 package org.apache.hadoop.hdds.security.x509.certificate.authority;
 
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateApprover.ApprovalType;
@@ -76,13 +76,14 @@ public interface CertificateServer {
    *
    * @param csr  - Certificate Signing Request.
    * @param type - An Enum which says what kind of approval process to follow.
+   * @param nodeType: OM/SCM/DN
    * @return A future that will have this certificate when this request is
    * approved.
    * @throws SCMSecurityException - on Error.
    */
   Future<X509CertificateHolder> requestCertificate(
       PKCS10CertificationRequest csr,
-      CertificateApprover.ApprovalType type)
+      CertificateApprover.ApprovalType type, NodeType nodeType)
       throws SCMSecurityException;
 
 
@@ -91,12 +92,13 @@ public interface CertificateServer {
    *
    * @param csr - Certificate Signing Request as a PEM encoded String.
    * @param type - An Enum which says what kind of approval process to follow.
+   * @param nodeType: OM/SCM/DN
    * @return A future that will have this certificate when this request is
    * approved.
    * @throws SCMSecurityException - on Error.
    */
   Future<X509CertificateHolder> requestCertificate(String csr,
-      ApprovalType type) throws IOException;
+      ApprovalType type, NodeType nodeType) throws IOException;
 
   /**
    * Revokes a Certificate issued by this CertificateServer.
@@ -122,7 +124,7 @@ public interface CertificateServer {
    * @return
    * @throws IOException
    */
-  List<X509Certificate> listCertificate(HddsProtos.NodeType type,
+  List<X509Certificate> listCertificate(NodeType type,
       long startSerialId, int count, boolean isRevoked) throws IOException;
 
   /**

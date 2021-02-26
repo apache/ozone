@@ -57,6 +57,15 @@ public class SCMDBDefinition implements DBDefinition {
           new X509CertificateCodec());
 
   public static final DBColumnFamilyDefinition<BigInteger, X509Certificate>
+      VALID_SCM_CERTS =
+      new DBColumnFamilyDefinition<>(
+          "validSCMCerts",
+          BigInteger.class,
+          new BigIntegerCodec(),
+          X509Certificate.class,
+          new X509CertificateCodec());
+
+  public static final DBColumnFamilyDefinition<BigInteger, X509Certificate>
       REVOKED_CERTS =
       new DBColumnFamilyDefinition<>(
           "revokedCerts",
@@ -105,6 +114,6 @@ public class SCMDBDefinition implements DBDefinition {
   @Override
   public DBColumnFamilyDefinition[] getColumnFamilies() {
     return new DBColumnFamilyDefinition[] {DELETED_BLOCKS, VALID_CERTS,
-        REVOKED_CERTS, PIPELINES, CONTAINERS, TRANSACTIONINFO};
+        VALID_SCM_CERTS, REVOKED_CERTS, PIPELINES, CONTAINERS, TRANSACTIONINFO};
   }
 }

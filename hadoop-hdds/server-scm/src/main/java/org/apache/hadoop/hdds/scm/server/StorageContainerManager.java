@@ -546,7 +546,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     certificateServer.init(new SecurityConfig(conf),
         CertificateServer.CAType.SELF_SIGNED_CA);
     securityProtocolServer = new SCMSecurityProtocolServer(conf,
-        certificateServer);
+        certificateServer, this);
 
     grpcTlsConfig = createTlsClientConfigForSCM(new SecurityConfig(conf),
             certificateServer);

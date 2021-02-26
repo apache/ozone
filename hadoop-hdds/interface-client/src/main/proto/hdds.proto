@@ -73,6 +73,12 @@ message OzoneManagerDetailsProto {
     repeated Port ports = 4;
 }
 
+message ScmNodeDetailsProto {
+    required string scmNodeId = 1;     // SCM Node Id.
+    required string clusterId = 2;     // Cluster Id of SCM cluster.
+    required string hostName = 3;      // Hostname of SCM.
+}
+
 message Port {
     required string name = 1;
     required uint32 value = 2;
