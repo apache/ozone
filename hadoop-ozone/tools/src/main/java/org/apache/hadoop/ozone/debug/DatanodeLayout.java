@@ -55,7 +55,8 @@ public class DatanodeLayout extends GenericCli
       description = "File Path")
   private String storagePath;
 
-  @CommandLine.Option(names = {"--verify"}, description = "Display this help and exit")
+  @CommandLine.Option(names = {"--verify"},
+      description = "Verify that the datanode layout is correct")
   private boolean verify;
 
   @Spec
