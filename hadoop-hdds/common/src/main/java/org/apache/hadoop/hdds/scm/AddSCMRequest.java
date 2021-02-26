@@ -20,7 +20,10 @@ package org.apache.hadoop.hdds.scm;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 
-
+/**
+ * Class for ADD SCM request to be sent by Bootstrapping SCM to existing
+ * leader SCM.
+ */
 public class AddSCMRequest {
 
   private final String clusterId;
