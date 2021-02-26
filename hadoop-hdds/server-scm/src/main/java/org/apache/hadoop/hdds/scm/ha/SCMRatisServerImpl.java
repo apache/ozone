@@ -143,7 +143,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
 
   @Override
   public RaftServer.Division getDivision() {
-      return division;
+    return division;
   }
 
   @VisibleForTesting
