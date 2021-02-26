@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.scm;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
@@ -34,6 +35,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -68,8 +70,6 @@ public class TestStorageContainerManagerHA {
   private String omServiceId;
   private static int numOfOMs = 3;
   private String scmServiceId;
-  // TODO: 3 servers will not work until SCM HA configs are considered in
-  // SCM HA Ratis server init
   private static int numOfSCMs = 3;
 
 
@@ -137,7 +137,7 @@ public class TestStorageContainerManagerHA {
     testPutKey();
   }
 
-  public void testPutKey() throws IOException {
+  public void testPutKey() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     Instant testStartTime = Instant.now();
@@ -172,6 +172,16 @@ public class TestStorageContainerManagerHA {
     final OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
     final List<OmKeyLocationInfo> keyLocationInfos =
         keyInfo.getKeyLocationVersions().get(0).getBlocksLatestVersionOnly();
+    long index = -1;
+    for (StorageContainerManager scm : cluster.getStorageContainerManagers()) {
+      if (scm.checkLeader()) {
+        index = getLastAppliedIndex(scm);
+      }
+    }
+    Assert.assertFalse(index == -1);
+    long finalIndex = index;
+    // Ensure all follower scms have caught up with the leader
+    GenericTestUtils.waitFor(() -> areAllScmInSync(finalIndex), 100, 10000);
     final long containerID = keyLocationInfos.get(0).getContainerID();
     for (int k = 0; k < numOfSCMs; k++) {
       StorageContainerManager scm =
@@ -184,5 +194,19 @@ public class TestStorageContainerManagerHA {
       Assert.assertNotNull(scm.getScmMetadataStore().getContainerTable()
           .get(ContainerID.valueOf(containerID)));
     }
+  }
+
+  private long getLastAppliedIndex(StorageContainerManager scm) {
+    return scm.getScmHAManager().getRatisServer().getDivision().getInfo()
+        .getLastAppliedIndex();
+  }
+
+  private boolean areAllScmInSync(long leaderIndex) {
+    List<StorageContainerManager> scms = cluster.getStorageContainerManagers();
+    boolean sync = false;
+    for (StorageContainerManager scm : scms) {
+      sync = getLastAppliedIndex(scm) == leaderIndex;
+    }
+    return sync;
   }
 }

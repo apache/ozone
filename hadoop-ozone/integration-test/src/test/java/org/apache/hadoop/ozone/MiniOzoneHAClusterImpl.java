@@ -65,7 +65,6 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
   private final OMHAService omhaService;
   private final SCMHAService scmhaService;
-  private static ObjectStore store = null;
 
   private int waitForClusterToBeReadyTimeout = 120000; // 2 min
 
@@ -467,11 +466,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
             OzoneConfiguration scmConfig = new OzoneConfiguration(conf);
             scmConfig.set(OZONE_METADATA_DIRS, metaDirPath);
             scmConfig.set(ScmConfigKeys.OZONE_SCM_NODE_ID_KEY, nodeId);
-            scmConfig.set(ScmConfigKeys.OZONE_SCM_HTTP_ADDRESS_KEY, "");
-            scmConfig.set(ScmConfigKeys.OZONE_SCM_HTTPS_ADDRESS_KEY, "");
             scmConfig.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
-
-            // TODO: set SCM HA configs
 
             configureSCM();
             if (i == 1) {
@@ -518,19 +513,6 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
         }
       }
       return scmList;
-    }
-
-    protected void configureSCM() {
-//      conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "127.0.0.1:0");
-//      conf.set(
-//      ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY, "127.0.0.1:0");
-//      conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY, "127.0.0.1:0");
-//      conf.set(ScmConfigKeys.OZONE_SCM_HTTP_ADDRESS_KEY, "127.0.0.1:0");
-//      conf.setInt(
-//      ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY, numOfScmHandlers);
-//      conf.set(HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
-//          "3s");
-//      configureSCMheartbeat();
     }
 
     /**
@@ -581,7 +563,6 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
         conf.set(dnPortKey, "127.0.0.1:" + (port + 5));
         conf.set(blockClientKey, "127.0.0.1:" + (port + 6));
         conf.set(ssClientKey, "127.0.0.1:" + (port + 7));
-        //conf.setInt("ozone.scm.ha.ratis.grpc.bind.port", port + 8);
         conf.setInt(scmGrpcPortKey, port + 8);
         scmNames.append(",").append("localhost:" + (port + 5));
         conf.set(ScmConfigKeys.
