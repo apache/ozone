@@ -141,7 +141,7 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
    */
   public String getSCMCertificate(ScmNodeDetailsProto scmNodeDetails,
       String certSignReq) throws IOException {
-   return getSCMCertChain(scmNodeDetails, certSignReq).getX509Certificate();
+    return getSCMCertChain(scmNodeDetails, certSignReq).getX509Certificate();
   }
 
 

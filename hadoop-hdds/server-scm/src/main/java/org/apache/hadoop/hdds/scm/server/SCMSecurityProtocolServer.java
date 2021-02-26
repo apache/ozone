@@ -31,7 +31,6 @@ import java.util.concurrent.Future;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.OzoneManagerDetailsProto;
@@ -74,7 +73,8 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
   private final StorageContainerManager storageContainerManager;
 
   SCMSecurityProtocolServer(OzoneConfiguration conf,
-      CertificateServer certificateServer, StorageContainerManager scm) throws IOException {
+      CertificateServer certificateServer, StorageContainerManager scm)
+      throws IOException {
     this.storageContainerManager = scm;
     this.certificateServer = certificateServer;
     final int handlerCount =

@@ -22,7 +22,6 @@ package org.apache.hadoop.hdds.security.x509.certificate.authority;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.commons.validator.routines.DomainValidator;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
@@ -261,8 +260,8 @@ public class DefaultCAServer implements CertificateServer {
         getCACertificate(), java.sql.Date.valueOf(beginDate),
         java.sql.Date.valueOf(endDate), csr, scmID, clusterID);
     if (nodeType.equals(NodeType.SCM)) {
-      // If scm cert store in scm cert table and valid cert table.
-      // This is to help to return scm certs when get certs call.
+      // If the role is SCM, store certificate in scm cert table and valid cert
+      // table. This is to help to return scm certs during getCertificate call.
       store.storeValidScmCertificate(xcert.getSerialNumber(),
           CertificateCodec.getX509Certificate(xcert));
     } else {
