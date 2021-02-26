@@ -697,7 +697,8 @@ public final class OMFileRequest {
     if (Strings.isNullOrEmpty(prefixName)) {
       return fileName;
     }
-    return prefixName.concat(OzoneConsts.OZONE_URI_DELIMITER).concat(fileName);
+    prefixName = OzoneFSUtils.addTrailingSlashIfNeeded(prefixName);
+    return prefixName.concat(fileName);
   }
 
   /**
