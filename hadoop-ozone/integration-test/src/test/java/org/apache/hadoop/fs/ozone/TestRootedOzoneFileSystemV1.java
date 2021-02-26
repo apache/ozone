@@ -82,6 +82,8 @@ public class TestRootedOzoneFileSystemV1 extends TestRootedOzoneFileSystem {
     // sub-directories of the renamed directory have also been renamed.
     assertTrue("Keys under the renamed directory not renamed",
         getFs().exists(new Path(dest, "sub_dir1")));
+    // cleanup 
+    getFs().delete(dest,true);
   }
 
 }
