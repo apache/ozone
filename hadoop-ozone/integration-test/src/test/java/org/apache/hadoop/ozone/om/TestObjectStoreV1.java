@@ -17,15 +17,18 @@
 package org.apache.hadoop.ozone.om;
 
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.fs.ozone.OzoneFileSystem;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -35,6 +38,7 @@ import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
+import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
@@ -51,8 +55,13 @@ import org.junit.Test;
 import org.junit.rules.Timeout;
 
 import java.io.IOException;
+import java.net.URI;
+import java.util.Arrays;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
@@ -60,6 +69,7 @@ import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationType.STAND_ALONE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.junit.Assert.assertEquals;
@@ -77,7 +87,7 @@ public class TestObjectStoreV1 {
   private static FileSystem fs;
 
   @Rule
-  public Timeout timeout = new Timeout(240000);
+  public Timeout timeout = new Timeout(1200000);
 
   /**
    * Create a MiniDFSCluster for testing.
@@ -273,6 +283,255 @@ public class TestObjectStoreV1 {
     verifyKeyInFileTable(fileTable, fileName, dirPathC.getObjectID(), true);
     verifyKeyInOpenFileTable(openFileTable, clientID, fileName,
             dirPathC.getObjectID(), true);
+  }
+
+  /**
+   * Verify listKeys at different levels.
+   *
+   *                  buck-1
+   *                    |
+   *                    a
+   *                    |
+   *      -----------------------------------
+   *     |              |                       |
+   *     b1             b2                      b3
+   *    -----           --------               ----------
+   *   |      |        |    |   |             |    |     |
+   *  c1     c2        d1   d2  d3             e1   e2   e3
+   *  |      |         |    |   |              |    |    |
+   * c1.tx  c2.tx   d11.tx  | d31.tx           |    |    e31.tx
+   *                      --------             |   e21.tx
+   *                     |        |            |
+   *                   d21.tx   d22.tx        e11.tx
+   *
+   * Above is the FS tree structure.
+   */
+  @Test
+  public void testListKeysAtDifferentLevels() throws Exception {
+    OzoneClient client = cluster.getClient();
+
+    ObjectStore objectStore = client.getObjectStore();
+    OzoneVolume ozoneVolume = objectStore.getVolume(volumeName);
+    Assert.assertTrue(ozoneVolume.getName().equals(volumeName));
+    OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
+    Assert.assertTrue(ozoneBucket.getName().equals(bucketName));
+
+    String keyc1 = "/a/b1/c1/c1.tx";
+    String keyc2 = "/a/b1/c2/c2.tx";
+
+    String keyd13 = "/a/b2/d1/d11.tx";
+    String keyd21 = "/a/b2/d2/d21.tx";
+    String keyd22 = "/a/b2/d2/d22.tx";
+    String keyd31 = "/a/b2/d3/d31.tx";
+
+    String keye11 = "/a/b3/e1/e11.tx";
+    String keye21 = "/a/b3/e2/e21.tx";
+    String keye31 = "/a/b3/e3/e31.tx";
+
+    LinkedList<String> keys = new LinkedList<>();
+    keys.add(keyc1);
+    keys.add(keyc2);
+
+    keys.add(keyd13);
+    keys.add(keyd21);
+    keys.add(keyd22);
+    keys.add(keyd31);
+
+    keys.add(keye11);
+    keys.add(keye21);
+    keys.add(keye31);
+
+    int length = 10;
+    byte[] input = new byte[length];
+    Arrays.fill(input, (byte)96);
+
+    createKeys(ozoneBucket, keys);
+
+    // Root level listing keys
+    Iterator<? extends OzoneKey> ozoneKeyIterator =
+        ozoneBucket.listKeys(null, null);
+    verifyFullTreeStructure(ozoneKeyIterator);
+
+    ozoneKeyIterator =
+        ozoneBucket.listKeys("a/", null);
+    verifyFullTreeStructure(ozoneKeyIterator);
+
+    LinkedList<String> expectedKeys;
+
+    // Intermediate level keyPrefix - 2nd level
+    ozoneKeyIterator =
+        ozoneBucket.listKeys("a///b2///", null);
+    expectedKeys = new LinkedList<>();
+    expectedKeys.add("a/b2/");
+    expectedKeys.add("a/b2/d1/");
+    expectedKeys.add("a/b2/d2/");
+    expectedKeys.add("a/b2/d3/");
+    expectedKeys.add("a/b2/d1/d11.tx");
+    expectedKeys.add("a/b2/d2/d21.tx");
+    expectedKeys.add("a/b2/d2/d22.tx");
+    expectedKeys.add("a/b2/d3/d31.tx");
+    checkKeyList(ozoneKeyIterator, expectedKeys);
+
+    // Intermediate level keyPrefix - 3rd level
+    ozoneKeyIterator =
+        ozoneBucket.listKeys("a/b2/d1", null);
+    expectedKeys = new LinkedList<>();
+    expectedKeys.add("a/b2/d1/");
+    expectedKeys.add("a/b2/d1/d11.tx");
+    checkKeyList(ozoneKeyIterator, expectedKeys);
+
+    // Boundary of a level
+    ozoneKeyIterator =
+        ozoneBucket.listKeys("a/b2/d2", "a/b2/d2/d21.tx");
+    expectedKeys = new LinkedList<>();
+    expectedKeys.add("a/b2/d2/d22.tx");
+    checkKeyList(ozoneKeyIterator, expectedKeys);
+
+    // Boundary case - last node in the depth-first-traversal
+    ozoneKeyIterator =
+        ozoneBucket.listKeys("a/b3/e3", "a/b3/e3/e31.tx");
+    expectedKeys = new LinkedList<>();
+    checkKeyList(ozoneKeyIterator, expectedKeys);
+  }
+
+  private void verifyFullTreeStructure(Iterator<? extends OzoneKey> keyItr) {
+    LinkedList<String> expectedKeys = new LinkedList<>();
+    expectedKeys.add("a/");
+    expectedKeys.add("a/b1/");
+    expectedKeys.add("a/b2/");
+    expectedKeys.add("a/b3/");
+    expectedKeys.add("a/b1/c1/");
+    expectedKeys.add("a/b1/c2/");
+    expectedKeys.add("a/b1/c1/c1.tx");
+    expectedKeys.add("a/b1/c2/c2.tx");
+    expectedKeys.add("a/b2/d1/");
+    expectedKeys.add("a/b2/d2/");
+    expectedKeys.add("a/b2/d3/");
+    expectedKeys.add("a/b2/d1/d11.tx");
+    expectedKeys.add("a/b2/d2/d21.tx");
+    expectedKeys.add("a/b2/d2/d22.tx");
+    expectedKeys.add("a/b2/d3/d31.tx");
+    expectedKeys.add("a/b3/e1/");
+    expectedKeys.add("a/b3/e2/");
+    expectedKeys.add("a/b3/e3/");
+    expectedKeys.add("a/b3/e1/e11.tx");
+    expectedKeys.add("a/b3/e2/e21.tx");
+    expectedKeys.add("a/b3/e3/e31.tx");
+    checkKeyList(keyItr, expectedKeys);
+  }
+
+  @Test
+  public void testListKeysWithNotNormalizedPath() throws Exception {
+    OzoneClient client = cluster.getClient();
+
+    ObjectStore objectStore = client.getObjectStore();
+    OzoneVolume ozoneVolume = objectStore.getVolume(volumeName);
+    Assert.assertTrue(ozoneVolume.getName().equals(volumeName));
+    OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
+    Assert.assertTrue(ozoneBucket.getName().equals(bucketName));
+
+    String key1 = "/dir1///dir2/file1/";
+    String key2 = "/dir1///dir2/file2/";
+    String key3 = "/dir1///dir2/file3/";
+
+    LinkedList<String> keys = new LinkedList<>();
+    keys.add("dir1/");
+    keys.add("dir1/dir2/");
+    keys.add(OmUtils.normalizeKey(key1, false));
+    keys.add(OmUtils.normalizeKey(key2, false));
+    keys.add(OmUtils.normalizeKey(key3, false));
+
+    int length = 10;
+    byte[] input = new byte[length];
+    Arrays.fill(input, (byte)96);
+
+    createKey(ozoneBucket, key1, 10, input);
+    createKey(ozoneBucket, key2, 10, input);
+    createKey(ozoneBucket, key3, 10, input);
+
+    // Iterator with key name as prefix.
+
+    Iterator<? extends OzoneKey> ozoneKeyIterator =
+            ozoneBucket.listKeys("/dir1//", null);
+
+    checkKeyList(ozoneKeyIterator, keys);
+
+    // Iterator with with normalized key prefix.
+    ozoneKeyIterator =
+            ozoneBucket.listKeys("dir1/");
+
+    checkKeyList(ozoneKeyIterator, keys);
+
+    // Iterator with key name as previous key.
+    ozoneKeyIterator = ozoneBucket.listKeys(null,
+            "/dir1///dir2/file1/");
+
+    // Remove keys before //dir1/dir2/file1
+    keys.remove("dir1/");
+    keys.remove("dir1/dir2/");
+    keys.remove("dir1/dir2/file1");
+
+    checkKeyList(ozoneKeyIterator, keys);
+
+    // Iterator with  normalized key as previous key.
+    ozoneKeyIterator = ozoneBucket.listKeys(null,
+            OmUtils.normalizeKey(key1, false));
+
+    checkKeyList(ozoneKeyIterator, keys);
+  }
+
+  private void checkKeyList(Iterator<? extends OzoneKey > ozoneKeyIterator,
+      List<String> keys) {
+
+    LinkedList<String> outputKeys = new LinkedList<>();
+    while (ozoneKeyIterator.hasNext()) {
+      OzoneKey ozoneKey = ozoneKeyIterator.next();
+      outputKeys.add(ozoneKey.getName());
+    }
+
+    Assert.assertEquals(keys, outputKeys);
+  }
+
+  private void createKeys(OzoneBucket ozoneBucket, List<String> keys)
+      throws Exception {
+    int length = 10;
+    byte[] input = new byte[length];
+    Arrays.fill(input, (byte) 96);
+    for (String key : keys) {
+      createKey(ozoneBucket, key, 10, input);
+    }
+  }
+
+  private void createKey(OzoneBucket ozoneBucket, String key, int length,
+      byte[] input) throws Exception {
+
+    OzoneOutputStream ozoneOutputStream =
+            ozoneBucket.createKey(key, length);
+
+    ozoneOutputStream.write(input);
+    ozoneOutputStream.write(input, 0, 10);
+    ozoneOutputStream.close();
+
+    // Read the key with given key name.
+    OzoneInputStream ozoneInputStream = ozoneBucket.readKey(key);
+    byte[] read = new byte[length];
+    ozoneInputStream.read(read, 0, length);
+    ozoneInputStream.close();
+
+    String inputString = new String(input, StandardCharsets.UTF_8);
+    Assert.assertEquals(inputString, new String(read, StandardCharsets.UTF_8));
+
+    // Read using filesystem.
+    String rootPath = String.format("%s://%s.%s/", OZONE_URI_SCHEME,
+            bucketName, volumeName, StandardCharsets.UTF_8);
+    OzoneFileSystem o3fs = (OzoneFileSystem) FileSystem.get(new URI(rootPath),
+            conf);
+    FSDataInputStream fsDataInputStream = o3fs.open(new Path(key));
+    read = new byte[length];
+    fsDataInputStream.read(read, 0, length);
+    ozoneInputStream.close();
+
+    Assert.assertEquals(inputString, new String(read, StandardCharsets.UTF_8));
   }
 
   @Test
