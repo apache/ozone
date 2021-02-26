@@ -16,7 +16,9 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.scm.server.upgrade; 
+package org.apache.hadoop.hdds.scm.server.upgrade;
+
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.DATANODE_SCHEMA_V2;
 
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.upgrade.HDDSUpgradeAction;
@@ -26,12 +28,13 @@ import org.slf4j.LoggerFactory;
 /**
  * SCM Upgrade Action for the very first Upgrade Version.
  */
-public class SCMUpgradeActionFirstUpgradeVersion implements
+public class ScmOnFinalizeActionForDatanodeSchemaV2 implements
     HDDSUpgradeAction<StorageContainerManager> {
   public static final Logger LOG =
-      LoggerFactory.getLogger(SCMUpgradeActionFirstUpgradeVersion.class);
+      LoggerFactory.getLogger(ScmOnFinalizeActionForDatanodeSchemaV2.class);
   @Override
   public void executeAction(StorageContainerManager arg) throws Exception {
-    LOG.info("Executing SCM Upgrade action for Very first Upgrade Version");
+    LOG.info("Executing SCM On Finalize action for layout feature {}",
+        DATANODE_SCHEMA_V2);
   }
 }

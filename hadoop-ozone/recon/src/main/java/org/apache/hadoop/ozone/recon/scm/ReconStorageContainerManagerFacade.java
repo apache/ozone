@@ -107,7 +107,7 @@ public class ReconStorageContainerManagerFacade
         .createDBStore(ozoneConfiguration, new ReconSCMDBDefinition());
 
     this.scmLayoutVersionManager =
-        new HDDSLayoutVersionManager(scmStorageConfig);
+        new HDDSLayoutVersionManager(scmStorageConfig.getLayoutVersion());
     this.nodeManager =
         new ReconNodeManager(conf, scmStorageConfig, eventQueue, clusterMap,
             ReconSCMDBDefinition.NODES.getTable(dbStore),

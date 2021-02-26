@@ -27,13 +27,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Handles Stale node event.
+ * Handles Read Only healthy to healthy node event. (Possibly due to a
+ * datanode having finalized)
  */
 public class ReadOnlyHealthyToHealthyNodeHandler
     implements EventHandler<DatanodeDetails> {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(NonHealthyToReadOnlyHealthyNodeHandler.class);
+      LoggerFactory.getLogger(ReadOnlyHealthyToHealthyNodeHandler.class);
 
   private final PipelineManager pipelineManager;
   private final ConfigurationSource conf;

@@ -41,6 +41,7 @@ import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 
 import static java.lang.Thread.sleep;
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.apache.hadoop.test.MetricsAsserts.assertGauge;
 import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
@@ -58,8 +59,6 @@ import org.mockito.Mockito;
  */
 public class TestSCMNodeMetrics {
 
-  private static final Integer METADATA_LAYOUT_VERSION = 1;
-  private static final Integer SOFTWARE_LAYOUT_VERSION = 1;
   private static SCMNodeManager nodeManager;
 
   private static DatanodeDetails registeredDatanode;
@@ -74,9 +73,9 @@ public class TestSCMNodeMetrics {
     HDDSLayoutVersionManager versionManager =
         Mockito.mock(HDDSLayoutVersionManager.class);
     Mockito.when(versionManager.getMetadataLayoutVersion())
-        .thenReturn(METADATA_LAYOUT_VERSION);
+        .thenReturn(maxLayoutVersion());
     Mockito.when(versionManager.getSoftwareLayoutVersion())
-        .thenReturn(SOFTWARE_LAYOUT_VERSION);
+        .thenReturn(maxLayoutVersion());
     nodeManager = new SCMNodeManager(source, config, publisher,
         new NetworkTopologyImpl(source), versionManager);
 
@@ -87,7 +86,7 @@ public class TestSCMNodeMetrics {
         .build();
 
     nodeManager.register(registeredDatanode, createNodeReport(),
-        PipelineReportsProto.newBuilder().build(), null);
+        PipelineReportsProto.newBuilder().build());
 
   }
 

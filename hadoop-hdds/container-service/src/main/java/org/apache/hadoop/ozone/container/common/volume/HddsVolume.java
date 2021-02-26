@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
+import static org.apache.hadoop.ozone.container.common.HDDSVolumeLayoutVersion.getLatestVersion;
+
 import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
@@ -35,7 +37,6 @@ import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
 import org.apache.hadoop.hdfs.server.datanode.checker.Checkable;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
 import org.apache.hadoop.ozone.common.InconsistentStorageStateException;
-import org.apache.hadoop.ozone.container.common.DataNodeLayoutVersion;
 import org.apache.hadoop.ozone.container.common.helpers.DatanodeVersionFile;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.util.DiskChecker;
@@ -271,7 +272,7 @@ public class HddsVolume
   private void createVersionFile() throws IOException {
     this.storageID = HddsVolumeUtil.generateUuid();
     this.cTime = Time.now();
-    this.layoutVersion = DataNodeLayoutVersion.getLatestVersion().getVersion();
+    this.layoutVersion = getLatestVersion().getVersion();
 
     if (this.clusterID == null || datanodeUuid == null) {
       // HddsDatanodeService does not have the cluster information yet. Wait
@@ -296,7 +297,7 @@ public class HddsVolume
     Preconditions.checkArgument(this.cTime > 0,
         "Creation Time should be positive");
     Preconditions.checkArgument(this.layoutVersion ==
-            DataNodeLayoutVersion.getLatestVersion().getVersion(),
+            getLatestVersion().getVersion(),
         "Version File should have the latest LayOutVersion");
 
     File versionFile = getVersionFile();

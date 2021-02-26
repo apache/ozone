@@ -651,9 +651,9 @@ public class NodeStateManager implements Runnable, Closeable {
               node);
         }
       }
+
     } catch (NodeNotFoundException ex) {
       LOG.error("Inconsistent NodeStateMap! {}", nodeStateMap);
-      ex.printStackTrace();
     }
   }
 
@@ -710,18 +710,18 @@ public class NodeStateManager implements Runnable, Closeable {
         NodeStatus status = nodeStateMap.getNodeStatus(node.getUuid());
         switch (status.getHealth()) {
         case HEALTHY:
-          // Move the node to STALE if the last heartbeat time is less than
-          // configured stale-node interval.
           updateNodeLayoutVersionState(node, layoutMisMatchCondition, status,
               NodeLifeCycleEvent.LAYOUT_MISMATCH);
+          // Move the node to STALE if the last heartbeat time is less than
+          // configured stale-node interval.
           updateNodeState(node, staleNodeCondition, status,
               NodeLifeCycleEvent.TIMEOUT);
           break;
         case HEALTHY_READONLY:
-          // Move the node to STALE if the last heartbeat time is less than
-          // configured stale-node interval.
           updateNodeLayoutVersionState(node, layoutMatchCondition, status,
               NodeLifeCycleEvent.LAYOUT_MATCH);
+          // Move the node to STALE if the last heartbeat time is less than
+          // configured stale-node interval.
           updateNodeState(node, staleNodeCondition, status,
               NodeLifeCycleEvent.TIMEOUT);
           break;

@@ -32,6 +32,8 @@ import java.util.stream.Collectors;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Layout Version Manager containing generic method implementations.
@@ -40,33 +42,38 @@ import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status;
 public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
     implements LayoutVersionManager, LayoutVersionManagerMXBean {
 
+  private static final Logger LOG =
+      LoggerFactory.getLogger(AbstractLayoutVersionManager.class);
+
   protected int metadataLayoutVersion; // MLV.
   protected int softwareLayoutVersion; // SLV.
   protected TreeMap<Integer, T> features = new TreeMap<>();
   protected Map<String, T> featureMap = new HashMap<>();
-  protected volatile boolean isInitialized = false;
-  protected volatile Status currentUpgradeState =
-      FINALIZATION_REQUIRED;
+  protected volatile Status currentUpgradeState = FINALIZATION_REQUIRED;
 
   protected void init(int version, T[] lfs) throws IOException {
 
-    if (!isInitialized) {
-      metadataLayoutVersion = version;
-      initializeFeatures(lfs);
-      softwareLayoutVersion = features.lastKey();
-      isInitialized = true;
-      if (softwareIsBehindMetaData()) {
-        throw new IOException(
-            String.format("Cannot initialize VersionManager. Metadata " +
-                    "layout version (%d) > software layout version (%d)",
-                metadataLayoutVersion, softwareLayoutVersion));
-      } else if (metadataLayoutVersion == softwareLayoutVersion) {
-        currentUpgradeState = ALREADY_FINALIZED;
-      }
+    metadataLayoutVersion = version;
+    initializeFeatures(lfs);
+    softwareLayoutVersion = features.lastKey();
+    if (softwareIsBehindMetaData()) {
+      throw new IOException(
+          String.format("Cannot initialize VersionManager. Metadata " +
+                  "layout version (%d) > software layout version (%d)",
+              metadataLayoutVersion, softwareLayoutVersion));
+    } else if (metadataLayoutVersion == softwareLayoutVersion) {
+      currentUpgradeState = ALREADY_FINALIZED;
     }
 
+    LayoutFeature mlvFeature = features.get(metadataLayoutVersion);
+    LayoutFeature slvFeature = features.get(softwareLayoutVersion);
+    LOG.info("Initializing Layout version manager with metadata layout" +
+        " = {} (version = {}), software layout = {} (version = {})",
+        mlvFeature, mlvFeature.layoutVersion(),
+        slvFeature, slvFeature.layoutVersion());
+
     MBeans.register("LayoutVersionManager",
-        "AbstractLayoutVersionManager", this);
+        getClass().getSimpleName(), this);
   }
 
   public Status getUpgradeState() {
@@ -84,15 +91,6 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
       features.put(f.layoutVersion(), f);
       featureMap.put(f.name(), f);
     });
-  }
-
-  protected void reset() {
-    metadataLayoutVersion = 0;
-    softwareLayoutVersion = 0;
-    featureMap.clear();
-    features.clear();
-    isInitialized = false;
-    currentUpgradeState = ALREADY_FINALIZED;
   }
 
   public void finalized(T layoutFeature) {

@@ -40,6 +40,7 @@ public class SCMUpgradeFinalizer extends
 
   public SCMUpgradeFinalizer(HDDSLayoutVersionManager versionManager) {
     super(versionManager);
+    loadSCMUpgradeActions();
   }
 
   @Override
@@ -100,6 +101,15 @@ public class SCMUpgradeFinalizer extends
         versionManager.setUpgradeState(FINALIZATION_DONE);
         isDone = true;
       }
+    }
+  }
+
+  private void loadSCMUpgradeActions() {
+    // we just need to iterate through the enum list to load
+    // the actions.
+    for (SCMLayoutAction action : SCMLayoutAction.values()) {
+      LOG.debug("Loading datanode action for {}",
+          action.getHddsFeature().description());
     }
   }
 }

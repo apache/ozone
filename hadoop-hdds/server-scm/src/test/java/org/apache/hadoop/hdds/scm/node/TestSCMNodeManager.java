@@ -94,6 +94,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys
     .OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.DATANODE_COMMAND;
+import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVersionProto;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -179,10 +180,9 @@ public class TestSCMNodeManager {
     try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
       LayoutVersionManager versionManager =
           nodeManager.getLayoutVersionManager();
-      LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
-          .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
-          .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
-          .build();
+      LayoutVersionProto layoutInfo = toLayoutVersionProto(
+          versionManager.getMetadataLayoutVersion(),
+          versionManager.getSoftwareLayoutVersion());
       int registeredNodes = 5;
       // Send some heartbeats from different nodes.
       for (int x = 0; x < registeredNodes; x++) {
@@ -211,15 +211,17 @@ public class TestSCMNodeManager {
       throws IOException, InterruptedException, AuthenticationException {
 
     try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
-      Integer nodeManagerSoftwareLayoutVersion =
-          nodeManager.getLayoutVersionManager().getSoftwareLayoutVersion();
-      LayoutVersionProto layoutInfoSuccess = LayoutVersionProto.newBuilder()
-          .setMetadataLayoutVersion(1)
-          .setSoftwareLayoutVersion(nodeManagerSoftwareLayoutVersion).build();
-      LayoutVersionProto layoutInfoFailure = LayoutVersionProto.newBuilder()
-          .setMetadataLayoutVersion(1)
-          .setSoftwareLayoutVersion(nodeManagerSoftwareLayoutVersion + 1)
-          .build();
+      HDDSLayoutVersionManager layoutVersionManager =
+          nodeManager.getLayoutVersionManager();
+      int nodeManagerMetadataLayoutVersion =
+          layoutVersionManager.getMetadataLayoutVersion();
+      int nodeManagerSoftwareLayoutVersion =
+          layoutVersionManager.getSoftwareLayoutVersion();
+      LayoutVersionProto layoutInfoSuccess = toLayoutVersionProto(
+          nodeManagerMetadataLayoutVersion, nodeManagerSoftwareLayoutVersion);
+      LayoutVersionProto layoutInfoFailure = toLayoutVersionProto(
+          nodeManagerSoftwareLayoutVersion + 1,
+          nodeManagerSoftwareLayoutVersion + 1);
       RegisteredCommand rcmd = nodeManager.register(
           MockDatanodeDetails.randomDatanodeDetails(), null,
           getRandomPipelineReports(), layoutInfoSuccess);
@@ -269,10 +271,9 @@ public class TestSCMNodeManager {
     DatanodeDetails datanodeDetails = TestUtils
         .createRandomDatanodeAndRegister(nodeManager);
     LayoutVersionManager versionManager = nodeManager.getLayoutVersionManager();
-    LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
-        .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
-        .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
-        .build();
+    LayoutVersionProto layoutInfo = toLayoutVersionProto(
+        versionManager.getMetadataLayoutVersion(),
+        versionManager.getSoftwareLayoutVersion());
     nodeManager.close();
 
     // These should never be processed.
@@ -301,10 +302,9 @@ public class TestSCMNodeManager {
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
       LayoutVersionManager versionManager =
           nodeManager.getLayoutVersionManager();
-      LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
-          .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
-          .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
-          .build();
+      LayoutVersionProto layoutInfo = toLayoutVersionProto(
+          versionManager.getMetadataLayoutVersion(),
+          versionManager.getSoftwareLayoutVersion());
 
       for (int x = 0; x < count; x++) {
         DatanodeDetails datanodeDetails = TestUtils
@@ -400,10 +400,9 @@ public class TestSCMNodeManager {
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
       LayoutVersionManager versionManager =
           nodeManager.getLayoutVersionManager();
-      LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
-          .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
-          .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
-          .build();
+      LayoutVersionProto layoutInfo = toLayoutVersionProto(
+          versionManager.getMetadataLayoutVersion(),
+          versionManager.getSoftwareLayoutVersion());
       List<DatanodeDetails> nodeList = createNodeSet(nodeManager, nodeCount);
 
 
@@ -507,10 +506,9 @@ public class TestSCMNodeManager {
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
       LayoutVersionManager versionManager =
           nodeManager.getLayoutVersionManager();
-      LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
-          .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
-          .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
-          .build();
+      LayoutVersionProto layoutInfo = toLayoutVersionProto(
+          versionManager.getMetadataLayoutVersion(),
+          versionManager.getSoftwareLayoutVersion());
       DatanodeDetails node1 =
           TestUtils.createRandomDatanodeAndRegister(nodeManager);
       DatanodeDetails node2 =
@@ -610,7 +608,7 @@ public class TestSCMNodeManager {
     when(scmStorageConfig.getClusterID()).thenReturn("xyz111");
     EventPublisher eventPublisher = mock(EventPublisher.class);
     HDDSLayoutVersionManager lvm  =
-        new HDDSLayoutVersionManager(scmStorageConfig);
+        new HDDSLayoutVersionManager(scmStorageConfig.getLayoutVersion());
     SCMNodeManager nodeManager  = new SCMNodeManager(conf,
         scmStorageConfig, eventPublisher, new NetworkTopologyImpl(conf), lvm);
     DatanodeDetails node1 =
@@ -716,10 +714,9 @@ public class TestSCMNodeManager {
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
       LayoutVersionManager versionManager =
           nodeManager.getLayoutVersionManager();
-      LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
-          .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
-          .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
-          .build();
+      LayoutVersionProto layoutInfo = toLayoutVersionProto(
+          versionManager.getMetadataLayoutVersion(),
+          versionManager.getSoftwareLayoutVersion());
       DatanodeDetails healthyNode =
           TestUtils.createRandomDatanodeAndRegister(nodeManager);
       DatanodeDetails staleNode =
@@ -840,10 +837,9 @@ public class TestSCMNodeManager {
                                 List<DatanodeDetails> list,
                                 int sleepDuration) throws InterruptedException {
     LayoutVersionManager versionManager = manager.getLayoutVersionManager();
-    LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
-        .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
-        .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
-        .build();
+    LayoutVersionProto layoutInfo = toLayoutVersionProto(
+        versionManager.getMetadataLayoutVersion(),
+        versionManager.getSoftwareLayoutVersion());
     while (!Thread.currentThread().isInterrupted()) {
       for (DatanodeDetails dn : list) {
         manager.processHeartbeat(dn, layoutInfo);
@@ -931,10 +927,9 @@ public class TestSCMNodeManager {
 
       LayoutVersionManager versionManager =
           nodeManager.getLayoutVersionManager();
-      LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
-          .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
-          .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
-          .build();
+      LayoutVersionProto layoutInfo = toLayoutVersionProto(
+          versionManager.getMetadataLayoutVersion(),
+          versionManager.getSoftwareLayoutVersion());
 
       // No Thread just one time HBs the node manager, so that these will be
       // marked as dead nodes eventually.
@@ -1068,10 +1063,10 @@ public class TestSCMNodeManager {
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
       LayoutVersionManager versionManager =
           nodeManager.getLayoutVersionManager();
-      LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
-          .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
-          .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
-          .build();
+      LayoutVersionProto layoutInfo = toLayoutVersionProto(
+          versionManager.getMetadataLayoutVersion(),
+          versionManager.getSoftwareLayoutVersion());
+
       EventQueue eventQueue = (EventQueue) scm.getEventQueue();
       for (int x = 0; x < nodeCount; x++) {
         DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
@@ -1081,8 +1076,7 @@ public class TestSCMNodeManager {
         String storagePath = testDir.getAbsolutePath() + "/" + dnId;
         StorageReportProto report = TestUtils
             .createStorageReport(dnId, storagePath, capacity, used, free, null);
-        nodeManager.register(dn, TestUtils.createNodeReport(report), null,
-            null);
+        nodeManager.register(dn, TestUtils.createNodeReport(report), null);
         nodeManager.processHeartbeat(dn, layoutInfo);
       }
       //TODO: wait for EventQueue to be processed
@@ -1137,13 +1131,12 @@ public class TestSCMNodeManager {
                 used, free, null, failed));
         failed = !failed;
       }
-      nodeManager.register(dn, TestUtils.createNodeReport(reports), null, null);
+      nodeManager.register(dn, TestUtils.createNodeReport(reports), null);
       LayoutVersionManager versionManager =
           nodeManager.getLayoutVersionManager();
-      LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
-          .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
-          .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
-          .build();
+      LayoutVersionProto layoutInfo = toLayoutVersionProto(
+          versionManager.getMetadataLayoutVersion(),
+          versionManager.getSoftwareLayoutVersion());
       nodeManager.processHeartbeat(dn, layoutInfo);
       //TODO: wait for EventQueue to be processed
       eventQueue.processAll(8000L);
@@ -1203,10 +1196,9 @@ public class TestSCMNodeManager {
             publisher);
         LayoutVersionManager versionManager =
             nodeManager.getLayoutVersionManager();
-        LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
-            .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
-            .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
-            .build();
+        LayoutVersionProto layoutInfo = toLayoutVersionProto(
+            versionManager.getMetadataLayoutVersion(),
+            versionManager.getSoftwareLayoutVersion());
         nodeManager.processHeartbeat(datanodeDetails, layoutInfo);
         Thread.sleep(100);
       }
@@ -1284,10 +1276,9 @@ public class TestSCMNodeManager {
 
       LayoutVersionManager versionManager =
           nodeManager.getLayoutVersionManager();
-      LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
-          .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
-          .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
-          .build();
+      LayoutVersionProto layoutInfo = toLayoutVersionProto(
+          versionManager.getMetadataLayoutVersion(),
+          versionManager.getSoftwareLayoutVersion());
 
       nodeManager.processHeartbeat(datanodeDetails, layoutInfo);
 
@@ -1329,9 +1320,8 @@ public class TestSCMNodeManager {
     try (SCMNodeManager nodemanager = createNodeManager(conf)) {
       eq.addHandler(DATANODE_COMMAND, nodemanager);
 
-      nodemanager
-          .register(datanodeDetails, TestUtils.createNodeReport(report),
-              getRandomPipelineReports(), null);
+      nodemanager.register(datanodeDetails, TestUtils.createNodeReport(report),
+              getRandomPipelineReports());
       eq.fireEvent(DATANODE_COMMAND,
           new CommandForDatanode<>(datanodeDetails.getUuid(),
               new CloseContainerCommand(1L,
@@ -1339,10 +1329,9 @@ public class TestSCMNodeManager {
 
       LayoutVersionManager versionManager =
           nodemanager.getLayoutVersionManager();
-      LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
-          .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
-          .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
-          .build();
+      LayoutVersionProto layoutInfo = toLayoutVersionProto(
+          versionManager.getMetadataLayoutVersion(),
+          versionManager.getSoftwareLayoutVersion());
       eq.processAll(1000L);
       List<SCMCommand> command =
           nodemanager.processHeartbeat(datanodeDetails, layoutInfo);
@@ -1424,7 +1413,7 @@ public class TestSCMNodeManager {
       for (int i = 0; i < nodeCount; i++) {
         DatanodeDetails node = createDatanodeDetails(
             UUID.randomUUID().toString(), hostNames[i], ipAddress[i], null);
-        nodeManager.register(node, null, null, null);
+        nodeManager.register(node, null, null);
       }
 
       // verify network topology cluster has all the registered nodes
@@ -1467,7 +1456,7 @@ public class TestSCMNodeManager {
       for (int i = 0; i < nodeCount; i++) {
         DatanodeDetails node = createDatanodeDetails(
             UUID.randomUUID().toString(), hostNames[i], ipAddress[i], null);
-        nodeManager.register(node, null, null, null);
+        nodeManager.register(node, null, null);
       }
 
       // verify network topology cluster has all the registered nodes
@@ -1517,10 +1506,9 @@ public class TestSCMNodeManager {
 
       LayoutVersionManager versionManager =
           nodeManager.getLayoutVersionManager();
-      LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
-          .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
-          .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
-          .build();
+      LayoutVersionProto layoutInfo = toLayoutVersionProto(
+          versionManager.getMetadataLayoutVersion(),
+          versionManager.getSoftwareLayoutVersion());
       nodeManager.register(datanodeDetails, TestUtils.createNodeReport(report),
           TestUtils.getRandomPipelineReports(), layoutInfo);
       nodeManager.processHeartbeat(datanodeDetails, layoutInfo);
@@ -1574,7 +1562,7 @@ public class TestSCMNodeManager {
       for (int i = 0; i < nodeCount; i++) {
         DatanodeDetails node = createDatanodeDetails(
             UUID.randomUUID().toString(), hostNames[i], ipAddress[i], null);
-        nodeManager.register(node, null, null, null);
+        nodeManager.register(node, null, null);
       }
       // test get node
       Assert.assertEquals(0, nodeManager.getNodesByAddress(null).size());

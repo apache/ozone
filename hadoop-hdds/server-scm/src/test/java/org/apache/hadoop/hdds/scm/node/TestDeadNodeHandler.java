@@ -143,25 +143,25 @@ public class TestDeadNodeHandler {
     // test case happy.
 
     nodeManager.register(datanode1,
-        TestUtils.createNodeReport(storageOne), null, null);
+        TestUtils.createNodeReport(storageOne), null);
     nodeManager.register(datanode2,
-        TestUtils.createNodeReport(storageOne), null, null);
+        TestUtils.createNodeReport(storageOne), null);
     nodeManager.register(datanode3,
-        TestUtils.createNodeReport(storageOne), null, null);
+        TestUtils.createNodeReport(storageOne), null);
 
     nodeManager.register(MockDatanodeDetails.randomDatanodeDetails(),
-        TestUtils.createNodeReport(storageOne), null, null);
+        TestUtils.createNodeReport(storageOne), null);
     nodeManager.register(MockDatanodeDetails.randomDatanodeDetails(),
-        TestUtils.createNodeReport(storageOne), null, null);
+        TestUtils.createNodeReport(storageOne), null);
     nodeManager.register(MockDatanodeDetails.randomDatanodeDetails(),
-        TestUtils.createNodeReport(storageOne), null, null);
+        TestUtils.createNodeReport(storageOne), null);
 
     nodeManager.register(MockDatanodeDetails.randomDatanodeDetails(),
-        TestUtils.createNodeReport(storageOne), null, null);
+        TestUtils.createNodeReport(storageOne), null);
     nodeManager.register(MockDatanodeDetails.randomDatanodeDetails(),
-        TestUtils.createNodeReport(storageOne), null, null);
+        TestUtils.createNodeReport(storageOne), null);
     nodeManager.register(MockDatanodeDetails.randomDatanodeDetails(),
-        TestUtils.createNodeReport(storageOne), null, null);
+        TestUtils.createNodeReport(storageOne), null);
 
     LambdaTestUtils.await(120000, 1000,
         () -> {

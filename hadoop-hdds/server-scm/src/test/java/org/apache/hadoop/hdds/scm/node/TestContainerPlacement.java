@@ -53,6 +53,9 @@ import org.apache.hadoop.test.PathUtils;
 import org.apache.commons.io.IOUtils;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import org.junit.After;
+
+import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVersionProto;
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.junit.Assert.assertEquals;
 import org.junit.Before;
 import org.junit.Ignore;
@@ -65,8 +68,6 @@ import org.mockito.Mockito;
  * Test for different container placement policy.
  */
 public class TestContainerPlacement {
-  private static final int SOFTWARE_LAYOUT_VERSION = 1;
-  private static final int METADATA_LAYOUT_VERSION = 1;
 
   @Rule
   public ExpectedException thrown = ExpectedException.none();
@@ -114,9 +115,9 @@ public class TestContainerPlacement {
     HDDSLayoutVersionManager versionManager =
         Mockito.mock(HDDSLayoutVersionManager.class);
     Mockito.when(versionManager.getMetadataLayoutVersion())
-        .thenReturn(METADATA_LAYOUT_VERSION);
+        .thenReturn(maxLayoutVersion());
     Mockito.when(versionManager.getSoftwareLayoutVersion())
-        .thenReturn(SOFTWARE_LAYOUT_VERSION);
+        .thenReturn(maxLayoutVersion());
     SCMNodeManager nodeManager = new SCMNodeManager(config,
         storageConfig, eventQueue, null, versionManager);
     return nodeManager;
@@ -166,10 +167,9 @@ public class TestContainerPlacement {
         TestUtils.getListOfRegisteredDatanodeDetails(nodeManager, nodeCount);
     XceiverClientManager xceiverClientManager = null;
     LayoutVersionManager versionManager = nodeManager.getLayoutVersionManager();
-    LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
-        .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
-        .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
-        .build();
+    LayoutVersionProto layoutInfo =
+        toLayoutVersionProto(versionManager.getMetadataLayoutVersion(),
+            versionManager.getSoftwareLayoutVersion());
     try {
       for (DatanodeDetails datanodeDetails : datanodes) {
         nodeManager.processHeartbeat(datanodeDetails, layoutInfo);

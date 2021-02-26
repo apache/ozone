@@ -116,14 +116,14 @@ public class MockNodeManager implements NodeManager {
     if (!nodes.isEmpty()) {
       for (int x = 0; x < nodes.size(); x++) {
         DatanodeDetails node = nodes.get(x);
-        register(node, null, null, null);
+        register(node, null, null);
         populateNodeMetric(node, x);
       }
     }
     if (initializeFakeNodes) {
       for (int x = 0; x < nodeCount; x++) {
         DatanodeDetails dd = MockDatanodeDetails.randomDatanodeDetails();
-        register(dd, null, null, null);
+        register(dd, null, null);
         populateNodeMetric(dd, x);
       }
     }

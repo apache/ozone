@@ -270,7 +270,7 @@ public class TestNodeDecommissionManager {
     for (int i=0; i<10; i++) {
       DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
       dns.add(dn);
-      nodeManager.register(dn, null, null, null);
+      nodeManager.register(dn, null, null);
     }
     // We have 10 random DNs, we want to create another one that is on the same
     // host as some of the others.
@@ -289,7 +289,7 @@ public class TestNodeDecommissionManager {
         .setNetworkLocation(multiDn.getNetworkLocation());
 
     DatanodeDetails dn = builder.build();
-    nodeManager.register(dn, null, null, null);
+    nodeManager.register(dn, null, null);
     dns.add(dn);
     return dns;
   }

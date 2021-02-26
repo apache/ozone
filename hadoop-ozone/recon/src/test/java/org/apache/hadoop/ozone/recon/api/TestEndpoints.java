@@ -80,6 +80,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayoutVersionProto;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
@@ -140,8 +141,6 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   private static final String PROMETHEUS_TEST_RESPONSE_FILE =
       "prometheus-test-response.txt";
   private ReconUtils reconUtilsMock;
-  private static final int TEST_SOFTWARE_LAYOUT_VERSION = 0;
-  private static final int TEST_METADATA_LAYOUT_VERSION = 0;
 
   private void initializeInjector() throws Exception {
     reconOMMetadataManager = getTestReconOmMetadataManager(
@@ -326,10 +325,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         NodeReportProto.newBuilder()
             .addStorageReport(storageReportProto3)
             .addStorageReport(storageReportProto4).build();
-    LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
-        .setMetadataLayoutVersion(TEST_METADATA_LAYOUT_VERSION)
-        .setSoftwareLayoutVersion(TEST_SOFTWARE_LAYOUT_VERSION)
-        .build();
+    LayoutVersionProto layoutInfo = defaultLayoutVersionProto();
 
     try {
       reconScm.getDatanodeProtocolServer()
@@ -338,7 +334,8 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
       reconScm.getDatanodeProtocolServer()
           .register(extendedDatanodeDetailsProto2, nodeReportProto2,
               ContainerReportsProto.newBuilder().build(),
-              PipelineReportsProto.newBuilder().build(), null);
+              PipelineReportsProto.newBuilder().build(),
+              defaultLayoutVersionProto());
       // Process all events in the event queue
       reconScm.getEventQueue().processAll(1000);
     } catch (Exception ex) {

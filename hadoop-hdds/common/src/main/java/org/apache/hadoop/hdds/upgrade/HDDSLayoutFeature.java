@@ -29,7 +29,8 @@ import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 public enum HDDSLayoutFeature implements LayoutFeature {
   //////////////////////////////  //////////////////////////////
   INITIAL_VERSION(0, "Initial Layout Version"),
-  FIRST_UPGRADE_VERSION(1, "First Layout Version After Upgrade");
+  DATANODE_SCHEMA_V2(1, "Datanode RocksDB Schema Version 2 (with column " +
+      "families)");
 
   //////////////////////////////  //////////////////////////////
 

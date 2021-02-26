@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,22 +18,27 @@
 
 package org.apache.hadoop.ozone.container.upgrade;
 
-import org.apache.hadoop.hdds.upgrade.HDDSUpgradeAction;
-import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
+
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 
 /**
- * Upgrade Action for DataNode for the very first first Upgrade Version.
+ * Util methods for upgrade.
  */
-public class DataNodeUpgradeActionFirstUpgradeVersion
-    implements HDDSUpgradeAction<DatanodeStateMachine> {
+public final class UpgradeUtils {
 
-  public static final Logger LOG =
-      LoggerFactory.getLogger(DataNodeUpgradeActionFirstUpgradeVersion.class);
-  @Override
-  public void executeAction(DatanodeStateMachine arg) throws Exception {
-    LOG.info("Executing datanode upgrade action for the very First Upgrade " +
-        "Version.");
+  private UpgradeUtils() {
+  }
+
+  public static LayoutVersionProto defaultLayoutVersionProto() {
+    return LayoutVersionProto.newBuilder()
+        .setMetadataLayoutVersion(maxLayoutVersion())
+        .setSoftwareLayoutVersion(maxLayoutVersion()).build();
+  }
+
+  public static LayoutVersionProto toLayoutVersionProto(int mLv, int sLv) {
+    return LayoutVersionProto.newBuilder()
+        .setMetadataLayoutVersion(mLv)
+        .setSoftwareLayoutVersion(sLv).build();
   }
 }

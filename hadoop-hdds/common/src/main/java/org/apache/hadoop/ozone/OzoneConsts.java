@@ -44,7 +44,7 @@ public final class OzoneConsts {
 
   public static final String STORAGE_ID = "storageID";
   public static final String DATANODE_UUID = "datanodeUuid";
-  public static final String DATANODE_STORAGE_DIR = "datanodeStorageConfig";
+  public static final String DATANODE_LAYOUT_VERSION_DIR = "dnlayoutversion";
   public static final String CLUSTER_ID = "clusterID";
   public static final String LAYOUTVERSION = "layOutVersion";
   public static final String CTIME = "ctime";
@@ -397,5 +397,6 @@ public final class OzoneConsts {
 
   public static final String OM_RATIS_SNAPSHOT_DIR = "snapshot";
 
-  public static final long DEFAULT_OM_UPDATE_ID = -1L;  
+  public static final long DEFAULT_OM_UPDATE_ID = -1L;
+
 }

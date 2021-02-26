@@ -16,17 +16,25 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.upgrade;
+package org.apache.hadoop.ozone.container.upgrade;
 
-import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.hdds.upgrade.HDDSUpgradeAction;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
- * Stub OM Action class to help with understanding. Will be removed.
+ * Upgrade Action for DataNode for the very first first Upgrade Version.
  */
-public class ECFeatureOnFinalizeAction implements OmUpgradeAction {
+public class DatanodeSchemaV2FinalizeAction
+    implements HDDSUpgradeAction<DatanodeStateMachine> {
 
+  public static final Logger LOG =
+      LoggerFactory.getLogger(DatanodeSchemaV2FinalizeAction.class);
   @Override
-  public void executeAction(OzoneManager ozoneManager) {
-    // Do blah....
+  public void executeAction(DatanodeStateMachine arg) throws Exception {
+    LOG.info("Executing datanode 'onFinalize' action for the first " +
+        "version with upgrade support. New containers will be " +
+        "created with Schema Version 2 henceforth.");
   }
 }

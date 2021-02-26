@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.recon.scm.ReconPipelineFactory.ReconPipelineProvi
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
 import org.junit.After;
@@ -61,9 +62,6 @@ import static org.mockito.Mockito.mock;
  * Class to test Recon Pipeline Manager.
  */
 public class TestReconPipelineManager {
-
-  private static final Integer SOFTWARE_LAYOUT_VERSION = 1;
-  private static final Integer METADATA_LAYOUT_VERSION = 1;
 
   @Rule
   public TemporaryFolder temporaryFolder = new TemporaryFolder();
@@ -120,9 +118,9 @@ public class TestReconPipelineManager {
     this.versionManager =
         Mockito.mock(HDDSLayoutVersionManager.class);
     Mockito.when(versionManager.getMetadataLayoutVersion())
-        .thenReturn(METADATA_LAYOUT_VERSION);
+        .thenReturn(maxLayoutVersion());
     Mockito.when(versionManager.getSoftwareLayoutVersion())
-        .thenReturn(SOFTWARE_LAYOUT_VERSION);
+        .thenReturn(maxLayoutVersion());
     NodeManager nodeManager =
         new SCMNodeManager(conf, scmStorageConfig, eventQueue, clusterMap,
             versionManager);
@@ -163,9 +161,9 @@ public class TestReconPipelineManager {
     this.versionManager =
         Mockito.mock(HDDSLayoutVersionManager.class);
     Mockito.when(versionManager.getMetadataLayoutVersion())
-        .thenReturn(METADATA_LAYOUT_VERSION);
+        .thenReturn(maxLayoutVersion());
     Mockito.when(versionManager.getSoftwareLayoutVersion())
-        .thenReturn(SOFTWARE_LAYOUT_VERSION);
+        .thenReturn(maxLayoutVersion());
     NodeManager nodeManager =
         new SCMNodeManager(conf, scmStorageConfig, eventQueue, clusterMap,
             versionManager);

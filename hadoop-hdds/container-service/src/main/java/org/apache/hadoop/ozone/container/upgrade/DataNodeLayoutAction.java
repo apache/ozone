@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.ozone.container.upgrade;
 
-import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.FIRST_UPGRADE_VERSION;
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.DATANODE_SCHEMA_V2;
 
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSUpgradeAction;
@@ -30,8 +30,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachin
  * any specific DataNodeActions.
  */
 public enum DataNodeLayoutAction {
-  DataNodeUpgradeFirstAction(FIRST_UPGRADE_VERSION,
-      new DataNodeUpgradeActionFirstUpgradeVersion());
+  DatanodeSchemaV2(DATANODE_SCHEMA_V2, new DatanodeSchemaV2FinalizeAction());
 
   //////////////////////////////  //////////////////////////////
 

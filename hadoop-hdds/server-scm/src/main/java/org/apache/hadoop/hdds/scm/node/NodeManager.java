@@ -17,8 +17,11 @@
  */
 package org.apache.hadoop.hdds.scm.node;
 
+import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayoutVersionProto;
+
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -33,6 +36,7 @@ import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.StorageContainerNodeProtocol;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
+import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 
 import java.io.Closeable;
@@ -65,6 +69,23 @@ import java.util.UUID;
  */
 public interface NodeManager extends StorageContainerNodeProtocol,
     EventHandler<CommandForDatanode>, NodeManagerMXBean, Closeable {
+
+
+  /**
+   * Register API without a layout version info object passed in. Useful for
+   * tests.
+   * @param datanodeDetails DN details
+   * @param nodeReport Node report
+   * @param pipelineReportsProto Pipeline reports
+   * @return whatever the regular register command returns with default
+   * layout version passed in.
+   */
+  default RegisteredCommand register(
+      DatanodeDetails datanodeDetails, NodeReportProto nodeReport,
+      PipelineReportsProto pipelineReportsProto) {
+    return register(datanodeDetails, nodeReport, pipelineReportsProto,
+        defaultLayoutVersionProto());
+  }
 
   /**
    * Gets all Live Datanodes that are currently communicating with SCM.
