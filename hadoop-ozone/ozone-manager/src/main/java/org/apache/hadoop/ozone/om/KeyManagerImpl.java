@@ -2420,12 +2420,18 @@ public class KeyManagerImpl implements KeyManager {
 
         // Check startKey is an immediate child of keyName. For example,
         // keyName=/a/ and expected startKey=/a/b. startKey can't be /xyz/b.
-        if (!OzoneFSUtils.isImmediateChild(keyName, startKey)) {
+        if (StringUtils.isNotBlank(keyName) &&
+                !OzoneFSUtils.isImmediateChild(keyName, startKey)) {
           if (LOG.isDebugEnabled()) {
             LOG.debug("StartKey {} is not an immediate child of keyName {}. " +
                     "Returns empty list", startKey, keyName);
           }
           return Collections.emptyList();
+        }
+
+        // assign startKeyPath if prefixPath is empty string.
+        if (StringUtils.isBlank(prefixPath)) {
+          prefixPath = OzoneFSUtils.getParentDir(startKey);
         }
 
         OzoneFileStatus fileStatusInfo = getOzoneFileStatusV1(volumeName,
