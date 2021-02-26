@@ -95,6 +95,7 @@ public class ContainerReader implements Runnable {
     this.isInUpgradeMode =
         conf.getBoolean(ScmConfigKeys.HDDS_DATANODE_UPGRADE_LAYOUT_INLINE,
             ScmConfigKeys.HDDS_DATANODE_UPGRADE_LAYOUT_INLINE_DEFAULT);
+    LOG.info("Running in upgrade mode:{}", this.isInUpgradeMode);
   }
 
 
@@ -174,7 +175,7 @@ public class ContainerReader implements Runnable {
       return storageLoc;
     }
 
-    System.out.println("Cluster dir" + clusterDir + "doesn't exists");
+    LOG.info("Cluster dir:{} doesn't exists", clusterDir);
     try {
       LOG.info("renaming stLoc:{} to {}", storageLoc, clusterDir);
       NativeIO.renameTo(storageLoc, clusterDir);

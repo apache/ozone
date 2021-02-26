@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 
@@ -32,7 +33,7 @@ import picocli.CommandLine.Model.CommandSpec;
 
 import picocli.CommandLine;
 
-import java.util.UUID;
+import java.util.List;
 import java.util.concurrent.Callable;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
@@ -54,25 +55,17 @@ public class DatanodeLayout extends GenericCli
       description = "File Path")
   private String storagePath;
 
+  @CommandLine.Option(names = {"--verify"}, description = "Display this help and exit")
+  private boolean verify;
+
   @Spec
   private CommandSpec spec;
 
   @Override
   public Void call() throws Exception {
-    System.out.println("in datanode layout tool");
     OzoneConfiguration conf = createOzoneConfiguration();
 
-    conf.unset(HDDS_DATANODE_DIR_KEY);
-
-    conf.set(HDDS_DATANODE_DIR_KEY, storagePath);
-    conf.setBoolean(ScmConfigKeys.HDDS_DATANODE_UPGRADE_LAYOUT_INLINE, true);
-
-    MutableVolumeSet volumeSet =
-        new MutableVolumeSet(null, conf);
-    ContainerSet containerSet = new ContainerSet();
-    OzoneContainer.buildContainerSet(volumeSet, containerSet, conf);
-
-    volumeSet.shutdown();
+    runUpgrade(conf, storagePath, verify);
     return null;
   }
 
@@ -83,5 +76,27 @@ public class DatanodeLayout extends GenericCli
   @Override
   public Class<?> getParentType() {
     return OzoneDebug.class;
+  }
+
+  public static List<HddsVolume> runUpgrade(OzoneConfiguration conf,
+        String storagePath, boolean verify) throws Exception {
+    conf.unset(HDDS_DATANODE_DIR_KEY);
+    conf.set(HDDS_DATANODE_DIR_KEY, storagePath);
+
+    if (!verify) {
+      conf.setBoolean(ScmConfigKeys.HDDS_DATANODE_UPGRADE_LAYOUT_INLINE, true);
+    }
+
+    MutableVolumeSet volumeSet = new MutableVolumeSet(conf);
+    ContainerSet containerSet = new ContainerSet();
+    OzoneContainer.buildContainerSet(volumeSet, containerSet, conf);
+    volumeSet.shutdown();
+
+    if (verify) {
+      for (HddsVolume vol : volumeSet.getFailedVolumesList()) {
+        System.out.println("Failed Volume:" + vol.getHddsRootDir());
+      }
+    }
+    return volumeSet.getFailedVolumesList();
   }
 }
