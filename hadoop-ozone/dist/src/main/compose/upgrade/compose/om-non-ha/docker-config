@@ -14,15 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-OZONE-SITE.XML_ozone.scm.names=scm
-OZONE-SITE.XML_ozone.scm.datanode.id.dir=/data
-OZONE-SITE.XML_ozone.scm.block.client.address=scm
-OZONE-SITE.XML_ozone.scm.container.size=1GB
-OZONE-SITE.XML_ozone.metadata.dirs=/data/metadata
-OZONE-SITE.XML_ozone.scm.client.address=scm
-OZONE-SITE.XML_ozone.client.failover.max.attempts=6
-OZONE-SITE.XML_hdds.datanode.dir=/data/hdds
-OZONE-SITE.XML_ozone.recon.address=recon:9888
-OZONE-SITE.XML_ozone.recon.db.dir=/data/metadata/recon
+OZONE-SITE.XML_ozone.om.address=om
+OZONE-SITE.XML_ozone.om.http-address=om:9874
 
-no_proxy=scm,s3g,recon,kdc,localhost,127.0.0.1
+no_proxy=om,scm,s3g,recon,kdc,localhost,127.0.0.1

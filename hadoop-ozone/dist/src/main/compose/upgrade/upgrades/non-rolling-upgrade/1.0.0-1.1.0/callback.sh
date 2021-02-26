@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-source "$COMPOSE_DIR"/testlib.sh
+source "$TEST_DIR"/testlib.sh
 
 setup() {
   # OM preparation is not implemented until 1.2.0.

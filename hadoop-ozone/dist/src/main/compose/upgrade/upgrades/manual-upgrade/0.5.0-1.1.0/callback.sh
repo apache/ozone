@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-source "$COMPOSE_DIR"/testlib.sh
+source "$TEST_DIR"/testlib.sh
 
 setup_old_version() {
   load_version_specifics "$OZONE_UPGRADE_FROM"
@@ -28,6 +28,8 @@ with_old_version() {
 
 setup_new_version() {
   unload_version_specifics "$OZONE_UPGRADE_FROM"
+  # Reformat SCM DB from 0.5.0 to format for versions after 1.0.0.
+  "$TEST_DIR"/../../libexec/upgrade/1.0.0.sh
   load_version_specifics "$OZONE_UPGRADE_TO"
 }
 

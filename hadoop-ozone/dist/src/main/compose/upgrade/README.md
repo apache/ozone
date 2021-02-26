@@ -14,13 +14,26 @@
 
 # Ozone Upgrade Acceptance Tests
 
-This directory contains a sample cluster definition and script for
-testing upgrades from any previous version to another previous version, or the current version.
+This directory contains cluster definitions and scripts for testing upgrades from any previous version to another
+previous version, or to the local build of the code. It is designed to catch backwards incompatible changes made between
+an older release of Ozone and a later release (which may be the local build).
 
+- **IMPORTANT NOTE**: These tests will not catch backwards incompatible changes against commits in between releases.
+    - Example:
+        1. After 1.0.0, a change *c1* is made that is backwards compatible with *1.0.0*.
+        2. After *c1*, a new change *c2* is made that is also backwards compatible with 1.0.0 but backwards *incompatible* with *c1*.
+        
+        - This test suite will not raise an error for *c2*, because it only tests against the last release
+        (1.0.0), and not the last commit (*c1*).
 ## Directory Layout
 
-Each type of upgrade has a subdirectory under this top level upgrade directory. Each upgrade's steps are controlled by a *test.sh* script in its *\<upgrade-type>* directory. Callbacks to execute throughout the upgrade are called by this script and should be placed in a file called *callback.sh* in the *\<upgrade-type>/\<upgrade-from>-\<upgrade-to>* directory. After the test is run, results and docker volume data for the upgrade for these versions will also be placed in this directory. The results of all upgrades run as part of the tests will be placed in a *results* folder in the top level upgrade directory.
+## upgrades
 
+Each type of upgrade has a subdirectory under the *upgrades* directory. Each upgrade's steps are controlled by a *test.sh* script in its *upgrades/\<upgrade-type>* directory. Callbacks to execute throughout the upgrade are called by this script and should be placed in a file called *callback.sh* in the *upgrades/\<upgrade-type>/\<upgrade-from>-\<upgrade-to>* directory. After the test is run, results and docker volume data for the upgrade for these versions will also be placed in this directory. The results of all upgrades run as part of the tests will be placed in a *results* folder in the top level upgrade directory.
+
+## compose
+
+Docker compose cluster definitions to be used in upgrade testing are defined in the *compose* directory. Each upgrade type builds its cluster by setting Docker's `COMPOSE_FILE` environment variable to one or more compose yaml files in this directory. Note that within each compose file, paths are considered relative to the first compose file used in `COMPOSE_FILE`. Therefore, absoulte paths using the `TEST_DIR` environment variable are preferred (see [Adding New Tests](#-adding-new-tests)).
 
 ## Upgrade Types
 
@@ -72,7 +85,10 @@ Each type of upgrade has a subdirectory under this top level upgrade directory. 
 - Each callback file will have access to the following environment variables:
     - `OZONE_UPGRADE_FROM`: The version of ozone being upgraded from.
     - `OZONE_UPGRADE_TO`: The version of ozone being upgraded to.
-    - `COMPOSE_DIR`: The top level directory containing the files *docker-compose.yaml* and *testlib.sh*.
+    - `TEST_DIR`: The top level *upgrade* directory containing all files for upgrade testing.
+
+- The compose cluster used for an upgrade can be overridden by assigning the desired docker compose files to Docker's
+`COMPOSE_FILE` environment variable and exporting it from the callback file.
 
 ### Testing New Versions
 

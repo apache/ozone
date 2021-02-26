@@ -57,8 +57,10 @@ prepare_for_image() {
     local image_version="$1"
 
     if [[ "$image_version" = "$OZONE_CURRENT_VERSION" ]]; then
+        echo "Preparing for runner $image_version $OZONE_CURRENT_VERSION"
         prepare_for_runner_image
     else
+        echo "preparing for binary $image_version $OZONE_CURRENT_VERSION"
         prepare_for_binary_image "$image_version"
     fi
 }
@@ -76,7 +78,7 @@ callback() {
 ## @param The version of Ozone to upgrade to.
 run_test() {
   # Export variables needed by test, since it is run in a subshell.
-  local test_dir="$_upgrade_dir"/"$1"
+  local test_dir="$_upgrade_dir/upgrades/$1"
   export OZONE_UPGRADE_FROM="$2"
   export OZONE_UPGRADE_TO="$3"
   local test_subdir="$test_dir"/"$OZONE_UPGRADE_FROM"-"$OZONE_UPGRADE_TO"
@@ -98,12 +100,12 @@ run_test() {
 ## @description Generates data on the cluster.
 ## @param The prefix to use for data generated.
 generate() {
-    execute_robot_test scm -v PREFIX:"$1" /upgrade/generate.robot
+    execute_robot_test scm -v PREFIX:"$1" upgrade/generate.robot
 }
 
 ## @description Validates that data exists on the cluster.
 ## @param The prefix of the data to be validated.
 validate() {
-    execute_robot_test scm -v PREFIX:"$1" /upgrade/validate.robot
+    execute_robot_test scm -v PREFIX:"$1" upgrade/validate.robot
 }
 
