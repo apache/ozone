@@ -1824,6 +1824,7 @@ public class KeyManagerImpl implements KeyManager {
                                              String clientAddress)
       throws IOException {
     OmKeyInfo fileKeyInfo = null;
+    OmKeyInfo dirKeyInfo = null;
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
         bucketName);
     try {
@@ -1836,6 +1837,15 @@ public class KeyManagerImpl implements KeyManager {
       // Check if the key is a file.
       String fileKeyBytes = metadataManager.getOzoneKey(
               volumeName, bucketName, keyName);
+      // if the queried key is already a directory key (For eg: Keyname= a/b/c/)
+      if (fileKeyBytes.endsWith(OZONE_URI_DELIMITER)){
+        dirKeyInfo = metadataManager.getKeyTable().get(fileKeyBytes);
+        if (dirKeyInfo != null) {
+          return new OzoneFileStatus(dirKeyInfo, scmBlockSize, true);
+        }
+      }
+      // queried key doesn't end with "/".
+      // There still exists a possibility of it being a directory.
       fileKeyInfo = metadataManager.getKeyTable().get(fileKeyBytes);
 
       // Check if the key is a directory.
@@ -1843,7 +1853,7 @@ public class KeyManagerImpl implements KeyManager {
         String dirKey = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
         String dirKeyBytes = metadataManager.getOzoneKey(
                 volumeName, bucketName, dirKey);
-        OmKeyInfo dirKeyInfo = metadataManager.getKeyTable().get(dirKeyBytes);
+        dirKeyInfo = metadataManager.getKeyTable().get(dirKeyBytes);
         if (dirKeyInfo != null) {
           return new OzoneFileStatus(dirKeyInfo, scmBlockSize, true);
         }

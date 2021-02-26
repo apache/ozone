@@ -1245,6 +1245,11 @@ public class TestRootedOzoneFileSystem {
     long prevNumTrashRenames = getOMMetrics().getNumTrashRenames();
     long prevNumTrashFileRenames = getOMMetrics().getNumTrashFilesRenames();
 
+    long prevNumTrashAtomicDirDeletes = getOMMetrics()
+        .getNumTrashAtomicDirDeletes();
+    long prevNumTrashAtomicDirRenames = getOMMetrics()
+        .getNumTrashAtomicDirRenames();
+
     // Call moveToTrash. We can't call protected fs.rename() directly
     trash.moveToTrash(keyPath1);
     // for key in second bucket
@@ -1273,12 +1278,17 @@ public class TestRootedOzoneFileSystem {
       }
     }, 1000, 180000);
 
-    // This condition should pass after the checkpoint
-    Assert.assertTrue(getOMMetrics()
-        .getNumTrashRenames() > prevNumTrashRenames);
-    // With new layout version, file renames wouldn't be counted
-    Assert.assertTrue(getOMMetrics()
-        .getNumTrashFilesRenames() >= prevNumTrashFileRenames);
+    if (isBucketFSOptimized){
+      Assert.assertTrue(getOMMetrics()
+          .getNumTrashAtomicDirRenames() > prevNumTrashAtomicDirRenames);
+    } else {
+      // This condition should pass after the checkpoint
+      Assert.assertTrue(getOMMetrics()
+          .getNumTrashRenames() > prevNumTrashRenames);
+      // With new layout version, file renames wouldn't be counted
+      Assert.assertTrue(getOMMetrics()
+          .getNumTrashFilesRenames() > prevNumTrashFileRenames);
+    }
 
     // wait for deletion of checkpoint dir
     GenericTestUtils.waitFor(()-> {
@@ -1293,10 +1303,16 @@ public class TestRootedOzoneFileSystem {
     }, 1000, 120000);
 
     // This condition should succeed once the checkpoint directory is deleted
-    GenericTestUtils.waitFor(
-        () -> getOMMetrics().getNumTrashDeletes() > prevNumTrashDeletes
-            && getOMMetrics().getNumTrashFilesDeletes()
-            >= prevNumTrashFileDeletes, 100, 180000);
+    if(isBucketFSOptimized){
+      GenericTestUtils.waitFor(
+          () -> getOMMetrics().getNumTrashAtomicDirDeletes() >
+              prevNumTrashAtomicDirDeletes, 100, 180000);
+    } else {
+      GenericTestUtils.waitFor(
+          () -> getOMMetrics().getNumTrashDeletes() > prevNumTrashDeletes
+              && getOMMetrics().getNumTrashFilesDeletes()
+              >= prevNumTrashFileDeletes, 100, 180000);
+    }
     // Cleanup
     ofs.delete(trashRoot, true);
     ofs.delete(trashRoot2, true);

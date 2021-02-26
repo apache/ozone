@@ -211,6 +211,10 @@ public class TestReadRetries {
     // try to read, this should be successful
     readKey(bucket, keyName, value);
 
+    // read intermediate directory
+    verifyIntermediateDir(bucket, "a/b/c/");
+    verifyIntermediateDir(bucket, "a/b/c");
+
     // shutdown the second datanode
     datanodeDetails = datanodes.get(1);
     cluster.shutdownHddsDatanode(datanodeDetails);
@@ -233,6 +237,10 @@ public class TestReadRetries {
     factory.releaseClient(clientSpi, false);
   }
 
+  private void verifyIntermediateDir(OzoneBucket bucket, String dir)
+      throws IOException {
+    Assert.assertTrue(bucket.getFileStatus(dir).isDirectory());
+  }
 
   private void readKey(OzoneBucket bucket, String keyName, String data)
       throws IOException {
