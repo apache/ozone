@@ -84,8 +84,9 @@ public class DatanodeLayout extends GenericCli
     conf.unset(HDDS_DATANODE_DIR_KEY);
     conf.set(HDDS_DATANODE_DIR_KEY, storagePath);
 
-    if (!verify) {
-      conf.setBoolean(ScmConfigKeys.HDDS_DATANODE_UPGRADE_LAYOUT_INLINE, true);
+    if (verify) {
+      conf.setBoolean(
+          ScmConfigKeys.HDDS_DATANODE_UPGRADE_LAYOUT_INLINE, false);
     }
 
     MutableVolumeSet volumeSet = new MutableVolumeSet(conf);

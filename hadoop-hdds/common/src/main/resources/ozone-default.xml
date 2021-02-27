@@ -148,7 +148,9 @@
     <name>hdds.datanode.upgrade.layout.inline</name>
     <value>true</value>
     <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>
-    <description>determines wheter to upgrade the DN on restart automatically
+    <description>Determines whether to upgrade the DN layout on restart
+      automatically. If set of false, the tool verifies that the current
+      disk format is correct.
     </description>
   </property>
   <property>

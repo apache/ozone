@@ -108,13 +108,14 @@ public class ContainerReader implements Runnable {
   public void run() {
     try {
       readVolume(hddsVolumeDir);
-    } catch (RuntimeException ex) {
+    } catch (Throwable t) {
       LOG.error("Caught a Run time exception during reading container files" +
-          " from Volume {} {}", hddsVolumeDir, ex);
+          " from Volume {} {}", hddsVolumeDir, t);
+      volumeSet.failVolume(hddsVolumeDir.getPath());
     }
   }
 
-  public void readVolume(File hddsVolumeRootDir) {
+  public void readVolume(File hddsVolumeRootDir) throws Exception {
     Preconditions.checkNotNull(hddsVolumeRootDir, "hddsVolumeRootDir" +
         "cannot be null");
 
@@ -168,21 +169,31 @@ public class ContainerReader implements Runnable {
     LOG.info("Finish verifying containers on volume {}", hddsVolumeRootDir);
   }
 
-  public File preProcessStorageLoc(File storageLoc) {
+  public File preProcessStorageLoc(File storageLoc) throws Exception {
     File clusterDir = getClusterDir();
-    if (!isInUpgradeMode || clusterDir.exists()) {
-      Preconditions.checkArgument(storageLoc.equals(clusterDir));
+
+    if (!isInUpgradeMode) {
+      Preconditions.checkArgument(clusterDir.exists(),
+          "Storage Dir:" + clusterDir + " doesn't exists");
+      Preconditions.checkArgument(storageLoc.equals(clusterDir),
+          "configured storage dir" + storageLoc +
+              " is not same as cluster UUID" + clusterDir);
       return storageLoc;
     }
 
-    LOG.info("Cluster dir:{} doesn't exists", clusterDir);
+    if (clusterDir.exists()) {
+      return storageLoc;
+    }
+
     try {
-      LOG.info("renaming stLoc:{} to {}", storageLoc, clusterDir);
+      LOG.info("Storage dir based on clusterId doesn't exists." +
+          "Renaming storage location:{} to {}", storageLoc, clusterDir);
       NativeIO.renameTo(storageLoc, clusterDir);
       return clusterDir;
     } catch (Throwable t) {
-      LOG.error("DN Layout upgrade failed", t);
-      return null;
+      LOG.error("DN Layout upgrade failed. Renaming of storage" +
+          "location:{} to {} failed", storageLoc, clusterDir, t);
+      throw t;
     }
   }
 
@@ -259,6 +270,11 @@ public class ContainerReader implements Runnable {
     Path p = Paths.get(path);
     Path relativePath = storageLoc.toPath().relativize(p);
     Path newPath = getClusterDir().toPath().resolve(relativePath);
+
+    if (!isInUpgradeMode) {
+      Preconditions.checkArgument(newPath.toFile().exists(),
+          "modified path:" + newPath + " doesn't exists");
+    }
 
     LOG.debug("new Normalized Path is:{}", newPath);
     return newPath.toAbsolutePath().toString();
