@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.ha;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
+import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.container.ContainerStateManagerV2;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.apache.ratis.server.RaftServer;
@@ -72,6 +73,12 @@ public class TestReplicationAnnotation {
       @Override
       public NotLeaderException triggerNotLeaderException() {
         return null;
+      }
+
+      @Override
+      public boolean addSCM(AddSCMRequest request)
+          throws IOException {
+        return false;
       }
     };
 

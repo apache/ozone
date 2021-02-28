@@ -76,6 +76,15 @@ public class NodeDetails {
     return hostPort.toString();
   }
 
+  public String getRatisAddressPortStr() {
+    StringBuilder hostPort = new StringBuilder();
+    hostPort.append(getInetAddress().getHostAddress())
+        .append(":")
+        .append(ratisPort);
+    return hostPort.toString();
+  }
+
+
   public int getRatisPort() {
     return ratisPort;
   }

@@ -23,6 +23,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.ratis.thirdparty.io.grpc.Server;
@@ -46,7 +47,8 @@ public class InterSCMGrpcProtocolService {
   public InterSCMGrpcProtocolService(final ConfigurationSource conf,
       final StorageContainerManager scm) {
     Preconditions.checkNotNull(conf);
-    this.port = conf.getObject(SCMHAConfiguration.class).getGrpcBindPort();
+    this.port = conf.getInt(ScmConfigKeys.OZONE_SCM_GRPC_PORT_KEY,
+        ScmConfigKeys.OZONE_SCM_GRPC_PORT_DEFAULT);
 
     NettyServerBuilder nettyServerBuilder =
         ((NettyServerBuilder) ServerBuilder.forPort(port))

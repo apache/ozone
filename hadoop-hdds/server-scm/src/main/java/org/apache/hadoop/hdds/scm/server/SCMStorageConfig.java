@@ -25,11 +25,10 @@ import org.apache.hadoop.ozone.common.Storage;
 import java.io.File;
 import java.io.IOException;
 import java.util.Properties;
+import java.util.UUID;
 
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.STORAGE_DIR;
-import static org.apache.hadoop.ozone.OzoneConsts.SCM_NODES_INFO;
-import static org.apache.hadoop.ozone.OzoneConsts.SCM_NODES_SEPARATOR;
 
 
 /**
@@ -59,17 +58,6 @@ public class SCMStorageConfig extends Storage {
     }
   }
 
-  public void setScmNodeInfo(String hostname) throws IOException {
-    if (getState() == StorageState.INITIALIZED) {
-      throw new IOException("SCM is already initialized.");
-    } else {
-      final StringBuilder b =
-          new StringBuilder(hostname).append(SCM_NODES_SEPARATOR)
-              .append(getScmId());
-      getStorageInfo().setProperty(SCM_NODES_INFO, b.toString());
-    }
-  }
-
   /**
    * Retrieves the SCM ID from the version file.
    * @return SCM_ID
@@ -78,31 +66,14 @@ public class SCMStorageConfig extends Storage {
     return getStorageInfo().getProperty(SCM_ID);
   }
 
-  /**
-   * Retrieves the SCM Node info from the version file.
-   * @return SCM_NODES
-   */
-  public String getScmNodeInfo() {
-    return getStorageInfo().getProperty(SCM_NODES_INFO);
-  }
-
   @Override
   protected Properties getNodeProperties() {
     String scmId = getScmId();
     if (scmId == null) {
-      // TODO:
-      //  Please check https://issues.apache.org/jira/browse/HDDS-4538
-      //  hard code clusterID and scmUuid on HDDS-2823,
-      //  so that multi SCMs won't cause chaos in Datanode side.
-      scmId = "3a11fedb-cce5-46ac-bb0d-cfdf17df9a19";
+      scmId = UUID.randomUUID().toString();
     }
     Properties scmProperties = new Properties();
     scmProperties.setProperty(SCM_ID, scmId);
-    String scmNodeInfo = getScmNodeInfo();
-    if (scmNodeInfo != null) {
-      // FOR NON-HA setup, SCM_NODES can be null
-      scmProperties.setProperty(SCM_NODES_INFO, getScmNodeInfo());
-    }
     return scmProperties;
   }
 

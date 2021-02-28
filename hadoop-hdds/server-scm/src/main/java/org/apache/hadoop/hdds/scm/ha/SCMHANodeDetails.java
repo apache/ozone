@@ -54,6 +54,8 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HTTP_BIND_HOST_
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEFAULT_SERVICE_ID;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PORT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_GRPC_PORT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_GRPC_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_BIND_HOST_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_KEY;
@@ -80,6 +82,7 @@ public class SCMHANodeDetails {
       OZONE_SCM_SECURITY_SERVICE_PORT_KEY,
       OZONE_SCM_SECURITY_SERVICE_BIND_HOST_KEY,
       OZONE_SCM_RATIS_PORT_KEY,
+      OZONE_SCM_GRPC_PORT_KEY,
       OZONE_SCM_HTTP_BIND_HOST_KEY,
       OZONE_SCM_HTTPS_BIND_HOST_KEY,
       OZONE_SCM_HTTP_ADDRESS_KEY,
@@ -107,10 +110,14 @@ public class SCMHANodeDetails {
     int ratisPort = conf.getInt(
         ScmConfigKeys.OZONE_SCM_RATIS_PORT_KEY,
         ScmConfigKeys.OZONE_SCM_RATIS_PORT_DEFAULT);
+    int grpcPort = conf.getInt(
+        ScmConfigKeys.OZONE_SCM_GRPC_PORT_KEY,
+        ScmConfigKeys.OZONE_SCM_GRPC_PORT_DEFAULT);
     InetSocketAddress rpcAddress = new InetSocketAddress(
         InetAddress.getLocalHost(), 0);
     SCMNodeDetails scmNodeDetails = new SCMNodeDetails.Builder()
         .setRatisPort(ratisPort)
+        .setGrpcPort(grpcPort)
         .setRpcAddress(rpcAddress)
         .setDatanodeProtocolServerAddress(
             HddsServerUtil.getScmDataNodeBindAddress(conf))
@@ -133,6 +140,7 @@ public class SCMHANodeDetails {
     String localScmServiceId = null;
     String localScmNodeId = null;
     int localRatisPort = 0;
+    int localGrpcPort = 0;
 
     Collection<String> scmServiceIds;
 
@@ -195,6 +203,11 @@ public class SCMHANodeDetails {
             serviceId, nodeId);
         int ratisPort = conf.getInt(ratisPortKey, OZONE_SCM_RATIS_PORT_DEFAULT);
 
+        String grpcPortKey = ConfUtils
+            .addKeySuffixes(ScmConfigKeys.OZONE_SCM_GRPC_PORT_KEY, serviceId,
+                nodeId);
+        int grpcPort = conf.getInt(grpcPortKey, OZONE_SCM_GRPC_PORT_DEFAULT);
+
         InetSocketAddress addr = null;
         try {
           addr = NetUtils.createSocketAddr(rpcAddrStr, ratisPort);
@@ -215,10 +228,11 @@ public class SCMHANodeDetails {
           localScmServiceId = serviceId;
           localScmNodeId = nodeId;
           localRatisPort = ratisPort;
+          localGrpcPort = grpcPort;
           found++;
         } else {
           peerNodesList.add(getHASCMNodeDetails(conf, serviceId,
-              nodeId, addr, ratisPort));
+              nodeId, addr, ratisPort, grpcPort));
         }
       }
 
@@ -232,8 +246,9 @@ public class SCMHANodeDetails {
         ConfUtils.setNodeSpecificConfigs(nodeSpecificConfigKeys, conf,
             localScmServiceId, localScmNodeId, LOG);
 
-        return new SCMHANodeDetails(getHASCMNodeDetails(conf, localScmServiceId,
-            localScmNodeId, localRpcAddress, localRatisPort), peerNodesList);
+        return new SCMHANodeDetails(
+            getHASCMNodeDetails(conf, localScmServiceId, localScmNodeId,
+                localRpcAddress, localRatisPort, localGrpcPort), peerNodesList);
 
       } else if (found > 1) {
         throwConfException("Configuration has multiple %s addresses that " +
@@ -253,7 +268,7 @@ public class SCMHANodeDetails {
 
   public static SCMNodeDetails getHASCMNodeDetails(OzoneConfiguration conf,
       String localScmServiceId, String localScmNodeId,
-      InetSocketAddress rpcAddress, int ratisPort) {
+      InetSocketAddress rpcAddress, int ratisPort, int grpcPort) {
     Preconditions.checkNotNull(localScmServiceId);
     Preconditions.checkNotNull(localScmNodeId);
 
@@ -261,6 +276,7 @@ public class SCMHANodeDetails {
     builder
         .setRpcAddress(rpcAddress)
         .setRatisPort(ratisPort)
+        .setGrpcPort(grpcPort)
         .setSCMServiceId(localScmServiceId)
         .setSCMNodeId(localScmNodeId)
         .setBlockProtocolServerAddress(

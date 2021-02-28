@@ -22,14 +22,19 @@ package org.apache.hadoop.hdds.scm.ha;
 import com.google.common.base.Strings;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.server.ServerUtils;
+import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
+
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_RATIS_SNAPSHOT_DIR;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEFAULT_SERVICE_ID;
@@ -130,5 +135,32 @@ public final class SCMHAUtils {
       }
     }
     return localScmServiceId;
+  }
+
+  /**
+   * Removes the self node from the list of nodes in the
+   * configuration.
+   * @param configuration OzoneConfiguration
+   * @return Updated OzoneConfiguration
+   */
+
+  public static OzoneConfiguration removeSelfId(
+      OzoneConfiguration configuration) {
+    final OzoneConfiguration conf = new OzoneConfiguration(configuration);
+    String scmNodes = conf.get(ConfUtils
+        .addKeySuffixes(ScmConfigKeys.OZONE_SCM_NODES_KEY,
+            getScmServiceId(conf)));
+    if (scmNodes != null) {
+      final String selfId = conf.get(ScmConfigKeys.OZONE_SCM_NODE_ID_KEY);
+      String[] parts = scmNodes.split(",");
+      List<String> partsLeft = new ArrayList<>();
+      for (String part : parts) {
+        if (!part.equals(selfId)) {
+          partsLeft.add(part);
+        }
+      }
+      conf.set(ScmConfigKeys.OZONE_SCM_NODES_KEY, String.join(",", partsLeft));
+    }
+    return conf;
   }
 }

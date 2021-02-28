@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.ha;
 
 import com.google.common.base.Strings;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.ratis.RaftConfigKeys;
 import org.apache.ratis.conf.RaftProperties;
@@ -57,7 +58,7 @@ public final class RatisUtil {
     // TODO: Check the default values.
     final RaftProperties properties = new RaftProperties();
     setRaftStorageDir(properties, haConf, conf);
-    setRaftRpcProperties(properties, haConf);
+    setRaftRpcProperties(properties, haConf, conf);
     setRaftLogProperties(properties, haConf);
     setRaftRetryCacheProperties(properties, haConf);
     setRaftSnapshotProperties(properties, haConf);
@@ -95,11 +96,12 @@ public final class RatisUtil {
    * @param conf SCMHAConfiguration
    */
   private static void setRaftRpcProperties(final RaftProperties properties,
-                                           final SCMHAConfiguration conf) {
+      final SCMHAConfiguration conf, ConfigurationSource ozoneConf) {
     RaftConfigKeys.Rpc.setType(properties,
         RpcType.valueOf(conf.getRatisRpcType()));
-    GrpcConfigKeys.Server.setPort(properties,
-        conf.getRatisBindAddress().getPort());
+    GrpcConfigKeys.Server.setPort(properties, ozoneConf
+        .getInt(ScmConfigKeys.OZONE_SCM_RATIS_PORT_KEY,
+            ScmConfigKeys.OZONE_SCM_RATIS_PORT_DEFAULT));
     GrpcConfigKeys.setMessageSizeMax(properties,
         SizeInBytes.valueOf("32m"));
 
