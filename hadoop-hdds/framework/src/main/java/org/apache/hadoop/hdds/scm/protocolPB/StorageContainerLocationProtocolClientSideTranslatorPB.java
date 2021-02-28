@@ -99,7 +99,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   private static final RpcController NULL_RPC_CONTROLLER = null;
 
   private final StorageContainerLocationProtocolPB rpcProxy;
-  private final SCMContainerLocationFailoverProxyProvider failoverProxyProvider;
+  private final SCMContainerLocationFailoverProxyProvider fpp;
 
   /**
    * Creates a new StorageContainerLocationProtocolClientSideTranslatorPB.
@@ -109,10 +109,11 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   public StorageContainerLocationProtocolClientSideTranslatorPB(
       SCMContainerLocationFailoverProxyProvider proxyProvider) {
     Preconditions.checkNotNull(proxyProvider);
-    this.failoverProxyProvider = proxyProvider;
+    this.fpp = proxyProvider;
     this.rpcProxy = (StorageContainerLocationProtocolPB) RetryProxy.create(
-        StorageContainerLocationProtocolPB.class, failoverProxyProvider,
-        failoverProxyProvider.getSCMContainerLocationRetryPolicy(null));
+        StorageContainerLocationProtocolPB.class,
+        fpp,
+        fpp.getRetryPolicy());
   }
 
   /**
@@ -123,7 +124,6 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
       Consumer<Builder> builderConsumer) throws IOException {
     final ScmContainerLocationResponse response;
     try {
-
       Builder builder = ScmContainerLocationRequest.newBuilder()
           .setCmdType(type)
           .setVersion(CURRENT_VERSION)
@@ -140,11 +140,14 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
   private ScmContainerLocationResponse submitRpcRequest(
       ScmContainerLocationRequest wrapper) throws ServiceException {
-    ScmContainerLocationResponse response =
-        rpcProxy.submitRequest(NULL_RPC_CONTROLLER, wrapper);
-    if (response.getStatus() ==
-        ScmContainerLocationResponse.Status.SCM_NOT_LEADER) {
-      failoverProxyProvider.performFailoverToAssignedLeader(null);
+    if (!ADMIN_COMMAND_TYPE.contains(wrapper.getCmdType())) {
+      return rpcProxy.submitRequest(NULL_RPC_CONTROLLER, wrapper);
+    }
+
+    // TODO: Modify ScmContainerLocationResponse to hold results from multi SCM
+    ScmContainerLocationResponse response = null;
+    for (StorageContainerLocationProtocolPB proxy : fpp.getProxies()) {
+      response = proxy.submitRequest(NULL_RPC_CONTROLLER, wrapper);
     }
     return response;
   }

@@ -28,13 +28,13 @@ import java.net.InetSocketAddress;
  * Class to store SCM proxy info.
  */
 public class SCMProxyInfo {
-  private String serviceId;
-  private String nodeId;
-  private String rpcAddrStr;
-  private InetSocketAddress rpcAddr;
-
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMProxyInfo.class);
+
+  private final String serviceId;
+  private final String nodeId;
+  private final String rpcAddrStr;
+  private final InetSocketAddress rpcAddr;
 
   public SCMProxyInfo(String serviceID, String nodeID,
                       InetSocketAddress rpcAddress) {
@@ -51,12 +51,9 @@ public class SCMProxyInfo {
     }
   }
 
+  @Override
   public String toString() {
-    return new StringBuilder()
-        .append("nodeId=")
-        .append(nodeId)
-        .append(",nodeAddress=")
-        .append(rpcAddrStr).toString();
+    return "nodeId=" + nodeId + ",nodeAddress=" + rpcAddrStr;
   }
 
   public InetSocketAddress getAddress() {
