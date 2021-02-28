@@ -38,6 +38,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 
@@ -131,7 +132,6 @@ import org.apache.hadoop.util.JvmPauseMonitor;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT_DEFAULT;
 import org.apache.ratis.grpc.GrpcTlsConfig;
-import org.apache.ratis.server.RaftServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -689,9 +689,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   }
 
   /**
-   * Routine to bootstrap the StorageContainerManager. Thsi will connect to a
+   * Routine to bootstrap the StorageContainerManager. This will connect to a
    * running SCM instance which has valid cluster id and fetch the cluster id
-   * from there. SCM ids will be also be exchanged here.
+   * from there.
    *
    * TODO: once SCM HA security is enabled, CSR cerificates will be fetched from
    * running scm leader instance as well.
@@ -708,14 +708,15 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
     // The node here will try to fetch the cluster id from any of existing
     // running SCM instances.
-    // TODO: need to avoid failover to local SCM Node here
-    final ScmInfo scmInfo = HAUtils.getScmInfo(conf);
+    SCMHANodeDetails.loadSCMHAConfig(conf);
+    OzoneConfiguration config = SCMHAUtils.removeSelfId(conf);
+    final ScmInfo scmInfo = HAUtils.getScmInfo(config);
     SCMStorageConfig scmStorageConfig = new SCMStorageConfig(conf);
     final String persistedClusterId = scmStorageConfig.getClusterID();
     final String fetchedId = scmInfo.getClusterId();
     Preconditions.checkNotNull(fetchedId);
     StorageState state = scmStorageConfig.getState();
-    if (state != StorageState.INITIALIZED) {
+    if (state == StorageState.INITIALIZED) {
       Preconditions.checkNotNull(scmStorageConfig.getScmId());
       if (!fetchedId.equals(persistedClusterId)) {
         LOG.error(
@@ -757,22 +758,22 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (state != StorageState.INITIALIZED) {
       try {
         if (clusterId != null && !clusterId.isEmpty()) {
+          // clusterId must be an UUID
+          Preconditions.checkNotNull(UUID.fromString(clusterId));
           scmStorageConfig.setClusterId(clusterId);
         }
-        // TODO: set the scm node info in the version file during upgrade
-        //  from non-HA SCM to SCM HA set up.
-        if (SCMHAUtils.isSCMHAEnabled(conf)) {
-          RaftServer server = SCMRatisServerImpl
-              .newRaftServer(clusterId, scmStorageConfig.getScmId(), haDetails,
-                  conf).build();
-          // ensure the ratis group exists
-          server.start();
-          server.close();
-          // TODO: Revisit if we need to set the Node info in SCM version file
-          scmStorageConfig
-              .setScmNodeInfo(haDetails.getLocalNodeDetails().getHostName());
-        }
         scmStorageConfig.initialize();
+        // TODO: Removing the HA enabled check right now as
+        //  when the SCM starts up , it always spins up the ratis
+        //  server irrespective of the check. If the ratis server is not
+        //  initialized here and starts up during the regular start,
+        //  it won't be starting a leader election and hence won't work. The
+        //  check will be re-introduced one we have clear segregation path with
+        //  ratis enable/disable switch.
+       // if (SCMHAUtils.isSCMHAEnabled(conf)) {
+        SCMRatisServerImpl.initialize(scmStorageConfig.getClusterID(),
+            scmStorageConfig.getScmId(), haDetails.getLocalNodeDetails(), conf);
+       // }
         LOG.info("SCM initialization succeeded. Current cluster id for sd={}"
                 + "; cid={}; layoutVersion={}; scmId={}",
             scmStorageConfig.getStorageDir(), scmStorageConfig.getClusterID(),
@@ -789,7 +790,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           clusterId, scmStorageConfig.getLayoutVersion());
       if (SCMHAUtils.isSCMHAEnabled(conf)) {
         SCMRatisServerImpl.validateRatisGroupExists(conf, clusterId);
-        Preconditions.checkNotNull(scmStorageConfig.getScmNodeInfo());
       }
       return true;
     }
@@ -1169,11 +1169,12 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   }
 
   /**
-   * Check if the current scm is the leader.
-   * @return - if the current scm is the leader.
+   * Check if the current scm is the leader and ready for accepting requests.
+   * @return - if the current scm is the leader and is ready.
    */
   public boolean checkLeader() {
-    return scmContext.isLeader();
+    return scmContext.isLeader() && getScmHAManager().getRatisServer()
+        .getDivision().getInfo().isLeaderReady();
   }
 
   public void checkAdminAccess(String remoteUser) throws IOException {

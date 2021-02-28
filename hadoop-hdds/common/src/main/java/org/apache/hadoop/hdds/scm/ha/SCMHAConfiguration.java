@@ -149,12 +149,12 @@ public class SCMHAConfiguration {
 
   @Config(key = "ratis.leader.election.timeout",
       type = ConfigType.TIME,
-      defaultValue = "1s",
+      defaultValue = "5s",
       tags = {SCM, OZONE, HA, RATIS},
       description = "The minimum timeout duration for SCM ratis leader" +
           " election. Default is 1s."
   )
-  private long ratisLeaderElectionTimeout = 1 * 1000L;
+  private long ratisLeaderElectionTimeout = 5 * 1000L;
 
   @Config(key = "ratis.server.failure.timeout.duration",
       type = ConfigType.TIME,
@@ -185,15 +185,6 @@ public class SCMHAConfiguration {
   )
   private String ratisSnapshotDir;
 
-  @Config(key = "grpc.bind.port",
-      type = ConfigType.INT,
-      defaultValue = "9899",
-      tags = {OZONE, SCM, HA, RATIS},
-      description = "Port used by SCM for Grpc Server."
-  )
-  // TODO: fix the default grpc port
-  private int grpcBindPort = 9899;
-
   @Config(key = "grpc.deadline.interval",
       type = ConfigType.TIME,
       defaultValue = "30m",
@@ -206,9 +197,6 @@ public class SCMHAConfiguration {
     return grpcDeadlineInterval;
   }
 
-  public int getGrpcBindPort() {
-    return grpcBindPort;
-  }
 
   public String getRatisStorageDir() {
     return ratisStorageDir;
@@ -252,10 +240,6 @@ public class SCMHAConfiguration {
 
   public void setRaftLogPurgeEnabled(boolean enabled) {
     this.raftLogPurgeEnabled = enabled;
-  }
-
-  public void setGrpcBindPort(int port) {
-    this.grpcBindPort = port;
   }
 
   public int getRaftLogPurgeGap() {

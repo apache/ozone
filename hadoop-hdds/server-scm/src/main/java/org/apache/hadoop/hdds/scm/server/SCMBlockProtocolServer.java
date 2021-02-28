@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos;
+import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.DeleteBlockResult;
@@ -286,6 +287,33 @@ public class SCMBlockProtocolServer implements
       if(auditSuccess) {
         AUDIT.logReadSuccess(
             buildAuditMessageForSuccess(SCMAction.GET_SCM_INFO, null)
+        );
+      }
+    }
+  }
+
+  @Override
+  public boolean addSCM(AddSCMRequest request) throws IOException {
+    LOG.debug("Adding SCM {} addr {} cluster id {}",
+        request.getScmId(), request.getRatisAddr(), request.getClusterId());
+
+    Map<String, String> auditMap = Maps.newHashMap();
+    auditMap.put("scmId", String.valueOf(request.getScmId()));
+    auditMap.put("cluster", String.valueOf(request.getClusterId()));
+    auditMap.put("addr", String.valueOf(request.getRatisAddr()));
+    boolean auditSuccess = true;
+    try{
+      return scm.getScmHAManager().addSCM(request);
+    } catch (Exception ex) {
+      auditSuccess = false;
+      AUDIT.logReadFailure(
+          buildAuditMessageForFailure(SCMAction.ADD_SCM, auditMap, ex)
+      );
+      throw ex;
+    } finally {
+      if(auditSuccess) {
+        AUDIT.logReadSuccess(
+            buildAuditMessageForSuccess(SCMAction.ADD_SCM, auditMap)
         );
       }
     }

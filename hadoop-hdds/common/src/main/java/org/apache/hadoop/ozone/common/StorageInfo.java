@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.common;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
+import org.apache.hadoop.ozone.OzoneConsts;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -27,6 +28,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.Properties;
+import java.util.UUID;
 
 /**
  * Common class for storage information. This class defines the common
@@ -197,11 +199,7 @@ public class StorageInfo {
    * @return new clusterID
    */
   public static String newClusterID() {
-    // TODO:
-    //  Please check https://issues.apache.org/jira/browse/HDDS-4538
-    //  hard code clusterID and scmUuid on HDDS-2823,
-    //  so that multi SCMs won't cause chaos in Datanode side.
-    return "CID-1df51ed9-19f1-4283-8f61-5d90a84c196c";
+    return OzoneConsts.CLUSTER_ID_PREFIX + UUID.randomUUID().toString();
   }
 
 }

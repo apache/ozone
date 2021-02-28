@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
+import org.apache.hadoop.hdds.scm.AddSCMRequest;
+
 import java.io.IOException;
 
 /**
@@ -48,4 +50,6 @@ public interface SCMHAManager {
    * Stops the HA service.
    */
   void shutdown() throws IOException;
+
+  boolean addSCM(AddSCMRequest request) throws IOException;
 }

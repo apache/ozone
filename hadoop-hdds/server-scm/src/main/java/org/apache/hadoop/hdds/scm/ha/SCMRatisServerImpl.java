@@ -19,10 +19,6 @@ package org.apache.hadoop.hdds.scm.ha;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.net.UnknownHostException;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -36,12 +32,13 @@ import java.util.stream.Stream;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.util.Time;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.RaftClientReply;
@@ -51,6 +48,7 @@ import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
+import org.apache.ratis.protocol.SetConfigurationRequest;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.RaftServerConfigKeys;
 import org.slf4j.Logger;
@@ -63,52 +61,100 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMRatisServerImpl.class);
 
-  private final RaftServer.Division division;
+  private final RaftServer server;
+  private final SCMStateMachine stateMachine;
   private final StorageContainerManager scm;
-  private final InetSocketAddress address;
   private final ClientId clientId = ClientId.randomId();
   private final AtomicLong callId = new AtomicLong();
+  private final RaftServer.Division division;
 
   // TODO: Refactor and remove ConfigurationSource and use only
   //  SCMHAConfiguration.
-  SCMRatisServerImpl(final SCMHAConfiguration haConf,
-      final ConfigurationSource conf, final StorageContainerManager scm,
-      final DBTransactionBuffer buffer) throws IOException {
+  SCMRatisServerImpl(final ConfigurationSource conf,
+      final StorageContainerManager scm, final DBTransactionBuffer buffer)
+      throws IOException {
     this.scm = scm;
-    this.address = haConf.getRatisBindAddress();
-    RaftServer server = newRaftServer(scm.getClusterId(), scm.getScmId(),
-        scm.getSCMHANodeDetails(), conf)
-        .setStateMachine(new SCMStateMachine(scm, this, buffer)).build();
+    this.stateMachine = new SCMStateMachine(scm, this, buffer);
+    final RaftGroupId groupId = buildRaftGroupId(scm.getClusterId());
+    LOG.info("starting Raft server for scm:{}", scm.getScmId());
+    // During SCM startup, the bootstrapped node will be started just with
+    // groupId information, so that it won't trigger any leader election
+    // as it doesn't have any peer info.
 
-    this.division =
-        server.getDivision(server.getGroups().iterator().next().getGroupId());
+    // The primary SCM node which is initialized using scm --init command,
+    // will initialize the raft server with the peer info and it will be
+    // persisted in the raft log post leader election. Now, when the primary
+    // scm boots up, it has peer info embedded in the raft log and will
+    // trigger leader election.
+    this.server =
+        newRaftServer(scm.getScmId(), conf).setStateMachine(stateMachine)
+            .setGroup(RaftGroup.valueOf(groupId)).build();
+    this.division = server.getDivision(groupId);
   }
 
-  public static RaftServer.Builder newRaftServer(final String clusterId,
-      final String scmId, final SCMHANodeDetails haDetails,
-      final ConfigurationSource conf) throws IOException {
-    final String scmNodeId = haDetails.getLocalNodeDetails().getNodeId();
+  public static void initialize(String clusterId, String scmId,
+      SCMNodeDetails details, OzoneConfiguration conf) throws IOException {
+    final RaftGroup group = buildRaftGroup(details, scmId, clusterId);
+    RaftServer server = newRaftServer(scmId, conf)
+        .setGroup(group).build();
+    server.start();
+    // TODO: Timeout and sleep interval should be made configurable
+    waitforLeaderToBeReady(server, 60000, group);
+    server.close();
+  }
+
+  private static void waitforLeaderToBeReady(RaftServer server, long timeout,
+      RaftGroup group)
+      throws IOException {
+    boolean ready;
+    long st = Time.monotonicNow();
+    do {
+      ready = server.getDivision(group.getGroupId()).getInfo().isLeaderReady();
+      if (!ready) {
+        try {
+          Thread.sleep(2000);
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+        }
+      }
+    } while (!ready && Time.monotonicNow() - st < timeout);
+
+    if (!ready) {
+      throw new IOException(String
+          .format("Ratis group %s is not ready in %d ms", group.getGroupId(),
+              timeout));
+    }
+  }
+
+  private static RaftServer.Builder newRaftServer(final String scmId,
+      final ConfigurationSource conf) {
     final SCMHAConfiguration haConf = conf.getObject(SCMHAConfiguration.class);
-    SCMHAGroupBuilder haGrpBuilder = scmNodeId != null ?
-        new SCMHAGroupBuilder(haDetails, clusterId, scmId) :
-        new SCMHAGroupBuilder(haConf, conf, clusterId);
     final RaftProperties serverProperties =
         RatisUtil.newRaftProperties(haConf, conf);
-    return RaftServer.newBuilder().setServerId(haGrpBuilder.getPeerId())
-        .setGroup(haGrpBuilder.getRaftGroup()).setProperties(serverProperties)
-        .setStateMachine(new SCMStateMachine());
+    return RaftServer.newBuilder().setServerId(RaftPeerId.getRaftPeerId(scmId))
+        .setProperties(serverProperties)
+        .setStateMachine(new SCMStateMachine(false));
   }
 
   @Override
   public void start() throws IOException {
-    division.getRaftServer().start();
+    server.start();
+  }
+
+  @Override
+  public RaftServer.Division getDivision() {
+    return division;
+  }
+
+  @VisibleForTesting
+  public SCMStateMachine getStateMachine() {
+    return stateMachine;
   }
 
   @Override
   public void registerStateMachineHandler(final RequestType handlerType,
                                           final Object handler) {
-    ((SCMStateMachine) division.getStateMachine())
-        .registerHandler(handlerType, handler);
+    stateMachine.registerHandler(handlerType, handler);
   }
 
   @Override
@@ -116,16 +162,17 @@ public class SCMRatisServerImpl implements SCMRatisServer {
       throws IOException, ExecutionException, InterruptedException {
     final RaftClientRequest raftClientRequest = RaftClientRequest.newBuilder()
         .setClientId(clientId)
-        .setServerId(division.getId())
-        .setGroupId(division.getGroup().getGroupId())
+        .setServerId(getDivision().getId())
+        .setGroupId(getDivision().getGroup().getGroupId())
         .setCallId(nextCallId())
         .setMessage(request.encode())
         .setType(RaftClientRequest.writeRequestType())
         .build();
     final RaftClientReply raftClientReply =
-        division.getRaftServer()
-            .submitClientRequestAsync(raftClientRequest)
-            .get();
+        server.submitClientRequestAsync(raftClientRequest).get();
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("request {} Reply {}", raftClientRequest, raftClientReply);
+    }
     return SCMRatisResponse.decode(raftClientReply);
   }
 
@@ -135,12 +182,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
 
   @Override
   public void stop() throws IOException {
-    division.getRaftServer().close();
-  }
-
-  @Override
-  public RaftServer.Division getDivision() {
-    return division;
+    server.close();
   }
 
   @Override
@@ -159,13 +201,47 @@ public class SCMRatisServerImpl implements SCMRatisServer {
         division.getMemberId(), null, division.getGroup().getPeers());
   }
 
+  @Override
+  public boolean addSCM(AddSCMRequest request) throws IOException {
+    List<RaftPeer> newRaftPeerList =
+        new ArrayList<>(getDivision().getGroup().getPeers());
+    // add the SCM node to be added to the raft peer list
+
+    RaftPeer raftPeer = RaftPeer.newBuilder().setId(request.getScmId())
+        .setAddress(request.getRatisAddr()).build();
+    newRaftPeerList.add(raftPeer);
+
+    LOG.info("{}: Submitting SetConfiguration request to Ratis server with" +
+            " new SCM peers list: {}", scm.getScmId(),
+        newRaftPeerList);
+    SetConfigurationRequest configRequest =
+        new SetConfigurationRequest(clientId, division.getPeer().getId(),
+            division.getGroup().getGroupId(), nextCallId(), newRaftPeerList);
+
+    try {
+      RaftClientReply raftClientReply =
+          division.getRaftServer().setConfiguration(configRequest);
+      if (raftClientReply.isSuccess()) {
+        LOG.info("Successfully added new SCM: {}.", request.getScmId());
+      } else {
+        LOG.error("Failed to add new SCM: {}. Ratis reply: {}" +
+            request.getScmId(), raftClientReply);
+        throw new IOException(raftClientReply.getException());
+      }
+      return raftClientReply.isSuccess();
+    } catch (IOException e) {
+      LOG.error("Failed to update Ratis configuration and add new peer. " +
+          "Cannot add new SCM: {}.", scm.getScmId(), e);
+      throw e;
+    }
+  }
+
   @VisibleForTesting
   public static void validateRatisGroupExists(OzoneConfiguration conf,
       String clusterId) throws IOException {
     final SCMHAConfiguration haConf = conf.getObject(SCMHAConfiguration.class);
     final RaftProperties properties = RatisUtil.newRaftProperties(haConf, conf);
-    final RaftGroupId raftGroupId =
-        RaftGroupId.valueOf(SCMHAGroupBuilder.buildRaftGroupId(clusterId));
+    final RaftGroupId raftGroupId = buildRaftGroupId(clusterId);
     final AtomicBoolean found = new AtomicBoolean(false);
     RaftServerConfigKeys.storageDir(properties).parallelStream().forEach(
         (dir) -> Optional.ofNullable(dir.listFiles()).map(Arrays::stream)
@@ -199,150 +275,29 @@ public class SCMRatisServerImpl implements SCMRatisServer {
           "Could not find any ratis group with id " + raftGroupId);
     }
   }
-  /**
-   * If the SCM group starts from {@link ScmConfigKeys#OZONE_SCM_NAMES},
-   * its raft peers should locate on different nodes, and use the same port
-   * to communicate with each other.
-   *
-   * Each of the raft peer figures out its {@link RaftPeerId} by computing
-   * its position in {@link ScmConfigKeys#OZONE_SCM_NAMES}.
-   *
-   * Assume {@link ScmConfigKeys#OZONE_SCM_NAMES} is "ip0,ip1,ip2",
-   * scm with ip0 identifies its {@link RaftPeerId} as scm0,
-   * scm with ip1 identifies its {@link RaftPeerId} as scm1,
-   * scm with ip2 identifies its {@link RaftPeerId} as scm2.
-   *
-   * After startup, they will form a {@link RaftGroup} with groupID
-   * "SCM-HA-Service", and communicate with each other via
-   * ozone.scm.ha.ratis.bind.port.
-   */
-  private static class SCMHAGroupBuilder {
-    private static final String SCM_SERVICE_ID = "SCM-HA-Service";
 
-    private final RaftGroupId raftGroupId;
-    private final RaftGroup raftGroup;
-    private RaftPeerId selfPeerId;
+  private static RaftGroup buildRaftGroup(SCMNodeDetails details,
+      String scmId, String clusterId) {
+    Preconditions.checkNotNull(scmId);
+    final RaftGroupId groupId = buildRaftGroupId(clusterId);
+    RaftPeerId selfPeerId = RaftPeerId.getRaftPeerId(scmId);
 
-    /**
-     * @return raft group
-     */
-    public RaftGroup getRaftGroup() {
-      return raftGroup;
-    }
+    RaftPeer localRaftPeer = RaftPeer.newBuilder().setId(selfPeerId)
+        // TODO : Should we use IP instead of hostname??
+        .setAddress(details.getRatisHostPortStr()).build();
 
-    /**
-     * @return raft group id
-     */
-    public RaftGroupId getRaftGroupId() {
-      return raftGroupId;
-    }
-
-    /**
-     * @return raft peer id
-     */
-    public RaftPeerId getPeerId() {
-      return selfPeerId;
-    }
-
-    /**
-     * This will be used when the SCM HA config are not defined.
-     * This will be removed once the HA configs are will defined.
-     */
-    SCMHAGroupBuilder(final SCMHAConfiguration haConf,
-        final ConfigurationSource conf, String clusterId) throws IOException {
-      // fetch port
-      int port = haConf.getRatisBindAddress().getPort();
-
-      // fetch localhost
-      InetAddress localHost = InetAddress.getLocalHost();
-
-      // fetch hosts from ozone.scm.names
-      List<String> hosts = parseHosts(conf);
-
-      final List<RaftPeer> raftPeers = new ArrayList<>();
-      for (int i = 0; i < hosts.size(); ++i) {
-        String nodeId = "scm" + i;
-        RaftPeerId peerId = RaftPeerId.getRaftPeerId(nodeId);
-
-        String host = hosts.get(i);
-        if (InetAddress.getByName(host).equals(localHost)) {
-          selfPeerId = peerId;
-          raftPeers.add(RaftPeer.newBuilder()
-              .setId(peerId)
-              .setAddress(host + ":" + port)
-              .build());
-          break;
-        }
-      }
-
-      if (selfPeerId == null) {
-        String errorMessage = "localhost " +  localHost
-            + " does not exist in ozone.scm.names "
-            + conf.get(ScmConfigKeys.OZONE_SCM_NAMES);
-        throw new IOException(errorMessage);
-      }
-
-      LOG.info("Build a RaftGroup for SCMHA, " +
-              "localHost: {}, OZONE_SCM_NAMES: {}, selfPeerId: {}",
-          localHost, conf.get(ScmConfigKeys.OZONE_SCM_NAMES), selfPeerId);
-
-      String groupId = clusterId == null ? SCM_SERVICE_ID : clusterId;
-      raftGroupId = RaftGroupId.valueOf(
-          UUID.nameUUIDFromBytes(groupId.getBytes(StandardCharsets.UTF_8)));
-
-      raftGroup = RaftGroup.valueOf(raftGroupId, raftPeers);
-    }
-
-    SCMHAGroupBuilder(final SCMHANodeDetails details, final String clusterId,
-        final String scmId) {
-
-      Preconditions.checkNotNull(clusterId);
-      // RaftGroupId is the clusterId
-      raftGroupId = RaftGroupId.valueOf(buildRaftGroupId(clusterId));
-      Preconditions.checkNotNull(scmId);
-      selfPeerId = RaftPeerId.getRaftPeerId(scmId);
-      SCMNodeDetails localNodeDetails = details.getLocalNodeDetails();
-
-      InetSocketAddress ratisAddr =
-          new InetSocketAddress(localNodeDetails.getInetAddress(),
-              localNodeDetails.getRatisPort());
-
-      RaftPeer localRaftPeer =
-          RaftPeer.newBuilder().setId(selfPeerId).setAddress(ratisAddr).build();
-
-      List<RaftPeer> raftPeers = new ArrayList<>();
-      // Add this Ratis server to the Ratis ring
-      raftPeers.add(localRaftPeer);
-      // always start as a standalone server
-      raftGroup = RaftGroup.valueOf(raftGroupId, raftPeers);
-    }
-
-    private static UUID buildRaftGroupId(String id) {
-      return UUID.nameUUIDFromBytes(id.getBytes(StandardCharsets.UTF_8));
-    }
-
-    private List<String> parseHosts(final ConfigurationSource conf)
-        throws UnknownHostException {
-      // fetch hosts from ozone.scm.names
-      List<String> hosts =
-          Arrays.stream(conf.getTrimmedStrings(ScmConfigKeys.OZONE_SCM_NAMES))
-              .map(scmName -> HddsUtils.getHostName(scmName).get())
-              .collect(Collectors.toList());
-
-      // if this is not a conf for a multi-server raft cluster,
-      // it means we are in integration test, and need to augment
-      // the conf to help build a single-server raft cluster.
-      if (hosts.size() == 0) {
-        // ozone.scm.names is not set
-        hosts.add(InetAddress.getLocalHost().getHostName());
-      } else if (hosts.size() == 1) {
-        // ozone.scm.names is set, yet the conf may not be usable.
-        hosts.set(0, InetAddress.getLocalHost().getHostName());
-      }
-
-      LOG.info("fetch hosts {} from ozone.scm.names {}.",
-          hosts, conf.get(ScmConfigKeys.OZONE_SCM_NAMES));
-      return hosts;
-    }
+    List<RaftPeer> raftPeers = new ArrayList<>();
+    // Add this Ratis server to the Ratis ring
+    raftPeers.add(localRaftPeer);
+    final RaftGroup group =
+        RaftGroup.valueOf(groupId, raftPeers);
+    return group;
   }
+
+  private static RaftGroupId buildRaftGroupId(String clusterId) {
+    Preconditions.checkNotNull(clusterId);
+    return RaftGroupId.valueOf(
+        UUID.fromString(clusterId.replace(OzoneConsts.CLUSTER_ID_PREFIX, "")));
+  }
+
 }

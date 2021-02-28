@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.SCMB
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.SortDatanodesRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.SortDatanodesResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.Status;
+import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
@@ -135,6 +136,10 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
         response.setGetScmInfoResponse(
             getScmInfo(request.getGetScmInfoRequest()));
         break;
+      case AddScm:
+        response.setAddScmResponse(
+            getAddSCMResponse(request.getAddScmRequestProto()));
+        break;
       case SortDatanodes:
         response.setSortDatanodesResponse(sortDatanodes(
             request.getSortDatanodesRequest(), request.getVersion()
@@ -218,6 +223,15 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
     return HddsProtos.GetScmInfoResponseProto.newBuilder()
         .setClusterId(scmInfo.getClusterId())
         .setScmId(scmInfo.getScmId())
+        .build();
+  }
+
+  public HddsProtos.AddScmResponseProto getAddSCMResponse(
+      HddsProtos.AddScmRequestProto req)
+      throws IOException {
+    boolean status = impl.addSCM(AddSCMRequest.getFromProtobuf(req));
+    return HddsProtos.AddScmResponseProto.newBuilder()
+        .setSuccess(status)
         .build();
   }
 

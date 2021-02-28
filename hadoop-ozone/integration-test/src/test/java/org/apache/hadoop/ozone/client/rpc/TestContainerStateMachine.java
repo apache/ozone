@@ -114,6 +114,7 @@ public class TestContainerStateMachine {
             .setHbInterval(200)
             .setCertificateClient(new CertificateClientTestImpl(conf))
             .build();
+    cluster.setWaitForClusterToBeReadyTimeout(300000);
     cluster.waitForClusterToBeReady();
     cluster.getOzoneManager().startSecretManager();
     //the easiest way to create an open container is creating a key

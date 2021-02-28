@@ -150,19 +150,6 @@ public class TestHddsServerUtils {
   }
 
   /**
-   * getScmAddressForDataNodes should fail when OZONE_SCM_NAMES has
-   * multiple addresses.
-   */
-  @Test
-  public void testClientFailsWithMultipleScmNames() {
-    final String scmHost = "host123,host456";
-    final OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(OZONE_SCM_NAMES, scmHost);
-    thrown.expect(IllegalArgumentException.class);
-    HddsServerUtil.getScmAddressForDataNodes(conf);
-  }
-
-  /**
    * Test {@link ServerUtils#getScmDbDir}.
    */
   @Test

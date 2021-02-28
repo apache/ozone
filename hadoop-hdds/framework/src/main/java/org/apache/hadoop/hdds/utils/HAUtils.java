@@ -17,17 +17,15 @@
 package org.apache.hadoop.hdds.utils;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.ScmInfo;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.proxy.SCMBlockLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
-import org.apache.hadoop.io.retry.RetryPolicy;
 
 import java.io.IOException;
-import java.util.concurrent.TimeUnit;
-
-import static org.apache.hadoop.io.retry.RetryPolicies.retryUpToMaximumCountWithFixedSleep;
 
 /**
  * utility class used by SCM and OM for HA.
@@ -40,16 +38,23 @@ public final class HAUtils {
   public static ScmInfo getScmInfo(OzoneConfiguration conf)
       throws IOException {
     try {
-      RetryPolicy retryPolicy = retryUpToMaximumCountWithFixedSleep(
-          10, 5, TimeUnit.SECONDS);
-      RetriableTask<ScmInfo> retriable = new RetriableTask<>(
-          retryPolicy, "getScmInfo",
-          () -> getScmBlockClient(conf).getScmInfo());
-      return retriable.call();
+      return getScmBlockClient(conf).getScmInfo();
     } catch (IOException e) {
       throw e;
     } catch (Exception e) {
       throw new IOException("Failed to get SCM info", e);
+    }
+  }
+
+  public static boolean addSCM(OzoneConfiguration conf, AddSCMRequest request)
+      throws IOException {
+    OzoneConfiguration config = SCMHAUtils.removeSelfId(conf);
+    try {
+      return getScmBlockClient(config).addSCM(request);
+    } catch (IOException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new IOException("Failed to add SCM", e);
     }
   }
 

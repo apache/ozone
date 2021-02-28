@@ -229,6 +229,16 @@ message GetScmInfoResponseProto {
     repeated string peerRoles = 3;
 }
 
+message AddScmRequestProto {
+    required string clusterId = 1;
+    required string scmId = 2;
+    required string ratisAddr = 3;
+}
+
+message AddScmResponseProto {
+    required bool success = 1;
+    optional string scmId = 2;
+}
 
 enum ReplicationType {
     RATIS = 1;

@@ -20,11 +20,12 @@ package org.apache.hadoop.hdds.scm.ha;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.google.common.base.Preconditions;
 import com.google.protobuf.InvalidProtocolBufferException;
@@ -32,17 +33,19 @@ import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImplV2;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.ratis.proto.RaftProtos;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftGroupMemberId;
 import org.apache.ratis.protocol.RaftPeerId;
-import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.util.Time;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.statemachine.SnapshotInfo;
 import org.apache.ratis.statemachine.TransactionContext;
 import org.apache.ratis.statemachine.impl.BaseStateMachine;
 
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
+import org.apache.ratis.statemachine.impl.SimpleStateMachineStorage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,6 +62,9 @@ public class SCMStateMachine extends BaseStateMachine {
   private SCMRatisServer ratisServer;
   private Map<RequestType, Object> handlers;
   private DBTransactionBuffer transactionBuffer;
+  private final SimpleStateMachineStorage storage =
+      new SimpleStateMachineStorage();
+  private final AtomicBoolean isInitialized;
 
   public SCMStateMachine(final StorageContainerManager scm,
       final SCMRatisServer ratisServer, DBTransactionBuffer buffer)
@@ -79,9 +85,11 @@ public class SCMStateMachine extends BaseStateMachine {
             ), SCM_NOT_INITIALIZED);
       }
     }
+    isInitialized = new AtomicBoolean(true);
   }
 
-  public SCMStateMachine() {
+  public SCMStateMachine(boolean init) {
+    isInitialized = new AtomicBoolean(init);
   }
   public void registerHandler(RequestType type, Object handler) {
     handlers.put(type, handler);
@@ -143,6 +151,9 @@ public class SCMStateMachine extends BaseStateMachine {
   public void notifyNotLeader(Collection<TransactionContext> pendingEntries) {
     LOG.info("current leader SCM steps down.");
 
+    if (!isInitialized.get()) {
+      return;
+    }
     scm.getScmContext().updateLeaderAndTerm(false, 0);
     scm.getSCMServiceManager().notifyStatusChanged();
   }
@@ -152,6 +163,10 @@ public class SCMStateMachine extends BaseStateMachine {
                                   RaftPeerId newLeaderId) {
     if (!groupMemberId.getPeerId().equals(newLeaderId)) {
       LOG.info("leader changed, yet current SCM is still follower.");
+      return;
+    }
+
+    if (!isInitialized.get()) {
       return;
     }
 
@@ -179,25 +194,47 @@ public class SCMStateMachine extends BaseStateMachine {
     long startTime = Time.monotonicNow();
     TermIndex lastTermIndex = getLastAppliedTermIndex();
     long lastAppliedIndex = lastTermIndex.getIndex();
-    TransactionInfo lastAppliedTrxInfo =
-        TransactionInfo.fromTermIndex(lastTermIndex);
-    if (transactionBuffer.getLatestTrxInfo()
-        .compareTo(lastAppliedTrxInfo) < 0) {
-      transactionBuffer.updateLatestTrxInfo(
-          TransactionInfo.builder()
-              .setCurrentTerm(lastTermIndex.getTerm())
-              .setTransactionIndex(lastTermIndex.getIndex())
-              .build());
-      transactionBuffer.setLatestSnapshot(
-          transactionBuffer.getLatestTrxInfo().toSnapshotInfo());
-    } else {
-      lastAppliedIndex =
-          transactionBuffer.getLatestTrxInfo().getTransactionIndex();
-    }
+    if (isInitialized.get()) {
+      TransactionInfo lastAppliedTrxInfo =
+          TransactionInfo.fromTermIndex(lastTermIndex);
+      if (transactionBuffer.getLatestTrxInfo().compareTo(lastAppliedTrxInfo)
+          < 0) {
+        transactionBuffer.updateLatestTrxInfo(
+            TransactionInfo.builder().setCurrentTerm(lastTermIndex.getTerm())
+                .setTransactionIndex(lastTermIndex.getIndex()).build());
+        transactionBuffer.setLatestSnapshot(
+            transactionBuffer.getLatestTrxInfo().toSnapshotInfo());
+      } else {
+        lastAppliedIndex =
+            transactionBuffer.getLatestTrxInfo().getTransactionIndex();
+      }
 
-    transactionBuffer.flush();
-    LOG.info("Current Snapshot Index {}, takeSnapshot took {} ms",
-        lastAppliedIndex, Time.monotonicNow() - startTime);
+      transactionBuffer.flush();
+      LOG.info("Current Snapshot Index {}, takeSnapshot took {} ms",
+          lastAppliedIndex, Time.monotonicNow() - startTime);
+    }
+    super.takeSnapshot();
     return lastAppliedIndex;
+  }
+
+  @Override
+  public void notifyTermIndexUpdated(long term, long index) {
+    if (transactionBuffer != null) {
+      transactionBuffer.updateLatestTrxInfo(
+          TransactionInfo.builder().setCurrentTerm(term)
+              .setTransactionIndex(index).build());
+    }
+    // We need to call updateLastApplied here because now in ratis when a
+    // node becomes leader, it is checking stateMachineIndex >=
+    // placeHolderIndex (when a node becomes leader, it writes a conf entry
+    // with some information like its peers and termIndex). So, calling
+    // updateLastApplied updates lastAppliedTermIndex.
+    updateLastAppliedTermIndex(term, index);
+  }
+
+
+  @Override
+  public void notifyConfigurationChanged(long term, long index,
+      RaftProtos.RaftConfigurationProto newRaftConfiguration) {
   }
 }

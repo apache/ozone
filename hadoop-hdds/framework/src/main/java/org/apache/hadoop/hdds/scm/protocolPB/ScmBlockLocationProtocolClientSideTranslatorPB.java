@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos
     .SortDatanodesRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos
     .SortDatanodesResponseProto;
+import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
@@ -247,6 +248,26 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
     return builder.build();
   }
 
+  /**
+   * Request to add SCM to existing SCM HA group.
+   * @return status
+   * @throws IOException
+   */
+  @Override
+  public boolean addSCM(AddSCMRequest request) throws IOException {
+    HddsProtos.AddScmRequestProto requestProto =
+        request.getProtobuf();
+    HddsProtos.AddScmResponseProto resp;
+    SCMBlockLocationRequest wrapper = createSCMBlockRequest(
+        Type.AddScm)
+        .setAddScmRequestProto(requestProto)
+        .build();
+
+    final SCMBlockLocationResponse wrappedResponse =
+        handleError(submitRequest(wrapper));
+    resp = wrappedResponse.getAddScmResponse();
+    return resp.getSuccess();
+  }
   /**
    * Sort the datanodes based on distance from client.
    * @return List<DatanodeDetails></>
