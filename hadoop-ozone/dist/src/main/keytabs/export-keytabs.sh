@@ -15,31 +15,3 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-export_keytab() {
-   kadmin.local -q "ktadd -norandkey -k /etc/security/keytabs/$2.keytab $1@EXAMPLE.COM"
-}
-
-export_keytab scm/scm scm
-export_keytab HTTP/scm scm
-export_keytab testuser/scm scm
-export_keytab testuser2/scm scm
-
-export_keytab testuser/scm testuser
-export_keytab testuser2/scm testuser2
-
-export_keytab om/om om
-export_keytab HTTP/om om
-
-export_keytab s3g/s3g s3g
-export_keytab HTTP/s3g s3g
-export_keytab testuser/s3g s3g
-
-export_keytab recon/recon recon
-export_keytab HTTP/recon recon
-
-export_keytab dn/dn dn
-export_keytab HTTP/dn dn
-
-export_keytab HTTP/scm HTTP
-
-chmod 755 /etc/security/keytabs/*.keytab
