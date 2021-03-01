@@ -21,6 +21,8 @@
 
 set -e -o pipefail
 
+echo "--- RUNNING NON-ROLLING UPGRADE TEST FROM $OZONE_UPGRADE_FROM TO $OZONE_UPGRADE_TO ---"
+
 # Prepare OMs before upgrade unless this variable is false.
 : "${OZONE_PREPARE_OMS:='true'}"
 
@@ -34,7 +36,7 @@ set +u
 
 # Tells main testlib.sh to wait for an OM leader.
 export OM_SERVICE_ID=omservice
-export COMPOSE_FILE="${TEST_DIR}/compose/common/docker-compose.yaml":"${TEST_DIR}/compose/om-ha/docker-compose.yaml"
+export COMPOSE_FILE="${TEST_DIR}/compose/ha/docker-compose.yaml"
 
 source "$TEST_DIR"/testlib.sh
 source "$OZONE_UPGRADE_CALLBACK"

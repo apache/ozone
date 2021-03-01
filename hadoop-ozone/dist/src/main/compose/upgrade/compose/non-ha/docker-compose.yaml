@@ -42,6 +42,22 @@ x-volumes:
     - &transformation ${TEST_DIR}/../../libexec/transformation.py:/opt/hadoop/libexec/transformation.py
 
 services:
+  om:
+    command: ["ozone","om"]
+    <<: *common-config
+    environment:
+      ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
+      <<: *replication
+    ports:
+      - 9862
+      - 9874
+    networks:
+      net:
+        ipv4_address: 10.9.0.11
+    volumes:
+      - ${OZONE_VOLUME}/om:/data
+      - *ozone-dir
+      - *transformation
   scm:
     command: ["ozone","scm"]
     <<: *common-config
@@ -51,7 +67,7 @@ services:
       <<: *replication
     networks:
       net:
-        ipv4_address: 10.9.0.11
+        ipv4_address: 10.9.0.12
     ports:
       - 9876:9876
     volumes:
@@ -62,7 +78,7 @@ services:
     <<: *datanode
     networks:
       net:
-        ipv4_address: 10.9.0.12
+        ipv4_address: 10.9.0.13
     volumes:
       - ${OZONE_VOLUME}/dn1:/data
       - *ozone-dir
@@ -71,7 +87,7 @@ services:
     <<: *datanode
     networks:
       net:
-        ipv4_address: 10.9.0.13
+        ipv4_address: 10.9.0.14
     volumes:
       - ${OZONE_VOLUME}/dn2:/data
       - *ozone-dir
@@ -80,7 +96,7 @@ services:
     <<: *datanode
     networks:
       net:
-        ipv4_address: 10.9.0.14
+        ipv4_address: 10.9.0.15
     volumes:
       - ${OZONE_VOLUME}/dn3:/data
       - *ozone-dir
@@ -92,7 +108,7 @@ services:
       <<: *replication
     networks:
       net:
-        ipv4_address: 10.9.0.15
+        ipv4_address: 10.9.0.16
     ports:
       - 9888:9888
     volumes:
@@ -106,7 +122,7 @@ services:
       <<: *replication
     networks:
       net:
-        ipv4_address: 10.9.0.16
+        ipv4_address: 10.9.0.17
     ports:
       - 9878:9878
     volumes:
