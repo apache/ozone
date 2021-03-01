@@ -33,7 +33,7 @@ Each type of upgrade has a subdirectory under the *upgrades* directory. Each upg
 
 ## compose
 
-Docker compose cluster definitions to be used in upgrade testing are defined in the *compose* directory. Each upgrade type builds its cluster by setting Docker's `COMPOSE_FILE` environment variable to one or more compose yaml files in this directory. Note that within each compose file, paths are considered relative to the first compose file used in `COMPOSE_FILE`. Therefore, absoulte paths using the `TEST_DIR` environment variable are preferred (see [Adding New Tests](#-adding-new-tests)).
+Docker compose cluster definitions to be used in upgrade testing are defined in the *compose* directory. Each upgrade type builds its cluster by setting Docker's `COMPOSE_FILE` environment variable to one or more compose yaml files in this directory.
 
 ## Upgrade Types
 
