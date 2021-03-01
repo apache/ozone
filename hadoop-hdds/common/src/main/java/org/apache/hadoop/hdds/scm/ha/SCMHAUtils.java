@@ -141,17 +141,17 @@ public final class SCMHAUtils {
    * Removes the self node from the list of nodes in the
    * configuration.
    * @param configuration OzoneConfiguration
+   * @param selfId - Local node Id of SCM.
    * @return Updated OzoneConfiguration
    */
 
   public static OzoneConfiguration removeSelfId(
-      OzoneConfiguration configuration) {
+      OzoneConfiguration configuration, String selfId) {
     final OzoneConfiguration conf = new OzoneConfiguration(configuration);
     String scmNodes = conf.get(ConfUtils
         .addKeySuffixes(ScmConfigKeys.OZONE_SCM_NODES_KEY,
             getScmServiceId(conf)));
     if (scmNodes != null) {
-      final String selfId = conf.get(ScmConfigKeys.OZONE_SCM_NODE_ID_KEY);
       String[] parts = scmNodes.split(",");
       List<String> partsLeft = new ArrayList<>();
       for (String part : parts) {
