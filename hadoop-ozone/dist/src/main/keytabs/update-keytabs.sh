@@ -56,6 +56,8 @@ if [ "$1" == "internal" ]; then
    export_keytab HTTP/scm HTTP
    export_keytab HTTP/s3g HTTP
 
+   export_keytab hadoop/rm hadoop
+
    chmod 755 /etc/security/keytabs/*.keytab
    chown 1000. /etc/security/keytabs/*.keytab
    exit 0
