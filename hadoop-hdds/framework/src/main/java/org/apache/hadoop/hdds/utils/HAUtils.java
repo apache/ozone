@@ -46,9 +46,18 @@ public final class HAUtils {
     }
   }
 
-  public static boolean addSCM(OzoneConfiguration conf, AddSCMRequest request)
-      throws IOException {
-    OzoneConfiguration config = SCMHAUtils.removeSelfId(conf);
+  /**
+   * Add SCM to the cluster.
+   * @param conf - OzoneConfiguration
+   * @param request - AddSCMRequest which has details of SCM to be added.
+   * @param selfId - Node Id of the SCM which is submitting the request to
+   * add SCM.
+   * @return true - if SCM node is added successfully, else false.
+   * @throws IOException
+   */
+  public static boolean addSCM(OzoneConfiguration conf, AddSCMRequest request,
+      String selfId) throws IOException {
+    OzoneConfiguration config = SCMHAUtils.removeSelfId(conf, selfId);
     try {
       return getScmBlockClient(config).addSCM(request);
     } catch (IOException e) {

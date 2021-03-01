@@ -708,8 +708,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
     // The node here will try to fetch the cluster id from any of existing
     // running SCM instances.
-    SCMHANodeDetails.loadSCMHAConfig(conf);
-    OzoneConfiguration config = SCMHAUtils.removeSelfId(conf);
+    SCMHANodeDetails scmhaNodeDetails = SCMHANodeDetails.loadSCMHAConfig(conf);
+    OzoneConfiguration config =
+        SCMHAUtils.removeSelfId(conf,
+            scmhaNodeDetails.getLocalNodeDetails().getNodeId());
     final ScmInfo scmInfo = HAUtils.getScmInfo(config);
     SCMStorageConfig scmStorageConfig = new SCMStorageConfig(conf);
     final String persistedClusterId = scmStorageConfig.getClusterID();
@@ -1345,5 +1347,13 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
   public String getClusterId() {
     return getScmStorageConfig().getClusterID();
+  }
+
+  /**
+   * Return the node Id of this SCM.
+   * @return node Id.
+   */
+  public String getSCMNodeId() {
+    return scmHANodeDetails.getLocalNodeDetails().getNodeId();
   }
 }
