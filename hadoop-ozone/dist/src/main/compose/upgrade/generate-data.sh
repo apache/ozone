@@ -18,6 +18,8 @@
 # This script can be run only if the cluster is already started 
 # one, and initialized (but not data is written, yet).
 
+docker-compose stop
+
 docker-compose run scm ozone freon cgscm -n 1
 docker-compose run om ozone freon cgom -n 1
 docker-compose run dn1 ozone freon cgdn -n 1
