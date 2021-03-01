@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.function.Consumer;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
@@ -37,7 +38,12 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecuri
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityRequest.Builder;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityResponse;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.Type;
+import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos;
+import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolPB;
+import org.apache.hadoop.hdds.scm.proxy.SCMBlockLocationFailoverProxyProvider;
+import org.apache.hadoop.hdds.scm.proxy.SCMSecurityFailoverProxyProvider;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.io.retry.RetryProxy;
 import org.apache.hadoop.ipc.ProtobufHelper;
 import org.apache.hadoop.ipc.ProtocolTranslator;
 import org.apache.hadoop.ipc.RPC;
@@ -58,10 +64,20 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
    */
   private static final RpcController NULL_RPC_CONTROLLER = null;
   private final SCMSecurityProtocolPB rpcProxy;
+  private SCMSecurityFailoverProxyProvider failoverProxyProvider;
 
   public SCMSecurityProtocolClientSideTranslatorPB(
       SCMSecurityProtocolPB rpcProxy) {
     this.rpcProxy = rpcProxy;
+  }
+
+  public SCMSecurityProtocolClientSideTranslatorPB(
+      SCMSecurityFailoverProxyProvider proxyProvider) {
+    Preconditions.checkState(proxyProvider != null);
+    this.failoverProxyProvider = proxyProvider;
+    this.rpcProxy = (SCMSecurityProtocolPB) RetryProxy.create(
+        SCMSecurityProtocolPB.class, failoverProxyProvider,
+        failoverProxyProvider.getRetryPolicy());
   }
 
   /**
@@ -80,6 +96,7 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
       SCMSecurityRequest wrapper = builder.build();
 
       response = rpcProxy.submitRequest(NULL_RPC_CONTROLLER, wrapper);
+
     } catch (ServiceException ex) {
       throw ProtobufHelper.getRemoteException(ex);
     }
