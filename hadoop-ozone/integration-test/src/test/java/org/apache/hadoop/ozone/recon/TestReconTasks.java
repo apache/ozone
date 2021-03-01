@@ -36,7 +36,7 @@ import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
+import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -90,7 +90,6 @@ public class TestReconTasks {
   }
 
   @Test
-  @Ignore
   public void testMissingContainerDownNode() throws Exception {
     ReconStorageContainerManagerFacade reconScm =
         (ReconStorageContainerManagerFacade)
@@ -115,9 +114,8 @@ public class TestReconTasks {
     runTestOzoneContainerViaDataNode(containerID, client);
 
     // Make sure Recon got the container report with new container.
-    // TODO: Fix ME
-    // assertEquals(scmContainerManager.getContainerIDs(),
-    //    reconContainerManager.getContainerIDs());
+    Assert.assertEquals(scmContainerManager.getContainerIDs(),
+        reconContainerManager.getContainerIDs());
 
     // Bring down the Datanode that had the container replica.
     cluster.shutdownHddsDatanode(pipeline.getFirstNode());
