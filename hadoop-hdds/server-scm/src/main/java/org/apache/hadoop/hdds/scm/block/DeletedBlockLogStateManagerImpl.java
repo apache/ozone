@@ -49,7 +49,8 @@ public class DeletedBlockLogStateManagerImpl
   private final Table<Long, DeletedBlocksTransaction> deletedTable;
   private final DBTransactionBuffer transactionBuffer;
   private final int maxRetry;
-  private Set<Long> deletingTxIDs;
+  private final Set<Long> deletingTxIDs;
+  private final Set<Long> skippingRetryTxIDs;
 
   public DeletedBlockLogStateManagerImpl(
       ConfigurationSource conf,
@@ -60,6 +61,7 @@ public class DeletedBlockLogStateManagerImpl
     this.deletedTable = deletedTable;
     this.transactionBuffer = txBuffer;
     this.deletingTxIDs = ConcurrentHashMap.newKeySet();
+    this.skippingRetryTxIDs = ConcurrentHashMap.newKeySet();
   }
 
   public TableIterator<Long, TypedTable.KeyValue<Long,
@@ -87,7 +89,8 @@ public class DeletedBlockLogStateManagerImpl
             throw new IllegalStateException("");
           }
 
-          if (!deletingTxIDs.contains(txID)) {
+          if (!deletingTxIDs.contains(txID) &&
+              !skippingRetryTxIDs.contains(txID)) {
             nextTx = next;
             if (LOG.isTraceEnabled()) {
               LOG.trace("DeletedBlocksTransaction matching txID:{}",
@@ -193,6 +196,7 @@ public class DeletedBlockLogStateManagerImpl
       DeletedBlocksTransaction.Builder builder = block.toBuilder().setCount(-1);
       deletedTable.putWithBatch(
           transactionBuffer.getCurrentBatchOperation(), txID, builder.build());
+      skippingRetryTxIDs.add(txID);
     }
   }
 
