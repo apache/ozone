@@ -203,7 +203,7 @@ public class DeletedBlockLogStateManagerImpl
 
   public void onFlush() {
     deletingTxIDs.clear();
-    LOG.info("Clear cached deletingTxIDs.");
+    skippingRetryTxIDs.clear();
   }
 
   public static Builder newBuilder() {
