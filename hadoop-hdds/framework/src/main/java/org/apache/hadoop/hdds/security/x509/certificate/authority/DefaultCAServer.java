@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.security.x509.certificate.authority;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.validator.routines.DomainValidator;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
@@ -32,6 +33,7 @@ import org.apache.hadoop.hdds.security.x509.certificates.utils.SelfSignedCertifi
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
+import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
@@ -52,12 +54,14 @@ import java.security.spec.InvalidKeySpecException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.Date;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
 import java.util.function.Consumer;
 
-import static org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest.*;
+import static org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest.getCertificationRequest;
 import static org.apache.hadoop.hdds.security.x509.exceptions.CertificateException.ErrorCode.CSR_ERROR;
 
 /**
@@ -121,6 +125,7 @@ public class DefaultCAServer implements CertificateServer {
    */
   private PKIProfile profile;
   private CertificateApprover approver;
+  private CRLApprover crlApprover;
   private CertificateStore store;
 
   /**
@@ -140,7 +145,7 @@ public class DefaultCAServer implements CertificateServer {
 
   @Override
   public void init(SecurityConfig securityConfig, CAType type)
-      throws SCMSecurityException {
+      throws IOException {
     caKeysPath = securityConfig.getKeyLocation(componentName);
     caRootX509Path = securityConfig.getCertificateLocation(componentName);
     this.config = securityConfig;
@@ -150,7 +155,7 @@ public class DefaultCAServer implements CertificateServer {
     profile = new DefaultProfile();
     this.approver = new DefaultApprover(profile, this.config);
 
-    /* In future we will spilt this code to have different kind of CAs.
+    /* In future we will split this code to have different kind of CAs.
      * Right now, we have only self-signed CertificateServer.
      */
 
@@ -159,6 +164,8 @@ public class DefaultCAServer implements CertificateServer {
       Consumer<SecurityConfig> caInitializer =
           processVerificationStatus(status);
       caInitializer.accept(securityConfig);
+      crlApprover = new DefaultCRLApprover(securityConfig,
+          getCAKeys().getPrivate());
       return;
     }
 
@@ -283,20 +290,25 @@ public class DefaultCAServer implements CertificateServer {
   }
 
   @Override
-  public Future<Boolean> revokeCertificate(X509Certificate certificate,
-      CertificateApprover.ApprovalType approverType)
-      throws SCMSecurityException {
-    CompletableFuture<Boolean> revoked = new CompletableFuture<>();
-    if (certificate == null) {
+  public Future<Optional<Long>> revokeCertificates(
+      List<BigInteger> certificates,
+      CRLReason reason,
+      Date revocationTime,
+      SecurityConfig securityConfig) {
+    CompletableFuture<Optional<Long>> revoked = new CompletableFuture<>();
+    if (CollectionUtils.isEmpty(certificates)) {
       revoked.completeExceptionally(new SCMSecurityException(
-          "Certificate cannot be null"));
+          "Certificates cannot be null or empty"));
       return revoked;
     }
     try {
-      store.revokeCertificate(certificate.getSerialNumber());
+      revoked.complete(
+          store.revokeCertificates(certificates,
+              getCACertificate(), reason, revocationTime, crlApprover)
+      );
     } catch (IOException ex) {
       LOG.error("Revoking the certificate failed.", ex.getCause());
-      throw new SCMSecurityException(ex);
+      revoked.completeExceptionally(new SCMSecurityException(ex));
     }
     return revoked;
   }
@@ -358,11 +370,14 @@ public class DefaultCAServer implements CertificateServer {
     boolean keyStatus = checkIfKeysExist();
     boolean certStatus = checkIfCertificatesExist();
 
+    // Check if both certStatus and keyStatus is set to true and return success.
     if ((certStatus == keyStatus) && (certStatus)) {
       return VerificationStatus.SUCCESS;
     }
 
-    if ((certStatus == keyStatus) && (!certStatus)) {
+    // At this point both certStatus and keyStatus should be false if they
+    // are equal
+    if ((certStatus == keyStatus)) {
       return VerificationStatus.INITIALIZE;
     }
 

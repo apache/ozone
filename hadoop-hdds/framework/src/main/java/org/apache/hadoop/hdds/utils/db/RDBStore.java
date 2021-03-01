@@ -50,6 +50,8 @@ import org.rocksdb.WriteOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.toIOException;
+
 /**
  * RocksDB Store that supports creating Tables in DB.
  */
@@ -148,7 +150,7 @@ public class RDBStore implements DBStore {
       }
 
       //Initialize checkpoint manager
-      checkPointManager = new RDBCheckpointManager(db, "rdb");
+      checkPointManager = new RDBCheckpointManager(db, dbLocation.getName());
       rdbMetrics = RDBMetrics.create();
 
     } catch (RocksDBException e) {
@@ -187,16 +189,6 @@ public class RDBStore implements DBStore {
           columnFamiliesInDb);
     }
     return columnFamiliesInDb;
-  }
-
-  public static IOException toIOException(String msg, RocksDBException e) {
-    String statusCode = e.getStatus() == null ? "N/A" :
-        e.getStatus().getCodeString();
-    String errMessage = e.getMessage() == null ? "Unknown error" :
-        e.getMessage();
-    String output = msg + "; status : " + statusCode
-        + "; message : " + errMessage;
-    return new IOException(output, e);
   }
 
   @Override

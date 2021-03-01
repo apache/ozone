@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
+import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -44,14 +45,13 @@ import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 
-import com.google.common.base.Preconditions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClient;
 import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * This class provides the client-facing APIs of container operations.
@@ -475,10 +475,12 @@ public class ContainerOperationClient implements ScmClient {
    * @return Returns true if SCM is in safe mode else returns false.
    * @throws IOException
    */
+  @Override
   public boolean inSafeMode() throws IOException {
     return storageContainerLocationClient.inSafeMode();
   }
 
+  @Override
   public Map<String, Pair<Boolean, String>> getSafeModeRuleStatuses()
       throws IOException {
     return storageContainerLocationClient.getSafeModeRuleStatuses();
@@ -512,5 +514,21 @@ public class ContainerOperationClient implements ScmClient {
   @Override
   public List<String> getScmRatisRoles() throws IOException {
     return storageContainerLocationClient.getScmInfo().getRatisPeerRoles();
+  }
+
+  /**
+   * Get Datanode Usage information by ipaddress or uuid.
+   *
+   * @param ipaddress - datanode ipaddress String
+   * @param uuid - datanode uuid String
+   * @return List of DatanodeUsageInfo. Each element contains info such as
+   * capacity, SCMused, and remaining space.
+   * @throws IOException
+   */
+  @Override
+  public List<HddsProtos.DatanodeUsageInfo> getDatanodeUsageInfo(
+      String ipaddress, String uuid) throws IOException {
+    return storageContainerLocationClient.getDatanodeUsageInfo(ipaddress,
+        uuid);
   }
 }

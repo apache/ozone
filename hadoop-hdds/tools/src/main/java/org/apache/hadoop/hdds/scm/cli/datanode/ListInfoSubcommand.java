@@ -94,7 +94,7 @@ public class ListInfoSubcommand extends ScmSubcommand {
           p -> p.getNodes().contains(datanode)).collect(Collectors.toList());
       if (relatedPipelines.isEmpty()) {
         pipelineListInfo.append("No related pipelines" +
-            " or the node is not in Healthy state.");
+            " or the node is not in Healthy state.\n");
       } else {
         relatedPipelineNum = relatedPipelines.size();
         relatedPipelines.forEach(
@@ -114,7 +114,7 @@ public class ListInfoSubcommand extends ScmSubcommand {
         + "/" + datanode.getHostName() + "/" + relatedPipelineNum +
         " pipelines)");
     System.out.println("Operational State: " + dna.getOpState());
-    System.out.println("Related pipelines: \n" + pipelineListInfo);
+    System.out.println("Related pipelines:\n" + pipelineListInfo);
   }
 
   private static class DatanodeWithAttributes {

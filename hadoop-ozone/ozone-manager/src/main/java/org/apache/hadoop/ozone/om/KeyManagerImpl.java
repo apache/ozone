@@ -621,7 +621,7 @@ public class KeyManagerImpl implements KeyManager {
       keyInfo.setModificationTime(Time.now());
 
       //update the block length for each block
-      keyInfo.updateLocationInfoList(locationInfoList);
+      keyInfo.updateLocationInfoList(locationInfoList, false);
       metadataManager.getStore().move(
           openKey,
           objectKey,
@@ -1116,7 +1116,7 @@ public class KeyManagerImpl implements KeyManager {
 
       // set the data size and location info list
       keyInfo.setDataSize(omKeyArgs.getDataSize());
-      keyInfo.updateLocationInfoList(omKeyArgs.getLocationInfoList());
+      keyInfo.updateLocationInfoList(omKeyArgs.getLocationInfoList(), true);
 
       partName = metadataManager.getOzoneKey(volumeName, bucketName, keyName)
           + clientID;
@@ -1748,6 +1748,7 @@ public class KeyManagerImpl implements KeyManager {
    * @throws IOException if there is error in the db
    *                     invalid arguments
    */
+  @Override
   public OzoneFileStatus getFileStatus(OmKeyArgs args) throws IOException {
     Preconditions.checkNotNull(args, "Key args can not be null");
     return getFileStatus(args, null);
@@ -1765,6 +1766,7 @@ public class KeyManagerImpl implements KeyManager {
    * @throws IOException if there is error in the db
    *                     invalid arguments
    */
+  @Override
   public OzoneFileStatus getFileStatus(OmKeyArgs args, String clientAddress)
           throws IOException {
     Preconditions.checkNotNull(args, "Key args can not be null");
@@ -1846,6 +1848,7 @@ public class KeyManagerImpl implements KeyManager {
    * @throws IOException if there is error in the db
    *                     invalid arguments
    */
+  @Override
   public void createDirectory(OmKeyArgs args) throws IOException {
     Preconditions.checkNotNull(args, "Key args can not be null");
     String volumeName = args.getVolumeName();
@@ -1994,6 +1997,7 @@ public class KeyManagerImpl implements KeyManager {
    * Refresh the key block location information by get latest info from SCM.
    * @param key
    */
+  @Override
   public void refresh(OmKeyInfo key) throws IOException {
     Preconditions.checkNotNull(key, "Key info can not be null");
     refreshPipeline(Arrays.asList(key));
@@ -2048,6 +2052,7 @@ public class KeyManagerImpl implements KeyManager {
    * @param numEntries Number of entries to list from the start key
    * @return list of file status
    */
+  @Override
   public List<OzoneFileStatus> listStatus(OmKeyArgs args, boolean recursive,
                                           String startKey, long numEntries)
           throws IOException {
@@ -2067,6 +2072,7 @@ public class KeyManagerImpl implements KeyManager {
    *                      pipeline by distance between client and datanode.
    * @return list of file status
    */
+  @Override
   public List<OzoneFileStatus> listStatus(OmKeyArgs args, boolean recursive,
       String startKey, long numEntries, String clientAddress)
           throws IOException {

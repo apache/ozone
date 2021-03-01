@@ -17,15 +17,6 @@
 version: "3.4"
 
 services:
-  old_client_0_5_0:
-    image: apache/ozone:0.5.0
-    env_file:
-      - docker-config
-    volumes:
-      - ../..:/opt/ozone
-    environment:
-      HADOOP_OPTS:
-    command: ["sleep","1000000"]
   old_client_1_0_0:
     image: apache/ozone:1.0.0
     env_file:

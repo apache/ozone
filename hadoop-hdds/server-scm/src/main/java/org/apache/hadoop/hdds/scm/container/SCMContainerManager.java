@@ -198,6 +198,7 @@ public class SCMContainerManager implements ContainerManager {
    * @param state {@link LifeCycleState}
    * @return Count
    */
+  @Override
   public Integer getContainerCountByState(LifeCycleState state) {
     return containerStateManager.getContainerCountByState(state);
   }
@@ -388,13 +389,15 @@ public class SCMContainerManager implements ContainerManager {
     }
   }
 
-    /**
-     * Update deleteTransactionId according to deleteTransactionMap.
-     *
-     * @param deleteTransactionMap Maps the containerId to latest delete
-     *                             transaction id for the container.
-     * @throws IOException
-     */
+
+  /**
+   * Update deleteTransactionId according to deleteTransactionMap.
+   *
+   * @param deleteTransactionMap Maps the containerId to latest delete
+   *                             transaction id for the container.
+   * @throws IOException
+   */
+  @Override
   public void updateDeleteTransactionId(Map<Long, Long> deleteTransactionMap)
       throws IOException {
 
@@ -446,12 +449,14 @@ public class SCMContainerManager implements ContainerManager {
    * @param pipeline     - Pipeline to which the container should belong.
    * @return ContainerInfo, null if there is no match found.
    */
+  @Override
   public ContainerInfo getMatchingContainer(final long sizeRequired,
       String owner, Pipeline pipeline) {
     return getMatchingContainer(sizeRequired, owner, pipeline,
         Collections.emptySet());
   }
 
+  @Override
   @SuppressWarnings("squid:S2445")
   public ContainerInfo getMatchingContainer(final long sizeRequired,
                                             String owner, Pipeline pipeline,
@@ -562,6 +567,7 @@ public class SCMContainerManager implements ContainerManager {
    * @param containerID
    * @return Set<DatanodeDetails>
    */
+  @Override
   public Set<ContainerReplica> getContainerReplicas(
       final ContainerID containerID) throws ContainerNotFoundException {
     return containerStateManager.getContainerReplicas(containerID);
@@ -573,6 +579,7 @@ public class SCMContainerManager implements ContainerManager {
    * @param containerID
    * @param replica
    */
+  @Override
   public void updateContainerReplica(final ContainerID containerID,
       final ContainerReplica replica) throws ContainerNotFoundException {
     containerStateManager.updateContainerReplica(containerID, replica);
@@ -585,6 +592,7 @@ public class SCMContainerManager implements ContainerManager {
    * @param replica
    * @return True of dataNode is removed successfully else false.
    */
+  @Override
   public void removeContainerReplica(final ContainerID containerID,
       final ContainerReplica replica)
       throws ContainerNotFoundException, ContainerReplicaNotFoundException {
@@ -616,6 +624,7 @@ public class SCMContainerManager implements ContainerManager {
     }
   }
 
+  @Override
   public void notifyContainerReportProcessing(boolean isFullReport,
       boolean success) {
     if (isFullReport) {

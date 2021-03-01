@@ -240,7 +240,12 @@ public class ContainerStateMap {
     if (!contains(containerID)) {
       return;
     }
-
+    // Return if updating state not changed
+    if (currentState == newState) {
+      LOG.debug("CurrentState and NewState are the same, return from " +
+          "updateState directly.");
+      return;
+    }
     // TODO: Simplify this logic.
     final ContainerInfo currentInfo = containerMap.get(containerID);
     try {
