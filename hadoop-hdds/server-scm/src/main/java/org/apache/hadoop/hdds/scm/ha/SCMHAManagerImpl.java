@@ -82,7 +82,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
               .setScmId(scm.getScmId()).setRatisAddr(
               scm.getSCMHANodeDetails().getLocalNodeDetails()
                   // TODO : Should we use IP instead of hostname??
-                  .getRatisHostPortStr()).build());
+                  .getRatisHostPortStr()).build(), scm.getSCMNodeId());
       if (!success) {
         throw new IOException("Adding SCM to existing HA group failed");
       }
