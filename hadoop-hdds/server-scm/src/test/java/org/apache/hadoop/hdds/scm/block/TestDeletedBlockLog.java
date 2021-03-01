@@ -259,47 +259,6 @@ public class TestDeletedBlockLog {
   }
 
   @Test
-  public void testIncrementCountLessFrequentWritingToDB() throws Exception {
-    OzoneConfiguration testConf = OzoneConfiguration.of(conf);
-    testConf.setInt(OZONE_SCM_BLOCK_DELETION_MAX_RETRY, 120);
-
-    deletedBlockLog.addTransactions(generateData(1));
-
-    List<DeletedBlocksTransaction> blocks =
-        getTransactions(40 * BLOCKS_PER_TXN);
-    List<Long> txIDs = blocks.stream().map(DeletedBlocksTransaction::getTxID)
-        .collect(Collectors.toList());
-
-    for (int i = 0; i < 50; i++) {
-      deletedBlockLog.incrementCount(txIDs);
-    }
-    blocks = getTransactions(40 * BLOCKS_PER_TXN);
-    for (DeletedBlocksTransaction block : blocks) {
-      // block count should not be updated as there are only 50 retries.
-      Assert.assertEquals(0, block.getCount());
-    }
-
-    for (int i = 0; i < 60; i++) {
-      deletedBlockLog.incrementCount(txIDs);
-    }
-    blocks = getTransactions(40 * BLOCKS_PER_TXN);
-    for (DeletedBlocksTransaction block : blocks) {
-      // block count should be updated to 100 as there are already 110 retries.
-      Assert.assertEquals(100, block.getCount());
-    }
-
-    for (int i = 0; i < 50; i++) {
-      deletedBlockLog.incrementCount(txIDs);
-    }
-    blocks = getTransactions(40 * BLOCKS_PER_TXN);
-    for (DeletedBlocksTransaction block : blocks) {
-      // block count should be updated to -1 as retry count exceeds maxRetry
-      // (i.e. 160 > maxRetry which is 120).
-      Assert.assertEquals(-1, block.getCount());
-    }
-  }
-
-  @Test
   public void testCommitTransactions() throws Exception {
     addTransactions(generateData(50));
     List<DeletedBlocksTransaction> blocks =

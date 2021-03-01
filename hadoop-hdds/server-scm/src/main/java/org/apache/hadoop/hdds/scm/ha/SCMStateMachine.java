@@ -186,7 +186,7 @@ public class SCMStateMachine extends BaseStateMachine {
     Preconditions.checkArgument(
         deletedBlockLog instanceof DeletedBlockLogImplV2);
     ((DeletedBlockLogImplV2) deletedBlockLog)
-          .clearTransactionToDNsCommitMap();
+          .onBecomeLeader();
   }
 
   @Override

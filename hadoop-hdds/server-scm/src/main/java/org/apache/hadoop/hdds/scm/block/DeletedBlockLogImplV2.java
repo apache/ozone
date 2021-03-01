@@ -79,6 +79,8 @@ public class DeletedBlockLogImplV2
   private final Lock lock;
   // Maps txId to set of DNs which are successful in committing the transaction
   private Map<Long, Set<UUID>> transactionToDNsCommitMap;
+  // Maps txId to its retry counts;
+  private Map<Long, Integer> transactionToRetryCountMap;
   // The access to DeletedBlocksTXTable is protected by
   // DeletedBlockLogStateManager.
   private final DeletedBlockLogStateManager deletedBlockLogStateManager;
@@ -101,6 +103,7 @@ public class DeletedBlockLogImplV2
 
     // maps transaction to dns which have committed it.
     transactionToDNsCommitMap = new ConcurrentHashMap<>();
+    transactionToRetryCountMap = new ConcurrentHashMap<>();
     this.deletedBlockLogStateManager = DeletedBlockLogStateManagerImpl
         .newBuilder()
         .setConfiguration(conf)
@@ -145,8 +148,25 @@ public class DeletedBlockLogImplV2
   public void incrementCount(List<Long> txIDs) throws IOException {
     lock.lock();
     try {
-      deletedBlockLogStateManager
-          .increaseRetryCountOfTransactionInDB(new ArrayList<>(txIDs));
+      ArrayList<Long> txIDsToUpdate = new ArrayList<>();
+      for (Long txID : txIDs) {
+        int currentCount =
+            transactionToRetryCountMap.getOrDefault(txID, 0);
+        if (currentCount > maxRetry) {
+          continue;
+        } else {
+          currentCount += 1;
+          if (currentCount > maxRetry) {
+            txIDsToUpdate.add(txID);
+          }
+          transactionToRetryCountMap.put(txID, currentCount);
+        }
+      }
+
+      if (!txIDsToUpdate.isEmpty()) {
+        deletedBlockLogStateManager
+            .increaseRetryCountOfTransactionInDB(txIDsToUpdate);
+      }
     } finally {
       lock.unlock();
     }
@@ -216,6 +236,7 @@ public class DeletedBlockLogImplV2
                 .collect(Collectors.toList());
             if (dnsWithCommittedTxn.containsAll(containerDns)) {
               transactionToDNsCommitMap.remove(txID);
+              transactionToRetryCountMap.remove(txID);
               if (LOG.isDebugEnabled()) {
                 LOG.debug("Purging txId={} from block deletion log", txID);
               }
@@ -281,8 +302,9 @@ public class DeletedBlockLogImplV2
    * Called in SCMStateMachine#notifyLeaderChanged when current SCM becomes
    *  leader.
    */
-  public void clearTransactionToDNsCommitMap() {
+  public void onBecomeLeader() {
     transactionToDNsCommitMap.clear();
+    transactionToRetryCountMap.clear();
   }
 
   /**
