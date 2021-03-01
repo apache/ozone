@@ -259,6 +259,8 @@ message NodeQueryResponseProto {
 message DatanodeUsageInfoRequestProto {
   optional string ipaddress = 1;
   optional string uuid = 2;
+  optional bool mostUsed = 3;
+  optional uint32 count = 4;
 }
 
 message DatanodeUsageInfoResponseProto {

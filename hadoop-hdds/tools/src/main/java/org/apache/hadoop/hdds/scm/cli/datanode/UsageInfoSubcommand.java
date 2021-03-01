@@ -41,51 +41,55 @@ import java.util.List;
     versionProvider = HddsVersionProvider.class)
 public class UsageInfoSubcommand extends ScmSubcommand {
 
-  @CommandLine.Option(names = {"--ip"}, paramLabel = "IP", description =
-      "Show info by datanode ip address")
-  private String ipaddress;
+  @CommandLine.ArgGroup(exclusive = true, multiplicity = "1")
+  private ExclusiveArguments exclusiveArguments;
 
-  @CommandLine.Option(names = {"--uuid"}, paramLabel = "UUID", description =
-      "Show info by datanode UUID")
-  private String uuid;
+  static class ExclusiveArguments {
+    @CommandLine.Option(names = {"--ip"}, paramLabel = "IP", description =
+        "show info by datanode ip address.", defaultValue = "")
+    private String ipaddress;
 
-  public String getIpaddress() {
-    return ipaddress;
+    @CommandLine.Option(names = {"--uuid"}, paramLabel = "UUID", description =
+        "show info by datanode UUID.", defaultValue = "")
+    private String uuid;
+
+    @CommandLine.Option(names = {"-m", "--most-used"},
+        description = "include this option to show the most used datanodes",
+        defaultValue = "false")
+    private boolean mostUsed;
+
+    @CommandLine.Option(names = {"-l", "--least-used"},
+        description = "include this option to show the least used datanodes",
+        defaultValue = "false")
+    private boolean leastUsed;
   }
 
-  public void setIpaddress(String ipaddress) {
-    this.ipaddress = ipaddress;
-  }
+  @CommandLine.Option(names = {"-c", "--count"}, description = "number of " +
+      "datanodes to display (Default: ${DEFAULT-VALUE})",
+      paramLabel = "NUMBER OF NODES", defaultValue = "3")
+  private int count;
 
-  public String getUuid() {
-    return uuid;
-  }
-
-  public void setUuid(String uuid) {
-    this.uuid = uuid;
-  }
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
-    if (Strings.isNullOrEmpty(ipaddress)) {
-      ipaddress = "";
-    }
-    if (Strings.isNullOrEmpty(uuid)) {
-      uuid = "";
-    }
-    if (Strings.isNullOrEmpty(ipaddress) && Strings.isNullOrEmpty(uuid)) {
-      throw new IOException("ipaddress or uuid of the datanode must be " +
-          "specified.");
+    List<HddsProtos.DatanodeUsageInfo> infoList = null;
+    if (!Strings.isNullOrEmpty(exclusiveArguments.ipaddress) ||
+        !Strings.isNullOrEmpty(exclusiveArguments.uuid)) {
+      infoList = scmClient.getDatanodeUsageInfo(exclusiveArguments.ipaddress,
+          exclusiveArguments.uuid);
+    } else {
+      infoList = scmClient.getDatanodeUsageInfo(exclusiveArguments.mostUsed,
+          count);
     }
 
-    List<HddsProtos.DatanodeUsageInfo> infoList =
-        scmClient.getDatanodeUsageInfo(ipaddress, uuid);
-
-    for (HddsProtos.DatanodeUsageInfo info : infoList) {
-      printInfo(info);
-    }
+    infoList.forEach(this::printInfo);
   }
 
+  /**
+   * Print datanode usage information.
+   *
+   * @param info Information such as Capacity, SCMUsed etc.
+   */
   public void printInfo(HddsProtos.DatanodeUsageInfo info) {
     Double capacity = (double)info.getCapacity();
     Double usedRatio = info.getUsed() / capacity;

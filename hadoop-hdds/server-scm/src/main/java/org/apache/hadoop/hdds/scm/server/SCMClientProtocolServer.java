@@ -77,8 +77,10 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
@@ -666,7 +668,7 @@ public class SCMClientProtocolServer implements
   /**
    * Get usage details for a specific DatanodeDetails node.
    *
-   * @param node - DatanodeDetails
+   * @param node DatanodeDetails
    * @return Usage info such as capacity, SCMUsed, and remaining space.
    * @throws IOException
    */
@@ -685,6 +687,38 @@ public class SCMClientProtocolServer implements
         .setRemaining(remaining)
         .build();
     return info;
+  }
+
+  @Override
+  public List<HddsProtos.DatanodeUsageInfo> getDatanodeUsageInfo(
+      boolean mostUsed, int count) throws IOException {
+    List<HddsProtos.DatanodeUsageInfo> infoList;
+
+    Map<DatanodeDetails, SCMNodeStat> nodeStatMap =
+        scm.getScmNodeManager().getNodeStats();
+
+    PriorityQueue<DatanodeDetails> nodes;
+
+    if (mostUsed) {
+      nodes = new PriorityQueue<DatanodeDetails>(count,
+          Comparator.comparingLong(node -> nodeStatMap.get(node)
+              .getRemaining().get()));
+    } else {
+      nodes = new PriorityQueue<DatanodeDetails>(count,
+          Comparator.comparingLong(node -> nodeStatMap.get(node).
+              getRemaining().get()).reversed());
+    }
+
+    nodeStatMap.forEach((node, stat) -> {
+      nodes.add(node);
+      if (nodes.size() > count) {
+        nodes.poll();
+      }
+    });
+
+    nodes.forEach((node, stat) -> {
+      getUsageInfoFromDatanodeDetails(node);
+    });
   }
 
   /**

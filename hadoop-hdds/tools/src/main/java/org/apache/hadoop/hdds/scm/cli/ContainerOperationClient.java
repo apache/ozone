@@ -548,4 +548,19 @@ public class ContainerOperationClient implements ScmClient {
         uuid);
   }
 
+  /**
+   * Gets usage information of most or least used datanodes.
+   *
+   * @param mostUsed true if most used, false if least used
+   * @param count Integer number of nodes to get info for
+   * @return List of DatanodeUsageInfo. Each element contains info such as
+   * capacity, SCMUsed, and remaining space.
+   * @throws IOException
+   */
+  @Override
+  public List<HddsProtos.DatanodeUsageInfo> getDatanodeUsageInfo(
+      boolean mostUsed, int count) throws IOException {
+    return storageContainerLocationClient.getDatanodeUsageInfo(mostUsed, count);
+  }
+
 }

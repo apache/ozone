@@ -637,6 +637,32 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     return response.getInfoList();
   }
 
+  /**
+   * Get usage information of most or least used datanodes.
+   *
+   * @param mostUsed true if most used, false if least used
+   * @param count Integer number of nodes to get info for
+   * @return List of DatanodeUsageInfo. Each element contains info such as
+   * capacity, SCMUsed, and remaining space.
+   * @throws IOException
+   */
+  @Override
+  public List<HddsProtos.DatanodeUsageInfo> getDatanodeUsageInfo(
+      boolean mostUsed, int count) throws IOException {
+    DatanodeUsageInfoRequestProto request =
+        DatanodeUsageInfoRequestProto.newBuilder()
+            .setMostUsed(mostUsed)
+            .setCount(count)
+            .build();
+
+    DatanodeUsageInfoResponseProto response =
+        submitRequest(Type.DatanodeUsageInfo,
+            builder -> builder.setDatanodeUsageInfoRequest(request))
+        .getDatanodeUsageInfoResponse();
+
+    return response.getInfoList();
+  }
+
   @Override
   public Object getUnderlyingProxyObject() {
     return rpcProxy;
