@@ -27,14 +27,18 @@ export_keytab() {
 # the rest of the code executes this part inside a container
 #
 if [ "$1" == "internal" ]; then
+   rm /etc/security/keytabs/*.keytab
+
    export_keytab scm/scm scm
    export_keytab HTTP/scm scm
    export_keytab testuser/scm scm
    export_keytab testuser2/scm scm
 
    export_keytab testuser/scm testuser
-   export_keytab testuser2/scm testuser2
    export_keytab testuser/s3g testuser
+   export_keytab testuser/om testuser
+
+   export_keytab testuser2/scm testuser2
 
    export_keytab om/om om
    export_keytab HTTP/om om
@@ -50,6 +54,7 @@ if [ "$1" == "internal" ]; then
    export_keytab HTTP/dn dn
 
    export_keytab HTTP/scm HTTP
+   export_keytab HTTP/s3g HTTP
 
    chmod 755 /etc/security/keytabs/*.keytab
    chown 1000. /etc/security/keytabs/*.keytab
@@ -59,7 +64,7 @@ fi
 rm -rf "$SCRIPT_DIR/keytabs" || true
 mkdir -p "$SCRIPT_DIR/keytabs"
 
-OZONE_RUNNER_VERSION=$(mvn -f "$SCRIPT_DIR"/../../../pom.xml help:evaluate -Dexpression=docker.ozone-runner.version -q -DforceStdout)
+TESTKRB5_IMAGE=$(mvn -f "$SCRIPT_DIR"/../../../pom.xml help:evaluate -Dexpression=docker.ozone-testkr5b.image -q -DforceStdout)
 
-docker run -it --entrypoint=/etc/security/keytabs/update-keytabs.sh -v "$SCRIPT_DIR":/etc/security/keytabs elek/ozone-devkrb5:latest internal
+docker run -it --entrypoint=/etc/security/keytabs/update-keytabs.sh -v "$SCRIPT_DIR":/etc/security/keytabs $TESTKRB5_IMAGE internal
 
