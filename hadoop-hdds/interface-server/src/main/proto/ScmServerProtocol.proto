@@ -135,7 +135,7 @@ message AllocateScmBlockRequestProto {
 
   //based on replication type, at least one should be included
   optional hadoop.hdds.RatisReplicationConfig ratisReplicationConfig = 8;
-  optional hadoop.hdds.EcReplicationConfig ecReplicationConfig = 8;
+  optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 9;
 }
 
 /**
