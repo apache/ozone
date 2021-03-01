@@ -147,8 +147,8 @@ start_docker_env(){
 }
 
 restart_docker_env() {
-  start_docker_env
   OZONE_KEEP_RESULTS=true stop_docker_env
+  start_docker_env
 }
 
 ## @description  Execute robot tests in a specific container.

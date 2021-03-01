@@ -54,22 +54,24 @@ create_data_dir() {
 ##   If this is equal to `OZONE_CURRENT_VERSION`, then the ozone runner image wil be used.
 ##   Else, a binary image will be used.
 prepare_for_image() {
-    local image_version="$1"
+  local image_version="$1"
 
-    if [[ "$image_version" = "$OZONE_CURRENT_VERSION" ]]; then
-        echo "Preparing for runner $image_version $OZONE_CURRENT_VERSION"
-        prepare_for_runner_image
-    else
-        echo "preparing for binary $image_version $OZONE_CURRENT_VERSION"
-        prepare_for_binary_image "$image_version"
-    fi
+  if [[ "$image_version" = "$OZONE_CURRENT_VERSION" ]]; then
+      prepare_for_runner_image
+  else
+      prepare_for_binary_image "$image_version"
+  fi
 }
 
 ## @description Runs a callback function only if it exists.
 ## @param The name of the function to run.
 callback() {
-    local func="$1"
-    type -t "$func" > /dev/null && "$func"
+  local func="$1"
+  if type -t "$func" > /dev/null; then
+    "$func"
+  else
+    echo "Skipping callback $func. No implementation found."
+  fi
 }
 
 ## @description Sets up and runs the test defined by "$1"/test.sh.
