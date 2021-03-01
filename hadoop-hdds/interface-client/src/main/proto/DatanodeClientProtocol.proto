@@ -154,6 +154,9 @@ message DatanodeBlockID {
   required int64 containerID = 1;
   required int64 localID = 2;
   optional uint64 blockCommitSequenceId = 3 [default = 0];
+  //for EC we record the index of the
+  //container/block inside the EC replication group.
+  optional int32 replicationIndex = 4;
 }
 
 message KeyValue {

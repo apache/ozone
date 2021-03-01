@@ -228,11 +228,23 @@ enum ReplicationType {
     RATIS = 1;
     STAND_ALONE = 2;
     CHAINED = 3;
+    EC = 4;
 }
 
+//Deprected: we should use replication config implementations everywhere
 enum ReplicationFactor {
     ONE = 1;
     THREE = 3;
+}
+
+//replicaiton config for Ratis replication. Will replace pure ReplicationType everywhere
+message RatisReplicationConfig {
+    required ReplicationFactor factor = 1;
+}
+
+message ECReplicationConfig {
+    required int32 data = 1;
+    required int32 parity = 2;
 }
 
 enum ScmOps {
