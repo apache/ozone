@@ -32,7 +32,6 @@ OZONE-SITE.XML_ozone.scm.ratis.enable=true
 OZONE-SITE.XML_ozone.scm.datanode.id.dir=/data
 OZONE-SITE.XML_ozone.scm.container.size=1GB
 OZONE-SITE.XML_ozone.metadata.dirs=/data/metadata
-OZONE-SITE.XML_ozone.scm.client.address=scm
 OZONE-SITE.XML_hdds.datanode.dir=/data/hdds
 OZONE-SITE.XML_ozone.datanode.pipeline.limit=1
 
