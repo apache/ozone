@@ -22,6 +22,7 @@ package org.apache.hadoop.hdds.security.x509.certificate.authority;
 import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
+import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 
 import java.io.IOException;
 import java.math.BigInteger;
@@ -105,11 +106,16 @@ public interface CertificateStore {
       throws IOException;
 
   /**
+   * Reinitialize the certificate server.
+   * @param metadataStore SCMMetaStore.
+   */
+  void reinitialize(SCMMetadataStore metadataStore);
+
+  /**
    * Different kind of Certificate stores.
    */
   enum CertType {
     VALID_CERTS,
     REVOKED_CERTS
   }
-
 }

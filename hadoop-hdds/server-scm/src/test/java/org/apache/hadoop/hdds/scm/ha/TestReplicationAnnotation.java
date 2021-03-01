@@ -80,6 +80,11 @@ public class TestReplicationAnnotation {
           throws IOException {
         return false;
       }
+
+      @Override
+      public SCMStateMachine getSCMStateMachine() {
+        return null;
+      }
     };
 
     scmhaInvocationHandler = new SCMHAInvocationHandler(

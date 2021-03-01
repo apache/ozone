@@ -114,11 +114,7 @@ public class ContainerStateMap {
     Preconditions.checkNotNull(info, "Container Info cannot be null");
     final ContainerID id = info.containerID();
     if (!contains(id)) {
-      containerMap.put(id, info);
-      lifeCycleStateMap.insert(info.getState(), id);
-      ownerMap.insert(info.getOwner(), id);
-      factorMap.insert(info.getReplicationFactor(), id);
-      typeMap.insert(info.getReplicationType(), id);
+      loadFromDB(info);
       replicaMap.put(id, ConcurrentHashMap.newKeySet());
 
       // Flush the cache of this container type, will be added later when
@@ -126,6 +122,21 @@ public class ContainerStateMap {
       flushCache(info);
       LOG.trace("Container {} added to ContainerStateMap.", id);
     }
+  }
+
+  /**
+   * The idea here is to rebuild the containerStateMap once the SCM StateMachine
+   * reloads from the the DBCheckpoint downloaded from leader SCM.
+   *
+   * Replica Map won't be rebuild but will remain as it is.
+   */
+   private void loadFromDB(final ContainerInfo info) throws SCMException {
+    final ContainerID id = info.containerID();
+    containerMap.put(id, info);
+    lifeCycleStateMap.insert(info.getState(), id);
+    ownerMap.insert(info.getOwner(), id);
+    factorMap.insert(info.getReplicationFactor(), id);
+    typeMap.insert(info.getReplicationType(), id);
   }
 
   public boolean contains(final ContainerID id) {

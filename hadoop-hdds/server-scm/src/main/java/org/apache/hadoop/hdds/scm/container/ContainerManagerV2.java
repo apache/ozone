@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 
 /**
@@ -40,6 +41,8 @@ import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionExcepti
 public interface ContainerManagerV2 extends Closeable {
   // TODO: Rename this to ContainerManager
 
+  void reinitialize(Table<ContainerID, ContainerInfo> containerStore)
+      throws IOException;
 
   /**
    * Returns the ContainerInfo from the container ID.

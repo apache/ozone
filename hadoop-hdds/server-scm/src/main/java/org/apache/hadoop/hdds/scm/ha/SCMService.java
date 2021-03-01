@@ -16,6 +16,8 @@
  */
 package org.apache.hadoop.hdds.scm.ha;
 
+import java.io.IOException;
+
 /**
  * Interface for background services in SCM, including ReplicationManager,
  * SCMBlockDeletingService and BackgroundPipelineCreator.
@@ -62,4 +64,8 @@ public interface SCMService {
     NEW_NODE_HANDLER_TRIGGERED,
     UNHEALTHY_TO_HEALTHY_NODE_HANDLER_TRIGGERED
   }
+
+  void start();
+
+  void stop();
 }

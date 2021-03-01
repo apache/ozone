@@ -50,7 +50,7 @@ public class PipelineStateManagerV2Impl implements StateManager {
   private static final Logger LOG =
       LoggerFactory.getLogger(PipelineStateManager.class);
 
-  private final PipelineStateMap pipelineStateMap;
+  private PipelineStateMap pipelineStateMap;
   private final NodeManager nodeManager;
   private Table<PipelineID, Pipeline> pipelineStore;
   private final DBTransactionBuffer transactionBuffer;
@@ -324,6 +324,24 @@ public class PipelineStateManagerV2Impl implements StateManager {
   @Override
   public void deactivatePipeline(PipelineID pipelineID) throws IOException {
     throw new IOException("Not supported.");
+  }
+
+  @Override
+  public void reinitialize(Table<PipelineID, Pipeline> pipelineStore)
+      throws IOException {
+    lock.writeLock().lock();
+    try {
+      pipelineStore.close();
+      this.pipelineStateMap = null;
+      this.pipelineStateMap = new PipelineStateMap();
+      this.pipelineStore = pipelineStore;;
+      initialize();
+    } catch (Exception ex) {
+      LOG.error("PipelineManager reinitialization close failed", ex);
+      throw new IOException(ex);
+    } finally {
+      lock.writeLock().unlock();
+    }
   }
 
   // legacy interfaces end

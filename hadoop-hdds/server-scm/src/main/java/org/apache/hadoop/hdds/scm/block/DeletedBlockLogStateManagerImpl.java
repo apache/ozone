@@ -46,7 +46,7 @@ public class DeletedBlockLogStateManagerImpl
   public static final Logger LOG =
       LoggerFactory.getLogger(DeletedBlockLogStateManagerImpl.class);
 
-  private final Table<Long, DeletedBlocksTransaction> deletedTable;
+  private Table<Long, DeletedBlocksTransaction> deletedTable;
   private final DBTransactionBuffer transactionBuffer;
   private final int maxRetry;
   private final Set<Long> deletingTxIDs;
@@ -204,6 +204,15 @@ public class DeletedBlockLogStateManagerImpl
   public void onFlush() {
     deletingTxIDs.clear();
     skippingRetryTxIDs.clear();
+  }
+
+  @Override
+  public void reinitialize(
+      Table<Long, DeletedBlocksTransaction> deletedBlocksTXTable) {
+    // Before Reinitilization, flush will be called from Ratis StateMachine.
+    // Just the DeletedDb will be loaded here.
+    Preconditions.checkArgument(deletingTxIDs.isEmpty());
+    this.deletedTable = deletedBlocksTXTable;
   }
 
   public static Builder newBuilder() {

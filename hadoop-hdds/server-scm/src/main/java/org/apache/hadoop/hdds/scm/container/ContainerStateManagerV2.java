@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 
 /**
@@ -171,6 +172,9 @@ public interface ContainerStateManagerV2 {
    */
   @Replicate
   void removeContainer(HddsProtos.ContainerID containerInfo)
+      throws IOException;
+
+  void reinitialize(Table<ContainerID, ContainerInfo> containerStore)
       throws IOException;
 
   /**

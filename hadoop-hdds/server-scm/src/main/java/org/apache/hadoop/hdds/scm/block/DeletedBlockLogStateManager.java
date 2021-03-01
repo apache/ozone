@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.block;
 
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 
@@ -42,4 +43,6 @@ public interface DeletedBlockLogStateManager {
       KeyValue<Long, DeletedBlocksTransaction>> getReadOnlyIterator();
 
   void onFlush();
+
+  void reinitialize(Table<Long, DeletedBlocksTransaction> deletedBlocksTXTable);
 }

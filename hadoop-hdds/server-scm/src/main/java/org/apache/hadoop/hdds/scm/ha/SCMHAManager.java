@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
+import org.apache.ratis.server.protocol.TermIndex;
 
 import java.io.IOException;
 
@@ -52,4 +53,6 @@ public interface SCMHAManager {
   void shutdown() throws IOException;
 
   boolean addSCM(AddSCMRequest request) throws IOException;
+
+  TermIndex installSnapshotFromLeader(String leaderId);
 }

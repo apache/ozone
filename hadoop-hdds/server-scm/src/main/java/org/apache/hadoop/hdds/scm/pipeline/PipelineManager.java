@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 
 /**
@@ -122,4 +123,7 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
    * @return boolean
    */
   boolean getSafeModeStatus();
+
+  void reinitialize(Table<PipelineID, Pipeline> pipelineStore)
+      throws IOException;
 }

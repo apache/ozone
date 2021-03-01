@@ -759,6 +759,11 @@ public class SCMPipelineManager implements
     return this.isInSafeMode.get();
   }
 
+  @Override
+  public void reinitialize(Table<PipelineID, Pipeline> pipelineStore)
+      throws IOException {
+  }
+
   public Table<PipelineID, Pipeline> getPipelineStore() {
     return pipelineStore;
   }

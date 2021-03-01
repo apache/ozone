@@ -20,7 +20,9 @@ package org.apache.hadoop.hdds.scm.pipeline;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
+import org.apache.hadoop.hdds.utils.db.Table;
 
 import java.io.IOException;
 import java.util.Collection;
@@ -117,4 +119,8 @@ public interface StateManager {
 
   void deactivatePipeline(PipelineID pipelineID)
       throws IOException;
+
+  void reinitialize(Table<PipelineID, Pipeline> pipelineStore)
+      throws IOException;
+
 }

@@ -17,7 +17,12 @@
  */
 package org.apache.hadoop.hdds.utils;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
+
+import java.io.File;
+import java.nio.file.Path;
 
 /**
  * Interface defined for getting HA related specific info from DB for SCM and

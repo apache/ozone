@@ -101,7 +101,7 @@ public class SCMSnapshotProvider {
     String snapshotFilePath =
         Paths.get(scmSnapshotDir.getAbsolutePath(), snapshotFileName).toFile()
             .getAbsolutePath();
-    File targetFile = new File(snapshotFileName + ".tar.gz");
+    File targetFile = new File(snapshotFilePath + ".tar.gz");
 
     // the client instance will be initialized only when first install snapshot
     // notification from ratis leader will be received.
@@ -123,8 +123,9 @@ public class SCMSnapshotProvider {
     FileUtil.unTar(targetFile, untarredDbDir.toFile());
     FileUtils.deleteQuietly(targetFile);
 
-    LOG.info("Successfully downloaded latest checkpoint from leader SCM: {}",
-        leaderSCMNodeID);
+    LOG.info(
+        "Successfully downloaded latest checkpoint from leader SCM: {} path {}",
+        leaderSCMNodeID, untarredDbDir.toAbsolutePath());
 
     RocksDBCheckpoint scmCheckpoint = new RocksDBCheckpoint(untarredDbDir);
     return scmCheckpoint;

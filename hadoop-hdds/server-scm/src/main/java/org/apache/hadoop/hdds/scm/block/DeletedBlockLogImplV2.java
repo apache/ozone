@@ -85,7 +85,7 @@ public class DeletedBlockLogImplV2
   // DeletedBlockLogStateManager.
   private final DeletedBlockLogStateManager deletedBlockLogStateManager;
   private final SCMContext scmContext;
-  private final Table<Long, DeletedBlocksTransaction> deletedBlocksTXTable;
+  private Table<Long, DeletedBlocksTransaction> deletedBlocksTXTable;
 
   public DeletedBlockLogImplV2(ConfigurationSource conf,
       ContainerManagerV2 containerManager,
@@ -296,6 +296,13 @@ public class DeletedBlockLogImplV2
     } finally {
       lock.unlock();
     }
+  }
+
+  @Override
+  public void reinitialize(
+      Table<Long, DeletedBlocksTransaction> deletedTable) {
+    this.deletedBlocksTXTable = deletedTable;
+    deletedBlockLogStateManager.reinitialize(deletedBlocksTXTable);
   }
 
   /**
