@@ -76,12 +76,13 @@ public class ListInfoSubcommand extends ScmSubcommand {
   private List<DatanodeWithAttributes> getAllNodes(ScmClient scmClient)
       throws IOException {
     List<HddsProtos.Node> nodes = scmClient.queryNode(null,
-        HddsProtos.NodeState.HEALTHY, HddsProtos.QueryScope.CLUSTER, "");
+        null, HddsProtos.QueryScope.CLUSTER, "");
 
     return nodes.stream()
         .map(p -> new DatanodeWithAttributes(
             DatanodeDetails.getFromProtoBuf(p.getNodeID()),
             p.getNodeOperationalStates(0), p.getNodeStates(0)))
+        .sorted((o1, o2) -> o1.healthState.compareTo(o2.healthState))
         .collect(Collectors.toList());
   }
 
@@ -114,6 +115,7 @@ public class ListInfoSubcommand extends ScmSubcommand {
         + "/" + datanode.getHostName() + "/" + relatedPipelineNum +
         " pipelines)");
     System.out.println("Operational State: " + dna.getOpState());
+    System.out.println("Health State: " + dna.getHealthState());
     System.out.println("Related pipelines:\n" + pipelineListInfo);
   }
 
