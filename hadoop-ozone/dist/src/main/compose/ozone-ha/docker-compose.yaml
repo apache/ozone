@@ -82,7 +82,7 @@ services:
     ports:
       - 9876
     environment:
-      WAITFOR: scm1:9863
+      WAITFOR: scm1:9865
       ENSURE_SCM_BOOTSTRAPPED: /data/metadata/scm/current/VERSION
       OZONE-SITE.XML_hdds.scm.safemode.min.datanode: ${OZONE_SAFEMODE_MIN_DATANODES:-1}
       <<: *replication
@@ -92,7 +92,7 @@ services:
     ports:
       - 9876
     environment:
-      WAITFOR: scm1:9863
+      WAITFOR: scm2:9865
       ENSURE_SCM_BOOTSTRAPPED: /data/metadata/scm/current/VERSION
       OZONE-SITE.XML_hdds.scm.safemode.min.datanode: ${OZONE_SAFEMODE_MIN_DATANODES:-1}
       <<: *replication
