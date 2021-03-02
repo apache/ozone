@@ -55,6 +55,7 @@ if [ "$1" == "internal" ]; then
 
    export_keytab HTTP/scm HTTP
    export_keytab HTTP/s3g HTTP
+   export_keytab HTTP/ozone HTTP
 
    export_keytab hadoop/rm hadoop
 
@@ -72,4 +73,5 @@ fi
 TESTKRB5_IMAGE=$(mvn -f "$SCRIPT_DIR"/../../../pom.xml help:evaluate -Dexpression=docker.ozone-testkr5b.image -q -DforceStdout)
 
 docker run -it --entrypoint=/etc/security/keytabs/update-keytabs.sh -v "$SCRIPT_DIR":/etc/security/keytabs $TESTKRB5_IMAGE internal
+
 
