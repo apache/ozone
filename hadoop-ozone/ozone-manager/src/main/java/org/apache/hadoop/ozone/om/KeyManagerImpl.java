@@ -717,7 +717,13 @@ public class KeyManagerImpl implements KeyManager {
     if (fileStatus == null) {
       return null;
     }
-    return fileStatus.isFile() ? fileStatus.getKeyInfo() : null;
+    // Appended trailing slash to represent directory to the user
+    if (fileStatus.isDirectory()) {
+      String keyPath = OzoneFSUtils.addTrailingSlashIfNeeded(
+          fileStatus.getKeyInfo().getKeyName());
+      fileStatus.getKeyInfo().setKeyName(keyPath);
+    }
+    return fileStatus.getKeyInfo();
   }
 
   private void addBlockToken4Read(OmKeyInfo value) throws IOException {
