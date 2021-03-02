@@ -215,7 +215,6 @@ public class SCMCertStore implements CertificateStore {
   public List<X509Certificate> listCertificate(NodeType role,
       BigInteger startSerialID, int count, CertType certType)
       throws IOException {
-    List<? extends Table.KeyValue<BigInteger, X509Certificate>> certs;
 
     Preconditions.checkNotNull(startSerialID);
 
@@ -223,7 +222,8 @@ public class SCMCertStore implements CertificateStore {
       startSerialID = null;
     }
 
-    certs = getCertTableList(role, certType, startSerialID, count);
+    List<? extends Table.KeyValue<BigInteger, X509Certificate>> certs =
+        getCertTableList(role, certType, startSerialID, count);
 
     List<X509Certificate> results = new ArrayList<>(certs.size());
 
