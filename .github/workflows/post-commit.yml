@@ -242,21 +242,10 @@ jobs:
         run: |
           mkdir -p /mnt/ozone/hadoop-ozone/dist/target
           tar xzvf hadoop-ozone*.tar.gz -C /mnt/ozone/hadoop-ozone/dist/target
-      - name: Install robotframework
-        run: sudo pip install robotframework
-      - name: Install k3s
-        run: curl -sfL https://get.k3s.io | sh -
-      - name: Copy Kubernetes config file
+      - name: Install dependencies
         run: |
-          sudo mkdir ~/.kube
-          sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
-          sudo chown $(id -u) ~/.kube/config
-      - name: Install flekszible
-        run: |
-          cd /tmp
-          wget https://github.com/elek/flekszible/releases/download/v1.8.1/flekszible_1.8.1_Linux_x86_64.tar.gz -O - | tar -zx
-          chmod +x flekszible
-          sudo mv flekszible /usr/bin/flekszible
+          cd /mnt/ozone
+          hadoop-ozone/dev-support/checks/install/_install.sh ${{ github.job }}
       - name: Execute tests
         run: |
           cd /mnt/ozone/hadoop-ozone/dist/target/ozone-* && sudo mkdir .aws && sudo chmod 777 .aws && sudo chown 1000 .aws
