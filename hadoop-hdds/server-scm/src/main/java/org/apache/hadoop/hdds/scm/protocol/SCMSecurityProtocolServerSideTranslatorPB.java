@@ -110,8 +110,7 @@ public class SCMSecurityProtocolServerSideTranslatorPB
             .build();
       case GetSCMCertificate:
        return scmSecurityResponse.setGetCertResponseProto(getSCMCertificate(
-                request.getGetSCMCertificateRequest()))
-            .build();
+           request.getGetSCMCertificateRequest())).build();
       default:
         throw new IllegalArgumentException(
             "Unknown request type: " + request.getCmdType());
@@ -119,6 +118,14 @@ public class SCMSecurityProtocolServerSideTranslatorPB
     } catch (IOException e) {
       scmSecurityResponse.setSuccess(false);
       scmSecurityResponse.setStatus(exceptionToResponseStatus(e));
+      // If actual cause is set in SCMSecurityException, set message with
+      // actuall cause message.
+      if (e instanceof SCMSecurityException) {
+        if (e.getCause() != null && e.getCause().getMessage() != null) {
+          scmSecurityResponse.setMessage(e.getCause().getMessage());
+          return scmSecurityResponse.build();
+        }
+      }
       if (e.getMessage() != null) {
         scmSecurityResponse.setMessage(e.getMessage());
       }
@@ -126,9 +133,15 @@ public class SCMSecurityProtocolServerSideTranslatorPB
     }
   }
 
+  /**
+   * Convert exception to corresponsing status.
+   * @param ex
+   * @return SCMSecurityProtocolProtos.Status code of the error.
+   */
   private SCMSecurityProtocolProtos.Status exceptionToResponseStatus(IOException ex) {
     if (ex instanceof SCMSecurityException) {
-      return SCMSecurityProtocolProtos.Status.values()[((SCMSecurityException) ex).getErrorCode().ordinal()];
+      return SCMSecurityProtocolProtos.Status.values()[
+          ((SCMSecurityException) ex).getErrorCode().ordinal()];
     } else {
       return SCMSecurityProtocolProtos.Status.INTERNAL_ERROR;
     }

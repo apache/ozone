@@ -53,7 +53,6 @@ import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.Client;
-import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.minikdc.MiniKdc;
@@ -303,7 +302,8 @@ public final class TestSecureOzoneCluster {
       assertNotNull(scmSecurityProtocolClient);
       String caCert = scmSecurityProtocolClient.getCACertificate();
       assertNotNull(caCert);
-      LambdaTestUtils.intercept(SCMSecurityException.class, "Certificate not found",
+      LambdaTestUtils.intercept(SCMSecurityException.class,
+          "Certificate not found",
           () -> scmSecurityProtocolClient.getCertificate("1"));
 
       // Case 2: User without Kerberos credentials should fail.

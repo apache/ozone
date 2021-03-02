@@ -35,6 +35,11 @@ public class SCMSecurityException extends IOException {
     this.errorCode = ErrorCode.DEFAULT;
   }
 
+  /**
+   * Ctor
+   * @param message - Error Message
+   * @param errorCode - Error code
+   */
   public SCMSecurityException(String message, ErrorCode errorCode) {
     super(message);
     this.errorCode = errorCode;
@@ -50,7 +55,14 @@ public class SCMSecurityException extends IOException {
     this.errorCode = ErrorCode.DEFAULT;
   }
 
-  public SCMSecurityException(String message, Throwable cause, ErrorCode errorCode) {
+  /**
+   * Ctor.
+   * @param message - Error Message
+   * @param cause - Actual cause.
+   * @param errorCode - Error code.
+   */
+  public SCMSecurityException(String message, Throwable cause,
+      ErrorCode errorCode) {
     super(message, cause);
     this.errorCode = errorCode;
   }

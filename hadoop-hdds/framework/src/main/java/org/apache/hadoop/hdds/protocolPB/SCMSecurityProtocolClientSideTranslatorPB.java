@@ -38,8 +38,7 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecuri
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityRequest.Builder;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityResponse;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.Type;
-import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.hdds.scm.proxy.SCMSecurityFailoverProxyProvider;
+import org.apache.hadoop.hdds.scm.proxy.SCMSecurityProtocolFailoverProxyProvider;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.io.retry.RetryProxy;
@@ -63,7 +62,7 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
    */
   private static final RpcController NULL_RPC_CONTROLLER = null;
   private final SCMSecurityProtocolPB rpcProxy;
-  private SCMSecurityFailoverProxyProvider failoverProxyProvider;
+  private SCMSecurityProtocolFailoverProxyProvider failoverProxyProvider;
 
   public SCMSecurityProtocolClientSideTranslatorPB(
       SCMSecurityProtocolPB rpcProxy) {
@@ -71,7 +70,7 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
   }
 
   public SCMSecurityProtocolClientSideTranslatorPB(
-      SCMSecurityFailoverProxyProvider proxyProvider) {
+      SCMSecurityProtocolFailoverProxyProvider proxyProvider) {
     Preconditions.checkState(proxyProvider != null);
     this.failoverProxyProvider = proxyProvider;
     this.rpcProxy = (SCMSecurityProtocolPB) RetryProxy.create(
@@ -104,7 +103,12 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
     return response;
   }
 
-
+  /**
+   * If response is not successful, throw exception.
+   * @param resp - SCMSecurityResponse
+   * @return if response is success, return response, else throw exception.
+   * @throws SCMSecurityException
+   */
   private SCMSecurityResponse handleError(SCMSecurityResponse resp)
       throws SCMSecurityException {
     if (resp.getStatus() != SCMSecurityProtocolProtos.Status.OK) {

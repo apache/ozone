@@ -1,3 +1,20 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with this
+ * work for additional information regarding copyright ownership.  The ASF
+ * licenses this file to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations under
+ * the License.
+ */
+
 package org.apache.hadoop.hdds.scm.proxy;
 
 import com.google.common.base.Preconditions;
@@ -29,11 +46,11 @@ import java.util.Map;
 /**
  * Failover proxy provider for SCMSecurityProtocol server.
  */
-public class SCMSecurityFailoverProxyProvider implements
+public class SCMSecurityProtocolFailoverProxyProvider implements
     FailoverProxyProvider<SCMSecurityProtocolPB>, Closeable {
 
   public static final Logger LOG =
-      LoggerFactory.getLogger(SCMSecurityFailoverProxyProvider.class);
+      LoggerFactory.getLogger(SCMSecurityProtocolFailoverProxyProvider.class);
 
   // scmNodeId -> ProxyInfo<rpcProxy>
   private final Map<String,
@@ -58,14 +75,17 @@ public class SCMSecurityFailoverProxyProvider implements
 
   private final UserGroupInformation ugi;
 
-
-  public SCMSecurityFailoverProxyProvider(ConfigurationSource conf,
-      UserGroupInformation userGroupInformation) throws IOException {
+  /**
+   * Construct fail-over proxy provider for SCMSecurityProtocol Server.
+   * @param conf
+   * @param userGroupInformation
+   */
+  public SCMSecurityProtocolFailoverProxyProvider(ConfigurationSource conf,
+      UserGroupInformation userGroupInformation) {
     Preconditions.checkNotNull(userGroupInformation);
     this.ugi = userGroupInformation ;
     this.conf = conf;
-    this.scmVersion = RPC.getProtocolVersion(
-        SCMSecurityProtocolPB.class);
+    this.scmVersion = RPC.getProtocolVersion(SCMSecurityProtocolPB.class);
 
     this.scmProxies = new HashMap<>();
     this.scmProxyInfoMap = new HashMap<>();
@@ -161,8 +181,7 @@ public class SCMSecurityFailoverProxyProvider implements
   }
 
   /**
-   * Performs failover if the leaderOMNodeId returned through OMResponse does
-   * not match the current leaderOMNodeId cached by the proxy provider.
+   * Performs fail-over to the next proxy.
    */
   public void performFailoverToNextProxy() {
     int newProxyIndex = incrementProxyIndex();
