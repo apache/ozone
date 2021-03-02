@@ -402,4 +402,8 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
   public SCMHAManager getSCMHAManager() {
     return haManager;
   }
+
+  public Set<ContainerID> getContainerIDs() {
+    return containerStateManager.getContainerIDs();
+  }
 }
