@@ -170,6 +170,7 @@ public class TrashOzoneFileSystem extends FileSystem {
   }
 
   private boolean renameV1(OFSPath srcPath, OFSPath dstPath) {
+    ozoneManager.getMetrics().incNumTrashAtomicDirRenames();
     OzoneManagerProtocolProtos.OMRequest omRequest =
         getRenameKeyRequest(srcPath, dstPath);
     try {
@@ -199,6 +200,7 @@ public class TrashOzoneFileSystem extends FileSystem {
   }
 
   private boolean deleteV1(OFSPath srcPath) {
+    ozoneManager.getMetrics().incNumTrashAtomicDirDeletes();
     OzoneManagerProtocolProtos.OMRequest omRequest =
         getDeleteKeyRequest(srcPath);
     try {
