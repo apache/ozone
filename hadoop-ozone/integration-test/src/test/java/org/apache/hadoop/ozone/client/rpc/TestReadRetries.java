@@ -51,9 +51,9 @@ import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 
 import org.junit.After;
@@ -68,7 +68,6 @@ import org.junit.rules.Timeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
-import static org.junit.Assert.assertEquals;
 
 import org.junit.rules.ExpectedException;
 
@@ -214,10 +213,7 @@ public class TestReadRetries {
     readKey(bucket, keyName, value);
 
     // read intermediate directory
-    verifyIntermediateDir(bucket, "a/b/c/");
     verifyIntermediateDir(bucket, "a/b/c");
-    verifyIntermediateDir(bucket, "/a/b/c/");
-    verifyIntermediateDir(bucket, "/a/b/c");
 
     // shutdown the second datanode
     datanodeDetails = datanodes.get(1);
@@ -241,15 +237,11 @@ public class TestReadRetries {
     factory.releaseClient(clientSpi, false);
   }
 
-  private void verifyIntermediateDir(OzoneBucket bucket,
-      String dir) throws IOException {
-    try {
-      bucket.getKey(dir);
-      fail("Should throw exception for directory listing");
-    } catch (OMException ome) {
-      // expected
-      assertEquals(OMException.ResultCodes.KEY_NOT_FOUND, ome.getResult());
-    }
+  private void verifyIntermediateDir(OzoneBucket bucket, String dir)
+      throws IOException {
+    OzoneFileStatus fileStatus = bucket.getFileStatus(dir);
+    Assert.assertTrue(fileStatus.isDirectory());
+    Assert.assertEquals(dir, fileStatus.getTrimmedName());
   }
 
   private void readKey(OzoneBucket bucket, String keyName, String data)
