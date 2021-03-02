@@ -12,7 +12,7 @@
   limitations under the License. See accompanying LICENSE file.
 -->
 
-The scripts in this directory define version-specific behavior required for [`testlib.sh`](../../testlib.sh).  For example the `ozone admin` command was renamed from `ozone scmcli` in 1.0.0.
+The scripts in this directory define version-specific behavior required for [`testlib.sh`](../testlib.sh).  For example the `ozone admin` command was renamed from `ozone scmcli` in 1.0.0.
 
 For each release a logical version is defined, starting from 1.  It is incremented only if the new version needs to execute some scripts to handle some (unintended) incompatibility.  For example 1.0.0 or later need to rename some RocksDB column-families when upgrading from 0.5.0.
 
