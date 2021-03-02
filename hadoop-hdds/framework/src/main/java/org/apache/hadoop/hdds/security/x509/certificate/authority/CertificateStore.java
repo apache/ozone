@@ -52,13 +52,6 @@ public interface CertificateStore {
       X509Certificate certificate, NodeType role) throws IOException;
 
   /**
-   * Writes a new SCM certificate that was issued to the persistent store.
-   * @param serialID - Certificate Serial Number.
-   * @param certificate - Certificate to persist.
-   * @throws IOException - on Failure.
-   */
-
-  /**
    * Adds the certificates to be revoked to a new CRL and moves all the
    * certificates in a transactional manner from valid certificate to
    * revoked certificate state. Returns an empty {@code Optional} instance if
