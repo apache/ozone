@@ -93,13 +93,19 @@ public final class VolumeInfo {
   private long getReserved(ConfigurationSource conf) {
     Collection<String> reserveList = conf.getTrimmedStringCollection(
         HDDS_DATANODE_DIR_DU_RESERVED);
-    Map<String, Long> reserveMap = new HashMap<>();
     for (String reserve : reserveList) {
       String[] words = reserve.split(":");
-      reserveMap.put(words[0], Long.parseLong(words[1].trim()));
+      if (words.length < 2) {
+        throw new IllegalArgumentException(
+            "Reserved space should config in pair");
+      }
+
+      if (words[0].trim().equals(rootDir)) {
+        return Long.parseLong(words[1].trim());
+      }
     }
 
-    return reserveMap.containsKey(rootDir) ? reserveMap.get(rootDir) : 0;
+    return 0;
   }
 
   private VolumeInfo(Builder b) throws IOException {
