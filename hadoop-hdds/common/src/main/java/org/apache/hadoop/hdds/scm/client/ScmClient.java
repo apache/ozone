@@ -297,7 +297,7 @@ public interface ScmClient extends Closeable {
       throws IOException;
 
   /**
-   * Gets usage information of most or least used datanodes.
+   * Get usage information of most or least used datanodes.
    *
    * @param mostUsed true if most used, false if least used
    * @param count Integer number of nodes to get info for

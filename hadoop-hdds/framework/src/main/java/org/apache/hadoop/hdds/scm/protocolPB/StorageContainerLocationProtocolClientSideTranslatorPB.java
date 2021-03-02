@@ -614,8 +614,8 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   /**
    * Builds request for datanode usage information and receives response.
    *
-   * @param ipaddress - Address String
-   * @param uuid - UUID String
+   * @param ipaddress Address String
+   * @param uuid UUID String
    * @return List of DatanodeUsageInfo. Each element contains info such as
    * capacity, SCMUsed, and remaining space.
    * @throws IOException

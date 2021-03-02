@@ -73,6 +73,9 @@ public class UsageInfoSubcommand extends ScmSubcommand {
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     List<HddsProtos.DatanodeUsageInfo> infoList = null;
+    if (count < 1) {
+      throw new IOException("count must be greater than 0");
+    }
     if (!Strings.isNullOrEmpty(exclusiveArguments.ipaddress) ||
         !Strings.isNullOrEmpty(exclusiveArguments.uuid)) {
       infoList = scmClient.getDatanodeUsageInfo(exclusiveArguments.ipaddress,
@@ -97,6 +100,7 @@ public class UsageInfoSubcommand extends ScmSubcommand {
     NumberFormat percentFormat = NumberFormat.getPercentInstance();
     percentFormat.setMinimumFractionDigits(5);
 
+    System.out.printf("Usage info for %s:%n", info.getNode().getUuid());
     System.out.printf("%-10s: %20sB %n", "Capacity", info.getCapacity());
     System.out.printf("%-10s: %20sB (%s) %n", "SCMUsed", info.getUsed(),
         percentFormat.format(usedRatio));

@@ -625,8 +625,8 @@ public class SCMClientProtocolServer implements
   /**
    * Get Datanode usage info (such as capacity, used) by ip or uuid.
    *
-   * @param ipaddress - Datanode Address String
-   * @param uuid - Datanode UUID String
+   * @param ipaddress Datanode Address String
+   * @param uuid Datanode UUID String
    * @return List of DatanodeUsageInfo. Each element contains usage info such
    * as capacity, SCMUsed, and remaining space.
    * @throws IOException
@@ -680,45 +680,111 @@ public class SCMClientProtocolServer implements
     long used = stat.getScmUsed().get();
     long remaining = stat.getRemaining().get();
 
-    HddsProtos.DatanodeUsageInfo info = HddsProtos.DatanodeUsageInfo
-        .newBuilder()
+    return HddsProtos.DatanodeUsageInfo.newBuilder()
         .setCapacity(capacity)
         .setUsed(used)
         .setRemaining(remaining)
+        .setNode(node.toProto(node.getCurrentVersion()))
         .build();
-    return info;
   }
 
+  /**
+   * Get information of the most or least used datanodes.
+   *
+   * @param mostUsed true if most used, false if least used
+   * @param count Integer number of nodes to get info for
+   * @return List of DatanodeUsageInfo. Each element contains usage info
+   * such as capacity, SCMUsed, and remaining space.
+   * @throws IOException
+   */
   @Override
   public List<HddsProtos.DatanodeUsageInfo> getDatanodeUsageInfo(
       boolean mostUsed, int count) throws IOException {
-    List<HddsProtos.DatanodeUsageInfo> infoList;
 
-    Map<DatanodeDetails, SCMNodeStat> nodeStatMap =
-        scm.getScmNodeManager().getNodeStats();
-
-    PriorityQueue<DatanodeDetails> nodes;
-
-    if (mostUsed) {
-      nodes = new PriorityQueue<DatanodeDetails>(count,
-          Comparator.comparingLong(node -> nodeStatMap.get(node)
-              .getRemaining().get()));
-    } else {
-      nodes = new PriorityQueue<DatanodeDetails>(count,
-          Comparator.comparingLong(node -> nodeStatMap.get(node).
-              getRemaining().get()).reversed());
+    // check admin authorisation
+    String remoteUser = getRpcRemoteUsername();
+    try {
+      getScm().checkAdminAccess(remoteUser);
+    } catch (IOException e) {
+      LOG.error("Authorisation failed", e);
+      throw e;
     }
 
+    PriorityQueue<DatanodeDetails> nodes = null;
+    if (mostUsed) {
+      nodes = getMostUsedDatanodes(count);
+    } else {
+      nodes = getLeastUsedDatanodes(count);
+    }
+
+    List<HddsProtos.DatanodeUsageInfo> infoList = new ArrayList<>();
+    for (DatanodeDetails node : nodes) {
+      infoList.add(getUsageInfoFromDatanodeDetails(node));
+    }
+    return infoList;
+  }
+
+  /**
+   * Get most used datanodes.
+   *
+   * @param count Integer number of datanodes to get. Must be greater than
+   *              zero and lesser than total (healthy + stale) number of nodes
+   * @return PriorityQueue of DatanodeDetails
+   * @throws IllegalArgumentException
+   */
+  private PriorityQueue<DatanodeDetails> getMostUsedDatanodes(int count)
+      throws IllegalArgumentException {
+    Map<DatanodeDetails, SCMNodeStat> nodeStatMap = scm.getScmNodeManager()
+        .getNodeStats();
+
+    if (count > nodeStatMap.size()) {
+      throw new IllegalArgumentException(
+          String.format("count must be lesser than %d", nodeStatMap.size()));
+    }
+    PriorityQueue<DatanodeDetails> nodes = new PriorityQueue<>(count,
+        Comparator.comparingLong(node -> nodeStatMap.get(node)
+            .getRemaining().get()).reversed());
+
+    // keep only count number of most used nodes
     nodeStatMap.forEach((node, stat) -> {
       nodes.add(node);
       if (nodes.size() > count) {
         nodes.poll();
       }
     });
+    return nodes;
+  }
 
-    nodes.forEach((node, stat) -> {
-      getUsageInfoFromDatanodeDetails(node);
+  /**
+   * Get least used datanodes.
+   *
+   * @param count Integer number of datanodes to get. Must be greater than
+   *              zero and lesser than total (healthy + stale) number of nodes
+   * @return PriorityQueue of DatanodeDetails
+   * @throws IllegalArgumentException
+   */
+  private PriorityQueue<DatanodeDetails> getLeastUsedDatanodes(int count)
+      throws IllegalArgumentException {
+    Map<DatanodeDetails, SCMNodeStat> nodeStatMap = scm.getScmNodeManager()
+        .getNodeStats();
+
+    PriorityQueue<DatanodeDetails> nodes = new PriorityQueue<>(count,
+        Comparator.comparingLong(node -> nodeStatMap.get(node)
+            .getRemaining().get()));
+
+    if (count > nodeStatMap.size()) {
+      throw new IllegalArgumentException(
+          String.format("count must be lesser than %d", nodeStatMap.size()));
+    }
+
+    // keep only count number of least used nodes
+    nodeStatMap.forEach((node, stat) -> {
+      nodes.add(node);
+      if (nodes.size() > count) {
+        nodes.poll();
+      }
     });
+    return nodes;
   }
 
   /**

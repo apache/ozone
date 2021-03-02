@@ -535,8 +535,8 @@ public class ContainerOperationClient implements ScmClient {
   /**
    * Get Datanode Usage information by ipaddress or uuid.
    *
-   * @param ipaddress - datanode ipaddress String
-   * @param uuid - datanode uuid String
+   * @param ipaddress datanode ipaddress String
+   * @param uuid datanode uuid String
    * @return List of DatanodeUsageInfo. Each element contains info such as
    * capacity, SCMused, and remaining space.
    * @throws IOException
@@ -549,7 +549,7 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   /**
-   * Gets usage information of most or least used datanodes.
+   * Get usage information of most or least used datanodes.
    *
    * @param mostUsed true if most used, false if least used
    * @param count Integer number of nodes to get info for

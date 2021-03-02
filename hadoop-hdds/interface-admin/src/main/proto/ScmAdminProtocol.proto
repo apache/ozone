@@ -254,7 +254,7 @@ message NodeQueryResponseProto {
 }
 
 /*
-  Usage info request message containing ip and uuid.
+  Datanode usage info request message.
 */
 message DatanodeUsageInfoRequestProto {
   optional string ipaddress = 1;

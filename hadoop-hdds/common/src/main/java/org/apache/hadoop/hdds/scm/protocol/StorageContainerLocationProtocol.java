@@ -243,8 +243,8 @@ public interface StorageContainerLocationProtocol extends Closeable {
   /**
    * Get Datanode usage information by ip or uuid.
    *
-   * @param ipaddress - datanode IP address String
-   * @param uuid - datanode UUID String
+   * @param ipaddress datanode IP address String
+   * @param uuid datanode UUID String
    * @return List of DatanodeUsageInfo. Each element contains info such as
    * capacity, SCMused, and remaining space.
    * @throws IOException
@@ -254,7 +254,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
       throws IOException;
 
   /**
-   * Gets usage information of most or least used datanodes.
+   * Get usage information of most or least used datanodes.
    *
    * @param mostUsed true if most used, false if least used
    * @param count Integer number of nodes to get info for
