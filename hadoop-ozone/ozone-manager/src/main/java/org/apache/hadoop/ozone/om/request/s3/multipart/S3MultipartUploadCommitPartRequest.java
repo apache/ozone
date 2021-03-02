@@ -155,7 +155,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       omKeyInfo.setDataSize(keyArgs.getDataSize());
       omKeyInfo.updateLocationInfoList(keyArgs.getKeyLocationsList().stream()
           .map(OmKeyLocationInfo::getFromProtobuf)
-          .collect(Collectors.toList()));
+          .collect(Collectors.toList()), true);
       // Set Modification time
       omKeyInfo.setModificationTime(keyArgs.getModificationTime());
       // Set the UpdateID to current transactionLogIndex

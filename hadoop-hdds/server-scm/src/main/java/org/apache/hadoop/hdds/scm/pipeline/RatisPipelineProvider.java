@@ -198,6 +198,7 @@ public class RatisPipelineProvider extends PipelineProvider {
    * @param pipeline            - Pipeline to be destroyed
    * @throws NotLeaderException - Send datanode command while not leader
    */
+  @Override
   public void close(Pipeline pipeline) throws NotLeaderException {
     final ClosePipelineCommand closeCommand =
         new ClosePipelineCommand(pipeline.getId());

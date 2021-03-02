@@ -82,6 +82,7 @@ include_directories("${CMAKE_CURRENT_BINARY_DIR}"
 #add_compile_options("-fpermissive")
 
 # Build server
+find_package(Threads)
 add_executable(failure_injector_svc_server 
     ${FS_DIR}/failure_injector_fs.cc ${FS_DIR}/failure_injector.cc
     ${SRV_DIR}/failure_injector_svc_server.cc ${SRV_DIR}/run_grpc_service.cc 

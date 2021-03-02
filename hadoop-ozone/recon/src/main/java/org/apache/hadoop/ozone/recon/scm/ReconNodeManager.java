@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -113,13 +114,12 @@ public class ReconNodeManager extends SCMNodeManager {
   @Override
   public void onMessage(CommandForDatanode commandForDatanode,
                         EventPublisher ignored) {
-    if (ALLOWED_COMMANDS.contains(
-        commandForDatanode.getCommand().getType())) {
+    final Type cmdType = commandForDatanode.getCommand().getType();
+    if (ALLOWED_COMMANDS.contains(cmdType)) {
       super.onMessage(commandForDatanode, ignored);
     } else {
-      LOG.info("Ignoring unsupported command {} for Datanode {}.",
-          commandForDatanode.getCommand().getType(),
-          commandForDatanode.getDatanodeId());
+      LOG.debug("Ignoring unsupported command {} for Datanode {}.",
+          cmdType, commandForDatanode.getDatanodeId());
     }
   }
 
@@ -138,5 +138,15 @@ public class ReconNodeManager extends SCMNodeManager {
     return cmds.stream()
         .filter(c -> ALLOWED_COMMANDS.contains(c.getType()))
         .collect(toList());
+  }
+
+  @Override
+  protected void updateDatanodeOpState(DatanodeDetails reportedDn)
+      throws NodeNotFoundException {
+    super.updateDatanodeOpState(reportedDn);
+    // Update NodeOperationalState in NodeStatus to keep it consistent for Recon
+    super.getNodeStateManager().setNodeOperationalState(reportedDn,
+        reportedDn.getPersistedOpState(),
+        reportedDn.getPersistedOpStateExpiryEpochSec());
   }
 }

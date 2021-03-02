@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 
 import java.util.UUID;
@@ -45,6 +46,7 @@ public final class PipelineID {
     return id;
   }
 
+  @JsonIgnore
   public HddsProtos.PipelineID getProtobuf() {
     HddsProtos.UUID uuid128 = HddsProtos.UUID.newBuilder()
         .setMostSigBits(id.getMostSignificantBits())

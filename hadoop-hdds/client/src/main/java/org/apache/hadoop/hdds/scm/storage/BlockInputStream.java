@@ -413,6 +413,13 @@ public class BlockInputStream extends InputStream
   public synchronized void close() {
     releaseClient();
     xceiverClientFactory = null;
+
+    final List<ChunkInputStream> inputStreams = this.chunkStreams;
+    if (inputStreams != null) {
+      for (ChunkInputStream is : inputStreams) {
+        is.close();
+      }
+    }
   }
 
   private void releaseClient() {

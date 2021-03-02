@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.TransactionInfoCodec;
@@ -85,7 +86,7 @@ public class SCMDBDefinition implements DBDefinition {
 
   public static final DBColumnFamilyDefinition<ContainerID, ContainerInfo>
       CONTAINERS =
-      new DBColumnFamilyDefinition<ContainerID, ContainerInfo>(
+      new DBColumnFamilyDefinition<>(
           "containers",
           ContainerID.class,
           new ContainerIDCodec(),
@@ -101,6 +102,23 @@ public class SCMDBDefinition implements DBDefinition {
           TransactionInfo.class,
           new TransactionInfoCodec());
 
+  public static final DBColumnFamilyDefinition<Long, CRLInfo> CRLS =
+      new DBColumnFamilyDefinition<>(
+          "crls",
+          Long.class,
+          new LongCodec(),
+          CRLInfo.class,
+          new CRLInfoCodec());
+
+  public static final DBColumnFamilyDefinition<String, Long>
+      CRL_SEQUENCE_ID =
+      new DBColumnFamilyDefinition<>(
+          "crlSequenceId",
+          String.class,
+          new StringCodec(),
+          Long.class,
+          new LongCodec());
+
   @Override
   public String getName() {
     return "scm.db";
@@ -114,6 +132,7 @@ public class SCMDBDefinition implements DBDefinition {
   @Override
   public DBColumnFamilyDefinition[] getColumnFamilies() {
     return new DBColumnFamilyDefinition[] {DELETED_BLOCKS, VALID_CERTS,
-        VALID_SCM_CERTS, REVOKED_CERTS, PIPELINES, CONTAINERS, TRANSACTIONINFO};
+        VALID_SCM_CERTS, REVOKED_CERTS, PIPELINES, CONTAINERS, TRANSACTIONINFO,
+        CRLS, CRL_SEQUENCE_ID};
   }
 }

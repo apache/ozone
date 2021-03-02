@@ -54,7 +54,6 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 
 import com.google.common.base.Optional;
 import org.apache.commons.codec.digest.DigestUtils;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_MULTIPART_MIN_SIZE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import org.slf4j.Logger;
@@ -217,12 +216,12 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
 
           // Except for last part all parts should have minimum size.
           if (currentPartCount != partsListSize) {
-            if (currentPartKeyInfo.getDataSize() < OM_MULTIPART_MIN_SIZE) {
-              LOG.error("MultipartUpload: {} Part number: {} size {}  is less "
-                              + "than minimum part size {}", ozoneKey,
-                      partKeyInfo.getPartNumber(),
-                      currentPartKeyInfo.getDataSize(),
-                      OzoneConsts.OM_MULTIPART_MIN_SIZE);
+            if (currentPartKeyInfo.getDataSize() <
+                ozoneManager.getMinMultipartUploadPartSize()) {
+              LOG.error("MultipartUpload: {} Part number: {} size {}  is less" +
+                      " than minimum part size {}", ozoneKey,
+                  partKeyInfo.getPartNumber(), currentPartKeyInfo.getDataSize(),
+                  ozoneManager.getMinMultipartUploadPartSize());
               throw new OMException(
                   failureMessage(requestedVolume, requestedBucket, keyName) +
                   ". Entity too small.",
@@ -233,6 +232,11 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
           // As all part keys will have only one version.
           OmKeyLocationInfoGroup currentKeyInfoGroup = currentPartKeyInfo
               .getKeyLocationVersions().get(0);
+
+          // Set partNumber in each block.
+          currentKeyInfoGroup.getLocationList().forEach(
+              omKeyLocationInfo -> omKeyLocationInfo.setPartNumber(partNumber));
+
           partLocationInfos.addAll(currentKeyInfoGroup.getLocationList());
           dataSize += currentPartKeyInfo.getDataSize();
         }
@@ -248,7 +252,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         if (omKeyInfo == null) {
           // This is a newly added key, it does not have any versions.
           OmKeyLocationInfoGroup keyLocationInfoGroup = new
-              OmKeyLocationInfoGroup(0, partLocationInfos);
+              OmKeyLocationInfoGroup(0, partLocationInfos, true);
 
           // Get the objectID of the key from OpenKeyTable
           OmKeyInfo dbOpenKeyInfo = omMetadataManager.getOpenKeyTable()
@@ -262,6 +266,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
               .setCreationTime(keyArgs.getModificationTime())
               .setModificationTime(keyArgs.getModificationTime())
               .setDataSize(dataSize)
+              .setFileEncryptionInfo(dbOpenKeyInfo.getFileEncryptionInfo())
               .setOmKeyLocationInfos(
                   Collections.singletonList(keyLocationInfoGroup))
               .setAcls(OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()));
@@ -277,7 +282,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
           // But now as versioning is not supported, just following the commit
           // key approach. When versioning support comes, then we can uncomment
           // below code keyInfo.addNewVersion(locations);
-          omKeyInfo.updateLocationInfoList(partLocationInfos);
+          omKeyInfo.updateLocationInfoList(partLocationInfos, true);
           omKeyInfo.setModificationTime(keyArgs.getModificationTime());
           omKeyInfo.setDataSize(dataSize);
         }

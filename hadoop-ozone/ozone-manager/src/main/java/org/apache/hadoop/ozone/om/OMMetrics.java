@@ -20,12 +20,12 @@ package org.apache.hadoop.ozone.om;
 import com.google.common.annotations.VisibleForTesting;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.utils.DBCheckpointMetrics;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
-import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 
 /**
  * This class is for maintaining Ozone Manager statistics.
@@ -131,14 +131,6 @@ public class OMMetrics {
   // few minutes before restart may not be included in this count.
   private @Metric MutableCounterLong numKeys;
 
-
-
-  // Metrics to track checkpointing statistics from last run.
-  private @Metric MutableGaugeLong lastCheckpointCreationTimeTaken;
-  private @Metric MutableGaugeLong lastCheckpointStreamingTimeTaken;
-  private @Metric MutableCounterLong numCheckpoints;
-  private @Metric MutableCounterLong numCheckpointFails;
-
   private @Metric MutableCounterLong numBucketS3Creates;
   private @Metric MutableCounterLong numBucketS3CreateFails;
   private @Metric MutableCounterLong numBucketS3Deletes;
@@ -163,7 +155,10 @@ public class OMMetrics {
   private @Metric MutableCounterLong numTrashRootsEnqueued;
   private @Metric MutableCounterLong numTrashRootsProcessed;
 
+  private final DBCheckpointMetrics dbCheckpointMetrics;
+
   public OMMetrics() {
+    dbCheckpointMetrics = DBCheckpointMetrics.create("OM Metrics");
   }
 
   public static OMMetrics create() {
@@ -171,6 +166,10 @@ public class OMMetrics {
     return ms.register(SOURCE_NAME,
         "Ozone Manager Metrics",
         new OMMetrics());
+  }
+
+  public DBCheckpointMetrics getDBCheckpointMetrics() {
+    return dbCheckpointMetrics;
   }
 
   public void incNumS3BucketCreates() {
@@ -553,22 +552,6 @@ public class OMMetrics {
     numGetServiceListFails.incr();
   }
 
-  public void setLastCheckpointCreationTimeTaken(long val) {
-    this.lastCheckpointCreationTimeTaken.set(val);
-  }
-
-  public void setLastCheckpointStreamingTimeTaken(long val) {
-    this.lastCheckpointStreamingTimeTaken.set(val);
-  }
-
-  public void incNumCheckpoints() {
-    numCheckpoints.incr();
-  }
-
-  public void incNumCheckpointFails() {
-    numCheckpointFails.incr();
-  }
-
   public void incNumOpenKeyDeleteRequests() {
     numOpenKeyDeleteRequests.incr();
   }
@@ -840,21 +823,6 @@ public class OMMetrics {
 
   public long getNumAbortMultipartUploadFails() {
     return numAbortMultipartUploadFails.value();
-  }
-
-  @VisibleForTesting
-  public long getLastCheckpointCreationTimeTaken() {
-    return lastCheckpointCreationTimeTaken.value();
-  }
-
-  @VisibleForTesting
-  public long getNumCheckpoints() {
-    return numCheckpoints.value();
-  }
-
-  @VisibleForTesting
-  public long getLastCheckpointStreamingTimeTaken() {
-    return lastCheckpointStreamingTimeTaken.value();
   }
 
   public long getNumOpenKeyDeleteRequests() {
