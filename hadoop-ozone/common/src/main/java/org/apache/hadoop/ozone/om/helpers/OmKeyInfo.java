@@ -42,7 +42,7 @@ import com.google.common.base.Preconditions;
  * This is returned from OM to client, and client use class to talk to
  * datanode. Also, this is the metadata written to om.db on server side.
  */
-public final class OmKeyInfo extends WithObjectID {
+public final class OmKeyInfo extends WithParentObjectId {
   private final String volumeName;
   private final String bucketName;
   // name of key client specified
