@@ -33,14 +33,14 @@ public class TestChecksumByteBuffer {
   @Test
   public void testPureJavaCrc32ByteBuffer() {
     final Checksum expected = new PureJavaCrc32();
-    final ChecksumByteBuffer testee = new PureJavaCrc32ByteBuffer();
+    final ChecksumByteBuffer testee = ChecksumByteBufferFactory.crc32Impl();
     new VerifyChecksumByteBuffer(expected, testee).testCorrectness();
   }
 
   @Test
   public void testPureJavaCrc32CByteBuffer() {
     final Checksum expected = new PureJavaCrc32C();
-    final ChecksumByteBuffer testee = new PureJavaCrc32CByteBuffer();
+    final ChecksumByteBuffer testee = ChecksumByteBufferFactory.crc32CImpl();
     new VerifyChecksumByteBuffer(expected, testee).testCorrectness();
   }
 

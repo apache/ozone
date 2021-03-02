@@ -80,6 +80,7 @@ public class DefaultApprover extends BaseApprover {
    * @throws OperatorCreationException - on Error.
    */
   @SuppressWarnings("ParameterNumber")
+  @Override
   public  X509CertificateHolder sign(
       SecurityConfig config,
       PrivateKey caPrivate,

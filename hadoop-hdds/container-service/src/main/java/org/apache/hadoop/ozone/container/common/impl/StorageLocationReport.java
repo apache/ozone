@@ -55,26 +55,32 @@ public final class StorageLocationReport implements
     this.storageLocation = storageLocation;
   }
 
+  @Override
   public String getId() {
     return id;
   }
 
+  @Override
   public boolean isFailed() {
     return failed;
   }
 
+  @Override
   public long getCapacity() {
     return capacity;
   }
 
+  @Override
   public long getScmUsed() {
     return scmUsed;
   }
 
+  @Override
   public long getRemaining() {
     return remaining;
   }
 
+  @Override
   public String getStorageLocation() {
     return storageLocation;
   }
