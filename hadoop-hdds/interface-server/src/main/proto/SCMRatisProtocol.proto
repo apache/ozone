@@ -24,6 +24,7 @@ enum RequestType {
     PIPELINE = 1;
     CONTAINER = 2;
     BLOCK = 3;
+    SEQUENCE_ID = 4;
 }
 
 message Method {

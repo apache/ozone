@@ -131,4 +131,9 @@ public interface SCMMetadataStore extends DBStoreHAManager {
    * Table that maintains all the container information.
    */
   Table<ContainerID, ContainerInfo> getContainerTable();
+
+  /**
+   * Table that maintains sequence id information.
+   */
+  Table<String, Long> getSequenceIdTable();
 }
