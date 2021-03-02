@@ -760,7 +760,7 @@ public class SCMPipelineManager implements
   }
 
   @Override
-  public void reinitialize(Table<PipelineID, Pipeline> pipelineStore)
+  public void reinitialize(Table<PipelineID, Pipeline> store)
       throws IOException {
   }
 

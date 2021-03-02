@@ -209,8 +209,8 @@ public class SCMHAManagerImpl implements SCMHAManager {
         stopServices();
 
         // Pause the State Machine so that no new transactions can be applied.
-        // This action also clears the SCM Double Buffer so that if there are any
-        // pending transactions in the buffer, they are discarded.
+        // This action also clears the SCM Double Buffer so that if there
+        // are any pending transactions in the buffer, they are discarded.
 
       } catch (Exception e) {
         LOG.error("Failed to stop/ pause the services. Cannot proceed with "

@@ -126,6 +126,7 @@ public class TestSCMInstallSnapshot {
     // Hack the transaction index in the checkpoint so as to ensure the
     // checkpointed transaction index is higher than when it was downloaded
     // from.
+    Assert.assertNotNull(db);
     HAUtils.getTransactionInfoTable(db, new SCMDBDefinition())
         .put(OzoneConsts.TRANSACTION_INFO_KEY, TransactionInfo.builder()
             .setCurrentTerm(1).setTransactionIndex(100).build());

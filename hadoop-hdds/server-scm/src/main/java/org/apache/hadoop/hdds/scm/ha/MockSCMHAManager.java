@@ -127,15 +127,18 @@ public final class MockSCMHAManager implements SCMHAManager {
     private Map<RequestType, Object> handlers =
         new EnumMap<>(RequestType.class);
 
-    @Override public void start() {
+    @Override
+    public void start() {
     }
 
-    @Override public void registerStateMachineHandler(final RequestType handlerType,
+    @Override
+    public void registerStateMachineHandler(final RequestType handlerType,
         final Object handler) {
       handlers.put(handlerType, handler);
     }
 
-    @Override public SCMRatisResponse submitRequest(final SCMRatisRequest request)
+    @Override
+    public SCMRatisResponse submitRequest(final SCMRatisRequest request)
         throws IOException {
       final RaftGroupMemberId raftId = RaftGroupMemberId
           .valueOf(RaftPeerId.valueOf("peer"), RaftGroupId.randomId());
@@ -168,7 +171,8 @@ public final class MockSCMHAManager implements SCMHAManager {
         final Object handler = handlers.get(request.getType());
 
         if (handler == null) {
-          throw new IOException("No handler found for request type " + request.getType());
+          throw new IOException(
+              "No handler found for request type " + request.getType());
         }
 
         final List<Class<?>> argumentTypes = new ArrayList<>();
@@ -176,7 +180,8 @@ public final class MockSCMHAManager implements SCMHAManager {
           argumentTypes.add(args.getClass());
         }
         final Object result = handler.getClass()
-            .getMethod(request.getOperation(), argumentTypes.toArray(new Class<?>[0]))
+            .getMethod(request.getOperation(),
+                argumentTypes.toArray(new Class<?>[0]))
             .invoke(handler, request.getArguments());
 
         return SCMRatisResponse.encode(result);

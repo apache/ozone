@@ -69,6 +69,7 @@ public class InterSCMGrpcService extends
 
       TransactionInfo transactionInfo =
           transactionInfoTable.get(TRANSACTION_INFO_KEY);
+      Preconditions.checkNotNull(transactionInfo);
       SCMGrpcOutputStream outputStream =
           new SCMGrpcOutputStream(responseObserver, scm.getClusterId(),
               BUFFER_SIZE);

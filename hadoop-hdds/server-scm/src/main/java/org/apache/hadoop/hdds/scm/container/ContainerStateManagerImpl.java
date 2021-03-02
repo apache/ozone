@@ -500,12 +500,12 @@ public final class ContainerStateManagerImpl
 
   @Override
   public void reinitialize(
-      Table<ContainerID, ContainerInfo> containerStore) throws IOException {
+      Table<ContainerID, ContainerInfo> store) throws IOException {
     lock.writeLock().lock();
     try {
       close();
       containers = null;
-      this.containerStore = containerStore;
+      this.containerStore = store;
       this.containers = new ContainerStateMap();
       this.lastUsedMap = new ConcurrentHashMap<>();
       initialize();

@@ -16,7 +16,6 @@
  */
 package org.apache.hadoop.hdds.scm.ha;
 
-import java.io.IOException;
 
 /**
  * Interface for background services in SCM, including ReplicationManager,

@@ -23,12 +23,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.ha.SCMHAConfiguration;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerImpl;
-import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.ha.SCMStateMachine;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
@@ -46,11 +46,11 @@ import org.apache.ratis.server.protocol.TermIndex;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Assert;
-import org.junit.Ignore;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.Disabled;
 import org.slf4j.Logger;
 import org.slf4j.event.Level;
 
@@ -84,8 +84,8 @@ public class TestSCMInstallSnapshotWithHA {
     scmId = UUID.randomUUID().toString();
     omServiceId = "om-service-test1";
     scmServiceId = "scm-service-test1";
-    SCMHAConfiguration scmhaConfiguration = conf.getObject(
-        SCMHAConfiguration.class);
+    SCMHAConfiguration scmhaConfiguration =
+        conf.getObject(SCMHAConfiguration.class);
   //  scmhaConfiguration.setRaftLogPurgeEnabled(true);
   //  scmhaConfiguration.setRaftLogPurgeGap(LOG_PURGE_GAP);
     scmhaConfiguration.setRatisSnapshotThreshold(SNAPSHOT_THRESHOLD);
@@ -123,8 +123,8 @@ public class TestSCMInstallSnapshotWithHA {
    *
    * TODO: Fix this
    * */
-  @Ignore
   @Test
+  @Disabled
   public void testInstallSnapshot() throws Exception {
     // Get the leader SCM
     StorageContainerManager leaderSCM = getLeader(cluster);
@@ -250,6 +250,7 @@ public class TestSCMInstallSnapshotWithHA {
         .getTrxnInfoFromCheckpoint(conf, leaderCheckpointLocation,
             new SCMDBDefinition());
 
+    Assert.assertNotNull(leaderCheckpointLocation);
     // Corrupt the leader checkpoint and install that on the follower. The
     // operation should fail and  should shutdown.
     boolean delete = true;

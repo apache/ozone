@@ -178,8 +178,8 @@ public class SCMStateMachine extends BaseStateMachine {
 
     String leaderNodeId = RaftPeerId.valueOf(roleInfoProto.getFollowerInfo()
         .getLeaderInfo().getId().getId()).toString();
-    LOG.info("Received install snapshot notification from SCM leader: {} with " +
-        "term index: {}", leaderNodeId, firstTermIndexInLog);
+    LOG.info("Received install snapshot notification from SCM leader: {} with "
+        + "term index: {}", leaderNodeId, firstTermIndexInLog);
 
     CompletableFuture<TermIndex> future = CompletableFuture.supplyAsync(
         () -> scm.getScmHAManager().installSnapshotFromLeader(leaderNodeId),

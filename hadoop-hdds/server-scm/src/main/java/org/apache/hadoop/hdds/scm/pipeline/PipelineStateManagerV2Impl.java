@@ -327,14 +327,14 @@ public class PipelineStateManagerV2Impl implements StateManager {
   }
 
   @Override
-  public void reinitialize(Table<PipelineID, Pipeline> pipelineStore)
+  public void reinitialize(Table<PipelineID, Pipeline> store)
       throws IOException {
     lock.writeLock().lock();
     try {
       pipelineStore.close();
       this.pipelineStateMap = null;
       this.pipelineStateMap = new PipelineStateMap();
-      this.pipelineStore = pipelineStore;;
+      this.pipelineStore = store;;
       initialize();
     } catch (Exception ex) {
       LOG.error("PipelineManager reinitialization close failed", ex);
@@ -345,7 +345,6 @@ public class PipelineStateManagerV2Impl implements StateManager {
   }
 
   // legacy interfaces end
-
   public static Builder newBuilder() {
     return new Builder();
   }

@@ -130,7 +130,7 @@ public class ContainerStateMap {
    *
    * Replica Map won't be rebuild but will remain as it is.
    */
-   private void loadFromDB(final ContainerInfo info) throws SCMException {
+  private void loadFromDB(final ContainerInfo info) throws SCMException {
     final ContainerID id = info.containerID();
     containerMap.put(id, info);
     lifeCycleStateMap.insert(info.getState(), id);
