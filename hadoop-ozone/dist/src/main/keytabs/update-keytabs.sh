@@ -58,13 +58,16 @@ if [ "$1" == "internal" ]; then
 
    export_keytab hadoop/rm hadoop
 
+   export_keytab rm/rm rm
+   export_keytab nm/nm nm
+   export_keytab jhs/jhs jhs
+
+
+
    chmod 755 /etc/security/keytabs/*.keytab
    chown 1000. /etc/security/keytabs/*.keytab
    exit 0
 fi
-
-rm -rf "$SCRIPT_DIR/keytabs" || true
-mkdir -p "$SCRIPT_DIR/keytabs"
 
 TESTKRB5_IMAGE=$(mvn -f "$SCRIPT_DIR"/../../../pom.xml help:evaluate -Dexpression=docker.ozone-testkr5b.image -q -DforceStdout)
 
