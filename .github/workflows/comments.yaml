@@ -25,7 +25,9 @@ jobs:
     name: check-comment
     runs-on: ubuntu-18.04
     steps:
-      - uses: actions/checkout@v2
-      - run: ./.github/process-comment.sh
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Execute process-comment script
+        run: ./.github/process-comment.sh
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
