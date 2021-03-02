@@ -67,6 +67,8 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_T
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_RETRY_COUNT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_RETRY_COUNT_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_RETRY_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_RETRY_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdds.server.ServerUtils.sanitizeUserArgs;
@@ -337,6 +339,18 @@ public final class HddsServerUtil {
   public static int getScmRpcRetryCount(ConfigurationSource conf) {
     return conf.getInt(OZONE_SCM_HEARTBEAT_RPC_RETRY_COUNT,
         OZONE_SCM_HEARTBEAT_RPC_RETRY_COUNT_DEFAULT);
+  }
+
+  /**
+   * Fixed datanode rpc retry interval, which is used by datanode to connect
+   * the SCM.
+   *
+   * @param conf - Ozone Config
+   * @return - Rpc retry interval.
+   */
+  public static long getScmRpcRetryInterval(ConfigurationSource conf) {
+    return conf.getTimeDuration(OZONE_SCM_HEARTBEAT_RPC_RETRY_INTERVAL,
+        OZONE_SCM_HEARTBEAT_RPC_RETRY_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
   }
 
   /**

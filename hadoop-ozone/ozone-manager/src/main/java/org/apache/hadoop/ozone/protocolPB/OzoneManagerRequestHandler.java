@@ -191,8 +191,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         responseBuilder.setDbUpdatesResponse(dbUpdatesResponse);
         break;
       case GetFileStatus:
-        GetFileStatusResponse getFileStatusResponse =
-            getOzoneFileStatus(request.getGetFileStatusRequest());
+        GetFileStatusResponse getFileStatusResponse = getOzoneFileStatus(
+            request.getGetFileStatusRequest(), request.getVersion());
         responseBuilder.setGetFileStatusResponse(getFileStatusResponse);
         break;
       case LookupFile:
@@ -202,7 +202,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         break;
       case ListStatus:
         ListStatusResponse listStatusResponse =
-            listStatus(request.getListStatusRequest());
+            listStatus(request.getListStatusRequest(), request.getVersion());
         responseBuilder.setListStatusResponse(listStatusResponse);
         break;
       case GetAcl:
@@ -555,7 +555,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   private GetFileStatusResponse getOzoneFileStatus(
-      GetFileStatusRequest request) throws IOException {
+      GetFileStatusRequest request, int clientVersion) throws IOException {
     KeyArgs keyArgs = request.getKeyArgs();
     OmKeyArgs omKeyArgs = new OmKeyArgs.Builder()
         .setVolumeName(keyArgs.getVolumeName())
@@ -565,7 +565,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .build();
 
     GetFileStatusResponse.Builder rb = GetFileStatusResponse.newBuilder();
-    rb.setStatus(impl.getFileStatus(omKeyArgs).getProtobuf());
+    rb.setStatus(impl.getFileStatus(omKeyArgs).getProtobuf(clientVersion));
 
     return rb.build();
   }
@@ -586,7 +586,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   private ListStatusResponse listStatus(
-      ListStatusRequest request) throws IOException {
+      ListStatusRequest request, int clientVersion) throws IOException {
     KeyArgs keyArgs = request.getKeyArgs();
     OmKeyArgs omKeyArgs = new OmKeyArgs.Builder()
         .setVolumeName(keyArgs.getVolumeName())
@@ -601,7 +601,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         listStatusResponseBuilder =
         ListStatusResponse.newBuilder();
     for (OzoneFileStatus status : statuses) {
-      listStatusResponseBuilder.addStatuses(status.getProtobuf());
+      listStatusResponseBuilder.addStatuses(status.getProtobuf(clientVersion));
     }
     return listStatusResponseBuilder.build();
   }

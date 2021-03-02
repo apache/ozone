@@ -157,6 +157,12 @@ message NodePool {
     repeated Node nodes = 1;
 }
 
+message DatanodeUsageInfo {
+    optional int64 capacity = 1;
+    optional int64 used = 2;
+    optional int64 remaining = 3;
+}
+
 /**
  * LifeCycleState for SCM object creation state machine:
  *    ->Allocated: allocated on SCM but client has not started creating it yet.
@@ -297,5 +303,13 @@ message UpgradeFinalizationStatus {
     }
     required Status status = 1;
     repeated string messages = 2;
+}
+
+/**
+ * Information for Certificate Revocation List.
+ */
+message CRLInfoProto {
+    required string x509CRL = 1;
+    required uint64 creationTimestamp = 2;
 }
 

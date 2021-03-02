@@ -335,6 +335,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   // execution, we can get from ozoneManager.
   private long maxUserVolumeCount;
 
+  private int minMultipartUploadPartSize = OzoneConsts.OM_MULTIPART_MIN_SIZE;
+
   private final ScmClient scmClient;
   private final long scmBlockSize;
   private final int preallocateBlocksMax;
@@ -3880,5 +3882,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       // Make sure OM prepare state is clean before proceeding.
       prepareState.cancelPrepare();
     }
+  }
+
+  public int getMinMultipartUploadPartSize() {
+    return minMultipartUploadPartSize;
+  }
+
+  @VisibleForTesting
+  public void setMinMultipartUploadPartSize(int partSizeForTest) {
+    this.minMultipartUploadPartSize = partSizeForTest;
   }
 }
