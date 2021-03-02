@@ -35,6 +35,11 @@ public class SCMSecurityException extends IOException {
     this.errorCode = ErrorCode.DEFAULT;
   }
 
+  public SCMSecurityException(String message, ErrorCode errorCode) {
+    super(message);
+    this.errorCode = errorCode;
+  }
+
   /**
    * Ctor.
    * @param message - Message.
@@ -45,12 +50,17 @@ public class SCMSecurityException extends IOException {
     this.errorCode = ErrorCode.DEFAULT;
   }
 
+  public SCMSecurityException(String message, Throwable cause, ErrorCode errorCode) {
+    super(message, cause);
+    this.errorCode = errorCode;
+  }
+
   /**
    * Ctor.
    * @param message - Message.
    * @param error   - error code.
    */
-  public SCMSecurityException(String message, ErrorCode error) {
+  public SCMSecurityException(Exception message, ErrorCode error) {
     super(message);
     this.errorCode = error;
   }
@@ -72,6 +82,17 @@ public class SCMSecurityException extends IOException {
    * Error codes to make it easy to decode these exceptions.
    */
   public enum ErrorCode {
+    OK,
+    INVALID_CSR,
+    UNABLE_TO_ISSUE_CERTIFICATE,
+    GET_DN_CERTIFICATE_FAILED,
+    GET_OM_CERTIFICATE_FAILED,
+    GET_SCM_CERTIFICATE_FAILED,
+    GET_CERTIFICATE_FAILED,
+    GET_CA_CERT_FAILED,
+    CERTIFICATE_NOT_FOUND,
+    PEM_ENCODE_FAILED,
+    INTERNAL_ERROR,
     DEFAULT,
     MISSING_BLOCK_TOKEN,
     BLOCK_TOKEN_VERIFICATION_FAILED

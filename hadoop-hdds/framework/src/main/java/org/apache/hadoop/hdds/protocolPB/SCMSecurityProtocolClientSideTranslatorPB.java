@@ -38,10 +38,9 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecuri
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityRequest.Builder;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityResponse;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.Type;
-import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos;
-import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolPB;
-import org.apache.hadoop.hdds.scm.proxy.SCMBlockLocationFailoverProxyProvider;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.proxy.SCMSecurityFailoverProxyProvider;
+import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.io.retry.RetryProxy;
 import org.apache.hadoop.ipc.ProtobufHelper;
@@ -97,12 +96,23 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
 
       response = rpcProxy.submitRequest(NULL_RPC_CONTROLLER, wrapper);
 
+      handleError(response);
+
     } catch (ServiceException ex) {
       throw ProtobufHelper.getRemoteException(ex);
     }
     return response;
   }
 
+
+  private SCMSecurityResponse handleError(SCMSecurityResponse resp)
+      throws SCMSecurityException {
+    if (resp.getStatus() != SCMSecurityProtocolProtos.Status.OK) {
+      throw new SCMSecurityException(resp.getMessage(),
+          SCMSecurityException.ErrorCode.values()[resp.getStatus().ordinal()]);
+    }
+    return resp;
+  }
   /**
    * Closes this stream and releases any system resources associated
    * with it. If the stream is already closed then invoking this
