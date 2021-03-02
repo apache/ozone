@@ -178,4 +178,10 @@ public interface ContainerManagerV2 extends Closeable {
    */
   void deleteContainer(ContainerID containerID)
       throws IOException;
+
+  /**
+   * Returns the list of containersIDs.
+   * @return list of containerIDs
+   */
+  Set<ContainerID> getContainerIDs();
 }
