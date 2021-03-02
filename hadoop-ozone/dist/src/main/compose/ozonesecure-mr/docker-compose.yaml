@@ -34,6 +34,7 @@ services:
     env_file:
       - ./docker-config
     volumes:
+      - ./krb5.conf:/etc/krb5.conf
       - ../../libexec/transformation.py:/opt/transformation.py
     command: ["hadoop", "kms"]
   datanode:
