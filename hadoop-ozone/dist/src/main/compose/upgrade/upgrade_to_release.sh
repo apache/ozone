@@ -15,33 +15,37 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script tests upgrade from one release to a later one.  Docker
+# image with Ozone binaries are required for both versions.
+
+set -e -o pipefail
+
 COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
 
 : "${OZONE_REPLICATION_FACTOR:=3}"
+: "${OZONE_UPGRADE_FROM:="0.5.0"}"
+: "${OZONE_UPGRADE_TO:="1.0.0"}"
 : "${OZONE_VOLUME:="${COMPOSE_DIR}/data"}"
 
-export OZONE_VOLUME
+export OZONE_REPLICATION_FACTOR OZONE_UPGRADE_FROM OZONE_UPGRADE_TO OZONE_VOLUME
 
-# shellcheck source=/dev/null
-source "${COMPOSE_DIR}/../testlib.sh"
+source "${COMPOSE_DIR}/testlib.sh"
 
-mkdir -p "${OZONE_VOLUME}"/{dn1,dn2,dn3,om,recon,s3g,scm}
-fix_data_dir_permissions
+create_data_dir
 
-# prepare pre-upgrade cluster
-start_docker_env
-execute_robot_test scm -v PREFIX:pre freon/generate.robot
-execute_robot_test scm -v PREFIX:pre freon/validate.robot
-KEEP_RUNNING=false stop_docker_env
+prepare_for_binary_image "${OZONE_UPGRADE_FROM}"
+load_version_specifics "${OZONE_UPGRADE_FROM}"
+first_run
+unload_version_specifics
 
-# re-start cluster with new version and check after upgrade
-export OZONE_KEEP_RESULTS=true
-start_docker_env
-execute_robot_test scm -v PREFIX:pre freon/validate.robot
-# test write key to old bucket after upgrade
-execute_robot_test scm -v PREFIX:post freon/generate.robot
-execute_robot_test scm -v PREFIX:post freon/validate.robot
-stop_docker_env
+from=$(get_logical_version "${OZONE_UPGRADE_FROM}")
+to=$(get_logical_version "${OZONE_UPGRADE_TO}")
+execute_upgrade_steps "$from" "$to"
+
+prepare_for_binary_image "${OZONE_UPGRADE_TO}"
+load_version_specifics "${OZONE_UPGRADE_TO}"
+second_run
+unload_version_specifics
 
 generate_report
