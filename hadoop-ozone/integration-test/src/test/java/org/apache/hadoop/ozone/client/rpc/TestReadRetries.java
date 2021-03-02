@@ -53,6 +53,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 
 import org.junit.After;
@@ -212,7 +213,6 @@ public class TestReadRetries {
     readKey(bucket, keyName, value);
 
     // read intermediate directory
-    verifyIntermediateDir(bucket, "a/b/c/");
     verifyIntermediateDir(bucket, "a/b/c");
 
     // shutdown the second datanode
@@ -239,7 +239,9 @@ public class TestReadRetries {
 
   private void verifyIntermediateDir(OzoneBucket bucket, String dir)
       throws IOException {
-    Assert.assertTrue(bucket.getFileStatus(dir).isDirectory());
+    OzoneFileStatus fileStatus = bucket.getFileStatus(dir);
+    Assert.assertTrue(fileStatus.isDirectory());
+    Assert.assertEquals(dir, fileStatus.getTrimmedName());
   }
 
   private void readKey(OzoneBucket bucket, String keyName, String data)
