@@ -14,25 +14,17 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-SCRIPT_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )
-ALL_RESULT_DIR="$SCRIPT_DIR/result"
-mkdir -p "$ALL_RESULT_DIR"
-rm "$ALL_RESULT_DIR"/* || true
-source "$SCRIPT_DIR/../testlib.sh"
 
-tests=$(find_tests)
-cd "$SCRIPT_DIR"
+ozone_logical_version() {
+  echo 2
+}
 
-RESULT=0
-# shellcheck disable=SC2044
-for t in ${tests}; do
-  d="$(dirname "${t}")"
+ozone_version_load() {
+  export OZONE_ADMIN_COMMAND=admin
+  export OZONE_SAFEMODE_STATUS_COMMAND='ozone admin safemode status --verbose'
+}
 
-  if ! run_test_script "${d}"; then
-    RESULT=1
-  fi
-
-  copy_results "${d}" "${ALL_RESULT_DIR}"
-done
-
-exit ${RESULT}
+ozone_version_unload() {
+  unset OZONE_ADMIN_COMMAND
+  unset OZONE_SAFEMODE_STATUS_COMMAND
+}
