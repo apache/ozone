@@ -18,5 +18,3 @@
 
 cd /tmp
 curl -LSs https://repo.maven.apache.org/maven2/com/github/spotbugs/spotbugs/3.1.12/spotbugs-3.1.12.tgz | tar xzf -
-cd spotbugs-3.1.12
-sudo cp -v bin/{convertXmlToText,fbwrap,unionBugs} /usr/local/bin/
