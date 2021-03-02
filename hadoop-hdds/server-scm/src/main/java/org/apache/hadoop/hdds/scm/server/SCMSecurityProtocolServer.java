@@ -91,7 +91,8 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
     BlockingService secureProtoPbService =
         SCMSecurityProtocolProtos.SCMSecurityProtocolService
             .newReflectiveBlockingService(
-                new SCMSecurityProtocolServerSideTranslatorPB(this, metrics));
+                new SCMSecurityProtocolServerSideTranslatorPB(this,
+                    scm, metrics));
     this.rpcServer =
         StorageContainerManager.startRpcServer(
             conf,

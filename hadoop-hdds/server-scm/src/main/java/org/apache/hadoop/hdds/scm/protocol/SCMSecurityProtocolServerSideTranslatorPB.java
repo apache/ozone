@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecuri
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityResponse;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.Status;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolPB;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 
@@ -54,14 +55,17 @@ public class SCMSecurityProtocolServerSideTranslatorPB
       LoggerFactory.getLogger(SCMSecurityProtocolServerSideTranslatorPB.class);
 
   private final SCMSecurityProtocol impl;
+  private final StorageContainerManager scm;
 
   private OzoneProtocolMessageDispatcher<SCMSecurityRequest,
       SCMSecurityResponse, ProtocolMessageEnum>
       dispatcher;
 
   public SCMSecurityProtocolServerSideTranslatorPB(SCMSecurityProtocol impl,
+      StorageContainerManager storageContainerManager,
       ProtocolMessageMetrics messageMetrics) {
     this.impl = impl;
+    this.scm = storageContainerManager;
     this.dispatcher =
         new OzoneProtocolMessageDispatcher<>("ScmSecurityProtocol",
             messageMetrics, LOG);
@@ -70,6 +74,11 @@ public class SCMSecurityProtocolServerSideTranslatorPB
   @Override
   public SCMSecurityResponse submitRequest(RpcController controller,
       SCMSecurityRequest request) throws ServiceException {
+    if (!scm.checkLeader()) {
+      throw new ServiceException(scm.getScmHAManager()
+          .getRatisServer()
+          .triggerNotLeaderException());
+    }
     return dispatcher.processRequest(request, this::processRequest,
         request.getCmdType(), request.getTraceID());
   }
