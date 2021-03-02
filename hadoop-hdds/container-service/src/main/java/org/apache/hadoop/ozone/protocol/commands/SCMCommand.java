@@ -59,6 +59,7 @@ public abstract class SCMCommand<T extends GeneratedMessage> implements
    * Gets the commandId of this object.
    * @return uuid.
    */
+  @Override
   public long getId() {
     return id;
   }

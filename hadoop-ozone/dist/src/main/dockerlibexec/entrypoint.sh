@@ -102,7 +102,7 @@ CONF_DESTINATION_DIR="${HADOOP_CONF_DIR:-/opt/hadoop/etc/hadoop}"
 #Try to copy the defaults
 set +e
 if [[ -d "/opt/ozone/etc/hadoop" ]]; then
-   cp /opt/hadoop/etc/hadoop/* "$CONF_DESTINATION_DIR/" > /dev/null 2>&1
+   cp /opt/ozone/etc/hadoop/* "$CONF_DESTINATION_DIR/" > /dev/null 2>&1
 elif [[ -d "/opt/hadoop/etc/hadoop" ]]; then
    cp /opt/hadoop/etc/hadoop/* "$CONF_DESTINATION_DIR/" > /dev/null 2>&1
 fi

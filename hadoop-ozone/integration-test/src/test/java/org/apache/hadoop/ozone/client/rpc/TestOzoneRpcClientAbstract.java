@@ -89,6 +89,7 @@ import org.apache.hadoop.ozone.om.ha.OMProxyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
@@ -3072,7 +3073,6 @@ public abstract class TestOzoneRpcClientAbstract {
     return chars;
   }
 
-
   private void doMultipartUpload(OzoneBucket bucket, String keyName, byte val)
       throws Exception {
     // Initiate Multipart upload request
@@ -3101,10 +3101,8 @@ public abstract class TestOzoneRpcClientAbstract {
     partsMap.put(3, partName);
     length += part3.getBytes(UTF_8).length;
 
-
     // Complete multipart upload request
     completeMultipartUpload(bucket, keyName, uploadID, partsMap);
-
 
     //Now Read the key which has been completed multipart upload.
     byte[] fileContent = new byte[data.length + data.length + part3.getBytes(
@@ -3125,8 +3123,19 @@ public abstract class TestOzoneRpcClientAbstract {
     sb.append(part2);
     sb.append(part3);
     Assert.assertEquals(sb.toString(), new String(fileContent, UTF_8));
-  }
 
+    String ozoneKey = ozoneManager.getMetadataManager()
+        .getOzoneKey(bucket.getVolumeName(), bucket.getName(), keyName);
+    OmKeyInfo omKeyInfo = ozoneManager.getMetadataManager().getKeyTable()
+        .get(ozoneKey);
+
+    OmKeyLocationInfoGroup latestVersionLocations =
+        omKeyInfo.getLatestVersionLocations();
+    Assert.assertEquals(true, latestVersionLocations.isMultipartKey());
+    latestVersionLocations.getBlocksLatestVersionOnly()
+        .forEach(omKeyLocationInfo ->
+            Assert.assertTrue(omKeyLocationInfo.getPartNumber() != -1));
+  }
 
   private String initiateMultipartUpload(OzoneBucket bucket, String keyName,
       ReplicationType replicationType, ReplicationFactor replicationFactor)

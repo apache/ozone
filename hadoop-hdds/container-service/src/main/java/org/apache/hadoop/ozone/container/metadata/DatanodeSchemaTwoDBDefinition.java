@@ -70,7 +70,7 @@ public class DatanodeSchemaTwoDBDefinition extends
           StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction.class,
           new DeletedBlocksTransactionCodec());
 
-  protected DatanodeSchemaTwoDBDefinition(String dbPath) {
+  public DatanodeSchemaTwoDBDefinition(String dbPath) {
     super(dbPath);
   }
 

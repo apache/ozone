@@ -170,6 +170,7 @@ public class TestStorageContainerManagerStarter {
     private boolean generateCalled = false;
     private String clusterId = null;
 
+    @Override
     public void start(OzoneConfiguration conf) throws Exception {
       if (throwOnStart) {
         throw new Exception("Simulated error on start");
@@ -177,6 +178,7 @@ public class TestStorageContainerManagerStarter {
       startCalled = true;
     }
 
+    @Override
     public boolean init(OzoneConfiguration conf, String cid)
         throws IOException {
       if (throwOnInit) {
@@ -187,6 +189,7 @@ public class TestStorageContainerManagerStarter {
       return initStatus;
     }
 
+    @Override
     public boolean bootStrap(OzoneConfiguration conf)
         throws IOException {
       if (throwOnBootstrap) {
@@ -195,6 +198,8 @@ public class TestStorageContainerManagerStarter {
       bootStrapCalled = true;
       return initStatus;
     }
+
+    @Override
     public String generateClusterId() {
       generateCalled = true;
       return "static-cluster-id";

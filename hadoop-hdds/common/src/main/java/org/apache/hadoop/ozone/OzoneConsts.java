@@ -232,6 +232,8 @@ public final class OzoneConsts {
   // instance gets stored.
   public static final String OM_CONTEXT_ATTRIBUTE = "ozone.om";
 
+  public static final String SCM_CONTEXT_ATTRIBUTE = "ozone.scm";
+
   private OzoneConsts() {
     // Never Constructed
   }
@@ -410,4 +412,7 @@ public final class OzoneConsts {
   // in non-HA style.
   public static final String SCM_DUMMY_NODEID = "scmNodeId";
   public static final String SCM_DUMMY_SERVICE_ID = "scmServiceId";
+
+  // CRL Sequence Id
+  public static final String CRL_SEQUENCE_ID_KEY = "CRL_SEQUENCE_ID";
 }
