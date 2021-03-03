@@ -36,7 +36,7 @@ public class SCMSecurityException extends IOException {
   }
 
   /**
-   * Ctor
+   * Ctor.
    * @param message - Error Message
    * @param errorCode - Error code
    */

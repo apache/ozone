@@ -38,7 +38,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.security.AccessControlException;
-import org.apache.hadoop.security.token.SecretManager;
 
 import java.io.File;
 import java.io.IOException;
@@ -292,6 +291,9 @@ public final class HAUtils {
 
   /**
    * Unwrap exception to check if it is some kind of access control problem
+=======
+   * Unwrap exception to check if it is some kind of access control problem.
+>>>>>>> fix cs
    * ({@link AccessControlException}
    */
   public static boolean isAccessControlException(Exception ex) {

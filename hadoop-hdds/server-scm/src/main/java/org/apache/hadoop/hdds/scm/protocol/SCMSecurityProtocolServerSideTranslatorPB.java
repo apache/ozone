@@ -109,8 +109,8 @@ public class SCMSecurityProtocolServerSideTranslatorPB
             listCertificate(request.getListCertificateRequest()))
             .build();
       case GetSCMCertificate:
-       return scmSecurityResponse.setGetCertResponseProto(getSCMCertificate(
-           request.getGetSCMCertificateRequest())).build();
+        return scmSecurityResponse.setGetCertResponseProto(getSCMCertificate(
+            request.getGetSCMCertificateRequest())).build();
       default:
         throw new IllegalArgumentException(
             "Unknown request type: " + request.getCmdType());
@@ -138,12 +138,12 @@ public class SCMSecurityProtocolServerSideTranslatorPB
    * @param ex
    * @return SCMSecurityProtocolProtos.Status code of the error.
    */
-  private SCMSecurityProtocolProtos.Status exceptionToResponseStatus(IOException ex) {
+  private Status exceptionToResponseStatus(IOException ex) {
     if (ex instanceof SCMSecurityException) {
-      return SCMSecurityProtocolProtos.Status.values()[
+      return Status.values()[
           ((SCMSecurityException) ex).getErrorCode().ordinal()];
     } else {
-      return SCMSecurityProtocolProtos.Status.INTERNAL_ERROR;
+      return Status.INTERNAL_ERROR;
     }
   }
 

@@ -433,7 +433,8 @@ public final class HddsServerUtil {
   public static SCMSecurityProtocolClientSideTranslatorPB getScmSecurityClient(
       OzoneConfiguration conf) throws IOException {
     return new SCMSecurityProtocolClientSideTranslatorPB(
-        new SCMSecurityProtocolFailoverProxyProvider(conf, UserGroupInformation.getCurrentUser()));
+        new SCMSecurityProtocolFailoverProxyProvider(conf,
+            UserGroupInformation.getCurrentUser()));
   }
 
 

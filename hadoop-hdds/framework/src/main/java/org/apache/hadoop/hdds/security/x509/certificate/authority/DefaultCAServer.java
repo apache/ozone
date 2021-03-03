@@ -255,7 +255,8 @@ public class DefaultCAServer implements CertificateServer {
       }
     } catch (CertificateException | IOException | OperatorCreationException e) {
       LOG.error("Unable to issue a certificate.", e);
-      xcertHolder.completeExceptionally(new SCMSecurityException(e, UNABLE_TO_ISSUE_CERTIFICATE));
+      xcertHolder.completeExceptionally(
+          new SCMSecurityException(e, UNABLE_TO_ISSUE_CERTIFICATE));
     }
     return xcertHolder;
   }
