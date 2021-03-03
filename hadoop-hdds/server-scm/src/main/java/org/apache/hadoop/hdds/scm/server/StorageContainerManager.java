@@ -64,6 +64,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.ScmInfo;
+import org.apache.hadoop.hdds.utils.HASecurityUtils;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.scm.ScmConfig;
@@ -776,10 +777,15 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         // It will write down the cluster Id fetched from already
         // running SCM as well as the local SCM Id.
 
-        // SCM Node info containing hostname to scm Id mappings
-        // will be persisted into the version file once this node gets added
-        // to existing SCM ring post node regular start up.
         scmStorageConfig.initialize();
+
+        if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
+          HASecurityUtils.initializeSecurity(fetchedId,
+              scmInfo.getScmId(), conf,
+              scmhaNodeDetails.getLocalNodeDetails()
+                  .getBlockProtocolServerAddress());
+        }
+
       } catch (IOException ioe) {
         LOG.error("Could not initialize SCM version file", ioe);
         return false;
@@ -817,12 +823,19 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           Preconditions.checkNotNull(UUID.fromString(clusterId));
           scmStorageConfig.setClusterId(clusterId);
         }
-        scmStorageConfig.initialize();
+
         if (SCMHAUtils.isSCMHAEnabled(conf)) {
           SCMRatisServerImpl.initialize(scmStorageConfig.getClusterID(),
               scmStorageConfig.getScmId(), haDetails.getLocalNodeDetails(),
               conf);
         }
+
+        if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
+          HASecurityUtils.initializeSecurity(scmStorageConfig.getClusterID(),
+              scmStorageConfig.getScmId(), conf,
+              haDetails.getLocalNodeDetails().getBlockProtocolServerAddress());
+        }
+        scmStorageConfig.initialize();
         LOG.info("SCM initialization succeeded. Current cluster id for sd={}"
                 + "; cid={}; layoutVersion={}; scmId={}",
             scmStorageConfig.getStorageDir(), scmStorageConfig.getClusterID(),
