@@ -86,7 +86,7 @@ public class SCMSecurityProtocolFailoverProxyProvider implements
   public SCMSecurityProtocolFailoverProxyProvider(ConfigurationSource conf,
       UserGroupInformation userGroupInformation) {
     Preconditions.checkNotNull(userGroupInformation);
-    this.ugi = userGroupInformation ;
+    this.ugi = userGroupInformation;
     this.conf = conf;
     this.scmVersion = RPC.getProtocolVersion(SCMSecurityProtocolPB.class);
 
