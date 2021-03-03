@@ -126,9 +126,9 @@ public class SCMSecurityProtocolFailoverProxyProvider implements
 
   @Override
   public ProxyInfo<SCMSecurityProtocolPB> getProxy() {
-    ProxyInfo currentProxyInfo = scmProxies.get(currentProxySCMNodeId);
+    ProxyInfo currentProxyInfo = scmProxies.get(getCurrentProxySCMNodeId());
     if (currentProxyInfo == null) {
-      currentProxyInfo = createSCMProxy(currentProxySCMNodeId);
+      currentProxyInfo = createSCMProxy(getCurrentProxySCMNodeId());
     }
     return currentProxyInfo;
   }
