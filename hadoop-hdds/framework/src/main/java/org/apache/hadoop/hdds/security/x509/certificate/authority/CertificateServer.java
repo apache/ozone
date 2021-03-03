@@ -131,7 +131,11 @@ public interface CertificateServer {
   List<X509Certificate> listCertificate(NodeType role,
       long startSerialId, int count, boolean isRevoked) throws IOException;
 
-
+  /**
+   * Reinitialise the certificate server withe the SCMMetastore during SCM
+   * state reload post install db checkpoint.
+   * @param scmMetadataStore
+   */
   void reinitialize(SCMMetadataStore scmMetadataStore);
 
   /**

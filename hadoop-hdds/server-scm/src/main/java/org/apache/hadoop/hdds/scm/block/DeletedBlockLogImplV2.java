@@ -301,6 +301,8 @@ public class DeletedBlockLogImplV2
   @Override
   public void reinitialize(
       Table<Long, DeletedBlocksTransaction> deletedTable) {
+    // we don't need handle transactionToDNsCommitMap and
+    // deletedBlockLogStateManager, since they will be cleared when becoming leader.
     this.deletedBlocksTXTable = deletedTable;
     deletedBlockLogStateManager.reinitialize(deletedBlocksTXTable);
   }

@@ -128,7 +128,7 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
     try {
       containerStateManager.reinitialize(containerStore);
     } catch (IOException ioe) {
-      LOG.error("Failed to reinitialize container Manager", ioe);
+      LOG.error("Failed to reinitialize containerManager", ioe);
       throw ioe;
     } finally {
       lock.unlock();

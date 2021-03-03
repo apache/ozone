@@ -41,6 +41,11 @@ import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionExcepti
 public interface ContainerManagerV2 extends Closeable {
   // TODO: Rename this to ContainerManager
 
+  /**
+   * Reinitialize the containerManager with the updated container store.
+   * @param containerStore Container Table
+   * @throws IOException
+   */
   void reinitialize(Table<ContainerID, ContainerInfo> containerStore)
       throws IOException;
 

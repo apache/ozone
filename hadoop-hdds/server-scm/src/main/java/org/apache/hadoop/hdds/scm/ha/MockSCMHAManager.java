@@ -140,8 +140,8 @@ public final class MockSCMHAManager implements SCMHAManager {
     @Override
     public SCMRatisResponse submitRequest(final SCMRatisRequest request)
         throws IOException {
-      final RaftGroupMemberId raftId = RaftGroupMemberId
-          .valueOf(RaftPeerId.valueOf("peer"), RaftGroupId.randomId());
+      final RaftGroupMemberId raftId = RaftGroupMemberId.valueOf(
+          RaftPeerId.valueOf("peer"), RaftGroupId.randomId());
       RaftClientReply reply;
       if (isLeader()) {
         try {
@@ -193,29 +193,35 @@ public final class MockSCMHAManager implements SCMHAManager {
       }
     }
 
-    @Override public void stop() {
+    @Override
+    public void stop() {
     }
 
-    @Override public RaftServer.Division getDivision() {
+    @Override
+    public RaftServer.Division getDivision() {
       return null;
     }
 
-    @Override public List<String> getRatisRoles() {
+    @Override
+    public List<String> getRatisRoles() {
       return Arrays
           .asList("180.3.14.5:9865", "180.3.14.21:9865", "180.3.14.145:9865");
     }
 
-    @Override public NotLeaderException triggerNotLeaderException() {
+    @Override
+    public NotLeaderException triggerNotLeaderException() {
       return new NotLeaderException(RaftGroupMemberId
           .valueOf(RaftPeerId.valueOf("peer"), RaftGroupId.randomId()), null,
           new ArrayList<>());
     }
 
-    @Override public SCMStateMachine getSCMStateMachine() {
+    @Override
+    public SCMStateMachine getSCMStateMachine() {
       return null;
     }
 
-    @Override public boolean addSCM(AddSCMRequest request) throws IOException {
+    @Override
+    public boolean addSCM(AddSCMRequest request) throws IOException {
       return false;
     }
   }

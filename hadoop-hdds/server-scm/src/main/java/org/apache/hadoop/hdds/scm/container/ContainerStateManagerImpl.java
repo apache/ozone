@@ -504,7 +504,6 @@ public final class ContainerStateManagerImpl
     lock.writeLock().lock();
     try {
       close();
-      containers = null;
       this.containerStore = store;
       this.containers = new ContainerStateMap();
       this.lastUsedMap = new ConcurrentHashMap<>();

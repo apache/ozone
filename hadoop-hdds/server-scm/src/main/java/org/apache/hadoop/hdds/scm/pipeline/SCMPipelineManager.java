@@ -762,6 +762,7 @@ public class SCMPipelineManager implements
   @Override
   public void reinitialize(Table<PipelineID, Pipeline> store)
       throws IOException {
+    throw new RuntimeException("Not supported operation.");
   }
 
   public Table<PipelineID, Pipeline> getPipelineStore() {

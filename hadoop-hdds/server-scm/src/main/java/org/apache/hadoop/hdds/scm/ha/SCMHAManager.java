@@ -52,7 +52,19 @@ public interface SCMHAManager {
    */
   void shutdown() throws IOException;
 
+  /**
+   * Adds the SC M instance to the SCM HA group.
+   * @param request AddSCM request
+   * @return status signying whether the AddSCM request succeeded or not.
+   * @throws IOException
+   */
   boolean addSCM(AddSCMRequest request) throws IOException;
 
+  /**
+   * Download the SCM DB checkpoint from leader and reload the SCM state from
+   * it.
+   * @param leaderId leader id.
+   * @return
+   */
   TermIndex installSnapshotFromLeader(String leaderId);
 }

@@ -43,6 +43,4 @@ public interface DBTransactionBuffer extends Closeable {
   void flush() throws IOException;
 
   void init() throws IOException;
-
-  void close() throws IOException;
 }

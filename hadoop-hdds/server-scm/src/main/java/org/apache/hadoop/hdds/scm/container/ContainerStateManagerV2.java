@@ -174,6 +174,11 @@ public interface ContainerStateManagerV2 {
   void removeContainer(HddsProtos.ContainerID containerInfo)
       throws IOException;
 
+  /**
+   * Reinitialize the ContainerStateManager with container store.
+   * @param containerStore container table.
+   * @throws IOException
+   */
   void reinitialize(Table<ContainerID, ContainerInfo> containerStore)
       throws IOException;
 

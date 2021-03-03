@@ -209,8 +209,12 @@ public class DeletedBlockLogStateManagerImpl
   @Override
   public void reinitialize(
       Table<Long, DeletedBlocksTransaction> deletedBlocksTXTable) {
-    // Before Reinitilization, flush will be called from Ratis StateMachine.
+    // Before Reinitialization, flush will be called from Ratis StateMachine.
     // Just the DeletedDb will be loaded here.
+
+    // We don't need to handle transactionBuffer, deletingTxIDs
+    // and skippingRetryTxIDs here, since onFlush() will be called
+    // before reinitialization. Just update deletedTable here.
     Preconditions.checkArgument(deletingTxIDs.isEmpty());
     this.deletedTable = deletedBlocksTXTable;
   }

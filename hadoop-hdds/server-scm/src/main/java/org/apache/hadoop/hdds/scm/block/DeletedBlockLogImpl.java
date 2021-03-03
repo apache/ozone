@@ -345,7 +345,7 @@ public class DeletedBlockLogImpl
   @Override
   public void reinitialize(
       Table<Long, DeletedBlocksTransaction> deletedBlocksTXTable) {
-
+    throw new RuntimeException("Not supported operation.");
   }
 
   /**

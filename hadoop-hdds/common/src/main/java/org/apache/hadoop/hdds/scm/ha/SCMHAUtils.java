@@ -163,6 +163,4 @@ public final class SCMHAUtils {
     }
     return conf;
   }
-
-
 }

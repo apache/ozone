@@ -124,6 +124,10 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
    */
   boolean getSafeModeStatus();
 
+  /**
+   * Reinitialize the pipelineManager with the lastest pipeline store
+   * during SCM reload.
+   */
   void reinitialize(Table<PipelineID, Pipeline> pipelineStore)
       throws IOException;
 }

@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.utils;
 
 import org.apache.hadoop.hdds.utils.db.Table;
 
-
 /**
  * Interface defined for getting HA related specific info from DB for SCM and
  * OM.
