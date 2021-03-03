@@ -213,7 +213,7 @@ public class DefaultCAServer implements CertificateServer {
   @Override
   public Future<X509CertificateHolder> requestCertificate(
       PKCS10CertificationRequest csr,
-      CertificateApprover.ApprovalType approverType, NodeType nodeType) {
+      CertificateApprover.ApprovalType approverType, NodeType role) {
     LocalDate beginDate = LocalDate.now().atStartOfDay().toLocalDate();
     LocalDateTime temp = LocalDateTime.of(beginDate, LocalTime.MIDNIGHT);
     LocalDate endDate =
@@ -238,12 +238,12 @@ public class DefaultCAServer implements CertificateServer {
       case TESTING_AUTOMATIC:
         X509CertificateHolder xcert;
         try {
-          xcert = signAndStoreCertificate(beginDate, endDate, csr, nodeType);
+          xcert = signAndStoreCertificate(beginDate, endDate, csr, role);
         } catch (SCMSecurityException e) {
           // Certificate with conflicting serial id, retry again may resolve
           // this issue.
           LOG.error("Certificate storage failed, retrying one more time.", e);
-          xcert = signAndStoreCertificate(beginDate, endDate, csr, nodeType);
+          xcert = signAndStoreCertificate(beginDate, endDate, csr, role);
         }
 
         xcertHolder.complete(xcert);
@@ -259,24 +259,15 @@ public class DefaultCAServer implements CertificateServer {
   }
 
   private X509CertificateHolder signAndStoreCertificate(LocalDate beginDate,
-      LocalDate endDate, PKCS10CertificationRequest csr, NodeType nodeType)
+      LocalDate endDate, PKCS10CertificationRequest csr, NodeType role)
       throws IOException,
       OperatorCreationException, CertificateException {
     X509CertificateHolder xcert = approver.sign(config,
         getCAKeys().getPrivate(),
         getCACertificate(), java.sql.Date.valueOf(beginDate),
         java.sql.Date.valueOf(endDate), csr, scmID, clusterID);
-    if (nodeType.equals(NodeType.SCM)) {
-      // If the role is SCM, store certificate in scm cert table and valid cert
-      // table. This is to help to return scm certs during getCertificate call.
-      store.storeValidScmCertificate(xcert.getSerialNumber(),
-          CertificateCodec.getX509Certificate(xcert));
-    } else {
-      // As we don't have different table for other roles, other role
-      // certificates will go to validCertsTable.
-      store.storeValidCertificate(xcert.getSerialNumber(),
-          CertificateCodec.getX509Certificate(xcert));
-    }
+    store.storeValidCertificate(xcert.getSerialNumber(),
+        CertificateCodec.getX509Certificate(xcert), role);
     return xcert;
   }
 
@@ -313,15 +304,6 @@ public class DefaultCAServer implements CertificateServer {
     return revoked;
   }
 
-  /**
-   *
-   * @param role            - node type: OM/SCM/DN.
-   * @param startSerialId   - start cert serial id.
-   * @param count           - max number of certificates returned in a batch.
-   * @param isRevoked       - whether return revoked cert only.
-   * @return
-   * @throws IOException
-   */
   @Override
   public List<X509Certificate> listCertificate(NodeType role,
       long startSerialId, int count, boolean isRevoked) throws IOException {

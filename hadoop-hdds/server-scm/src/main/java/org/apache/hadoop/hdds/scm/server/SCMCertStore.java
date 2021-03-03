@@ -33,7 +33,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CRLApprover;
@@ -49,6 +50,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.OzoneConsts.CRL_SEQUENCE_ID_KEY;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.SCM;
+import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore.CertType.VALID_CERTS;
 
 /**
  * A Certificate Store class that persists certificates issued by SCM CA.
@@ -68,20 +71,34 @@ public class SCMCertStore implements CertificateStore {
 
   @Override
   public void storeValidCertificate(BigInteger serialID,
-                                    X509Certificate certificate)
+      X509Certificate certificate, NodeType role)
       throws IOException {
     lock.lock();
     try {
       // This makes sure that no certificate IDs are reusable.
       checkValidCertID(serialID);
-      scmMetadataStore.getValidCertsTable().put(serialID, certificate);
+      if (role == SCM) {
+        // If the role is SCM, store certificate in scm cert table
+        // and valid cert table. This is to help to return scm certs during
+        // getCertificate call.
+        storeValidScmCertificate(serialID, certificate);
+      } else {
+        // As we don't have different table for other roles, other role
+        // certificates will go to validCertsTable.
+        scmMetadataStore.getValidCertsTable().put(serialID, certificate);
+      }
     } finally {
       lock.unlock();
     }
   }
 
-  @Override
-  public void storeValidScmCertificate(BigInteger serialID,
+  /**
+   * Writes a new SCM certificate that was issued to the persistent store.
+   * @param serialID - Certificate Serial Number.
+   * @param certificate - Certificate to persist.
+   * @throws IOException - on Failure.
+   */
+  private void storeValidScmCertificate(BigInteger serialID,
       X509Certificate certificate) throws IOException {
     lock.lock();
     try {
@@ -99,7 +116,7 @@ public class SCMCertStore implements CertificateStore {
   }
 
   private void checkValidCertID(BigInteger serialID) throws IOException {
-    if ((getCertificateByID(serialID, CertType.VALID_CERTS) != null) ||
+    if ((getCertificateByID(serialID, VALID_CERTS) != null) ||
         (getCertificateByID(serialID, CertType.REVOKED_CERTS) != null)) {
       throw new SCMSecurityException("Conflicting certificate ID");
     }
@@ -187,7 +204,7 @@ public class SCMCertStore implements CertificateStore {
   public X509Certificate getCertificateByID(BigInteger serialID,
                                             CertType certType)
       throws IOException {
-    if (certType == CertType.VALID_CERTS) {
+    if (certType == VALID_CERTS) {
       return scmMetadataStore.getValidCertsTable().get(serialID);
     } else {
       return scmMetadataStore.getRevokedCertsTable().get(serialID);
@@ -195,32 +212,24 @@ public class SCMCertStore implements CertificateStore {
   }
 
   @Override
-  public List<X509Certificate> listCertificate(HddsProtos.NodeType role,
+  public List<X509Certificate> listCertificate(NodeType role,
       BigInteger startSerialID, int count, CertType certType)
       throws IOException {
-    // TODO: Filter by role
-    List<? extends Table.KeyValue<BigInteger, X509Certificate>> certs;
+
+    Preconditions.checkNotNull(startSerialID);
+
     if (startSerialID.longValue() == 0) {
       startSerialID = null;
     }
-    if (certType == CertType.VALID_CERTS) {
-      certs = scmMetadataStore.getValidCertsTable().getRangeKVs(
-          startSerialID, count);
-    } else {
-      certs = scmMetadataStore.getRevokedCertsTable().getRangeKVs(
-          startSerialID, count);
-    }
+
+    List<? extends Table.KeyValue<BigInteger, X509Certificate>> certs =
+        getCertTableList(role, certType, startSerialID, count);
+
     List<X509Certificate> results = new ArrayList<>(certs.size());
+
     for (Table.KeyValue<BigInteger, X509Certificate> kv : certs) {
       try {
         X509Certificate cert = kv.getValue();
-        // TODO: filter certificate based on CN and specified role.
-        // This requires change of the approved subject CN format:
-        // Subject: O=CID-e66d4728-32bb-4282-9770-351a7e913f07,
-        // OU=9a7c4f86-c862-4067-b12c-e7bca51d3dfe, CN=root@98dba189d5f0
-
-        // The new format will look like below that are easier to filter.
-        // CN=FQDN/user=root/role=datanode/...
         results.add(cert);
       } catch (IOException e) {
         LOG.error("Fail to list certificate from SCM metadata store", e);
@@ -229,5 +238,32 @@ public class SCMCertStore implements CertificateStore {
       }
     }
     return results;
+  }
+
+  private List<? extends Table.KeyValue<BigInteger, X509Certificate>>
+      getCertTableList(NodeType role, CertType certType,
+      BigInteger startSerialID, int count)
+      throws IOException {
+    // Implemented for role SCM and CertType VALID_CERTS.
+    // TODO: Implement for role OM/Datanode and for SCM for CertType
+    //  REVOKED_CERTS.
+
+    if (role == SCM) {
+      if (certType == VALID_CERTS) {
+        return scmMetadataStore.getValidSCMCertsTable().getRangeKVs(
+            startSerialID, count);
+      } else {
+        return scmMetadataStore.getRevokedCertsTable().getRangeKVs(
+            startSerialID, count);
+      }
+    } else {
+      if (certType == VALID_CERTS) {
+        return scmMetadataStore.getValidCertsTable().getRangeKVs(
+            startSerialID, count);
+      } else {
+        return scmMetadataStore.getRevokedCertsTable().getRangeKVs(
+            startSerialID, count);
+      }
+    }
   }
 }
