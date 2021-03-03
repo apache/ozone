@@ -554,6 +554,14 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     securityProtocolServer = new SCMSecurityProtocolServer(conf,
         certificateServer, this);
 
+    // For primary do this during SCM startup, as it requires SCM Security
+    // protocol server, Ratis Server and SCMMetadataStore setup.
+    if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
+      HASecurityUtils.initializeSecurity(scmStorageConfig.getClusterID(),
+          scmStorageConfig.getScmId(), conf,
+          scmHANodeDetails.getLocalNodeDetails().getBlockProtocolServerAddress());
+    }
+
     grpcTlsConfig = createTlsClientConfigForSCM(new SecurityConfig(conf),
             certificateServer);
   }
@@ -756,9 +764,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         scmStorageConfig.initialize();
 
         if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
-          HASecurityUtils.initializeSecurity(fetchedId,
-              scmInfo.getScmId(), conf,
-              scmhaNodeDetails.getLocalNodeDetails()
+          HASecurityUtils.initializeSecurity(scmStorageConfig.getClusterID(),
+              fetchedId, conf, scmhaNodeDetails.getLocalNodeDetails()
                   .getBlockProtocolServerAddress());
         }
 
@@ -806,12 +813,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
                 + "; cid={}; layoutVersion={}; scmId={}",
             scmStorageConfig.getStorageDir(), scmStorageConfig.getClusterID(),
             scmStorageConfig.getLayoutVersion(), scmStorageConfig.getScmId());
-
-        if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
-          HASecurityUtils.initializeSecurity(scmStorageConfig.getClusterID(),
-              scmStorageConfig.getScmId(), conf,
-              haDetails.getLocalNodeDetails().getBlockProtocolServerAddress());
-        }
         return true;
       } catch (IOException ioe) {
         LOG.error("Could not initialize SCM version file", ioe);
