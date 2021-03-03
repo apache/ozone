@@ -26,7 +26,7 @@ import org.junit.Test;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SEQUENCE_ID_BATCH_SIZE;
 
-public class TestSequenceIDGen {
+public class TestSequenceIDGenerator {
   @Test
   public void testSequenceIDGenUponNonRatis() throws Exception {
     OzoneConfiguration conf = SCMTestUtils.getConf();
@@ -34,7 +34,7 @@ public class TestSequenceIDGen {
     SCMMetadataStore scmMetadataStore = new SCMMetadataStoreImpl(conf);
     scmMetadataStore.start(conf);
 
-    SequenceIdGen sequenceIdGen = new SequenceIdGen(
+    SequenceIdGenerator sequenceIdGen = new SequenceIdGenerator(
         conf, null, scmMetadataStore.getSequenceIdTable());
 
     // the first batch is [1, 1000]
@@ -69,7 +69,7 @@ public class TestSequenceIDGen {
 
     SCMHAManager scmHAManager = MockSCMHAManager.getInstance(true);
 
-    SequenceIdGen sequenceIdGen = new SequenceIdGen(
+    SequenceIdGenerator sequenceIdGen = new SequenceIdGenerator(
         conf, scmHAManager, scmMetadataStore.getSequenceIdTable());
 
     // the first batch is [1, 100]

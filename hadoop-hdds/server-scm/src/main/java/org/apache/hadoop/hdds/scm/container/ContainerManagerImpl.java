@@ -44,7 +44,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.metrics.SCMContainerManagerMetrics;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
-import org.apache.hadoop.hdds.scm.ha.SequenceIdGen;
+import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -85,7 +85,7 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
   private final ContainerStateManagerV2 containerStateManager;
 
   private final SCMHAManager haManager;
-  private final SequenceIdGen sequenceIdGen;
+  private final SequenceIdGenerator sequenceIdGen;
 
   // TODO: Revisit this.
   // Metrics related to operations should be moved to ProtocolServer
@@ -100,7 +100,7 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
   public ContainerManagerImpl(
       final Configuration conf,
       final SCMHAManager scmHaManager,
-      final SequenceIdGen sequenceIdGen,
+      final SequenceIdGenerator sequenceIdGen,
       final PipelineManager pipelineManager,
       final Table<ContainerID, ContainerInfo> containerStore)
       throws IOException {

@@ -26,7 +26,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
-import org.apache.hadoop.hdds.scm.ha.SequenceIdGen;
+import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
@@ -50,7 +50,7 @@ public class TestContainerManagerImpl {
   private DBStore dbStore;
   private ContainerManagerV2 containerManager;
   private SCMHAManager scmhaManager;
-  private SequenceIdGen sequenceIdGen;
+  private SequenceIdGenerator sequenceIdGen;
 
   @Before
   public void setUp() throws Exception {
@@ -61,7 +61,7 @@ public class TestContainerManagerImpl {
     dbStore = DBStoreBuilder.createDBStore(
         conf, new SCMDBDefinition());
     scmhaManager = MockSCMHAManager.getInstance(true);
-    sequenceIdGen = new SequenceIdGen(
+    sequenceIdGen = new SequenceIdGenerator(
         conf, scmhaManager, SCMDBDefinition.SEQUENCE_ID.getTable(dbStore));
     final PipelineManager pipelineManager = MockPipelineManager.getInstance();
     pipelineManager.createPipeline(HddsProtos.ReplicationType.RATIS,

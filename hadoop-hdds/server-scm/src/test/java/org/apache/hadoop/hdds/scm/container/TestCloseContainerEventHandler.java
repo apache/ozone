@@ -33,7 +33,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMService.Event;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
-import org.apache.hadoop.hdds.scm.ha.SequenceIdGen;
+import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
 import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
@@ -69,7 +69,7 @@ public class TestCloseContainerEventHandler {
   private static SCMContext scmContext;
   private static SCMMetadataStore scmMetadataStore;
   private static SCMHAManager scmhaManager;
-  private static SequenceIdGen sequenceIdGen;
+  private static SequenceIdGenerator sequenceIdGen;
 
   @BeforeClass
   public static void setUp() throws Exception {
@@ -86,7 +86,7 @@ public class TestCloseContainerEventHandler {
     scmContext = SCMContext.emptyContext();
     scmMetadataStore = new SCMMetadataStoreImpl(configuration);
     scmhaManager = MockSCMHAManager.getInstance(true);
-    sequenceIdGen = new SequenceIdGen(
+    sequenceIdGen = new SequenceIdGenerator(
         configuration, scmhaManager, scmMetadataStore.getSequenceIdTable());
 
     SCMServiceManager serviceManager = new SCMServiceManager();

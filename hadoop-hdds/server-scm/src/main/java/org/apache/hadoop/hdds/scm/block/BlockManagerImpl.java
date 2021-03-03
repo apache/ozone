@@ -41,7 +41,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.hdds.scm.ha.SequenceIdGen;
+import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
@@ -78,7 +78,7 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
 
   private ObjectName mxBean;
   private final PipelineChoosePolicy pipelineChoosePolicy;
-  private final SequenceIdGen sequenceIdGen;
+  private final SequenceIdGenerator sequenceIdGen;
 
   /**
    * Constructor.

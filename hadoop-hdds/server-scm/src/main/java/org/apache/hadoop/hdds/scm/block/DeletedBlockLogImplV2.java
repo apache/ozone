@@ -44,7 +44,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.ha.DBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
-import org.apache.hadoop.hdds.scm.ha.SequenceIdGen;
+import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -85,7 +85,7 @@ public class DeletedBlockLogImplV2
   // DeletedBlockLogStateManager.
   private final DeletedBlockLogStateManager deletedBlockLogStateManager;
   private final SCMContext scmContext;
-  private final SequenceIdGen sequenceIdGen;
+  private final SequenceIdGenerator sequenceIdGen;
 
   public DeletedBlockLogImplV2(ConfigurationSource conf,
       ContainerManagerV2 containerManager,
@@ -93,7 +93,7 @@ public class DeletedBlockLogImplV2
       Table<Long, DeletedBlocksTransaction> deletedBlocksTXTable,
       DBTransactionBuffer dbTxBuffer,
       SCMContext scmContext,
-      SequenceIdGen sequenceIdGen) {
+      SequenceIdGenerator sequenceIdGen) {
     maxRetry = conf.getInt(OZONE_SCM_BLOCK_DELETION_MAX_RETRY,
         OZONE_SCM_BLOCK_DELETION_MAX_RETRY_DEFAULT);
     this.containerManager = containerManager;

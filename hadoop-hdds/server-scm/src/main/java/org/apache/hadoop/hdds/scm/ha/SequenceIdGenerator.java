@@ -43,9 +43,9 @@ import static org.apache.hadoop.ozone.OzoneConsts.SEQUENCE_ID_KEY;
  * nextId = lastId + 1, so that a new leader will reload lastId from
  * rocksDB and allocate a new batch when receiving its first getNextId() call.
  */
-public class SequenceIdGen {
+public class SequenceIdGenerator {
   private static final Logger LOG =
-      LoggerFactory.getLogger(SequenceIdGen.class);
+      LoggerFactory.getLogger(SequenceIdGenerator.class);
   private static final long INVALID_SEQUENCE_ID = 0;
 
   private long lastId = INVALID_SEQUENCE_ID;
@@ -60,20 +60,20 @@ public class SequenceIdGen {
    * @param scmhaManager    : null if non-Ratis based
    * @param sequenceIdTable : sequenceIdTable
    */
-  public SequenceIdGen(ConfigurationSource conf, SCMHAManager scmhaManager,
-                       Table<String, Long> sequenceIdTable) {
+  public SequenceIdGenerator(ConfigurationSource conf, SCMHAManager scmhaManager,
+                             Table<String, Long> sequenceIdTable) {
     this.lock = new ReentrantLock();
     this.batchSize = conf.getInt(OZONE_SCM_SEQUENCE_ID_BATCH_SIZE,
         OZONE_SCM_SEQUENCE_ID_BATCH_SIZE_DEFAULT);
 
     if (SCMHAUtils.isSCMHAEnabled(conf)) {
-      this.stateManager = new StateManagerRatisImpl.Builder()
+      this.stateManager = new StateManagerHAImpl.Builder()
           .setRatisServer(scmhaManager.getRatisServer())
           .setDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
           .setSequenceIdTable(sequenceIdTable)
           .build();
     } else {
-      this.stateManager = new StateManagerNonRatisImpl(sequenceIdTable);
+      this.stateManager = new StateManagerImpl(sequenceIdTable);
     }
   }
 
@@ -91,6 +91,8 @@ public class SequenceIdGen {
       while (true) {
         Long prevLastId = lastId;
         nextId = prevLastId + 1;
+
+        Preconditions.checkArgument(Long.MAX_VALUE - lastId >= batchSize);
         lastId += batchSize;
 
         if (stateManager.allocateBatch(prevLastId, lastId)) {
@@ -146,16 +148,16 @@ public class SequenceIdGen {
   }
 
   /**
-   * Ratis based StateMachine, db operations are queued in
+   * Ratis based StateManager, db operations are queued in
    * DBTransactionBuffer until a snapshot is taken.
    */
-  static final class StateManagerRatisImpl implements StateManager {
+  static final class StateManagerHAImpl implements StateManager {
     private final Table<String, Long> sequenceIdTable;
     private final DBTransactionBuffer transactionBuffer;
     private volatile Long lastId;
 
-    private StateManagerRatisImpl(Table<String, Long> sequenceIdTable,
-        DBTransactionBuffer trxBuffer) {
+    private StateManagerHAImpl(Table<String, Long> sequenceIdTable,
+                               DBTransactionBuffer trxBuffer) {
       this.sequenceIdTable = sequenceIdTable;
       this.transactionBuffer = trxBuffer;
 
@@ -167,7 +169,7 @@ public class SequenceIdGen {
       if (lastId == null) {
         lastId = INVALID_SEQUENCE_ID;
       }
-      LOG.info("Init Ratis based SequenceIdGen, lastId is {}.", lastId);
+      LOG.info("Init the HA SequenceIdGenerator, lastId is {}.", lastId);
     }
 
     @Override
@@ -223,7 +225,7 @@ public class SequenceIdGen {
         Preconditions.checkNotNull(buffer);
         Preconditions.checkNotNull(ratisServer);
 
-        final StateManager impl = new StateManagerRatisImpl(table, buffer);
+        final StateManager impl = new StateManagerHAImpl(table, buffer);
         final SCMHAInvocationHandler invocationHandler
             = new SCMHAInvocationHandler(SEQUENCE_ID, impl, ratisServer);
 
@@ -236,14 +238,14 @@ public class SequenceIdGen {
   }
 
   /**
-   * non-Ratis based StateMachine, db operations directly go to RocksDB.
+   * Default StateManager, writes directly go to RocksDB.
    */
-  static final class StateManagerNonRatisImpl implements StateManager {
+  static final class StateManagerImpl implements StateManager {
     private final Table<String, Long> sequenceIdTable;
 
-    StateManagerNonRatisImpl(Table<String, Long> sequenceIdTable) {
+    StateManagerImpl(Table<String, Long> sequenceIdTable) {
       this.sequenceIdTable = sequenceIdTable;
-      LOG.info("Init non-Ratis based SequenceIdGen.");
+      LOG.info("Init default SequenceIdGenerator.");
     }
 
     @Override

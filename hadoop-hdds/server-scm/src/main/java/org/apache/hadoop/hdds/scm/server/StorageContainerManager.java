@@ -62,7 +62,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
-import org.apache.hadoop.hdds.scm.ha.SequenceIdGen;
+import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
@@ -183,7 +183,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private SCMMetadataStore scmMetadataStore;
   private SCMHAManager scmHAManager;
   private SCMContext scmContext;
-  private SequenceIdGen sequenceIdGen;
+  private SequenceIdGenerator sequenceIdGen;
 
   private final EventQueue eventQueue;
   private final SCMServiceManager serviceManager;
@@ -454,7 +454,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
 
     // Distributed sequence id generator
-    sequenceIdGen = new SequenceIdGen(
+    sequenceIdGen = new SequenceIdGenerator(
         conf, scmHAManager, scmMetadataStore.getSequenceIdTable());
 
     if (configurator.getScmContext() != null) {
@@ -1319,7 +1319,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   /**
    * Returns SequenceIdGen.
    */
-  public SequenceIdGen getSequenceIdGen() {
+  public SequenceIdGenerator getSequenceIdGen() {
     return sequenceIdGen;
   }
 

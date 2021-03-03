@@ -35,7 +35,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
-import org.apache.hadoop.hdds.scm.ha.SequenceIdGen;
+import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
@@ -88,7 +88,7 @@ public class TestBlockManager {
   private PipelineManagerV2Impl pipelineManager;
   private BlockManagerImpl blockManager;
   private SCMHAManager scmHAManager;
-  private SequenceIdGen sequenceIdGen;
+  private SequenceIdGenerator sequenceIdGen;
   private static final long DEFAULT_BLOCK_SIZE = 128 * MB;
   private HddsProtos.ReplicationFactor factor;
   private HddsProtos.ReplicationType type;
@@ -130,7 +130,7 @@ public class TestBlockManager {
     scmMetadataStore = new SCMMetadataStoreImpl(conf);
     scmMetadataStore.start(conf);
 
-    sequenceIdGen = new SequenceIdGen(
+    sequenceIdGen = new SequenceIdGenerator(
         conf, scmHAManager, scmMetadataStore.getSequenceIdTable());
 
     pipelineManager =
