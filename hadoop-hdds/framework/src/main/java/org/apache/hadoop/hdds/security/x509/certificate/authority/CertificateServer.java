@@ -80,14 +80,14 @@ public interface CertificateServer {
    *
    * @param csr  - Certificate Signing Request.
    * @param type - An Enum which says what kind of approval process to follow.
-   * @param nodeType: OM/SCM/DN
+   * @param role : OM/SCM/DN
    * @return A future that will have this certificate when this request is
    * approved.
    * @throws SCMSecurityException - on Error.
    */
   Future<X509CertificateHolder> requestCertificate(
       PKCS10CertificationRequest csr,
-      CertificateApprover.ApprovalType type, NodeType nodeType)
+      CertificateApprover.ApprovalType type, NodeType role)
       throws SCMSecurityException;
 
 
@@ -121,13 +121,13 @@ public interface CertificateServer {
 
   /**
    * List certificates.
-   * @param type            - node type: OM/SCM/DN
+   * @param role            - role: OM/SCM/DN
    * @param startSerialId   - start certificate serial id
    * @param count           - max number of certificates returned in a batch
    * @return List of X509 Certificates.
    * @throws IOException - On Failure
    */
-  List<X509Certificate> listCertificate(NodeType type,
+  List<X509Certificate> listCertificate(NodeType role,
       long startSerialId, int count, boolean isRevoked) throws IOException;
 
   /**
