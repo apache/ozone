@@ -39,7 +39,7 @@ import java.util.concurrent.Callable;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 
 /**
- * Parse Ratis Log CLI implementation.
+ * Tool to upgrade Datanode layout.
  */
 @CommandLine.Command(
     name = "dnlayout",
@@ -51,11 +51,11 @@ public class DatanodeLayout extends GenericCli
     implements Callable<Void>, SubcommandWithParent{
 
   @CommandLine.Option(names = {"--path"},
-      required = true,
       description = "File Path")
   private String storagePath;
 
   @CommandLine.Option(names = {"--verify"},
+      hidden = true,
       description = "Verify that the datanode layout is correct")
   private boolean verify;
 
@@ -81,8 +81,10 @@ public class DatanodeLayout extends GenericCli
 
   public static List<HddsVolume> runUpgrade(OzoneConfiguration conf,
         String storagePath, boolean verify) throws Exception {
-    conf.unset(HDDS_DATANODE_DIR_KEY);
-    conf.set(HDDS_DATANODE_DIR_KEY, storagePath);
+    if (storagePath != null) {
+      conf.unset(HDDS_DATANODE_DIR_KEY);
+      conf.set(HDDS_DATANODE_DIR_KEY, storagePath);
+    }
 
     if (verify) {
       conf.setBoolean(

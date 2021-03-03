@@ -101,15 +101,14 @@ public class ContainerReader implements Runnable {
 
   private File getClusterDir() {
     File hddsVolumeRootDir = hddsVolume.getHddsRootDir();
-    File clusterDir = new File(hddsVolumeRootDir, hddsVolume.getClusterID());
-    return clusterDir;
+    return new File(hddsVolumeRootDir, hddsVolume.getClusterID());
   }
   @Override
   public void run() {
     try {
       readVolume(hddsVolumeDir);
     } catch (Throwable t) {
-      LOG.error("Caught a Run time exception during reading container files" +
+      LOG.error("Caught an exception during reading container files" +
           " from Volume {} {}", hddsVolumeDir, t);
       volumeSet.failVolume(hddsVolumeDir.getPath());
     }
@@ -176,8 +175,9 @@ public class ContainerReader implements Runnable {
       Preconditions.checkArgument(clusterDir.exists(),
           "Storage Dir:" + clusterDir + " doesn't exists");
       Preconditions.checkArgument(storageLoc.equals(clusterDir),
-          "configured storage dir" + storageLoc +
-              " is not same as cluster UUID" + clusterDir);
+          "configured storage location path" + storageLoc +
+              " does not container the clusterId:" +
+              hddsVolume.getClusterID());
       return storageLoc;
     }
 
@@ -215,6 +215,37 @@ public class ContainerReader implements Runnable {
   }
 
   /**
+   * This function upgrades the container layout in following steps
+   * a) Converts the chunk and metadata path to the new clusterID
+   *    based location
+   * b) Re-computes the new container checksum
+   * b) Persists the new container layout to disk
+   * @param storageLoc
+   * @param kvContainerData
+   * @return upgraded KeyValueContainer
+   * @throws IOException
+   */
+  public KeyValueContainer upgradeContainerLayout(File storageLoc,
+      KeyValueContainerData kvContainerData) throws IOException {
+    kvContainerData.setMetadataPath(
+        findNormalizedPath(storageLoc,
+            kvContainerData.getMetadataPath()));
+    kvContainerData.setChunksPath(
+        findNormalizedPath(storageLoc,
+            kvContainerData.getChunksPath()));
+
+    Yaml yaml = ContainerDataYaml.getYamlForContainerType(
+        kvContainerData.getContainerType());
+    kvContainerData.computeAndSetChecksum(yaml);
+
+    KeyValueContainerUtil.parseKVContainerData(kvContainerData, config);
+    KeyValueContainer kvContainer = new KeyValueContainer(
+        kvContainerData, config);
+    kvContainer.update(Collections.emptyMap(), true);
+    return kvContainer;
+  }
+
+  /**
    * verify ContainerData loaded from disk and fix-up stale members.
    * Specifically blockCommitSequenceId, delete related metadata
    * and bytesUsed
@@ -231,21 +262,8 @@ public class ContainerReader implements Runnable {
         containerData.setVolume(hddsVolume);
         KeyValueContainer kvContainer = null;
         if (isInUpgradeMode) {
-          kvContainerData.setMetadataPath(
-              findNormalizedPath(storageLoc,
-                  kvContainerData.getMetadataPath()));
-          kvContainerData.setChunksPath(
-              findNormalizedPath(storageLoc,
-                  kvContainerData.getChunksPath()));
-
-          Yaml yaml = ContainerDataYaml.getYamlForContainerType(
-              containerData.getContainerType());
-          containerData.computeAndSetChecksum(yaml);
-
-          KeyValueContainerUtil.parseKVContainerData(kvContainerData, config);
-          kvContainer = new KeyValueContainer(
-              kvContainerData, config);
-          kvContainer.update(Collections.emptyMap(), true);
+          kvContainer =
+              upgradeContainerLayout(storageLoc, kvContainerData);
         } else {
           KeyValueContainerUtil.parseKVContainerData(kvContainerData, config);
           kvContainer = new KeyValueContainer(
