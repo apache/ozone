@@ -272,8 +272,9 @@ public final class HAUtils {
 
     if (metadataDir == null) {
       LOG.warn("{} is not configured. We recommend adding this setting. "
-              + "Falling back to {} instead.", definition.getLocationConfigKey(),
-          HddsConfigKeys.OZONE_METADATA_DIRS);
+              + "Falling back to {} instead.",
+          definition.getLocationConfigKey(), HddsConfigKeys.
+              OZONE_METADATA_DIRS);
       metadataDir = getOzoneMetaDirPath(configuration);
     }
     return metadataDir;

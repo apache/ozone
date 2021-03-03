@@ -15,4 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+/**
+ * Metadata specific package utility for SCM.
+ */
 package org.apache.hadoop.hdds.scm.metadata;

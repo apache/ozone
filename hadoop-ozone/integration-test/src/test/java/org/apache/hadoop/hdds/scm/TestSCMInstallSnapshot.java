@@ -83,7 +83,7 @@ public class TestSCMInstallSnapshot {
 
   @Test
   public void testDownloadSnapshot() throws Exception {
-   downloadSnapshot();
+    downloadSnapshot();
   }
 
   private DBCheckpoint downloadSnapshot() throws Exception {

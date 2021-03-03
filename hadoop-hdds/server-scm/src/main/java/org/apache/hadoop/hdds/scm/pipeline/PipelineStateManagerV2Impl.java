@@ -334,7 +334,7 @@ public class PipelineStateManagerV2Impl implements StateManager {
       pipelineStore.close();
       this.pipelineStateMap = null;
       this.pipelineStateMap = new PipelineStateMap();
-      this.pipelineStore = store;;
+      this.pipelineStore = store;
       initialize();
     } catch (Exception ex) {
       LOG.error("PipelineManager reinitialization close failed", ex);
