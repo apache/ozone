@@ -67,7 +67,7 @@ public class ListInfoSubcommand extends ScmSubcommand {
       }
       if (!Strings.isNullOrEmpty(uuid)) {
         allNodes = allNodes.filter(p ->
-            p.getDatanodeDetails().toString().equals(uuid));
+            p.getDatanodeDetails().getUuidString().equals(uuid));
       }
       allNodes.forEach(this::printDatanodeInfo);
     }
