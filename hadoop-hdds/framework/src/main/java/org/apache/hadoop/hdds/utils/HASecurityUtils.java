@@ -95,7 +95,7 @@ public final class HASecurityUtils {
         client.getPrivateKey());
 
     // Get host name.
-    String hostname = scmAddress.getHostName();
+    String hostname = scmAddress.getAddress().getHostName();
     String ip = scmAddress.getAddress().getHostAddress();
 
     String subject;
@@ -120,6 +120,7 @@ public final class HASecurityUtils {
 
     HddsProtos.ScmNodeDetailsProto scmNodeDetailsProto =
         HddsProtos.ScmNodeDetailsProto.newBuilder()
+            .setClusterId(clusterId)
             .setHostName(scmAddress.getHostName())
             .setScmNodeId(fetchedSCMId).build();
 
