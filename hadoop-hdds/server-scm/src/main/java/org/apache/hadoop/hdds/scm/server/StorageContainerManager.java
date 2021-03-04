@@ -557,7 +557,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     // For primary do this during SCM startup, as it requires SCM Security
     // protocol server, Ratis Server and SCMMetadataStore setup.
     if (OzoneSecurityUtil.isSecurityEnabled(conf) &&
-        scmStorageConfig.getPrimaryScmNodeId().equals(scmStorageConfig.getScmId())) {
+        scmStorageConfig.getPrimaryScmNodeId().equals(
+            scmStorageConfig.getScmId())) {
       HASecurityUtils.initializeSecurity(scmStorageConfig.getClusterID(),
           scmStorageConfig.getScmId(), conf,
           scmHANodeDetails.getLocalNodeDetails()
