@@ -811,7 +811,14 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         // plan to move to new node and do init, this version file has
         // incorrect version information about primary, when it is not primary.
         if (scmStorageConfig.getVersionFile().exists()) {
-          scmStorageConfig.getVersionFile().delete();
+          try {
+            scmStorageConfig.getVersionFile().delete();
+          } catch (Exception e) {
+            LOG.error("Unable to delete version file on primary SCM node " +
+                "during init. If planning to change primary to other node, " +
+                    "delete version file [" +
+                scmStorageConfig.getVersionFile() + "] at this location.", e);
+          }
         }
         return false;
       }
