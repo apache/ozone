@@ -557,6 +557,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
             certificateServer);
   }
 
+  public CertificateServer getCertificateServer() {
+    return certificateServer;
+  }
+
   // For Internal gRPC client from SCM to DN with gRPC TLS
   static GrpcTlsConfig createTlsClientConfigForSCM(SecurityConfig conf,
       CertificateServer certificateServer) throws IOException {
@@ -1110,7 +1114,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     scmSafeModeManager.stop();
   }
-
+  
   /**
    * Wait until service has completed shutdown.
    */

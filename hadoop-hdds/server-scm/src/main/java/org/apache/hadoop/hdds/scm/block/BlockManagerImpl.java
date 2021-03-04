@@ -73,7 +73,7 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
 
   private final long containerSize;
 
-  private final DeletedBlockLog deletedBlockLog;
+  private DeletedBlockLog deletedBlockLog;
   private final SCMBlockDeletingService blockDeletingService;
 
   private ObjectName mxBean;

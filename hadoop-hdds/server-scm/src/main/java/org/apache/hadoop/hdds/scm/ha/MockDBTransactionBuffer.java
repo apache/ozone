@@ -77,6 +77,11 @@ public class MockDBTransactionBuffer implements DBTransactionBuffer {
   }
 
   @Override
+  public void init() throws IOException {
+
+  }
+
+  @Override
   public void close() throws IOException {
     flush();
   }

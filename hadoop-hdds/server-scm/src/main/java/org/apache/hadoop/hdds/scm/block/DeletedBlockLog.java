@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.protocol.proto
     .DeleteBlockTransactionResult;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
+import org.apache.hadoop.hdds.utils.db.Table;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -104,4 +105,10 @@ public interface DeletedBlockLog extends Closeable {
    * @throws IOException
    */
   int getNumOfValidTransactions() throws IOException;
+
+  /**
+   * Reinitialize the delete log from the db.
+   * @param deletedBlocksTXTable delete transaction table
+   */
+  void reinitialize(Table<Long, DeletedBlocksTransaction> deletedBlocksTXTable);
 }

@@ -53,4 +53,6 @@ public interface SCMRatisServer {
   NotLeaderException triggerNotLeaderException();
 
   boolean addSCM(AddSCMRequest request) throws IOException;
+
+  SCMStateMachine getSCMStateMachine();
 }

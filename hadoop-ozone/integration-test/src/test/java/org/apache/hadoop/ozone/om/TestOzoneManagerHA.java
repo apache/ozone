@@ -189,7 +189,7 @@ public abstract class TestOzoneManagerHA {
    * Create a key in the bucket.
    * @return the key name.
    */
-  static String createKey(OzoneBucket ozoneBucket) throws IOException {
+  public static String createKey(OzoneBucket ozoneBucket) throws IOException {
     String keyName = "key" + RandomStringUtils.randomNumeric(5);
     String data = "data" + RandomStringUtils.randomNumeric(5);
     OzoneOutputStream ozoneOutputStream = ozoneBucket.createKey(keyName,

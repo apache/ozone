@@ -95,7 +95,7 @@ public final class ContainerStateManagerImpl
   /**
    * In-memory representation of Container States.
    */
-  private final ContainerStateMap containers;
+  private ContainerStateMap containers;
 
   /**
    * Persistent store for Container States.
@@ -118,7 +118,7 @@ public final class ContainerStateManagerImpl
    * We use the containers in round-robin fashion for operations like block
    * allocation. This map is used for remembering the last used container.
    */
-  private final ConcurrentHashMap<ContainerState, ContainerID> lastUsedMap;
+  private ConcurrentHashMap<ContainerState, ContainerID> lastUsedMap;
 
   private final Map<LifeCycleEvent, CheckedConsumer<ContainerInfo, IOException>>
       containerStateChangeActions;
@@ -493,6 +493,21 @@ public final class ContainerStateManagerImpl
             cid);
         containers.removeContainer(cid);
       }).onException(() -> containerStore.put(cid, containerInfo)).execute();
+    } finally {
+      lock.writeLock().unlock();
+    }
+  }
+
+  @Override
+  public void reinitialize(
+      Table<ContainerID, ContainerInfo> store) throws IOException {
+    lock.writeLock().lock();
+    try {
+      close();
+      this.containerStore = store;
+      this.containers = new ContainerStateMap();
+      this.lastUsedMap = new ConcurrentHashMap<>();
+      initialize();
     } finally {
       lock.writeLock().unlock();
     }

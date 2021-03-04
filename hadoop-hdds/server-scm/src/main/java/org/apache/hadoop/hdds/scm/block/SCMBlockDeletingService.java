@@ -248,4 +248,9 @@ public class SCMBlockDeletingService extends BackgroundService
   public String getServiceName() {
     return SCMBlockDeletingService.class.getSimpleName();
   }
+
+  @Override
+  public void stop() {
+    throw new RuntimeException("Not supported operation.");
+  }
 }
