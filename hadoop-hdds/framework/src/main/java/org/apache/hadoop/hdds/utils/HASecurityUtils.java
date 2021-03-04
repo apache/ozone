@@ -37,6 +37,9 @@ import static org.apache.hadoop.hdds.security.x509.certificates.utils.Certificat
 
 public class HASecurityUtils {
 
+  private HASecurityUtils() {
+  }
+
   public static final Logger LOG =
       LoggerFactory.getLogger(HASecurityUtils.class);
 
