@@ -215,11 +215,11 @@ public class ContainerReader implements Runnable {
   }
 
   /**
-   * This function upgrades the container layout in following steps
+   * This function upgrades the container layout in following steps.
    * a) Converts the chunk and metadata path to the new clusterID
-   *    based location
-   * b) Re-computes the new container checksum
-   * b) Persists the new container layout to disk
+   *    based location.
+   * b) Re-computes the new container checksum.
+   * b) Persists the new container layout to disk.
    * @param storageLoc
    * @param kvContainerData
    * @return upgraded KeyValueContainer
