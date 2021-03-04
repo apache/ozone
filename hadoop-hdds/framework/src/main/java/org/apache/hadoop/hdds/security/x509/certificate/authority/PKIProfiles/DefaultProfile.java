@@ -25,6 +25,7 @@ import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.validator.routines.DomainValidator;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.x500.RDN;
+import org.bouncycastle.asn1.x509.BasicConstraints;
 import org.bouncycastle.asn1.x509.ExtendedKeyUsage;
 import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.asn1.x509.GeneralName;
@@ -57,6 +58,8 @@ import static org.bouncycastle.asn1.x509.KeyPurposeId.id_kp_serverAuth;
  * by SCM CA are constrained
  */
 public class DefaultProfile implements PKIProfile {
+  static final BiFunction<Extension, PKIProfile, Boolean> BASIC_EXTENSIONS =
+      DefaultProfile::validateBasicExtensions;
   static final BiFunction<Extension, PKIProfile, Boolean>
       VALIDATE_KEY_USAGE = DefaultProfile::validateKeyUsage;
   static final BiFunction<Extension, PKIProfile, Boolean>
@@ -79,6 +82,7 @@ public class DefaultProfile implements PKIProfile {
   // Map that handles all the Extensions lookup and validations.
   private static final Map<ASN1ObjectIdentifier, BiFunction<Extension,
       PKIProfile, Boolean>> EXTENSIONS_MAP = Stream.of(
+      new SimpleEntry<>(Extension.basicConstraints, BASIC_EXTENSIONS),
       new SimpleEntry<>(Extension.keyUsage, VALIDATE_KEY_USAGE),
       new SimpleEntry<>(Extension.subjectAlternativeName, VALIDATE_SAN),
       new SimpleEntry<>(Extension.authorityKeyIdentifier,
@@ -338,6 +342,19 @@ public class DefaultProfile implements PKIProfile {
 
   @Override
   public boolean isCA() {
+    return true;
+  }
+
+  private static boolean validateBasicExtensions(Extension ext,
+      PKIProfile pkiProfile) {
+    BasicConstraints constraints =
+        BasicConstraints.getInstance(ext.getParsedValue());
+    if(constraints.isCA()) {
+      if (pkiProfile.isCA()) {
+        return true;
+      }
+    }
     return false;
   }
+
 }

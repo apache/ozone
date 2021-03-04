@@ -1045,8 +1045,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     // pass until we complete HA security implementation.
 
     // Till then make this run only on HA config cluster.
-    if (SCMHAUtils.getScmServiceId(configuration) != null &&
-        OzoneSecurityUtil.isSecurityEnabled(configuration) &&
+    if (OzoneSecurityUtil.isSecurityEnabled(configuration) &&
         scmStorageConfig.getPrimaryScmNodeId().equals(
             scmStorageConfig.getScmId())) {
       HASecurityUtils.initializeSecurity(scmStorageConfig.getClusterID(),
