@@ -759,6 +759,12 @@ public class SCMPipelineManager implements
     return this.isInSafeMode.get();
   }
 
+  @Override
+  public void reinitialize(Table<PipelineID, Pipeline> store)
+      throws IOException {
+    throw new RuntimeException("Not supported operation.");
+  }
+
   public Table<PipelineID, Pipeline> getPipelineStore() {
     return pipelineStore;
   }

@@ -38,7 +38,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
  */
 public class SCMDBTransactionBuffer implements DBTransactionBuffer {
   private final StorageContainerManager scm;
-  private final SCMMetadataStore metadataStore;
+  private SCMMetadataStore metadataStore;
   private BatchOperation currentBatchOperation;
   private TransactionInfo latestTrxInfo;
   private SnapshotInfo latestSnapshot;
@@ -46,22 +46,7 @@ public class SCMDBTransactionBuffer implements DBTransactionBuffer {
   public SCMDBTransactionBuffer(StorageContainerManager scm)
       throws IOException {
     this.scm = scm;
-    this.metadataStore = scm.getScmMetadataStore();
-
-    // initialize a batch operation during construction time
-    currentBatchOperation = this.metadataStore.getStore().initBatchOperation();
-    latestTrxInfo = this.metadataStore.getTransactionInfoTable()
-        .get(TRANSACTION_INFO_KEY);
-    if (latestTrxInfo == null) {
-      // transaction table is empty
-      latestTrxInfo =
-          TransactionInfo
-              .builder()
-              .setTransactionIndex(-1)
-              .setCurrentTerm(0)
-              .build();
-    }
-    latestSnapshot = latestTrxInfo.toSnapshotInfo();
+    init();
   }
 
   @Override
@@ -116,12 +101,32 @@ public class SCMDBTransactionBuffer implements DBTransactionBuffer {
   }
 
   @Override
+  public void init() throws IOException {
+    metadataStore = scm.getScmMetadataStore();
+
+    // initialize a batch operation during construction time
+    currentBatchOperation = this.metadataStore.getStore().initBatchOperation();
+    latestTrxInfo = this.metadataStore.getTransactionInfoTable()
+        .get(TRANSACTION_INFO_KEY);
+    if (latestTrxInfo == null) {
+      // transaction table is empty
+      latestTrxInfo =
+          TransactionInfo
+              .builder()
+              .setTransactionIndex(-1)
+              .setCurrentTerm(0)
+              .build();
+    }
+    latestSnapshot = latestTrxInfo.toSnapshotInfo();
+  }
+
+  @Override
   public String toString() {
     return latestTrxInfo.toString();
   }
 
   @Override
   public void close() throws IOException {
-
+    flush();
   }
 }

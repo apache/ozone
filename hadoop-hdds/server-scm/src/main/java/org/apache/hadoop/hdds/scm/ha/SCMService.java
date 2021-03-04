@@ -62,4 +62,14 @@ public interface SCMService {
     NEW_NODE_HANDLER_TRIGGERED,
     UNHEALTHY_TO_HEALTHY_NODE_HANDLER_TRIGGERED
   }
+
+  /**
+   * starts the SCM service.
+   */
+  void start();
+
+  /**
+   * stops the SCM service.
+   */
+  void stop();
 }

@@ -114,6 +114,7 @@ public class BackgroundPipelineCreatorV2 implements SCMService {
   /**
    * Start RatisPipelineUtilsThread.
    */
+  @Override
   public void start() {
     if (!running.compareAndSet(false, true)) {
       LOG.warn("{} is already started, just ignore.", THREAD_NAME);

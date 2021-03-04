@@ -64,4 +64,24 @@ public final class SCMServiceManager {
       service.notifyEventTriggered(event);
     }
   }
+
+  /**
+   * Starts all running services.
+   */
+  public synchronized void start() {
+    for (SCMService service : services) {
+      LOG.debug("Stopping service:{}.", service.getServiceName());
+      service.start();
+    }
+  }
+
+  /**
+   * Stops all running services.
+   */
+  public synchronized void stop() {
+    for (SCMService service : services) {
+      LOG.debug("Stopping service:{}.", service.getServiceName());
+      service.stop();
+    }
+  }
 }

@@ -144,6 +144,14 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     return omhaService.isServiceActive(omNodeId);
   }
 
+  public boolean isSCMActive(String scmNodeId) {
+    return scmhaService.isServiceActive(scmNodeId);
+  }
+
+  public StorageContainerManager getSCM(String scmNodeId) {
+    return this.scmhaService.getServiceById(scmNodeId);
+  }
+
   public OzoneManager getOzoneManager(int index) {
     return this.omhaService.getServiceByIndex(index);
   }
@@ -181,6 +189,14 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
    */
   public void startInactiveOM(String omNodeID) throws IOException {
     omhaService.startInactiveService(omNodeID, OzoneManager::start);
+  }
+
+  /**
+   * Start a previously inactive SCM.
+   */
+  public void startInactiveSCM(String scmNodeId) throws IOException {
+    scmhaService
+        .startInactiveService(scmNodeId, StorageContainerManager::start);
   }
 
   @Override

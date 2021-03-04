@@ -25,6 +25,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.google.common.base.Preconditions;
@@ -33,6 +35,7 @@ import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImplV2;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.util.concurrent.HadoopExecutors;
 import org.apache.ratis.proto.RaftProtos;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.util.Time;
@@ -46,6 +49,7 @@ import org.apache.ratis.statemachine.impl.BaseStateMachine;
 
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.ratis.statemachine.impl.SimpleStateMachineStorage;
+import org.apache.ratis.util.LifeCycle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,6 +69,7 @@ public class SCMStateMachine extends BaseStateMachine {
   private final SimpleStateMachineStorage storage =
       new SimpleStateMachineStorage();
   private final AtomicBoolean isInitialized;
+  private ExecutorService installSnapshotExecutor;
 
   public SCMStateMachine(final StorageContainerManager scm,
       final SCMRatisServer ratisServer, DBTransactionBuffer buffer)
@@ -85,6 +90,7 @@ public class SCMStateMachine extends BaseStateMachine {
             ), SCM_NOT_INITIALIZED);
       }
     }
+    this.installSnapshotExecutor = HadoopExecutors.newSingleThreadExecutor();
     isInitialized = new AtomicBoolean(true);
   }
 
@@ -156,6 +162,29 @@ public class SCMStateMachine extends BaseStateMachine {
     }
     scm.getScmContext().updateLeaderAndTerm(false, 0);
     scm.getSCMServiceManager().notifyStatusChanged();
+  }
+
+  /**
+   * Leader SCM has purged entries from its log. To catch up, SCM must download
+   * the latest checkpoint from the leader SCM and install it.
+   * @param roleInfoProto the leader node information
+   * @param firstTermIndexInLog TermIndex of the first append entry available
+   *                           in the Leader's log.
+   * @return the last term index included in the installed snapshot.
+   */
+  @Override
+  public CompletableFuture<TermIndex> notifyInstallSnapshotFromLeader(
+      RaftProtos.RoleInfoProto roleInfoProto, TermIndex firstTermIndexInLog) {
+
+    String leaderNodeId = RaftPeerId.valueOf(roleInfoProto.getFollowerInfo()
+        .getLeaderInfo().getId().getId()).toString();
+    LOG.info("Received install snapshot notification from SCM leader: {} with "
+        + "term index: {}", leaderNodeId, firstTermIndexInLog);
+
+    CompletableFuture<TermIndex> future = CompletableFuture.supplyAsync(
+        () -> scm.getScmHAManager().installSnapshotFromLeader(leaderNodeId),
+        installSnapshotExecutor);
+    return future;
   }
 
   @Override
@@ -236,5 +265,34 @@ public class SCMStateMachine extends BaseStateMachine {
   @Override
   public void notifyConfigurationChanged(long term, long index,
       RaftProtos.RaftConfigurationProto newRaftConfiguration) {
+  }
+
+  @Override
+  public void pause() {
+    getLifeCycle().transition(LifeCycle.State.PAUSING);
+    getLifeCycle().transition(LifeCycle.State.PAUSED);
+  }
+
+  public void stop() {
+    HadoopExecutors.
+        shutdown(installSnapshotExecutor, LOG, 5, TimeUnit.SECONDS);
+  }
+  /**
+   * Unpause the StateMachine, re-initialize the DoubleBuffer and update the
+   * lastAppliedIndex. This should be done after uploading new state to the
+   * StateMachine.
+   */
+  public void unpause(long newLastAppliedSnaphsotIndex,
+      long newLastAppliedSnapShotTermIndex) {
+    getLifeCycle().startAndTransition(() -> {
+      try {
+        transactionBuffer.init();
+        this.setLastAppliedTermIndex(TermIndex
+            .valueOf(newLastAppliedSnapShotTermIndex,
+                newLastAppliedSnaphsotIndex));
+      } catch (IOException ioe) {
+        LOG.error("Failed to unpause ", ioe);
+      }
+    });
   }
 }

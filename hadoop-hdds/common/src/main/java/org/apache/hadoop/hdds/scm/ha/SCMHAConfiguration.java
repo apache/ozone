@@ -210,6 +210,14 @@ public class SCMHAConfiguration {
     this.ratisStorageDir = dir;
   }
 
+  public void setRatisSnapshotDir(String dir) {
+    this.ratisSnapshotDir = dir;
+  }
+
+  public void setRaftLogPurgeGap(int gap) {
+    this.raftLogPurgeGap = gap;
+  }
+
   public InetSocketAddress getRatisBindAddress() {
     return NetUtils.createSocketAddr(ratisBindHost, ratisBindPort);
   }

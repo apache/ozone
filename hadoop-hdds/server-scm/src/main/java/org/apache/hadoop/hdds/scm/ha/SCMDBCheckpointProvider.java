@@ -43,7 +43,7 @@ public class SCMDBCheckpointProvider {
 
   public void writeDBCheckPointToSream(OutputStream stream, boolean flush)
       throws IOException {
-    LOG.info("Received request to obtain OM DB checkpoint snapshot");
+    LOG.info("Received request to obtain SCM DB checkpoint snapshot");
     if (scmDbStore == null) {
       LOG.error("Unable to process checkpointing request. DB Store is null");
       return;
