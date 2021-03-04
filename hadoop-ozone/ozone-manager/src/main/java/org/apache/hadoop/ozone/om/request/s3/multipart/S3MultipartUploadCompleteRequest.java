@@ -269,7 +269,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
               .setFileEncryptionInfo(dbOpenKeyInfo.getFileEncryptionInfo())
               .setOmKeyLocationInfos(
                   Collections.singletonList(keyLocationInfoGroup))
-              .setAcls(OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()));
+              .setAcls(dbOpenKeyInfo.getAcls());
           // Check if db entry has ObjectID. This check is required because
           // it is possible that between multipart key uploads and complete,
           // we had an upgrade.
