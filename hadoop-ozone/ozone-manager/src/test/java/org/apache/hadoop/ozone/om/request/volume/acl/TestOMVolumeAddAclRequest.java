@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.om.request.volume.acl;
 
 import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.om.helpers.OmOzoneAclMap;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.om.request.volume.TestOMVolumeRequest;
@@ -31,6 +30,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.junit.Assert;
 import org.junit.Test;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -95,12 +95,12 @@ public class TestOMVolumeAddAclRequest extends TestOMVolumeRequest {
     Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omResponse.getStatus());
 
-    OmOzoneAclMap aclMapAfterSet = omMetadataManager
-        .getVolumeTable().get(volumeKey).getAclMap();
+    List<OzoneAcl> aclsAfterSet = omMetadataManager
+        .getVolumeTable().get(volumeKey).getAcls();
 
     // acl is added to aclMapAfterSet
-    Assert.assertEquals(1, aclMapAfterSet.getAcl().size());
-    Assert.assertEquals(acl, aclMapAfterSet.getAcl().get(0));
+    Assert.assertEquals(1, aclsAfterSet.size());
+    Assert.assertEquals(acl, aclsAfterSet.get(0));
   }
 
   @Test

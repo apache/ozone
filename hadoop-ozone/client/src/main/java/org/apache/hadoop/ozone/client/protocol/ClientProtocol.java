@@ -124,6 +124,7 @@ public interface ClientProtocol {
    * @return Boolean - True if the user with a role can access the volume.
    * This is possible for owners of the volume and admin users
    * @throws IOException
+   * TODO: deprecate and remove this API.
    */
   boolean checkVolumeAccess(String volumeName, OzoneAcl acl)
       throws IOException;
