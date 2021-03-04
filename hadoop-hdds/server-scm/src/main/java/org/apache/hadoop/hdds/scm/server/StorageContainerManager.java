@@ -813,9 +813,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
               haDetails.getLocalNodeDetails().getBlockProtocolServerAddress());
         }
 
-        scmStorageConfig.initialize();
-
-
         scmStorageConfig.setPrimaryScmNodeId(scmStorageConfig.getScmId());
         scmStorageConfig.initialize();
         LOG.info("SCM initialization succeeded. Current cluster id for sd={}"
