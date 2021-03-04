@@ -113,8 +113,8 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
       task.setStatus(Status.FAILED);
     } else {
       try {
-        //wait for the download. This thread pool is limiting the parallel
-        //downloads, so it's ok to block here and wait for the full download.
+        // Wait for the download. This thread pool is limiting the parallel
+        // downloads, so it's ok to block here and wait for the full download.
         Path path = tempTarFile.get();
         long bytes = Files.size(path);
 
