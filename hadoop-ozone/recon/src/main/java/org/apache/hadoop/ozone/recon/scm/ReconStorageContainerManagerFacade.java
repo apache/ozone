@@ -37,7 +37,7 @@ import org.apache.hadoop.hdds.scm.container.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementPolicyFactory;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementMetrics;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
-import org.apache.hadoop.hdds.scm.ha.MockDBTransactionBuffer;
+import org.apache.hadoop.hdds.scm.ha.MockSCMHADBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHANodeDetails;
@@ -119,7 +119,7 @@ public class ReconStorageContainerManagerFacade
     this.dbStore = DBStoreBuilder
         .createDBStore(ozoneConfiguration, new ReconSCMDBDefinition());
     this.scmhaManager = MockSCMHAManager.getInstance(
-        true, new MockDBTransactionBuffer(dbStore));
+        true, new MockSCMHADBTransactionBuffer(dbStore));
     this.sequenceIdGen = new SequenceIdGenerator(
         conf, scmhaManager, ReconSCMDBDefinition.SEQUENCE_ID.getTable(dbStore));
     this.nodeManager =
