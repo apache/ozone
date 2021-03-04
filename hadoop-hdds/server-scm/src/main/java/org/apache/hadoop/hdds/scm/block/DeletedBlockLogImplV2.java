@@ -338,7 +338,7 @@ public class DeletedBlockLogImplV2
       ArrayList<DeletedBlocksTransaction> txsToBeAdded = new ArrayList<>();
       for (Map.Entry< Long, List< Long > > entry :
           containerBlocksMap.entrySet()) {
-        long nextTXID = sequenceIdGen.getNextId();
+        long nextTXID = sequenceIdGen.getNextId("delTxnId");
         DeletedBlocksTransaction tx = constructNewTransaction(nextTXID,
             entry.getKey(), entry.getValue());
         txsToBeAdded.add(tx);

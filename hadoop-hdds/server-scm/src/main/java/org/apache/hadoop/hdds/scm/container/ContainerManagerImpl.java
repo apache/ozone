@@ -207,7 +207,7 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
   private ContainerInfo allocateContainer(final Pipeline pipeline,
                                           final String owner)
       throws IOException {
-    final long uniqueId = sequenceIdGen.getNextId();
+    final long uniqueId = sequenceIdGen.getNextId("containerId");
     Preconditions.checkState(uniqueId > 0,
         "Cannot allocate container, negative container id" +
             " generated. %s.", uniqueId);

@@ -25,13 +25,15 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.lang.reflect.Proxy;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import static org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType.SEQUENCE_ID;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SEQUENCE_ID_BATCH_SIZE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SEQUENCE_ID_BATCH_SIZE_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConsts.SEQUENCE_ID_KEY;
 
 /**
  * After SCM starts, set lastId = 0, nextId = lastId + 1.
@@ -48,8 +50,14 @@ public class SequenceIdGenerator {
       LoggerFactory.getLogger(SequenceIdGenerator.class);
   private static final long INVALID_SEQUENCE_ID = 0;
 
-  private long lastId = INVALID_SEQUENCE_ID;
-  private long nextId = lastId + 1;
+  static class Batch {
+    // The upper bound of the batch.
+    private long lastId = INVALID_SEQUENCE_ID;
+    // The next id to be allocated in this batch.
+    private long nextId = lastId + 1;
+  }
+
+  private final Map<String, Batch> sequenceIdToBatchMap;
 
   private final Lock lock;
   private final long batchSize;
@@ -60,8 +68,9 @@ public class SequenceIdGenerator {
    * @param scmhaManager    : null if non-Ratis based
    * @param sequenceIdTable : sequenceIdTable
    */
-  public SequenceIdGenerator(ConfigurationSource conf, SCMHAManager scmhaManager,
-                             Table<String, Long> sequenceIdTable) {
+  public SequenceIdGenerator(ConfigurationSource conf,
+      SCMHAManager scmhaManager, Table<String, Long> sequenceIdTable) {
+    this.sequenceIdToBatchMap = new HashMap<>();
     this.lock = new ReentrantLock();
     this.batchSize = conf.getInt(OZONE_SCM_SEQUENCE_ID_BATCH_SIZE,
         OZONE_SCM_SEQUENCE_ID_BATCH_SIZE_DEFAULT);
@@ -78,35 +87,40 @@ public class SequenceIdGenerator {
   }
 
   /**
-   * @return next distributed sequence id.
+   * @param sequenceIdName : name of the sequenceId
+   * @return : next id of this sequenceId.
    */
-  public long getNextId() {
+  public long getNextId(String sequenceIdName) {
     lock.lock();
     try {
-      if (nextId <= lastId) {
-        return nextId++;
+      Batch batch = sequenceIdToBatchMap.computeIfAbsent(
+          sequenceIdName, key -> new Batch());
+
+      if (batch.nextId <= batch.lastId) {
+        return batch.nextId++;
       }
 
-      Preconditions.checkArgument(nextId == lastId + 1);
+      Preconditions.checkArgument(batch.nextId == batch.lastId + 1);
       while (true) {
-        Long prevLastId = lastId;
-        nextId = prevLastId + 1;
+        Long prevLastId = batch.lastId;
+        batch.nextId = prevLastId + 1;
 
-        Preconditions.checkArgument(Long.MAX_VALUE - lastId >= batchSize);
-        lastId += batchSize;
+        Preconditions.checkArgument(Long.MAX_VALUE - batch.lastId >= batchSize);
+        batch.lastId += batchSize;
 
-        if (stateManager.allocateBatch(prevLastId, lastId)) {
-          LOG.info("Allocate a batch, change lastId from {} to {}.",
-              prevLastId, lastId);
+        if (stateManager.allocateBatch(sequenceIdName,
+            prevLastId, batch.lastId)) {
+          LOG.info("Allocate a batch for {}, change lastId from {} to {}.",
+              sequenceIdName, prevLastId, batch.lastId);
           break;
         }
 
         // reload lastId from RocksDB.
-        lastId = stateManager.getLastId();
+        batch.lastId = stateManager.getLastId(sequenceIdName);
       }
 
-      Preconditions.checkArgument(nextId <= lastId);
-      return nextId++;
+      Preconditions.checkArgument(batch.nextId <= batch.lastId);
+      return batch.nextId++;
 
     } finally {
       lock.unlock();
@@ -120,7 +134,8 @@ public class SequenceIdGenerator {
   public void invalidateBatch() {
     lock.lock();
     try {
-      nextId = lastId + 1;
+      sequenceIdToBatchMap.forEach(
+          (sequenceId, batch) -> batch.nextId = batch.lastId + 1);
     } finally {
       lock.unlock();
     }
@@ -134,17 +149,20 @@ public class SequenceIdGenerator {
      * Compare And Swap lastId saved in db from expectedLastId to newLastId.
      * If based on Ratis, it will submit a raft client request.
      *
+     * @param sequenceIdName : name of the sequence id.
      * @param expectedLastId : the expected lastId saved in db
      * @param newLastId      : the new lastId to save in db
      * @return               : result of the C.A.S.
      */
     @Replicate
-    Boolean allocateBatch(Long expectedLastId, Long newLastId);
+    Boolean allocateBatch(String sequenceIdName,
+                          Long expectedLastId, Long newLastId);
 
     /**
+     * @param sequenceIdName : name of the sequence id.
      * @return lastId saved in db
      */
-    Long getLastId();
+    Long getLastId(String sequenceIdName);
   }
 
   /**
@@ -154,46 +172,49 @@ public class SequenceIdGenerator {
   static final class StateManagerHAImpl implements StateManager {
     private final Table<String, Long> sequenceIdTable;
     private final DBTransactionBuffer transactionBuffer;
-    private volatile Long lastId;
+    private final Map<String, Long> sequenceIdToLastIdMap;
 
     private StateManagerHAImpl(Table<String, Long> sequenceIdTable,
                                DBTransactionBuffer trxBuffer) {
       this.sequenceIdTable = sequenceIdTable;
       this.transactionBuffer = trxBuffer;
-
-      try {
-        lastId = this.sequenceIdTable.get(SEQUENCE_ID_KEY);
-      } catch (IOException ioe) {
-        throw new RuntimeException("Failed to get lastId from db", ioe);
-      }
-      if (lastId == null) {
-        lastId = INVALID_SEQUENCE_ID;
-      }
-      LOG.info("Init the HA SequenceIdGenerator, lastId is {}.", lastId);
+      this.sequenceIdToLastIdMap = new ConcurrentHashMap<>();
+      LOG.info("Init the HA SequenceIdGenerator.");
     }
 
     @Override
-    public Boolean allocateBatch(Long expectedLastId, Long newLastId) {
+    public Boolean allocateBatch(String sequenceIdName,
+                                 Long expectedLastId, Long newLastId) {
+      Long lastId = sequenceIdToLastIdMap.computeIfAbsent(sequenceIdName,
+          key -> {
+            try {
+              Long idInDb = this.sequenceIdTable.get(key);
+              return idInDb != null ? idInDb : INVALID_SEQUENCE_ID;
+            } catch (IOException ioe) {
+              throw new RuntimeException("Failed to get lastId from db", ioe);
+            }
+          });
+
       if (!lastId.equals(expectedLastId)) {
-        LOG.warn("Failed to allocate a batch, expected lastId is {}," +
-            " actual lastId is {}.", expectedLastId, lastId);
+        LOG.warn("Failed to allocate a batch for {}, expected lastId is {}," +
+            " actual lastId is {}.", sequenceIdName, expectedLastId, lastId);
         return false;
       }
 
       try {
         sequenceIdTable.putWithBatch(transactionBuffer
-            .getCurrentBatchOperation(), SEQUENCE_ID_KEY, newLastId);
+            .getCurrentBatchOperation(), sequenceIdName, newLastId);
       } catch (IOException ioe) {
         throw new RuntimeException("Failed to put lastId to Batch", ioe);
       }
 
-      lastId = newLastId;
+      sequenceIdToLastIdMap.put(sequenceIdName, newLastId);
       return true;
     }
 
     @Override
-    public Long getLastId() {
-      return lastId;
+    public Long getLastId(String sequenceIdName) {
+      return sequenceIdToLastIdMap.get(sequenceIdName);
     }
 
     /**
@@ -249,10 +270,11 @@ public class SequenceIdGenerator {
     }
 
     @Override
-    public Boolean allocateBatch(Long expectedLastId, Long newLastId) {
+    public Boolean allocateBatch(String sequenceIdName,
+                                 Long expectedLastId, Long newLastId) {
       Long lastId;
       try {
-        lastId = sequenceIdTable.get(SEQUENCE_ID_KEY);
+        lastId = sequenceIdTable.get(sequenceIdName);
       } catch (IOException ioe) {
         throw new RuntimeException("Failed to get lastId from db", ioe);
       }
@@ -261,13 +283,13 @@ public class SequenceIdGenerator {
       }
 
       if (!lastId.equals(expectedLastId)) {
-        LOG.warn("Failed to allocate a batch, expected lastId is {}," +
-            " actual lastId is {}.", expectedLastId, lastId);
+        LOG.warn("Failed to allocate a batch for {}, expected lastId is {}," +
+            " actual lastId is {}.", sequenceIdName, expectedLastId, lastId);
         return false;
       }
 
       try {
-        sequenceIdTable.put(SEQUENCE_ID_KEY, newLastId);
+        sequenceIdTable.put(sequenceIdName, newLastId);
       } catch (IOException ioe) {
         throw new RuntimeException("Failed to put lastId to db", ioe);
       }
@@ -275,9 +297,9 @@ public class SequenceIdGenerator {
     }
 
     @Override
-    public Long getLastId() {
+    public Long getLastId(String sequenceIdName) {
       try {
-        return sequenceIdTable.get(SEQUENCE_ID_KEY);
+        return sequenceIdTable.get(sequenceIdName);
       } catch (IOException ioe) {
         throw new RuntimeException("Failed to get lastId from db", ioe);
       }
