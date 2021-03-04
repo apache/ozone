@@ -59,7 +59,7 @@ public final class SCMServiceManager {
    */
   public synchronized void notifyEventTriggered(Event event) {
     for (SCMService service : services) {
-      LOG.debug("Notify service:{} with event:{.",
+      LOG.debug("Notify service:{} with event:{}.",
           service.getServiceName(), event);
       service.notifyEventTriggered(event);
     }

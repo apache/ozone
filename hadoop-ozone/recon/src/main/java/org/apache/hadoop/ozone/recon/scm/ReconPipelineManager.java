@@ -23,43 +23,68 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineFactory;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineStateManager;
-import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerV2Impl;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineStateManagerV2Impl;
+import org.apache.hadoop.hdds.scm.pipeline.StateManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.ClientVersions;
 
 import com.google.common.annotations.VisibleForTesting;
-import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.CLOSED;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
+import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.CLOSED;
 
 /**
  * Recon's overriding implementation of SCM's Pipeline Manager.
  */
-public class ReconPipelineManager extends SCMPipelineManager {
+public final class ReconPipelineManager extends PipelineManagerV2Impl {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ReconPipelineManager.class);
 
-  public ReconPipelineManager(ConfigurationSource conf,
+  private ReconPipelineManager(ConfigurationSource conf,
+                               SCMHAManager scmhaManager,
+                               NodeManager nodeManager,
+                               StateManager pipelineStateManager,
+                               PipelineFactory pipelineFactory,
+                               EventPublisher eventPublisher,
+                               SCMContext scmContext) {
+    super(conf, scmhaManager, nodeManager, pipelineStateManager,
+        pipelineFactory, eventPublisher, scmContext);
+  }
+
+  public static ReconPipelineManager newReconPipelineManager(
+      ConfigurationSource conf,
       NodeManager nodeManager,
       Table<PipelineID, Pipeline> pipelineStore,
-      EventPublisher eventPublisher)
-      throws IOException {
-    super(conf, nodeManager, pipelineStore, eventPublisher,
-        new PipelineStateManager(),
-        new ReconPipelineFactory());
-    initializePipelineState();
-  }
-  
-  @Override
-  public void triggerPipelineCreation() {
-    // Don't do anything in Recon.
+      EventPublisher eventPublisher,
+      SCMHAManager scmhaManager,
+      SCMContext scmContext) throws IOException {
+
+    // Create PipelineStateManager
+    StateManager stateManager = PipelineStateManagerV2Impl
+        .newBuilder()
+        .setPipelineStore(pipelineStore)
+        .setNodeManager(nodeManager)
+        .setRatisServer(scmhaManager.getRatisServer())
+        .setSCMDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
+        .build();
+
+    // Create PipelineFactory
+    PipelineFactory pipelineFactory = new ReconPipelineFactory();
+
+    return new ReconPipelineManager(conf, scmhaManager, nodeManager,
+        stateManager, pipelineFactory, eventPublisher, scmContext);
   }
 
   /**
@@ -69,7 +94,7 @@ public class ReconPipelineManager extends SCMPipelineManager {
    */
   void initializePipelines(List<Pipeline> pipelinesFromScm) throws IOException {
 
-    getLock().writeLock().lock();
+    getLock().lock();
     try {
       List<Pipeline> pipelinesInHouse = getPipelines();
       LOG.info("Recon has {} pipelines in house.", pipelinesInHouse.size());
@@ -82,20 +107,21 @@ public class ReconPipelineManager extends SCMPipelineManager {
         } else {
           // Recon already has this pipeline. Just update state and creation
           // time.
-          getStateManager().updatePipelineState(pipeline.getId(),
-              pipeline.getPipelineState());
+          getStateManager().updatePipelineState(
+              pipeline.getId().getProtobuf(),
+              Pipeline.PipelineState.getProtobuf(pipeline.getPipelineState()));
           getPipeline(pipeline.getId()).setCreationTimestamp(
               pipeline.getCreationTimestamp());
         }
         removeInvalidPipelines(pipelinesFromScm);
       }
     } finally {
-      getLock().writeLock().unlock();
+      getLock().unlock();
     }
   }
 
   public void removeInvalidPipelines(List<Pipeline> pipelinesFromScm) {
-    getLock().writeLock().lock();
+    getLock().lock();
     try {
       List<Pipeline> pipelinesInHouse = getPipelines();
       // Removing pipelines in Recon that are no longer in SCM.
@@ -109,7 +135,9 @@ public class ReconPipelineManager extends SCMPipelineManager {
         PipelineID pipelineID = p.getId();
         if (!p.getPipelineState().equals(CLOSED)) {
           try {
-            getStateManager().updatePipelineState(pipelineID, CLOSED);
+            getStateManager().updatePipelineState(
+                pipelineID.getProtobuf(),
+                HddsProtos.PipelineState.PIPELINE_CLOSED);
           } catch (IOException e) {
             LOG.warn("Pipeline {} not found while updating state. ",
                 p.getId(), e);
@@ -123,7 +151,7 @@ public class ReconPipelineManager extends SCMPipelineManager {
         }
       });
     } finally {
-      getLock().writeLock().unlock();
+      getLock().unlock();
     }
   }
   /**
@@ -133,13 +161,12 @@ public class ReconPipelineManager extends SCMPipelineManager {
    */
   @VisibleForTesting
   public void addPipeline(Pipeline pipeline) throws IOException {
-    getLock().writeLock().lock();
+    getLock().lock();
     try {
-      getPipelineStore().put(pipeline.getId(), pipeline);
-      getStateManager().addPipeline(pipeline);
-      getNodeManager().addPipeline(pipeline);
+      getStateManager().addPipeline(
+          pipeline.getProtobufMessage(ClientVersions.CURRENT_VERSION));
     } finally {
-      getLock().writeLock().unlock();
+      getLock().unlock();
     }
   }
 }

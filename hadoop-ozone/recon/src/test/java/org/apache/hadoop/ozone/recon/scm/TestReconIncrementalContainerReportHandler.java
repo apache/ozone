@@ -52,7 +52,6 @@ import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.test.GenericTestUtils;
-import org.junit.Ignore;
 import org.junit.Test;
 
 /**
@@ -62,7 +61,6 @@ public class TestReconIncrementalContainerReportHandler
     extends AbstractReconContainerManagerTest {
 
   @Test
-  @Ignore
   public void testProcessICR() throws IOException, NodeNotFoundException {
 
     ContainerID containerID = ContainerID.valueOf(100L);
@@ -91,7 +89,7 @@ public class TestReconIncrementalContainerReportHandler
     ReconContainerManager containerManager = getContainerManager();
     ReconIncrementalContainerReportHandler reconIcr =
         new ReconIncrementalContainerReportHandler(nodeManager,
-            null, SCMContext.emptyContext());
+            containerManager, SCMContext.emptyContext());
     EventPublisher eventPublisherMock = mock(EventPublisher.class);
 
     reconIcr.onMessage(reportMock, eventPublisherMock);
@@ -102,7 +100,6 @@ public class TestReconIncrementalContainerReportHandler
   }
 
   @Test
-  @Ignore
   public void testProcessICRStateMismatch() throws IOException {
 
     // Recon container state is "OPEN".
@@ -134,7 +131,7 @@ public class TestReconIncrementalContainerReportHandler
       when(reportMock.getReport()).thenReturn(containerReport);
       ReconIncrementalContainerReportHandler reconIcr =
           new ReconIncrementalContainerReportHandler(nodeManagerMock,
-              null, SCMContext.emptyContext());
+              containerManager, SCMContext.emptyContext());
 
       reconIcr.onMessage(reportMock, mock(EventPublisher.class));
       assertTrue(containerManager.containerExist(containerID));
