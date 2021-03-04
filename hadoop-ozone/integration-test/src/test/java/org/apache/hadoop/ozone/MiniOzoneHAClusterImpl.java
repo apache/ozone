@@ -164,6 +164,14 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     return omhaService.getServices();
   }
 
+  public List<StorageContainerManager> getStorageContainerManagersList() {
+    return scmhaService.getServices();
+  }
+
+  public StorageContainerManager getStorageContainerManager(int index) {
+    return this.scmhaService.getServiceByIndex(index);
+  }
+
   /**
    * Get OzoneManager leader object.
    * @return OzoneManager object, null if there isn't one or more than one
@@ -221,6 +229,27 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     if (waitForOM) {
       GenericTestUtils.waitFor(ozoneManager::isRunning,
           1000, waitForClusterToBeReadyTimeout);
+    }
+  }
+
+  public void shutdownStorageContainerManager(StorageContainerManager scm) {
+    LOG.info("Shutting down StorageContainerManager " + scm.getScmId());
+
+    scm.stop();
+  }
+
+  public void restartStorageContainerManager(StorageContainerManager scm, boolean waitForSCM)
+      throws IOException, TimeoutException, InterruptedException, AuthenticationException {
+    LOG.info("Restarting OzoneManager " + scm.getScmId());
+
+    LOG.info("Restarting SCM in cluster " + this.getClass());
+    OzoneConfiguration scmConf = scm.getConfiguration();
+    scm.stop();
+    scm.join();
+    scm = TestUtils.getScmSimple(scmConf);
+    scm.start();
+    if (waitForSCM) {
+      waitForClusterToBeReady();
     }
   }
 
