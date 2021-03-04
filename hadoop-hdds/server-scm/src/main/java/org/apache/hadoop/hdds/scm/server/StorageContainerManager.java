@@ -36,6 +36,7 @@ import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -58,6 +59,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerImpl;
 import org.apache.hadoop.hdds.scm.ha.SCMHANodeDetails;
+import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
@@ -121,6 +123,7 @@ import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.util.MBeans;
+import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.common.Storage.StorageState;
@@ -1015,13 +1018,41 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     // For primary do this during SCM startup, as it requires SCM Security
     // protocol server, Ratis Server and SCMMetadataStore setup.
-    if (OzoneSecurityUtil.isSecurityEnabled(configuration) &&
+
+    List<SCMNodeInfo> scmNodeInfoList = SCMNodeInfo.buildNodeInfo(
+        configuration);
+    Preconditions.checkNotNull(scmNodeInfoList, "scmNodeInfoList is null");
+
+    InetSocketAddress scmAddress = null;
+    if (SCMHAUtils.getScmServiceId(configuration) != null) {
+      for (SCMNodeInfo scmNodeInfo : scmNodeInfoList) {
+        if (scmHANodeDetails.getLocalNodeDetails().getNodeId() != null
+            && scmHANodeDetails.getLocalNodeDetails().getNodeId().equals(
+            scmNodeInfo.getNodeId())) {
+          scmAddress =
+              NetUtils.createSocketAddr(scmNodeInfo.getScmClientAddress());
+        }
+      }
+    } else  {
+      scmAddress = NetUtils.createSocketAddr(
+          scmNodeInfoList.get(0).getScmClientAddress());
+    }
+
+    Preconditions.checkNotNull(scmAddress,
+        "SCM Client Address is null");
+
+    //TODO: Until we have PKI profile, do not create cert client as present
+    // profile does not validate basic extension and KeyUsage for CA CSR.
+    // This will be fixed in further jiras. This is to make current tests
+    // pass until we complete HA security implementation.
+
+    // Till then make this run only on HA config cluster.
+    if (SCMHAUtils.getScmServiceId(configuration) != null &&
+        OzoneSecurityUtil.isSecurityEnabled(configuration) &&
         scmStorageConfig.getPrimaryScmNodeId().equals(
             scmStorageConfig.getScmId())) {
       HASecurityUtils.initializeSecurity(scmStorageConfig.getClusterID(),
-          scmStorageConfig.getScmId(), configuration,
-          scmHANodeDetails.getLocalNodeDetails()
-              .getBlockProtocolServerAddress());
+          scmStorageConfig.getScmId(), configuration, scmAddress);
     }
 
     setStartTime();
