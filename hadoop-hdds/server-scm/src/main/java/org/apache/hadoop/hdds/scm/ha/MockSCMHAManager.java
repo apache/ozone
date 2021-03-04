@@ -27,6 +27,7 @@ import java.util.Map;
 import com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
+import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftClientReply;
@@ -46,14 +47,14 @@ public final class MockSCMHAManager implements SCMHAManager {
 
   private final SCMRatisServer ratisServer;
   private boolean isLeader;
-  private DBTransactionBuffer transactionBuffer;
+  private SCMHADBTransactionBuffer transactionBuffer;
 
   public static SCMHAManager getInstance(boolean isLeader) {
     return new MockSCMHAManager(isLeader);
   }
 
   public static SCMHAManager getInstance(boolean isLeader,
-      DBTransactionBuffer buffer) {
+      SCMHADBTransactionBuffer buffer) {
     return new MockSCMHAManager(isLeader, buffer);
   }
 
@@ -61,10 +62,10 @@ public final class MockSCMHAManager implements SCMHAManager {
    * Creates MockSCMHAManager instance.
    */
   private MockSCMHAManager(boolean isLeader) {
-    this(isLeader, new MockDBTransactionBuffer());
+    this(isLeader, new MockSCMHADBTransactionBuffer());
   }
 
-  private MockSCMHAManager(boolean isLeader, DBTransactionBuffer buffer) {
+  private MockSCMHAManager(boolean isLeader, SCMHADBTransactionBuffer buffer) {
     this.ratisServer = new MockRatisServer();
     this.isLeader = isLeader;
     this.transactionBuffer = buffer;
@@ -96,6 +97,11 @@ public final class MockSCMHAManager implements SCMHAManager {
 
   @Override
   public DBTransactionBuffer getDBTransactionBuffer() {
+    return transactionBuffer;
+  }
+
+  @Override
+  public SCMHADBTransactionBuffer asSCMHADBTransactionBuffer() {
     return transactionBuffer;
   }
 

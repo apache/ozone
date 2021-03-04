@@ -21,9 +21,9 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
-import org.apache.hadoop.hdds.scm.ha.DBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.ha.SCMHAInvocationHandler;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
+import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
@@ -160,8 +160,7 @@ public class DeletedBlockLogStateManagerImpl
   public void addTransactionsToDB(ArrayList<DeletedBlocksTransaction> txs)
       throws IOException {
     for (DeletedBlocksTransaction tx : txs) {
-      deletedTable.putWithBatch(
-          transactionBuffer.getCurrentBatchOperation(), tx.getTxID(), tx);
+      transactionBuffer.addToBuffer(deletedTable, tx.getTxID(), tx);
     }
   }
 
@@ -170,8 +169,7 @@ public class DeletedBlockLogStateManagerImpl
       throws IOException {
     deletingTxIDs.addAll(txIDs);
     for (Long txID : txIDs) {
-      deletedTable.deleteWithBatch(
-          transactionBuffer.getCurrentBatchOperation(), txID);
+      transactionBuffer.removeFromBuffer(deletedTable, txID);
     }
   }
 
@@ -194,8 +192,7 @@ public class DeletedBlockLogStateManagerImpl
       // then set the retry value to -1, stop retrying, admins can
       // analyze those blocks and purge them manually by SCMCli.
       DeletedBlocksTransaction.Builder builder = block.toBuilder().setCount(-1);
-      deletedTable.putWithBatch(
-          transactionBuffer.getCurrentBatchOperation(), txID, builder.build());
+      transactionBuffer.addToBuffer(deletedTable, txID, builder.build());
       skippingRetryTxIDs.add(txID);
     }
   }
@@ -255,7 +252,6 @@ public class DeletedBlockLogStateManagerImpl
 
     public DeletedBlockLogStateManager build() {
       Preconditions.checkNotNull(conf);
-      Preconditions.checkNotNull(scmRatisServer);
       Preconditions.checkNotNull(table);
 
       final DeletedBlockLogStateManager impl =

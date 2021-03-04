@@ -460,6 +460,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (configurator.getScmContext() != null) {
       scmContext = configurator.getScmContext();
     } else {
+      if (SCMHAUtils.isSCMHAEnabled(conf)) {
       // non-leader of term 0, in safe mode, preCheck not completed.
       scmContext = new SCMContext.Builder()
           .setLeader(false)
@@ -468,6 +469,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           .setIsPreCheckComplete(false)
           .setSCM(this)
           .build();
+      } else {
+        scmContext = SCMContext.emptyContext();
+      }
     }
 
     if(configurator.getScmNodeManager() != null) {
@@ -801,10 +805,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         //  it won't be starting a leader election and hence won't work. The
         //  check will be re-introduced one we have clear segregation path with
         //  ratis enable/disable switch.
-       // if (SCMHAUtils.isSCMHAEnabled(conf)) {
+        if (SCMHAUtils.isSCMHAEnabled(conf)) {
         SCMRatisServerImpl.initialize(scmStorageConfig.getClusterID(),
             scmStorageConfig.getScmId(), haDetails.getLocalNodeDetails(), conf);
-       // }
+        }
         LOG.info("SCM initialization succeeded. Current cluster id for sd={}"
                 + "; cid={}; layoutVersion={}; scmId={}",
             scmStorageConfig.getStorageDir(), scmStorageConfig.getClusterID(),

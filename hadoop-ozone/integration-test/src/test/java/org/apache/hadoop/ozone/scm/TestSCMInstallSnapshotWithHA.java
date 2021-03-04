@@ -138,7 +138,8 @@ public class TestSCMInstallSnapshotWithHA {
 
     // Get the latest db checkpoint from the leader SCM.
     TransactionInfo transactionInfo =
-        leaderSCM.getScmHAManager().getDBTransactionBuffer().getLatestTrxInfo();
+        leaderSCM.getScmHAManager().asSCMHADBTransactionBuffer()
+            .getLatestTrxInfo();
     TermIndex leaderTermIndex =
         TermIndex.valueOf(transactionInfo.getTerm(),
             transactionInfo.getTransactionIndex());

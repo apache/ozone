@@ -532,9 +532,11 @@ public class SCMClientProtocolServer implements
       ScmInfo.Builder builder =
           new ScmInfo.Builder()
               .setClusterId(scm.getScmStorageConfig().getClusterID())
-              .setScmId(scm.getScmStorageConfig().getScmId())
-              .setRatisPeerRoles(
-                  scm.getScmHAManager().getRatisServer().getRatisRoles());
+              .setScmId(scm.getScmStorageConfig().getScmId());
+      if (scm.getScmHAManager().getRatisServer() != null) {
+        builder.setRatisPeerRoles(
+            scm.getScmHAManager().getRatisServer().getRatisRoles());
+      }
       return builder.build();
     } catch (Exception ex) {
       auditSuccess = false;

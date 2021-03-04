@@ -65,14 +65,14 @@ public class SCMStateMachine extends BaseStateMachine {
   private StorageContainerManager scm;
   private SCMRatisServer ratisServer;
   private Map<RequestType, Object> handlers;
-  private DBTransactionBuffer transactionBuffer;
+  private SCMHADBTransactionBuffer transactionBuffer;
   private final SimpleStateMachineStorage storage =
       new SimpleStateMachineStorage();
   private final AtomicBoolean isInitialized;
   private ExecutorService installSnapshotExecutor;
 
   public SCMStateMachine(final StorageContainerManager scm,
-      final SCMRatisServer ratisServer, DBTransactionBuffer buffer)
+      final SCMRatisServer ratisServer, SCMHADBTransactionBuffer buffer)
       throws SCMException {
     this.scm = scm;
     this.ratisServer = ratisServer;

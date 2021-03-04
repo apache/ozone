@@ -50,7 +50,9 @@ public class SCMHAInvocationHandler implements InvocationHandler {
     this.requestType = requestType;
     this.localHandler = localHandler;
     this.ratisHandler = ratisHandler;
-    ratisHandler.registerStateMachineHandler(requestType, localHandler);
+    if (ratisHandler != null) {
+      ratisHandler.registerStateMachineHandler(requestType, localHandler);
+    }
   }
 
   @Override

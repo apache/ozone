@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -283,8 +284,10 @@ public class TestDeleteWithSlowFollower {
             deleteKey("ratis");
     GenericTestUtils.waitFor(() -> {
       try {
-        cluster.getStorageContainerManager().getScmHAManager()
-            .getDBTransactionBuffer().flush();
+        if (SCMHAUtils.isSCMHAEnabled(cluster.getConf())) {
+          cluster.getStorageContainerManager().getScmHAManager()
+              .asSCMHADBTransactionBuffer().flush();
+        }
         return
             dnStateMachine.getCommandDispatcher()
                 .getDeleteBlocksCommandHandler().getInvocationCount() >= 1;

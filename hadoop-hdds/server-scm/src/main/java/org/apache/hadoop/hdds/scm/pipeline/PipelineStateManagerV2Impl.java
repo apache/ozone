@@ -22,9 +22,9 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.ha.DBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.ha.SCMHAInvocationHandler;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
+import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -93,8 +93,8 @@ public class PipelineStateManagerV2Impl implements StateManager {
     try {
       Pipeline pipeline = Pipeline.getFromProtobuf(pipelineProto);
       if (pipelineStore != null) {
-        pipelineStore.putWithBatch(transactionBuffer.getCurrentBatchOperation(),
-            pipeline.getId(), pipeline);
+        transactionBuffer
+            .addToBuffer(pipelineStore, pipeline.getId(), pipeline);
         pipelineStateMap.addPipeline(pipeline);
         nodeManager.addPipeline(pipeline);
         LOG.info("Created pipeline {}.", pipeline);
@@ -223,8 +223,7 @@ public class PipelineStateManagerV2Impl implements StateManager {
     try {
       PipelineID pipelineID = PipelineID.getFromProtobuf(pipelineIDProto);
       if (pipelineStore != null) {
-        pipelineStore.deleteWithBatch(
-            transactionBuffer.getCurrentBatchOperation(), pipelineID);
+        transactionBuffer.removeFromBuffer(pipelineStore, pipelineID);
       }
       Pipeline pipeline = pipelineStateMap.removePipeline(pipelineID);
       nodeManager.removePipeline(pipeline);
@@ -261,8 +260,8 @@ public class PipelineStateManagerV2Impl implements StateManager {
       if (pipelineStore != null) {
         pipelineStateMap.updatePipelineState(pipelineID,
             Pipeline.PipelineState.fromProtobuf(newState));
-        pipelineStore.putWithBatch(transactionBuffer.getCurrentBatchOperation(),
-            pipelineID, getPipeline(pipelineID));
+        transactionBuffer
+            .addToBuffer(pipelineStore, pipelineID, getPipeline(pipelineID));
       }
     } catch (IOException ex) {
       LOG.warn("Pipeline {} state update failed", pipelineID);
