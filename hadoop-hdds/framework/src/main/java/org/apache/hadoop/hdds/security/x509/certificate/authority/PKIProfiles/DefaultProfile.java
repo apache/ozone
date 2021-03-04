@@ -153,6 +153,7 @@ public class DefaultProfile implements PKIProfile {
           GeneralNames.getInstance(ext.getParsedValue()).toString());
       return false;
     }
+
     GeneralNames generalNames = GeneralNames.getInstance(ext.getParsedValue());
     for (GeneralName name : generalNames.getNames()) {
       try {
@@ -304,8 +305,10 @@ public class DefaultProfile implements PKIProfile {
    */
   @Override
   public KeyUsage getKeyUsage() {
+    // Adding to same profile
+    // TODO: Create a new profile for RootCA which issues certificate?
     return new KeyUsage(KeyUsage.digitalSignature | KeyUsage.keyEncipherment
-        | KeyUsage.dataEncipherment | KeyUsage.keyAgreement);
+        | KeyUsage.dataEncipherment | KeyUsage.keyAgreement | KeyUsage.keyCertSign | KeyUsage.cRLSign);
   }
 
   /**

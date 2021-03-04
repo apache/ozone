@@ -158,7 +158,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
         scmNodeDetails.getHostName(), scmNodeDetails.getScmNodeId());
 
     // Check clusterID
-    if (storageContainerManager.getClusterId().equals(
+    if (!storageContainerManager.getClusterId().equals(
         scmNodeDetails.getClusterId())) {
       throw new IOException("SCM ClusterId mismatch. Peer SCM ClusterId " +
           scmNodeDetails.getClusterId() + ", primary SCM ClusterId "
