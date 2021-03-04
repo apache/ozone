@@ -30,8 +30,6 @@ set -u
 : "${OZONE_UPGRADE_CALLBACK}"
 set +u
 
-export COMPOSE_FILE="${TEST_DIR}/compose/non-ha/docker-compose.yaml"
-
 source "$TEST_DIR"/testlib.sh
 source "$OZONE_UPGRADE_CALLBACK"
 

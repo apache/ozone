@@ -39,13 +39,15 @@ source "${_upgrade_dir}/../testlib.sh"
 
 ## @description Create the directory tree required for persisting data between
 ##   compose cluster restarts
-create_data_dir() {
+create_data_dirs() {
+  local dirs_to_create="$@"
+
   if [[ -z "${OZONE_VOLUME}" ]]; then
     return 1
   fi
 
   rm -fr "${OZONE_VOLUME}" 2> /dev/null || sudo rm -fr "${OZONE_VOLUME}"
-  mkdir -p "${OZONE_VOLUME}"/{om1,om2,om3,dn1,dn2,dn3,recon,s3g,scm}
+  mkdir -p $dirs_to_create
   fix_data_dir_permissions
 }
 
@@ -85,11 +87,8 @@ run_test() {
   export OZONE_UPGRADE_TO="$3"
   local test_subdir="$test_dir"/"$OZONE_UPGRADE_FROM"-"$OZONE_UPGRADE_TO"
   export OZONE_UPGRADE_CALLBACK="$test_subdir"/callback.sh
-
-  OZONE_VOLUME="$test_subdir"/data
+  export OZONE_VOLUME="$test_subdir"/data
   export RESULT_DIR="$test_subdir"/result
-
-  create_data_dir
 
   if ! run_test_script "${test_dir}"; then
     RESULT=1
