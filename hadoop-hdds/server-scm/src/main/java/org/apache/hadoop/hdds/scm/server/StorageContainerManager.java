@@ -556,7 +556,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     // For primary do this during SCM startup, as it requires SCM Security
     // protocol server, Ratis Server and SCMMetadataStore setup.
-    if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
+
+    if (OzoneSecurityUtil.isSecurityEnabled(conf) &&
+        scmStorageConfig.getPrimaryScmNodeId().equals(scmStorageConfig.getScmId())) {
       HASecurityUtils.initializeSecurity(scmStorageConfig.getClusterID(),
           scmStorageConfig.getScmId(), conf,
           scmHANodeDetails.getLocalNodeDetails().getBlockProtocolServerAddress());
@@ -796,7 +798,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           Preconditions.checkNotNull(UUID.fromString(clusterId));
           scmStorageConfig.setClusterId(clusterId);
         }
-        scmStorageConfig.initialize();
         // TODO: Removing the HA enabled check right now as
         //  when the SCM starts up , it always spins up the ratis
         //  server irrespective of the check. If the ratis server is not
@@ -808,7 +809,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         SCMRatisServerImpl.initialize(scmStorageConfig.getClusterID(),
             scmStorageConfig.getScmId(), haDetails.getLocalNodeDetails(), conf);
        // }
-
+        scmStorageConfig.setPrimaryScmNodeId(scmStorageConfig.getScmId());
+        scmStorageConfig.initialize();
         LOG.info("SCM initialization succeeded. Current cluster id for sd={}"
                 + "; cid={}; layoutVersion={}; scmId={}",
             scmStorageConfig.getStorageDir(), scmStorageConfig.getClusterID(),
@@ -816,6 +818,12 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         return true;
       } catch (IOException ioe) {
         LOG.error("Could not initialize SCM version file", ioe);
+        // If initialization failed, delete version file. Because if they
+        // plan to move to new node and do init, this version file has
+        // incorrect version information about primary, when it is not primary.
+        if (scmStorageConfig.getVersionFile().exists()) {
+          scmStorageConfig.getVersionFile().delete();
+        }
         return false;
       }
     } else {
