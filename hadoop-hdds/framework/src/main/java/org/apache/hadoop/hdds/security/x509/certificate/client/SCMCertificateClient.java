@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.x509.certificate.client.DefaultCertificateClient.InitCase;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
 import org.slf4j.Logger;
@@ -50,8 +51,8 @@ public class SCMCertificateClient extends DefaultCertificateClient {
   }
 
   @Override
-  protected InitResponse handleCase(DefaultCertificateClient.InitCase init) throws
-      CertificateException {
+  protected InitResponse handleCase(InitCase init)
+      throws CertificateException {
     // This is similar to OM, where it overrides handleCase method from
     // DefaultCertClient.
     switch (init) {
