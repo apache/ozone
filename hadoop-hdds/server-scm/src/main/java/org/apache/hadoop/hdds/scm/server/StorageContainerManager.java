@@ -553,18 +553,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         CertificateServer.CAType.SELF_SIGNED_CA);
     securityProtocolServer = new SCMSecurityProtocolServer(conf,
         certificateServer, this);
-
-    // For primary do this during SCM startup, as it requires SCM Security
-    // protocol server, Ratis Server and SCMMetadataStore setup.
-    if (OzoneSecurityUtil.isSecurityEnabled(conf) &&
-        scmStorageConfig.getPrimaryScmNodeId().equals(
-            scmStorageConfig.getScmId())) {
-      HASecurityUtils.initializeSecurity(scmStorageConfig.getClusterID(),
-          scmStorageConfig.getScmId(), conf,
-          scmHANodeDetails.getLocalNodeDetails()
-              .getBlockProtocolServerAddress());
-    }
-
     grpcTlsConfig = createTlsClientConfigForSCM(new SecurityConfig(conf),
             certificateServer);
   }
@@ -1013,6 +1001,18 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     } catch (Exception ex) {
       // SCM HttpServer start-up failure should be non-fatal
       LOG.error("SCM HttpServer failed to start.", ex);
+    }
+
+
+    // For primary do this during SCM startup, as it requires SCM Security
+    // protocol server, Ratis Server and SCMMetadataStore setup.
+    if (OzoneSecurityUtil.isSecurityEnabled(configuration) &&
+        scmStorageConfig.getPrimaryScmNodeId().equals(
+            scmStorageConfig.getScmId())) {
+      HASecurityUtils.initializeSecurity(scmStorageConfig.getClusterID(),
+          scmStorageConfig.getScmId(), configuration,
+          scmHANodeDetails.getLocalNodeDetails()
+              .getBlockProtocolServerAddress());
     }
 
     setStartTime();
