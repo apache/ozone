@@ -84,15 +84,14 @@ public class ContainerEndpoint {
   @Inject
   private ReconOMMetadataManager omMetadataManager;
 
-  // TODO: Fix ME, This has to be ReconContainerManager
-  private ReconContainerManager containerManager;
+  private final ReconContainerManager containerManager;
   private final ContainerHealthSchemaManager containerHealthSchemaManager;
 
   @Inject
   public ContainerEndpoint(OzoneStorageContainerManager reconSCM,
       ContainerHealthSchemaManager containerHealthSchemaManager) {
-    this.containerManager = (ReconContainerManager) reconSCM
-        .getContainerManager();
+    this.containerManager =
+        (ReconContainerManager) reconSCM.getContainerManager();
     this.containerHealthSchemaManager = containerHealthSchemaManager;
   }
 

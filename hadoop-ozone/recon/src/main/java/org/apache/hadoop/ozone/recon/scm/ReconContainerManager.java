@@ -42,8 +42,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ContainerReplicaNotFoundException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
-import org.apache.hadoop.hdds.scm.ha.MockDBTransactionBuffer;
-import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -82,6 +81,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
    *
    * @throws IOException on Failure.
    */
+  @SuppressWarnings("parameternumber")
   public ReconContainerManager(
       Configuration conf,
       DBStore store,
@@ -89,10 +89,10 @@ public class ReconContainerManager extends ContainerManagerImpl {
       PipelineManager pipelineManager,
       StorageContainerServiceProvider scm,
       ContainerHealthSchemaManager containerHealthSchemaManager,
-      ContainerDBServiceProvider containerDBServiceProvider)
+      ContainerDBServiceProvider containerDBServiceProvider,
+      SCMHAManager scmhaManager)
       throws IOException {
-    super(conf, MockSCMHAManager.getInstance(true,
-        new MockDBTransactionBuffer(store)), pipelineManager, containerStore);
+    super(conf, scmhaManager, pipelineManager, containerStore);
     this.scmClient = scm;
     this.pipelineManager = pipelineManager;
     this.containerHealthSchemaManager = containerHealthSchemaManager;

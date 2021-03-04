@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.recon.fsck;
 
 import static junit.framework.TestCase.assertEquals;
 import static org.junit.Assert.assertNotNull;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -55,7 +54,6 @@ import org.hadoop.ozone.recon.schema.tables.daos.UnhealthyContainersDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
 import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
 import org.junit.Assert;
-import org.junit.Ignore;
 import org.junit.Test;
 
 /**
@@ -63,7 +61,6 @@ import org.junit.Test;
  */
 public class TestContainerHealthTask extends AbstractReconSqlDBTest {
   @Test
-  @Ignore
   public void testRun() throws Exception {
     UnhealthyContainersDao unHealthyContainersTableHandle =
         getDao(UnhealthyContainersDao.class);
@@ -85,8 +82,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     // defined below. The container with ID=6 will be healthy.
     List<ContainerInfo> mockContainers = getMockContainers(6);
     when(scmMock.getContainerManager()).thenReturn(containerManagerMock);
-    when(containerManagerMock.getContainers(any(), any()))
-        .thenReturn(mockContainers);
+    when(containerManagerMock.getContainers()).thenReturn(mockContainers);
     for (ContainerInfo c : mockContainers) {
       when(containerManagerMock.getContainer(c.containerID())).thenReturn(c);
     }

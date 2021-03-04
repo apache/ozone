@@ -21,6 +21,7 @@ import java.util.Optional;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -37,7 +38,6 @@ import org.apache.hadoop.test.LambdaTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -90,7 +90,6 @@ public class TestReconAsPassiveScm {
   }
 
   @Test
-  @Ignore
   public void testDatanodeRegistrationAndReports() throws Exception {
     ReconStorageContainerManagerFacade reconScm =
         (ReconStorageContainerManagerFacade)
@@ -126,6 +125,7 @@ public class TestReconAsPassiveScm {
         reconNodeManager.getAllNodes().size());
 
     // Create container
+    ContainerManagerV2 reconContainerManager = reconScm.getContainerManager();
     ContainerInfo containerInfo =
         scmContainerManager.allocateContainer(RATIS, ONE, "test");
     long containerID = containerInfo.getContainerID();
@@ -135,9 +135,8 @@ public class TestReconAsPassiveScm {
     runTestOzoneContainerViaDataNode(containerID, client);
 
     // Verify Recon picked up the new container that was created.
-    // TODO: Fix ME
-    //assertEquals(scmContainerManager.getContainerIDs(),
-    //    reconContainerManager.getContainerIDs());
+    assertEquals(scmContainerManager.getContainerIDs(),
+        reconContainerManager.getContainerIDs());
 
     GenericTestUtils.LogCapturer logCapturer =
         GenericTestUtils.LogCapturer.captureLogs(ReconNodeManager.LOG);
@@ -150,7 +149,6 @@ public class TestReconAsPassiveScm {
   }
 
   @Test
-  @Ignore
   public void testReconRestart() throws Exception {
     final OzoneStorageContainerManager reconScm =
             cluster.getReconServer().getReconStorageContainerManager();
@@ -204,9 +202,8 @@ public class TestReconAsPassiveScm {
     assertFalse(
         reconPipelineManager.containsPipeline(pipelineToClose.get().getId()));
 
-    // TODO: Fix ME
-    //LambdaTestUtils.await(90000, 5000,
-    //    () -> (newReconScm.getContainerManager()
-    //        .exists(ContainerID.valueOf(containerID))));
+    LambdaTestUtils.await(90000, 5000,
+        () -> (newReconScm.getContainerManager()
+            .containerExist(ContainerID.valueOf(containerID))));
   }
 }
