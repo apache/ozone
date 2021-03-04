@@ -24,6 +24,7 @@ import com.google.common.base.Preconditions;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.validator.routines.DomainValidator;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
+import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.DefaultProfile;
@@ -310,6 +311,11 @@ public class DefaultCAServer implements CertificateServer {
     return store.listCertificate(role, BigInteger.valueOf(startSerialId), count,
         isRevoked? CertificateStore.CertType.REVOKED_CERTS :
             CertificateStore.CertType.VALID_CERTS);
+  }
+
+  @Override
+  public void reinitialize(SCMMetadataStore scmMetadataStore) {
+    store.reinitialize(scmMetadataStore);
   }
 
   /**

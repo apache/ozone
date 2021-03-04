@@ -36,6 +36,7 @@ import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
+import org.apache.ratis.server.protocol.TermIndex;
 
 // TODO: Move this class to test package after fixing Recon
 /**
@@ -116,6 +117,11 @@ public final class MockSCMHAManager implements SCMHAManager {
     return false;
   }
 
+  @Override
+  public TermIndex installSnapshotFromLeader(String leaderId) {
+    return null;
+  }
+
   private class MockRatisServer implements SCMRatisServer {
 
     private Map<RequestType, Object> handlers =
@@ -127,7 +133,7 @@ public final class MockSCMHAManager implements SCMHAManager {
 
     @Override
     public void registerStateMachineHandler(final RequestType handlerType,
-                                            final Object handler) {
+        final Object handler) {
       handlers.put(handlerType, handler);
     }
 
@@ -140,59 +146,42 @@ public final class MockSCMHAManager implements SCMHAManager {
       if (isLeader()) {
         try {
           final Message result = process(request);
-          reply = RaftClientReply.newBuilder()
-              .setClientId(ClientId.randomId())
-              .setServerId(raftId)
-              .setGroupId(RaftGroupId.emptyGroupId())
-              .setCallId(1L)
-              .setSuccess(true)
-              .setMessage(result)
-              .setException(null)
-              .setLogIndex(1L)
-              .build();
+          reply = RaftClientReply.newBuilder().setClientId(ClientId.randomId())
+              .setServerId(raftId).setGroupId(RaftGroupId.emptyGroupId())
+              .setCallId(1L).setSuccess(true).setMessage(result)
+              .setException(null).setLogIndex(1L).build();
         } catch (Exception ex) {
-          reply = RaftClientReply.newBuilder()
-              .setClientId(ClientId.randomId())
-              .setServerId(raftId)
-              .setGroupId(RaftGroupId.emptyGroupId())
-              .setCallId(1L)
-              .setSuccess(false)
-              .setMessage(Message.EMPTY)
+          reply = RaftClientReply.newBuilder().setClientId(ClientId.randomId())
+              .setServerId(raftId).setGroupId(RaftGroupId.emptyGroupId())
+              .setCallId(1L).setSuccess(false).setMessage(Message.EMPTY)
               .setException(new StateMachineException(raftId, ex))
-              .setLogIndex(1L)
-              .build();
+              .setLogIndex(1L).build();
         }
       } else {
-        reply = RaftClientReply.newBuilder()
-            .setClientId(ClientId.randomId())
-            .setServerId(raftId)
-            .setGroupId(RaftGroupId.emptyGroupId())
-            .setCallId(1L)
-            .setSuccess(false)
-            .setMessage(Message.EMPTY)
-            .setException(triggerNotLeaderException())
-            .setLogIndex(1L)
-            .build();
+        reply = RaftClientReply.newBuilder().setClientId(ClientId.randomId())
+            .setServerId(raftId).setGroupId(RaftGroupId.emptyGroupId())
+            .setCallId(1L).setSuccess(false).setMessage(Message.EMPTY)
+            .setException(triggerNotLeaderException()).setLogIndex(1L).build();
       }
       return SCMRatisResponse.decode(reply);
     }
 
-    private Message process(final SCMRatisRequest request)
-        throws Exception {
+    private Message process(final SCMRatisRequest request) throws Exception {
       try {
         final Object handler = handlers.get(request.getType());
 
         if (handler == null) {
-          throw new IOException("No handler found for request type " +
-              request.getType());
+          throw new IOException(
+              "No handler found for request type " + request.getType());
         }
 
         final List<Class<?>> argumentTypes = new ArrayList<>();
-        for(Object args : request.getArguments()) {
+        for (Object args : request.getArguments()) {
           argumentTypes.add(args.getClass());
         }
-        final Object result = handler.getClass().getMethod(
-            request.getOperation(), argumentTypes.toArray(new Class<?>[0]))
+        final Object result = handler.getClass()
+            .getMethod(request.getOperation(),
+                argumentTypes.toArray(new Class<?>[0]))
             .invoke(handler, request.getArguments());
 
         return SCMRatisResponse.encode(result);
@@ -215,17 +204,20 @@ public final class MockSCMHAManager implements SCMHAManager {
 
     @Override
     public List<String> getRatisRoles() {
-      return Arrays.asList(
-          "180.3.14.5:9865",
-          "180.3.14.21:9865",
-          "180.3.14.145:9865");
+      return Arrays
+          .asList("180.3.14.5:9865", "180.3.14.21:9865", "180.3.14.145:9865");
     }
 
     @Override
     public NotLeaderException triggerNotLeaderException() {
-      return new NotLeaderException(RaftGroupMemberId.valueOf(
-          RaftPeerId.valueOf("peer"), RaftGroupId.randomId()),
-          null, new ArrayList<>());
+      return new NotLeaderException(RaftGroupMemberId
+          .valueOf(RaftPeerId.valueOf("peer"), RaftGroupId.randomId()), null,
+          new ArrayList<>());
+    }
+
+    @Override
+    public SCMStateMachine getSCMStateMachine() {
+      return null;
     }
 
     @Override

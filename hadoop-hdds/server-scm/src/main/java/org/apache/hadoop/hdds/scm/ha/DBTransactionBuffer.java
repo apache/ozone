@@ -41,4 +41,6 @@ public interface DBTransactionBuffer extends Closeable {
   void setLatestSnapshot(SnapshotInfo latestSnapshot);
 
   void flush() throws IOException;
+
+  void init() throws IOException;
 }

@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.metadata;
 
+import java.io.File;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
@@ -25,6 +26,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -45,7 +47,9 @@ import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.REVOKED_CERTS;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.TRANSACTIONINFO;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.VALID_CERTS;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.VALID_SCM_CERTS;
+import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
 
+import org.apache.ratis.util.ExitUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -94,6 +98,23 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
   public void start(OzoneConfiguration config)
       throws IOException {
     if (this.store == null) {
+
+      File metaDir = HAUtils.getMetaDir(new SCMDBDefinition(), configuration);
+      // Check if there is a DB Inconsistent Marker in the metaDir. This
+      // marker indicates that the DB is in an inconsistent state and hence
+      // the OM process should be terminated.
+      File markerFile = new File(metaDir, DB_TRANSIENT_MARKER);
+      if (markerFile.exists()) {
+        LOG.error("File {} marks that SCM DB is in an inconsistent state.",
+            markerFile);
+        // Note - The marker file should be deleted only after fixing the DB.
+        // In an HA setup, this can be done by replacing this DB with a
+        // checkpoint from another SCM.
+        String errorMsg = "Cannot load SCM DB as it is in an inconsistent " +
+            "state.";
+        ExitUtils.terminate(1, errorMsg, LOG);
+      }
+
 
       this.store = DBStoreBuilder.createDBStore(config, new SCMDBDefinition());
 

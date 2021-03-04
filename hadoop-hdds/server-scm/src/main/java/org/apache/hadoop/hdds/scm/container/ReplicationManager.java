@@ -215,6 +215,7 @@ public class ReplicationManager implements MetricsSource, SCMService {
   /**
    * Starts Replication Monitor thread.
    */
+  @Override
   public synchronized void start() {
 
     if (!isRunning()) {

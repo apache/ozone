@@ -120,11 +120,6 @@ public class ContainerStateMap {
       factorMap.insert(info.getReplicationFactor(), id);
       typeMap.insert(info.getReplicationType(), id);
       replicaMap.put(id, ConcurrentHashMap.newKeySet());
-
-      // Flush the cache of this container type, will be added later when
-      // get container queries are executed.
-      flushCache(info);
-      LOG.trace("Container {} added to ContainerStateMap.", id);
     }
   }
 

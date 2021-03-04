@@ -21,14 +21,25 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
+import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.HAUtils;
+
+import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.OzoneSecurityUtil;
+import org.apache.hadoop.ozone.util.ExitManager;
 import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.ratis.util.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 
 /**
  * SCMHAManagerImpl uses Apache Ratis for HA implementation. We will have 2N+1
@@ -48,6 +59,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
   private final SCMDBTransactionBuffer transactionBuffer;
   private final SCMSnapshotProvider scmSnapshotProvider;
   private final StorageContainerManager scm;
+  private ExitManager exitManager;
 
   // this should ideally be started only in a ratis leader
   private final InterSCMGrpcProtocolService grpcServer;
@@ -109,50 +121,37 @@ public class SCMHAManagerImpl implements SCMHAManager {
   }
 
   /**
-   * Download and install latest checkpoint from leader OM.
+   * Download and install latest checkpoint from leader SCM.
    *
-   * @param leaderId peerNodeID of the leader OM
+   * @param leaderId peerNodeID of the leader SCM
    * @return If checkpoint is installed successfully, return the
    *         corresponding termIndex. Otherwise, return null.
    */
   public TermIndex installSnapshotFromLeader(String leaderId) {
-    if(scmSnapshotProvider == null) {
-      LOG.error("OM Snapshot Provider is not configured as there are no peer " +
-          "nodes.");
+    if (scmSnapshotProvider == null) {
+      LOG.error("SCM Snapshot Provider is not configured as there are no peer "
+          + "nodes.");
       return null;
     }
 
-    DBCheckpoint omDBCheckpoint = getDBCheckpointFromLeader(leaderId);
+    DBCheckpoint dBCheckpoint = getDBCheckpointFromLeader(leaderId);
     LOG.info("Downloaded checkpoint from Leader {} to the location {}",
-        leaderId, omDBCheckpoint.getCheckpointLocation());
+        leaderId, dBCheckpoint.getCheckpointLocation());
 
     TermIndex termIndex = null;
     try {
-      termIndex = installCheckpoint(leaderId, omDBCheckpoint);
+      termIndex = installCheckpoint(leaderId, dBCheckpoint);
     } catch (Exception ex) {
-      LOG.error("Failed to install snapshot from Leader OM.", ex);
+      LOG.error("Failed to install snapshot from Leader SCM.", ex);
     }
     return termIndex;
   }
 
   /**
-   * Install checkpoint. If the checkpoints snapshot index is greater than
-   * SCM's last applied transaction index, then re-initialize the OM
-   * state via this checkpoint. Before re-initializing OM state, the OM Ratis
-   * server should be stopped so that no new transactions can be applied.
-   */
-  TermIndex installCheckpoint(String leaderId, DBCheckpoint omDBCheckpoint)
-      throws Exception {
-    // TODO : implement install checkpoint
-    return null;
-  }
-
-
-  /**
-   * Download the latest SCM DB checkpoint from the leader OM.
+   * Download the latest SCM DB checkpoint from the leader SCM.
    *
-   * @param leaderId OMNodeID of the leader OM node.
-   * @return latest DB checkpoint from leader OM.
+   * @param leaderId SCMNodeID of the leader SCM node.
+   * @return latest DB checkpoint from leader SCM.
    */
   private DBCheckpoint getDBCheckpointFromLeader(String leaderId) {
     LOG.info("Downloading checkpoint from leader SCM {} and reloading state " +
@@ -161,11 +160,127 @@ public class SCMHAManagerImpl implements SCMHAManager {
     try {
       return scmSnapshotProvider.getSCMDBSnapshot(leaderId);
     } catch (IOException e) {
-      LOG.error("Failed to download checkpoint from OM leader {}", leaderId, e);
+      LOG.error("Failed to download checkpoint from SCM leader {}", leaderId,
+          e);
     }
     return null;
   }
 
+  /**
+   * Install checkpoint. If the checkpoints snapshot index is greater than
+   * SCM's last applied transaction index, then re-initialize the SCM
+   * state via this checkpoint. Before re-initializing SCM state, the SCM Ratis
+   * server should be stopped so that no new transactions can be applied.
+   */
+  @VisibleForTesting
+  public TermIndex installCheckpoint(String leaderId, DBCheckpoint dbCheckpoint)
+      throws Exception {
+
+    Path checkpointLocation = dbCheckpoint.getCheckpointLocation();
+    TransactionInfo checkpointTrxnInfo = HAUtils
+        .getTrxnInfoFromCheckpoint(OzoneConfiguration.of(conf),
+            checkpointLocation, new SCMDBDefinition());
+
+    LOG.info("Installing checkpoint with SCMTransactionInfo {}",
+        checkpointTrxnInfo);
+
+    return installCheckpoint(leaderId, checkpointLocation, checkpointTrxnInfo);
+  }
+
+  public TermIndex installCheckpoint(String leaderId, Path checkpointLocation,
+      TransactionInfo checkpointTrxnInfo) throws Exception {
+
+    File dbBackup = null;
+    TermIndex termIndex =
+        getRatisServer().getSCMStateMachine().getLastAppliedTermIndex();
+    long term = termIndex.getTerm();
+    long lastAppliedIndex = termIndex.getIndex();
+    // Check if current applied log index is smaller than the downloaded
+    // checkpoint transaction index. If yes, proceed by stopping the ratis
+    // server so that the SCM state can be re-initialized. If no then do not
+    // proceed with installSnapshot.
+    boolean canProceed = HAUtils
+        .verifyTransactionInfo(checkpointTrxnInfo, lastAppliedIndex, leaderId,
+            checkpointLocation, LOG);
+    File oldDBLocation = scm.getScmMetadataStore().getStore().getDbLocation();
+    if (canProceed) {
+      try {
+        // Stop services
+        stopServices();
+
+        // Pause the State Machine so that no new transactions can be applied.
+        // This action also clears the SCM Double Buffer so that if there
+        // are any pending transactions in the buffer, they are discarded.
+
+      } catch (Exception e) {
+        LOG.error("Failed to stop/ pause the services. Cannot proceed with "
+            + "installing the new checkpoint.");
+        startServices();
+        throw e;
+      }
+      try {
+        dbBackup = HAUtils
+            .replaceDBWithCheckpoint(lastAppliedIndex, oldDBLocation,
+                checkpointLocation, OzoneConsts.SCM_DB_BACKUP_PREFIX);
+        term = checkpointTrxnInfo.getTerm();
+        lastAppliedIndex = checkpointTrxnInfo.getTransactionIndex();
+        LOG.info(
+            "Replaced DB with checkpoint from SCM: {}, term: {}, index: {}",
+            leaderId, term, lastAppliedIndex);
+      } catch (Exception e) {
+        LOG.error("Failed to install Snapshot from {} as SCM failed to replace"
+            + " DB with downloaded checkpoint. Reloading old SCM state.", e);
+      }
+    } else {
+      LOG.warn("Cannot proceed with InstallSnapshot as SCM is at TermIndex {} "
+          + "and checkpoint has lower TermIndex {}. Reloading old "
+          + "state of SCM.", termIndex, checkpointTrxnInfo.getTermIndex());
+    }
+
+    // Reload the DB store with the new checkpoint.
+    // Restart (unpause) the state machine and update its last applied index
+    // to the installed checkpoint's snapshot index.
+    try {
+      reloadSCMState();
+      getRatisServer().getSCMStateMachine().unpause(lastAppliedIndex, term);
+      LOG.info("Reloaded SCM state with Term: {} and Index: {}", term,
+          lastAppliedIndex);
+    } catch (Exception ex) {
+      String errorMsg = "Failed to reload SCM state and instantiate services.";
+      exitManager.exitSystem(1, errorMsg, ex, LOG);
+    }
+
+    // Delete the backup DB
+    try {
+      if (dbBackup != null) {
+        FileUtils.deleteFully(dbBackup);
+      }
+    } catch (Exception e) {
+      LOG.error("Failed to delete the backup of the original DB {}", dbBackup);
+    }
+
+    if (lastAppliedIndex != checkpointTrxnInfo.getTransactionIndex()) {
+      // Install Snapshot failed and old state was reloaded. Return null to
+      // Ratis to indicate that installation failed.
+      return null;
+    }
+
+    // TODO: We should only return the snpashotIndex to the leader.
+    //  Should be fixed after RATIS-586
+    TermIndex newTermIndex = TermIndex.valueOf(term, lastAppliedIndex);
+    return newTermIndex;
+  }
+
+
+  /**
+   * Re-instantiate MetadataManager with new DB checkpoint.
+   * All the classes which use/ store MetadataManager should also be updated
+   * with the new MetadataManager instance.
+   */
+  void reloadSCMState()
+      throws IOException {
+    startServices();
+  }
 
   /**
    * {@inheritDoc}
@@ -173,6 +288,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
   @Override
   public void shutdown() throws IOException {
     ratisServer.stop();
+    ratisServer.getSCMStateMachine().stop();
     grpcServer.stop();
   }
 
@@ -188,5 +304,36 @@ public class SCMHAManagerImpl implements SCMHAManager {
     Preconditions.checkNotNull(
         getRatisServer().getDivision().getGroup().getGroupId());
     return getRatisServer().addSCM(request);
+  }
+
+  void stopServices() throws Exception {
+
+    // just stop the SCMMetaData store. All other background
+    // services will be in pausing state in the follower.
+    scm.getScmMetadataStore().stop();
+  }
+
+  void startServices() throws IOException {
+
+   // TODO: Fix the metrics ??
+    final SCMMetadataStore metadataStore = scm.getScmMetadataStore();
+    metadataStore.start(OzoneConfiguration.of(conf));
+    scm.getPipelineManager().reinitialize(metadataStore.getPipelineTable());
+    scm.getContainerManager().reinitialize(metadataStore.getContainerTable());
+    scm.getScmBlockManager().getDeletedBlockLog().reinitialize(
+        metadataStore.getDeletedBlocksTXTable());
+    if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
+      scm.getCertificateServer().reinitialize(metadataStore);
+    }
+  }
+
+  @VisibleForTesting
+  public void setExitManagerForTesting(ExitManager exitManagerForTesting) {
+    this.exitManager = exitManagerForTesting;
+  }
+
+  @VisibleForTesting
+  public static Logger getLogger() {
+    return LOG;
   }
 }

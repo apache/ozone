@@ -122,6 +122,20 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
   }
 
   @Override
+  public void reinitialize(Table<ContainerID, ContainerInfo> containerStore)
+      throws IOException {
+    lock.lock();
+    try {
+      containerStateManager.reinitialize(containerStore);
+    } catch (IOException ioe) {
+      LOG.error("Failed to reinitialize containerManager", ioe);
+      throw ioe;
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  @Override
   public ContainerInfo getContainer(final ContainerID id)
       throws ContainerNotFoundException {
     return Optional.ofNullable(containerStateManager

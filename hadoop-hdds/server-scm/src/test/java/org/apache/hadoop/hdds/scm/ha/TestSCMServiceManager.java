@@ -56,6 +56,14 @@ public class TestSCMServiceManager {
       public String getServiceName() {
         return "serviceRunWhenLeader";
       }
+
+      @Override
+      public void start() {
+      }
+
+      @Override
+      public void stop() {
+      }
     };
 
     SCMServiceManager serviceManager = new SCMServiceManager();
@@ -117,6 +125,14 @@ public class TestSCMServiceManager {
       @Override
       public String getServiceName() {
         return "serviceRunWhenLeaderAndOutOfSafeMode";
+      }
+
+      @Override
+      public void start() {
+      }
+
+      @Override
+      public void stop() {
       }
     };
 

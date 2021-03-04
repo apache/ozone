@@ -502,6 +502,12 @@ public final class PipelineManagerV2Impl implements PipelineManager {
   }
 
   @Override
+  public void reinitialize(Table<PipelineID, Pipeline> pipelineStore)
+      throws IOException {
+    stateManager.reinitialize(pipelineStore);
+  }
+
+  @Override
   public void close() throws IOException {
     if (backgroundPipelineCreator != null) {
       backgroundPipelineCreator.stop();

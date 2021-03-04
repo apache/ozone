@@ -18,16 +18,22 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import java.io.IOException;
+import java.util.Arrays;
 
 import com.google.common.base.Preconditions;
 
 import org.apache.hadoop.hdds.protocol.scm.proto.InterSCMProtocolProtos.CopyDBCheckpointRequestProto;
 import org.apache.hadoop.hdds.protocol.scm.proto.InterSCMProtocolProtos.CopyDBCheckpointResponseProto;
 import org.apache.hadoop.hdds.protocol.scm.proto.InterSCMProtocolServiceGrpc;
+import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 
 /**
  * Service to handle Rocks db Checkpointing.
@@ -40,12 +46,13 @@ public class InterSCMGrpcService extends
 
   private static final int BUFFER_SIZE = 1024 * 1024;
 
-  private final String clusterId;
   private final SCMDBCheckpointProvider provider;
+
+  private final StorageContainerManager scm;
 
   public InterSCMGrpcService(final StorageContainerManager scm) {
     Preconditions.checkNotNull(scm);
-    this.clusterId = scm.getClusterId();
+    this.scm = scm;
     provider =
         new SCMDBCheckpointProvider(scm.getScmMetadataStore().getStore());
   }
@@ -54,8 +61,18 @@ public class InterSCMGrpcService extends
   public void download(CopyDBCheckpointRequestProto request,
       StreamObserver<CopyDBCheckpointResponseProto> responseObserver) {
     try {
+      scm.getScmHAManager().getDBTransactionBuffer().flush();
+      Table<String, TransactionInfo> transactionInfoTable =
+          Arrays.stream(new SCMDBDefinition().getColumnFamilies())
+              .filter(t -> t.getValueType() == TransactionInfo.class)
+              .findFirst().get().getTable(scm.getScmMetadataStore().getStore());
+
+      TransactionInfo transactionInfo =
+          transactionInfoTable.get(TRANSACTION_INFO_KEY);
+      Preconditions.checkNotNull(transactionInfo);
       SCMGrpcOutputStream outputStream =
-          new SCMGrpcOutputStream(responseObserver, clusterId, BUFFER_SIZE);
+          new SCMGrpcOutputStream(responseObserver, scm.getClusterId(),
+              BUFFER_SIZE);
       provider.writeDBCheckPointToSream(outputStream, request.getFlush());
 
     } catch (IOException e) {

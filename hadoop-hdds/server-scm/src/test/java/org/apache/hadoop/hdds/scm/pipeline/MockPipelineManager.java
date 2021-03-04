@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.utils.db.Table;
 
 import java.io.IOException;
 import java.util.Collection;
@@ -216,6 +217,12 @@ public final class MockPipelineManager implements PipelineManager {
   @Override
   public boolean getSafeModeStatus() {
     return false;
+  }
+
+  @Override
+  public void reinitialize(Table<PipelineID, Pipeline> pipelineStore)
+      throws IOException {
+
   }
 
   @Override

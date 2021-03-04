@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -180,6 +181,11 @@ public class PipelineStateManager implements StateManager {
       throws IOException {
     pipelineStateMap
         .updatePipelineState(pipelineID, PipelineState.DORMANT);
+  }
+
+  @Override
+  public void reinitialize(Table<PipelineID, Pipeline> pipelineStore)
+      throws IOException {
   }
 
   @Override

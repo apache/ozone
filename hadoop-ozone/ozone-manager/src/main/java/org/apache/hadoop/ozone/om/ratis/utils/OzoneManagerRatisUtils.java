@@ -19,10 +19,9 @@ package org.apache.hadoop.ozone.om.ratis.utils;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.utils.db.DBStore;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketCreateRequest;
@@ -69,14 +68,11 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneObj.ObjectType;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
-import org.apache.ratis.util.FileUtils;
 import org.rocksdb.RocksDBException;
 
 import java.io.IOException;
 import java.nio.file.Path;
 
-import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TRANSACTION_INFO_TABLE;
 
 /**
  * Utility class used by OzoneManager HA.
@@ -235,45 +231,8 @@ public final class OzoneManagerRatisUtils {
    */
   public static TransactionInfo getTrxnInfoFromCheckpoint(
       OzoneConfiguration conf, Path dbPath) throws Exception {
-
-    if (dbPath != null) {
-      Path dbDir = dbPath.getParent();
-      Path dbFile = dbPath.getFileName();
-      if (dbDir != null && dbFile != null) {
-        return getTransactionInfoFromDB(conf, dbDir, dbFile.toString());
-      }
-    }
-    
-    throw new IOException("Checkpoint " + dbPath + " does not have proper " +
-        "DB location");
-  }
-
-  /**
-   * Obtain Transaction info from DB.
-   * @param tempConfig
-   * @param dbDir path to DB
-   * @return OMTransactionInfo
-   * @throws Exception
-   */
-  private static TransactionInfo getTransactionInfoFromDB(
-      OzoneConfiguration tempConfig, Path dbDir, String dbName)
-      throws Exception {
-    DBStore dbStore = OmMetadataManagerImpl.loadDB(tempConfig, dbDir.toFile(),
-        dbName);
-
-    Table<String, TransactionInfo> transactionInfoTable =
-        dbStore.getTable(TRANSACTION_INFO_TABLE,
-            String.class, TransactionInfo.class);
-
-    TransactionInfo transactionInfo =
-        transactionInfoTable.get(TRANSACTION_INFO_KEY);
-    dbStore.close();
-
-    if (transactionInfo == null) {
-      throw new IOException("Failed to read OMTransactionInfo from DB " +
-          dbName + " at " + dbDir);
-    }
-    return transactionInfo;
+    return HAUtils
+        .getTrxnInfoFromCheckpoint(conf, dbPath, new OMDBDefinition());
   }
 
   /**
@@ -287,25 +246,10 @@ public final class OzoneManagerRatisUtils {
    * @param newDBlocation
    * @return boolean
    */
-  public static boolean verifyTransactionInfo(
-      TransactionInfo transactionInfo,
-      long lastAppliedIndex,
-      String leaderId, Path newDBlocation) {
-    if (transactionInfo.getTransactionIndex() <= lastAppliedIndex) {
-      OzoneManager.LOG.error("Failed to install checkpoint from OM leader: {}" +
-              ". The last applied index: {} is greater than or equal to the " +
-              "checkpoint's applied index: {}. Deleting the downloaded " +
-              "checkpoint {}", leaderId, lastAppliedIndex,
-          transactionInfo.getTransactionIndex(), newDBlocation);
-      try {
-        FileUtils.deleteFully(newDBlocation);
-      } catch (IOException e) {
-        OzoneManager.LOG.error("Failed to fully delete the downloaded DB " +
-            "checkpoint {} from OM leader {}.", newDBlocation, leaderId, e);
-      }
-      return false;
-    }
-
-    return true;
+  public static boolean verifyTransactionInfo(TransactionInfo transactionInfo,
+      long lastAppliedIndex, String leaderId, Path newDBlocation) {
+    return HAUtils
+        .verifyTransactionInfo(transactionInfo, lastAppliedIndex, leaderId,
+            newDBlocation, OzoneManager.LOG);
   }
 }

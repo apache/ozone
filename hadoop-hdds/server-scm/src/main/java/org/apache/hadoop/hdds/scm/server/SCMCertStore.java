@@ -59,7 +59,7 @@ import static org.apache.hadoop.hdds.security.x509.certificate.authority.Certifi
 public class SCMCertStore implements CertificateStore {
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMCertStore.class);
-  private final SCMMetadataStore scmMetadataStore;
+  private SCMMetadataStore scmMetadataStore;
   private final Lock lock;
   private AtomicLong crlSequenceId;
 
@@ -265,5 +265,15 @@ public class SCMCertStore implements CertificateStore {
             startSerialID, count);
       }
     }
+  }
+
+  /**
+   * Reinitialise the underlying store with SCMMetaStore
+   * during SCM StateMachine reload.
+   * @param metadataStore
+   */
+  @Override
+  public void reinitialize(SCMMetadataStore metadataStore) {
+    this.scmMetadataStore = metadataStore;
   }
 }
