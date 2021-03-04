@@ -252,7 +252,7 @@ public class PrefixManagerImpl implements PrefixManager {
     } finally {
       metadataManager.getLock().releaseReadLock(PREFIX_LOCK, prefixPath);
     }
-    return false;
+    return true;
   }
 
   @Override
