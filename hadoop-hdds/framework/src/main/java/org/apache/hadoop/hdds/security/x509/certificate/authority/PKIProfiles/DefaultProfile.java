@@ -305,10 +305,8 @@ public class DefaultProfile implements PKIProfile {
    */
   @Override
   public KeyUsage getKeyUsage() {
-    // Adding to same profile
-    // TODO: Create a new profile for RootCA which issues certificate?
     return new KeyUsage(KeyUsage.digitalSignature | KeyUsage.keyEncipherment
-        | KeyUsage.dataEncipherment | KeyUsage.keyAgreement | KeyUsage.keyCertSign | KeyUsage.cRLSign);
+        | KeyUsage.dataEncipherment | KeyUsage.keyAgreement);
   }
 
   /**
