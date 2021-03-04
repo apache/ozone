@@ -60,9 +60,9 @@ import java.util.concurrent.locks.ReentrantLock;
  * All the write operations for pipelines must come via PipelineManager.
  * It synchronises all write and read operations via a ReadWriteLock.
  */
-public final class PipelineManagerV2Impl implements PipelineManager {
+public class PipelineManagerV2Impl implements PipelineManager {
   private static final Logger LOG =
-      LoggerFactory.getLogger(SCMPipelineManager.class);
+      LoggerFactory.getLogger(PipelineManagerV2Impl.class);
 
   // Limit the number of on-going ratis operation to be 1.
   private final Lock lock;
@@ -79,13 +79,13 @@ public final class PipelineManagerV2Impl implements PipelineManager {
   private final SCMContext scmContext;
   private final NodeManager nodeManager;
 
-  private PipelineManagerV2Impl(ConfigurationSource conf,
-                                SCMHAManager scmhaManager,
-                                NodeManager nodeManager,
-                                StateManager pipelineStateManager,
-                                PipelineFactory pipelineFactory,
-                                EventPublisher eventPublisher,
-                                SCMContext scmContext) {
+  protected PipelineManagerV2Impl(ConfigurationSource conf,
+                                 SCMHAManager scmhaManager,
+                                 NodeManager nodeManager,
+                                 StateManager pipelineStateManager,
+                                 PipelineFactory pipelineFactory,
+                                 EventPublisher eventPublisher,
+                                 SCMContext scmContext) {
     this.lock = new ReentrantLock();
     this.pipelineFactory = pipelineFactory;
     this.stateManager = pipelineStateManager;
@@ -560,6 +560,11 @@ public final class PipelineManagerV2Impl implements PipelineManager {
     return this.backgroundPipelineCreator;
   }
 
+  @VisibleForTesting
+  public PipelineFactory getPipelineFactory() {
+    return pipelineFactory;
+  }
+
   private void recordMetricsForPipeline(Pipeline pipeline) {
     metrics.incNumPipelineAllocated();
     if (pipeline.isOpen()) {
@@ -592,5 +597,9 @@ public final class PipelineManagerV2Impl implements PipelineManager {
       // Not supported.
       return;
     }
+  }
+
+  protected Lock getLock() {
+    return lock;
   }
 }

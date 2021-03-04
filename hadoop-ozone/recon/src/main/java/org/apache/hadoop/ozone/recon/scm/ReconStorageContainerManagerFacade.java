@@ -37,9 +37,12 @@ import org.apache.hadoop.hdds.scm.container.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementPolicyFactory;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementMetrics;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.ha.MockDBTransactionBuffer;
+import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHANodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.node.DeadNodeHandler;
@@ -86,6 +89,7 @@ public class ReconStorageContainerManagerFacade
   private final SCMStorageConfig scmStorageConfig;
   private final DBStore dbStore;
   private final SCMHANodeDetails scmHANodeDetails;
+  private final SCMHAManager scmhaManager;
 
   private ReconNodeManager nodeManager;
   private ReconPipelineManager pipelineManager;
@@ -110,9 +114,10 @@ public class ReconStorageContainerManagerFacade
     this.ozoneConfiguration = getReconScmConfiguration(conf);
     this.scmStorageConfig = new ReconStorageConfig(conf);
     this.clusterMap = new NetworkTopologyImpl(conf);
-    dbStore = DBStoreBuilder
+    this.dbStore = DBStoreBuilder
         .createDBStore(ozoneConfiguration, new ReconSCMDBDefinition());
-
+    this.scmhaManager = MockSCMHAManager.getInstance(
+        true, new MockDBTransactionBuffer(dbStore));
     this.nodeManager =
         new ReconNodeManager(conf, scmStorageConfig, eventQueue, clusterMap,
             ReconSCMDBDefinition.NODES.getTable(dbStore));
@@ -122,16 +127,19 @@ public class ReconStorageContainerManagerFacade
         clusterMap, true, placementMetrics);
     this.datanodeProtocolServer = new ReconDatanodeProtocolServer(
         conf, this, eventQueue);
-    this.pipelineManager =
-        new ReconPipelineManager(conf,
-            nodeManager,
-            ReconSCMDBDefinition.PIPELINES.getTable(dbStore),
-            eventQueue);
+    this.pipelineManager = ReconPipelineManager.newReconPipelineManager(
+        conf,
+        nodeManager,
+        ReconSCMDBDefinition.PIPELINES.getTable(dbStore),
+        eventQueue,
+        scmhaManager,
+        scmContext);
     this.containerManager = new ReconContainerManager(conf,
         dbStore,
         ReconSCMDBDefinition.CONTAINERS.getTable(dbStore),
         pipelineManager, scmServiceProvider,
-        containerHealthSchemaManager, containerDBServiceProvider);
+        containerHealthSchemaManager, containerDBServiceProvider,
+        scmhaManager);
     this.scmServiceProvider = scmServiceProvider;
 
     NodeReportHandler nodeReportHandler =
