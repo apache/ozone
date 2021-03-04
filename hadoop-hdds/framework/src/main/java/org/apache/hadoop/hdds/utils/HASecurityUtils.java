@@ -35,7 +35,7 @@ import java.security.KeyPair;
 
 import static org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest.getEncodedString;
 
-public class HASecurityUtils {
+public final class HASecurityUtils {
 
   private HASecurityUtils() {
   }
