@@ -547,7 +547,7 @@ public class SCMNodeManager implements NodeManager {
 
     // If the data node slv is > scm slv => log error condition
     if (dnSlv > scmSlv) {
-      LOG.error("Rogue data node in the cluster : {}. " +
+      LOG.error("Invalid data node in the cluster : {}. " +
               "DataNode SoftwareLayoutVersion = {}, SCM " +
               "SoftwareLayoutVersion = {}",
           datanodeDetails.getHostName(), dnSlv, scmSlv);
