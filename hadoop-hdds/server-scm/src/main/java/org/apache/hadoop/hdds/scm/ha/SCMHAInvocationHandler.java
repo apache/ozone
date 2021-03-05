@@ -21,6 +21,7 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.hadoop.util.Time;
@@ -87,6 +88,7 @@ public class SCMHAInvocationHandler implements InvocationHandler {
   private Object invokeRatis(Method method, Object[] args)
       throws Exception {
     long startTime = Time.monotonicNowNanos();
+    Preconditions.checkNotNull(ratisHandler);
     final SCMRatisResponse response =  ratisHandler.submitRequest(
         SCMRatisRequest.of(requestType, method.getName(), args));
     LOG.info("Invoking method {} on target {}, cost {}us",

@@ -460,6 +460,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (configurator.getScmContext() != null) {
       scmContext = configurator.getScmContext();
     } else {
+      // When term equals SCMContext.INVALID_TERM, the isLeader() check
+      // and getTermOfLeader() will always pass.
       long term = SCMHAUtils.isSCMHAEnabled(conf) ? 0 : SCMContext.INVALID_TERM;
       // non-leader of term 0, in safe mode, preCheck not completed.
       scmContext = new SCMContext.Builder()

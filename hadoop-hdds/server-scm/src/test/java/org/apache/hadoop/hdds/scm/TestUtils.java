@@ -476,6 +476,8 @@ public final class TestUtils {
   public static StorageContainerManager getScmSimple(OzoneConfiguration conf)
       throws IOException, AuthenticationException {
     SCMConfigurator configurator = new SCMConfigurator();
+    // The default behaviour whether ratis will be enabled or not
+    // in SCM will be inferred from ozone-default.xml.
     // conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
     return StorageContainerManager.createSCM(conf, configurator);
   }

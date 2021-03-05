@@ -239,7 +239,19 @@ public class PipelineStateManagerV2Impl implements StateManager {
       PipelineID pipelineID, ContainerID containerID) throws IOException {
     lock.writeLock().lock();
     try {
+      // Typica;;y, SCM can send a pipeline close Action to datanode and receive
+      // pipelineCloseAction to close the pipeline which will remove the
+      // pipelineId both from the piplineStateMap as well as
+      // pipeline2containerMap Subsequently, close container handler event can
+      // also try to close the container as a part of which , it will also
+      // try to remove the container from the pipeline2container Map which will
+      // fail with PipelineNotFoundException. These are executed over ratis, and
+      // if the exception is propagated to SCMStateMachine., it will bring down
+      // the SCM. Ignoring it here.
       pipelineStateMap.removeContainerFromPipeline(pipelineID, containerID);
+    } catch (PipelineNotFoundException pnfe) {
+      LOG.info("Pipeline {} is not found in the pipeline2ContainerMap. Pipeline"
+          + " may have been closed already.", pipelineID);
     } finally {
       lock.writeLock().unlock();
     }

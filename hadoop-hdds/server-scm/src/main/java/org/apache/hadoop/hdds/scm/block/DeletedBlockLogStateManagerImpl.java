@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.ha.SCMHAInvocationHandler;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -60,8 +61,10 @@ public class DeletedBlockLogStateManagerImpl
         OZONE_SCM_BLOCK_DELETION_MAX_RETRY_DEFAULT);
     this.deletedTable = deletedTable;
     this.transactionBuffer = txBuffer;
-    this.deletingTxIDs = ConcurrentHashMap.newKeySet();
-    this.skippingRetryTxIDs = ConcurrentHashMap.newKeySet();
+    final boolean isRatisEnabled = SCMHAUtils.isSCMHAEnabled(conf);
+    this.deletingTxIDs = isRatisEnabled ? ConcurrentHashMap.newKeySet() : null;
+    this.skippingRetryTxIDs =
+        isRatisEnabled ? ConcurrentHashMap.newKeySet() : null;
   }
 
   public TableIterator<Long, TypedTable.KeyValue<Long,
@@ -89,8 +92,8 @@ public class DeletedBlockLogStateManagerImpl
             throw new IllegalStateException("");
           }
 
-          if (!deletingTxIDs.contains(txID) &&
-              !skippingRetryTxIDs.contains(txID)) {
+          if (deletingTxIDs != null && !deletingTxIDs.contains(txID) &&
+              skippingRetryTxIDs!= null && !skippingRetryTxIDs.contains(txID)) {
             nextTx = next;
             if (LOG.isTraceEnabled()) {
               LOG.trace("DeletedBlocksTransaction matching txID:{}",
@@ -167,7 +170,9 @@ public class DeletedBlockLogStateManagerImpl
   @Override
   public void removeTransactionsFromDB(ArrayList<Long> txIDs)
       throws IOException {
-    deletingTxIDs.addAll(txIDs);
+    if (deletingTxIDs != null) {
+      deletingTxIDs.addAll(txIDs);
+    }
     for (Long txID : txIDs) {
       transactionBuffer.removeFromBuffer(deletedTable, txID);
     }
@@ -193,14 +198,19 @@ public class DeletedBlockLogStateManagerImpl
       // analyze those blocks and purge them manually by SCMCli.
       DeletedBlocksTransaction.Builder builder = block.toBuilder().setCount(-1);
       transactionBuffer.addToBuffer(deletedTable, txID, builder.build());
-      skippingRetryTxIDs.add(txID);
+      if (skippingRetryTxIDs != null) {
+        skippingRetryTxIDs.add(txID);
+      }
     }
   }
 
 
   public void onFlush() {
-    deletingTxIDs.clear();
-    skippingRetryTxIDs.clear();
+    if (deletingTxIDs != null) {
+      deletingTxIDs.clear();
+      Preconditions.checkNotNull(skippingRetryTxIDs);
+      skippingRetryTxIDs.clear();
+    }
   }
 
   @Override

@@ -49,7 +49,7 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
     init();
   }
 
-  public BatchOperation getCurrentBatchOperation() {
+  private BatchOperation getCurrentBatchOperation() {
     return currentBatchOperation;
   }
 

@@ -167,7 +167,6 @@ public class TestDeletedBlockLog {
 
   private void addTransactions(Map<Long, List<Long>> containerBlocksMap)
       throws IOException {
-    //SCMHADBTransactionBuffer.getCurrentBatchOperation();
     deletedBlockLog.addTransactions(containerBlocksMap);
     scmHADBTransactionBuffer.flush();
   }

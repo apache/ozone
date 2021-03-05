@@ -32,6 +32,4 @@ public interface DBTransactionBuffer<KEY, VALUE> extends Closeable {
 
   void removeFromBuffer(Table<KEY, VALUE> table, KEY key) throws
       IOException;
-
-  void close() throws IOException;
 }

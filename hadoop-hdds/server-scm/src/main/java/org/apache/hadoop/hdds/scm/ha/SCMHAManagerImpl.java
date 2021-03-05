@@ -94,27 +94,28 @@ public class SCMHAManagerImpl implements SCMHAManager {
    */
   @Override
   public void start() throws IOException {
-    if (ratisServer != null) {
-      ratisServer.start();
-      if (ratisServer.getDivision().getGroup().getPeers().isEmpty()) {
-        // this is a bootstrapped node
-        // It will first try to add itself to existing ring
-        boolean success = HAUtils.addSCM(OzoneConfiguration.of(conf),
-            new AddSCMRequest.Builder().setClusterId(scm.getClusterId())
-                .setScmId(scm.getScmId())
-                .setRatisAddr(scm.getSCMHANodeDetails().getLocalNodeDetails()
-                    // TODO : Should we use IP instead of hostname??
-                    .getRatisHostPortStr()).build(), scm.getSCMNodeId());
-        if (!success) {
-          throw new IOException("Adding SCM to existing HA group failed");
-        }
-      } else {
-        LOG.info(" scm role is {} peers {}",
-            ratisServer.getDivision().getInfo().getCurrentRole(),
-            ratisServer.getDivision().getGroup().getPeers());
-      }
-      grpcServer.start();
+    if (ratisServer == null) {
+      return;
     }
+    ratisServer.start();
+    if (ratisServer.getDivision().getGroup().getPeers().isEmpty()) {
+      // this is a bootstrapped node
+      // It will first try to add itself to existing ring
+      boolean success = HAUtils.addSCM(OzoneConfiguration.of(conf),
+          new AddSCMRequest.Builder().setClusterId(scm.getClusterId())
+              .setScmId(scm.getScmId())
+              .setRatisAddr(scm.getSCMHANodeDetails().getLocalNodeDetails()
+                  // TODO : Should we use IP instead of hostname??
+                  .getRatisHostPortStr()).build(), scm.getSCMNodeId());
+      if (!success) {
+        throw new IOException("Adding SCM to existing HA group failed");
+      }
+    } else {
+      LOG.info(" scm role is {} peers {}",
+          ratisServer.getDivision().getInfo().getCurrentRole(),
+          ratisServer.getDivision().getGroup().getPeers());
+    }
+    grpcServer.start();
   }
 
   public SCMRatisServer getRatisServer() {

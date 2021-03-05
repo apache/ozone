@@ -36,7 +36,7 @@ public class MockSCMHADBTransactionBuffer implements SCMHADBTransactionBuffer {
     this.dbStore = store;
   }
 
-  public BatchOperation getCurrentBatchOperation() {
+  private BatchOperation getCurrentBatchOperation() {
     if (currentBatchOperation == null) {
       if (dbStore != null) {
         currentBatchOperation = dbStore.initBatchOperation();

@@ -125,8 +125,8 @@ public class SCMStateMachine extends BaseStateMachine {
           .setTransactionIndex(trx.getLogEntry().getIndex())
           .build());
     } catch (Exception ex) {
-      ExitUtils.terminate(1, ex.getMessage(), ex, StateMachine.LOG);
       applyTransactionFuture.completeExceptionally(ex);
+      ExitUtils.terminate(1, ex.getMessage(), ex, StateMachine.LOG);
     }
     return applyTransactionFuture;
   }
