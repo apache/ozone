@@ -1225,7 +1225,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    */
   public boolean checkLeader() {
     // For NON-HA setup, the node will always be the leader
-    scmContext.isLeader();
     if (!SCMHAUtils.isSCMHAEnabled(configuration)) {
       Preconditions.checkArgument(scmContext.isLeader());
       return true;
