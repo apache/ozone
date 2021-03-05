@@ -1224,8 +1224,17 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    * @return - if the current scm is the leader and is ready.
    */
   public boolean checkLeader() {
-    return scmContext.isLeader() && getScmHAManager().getRatisServer()
-        .getDivision().getInfo().isLeaderReady();
+    // For NON-HA setup, the node will always be the leader
+    scmContext.isLeader();
+    if (!SCMHAUtils.isSCMHAEnabled(configuration)) {
+      Preconditions.checkArgument(scmContext.isLeader());
+      return true;
+    } else {
+      // FOR HA setup, the node has to be the leader and ready to server
+      // requests.
+      return scmContext.isLeader() && getScmHAManager().getRatisServer()
+          .getDivision().getInfo().isLeaderReady();
+    }
   }
 
   public void checkAdminAccess(String remoteUser) throws IOException {
