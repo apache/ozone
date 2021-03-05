@@ -18,9 +18,16 @@ package org.apache.hadoop.hdds.scm.ha;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
+import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
+import org.apache.hadoop.hdds.utils.UniqueId;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -304,6 +311,52 @@ public class SequenceIdGenerator {
       } catch (IOException ioe) {
         throw new RuntimeException("Failed to get lastId from db", ioe);
       }
+    }
+  }
+
+  /**
+   * TODO
+   *  Relocate the code after upgrade framework is ready.
+   *
+   * Upgrade localID, delTxnId, containerId from legacy solution
+   * to SequenceIdGenerator.
+   */
+  public static void upgradeToSequenceId(SCMMetadataStore scmMetadataStore)
+      throws IOException {
+    Table<String, Long> sequenceIdTable = scmMetadataStore.getSequenceIdTable();
+
+    // upgrade localId
+    String localId = "localId";
+    if (sequenceIdTable.get(localId) == null) {
+      sequenceIdTable.put(localId, UniqueId.next());
+      LOG.info("upgrade {} to {}", localId, sequenceIdTable.get(localId));
+    }
+
+    // upgrade delTxnId
+    String delTxnId = "delTxnId";
+    if (sequenceIdTable.get(delTxnId) == null) {
+      // fetch delTxnId from DeletedBlocksTXTable
+      // check HDDS-4477 for details.
+      DeletedBlocksTransaction txn
+          = scmMetadataStore.getDeletedBlocksTXTable().get(0L);
+      sequenceIdTable.put(delTxnId, txn != null ? txn.getTxID() : 0L);
+      LOG.info("upgrade {} to {}", delTxnId, sequenceIdTable.get(delTxnId));
+    }
+
+    // upgrade containerId
+    String containerId = "containerId";
+    if (sequenceIdTable.get(containerId) == null) {
+      long largestContainerId = 0;
+      TableIterator<ContainerID, ? extends KeyValue<ContainerID, ContainerInfo>>
+          iterator = scmMetadataStore.getContainerTable().iterator();
+      while (iterator.hasNext()) {
+        ContainerInfo containerInfo = iterator.next().getValue();
+        largestContainerId
+            = Long.max(containerInfo.getContainerID(), largestContainerId);
+      }
+      sequenceIdTable.put(containerId, largestContainerId);
+      LOG.info("upgrade {} to {}",
+          containerId, sequenceIdTable.get(containerId));
     }
   }
 }
