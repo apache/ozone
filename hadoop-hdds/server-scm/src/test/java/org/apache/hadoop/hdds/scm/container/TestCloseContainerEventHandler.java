@@ -32,6 +32,8 @@ import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMService.Event;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
 import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
@@ -66,6 +68,8 @@ public class TestCloseContainerEventHandler {
   private static EventQueue eventQueue;
   private static SCMContext scmContext;
   private static SCMMetadataStore scmMetadataStore;
+  private static SCMHAManager scmhaManager;
+  private static SequenceIdGenerator sequenceIdGen;
 
   @BeforeClass
   public static void setUp() throws Exception {
@@ -81,13 +85,16 @@ public class TestCloseContainerEventHandler {
     eventQueue = new EventQueue();
     scmContext = SCMContext.emptyContext();
     scmMetadataStore = new SCMMetadataStoreImpl(configuration);
+    scmhaManager = MockSCMHAManager.getInstance(true);
+    sequenceIdGen = new SequenceIdGenerator(
+        configuration, scmhaManager, scmMetadataStore.getSequenceIdTable());
 
     SCMServiceManager serviceManager = new SCMServiceManager();
 
     pipelineManager =
         PipelineManagerV2Impl.newPipelineManager(
             configuration,
-            MockSCMHAManager.getInstance(true),
+            scmhaManager,
             nodeManager,
             scmMetadataStore.getPipelineTable(),
             eventQueue,
@@ -100,7 +107,8 @@ public class TestCloseContainerEventHandler {
     pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
         mockRatisProvider);
     containerManager = new ContainerManagerImpl(configuration,
-        MockSCMHAManager.getInstance(true),
+        scmhaManager,
+        sequenceIdGen,
         pipelineManager,
         scmMetadataStore.getContainerTable());
 

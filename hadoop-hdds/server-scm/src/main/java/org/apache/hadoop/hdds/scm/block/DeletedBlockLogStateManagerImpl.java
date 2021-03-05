@@ -257,7 +257,6 @@ public class DeletedBlockLogStateManagerImpl
       Preconditions.checkNotNull(conf);
       Preconditions.checkNotNull(scmRatisServer);
       Preconditions.checkNotNull(table);
-      Preconditions.checkNotNull(table);
 
       final DeletedBlockLogStateManager impl =
           new DeletedBlockLogStateManagerImpl(conf, table, transactionBuffer);

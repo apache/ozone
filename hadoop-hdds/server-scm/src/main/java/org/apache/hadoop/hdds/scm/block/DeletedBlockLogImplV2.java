@@ -44,9 +44,9 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.ha.DBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
+import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.apache.hadoop.hdds.utils.UniqueId;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 
@@ -85,14 +85,15 @@ public class DeletedBlockLogImplV2
   // DeletedBlockLogStateManager.
   private final DeletedBlockLogStateManager deletedBlockLogStateManager;
   private final SCMContext scmContext;
-  private Table<Long, DeletedBlocksTransaction> deletedBlocksTXTable;
+  private final SequenceIdGenerator sequenceIdGen;
 
   public DeletedBlockLogImplV2(ConfigurationSource conf,
       ContainerManagerV2 containerManager,
       SCMRatisServer ratisServer,
       Table<Long, DeletedBlocksTransaction> deletedBlocksTXTable,
       DBTransactionBuffer dbTxBuffer,
-      SCMContext scmContext) {
+      SCMContext scmContext,
+      SequenceIdGenerator sequenceIdGen) {
     maxRetry = conf.getInt(OZONE_SCM_BLOCK_DELETION_MAX_RETRY,
         OZONE_SCM_BLOCK_DELETION_MAX_RETRY_DEFAULT);
     this.containerManager = containerManager;
@@ -112,9 +113,8 @@ public class DeletedBlockLogImplV2
         .setSCMDBTransactionBuffer(dbTxBuffer)
         .build();
     this.scmContext = scmContext;
-    this.deletedBlocksTXTable = deletedBlocksTXTable;
+    this.sequenceIdGen = sequenceIdGen;
   }
-
 
   @Override
   public List<DeletedBlocksTransaction> getFailedTransactions()
@@ -304,8 +304,7 @@ public class DeletedBlockLogImplV2
     // we don't need handle transactionToDNsCommitMap and
     // deletedBlockLogStateManager, since they will be cleared
     // when becoming leader.
-    this.deletedBlocksTXTable = deletedTable;
-    deletedBlockLogStateManager.reinitialize(deletedBlocksTXTable);
+    deletedBlockLogStateManager.reinitialize(deletedTable);
   }
 
   /**
@@ -339,8 +338,7 @@ public class DeletedBlockLogImplV2
       ArrayList<DeletedBlocksTransaction> txsToBeAdded = new ArrayList<>();
       for (Map.Entry< Long, List< Long > > entry :
           containerBlocksMap.entrySet()) {
-        // TODO(runzhiwang): Should use distributed sequence id generator
-        long nextTXID = UniqueId.next();
+        long nextTXID = sequenceIdGen.getNextId("delTxnId");
         DeletedBlocksTransaction tx = constructNewTransaction(nextTXID,
             entry.getKey(), entry.getValue());
         txsToBeAdded.add(tx);
