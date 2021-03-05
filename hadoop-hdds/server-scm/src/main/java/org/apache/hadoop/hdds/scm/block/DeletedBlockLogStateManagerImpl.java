@@ -92,8 +92,9 @@ public class DeletedBlockLogStateManagerImpl
             throw new IllegalStateException("");
           }
 
-          if (deletingTxIDs != null && !deletingTxIDs.contains(txID) &&
-              skippingRetryTxIDs!= null && !skippingRetryTxIDs.contains(txID)) {
+          if ((deletingTxIDs == null || !deletingTxIDs.contains(txID)) && (
+              skippingRetryTxIDs == null || !skippingRetryTxIDs
+                  .contains(txID))) {
             nextTx = next;
             if (LOG.isTraceEnabled()) {
               LOG.trace("DeletedBlocksTransaction matching txID:{}",
@@ -204,13 +205,12 @@ public class DeletedBlockLogStateManagerImpl
     }
   }
 
-
   public void onFlush() {
-    if (deletingTxIDs != null) {
-      deletingTxIDs.clear();
-      Preconditions.checkNotNull(skippingRetryTxIDs);
-      skippingRetryTxIDs.clear();
-    }
+    // onFlush() can be invoked only when ratis is enabled.
+    Preconditions.checkNotNull(deletingTxIDs);
+    Preconditions.checkNotNull(skippingRetryTxIDs);
+    deletingTxIDs.clear();
+    skippingRetryTxIDs.clear();
   }
 
   @Override

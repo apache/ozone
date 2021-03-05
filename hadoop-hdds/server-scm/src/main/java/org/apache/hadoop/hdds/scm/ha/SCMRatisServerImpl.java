@@ -175,9 +175,9 @@ public class SCMRatisServerImpl implements SCMRatisServer {
         .build();
     final RaftClientReply raftClientReply =
         server.submitClientRequestAsync(raftClientRequest).get();
-   // if (LOG.isDebugEnabled()) {
+    if (LOG.isDebugEnabled()) {
       LOG.info("request {} Reply {}", raftClientRequest, raftClientReply);
-   // }
+   }
     return SCMRatisResponse.decode(raftClientReply);
   }
 
