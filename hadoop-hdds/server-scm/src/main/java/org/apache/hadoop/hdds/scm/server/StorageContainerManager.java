@@ -460,18 +460,15 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (configurator.getScmContext() != null) {
       scmContext = configurator.getScmContext();
     } else {
-      if (!SCMHAUtils.isSCMHAEnabled(conf)) {
-        scmContext = SCMContext.emptyContext();
-      } else {
-        // non-leader of term 0, in safe mode, preCheck not completed.
-        scmContext = new SCMContext.Builder()
-            .setLeader(false)
-            .setTerm(0)
-            .setIsInSafeMode(true)
-            .setIsPreCheckComplete(false)
-            .setSCM(this)
-            .build();
-      }
+      long term = SCMHAUtils.isSCMHAEnabled(conf) ? 0 : SCMContext.INVALID_TERM;
+      // non-leader of term 0, in safe mode, preCheck not completed.
+      scmContext = new SCMContext.Builder()
+          .setLeader(false)
+          .setTerm(term)
+          .setIsInSafeMode(true)
+          .setIsPreCheckComplete(false)
+          .setSCM(this)
+          .build();
     }
 
     if(configurator.getScmNodeManager() != null) {
