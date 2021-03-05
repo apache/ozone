@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.scm.ha.MockDBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -72,6 +73,7 @@ public class AbstractReconContainerManagerTest {
   private DBStore store;
   private SCMHAManager scmhaManager;
   private SCMContext scmContext;
+  private SequenceIdGenerator sequenceIdGen;
 
   @Before
   public void setUp() throws Exception {
@@ -82,6 +84,8 @@ public class AbstractReconContainerManagerTest {
     store = DBStoreBuilder.createDBStore(conf, new ReconSCMDBDefinition());
     scmhaManager = MockSCMHAManager.getInstance(
         true, new MockDBTransactionBuffer(store));
+    sequenceIdGen = new SequenceIdGenerator(
+        conf, scmhaManager, ReconSCMDBDefinition.SEQUENCE_ID.getTable(store));
     scmContext = SCMContext.emptyContext();
     scmStorageConfig = new ReconStorageConfig(conf);
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
@@ -103,7 +107,8 @@ public class AbstractReconContainerManagerTest {
         getScmServiceProvider(),
         mock(ContainerHealthSchemaManager.class),
         mock(ContainerDBServiceProvider.class),
-        scmhaManager);
+        scmhaManager,
+        sequenceIdGen);
   }
 
   @After

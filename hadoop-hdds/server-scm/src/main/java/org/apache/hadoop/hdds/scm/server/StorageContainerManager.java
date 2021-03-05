@@ -62,6 +62,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
+import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
@@ -182,6 +183,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private SCMMetadataStore scmMetadataStore;
   private SCMHAManager scmHAManager;
   private SCMContext scmContext;
+  private SequenceIdGenerator sequenceIdGen;
 
   private final EventQueue eventQueue;
   private final SCMServiceManager serviceManager;
@@ -451,6 +453,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       scmHAManager = new SCMHAManagerImpl(conf, this);
     }
 
+    // Distributed sequence id generator
+    sequenceIdGen = new SequenceIdGenerator(
+        conf, scmHAManager, scmMetadataStore.getSequenceIdTable());
+
     if (configurator.getScmContext() != null) {
       scmContext = configurator.getScmContext();
     } else {
@@ -494,7 +500,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       containerManager = configurator.getContainerManager();
     } else {
       containerManager = new ContainerManagerImpl(conf, scmHAManager,
-          pipelineManager, scmMetadataStore.getContainerTable());
+          sequenceIdGen, pipelineManager, scmMetadataStore.getContainerTable());
     }
 
     pipelineChoosePolicy = PipelineChoosePolicyFactory.getPolicy(conf);
@@ -1308,6 +1314,13 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    */
   public SCMContext getScmContext() {
     return scmContext;
+  }
+
+  /**
+   * Returns SequenceIdGen.
+   */
+  public SequenceIdGenerator getSequenceIdGen() {
+    return sequenceIdGen;
   }
 
   /**

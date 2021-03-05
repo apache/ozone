@@ -29,8 +29,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.ha.DBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.ha.MockDBTransactionBuffer;
-import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
-import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -98,10 +96,13 @@ public class TestDeletedBlockLog {
     containerManager = Mockito.mock(ContainerManagerV2.class);
     dbTransactionBuffer =
         new MockDBTransactionBuffer(scm.getScmMetadataStore().getStore());
-    deletedBlockLog = new DeletedBlockLogImplV2(conf, containerManager,
-        MockSCMHAManager.getInstance(true).getRatisServer(),
+    deletedBlockLog = new DeletedBlockLogImplV2(conf,
+        containerManager,
+        scm.getScmHAManager().getRatisServer(),
         scm.getScmMetadataStore().getDeletedBlocksTXTable(),
-        dbTransactionBuffer, SCMContext.emptyContext());
+        dbTransactionBuffer,
+        scm.getScmContext(),
+        scm.getSequenceIdGen());
     dnList = new ArrayList<>(3);
     setupContainerManager();
   }
@@ -328,10 +329,13 @@ public class TestDeletedBlockLog {
     // close db and reopen it again to make sure
     // transactions are stored persistently.
     deletedBlockLog.close();
-    deletedBlockLog = new DeletedBlockLogImplV2(conf, containerManager,
-        MockSCMHAManager.getInstance(true).getRatisServer(),
+    deletedBlockLog = new DeletedBlockLogImplV2(conf,
+        containerManager,
+        scm.getScmHAManager().getRatisServer(),
         scm.getScmMetadataStore().getDeletedBlocksTXTable(),
-        dbTransactionBuffer, SCMContext.emptyContext());
+        dbTransactionBuffer,
+        scm.getScmContext(),
+        scm.getSequenceIdGen());
     List<DeletedBlocksTransaction> blocks =
         getTransactions(BLOCKS_PER_TXN * 10);
     Assert.assertEquals(10, blocks.size());
@@ -343,10 +347,13 @@ public class TestDeletedBlockLog {
     // close db and reopen it again to make sure
     // currentTxnID = 50
     deletedBlockLog.close();
-    new DeletedBlockLogImplV2(conf, containerManager,
-        MockSCMHAManager.getInstance(true).getRatisServer(),
+    new DeletedBlockLogImplV2(conf,
+        containerManager,
+        scm.getScmHAManager().getRatisServer(),
         scm.getScmMetadataStore().getDeletedBlocksTXTable(),
-        dbTransactionBuffer, SCMContext.emptyContext());
+        dbTransactionBuffer,
+        scm.getScmContext(),
+        scm.getSequenceIdGen());
     blocks = getTransactions(BLOCKS_PER_TXN * 40);
     Assert.assertEquals(0, blocks.size());
     //Assert.assertEquals((long)deletedBlockLog.getCurrentTXID(), 50L);

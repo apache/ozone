@@ -41,11 +41,11 @@ import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.hdds.utils.UniqueId;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.util.StringUtils;
@@ -77,7 +77,8 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
   private final SCMBlockDeletingService blockDeletingService;
 
   private ObjectName mxBean;
-  private PipelineChoosePolicy pipelineChoosePolicy;
+  private final PipelineChoosePolicy pipelineChoosePolicy;
+  private final SequenceIdGenerator sequenceIdGen;
 
   /**
    * Constructor.
@@ -94,6 +95,7 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
     this.pipelineManager = scm.getPipelineManager();
     this.containerManager = scm.getContainerManager();
     this.pipelineChoosePolicy = scm.getPipelineChoosePolicy();
+    this.sequenceIdGen = scm.getSequenceIdGen();
     this.containerSize = (long)conf.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,
@@ -102,11 +104,13 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
     mxBean = MBeans.register("BlockManager", "BlockManagerImpl", this);
 
     // SCM block deleting transaction log and deleting service.
-    deletedBlockLog = new DeletedBlockLogImplV2(conf, scm.getContainerManager(),
+    deletedBlockLog = new DeletedBlockLogImplV2(conf,
+        scm.getContainerManager(),
         scm.getScmHAManager().getRatisServer(),
         scm.getScmMetadataStore().getDeletedBlocksTXTable(),
         scm.getScmHAManager().getDBTransactionBuffer(),
-        scm.getScmContext());
+        scm.getScmContext(),
+        scm.getSequenceIdGen());
     Duration svcInterval = conf.getObject(
             ScmConfig.class).getBlockDeletionInterval();
     long serviceTimeout =
@@ -266,8 +270,7 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
     try {
       final Pipeline pipeline = pipelineManager
           .getPipeline(containerInfo.getPipelineID());
-      // TODO : Revisit this local ID allocation when HA is added.
-      long localID = UniqueId.next();
+      long localID = sequenceIdGen.getNextId("localID");
       long containerID = containerInfo.getContainerID();
       AllocatedBlock.Builder abb =  new AllocatedBlock.Builder()
           .setContainerBlockID(new ContainerBlockID(containerID, localID))

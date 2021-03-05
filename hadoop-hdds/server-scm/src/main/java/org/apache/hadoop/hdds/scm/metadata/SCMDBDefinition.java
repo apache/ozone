@@ -119,6 +119,15 @@ public class SCMDBDefinition implements DBDefinition {
           Long.class,
           new LongCodec());
 
+  public static final DBColumnFamilyDefinition<String, Long>
+      SEQUENCE_ID =
+      new DBColumnFamilyDefinition<>(
+          "sequenceId",
+          String.class,
+          new StringCodec(),
+          Long.class,
+          new LongCodec());
+
   @Override
   public String getName() {
     return "scm.db";
@@ -133,6 +142,6 @@ public class SCMDBDefinition implements DBDefinition {
   public DBColumnFamilyDefinition[] getColumnFamilies() {
     return new DBColumnFamilyDefinition[] {DELETED_BLOCKS, VALID_CERTS,
         VALID_SCM_CERTS, REVOKED_CERTS, PIPELINES, CONTAINERS, TRANSACTIONINFO,
-        CRLS, CRL_SEQUENCE_ID};
+        CRLS, CRL_SEQUENCE_ID, SEQUENCE_ID};
   }
 }

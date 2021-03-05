@@ -16,25 +16,101 @@
  */
 package org.apache.hadoop.hdds.scm.ha;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
+import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
+import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SEQUENCE_ID_BATCH_SIZE;
+
 public class TestSequenceIDGenerator {
   @Test
-  public void testSequenceIDGen() throws Exception {
-    SequenceIDGenerator idGenerator = new SequenceIDGenerator(0);
-    Assert.assertEquals(0L, idGenerator.nextID());
-    Assert.assertEquals(1L, idGenerator.nextID());
-    Assert.assertEquals(2L, idGenerator.nextID());
+  public void testSequenceIDGenUponNonRatis() throws Exception {
+    OzoneConfiguration conf = SCMTestUtils.getConf();
 
-    idGenerator = new SequenceIDGenerator(1);
-    Assert.assertEquals(17179869184L, idGenerator.nextID());
-    Assert.assertEquals(17179869185L, idGenerator.nextID());
-    Assert.assertEquals(17179869186L, idGenerator.nextID());
+    SCMMetadataStore scmMetadataStore = new SCMMetadataStoreImpl(conf);
+    scmMetadataStore.start(conf);
 
-    idGenerator = new SequenceIDGenerator(100);
-    Assert.assertEquals(1717986918400L, idGenerator.nextID());
-    Assert.assertEquals(1717986918401L, idGenerator.nextID());
-    Assert.assertEquals(1717986918402L, idGenerator.nextID());
+    SequenceIdGenerator sequenceIdGen = new SequenceIdGenerator(
+        conf, null, scmMetadataStore.getSequenceIdTable());
+
+    // the first batch is [1, 1000]
+    Assert.assertEquals(1L, sequenceIdGen.getNextId("someKey"));
+    Assert.assertEquals(2L, sequenceIdGen.getNextId("someKey"));
+    Assert.assertEquals(3L, sequenceIdGen.getNextId("someKey"));
+
+    Assert.assertEquals(1L, sequenceIdGen.getNextId("otherKey"));
+    Assert.assertEquals(2L, sequenceIdGen.getNextId("otherKey"));
+    Assert.assertEquals(3L, sequenceIdGen.getNextId("otherKey"));
+
+    // default batchSize is 1000, the next batch is [1001, 2000]
+    sequenceIdGen.invalidateBatch();
+    Assert.assertEquals(1001, sequenceIdGen.getNextId("someKey"));
+    Assert.assertEquals(1002, sequenceIdGen.getNextId("someKey"));
+    Assert.assertEquals(1003, sequenceIdGen.getNextId("someKey"));
+
+    Assert.assertEquals(1001, sequenceIdGen.getNextId("otherKey"));
+    Assert.assertEquals(1002, sequenceIdGen.getNextId("otherKey"));
+    Assert.assertEquals(1003, sequenceIdGen.getNextId("otherKey"));
+
+    // default batchSize is 1000, the next batch is [2001, 3000]
+    sequenceIdGen.invalidateBatch();
+    Assert.assertEquals(2001, sequenceIdGen.getNextId("someKey"));
+    Assert.assertEquals(2002, sequenceIdGen.getNextId("someKey"));
+    Assert.assertEquals(2003, sequenceIdGen.getNextId("someKey"));
+
+    Assert.assertEquals(2001, sequenceIdGen.getNextId("otherKey"));
+    Assert.assertEquals(2002, sequenceIdGen.getNextId("otherKey"));
+    Assert.assertEquals(2003, sequenceIdGen.getNextId("otherKey"));
+  }
+
+  @Test
+  public void testSequenceIDGenUponRatis() throws Exception {
+    OzoneConfiguration conf = SCMTestUtils.getConf();
+    // enable ratis based SequenceIDGen
+    conf.setBoolean(OZONE_SCM_HA_ENABLE_KEY, true);
+
+    // change batchSize to 100
+    conf.setInt(OZONE_SCM_SEQUENCE_ID_BATCH_SIZE, 100);
+
+    SCMMetadataStore scmMetadataStore = new SCMMetadataStoreImpl(conf);
+    scmMetadataStore.start(conf);
+
+    SCMHAManager scmHAManager = MockSCMHAManager.getInstance(true);
+
+    SequenceIdGenerator sequenceIdGen = new SequenceIdGenerator(
+        conf, scmHAManager, scmMetadataStore.getSequenceIdTable());
+
+    // the first batch is [1, 100]
+    Assert.assertEquals(1L, sequenceIdGen.getNextId("someKey"));
+    Assert.assertEquals(2L, sequenceIdGen.getNextId("someKey"));
+    Assert.assertEquals(3L, sequenceIdGen.getNextId("someKey"));
+
+    Assert.assertEquals(1L, sequenceIdGen.getNextId("otherKey"));
+    Assert.assertEquals(2L, sequenceIdGen.getNextId("otherKey"));
+    Assert.assertEquals(3L, sequenceIdGen.getNextId("otherKey"));
+
+    // the next batch is [101, 200]
+    sequenceIdGen.invalidateBatch();
+    Assert.assertEquals(101, sequenceIdGen.getNextId("someKey"));
+    Assert.assertEquals(102, sequenceIdGen.getNextId("someKey"));
+    Assert.assertEquals(103, sequenceIdGen.getNextId("someKey"));
+
+    Assert.assertEquals(101, sequenceIdGen.getNextId("otherKey"));
+    Assert.assertEquals(102, sequenceIdGen.getNextId("otherKey"));
+    Assert.assertEquals(103, sequenceIdGen.getNextId("otherKey"));
+
+    // the next batch is [201, 300]
+    sequenceIdGen.invalidateBatch();
+    Assert.assertEquals(201, sequenceIdGen.getNextId("someKey"));
+    Assert.assertEquals(202, sequenceIdGen.getNextId("someKey"));
+    Assert.assertEquals(203, sequenceIdGen.getNextId("someKey"));
+
+    Assert.assertEquals(201, sequenceIdGen.getNextId("otherKey"));
+    Assert.assertEquals(202, sequenceIdGen.getNextId("otherKey"));
+    Assert.assertEquals(203, sequenceIdGen.getNextId("otherKey"));
   }
 }
