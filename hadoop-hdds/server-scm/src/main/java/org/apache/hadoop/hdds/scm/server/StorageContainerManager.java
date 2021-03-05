@@ -803,8 +803,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         //  check will be re-introduced one we have clear segregation path with
         //  ratis enable/disable switch.
         if (SCMHAUtils.isSCMHAEnabled(conf)) {
-        SCMRatisServerImpl.initialize(scmStorageConfig.getClusterID(),
-            scmStorageConfig.getScmId(), haDetails.getLocalNodeDetails(), conf);
+          SCMRatisServerImpl.initialize(scmStorageConfig.getClusterID(),
+              scmStorageConfig.getScmId(), haDetails.getLocalNodeDetails(),
+              conf);
         }
         LOG.info("SCM initialization succeeded. Current cluster id for sd={}"
                 + "; cid={}; layoutVersion={}; scmId={}",

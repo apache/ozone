@@ -44,11 +44,13 @@ import org.apache.ratis.protocol.RaftGroupMemberId;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.statemachine.SnapshotInfo;
+import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.statemachine.TransactionContext;
 import org.apache.ratis.statemachine.impl.BaseStateMachine;
 
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.ratis.statemachine.impl.SimpleStateMachineStorage;
+import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.LifeCycle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -123,6 +125,7 @@ public class SCMStateMachine extends BaseStateMachine {
           .setTransactionIndex(trx.getLogEntry().getIndex())
           .build());
     } catch (Exception ex) {
+      ExitUtils.terminate(1, ex.getMessage(), ex, StateMachine.LOG);
       applyTransactionFuture.completeExceptionally(ex);
     }
     return applyTransactionFuture;
