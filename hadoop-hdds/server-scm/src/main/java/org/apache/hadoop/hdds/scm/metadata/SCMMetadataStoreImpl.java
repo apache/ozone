@@ -47,6 +47,7 @@ import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.REVOKED_CERTS;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.TRANSACTIONINFO;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.VALID_CERTS;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.VALID_SCM_CERTS;
+import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.SEQUENCE_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
 
 import org.apache.ratis.util.ExitUtils;
@@ -76,6 +77,8 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
   private Table<Long, CRLInfo> crlInfoTable;
 
   private Table<String, Long> crlSequenceIdTable;
+
+  private Table<String, Long> sequenceIdTable;
 
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMMetadataStoreImpl.class);
@@ -151,6 +154,10 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
       crlInfoTable = CRLS.getTable(store);
 
       crlSequenceIdTable = CRL_SEQUENCE_ID.getTable(store);
+
+      sequenceIdTable = SEQUENCE_ID.getTable(store);
+
+      checkTableStatus(sequenceIdTable, SEQUENCE_ID.getName());
     }
   }
 
@@ -242,7 +249,10 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
     return containerTable;
   }
 
-
+  @Override
+  public Table<String, Long> getSequenceIdTable() {
+    return sequenceIdTable;
+  }
 
   private void checkTableStatus(Table table, String name) throws IOException {
     String logMessage = "Unable to get a reference to %s table. Cannot " +

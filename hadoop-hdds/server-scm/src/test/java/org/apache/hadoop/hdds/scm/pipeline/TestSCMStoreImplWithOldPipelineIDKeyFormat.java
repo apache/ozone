@@ -114,6 +114,11 @@ public class TestSCMStoreImplWithOldPipelineIDKeyFormat
   }
 
   @Override
+  public Table<String, Long> getSequenceIdTable() {
+    return null;
+  }
+
+  @Override
   public TableIterator getAllCerts(CertificateStore.CertType certType) {
     return null;
   }

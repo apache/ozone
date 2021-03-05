@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHANodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.node.DeadNodeHandler;
@@ -90,6 +91,7 @@ public class ReconStorageContainerManagerFacade
   private final DBStore dbStore;
   private final SCMHANodeDetails scmHANodeDetails;
   private final SCMHAManager scmhaManager;
+  private final SequenceIdGenerator sequenceIdGen;
 
   private ReconNodeManager nodeManager;
   private ReconPipelineManager pipelineManager;
@@ -118,6 +120,8 @@ public class ReconStorageContainerManagerFacade
         .createDBStore(ozoneConfiguration, new ReconSCMDBDefinition());
     this.scmhaManager = MockSCMHAManager.getInstance(
         true, new MockDBTransactionBuffer(dbStore));
+    this.sequenceIdGen = new SequenceIdGenerator(
+        conf, scmhaManager, ReconSCMDBDefinition.SEQUENCE_ID.getTable(dbStore));
     this.nodeManager =
         new ReconNodeManager(conf, scmStorageConfig, eventQueue, clusterMap,
             ReconSCMDBDefinition.NODES.getTable(dbStore));
@@ -139,7 +143,7 @@ public class ReconStorageContainerManagerFacade
         ReconSCMDBDefinition.CONTAINERS.getTable(dbStore),
         pipelineManager, scmServiceProvider,
         containerHealthSchemaManager, containerDBServiceProvider,
-        scmhaManager);
+        scmhaManager, sequenceIdGen);
     this.scmServiceProvider = scmServiceProvider;
 
     NodeReportHandler nodeReportHandler =

@@ -209,6 +209,7 @@ public class SCMStateMachine extends BaseStateMachine {
 
     scm.getScmContext().updateLeaderAndTerm(true, term);
     scm.getSCMServiceManager().notifyStatusChanged();
+    scm.getSequenceIdGen().invalidateBatch();
 
     DeletedBlockLog deletedBlockLog = scm.getScmBlockManager()
         .getDeletedBlockLog();

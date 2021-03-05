@@ -34,7 +34,11 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.TestUtils;
+import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.container.CloseContainerEventHandler;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -44,9 +48,6 @@ import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
-import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
-import org.apache.hadoop.hdds.scm.ha.SCMContext;
-import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
 import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
@@ -87,6 +88,7 @@ public class TestBlockManager {
   private PipelineManagerV2Impl pipelineManager;
   private BlockManagerImpl blockManager;
   private SCMHAManager scmHAManager;
+  private SequenceIdGenerator sequenceIdGen;
   private static final long DEFAULT_BLOCK_SIZE = 128 * MB;
   private HddsProtos.ReplicationFactor factor;
   private HddsProtos.ReplicationType type;
@@ -127,6 +129,10 @@ public class TestBlockManager {
 
     scmMetadataStore = new SCMMetadataStoreImpl(conf);
     scmMetadataStore.start(conf);
+
+    sequenceIdGen = new SequenceIdGenerator(
+        conf, scmHAManager, scmMetadataStore.getSequenceIdTable());
+
     pipelineManager =
         PipelineManagerV2Impl.newPipelineManager(
             conf,
@@ -144,7 +150,8 @@ public class TestBlockManager {
         mockRatisProvider);
     ContainerManagerV2 containerManager =
         new ContainerManagerImpl(conf,
-            MockSCMHAManager.getInstance(true),
+            scmHAManager,
+            sequenceIdGen,
             pipelineManager,
             scmMetadataStore.getContainerTable());
     SCMSafeModeManager safeModeManager = new SCMSafeModeManager(conf,

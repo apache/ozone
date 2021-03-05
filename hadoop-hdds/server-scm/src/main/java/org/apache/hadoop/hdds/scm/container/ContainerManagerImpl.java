@@ -44,9 +44,9 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.metrics.SCMContainerManagerMetrics;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
-import org.apache.hadoop.hdds.utils.UniqueId;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.util.Time;
@@ -85,6 +85,7 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
   private final ContainerStateManagerV2 containerStateManager;
 
   private final SCMHAManager haManager;
+  private final SequenceIdGenerator sequenceIdGen;
 
   // TODO: Revisit this.
   // Metrics related to operations should be moved to ProtocolServer
@@ -99,6 +100,7 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
   public ContainerManagerImpl(
       final Configuration conf,
       final SCMHAManager scmHaManager,
+      final SequenceIdGenerator sequenceIdGen,
       final PipelineManager pipelineManager,
       final Table<ContainerID, ContainerInfo> containerStore)
       throws IOException {
@@ -106,6 +108,7 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
     this.lock = new ReentrantLock();
     this.pipelineManager = pipelineManager;
     this.haManager = scmHaManager;
+    this.sequenceIdGen = sequenceIdGen;
     this.containerStateManager = ContainerStateManagerImpl.newBuilder()
         .setConfiguration(conf)
         .setPipelineManager(pipelineManager)
@@ -204,8 +207,7 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
   private ContainerInfo allocateContainer(final Pipeline pipeline,
                                           final String owner)
       throws IOException {
-    // TODO: Replace this with Distributed unique id generator.
-    final long uniqueId = UniqueId.next();
+    final long uniqueId = sequenceIdGen.getNextId("containerId");
     Preconditions.checkState(uniqueId > 0,
         "Cannot allocate container, negative container id" +
             " generated. %s.", uniqueId);

@@ -369,6 +369,10 @@ public final class ScmConfigKeys {
   public static final String HDDS_SCM_WATCHER_TIMEOUT =
       "hdds.scm.watcher.timeout";
 
+  public static final String OZONE_SCM_SEQUENCE_ID_BATCH_SIZE =
+      "ozone.scm.sequence.id.batch.size";
+  public static final int OZONE_SCM_SEQUENCE_ID_BATCH_SIZE_DEFAULT = 1000;
+
   public static final String HDDS_SCM_WATCHER_TIMEOUT_DEFAULT =
       "10m";
 
