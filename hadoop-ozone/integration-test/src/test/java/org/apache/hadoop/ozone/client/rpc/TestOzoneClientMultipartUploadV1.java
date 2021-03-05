@@ -58,6 +58,9 @@ import java.util.UUID;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationType.STAND_ALONE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 /**
  * This test verifies all the S3 multipart client apis - layout version V1.
@@ -448,6 +451,92 @@ public class TestOzoneClientMultipartUploadV1 {
       Assert.assertEquals(NO_SUCH_MULTIPART_UPLOAD_ERROR,
               ((OMException) ex).getResult());
     }
+  }
+
+  @Test
+  public void testAbortUploadFail() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    OzoneTestUtils.expectOmException(NO_SUCH_MULTIPART_UPLOAD_ERROR,
+        () -> bucket.abortMultipartUpload(keyName, "random"));
+  }
+
+  @Test
+  public void testAbortUploadFailWithInProgressPartUpload() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String parentDir = "a/b/c/d/";
+    String keyName = parentDir + UUID.randomUUID().toString();
+
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    OmMultipartInfo omMultipartInfo = bucket.initiateMultipartUpload(keyName,
+        STAND_ALONE, ONE);
+
+    Assert.assertNotNull(omMultipartInfo.getUploadID());
+
+    // Do not close output stream.
+    byte[] data = "data".getBytes(UTF_8);
+    OzoneOutputStream ozoneOutputStream = bucket.createMultipartKey(keyName,
+        data.length, 1, omMultipartInfo.getUploadID());
+    ozoneOutputStream.write(data, 0, data.length);
+
+    // Abort before completing part upload.
+    bucket.abortMultipartUpload(keyName, omMultipartInfo.getUploadID());
+
+    try {
+      ozoneOutputStream.close();
+      fail("testAbortUploadFailWithInProgressPartUpload failed");
+    } catch (IOException ex) {
+      assertTrue(ex instanceof OMException);
+      assertEquals(NO_SUCH_MULTIPART_UPLOAD_ERROR,
+          ((OMException) ex).getResult());
+    }
+  }
+
+  @Test
+  public void testAbortUploadSuccessWithOutAnyParts() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String parentDir = "a/b/c/d/";
+    String keyName = parentDir + UUID.randomUUID().toString();
+
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    String uploadID = initiateMultipartUpload(bucket, keyName, STAND_ALONE,
+        ONE);
+    bucket.abortMultipartUpload(keyName, uploadID);
+  }
+
+  @Test
+  public void testAbortUploadSuccessWithParts() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String parentDir = "a/b/c/d/";
+    String keyName = parentDir + UUID.randomUUID().toString();
+
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    String uploadID = initiateMultipartUpload(bucket, keyName, STAND_ALONE,
+        ONE);
+    uploadPart(bucket, keyName, uploadID, 1, "data".getBytes(UTF_8));
+    bucket.abortMultipartUpload(keyName, uploadID);
   }
 
   private String initiateMultipartUpload(OzoneBucket bucket, String keyName,

@@ -65,8 +65,8 @@ public class TestS3InitiateMultipartUploadRequestV1
     OMRequest modifiedRequest = doPreExecuteInitiateMPUV1(volumeName,
         bucketName, keyName);
 
-    S3InitiateMultipartUploadRequestV1 s3InitiateMultipartUploadRequestV1 =
-        new S3InitiateMultipartUploadRequestV1(modifiedRequest);
+    S3InitiateMultipartUploadRequest s3InitiateMultipartUploadRequestV1 =
+        getS3InitiateMultipartUploadReq(modifiedRequest);
 
     OMClientResponse omClientResponse =
             s3InitiateMultipartUploadRequestV1.validateAndUpdateCache(
@@ -112,54 +112,6 @@ public class TestS3InitiateMultipartUploadRequestV1
             .getCreationTime());
   }
 
-  @Test
-  public void testValidateAndUpdateCacheWithBucketNotFound() throws Exception {
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
-    String keyName = UUID.randomUUID().toString();
-
-    TestOMRequestUtils.addVolumeToDB(volumeName, omMetadataManager);
-
-    OMRequest modifiedRequest = doPreExecuteInitiateMPU(
-        volumeName, bucketName, keyName);
-
-    S3InitiateMultipartUploadRequest s3InitiateMultipartUploadRequest =
-        new S3InitiateMultipartUploadRequest(modifiedRequest);
-
-    OMClientResponse omClientResponse =
-        s3InitiateMultipartUploadRequest.validateAndUpdateCache(ozoneManager,
-            100L, ozoneManagerDoubleBufferHelper);
-
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND,
-        omClientResponse.getOMResponse().getStatus());
-
-    Assert.assertTrue(omMetadataManager.getOpenKeyTable().isEmpty());
-    Assert.assertTrue(omMetadataManager.getMultipartInfoTable().isEmpty());
-  }
-
-  @Test
-  public void testValidateAndUpdateCacheWithVolumeNotFound() throws Exception {
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
-    String keyName = UUID.randomUUID().toString();
-
-    OMRequest modifiedRequest = doPreExecuteInitiateMPU(volumeName, bucketName,
-        keyName);
-
-    S3InitiateMultipartUploadRequest s3InitiateMultipartUploadRequest =
-        new S3InitiateMultipartUploadRequest(modifiedRequest);
-
-    OMClientResponse omClientResponse =
-        s3InitiateMultipartUploadRequest.validateAndUpdateCache(ozoneManager,
-            100L, ozoneManagerDoubleBufferHelper);
-
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND,
-        omClientResponse.getOMResponse().getStatus());
-
-    Assert.assertTrue(omMetadataManager.getOpenKeyTable().isEmpty());
-    Assert.assertTrue(omMetadataManager.getMultipartInfoTable().isEmpty());
-  }
-
   private long verifyDirectoriesInDB(List<String> dirs, long bucketID)
       throws IOException {
     // bucketID is the parent
@@ -178,5 +130,10 @@ public class TestS3InitiateMultipartUploadRequestV1
       parentID = omDirInfo.getObjectID();
     }
     return parentID;
+  }
+
+  protected S3InitiateMultipartUploadRequest getS3InitiateMultipartUploadReq(
+      OMRequest initiateMPURequest) {
+    return new S3InitiateMultipartUploadRequestV1(initiateMPURequest);
   }
 }
