@@ -60,8 +60,10 @@ public class SCMHAInvocationHandler implements InvocationHandler {
                        final Object[] args) throws Throwable {
     try {
       long startTime = Time.monotonicNow();
-      final Object result = method.isAnnotationPresent(Replicate.class) ?
-          invokeRatis(method, args) : invokeLocal(method, args);
+      final Object result =
+          ratisHandler != null && method.isAnnotationPresent(Replicate.class) ?
+              invokeRatis(method, args) :
+              invokeLocal(method, args);
       LOG.debug("Call: {} took {} ms", method, Time.monotonicNow() - startTime);
       return result;
     } catch(InvocationTargetException iEx) {
