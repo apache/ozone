@@ -270,7 +270,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
 
     // Add default acls from volume.
     List<OzoneAcl> defaultVolumeAcls = omVolumeArgs.getDefaultAcls();
-    OzoneAclUtil.inheritDefaultAclsAsDefault(acls, defaultVolumeAcls);
+    OzoneAclUtil.inheritDefaultAcls(acls, defaultVolumeAcls);
     omBucketInfo.setAcls(acls);
   }
 

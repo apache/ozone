@@ -300,6 +300,10 @@ public class PrefixManagerImpl implements PrefixManager {
     if (Strings.isNullOrEmpty(prefixName)) {
       throw new OMException("Prefix name is required.", PREFIX_NOT_FOUND);
     }
+    if (!prefixName.endsWith("/")) {
+      throw new OMException("Invalid prefix name: " + prefixName,
+          PREFIX_NOT_FOUND);
+    }
   }
 
   public OMPrefixAclOpResult addAcl(OzoneObj ozoneObj, OzoneAcl ozoneAcl,
@@ -373,7 +377,7 @@ public class PrefixManagerImpl implements PrefixManager {
       // Add all acls from direct parent to key.
       OmPrefixInfo parentPrefixInfo = prefixList.get(prefixList.size() - 1);
       if (parentPrefixInfo != null) {
-        prefixParentFound = OzoneAclUtil.inheritDefaultAclsAsDefault(
+        prefixParentFound = OzoneAclUtil.inheritDefaultAcls(
             aclsToBeSet, parentPrefixInfo.getAcls());
       }
     }
@@ -385,8 +389,7 @@ public class PrefixManagerImpl implements PrefixManager {
       OmBucketInfo bucketInfo = metadataManager.getBucketTable().
           get(bucketKey);
       if (bucketInfo != null) {
-        OzoneAclUtil.inheritDefaultAclsAsDefault(aclsToBeSet,
-            bucketInfo.getAcls());
+        OzoneAclUtil.inheritDefaultAcls(aclsToBeSet, bucketInfo.getAcls());
       }
     }
   }

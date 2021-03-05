@@ -159,7 +159,8 @@ public class BucketManagerImpl implements BucketManager {
       OmBucketInfo.Builder omBucketInfoBuilder = bucketInfo.toBuilder()
           .setCreationTime(Time.now());
 
-      omBucketInfoBuilder.setAcls(volumeArgs.getAcls());
+      OzoneAclUtil.inheritDefaultAcls(omBucketInfoBuilder.getAcls(),
+          volumeArgs.getDefaultAcls());
 
       if (bekb != null) {
         omBucketInfoBuilder.setBucketEncryptionKey(bekb.build());

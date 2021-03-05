@@ -31,6 +31,7 @@ import java.util.BitSet;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.GROUP;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
@@ -58,11 +59,11 @@ public final class OzoneAclUtil {
     List<OzoneAcl> listOfAcls = new ArrayList<>();
 
     // User ACL.
-    listOfAcls.add(new OzoneAcl(USER, userName, userRights, DEFAULT));
+    listOfAcls.add(new OzoneAcl(USER, userName, userRights, ACCESS));
     if(userGroups != null) {
       // Group ACLs of the User.
       Arrays.asList(userGroups).forEach((group) -> listOfAcls.add(
-          new OzoneAcl(GROUP, group, groupRights, DEFAULT)));
+          new OzoneAcl(GROUP, group, groupRights, ACCESS)));
     }
     return listOfAcls;
   }
@@ -174,24 +175,7 @@ public final class OzoneAclUtil {
       inheritedAcls = parentAcls.stream()
           .filter(a -> a.getAclScope() == DEFAULT)
           .map(acl -> new OzoneAcl(acl.getType(), acl.getName(),
-              acl.getAclBitSet(), OzoneAcl.AclScope.ACCESS))
-          .collect(Collectors.toList());
-    }
-    if (inheritedAcls != null && !inheritedAcls.isEmpty()) {
-      inheritedAcls.stream().forEach(acl -> addAcl(acls, acl));
-      return true;
-    }
-    return false;
-  }
-
-  public static boolean inheritDefaultAclsAsDefault(List<OzoneAcl> acls,
-      List<OzoneAcl> parentAcls) {
-    List<OzoneAcl> inheritedAcls = null;
-    if (parentAcls != null && !parentAcls.isEmpty()) {
-      inheritedAcls = parentAcls.stream()
-          .filter(a -> a.getAclScope() == DEFAULT)
-          .map(acl -> new OzoneAcl(acl.getType(), acl.getName(),
-              acl.getAclBitSet(), DEFAULT))
+              acl.getAclBitSet(), ACCESS))
           .collect(Collectors.toList());
     }
     if (inheritedAcls != null && !inheritedAcls.isEmpty()) {
