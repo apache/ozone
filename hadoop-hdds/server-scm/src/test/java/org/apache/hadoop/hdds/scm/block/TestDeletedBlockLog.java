@@ -85,7 +85,7 @@ public class TestDeletedBlockLog {
   private ContainerManagerV2 containerManager;
   private StorageContainerManager scm;
   private List<DatanodeDetails> dnList;
-  private SCMHADBTransactionBuffer SCMHADBTransactionBuffer;
+  private SCMHADBTransactionBuffer scmHADBTransactionBuffer;
 
   @Before
   public void setup() throws Exception {
@@ -97,13 +97,13 @@ public class TestDeletedBlockLog {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     scm = TestUtils.getScm(conf);
     containerManager = Mockito.mock(ContainerManagerV2.class);
-    SCMHADBTransactionBuffer =
+    scmHADBTransactionBuffer =
         new MockSCMHADBTransactionBuffer(scm.getScmMetadataStore().getStore());
     deletedBlockLog = new DeletedBlockLogImplV2(conf,
         containerManager,
         scm.getScmHAManager().getRatisServer(),
         scm.getScmMetadataStore().getDeletedBlocksTXTable(),
-        SCMHADBTransactionBuffer,
+        scmHADBTransactionBuffer,
         scm.getScmContext(),
         scm.getSequenceIdGen());
     dnList = new ArrayList<>(3);
@@ -169,12 +169,12 @@ public class TestDeletedBlockLog {
       throws IOException {
     //SCMHADBTransactionBuffer.getCurrentBatchOperation();
     deletedBlockLog.addTransactions(containerBlocksMap);
-    SCMHADBTransactionBuffer.flush();
+    scmHADBTransactionBuffer.flush();
   }
 
   private void incrementCount(List<Long> txIDs) throws IOException {
     deletedBlockLog.incrementCount(txIDs);
-    SCMHADBTransactionBuffer.flush();
+    scmHADBTransactionBuffer.flush();
   }
 
   private void commitTransactions(
@@ -184,7 +184,7 @@ public class TestDeletedBlockLog {
       deletedBlockLog
           .commitTransactions(transactionResults, dnDetails.getUuid());
     }
-    SCMHADBTransactionBuffer.flush();
+    scmHADBTransactionBuffer.flush();
   }
 
   private void commitTransactions(
@@ -334,7 +334,7 @@ public class TestDeletedBlockLog {
         containerManager,
         scm.getScmHAManager().getRatisServer(),
         scm.getScmMetadataStore().getDeletedBlocksTXTable(),
-        SCMHADBTransactionBuffer,
+        scmHADBTransactionBuffer,
         scm.getScmContext(),
         scm.getSequenceIdGen());
     List<DeletedBlocksTransaction> blocks =
@@ -352,7 +352,7 @@ public class TestDeletedBlockLog {
         containerManager,
         scm.getScmHAManager().getRatisServer(),
         scm.getScmMetadataStore().getDeletedBlocksTXTable(),
-        SCMHADBTransactionBuffer,
+        scmHADBTransactionBuffer,
         scm.getScmContext(),
         scm.getSequenceIdGen());
     blocks = getTransactions(BLOCKS_PER_TXN * 40);

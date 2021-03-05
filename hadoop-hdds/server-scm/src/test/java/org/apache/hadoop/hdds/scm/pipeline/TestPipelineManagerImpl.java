@@ -125,7 +125,8 @@ public class TestPipelineManagerImpl {
 
   @Test
   public void testCreatePipeline() throws Exception {
-    SCMHADBTransactionBuffer buffer1 = new MockSCMHADBTransactionBuffer(dbStore);
+    SCMHADBTransactionBuffer buffer1 =
+        new MockSCMHADBTransactionBuffer(dbStore);
     PipelineManagerV2Impl pipelineManager =
         createPipelineManager(true, buffer1);
     Assert.assertTrue(pipelineManager.getPipelines().isEmpty());
@@ -141,7 +142,8 @@ public class TestPipelineManagerImpl {
     buffer1.close();
     pipelineManager.close();
 
-    SCMHADBTransactionBuffer buffer2 = new MockSCMHADBTransactionBuffer(dbStore);
+    SCMHADBTransactionBuffer buffer2 =
+        new MockSCMHADBTransactionBuffer(dbStore);
     PipelineManagerV2Impl pipelineManager2 =
         createPipelineManager(true, buffer2);
     // Should be able to load previous pipelines.
@@ -450,7 +452,8 @@ public class TestPipelineManagerImpl {
 
   @Test
   public void testPipelineOpenOnlyWhenLeaderReported() throws Exception {
-    SCMHADBTransactionBuffer buffer1 = new MockSCMHADBTransactionBuffer(dbStore);
+    SCMHADBTransactionBuffer buffer1 =
+        new MockSCMHADBTransactionBuffer(dbStore);
     PipelineManagerV2Impl pipelineManager =
         createPipelineManager(true, buffer1);
 
