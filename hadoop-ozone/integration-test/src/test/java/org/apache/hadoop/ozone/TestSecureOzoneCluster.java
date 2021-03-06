@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.scm.ScmConfig;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMHANodeDetails;
@@ -91,6 +92,8 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_D
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PORT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_GRPC_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.net.ServerSocketUtil.getPort;
@@ -101,6 +104,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_KEY
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_EXPIRED;
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
 import org.apache.ratis.protocol.ClientId;
@@ -161,6 +165,7 @@ public final class TestSecureOzoneCluster {
   public void init() {
     try {
       conf = new OzoneConfiguration();
+      conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, false);
       conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
 
       conf.setInt(OZONE_SCM_CLIENT_PORT_KEY,
@@ -171,6 +176,11 @@ public final class TestSecureOzoneCluster {
           getPort(OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT, 100));
       conf.setInt(OZONE_SCM_SECURITY_SERVICE_PORT_KEY,
           getPort(OZONE_SCM_SECURITY_SERVICE_PORT_DEFAULT, 100));
+      // use the same base ports as MiniOzoneHACluster
+      conf.setInt(OZONE_SCM_RATIS_PORT_KEY, getPort(1200, 100));
+      conf.setInt(OZONE_SCM_GRPC_PORT_KEY, getPort(1201, 100));
+      conf.set(OZONE_OM_ADDRESS_KEY, "localhost:1202");
+
 
       DefaultMetricsSystem.setMiniClusterMode(true);
       final String path = folder.newFolder().toString();
@@ -329,7 +339,7 @@ public final class TestSecureOzoneCluster {
     scmStore.setScmId(scmId);
     // writes the version file properties
     scmStore.initialize();
-    if (!SCMHAUtils.isSCMHAEnabled(conf)) {
+    if (SCMHAUtils.isSCMHAEnabled(conf)) {
       SCMRatisServerImpl.initialize(clusterId, scmId,
           SCMHANodeDetails.loadSCMHAConfig(conf).getLocalNodeDetails(), conf);
     }
@@ -704,6 +714,9 @@ public final class TestSecureOzoneCluster {
     } finally {
       if (scm != null) {
         scm.stop();
+      }
+      if (om != null) {
+        om.stop();
       }
       IOUtils.closeQuietly(om);
     }
