@@ -165,7 +165,6 @@ public final class TestSecureOzoneCluster {
   public void init() {
     try {
       conf = new OzoneConfiguration();
-      conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, false);
       conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
 
       conf.setInt(OZONE_SCM_CLIENT_PORT_KEY,
