@@ -47,14 +47,14 @@ public final class MockSCMHAManager implements SCMHAManager {
 
   private final SCMRatisServer ratisServer;
   private boolean isLeader;
-  private SCMHADBTransactionBuffer transactionBuffer;
+  private DBTransactionBuffer transactionBuffer;
 
   public static SCMHAManager getInstance(boolean isLeader) {
     return new MockSCMHAManager(isLeader);
   }
 
   public static SCMHAManager getInstance(boolean isLeader,
-      SCMHADBTransactionBuffer buffer) {
+      DBTransactionBuffer buffer) {
     return new MockSCMHAManager(isLeader, buffer);
   }
 
@@ -65,7 +65,7 @@ public final class MockSCMHAManager implements SCMHAManager {
     this(isLeader, new MockSCMHADBTransactionBuffer());
   }
 
-  private MockSCMHAManager(boolean isLeader, SCMHADBTransactionBuffer buffer) {
+  private MockSCMHAManager(boolean isLeader, DBTransactionBuffer buffer) {
     this.ratisServer = new MockRatisServer();
     this.isLeader = isLeader;
     this.transactionBuffer = buffer;
@@ -102,7 +102,7 @@ public final class MockSCMHAManager implements SCMHAManager {
 
   @Override
   public SCMHADBTransactionBuffer asSCMHADBTransactionBuffer() {
-    return transactionBuffer;
+    return null;
   }
 
   @Override
