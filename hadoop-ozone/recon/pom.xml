@@ -20,7 +20,7 @@
     <artifactId>hadoop-ozone</artifactId>
     <version>1.1.0-SNAPSHOT</version>
   </parent>
-  <name>Apache Hadoop Ozone Recon</name>
+  <name>Apache Ozone Recon</name>
   <modelVersion>4.0.0</modelVersion>
   <artifactId>hadoop-ozone-recon</artifactId>
   <build>
