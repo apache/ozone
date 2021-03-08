@@ -84,14 +84,20 @@ public class SCMRatisServerImpl implements SCMRatisServer {
     // scm boots up, it has peer info embedded in the raft log and will
     // trigger leader election.
 
-    // Initialize TLS parameters.
-    Parameters parameters =
-        HASecurityUtils.createServerTlsParameters(new SecurityConfig(conf),
-            scm.getScmCertificateClient());
-    this.server =
+    RaftServer.Builder builder =
         newRaftServer(scm.getScmId(), conf).setStateMachine(stateMachine)
-            .setGroup(RaftGroup.valueOf(groupId))
-            .setParameters(parameters).build();
+            .setGroup(RaftGroup.valueOf(groupId));
+
+    // Initialize TLS parameters.
+    if (SCMHAUtils.isSCMHAEnabled(conf)) {
+      Parameters parameters =
+          HASecurityUtils.createServerTlsParameters(new SecurityConfig(conf),
+              scm.getScmCertificateClient());
+      builder.setParameters(parameters);
+    }
+
+    server = builder.build();
+
     this.division = server.getDivision(groupId);
   }
 
