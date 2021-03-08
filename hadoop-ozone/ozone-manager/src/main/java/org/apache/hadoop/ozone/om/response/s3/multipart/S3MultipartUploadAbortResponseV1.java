@@ -18,21 +18,12 @@
 
 package org.apache.hadoop.ozone.om.response.s3.multipart;
 
-import org.apache.hadoop.hdds.utils.db.BatchOperation;
-import org.apache.hadoop.ozone.OmUtils;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 
 import javax.annotation.Nonnull;
-import java.io.IOException;
-import java.util.Map;
-import java.util.TreeMap;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.MULTIPARTFILEINFO_TABLE;
@@ -60,41 +51,5 @@ public class S3MultipartUploadAbortResponseV1
    */
   public S3MultipartUploadAbortResponseV1(@Nonnull OMResponse omResponse) {
     super(omResponse);
-  }
-
-  @Override
-  public void addToDBBatch(OMMetadataManager omMetadataManager,
-      BatchOperation batchOperation) throws IOException {
-
-    // Delete from openKey table and multipart info table.
-    omMetadataManager.getOpenKeyTable().deleteWithBatch(batchOperation,
-        getMultipartKey());
-    omMetadataManager.getMultipartInfoTable().deleteWithBatch(batchOperation,
-        getMultipartKey());
-
-    // Move all the parts to delete table
-    TreeMap<Integer, PartKeyInfo > partKeyInfoMap =
-        getOmMultipartKeyInfo().getPartKeyInfoMap();
-    for (Map.Entry<Integer, PartKeyInfo > partKeyInfoEntry :
-        partKeyInfoMap.entrySet()) {
-      PartKeyInfo partKeyInfo = partKeyInfoEntry.getValue();
-      OmKeyInfo currentKeyPartInfo =
-          OmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
-
-      RepeatedOmKeyInfo repeatedOmKeyInfo =
-          omMetadataManager.getDeletedTable().get(partKeyInfo.getPartName());
-
-      repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(currentKeyPartInfo,
-          repeatedOmKeyInfo, getOmMultipartKeyInfo().getUpdateID(),
-          isRatisEnabled());
-
-      omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
-          partKeyInfo.getPartName(), repeatedOmKeyInfo);
-
-      // update bucket usedBytes.
-      omMetadataManager.getBucketTable().putWithBatch(batchOperation,
-          omMetadataManager.getBucketKey(getOmBucketInfo().getVolumeName(),
-              getOmBucketInfo().getBucketName()), getOmBucketInfo());
-    }
   }
 }

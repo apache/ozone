@@ -20,12 +20,11 @@ package org.apache.hadoop.ozone.om.response.s3.multipart;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
-import java.util.List;
+import java.util.ArrayList;
 import java.util.UUID;
 
 /**
@@ -33,8 +32,6 @@ import java.util.UUID;
  */
 public class TestS3MultipartUploadAbortResponseV1
     extends TestS3MultipartUploadAbortResponse {
-
-  private List<OmDirectoryInfo> parentDirInfos;
 
   private String dirName = "abort/b/c/";
 
@@ -55,7 +52,7 @@ public class TestS3MultipartUploadAbortResponseV1
       OmMultipartKeyInfo multipartKeyInfo, OmKeyInfo omKeyInfo,
       OzoneManagerProtocolProtos.OMResponse omResponse) {
     return new S3InitiateMultipartUploadResponseV1(omResponse, multipartKeyInfo,
-        omKeyInfo, parentDirInfos);
+        omKeyInfo, new ArrayList<>());
   }
 
   protected S3MultipartUploadAbortResponse getS3MultipartUploadAbortResp(

@@ -78,7 +78,7 @@ public class S3MultipartUploadAbortResponse extends OMClientResponse {
 
     // Delete from openKey table and multipart info table.
     omMetadataManager.getOpenKeyTable().deleteWithBatch(batchOperation,
-        getMultipartKey());
+        multipartKey);
     omMetadataManager.getMultipartInfoTable().deleteWithBatch(batchOperation,
         multipartKey);
 
@@ -105,21 +105,5 @@ public class S3MultipartUploadAbortResponse extends OMClientResponse {
           omMetadataManager.getBucketKey(omBucketInfo.getVolumeName(),
               omBucketInfo.getBucketName()), omBucketInfo);
     }
-  }
-
-  protected String getMultipartKey() {
-    return multipartKey;
-  }
-
-  protected OmMultipartKeyInfo getOmMultipartKeyInfo() {
-    return omMultipartKeyInfo;
-  }
-
-  protected boolean isRatisEnabled() {
-    return isRatisEnabled;
-  }
-
-  protected OmBucketInfo getOmBucketInfo() {
-    return omBucketInfo;
   }
 }
