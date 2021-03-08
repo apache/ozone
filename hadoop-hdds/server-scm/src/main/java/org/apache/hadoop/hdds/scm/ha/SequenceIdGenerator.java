@@ -56,6 +56,14 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SEQUENCE_ID_BAT
 public class SequenceIdGenerator {
   private static final Logger LOG =
       LoggerFactory.getLogger(SequenceIdGenerator.class);
+
+  /**
+   * Ids supported.
+   */
+  public static final String LOCAL_ID = "localId";
+  public static final String DEL_TXN_ID = "delTxnId";
+  public static final String CONTAINER_ID = "containerId";
+
   private static final long INVALID_SEQUENCE_ID = 0;
 
   static class Batch {
@@ -326,26 +334,23 @@ public class SequenceIdGenerator {
     Table<String, Long> sequenceIdTable = scmMetadataStore.getSequenceIdTable();
 
     // upgrade localId
-    String localId = "localId";
-    if (sequenceIdTable.get(localId) == null) {
-      sequenceIdTable.put(localId, UniqueId.next());
-      LOG.info("upgrade {} to {}", localId, sequenceIdTable.get(localId));
+    if (sequenceIdTable.get(LOCAL_ID) == null) {
+      sequenceIdTable.put(LOCAL_ID, UniqueId.next());
+      LOG.info("upgrade {} to {}", LOCAL_ID, sequenceIdTable.get(LOCAL_ID));
     }
 
     // upgrade delTxnId
-    String delTxnId = "delTxnId";
-    if (sequenceIdTable.get(delTxnId) == null) {
+    if (sequenceIdTable.get(DEL_TXN_ID) == null) {
       // fetch delTxnId from DeletedBlocksTXTable
       // check HDDS-4477 for details.
       DeletedBlocksTransaction txn
           = scmMetadataStore.getDeletedBlocksTXTable().get(0L);
-      sequenceIdTable.put(delTxnId, txn != null ? txn.getTxID() : 0L);
-      LOG.info("upgrade {} to {}", delTxnId, sequenceIdTable.get(delTxnId));
+      sequenceIdTable.put(DEL_TXN_ID, txn != null ? txn.getTxID() : 0L);
+      LOG.info("upgrade {} to {}", DEL_TXN_ID, sequenceIdTable.get(DEL_TXN_ID));
     }
 
     // upgrade containerId
-    String containerId = "containerId";
-    if (sequenceIdTable.get(containerId) == null) {
+    if (sequenceIdTable.get(CONTAINER_ID) == null) {
       long largestContainerId = 0;
       TableIterator<ContainerID, ? extends KeyValue<ContainerID, ContainerInfo>>
           iterator = scmMetadataStore.getContainerTable().iterator();
@@ -354,9 +359,9 @@ public class SequenceIdGenerator {
         largestContainerId
             = Long.max(containerInfo.getContainerID(), largestContainerId);
       }
-      sequenceIdTable.put(containerId, largestContainerId);
+      sequenceIdTable.put(CONTAINER_ID, largestContainerId);
       LOG.info("upgrade {} to {}",
-          containerId, sequenceIdTable.get(containerId));
+          CONTAINER_ID, sequenceIdTable.get(CONTAINER_ID));
     }
   }
 }
