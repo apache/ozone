@@ -270,7 +270,7 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
     try {
       final Pipeline pipeline = pipelineManager
           .getPipeline(containerInfo.getPipelineID());
-      long localID = sequenceIdGen.getNextId("localID");
+      long localID = sequenceIdGen.getNextId("localId");
       long containerID = containerInfo.getContainerID();
       AllocatedBlock.Builder abb =  new AllocatedBlock.Builder()
           .setContainerBlockID(new ContainerBlockID(containerID, localID))
