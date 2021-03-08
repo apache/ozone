@@ -44,6 +44,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -417,6 +418,8 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
       Assert.fail(String.format("Datanode %s not registered",
           hostname));
     }
+    Assert.assertEquals(HDDSLayoutVersionManager.maxLayoutVersion(),
+        datanodeMetadata.getLayoutVersion());
   }
 
   @Test

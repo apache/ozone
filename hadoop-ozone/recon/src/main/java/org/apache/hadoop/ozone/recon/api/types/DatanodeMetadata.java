@@ -67,6 +67,9 @@ public final class DatanodeMetadata {
   @XmlElement(name = "buildDate")
   private String buildDate;
 
+  @XmlElement(name = "layoutVersion")
+  private int layoutVersion;
+
   private DatanodeMetadata(Builder builder) {
     this.hostname = builder.hostname;
     this.uuid = builder.uuid;
@@ -80,6 +83,7 @@ public final class DatanodeMetadata {
     this.setupTime = builder.setupTime;
     this.revision = builder.revision;
     this.buildDate = builder.buildDate;
+    this.layoutVersion = builder.layoutVersion;
   }
 
   public String getHostname() {
@@ -129,6 +133,9 @@ public final class DatanodeMetadata {
   public String getBuildDate() {
     return buildDate;
   }
+  public int getLayoutVersion() {
+    return layoutVersion;
+  }
 
   /**
    * Returns new builder class that builds a DatanodeMetadata.
@@ -156,6 +163,7 @@ public final class DatanodeMetadata {
     private long setupTime;
     private String revision;
     private String buildDate;
+    private int layoutVersion;
 
     public Builder() {
       this.containers = 0;
@@ -220,6 +228,11 @@ public final class DatanodeMetadata {
 
     public Builder withBuildDate(String buildDate) {
       this.buildDate = buildDate;
+      return this;
+    }
+
+    public Builder withLayoutVersion(int layoutVersion) {
+      this.layoutVersion = layoutVersion;
       return this;
     }
 
