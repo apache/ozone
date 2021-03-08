@@ -807,6 +807,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           HASecurityUtils.initializeSecurity(scmStorageConfig,
               fetchedId, conf, scmAddress, false);
         }
+
+        scmStorageConfig.setPrimaryScmNodeId(scmInfo.getScmId());
         // It will write down the cluster Id fetched from already
         // running SCM as well as the local SCM Id.
         scmStorageConfig.initialize();
