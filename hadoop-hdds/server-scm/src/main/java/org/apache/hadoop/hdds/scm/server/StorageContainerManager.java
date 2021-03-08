@@ -295,11 +295,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
 
 
-    if (SCMHAUtils.isSCMHAEnabled(conf)) {
-      scmCertificateClient =
-          new SCMCertificateClient(new SecurityConfig(configuration),
-              scmStorageConfig.getScmCertSerialId());
-    }
+    scmCertificateClient =
+        new SCMCertificateClient(new SecurityConfig(configuration),
+            scmStorageConfig.getScmCertSerialId());
 
 
 
@@ -583,49 +581,36 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     scmCertStore = new SCMCertStore(this.scmMetadataStore,
         getLastSequenceIdForCRL());
 
-    if (SCMHAUtils.isSCMHAEnabled(conf)) {
-      // Start Root Certificate Server on only primary SCM.
-      if (scmStorageConfig.getPrimaryScmNodeId().equals(
-          scmStorageConfig.getScmId())) {
-        if (configurator.getCertificateServer() != null) {
-          this.rootCertificateServer = configurator.getCertificateServer();
-        } else {
-          rootCertificateServer = HASecurityUtils.initializeRootCertificateServer(
-              getScmStorageConfig().getClusterID(),
-              getScmStorageConfig().getScmId(), scmCertStore);
-          rootCertificateServer.init(new SecurityConfig(configuration),
-              CertificateServer.CAType.SELF_SIGNED_CA);
-        }
-      } else {
-        rootCertificateServer = null;
-      }
-
-      String subject = "scm@" + InetAddress.getLocalHost().getHostName();
+    // Start Root Certificate Server on only primary SCM.
+    if (scmStorageConfig.getPrimaryScmNodeId().equals(
+        scmStorageConfig.getScmId())) {
       if (configurator.getCertificateServer() != null) {
-        this.scmCertificateServer = configurator.getCertificateServer();
+        this.rootCertificateServer = configurator.getCertificateServer();
       } else {
-        scmCertificateServer = new DefaultCAServer(subject,
-            scmStorageConfig.getClusterID(), scmStorageConfig.getScmId(),
-            scmCertStore, new DefaultProfile(), Paths.get("scm").toString());
+        rootCertificateServer = HASecurityUtils.initializeRootCertificateServer(
+            getScmStorageConfig().getClusterID(),
+            getScmStorageConfig().getScmId(), scmCertStore);
+        rootCertificateServer.init(new SecurityConfig(configuration),
+            CertificateServer.CAType.SELF_SIGNED_CA);
       }
-      // INTERMEDIARY_CA which issues certs to DN and OM.
-      scmCertificateServer.init(new SecurityConfig(configuration),
-          CertificateServer.CAType.INTERMEDIARY_CA);
-
-      securityProtocolServer = new SCMSecurityProtocolServer(conf,
-          rootCertificateServer, this);
     } else {
-      // Behave like old code, so that it can work even after upgrade to this
-      // version.
-      String subject = "scm@" + InetAddress.getLocalHost().getHostName();
-      rootCertificateServer = new DefaultCAServer(subject,
-          scmStorageConfig.getClusterID(), scmStorageConfig.getScmId(),
-          scmCertStore, new DefaultProfile(),
-          Paths.get("scm", "ca").toString());
-      rootCertificateServer.init(new SecurityConfig(configuration),
-          CertificateServer.CAType.SELF_SIGNED_CA);
-      scmCertificateServer = rootCertificateServer;
+      rootCertificateServer = null;
     }
+
+    String subject = "scm@"+InetAddress.getLocalHost().getHostName();
+    if (configurator.getCertificateServer() != null) {
+      this.scmCertificateServer = configurator.getCertificateServer();
+    } else {
+      scmCertificateServer = new DefaultCAServer(subject,
+          scmStorageConfig.getClusterID(), scmStorageConfig.getScmId(),
+          scmCertStore, new DefaultProfile(), Paths.get("scm").toString());
+    }
+    // INTERMEDIARY_CA which issues certs to DN and OM.
+    scmCertificateServer.init(new SecurityConfig(configuration),
+        CertificateServer.CAType.INTERMEDIARY_CA);
+
+    securityProtocolServer = new SCMSecurityProtocolServer(conf,
+        rootCertificateServer, this);
     grpcTlsConfig = createTlsClientConfigForSCM(new SecurityConfig(conf),
         rootCertificateServer);
   }
@@ -867,11 +852,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
         InetSocketAddress scmAddress = getScmAddress(haDetails, conf);
 
-        if (SCMHAUtils.isSCMHAEnabled(conf)) {
-          if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
-            HASecurityUtils.initializeSecurity(scmStorageConfig,
-                scmStorageConfig.getScmId(), conf, scmAddress, true);
-          }
+        if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
+          HASecurityUtils.initializeSecurity(scmStorageConfig,
+              scmStorageConfig.getScmId(), conf,
+              scmAddress, true);
         }
 
         if (SCMHAUtils.isSCMHAEnabled(conf)) {
