@@ -2264,7 +2264,8 @@ public abstract class TestOzoneRpcClientAbstract {
     bucket.addAcls(acl4);
 
     doMultipartUpload(bucket, keyName, (byte)98);
-    OzoneObj keyObj = OzoneObjInfo.Builder.newBuilder().setBucketName(bucketName)
+    OzoneObj keyObj = OzoneObjInfo.Builder.newBuilder()
+        .setBucketName(bucketName)
         .setVolumeName(volumeName).setKeyName(keyName)
         .setResType(OzoneObj.ResourceType.KEY)
         .setStoreType(OzoneObj.StoreType.OZONE).build();
