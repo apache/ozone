@@ -262,6 +262,8 @@ public class DefaultCAServer implements CertificateServer {
         getCAKeys().getPrivate(),
         getCACertificate(), java.sql.Date.valueOf(beginDate),
         java.sql.Date.valueOf(endDate), csr, scmID, clusterID);
+    // Only when primary SCM calls the store will be null. As it requests the
+    // certificate during init.
     if (store != null) {
       store.storeValidCertificate(xcert.getSerialNumber(),
           CertificateCodec.getX509Certificate(xcert), role);

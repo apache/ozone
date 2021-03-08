@@ -33,6 +33,9 @@ import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.ratis.conf.Parameters;
+import org.apache.ratis.grpc.GrpcConfigKeys;
+import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
@@ -296,5 +299,28 @@ public final class HASecurityUtils {
 
     return new DefaultCAServer(subject, clusterID, scmID, scmCertStore,
         new DefaultCAProfile(), Paths.get("scm", "ca").toString());
+  }
+
+  /**
+   * Create Server TLS parameters required for Ratis Server.
+   * @param conf
+   * @param caClient
+   * @return
+   */
+  public static Parameters createServerTlsParameters(SecurityConfig conf,
+      CertificateClient caClient) {
+    Parameters parameters = new Parameters();
+
+    if (conf.isSecurityEnabled() && conf.isGrpcTlsEnabled()) {
+      GrpcTlsConfig config = new GrpcTlsConfig(
+          caClient.getPrivateKey(), caClient.getCertificate(),
+          caClient.getCACertificate(), true);
+      GrpcConfigKeys.Server.setTlsConf(parameters, config);
+      GrpcConfigKeys.Admin.setTlsConf(parameters, config);
+      GrpcConfigKeys.Client.setTlsConf(parameters, config);
+      GrpcConfigKeys.TLS.setConf(parameters, config);
+    }
+
+    return parameters;
   }
 }

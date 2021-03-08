@@ -70,6 +70,8 @@ import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.DefaultCAProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.DefaultProfile;
 import org.apache.hadoop.hdds.scm.ha.HASecurityUtils;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
+import org.apache.hadoop.hdds.security.x509.certificate.client.SCMCertificateClient;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.scm.ScmConfig;
@@ -220,6 +222,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private CertificateServer rootCertificateServer;
   private CertificateServer scmCertificateServer;
   private SCMCertStore scmCertStore;
+  private SCMCertificateClient scmCertificateClient;
+
 
   private GrpcTlsConfig grpcTlsConfig;
 
@@ -273,6 +277,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     initMetrics();
     containerReportCache = buildContainerReportCache();
 
+
     /**
      * It is assumed the scm --init command creates the SCM Storage Config.
      */
@@ -289,6 +294,13 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       throw new SCMException("SCM not initialized due to storage config " +
           "failure.", ResultCodes.SCM_NOT_INITIALIZED);
     }
+
+
+    scmCertificateClient =
+        new SCMCertificateClient(new SecurityConfig(configuration),
+            scmStorageConfig.getScmCertSerialId());
+
+
 
     /**
      * Important : This initialization sequence is assumed by some of our tests.
@@ -1521,5 +1533,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    */
   public String getSCMNodeId() {
     return scmHANodeDetails.getLocalNodeDetails().getNodeId();
+  }
+
+  public CertificateClient getScmCertificateClient() {
+    return scmCertificateClient;
   }
 }

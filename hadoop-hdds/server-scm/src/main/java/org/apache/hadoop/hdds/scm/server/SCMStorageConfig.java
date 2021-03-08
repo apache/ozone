@@ -93,6 +93,10 @@ public class SCMStorageConfig extends Storage {
     return getStorageInfo().getProperty(SCM_ID);
   }
 
+  public String getScmCertSerialId() {
+    return getStorageInfo().getProperty(SCM_CERT_SERIAL_ID);
+  }
+
   @Override
   protected Properties getNodeProperties() {
     String scmId = getScmId();
