@@ -597,7 +597,7 @@ public class TestSCMNodeManager {
               .setSoftwareLayoutVersion(scmMlv + 2)
               .build());
       Assert.assertTrue(logCapturer.getOutput()
-          .contains("Rogue data node in the cluster"));
+          .contains("Invalid data node in the cluster"));
     }
   }
 
