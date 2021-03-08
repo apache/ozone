@@ -518,6 +518,39 @@ public class TestStorageContainerManager {
     }
   }
 
+
+  @Test
+  public void testSCMReinitializationWithHAEnabled() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, false);
+    final String path = GenericTestUtils.getTempPath(
+        UUID.randomUUID().toString());
+    Path scmPath = Paths.get(path, "scm-meta");
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, scmPath.toString());
+    //This will set the cluster id in the version file
+    MiniOzoneCluster cluster =
+        MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3).build();
+    cluster.waitForClusterToBeReady();
+    try {
+      final String clusterId =
+          cluster.getStorageContainerManager().getClusterId();
+      // validate there is no ratis group pre existing
+      try {
+        SCMRatisServerImpl.validateRatisGroupExists(conf, clusterId);
+        Assert.fail();
+      } catch (IOException ioe) {
+        // Exception is expected here
+      }
+      conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
+      // This will re-initialize SCM
+      StorageContainerManager.scmInit(conf, clusterId);
+      // Ratis group with cluster id exists now
+      SCMRatisServerImpl.validateRatisGroupExists(conf, clusterId);
+    } finally {
+      cluster.shutdown();
+    }
+  }
+
   @Test
   public void testSCMInitializationFailure()
       throws IOException, AuthenticationException {

@@ -24,6 +24,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.Optional;
+import java.util.Iterator;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -101,6 +102,27 @@ public class SCMRatisServerImpl implements SCMRatisServer {
     // TODO: Timeout and sleep interval should be made configurable
     waitforLeaderToBeReady(server, 60000, group);
     server.close();
+  }
+
+  public static void reinitialize(String clusterId, String scmId,
+      SCMNodeDetails details, OzoneConfiguration conf) throws IOException {
+    RaftServer server = newRaftServer(scmId, conf).build();
+    RaftGroup group = null;
+    Iterator<RaftGroup> iter = server.getGroups().iterator();
+    if (iter.hasNext()) {
+      group = iter.next();
+    }
+    // close the server instance so that pending locks on raft storage directory
+    // gets released if any.
+    server.close();
+    if (group != null && group.getGroupId()
+        .equals(buildRaftGroupId(clusterId))) {
+      LOG.info("Ratis group with group Id {} already exists.",
+          group.getGroupId());
+      return;
+    } else {
+      initialize(clusterId, scmId, details, conf);
+    }
   }
 
   private static void waitforLeaderToBeReady(RaftServer server, long timeout,

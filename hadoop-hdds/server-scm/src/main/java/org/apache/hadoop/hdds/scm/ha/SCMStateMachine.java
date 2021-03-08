@@ -277,7 +277,8 @@ public class SCMStateMachine extends BaseStateMachine {
     getLifeCycle().transition(LifeCycle.State.PAUSED);
   }
 
-  public void stop() {
+  public void stop() throws IOException {
+    transactionBuffer.close();
     HadoopExecutors.
         shutdown(installSnapshotExecutor, LOG, 5, TimeUnit.SECONDS);
   }

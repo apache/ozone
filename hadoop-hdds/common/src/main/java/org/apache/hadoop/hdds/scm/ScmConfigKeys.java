@@ -292,6 +292,17 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_NODE_ID_KEY =
       "ozone.scm.node.id";
 
+  // optional config, if being set will cause scm --init to only take effect on
+  // the specific node and ignore scm --bootstrap cmd.
+  // Similarly, scm --init will be ignored on the non-primordial scm nodes.
+  // If a cluster is upgraded from non-ratis to ratis based SCM, if the config
+  // is set , this will be the primary SCM node which will initialize the ratis
+  // ring.
+
+  // If the config is not set, scm --init needs to re-run for switching from
+  // non-ratis based SCM to ratis-based SCM.
+  public static final String OZONE_SCM_PRIMORDIAL_NODE_ID_KEY =
+      "ozone.scm.primordial.node.id";
   // The path where datanode ID is to be written to.
   // if this value is not set then container startup will fail.
   public static final String OZONE_SCM_DATANODE_ID_DIR =

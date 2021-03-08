@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.scm;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -207,5 +208,24 @@ public class TestStorageContainerManagerHA {
       sync = getLastAppliedIndex(scm) == leaderIndex;
     }
     return sync;
+  }
+
+  @Test
+  public void testPrimordialSCM() throws Exception {
+    StorageContainerManager scm1 = cluster.getStorageContainerManagers().get(0);
+    StorageContainerManager scm2 = cluster.getStorageContainerManagers().get(1);
+    OzoneConfiguration conf1 = scm1.getConfiguration();
+    OzoneConfiguration conf2 = scm2.getConfiguration();
+    conf1.set(ScmConfigKeys.OZONE_SCM_PRIMORDIAL_NODE_ID_KEY,
+        scm1.getSCMNodeId());
+    conf2.set(ScmConfigKeys.OZONE_SCM_PRIMORDIAL_NODE_ID_KEY,
+        scm1.getSCMNodeId());
+    Assert.assertFalse(StorageContainerManager.scmBootstrap(conf1));
+    scm1.getScmHAManager().shutdown();
+    Assert.assertTrue(
+        StorageContainerManager.scmInit(conf1, scm1.getClusterId()));
+    Assert.assertTrue(StorageContainerManager.scmBootstrap(conf2));
+    Assert.assertFalse(
+        StorageContainerManager.scmInit(conf2, scm2.getClusterId()));
   }
 }

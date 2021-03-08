@@ -741,6 +741,15 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     // The node here will try to fetch the cluster id from any of existing
     // running SCM instances.
     SCMHANodeDetails scmhaNodeDetails = SCMHANodeDetails.loadSCMHAConfig(conf);
+    String primordialSCM = SCMHAUtils.getPrimordialSCM(conf);
+    String selfNodeId = scmhaNodeDetails.getLocalNodeDetails().getNodeId();
+    if (primordialSCM != null && SCMHAUtils.isPrimordialSCM(conf, selfNodeId)) {
+      LOG.info(
+          "SCM bootstrap command can only be executed in non-Primordial SCM "
+              + "{}, self id {} "
+              + "Ignoring it.", primordialSCM, selfNodeId);
+      return false;
+    }
     OzoneConfiguration config =
         SCMHAUtils.removeSelfId(conf,
             scmhaNodeDetails.getLocalNodeDetails().getNodeId());
@@ -789,6 +798,16 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     SCMStorageConfig scmStorageConfig = new SCMStorageConfig(conf);
     StorageState state = scmStorageConfig.getState();
     final SCMHANodeDetails haDetails = SCMHANodeDetails.loadSCMHAConfig(conf);
+    String primordialSCM = SCMHAUtils.getPrimordialSCM(conf);
+    String selfNodeId = haDetails.getLocalNodeDetails().getNodeId();
+    if (primordialSCM != null && !SCMHAUtils
+        .isPrimordialSCM(conf, selfNodeId)) {
+      LOG.info(
+          "SCM init command can only be executed in Primordial SCM {}, "
+              + "self id {} "
+              + "Ignoring it.", primordialSCM, selfNodeId);
+      return false;
+    }
     if (state != StorageState.INITIALIZED) {
       try {
         if (clusterId != null && !clusterId.isEmpty()) {
@@ -817,7 +836,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
               + ";cid={};layoutVersion={}", scmStorageConfig.getStorageDir(),
           clusterId, scmStorageConfig.getLayoutVersion());
       if (SCMHAUtils.isSCMHAEnabled(conf)) {
-        SCMRatisServerImpl.validateRatisGroupExists(conf, clusterId);
+        SCMRatisServerImpl.reinitialize(clusterId, scmStorageConfig.getScmId(),
+            haDetails.getLocalNodeDetails(), conf);
       }
       return true;
     }
