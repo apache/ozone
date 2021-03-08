@@ -590,13 +590,14 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         rootCertificateServer = HASecurityUtils.initializeRootCertificateServer(
             getScmStorageConfig().getClusterID(),
             getScmStorageConfig().getScmId(), scmCertStore);
+        rootCertificateServer.init(new SecurityConfig(configuration),
+            CertificateServer.CAType.SELF_SIGNED_CA);
       }
     } else {
       rootCertificateServer = null;
     }
 
-    rootCertificateServer.init(new SecurityConfig(configuration),
-        CertificateServer.CAType.INTERMEDIARY_CA);
+
 
     String subject = "scm@"+InetAddress.getLocalHost().getHostName();
     if (configurator.getCertificateServer() != null) {

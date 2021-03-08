@@ -252,7 +252,7 @@ public final class HASecurityUtils {
           requestCertificate(csr, KERBEROS_TRUSTED, SCM).get();
 
       X509CertificateHolder rootCAServerCACertificateHolder =
-        rootCAServer.getCACertificate();
+          rootCAServer.getCACertificate();
 
       String pemEncodedCert =
           CertificateCodec.getPEMEncodedString(certificateHolder);
