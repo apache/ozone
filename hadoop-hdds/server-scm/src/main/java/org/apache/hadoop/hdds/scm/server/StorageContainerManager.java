@@ -453,6 +453,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       scmHAManager = new SCMHAManagerImpl(conf, this);
     }
 
+    // inline upgrade for SequenceIdGenerator
+    SequenceIdGenerator.upgradeToSequenceId(scmMetadataStore);
     // Distributed sequence id generator
     sequenceIdGen = new SequenceIdGenerator(
         conf, scmHAManager, scmMetadataStore.getSequenceIdTable());

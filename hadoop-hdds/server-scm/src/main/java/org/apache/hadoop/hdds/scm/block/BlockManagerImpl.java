@@ -51,6 +51,7 @@ import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.util.StringUtils;
 
 import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.INVALID_BLOCK_SIZE;
+import static org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator.LOCAL_ID;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT;
 
@@ -270,7 +271,7 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
     try {
       final Pipeline pipeline = pipelineManager
           .getPipeline(containerInfo.getPipelineID());
-      long localID = sequenceIdGen.getNextId("localID");
+      long localID = sequenceIdGen.getNextId(LOCAL_ID);
       long containerID = containerInfo.getContainerID();
       AllocatedBlock.Builder abb =  new AllocatedBlock.Builder()
           .setContainerBlockID(new ContainerBlockID(containerID, localID))

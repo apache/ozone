@@ -55,12 +55,10 @@ execute_robot_test scm admincli
 execute_robot_test scm spnego
 
 # test replication
-# TODO: https://issues.apache.org/jira/browse/HDDS-4860
-#   Reopen replication/wait.robot after distributed sequence id is implemented.
-#docker-compose up -d --scale datanode=2
-#execute_robot_test scm -v container:1 -v count:2 replication/wait.robot
-#docker-compose up -d --scale datanode=3
-#execute_robot_test scm -v container:1 -v count:3 replication/wait.robot
+docker-compose up -d --scale datanode=2
+execute_robot_test scm -v container:1 -v count:2 replication/wait.robot
+docker-compose up -d --scale datanode=3
+execute_robot_test scm -v container:1 -v count:3 replication/wait.robot
 
 stop_docker_env
 
