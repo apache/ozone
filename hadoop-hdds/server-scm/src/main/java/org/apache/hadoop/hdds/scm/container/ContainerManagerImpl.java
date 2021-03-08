@@ -53,6 +53,8 @@ import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator.CONTAINER_ID;
+
 /**
  * TODO: Add javadoc.
  */
@@ -207,7 +209,7 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
   private ContainerInfo allocateContainer(final Pipeline pipeline,
                                           final String owner)
       throws IOException {
-    final long uniqueId = sequenceIdGen.getNextId("containerId");
+    final long uniqueId = sequenceIdGen.getNextId(CONTAINER_ID);
     Preconditions.checkState(uniqueId > 0,
         "Cannot allocate container, negative container id" +
             " generated. %s.", uniqueId);
