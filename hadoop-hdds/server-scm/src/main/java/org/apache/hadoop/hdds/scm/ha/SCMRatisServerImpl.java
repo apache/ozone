@@ -96,32 +96,44 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   public static void initialize(String clusterId, String scmId,
       SCMNodeDetails details, OzoneConfiguration conf) throws IOException {
     final RaftGroup group = buildRaftGroup(details, scmId, clusterId);
-    RaftServer server = newRaftServer(scmId, conf)
-        .setGroup(group).build();
-    server.start();
-    // TODO: Timeout and sleep interval should be made configurable
-    waitforLeaderToBeReady(server, 60000, group);
-    server.close();
+    RaftServer server = null;
+    try {
+      server = newRaftServer(scmId, conf).setGroup(group).build();
+      server.start();
+      // TODO: Timeout and sleep interval should be made configurable
+      waitforLeaderToBeReady(server, 60000, group);
+    } finally {
+      if (server != null) {
+        server.close();
+      }
+    }
   }
 
   public static void reinitialize(String clusterId, String scmId,
       SCMNodeDetails details, OzoneConfiguration conf) throws IOException {
-    RaftServer server = newRaftServer(scmId, conf).build();
-    RaftGroup group = null;
-    Iterator<RaftGroup> iter = server.getGroups().iterator();
-    if (iter.hasNext()) {
-      group = iter.next();
-    }
-    // close the server instance so that pending locks on raft storage directory
-    // gets released if any.
-    server.close();
-    if (group != null && group.getGroupId()
-        .equals(buildRaftGroupId(clusterId))) {
-      LOG.info("Ratis group with group Id {} already exists.",
-          group.getGroupId());
-      return;
-    } else {
-      initialize(clusterId, scmId, details, conf);
+    RaftServer server = null;
+    try {
+      server = newRaftServer(scmId, conf).build();
+      RaftGroup group = null;
+      Iterator<RaftGroup> iter = server.getGroups().iterator();
+      if (iter.hasNext()) {
+        group = iter.next();
+      }
+      if (group != null && group.getGroupId()
+          .equals(buildRaftGroupId(clusterId))) {
+        LOG.info("Ratis group with group Id {} already exists.",
+            group.getGroupId());
+        return;
+      } else {
+        // close the server instance so that pending locks on raft storage
+        // directory gets released if any and further initiliaze can succeed.
+        server.close();
+        initialize(clusterId, scmId, details, conf);
+      }
+    } finally {
+      if (server != null) {
+        server.close();
+      }
     }
   }
 
