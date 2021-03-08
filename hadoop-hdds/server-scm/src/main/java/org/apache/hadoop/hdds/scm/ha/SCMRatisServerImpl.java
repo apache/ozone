@@ -71,7 +71,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   // TODO: Refactor and remove ConfigurationSource and use only
   //  SCMHAConfiguration.
   SCMRatisServerImpl(final ConfigurationSource conf,
-      final StorageContainerManager scm, final DBTransactionBuffer buffer)
+      final StorageContainerManager scm, final SCMHADBTransactionBuffer buffer)
       throws IOException {
     this.scm = scm;
     this.stateMachine = new SCMStateMachine(scm, this, buffer);
@@ -176,7 +176,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
     final RaftClientReply raftClientReply =
         server.submitClientRequestAsync(raftClientRequest).get();
     if (LOG.isDebugEnabled()) {
-      LOG.debug("request {} Reply {}", raftClientRequest, raftClientReply);
+      LOG.info("request {} Reply {}", raftClientRequest, raftClientReply);
     }
     return SCMRatisResponse.decode(raftClientReply);
   }

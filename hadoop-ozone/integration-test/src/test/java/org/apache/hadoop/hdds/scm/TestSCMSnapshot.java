@@ -62,7 +62,7 @@ public class TestSCMSnapshot {
   @Test
   public void testSnapshot() throws Exception {
     StorageContainerManager scm = cluster.getStorageContainerManager();
-    long snapshotInfo1 = scm.getScmHAManager().getDBTransactionBuffer()
+    long snapshotInfo1 = scm.getScmHAManager().asSCMHADBTransactionBuffer()
         .getLatestTrxInfo().getTransactionIndex();
     ContainerManagerV2 containerManager = scm.getContainerManager();
     PipelineManager pipelineManager = scm.getPipelineManager();
@@ -74,7 +74,7 @@ public class TestSCMSnapshot {
         containerManager.allocateContainer(
             RATIS, ONE, "Owner2").getPipelineID());
     pipelineManager.openPipeline(ratisPipeline2.getId());
-    long snapshotInfo2 = scm.getScmHAManager().getDBTransactionBuffer()
+    long snapshotInfo2 = scm.getScmHAManager().asSCMHADBTransactionBuffer()
         .getLatestTrxInfo().getTransactionIndex();
 
     Assert.assertTrue(
@@ -93,7 +93,7 @@ public class TestSCMSnapshot {
 
     cluster.restartStorageContainerManager(false);
     TransactionInfo trxInfoAfterRestart =
-        scm.getScmHAManager().getDBTransactionBuffer().getLatestTrxInfo();
+        scm.getScmHAManager().asSCMHADBTransactionBuffer().getLatestTrxInfo();
     Assert.assertTrue(
         trxInfoAfterRestart.getTransactionIndex() >= snapshotInfo2);
     try {

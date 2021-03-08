@@ -61,6 +61,7 @@ public class TestSCMInstallSnapshot {
   @BeforeClass
   public static void setup() throws Exception {
     conf = new OzoneConfiguration();
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
     SCMHAConfiguration scmhaConfiguration = conf.getObject(
         SCMHAConfiguration.class);
     scmhaConfiguration.setRatisSnapshotThreshold(1L);
@@ -152,7 +153,7 @@ public class TestSCMInstallSnapshot {
         getTransactionInfoTable().get(OzoneConsts.TRANSACTION_INFO_KEY)
         .getTransactionIndex());
     Assert.assertEquals(100,
-        scm.getScmHAManager().getDBTransactionBuffer().getLatestTrxInfo()
+        scm.getScmHAManager().asSCMHADBTransactionBuffer().getLatestTrxInfo()
             .getTermIndex().getIndex());
   }
 }

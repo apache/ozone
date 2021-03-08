@@ -26,7 +26,7 @@ import java.util.List;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
-import org.apache.hadoop.hdds.scm.ha.MockDBTransactionBuffer;
+import org.apache.hadoop.hdds.scm.ha.MockSCMHADBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
@@ -81,7 +81,7 @@ public class TestReconPipelineManager {
     scmStorageConfig = new ReconStorageConfig(conf);
     store = DBStoreBuilder.createDBStore(conf, new ReconSCMDBDefinition());
     scmhaManager = MockSCMHAManager.getInstance(
-        true, new MockDBTransactionBuffer(store));
+        true, new MockSCMHADBTransactionBuffer(store));
     scmContext = SCMContext.emptyContext();
   }
 

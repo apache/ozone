@@ -30,7 +30,7 @@ public class TestSequenceIDGenerator {
   @Test
   public void testSequenceIDGenUponNonRatis() throws Exception {
     OzoneConfiguration conf = SCMTestUtils.getConf();
-
+    conf.setBoolean(OZONE_SCM_HA_ENABLE_KEY, false);
     SCMMetadataStore scmMetadataStore = new SCMMetadataStoreImpl(conf);
     scmMetadataStore.start(conf);
 

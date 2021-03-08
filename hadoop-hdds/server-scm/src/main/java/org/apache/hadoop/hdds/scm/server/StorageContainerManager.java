@@ -460,10 +460,13 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (configurator.getScmContext() != null) {
       scmContext = configurator.getScmContext();
     } else {
+      // When term equals SCMContext.INVALID_TERM, the isLeader() check
+      // and getTermOfLeader() will always pass.
+      long term = SCMHAUtils.isSCMHAEnabled(conf) ? 0 : SCMContext.INVALID_TERM;
       // non-leader of term 0, in safe mode, preCheck not completed.
       scmContext = new SCMContext.Builder()
           .setLeader(false)
-          .setTerm(0)
+          .setTerm(term)
           .setIsInSafeMode(true)
           .setIsPreCheckComplete(false)
           .setSCM(this)
@@ -794,17 +797,11 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           scmStorageConfig.setClusterId(clusterId);
         }
         scmStorageConfig.initialize();
-        // TODO: Removing the HA enabled check right now as
-        //  when the SCM starts up , it always spins up the ratis
-        //  server irrespective of the check. If the ratis server is not
-        //  initialized here and starts up during the regular start,
-        //  it won't be starting a leader election and hence won't work. The
-        //  check will be re-introduced one we have clear segregation path with
-        //  ratis enable/disable switch.
-       // if (SCMHAUtils.isSCMHAEnabled(conf)) {
-        SCMRatisServerImpl.initialize(scmStorageConfig.getClusterID(),
-            scmStorageConfig.getScmId(), haDetails.getLocalNodeDetails(), conf);
-       // }
+        if (SCMHAUtils.isSCMHAEnabled(conf)) {
+          SCMRatisServerImpl.initialize(scmStorageConfig.getClusterID(),
+              scmStorageConfig.getScmId(), haDetails.getLocalNodeDetails(),
+              conf);
+        }
         LOG.info("SCM initialization succeeded. Current cluster id for sd={}"
                 + "; cid={}; layoutVersion={}; scmId={}",
             scmStorageConfig.getStorageDir(), scmStorageConfig.getClusterID(),
@@ -1220,8 +1217,16 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    * @return - if the current scm is the leader and is ready.
    */
   public boolean checkLeader() {
-    return scmContext.isLeader() && getScmHAManager().getRatisServer()
-        .getDivision().getInfo().isLeaderReady();
+    // For NON-HA setup, the node will always be the leader
+    if (!SCMHAUtils.isSCMHAEnabled(configuration)) {
+      Preconditions.checkArgument(scmContext.isLeader());
+      return true;
+    } else {
+      // FOR HA setup, the node has to be the leader and ready to serve
+      // requests.
+      return scmContext.isLeader() && getScmHAManager().getRatisServer()
+          .getDivision().getInfo().isLeaderReady();
+    }
   }
 
   public void checkAdminAccess(String remoteUser) throws IOException {

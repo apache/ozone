@@ -36,22 +36,33 @@ import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
  * written into DB to indicate the term and transaction index for the latest
  * operation in DB.
  */
-public class SCMDBTransactionBuffer implements DBTransactionBuffer {
+public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
   private final StorageContainerManager scm;
   private SCMMetadataStore metadataStore;
   private BatchOperation currentBatchOperation;
   private TransactionInfo latestTrxInfo;
   private SnapshotInfo latestSnapshot;
 
-  public SCMDBTransactionBuffer(StorageContainerManager scm)
+  public SCMHADBTransactionBufferImpl(StorageContainerManager scm)
       throws IOException {
     this.scm = scm;
     init();
   }
 
-  @Override
-  public BatchOperation getCurrentBatchOperation() {
+  private BatchOperation getCurrentBatchOperation() {
     return currentBatchOperation;
+  }
+
+  @Override
+  public void addToBuffer(Table table, Object key, Object value)
+      throws IOException {
+    table.putWithBatch(getCurrentBatchOperation(), key, value);
+  }
+
+  @Override
+  public void removeFromBuffer(Table table, Object key)
+      throws IOException {
+    table.deleteWithBatch(getCurrentBatchOperation(), key);
   }
 
   @Override
