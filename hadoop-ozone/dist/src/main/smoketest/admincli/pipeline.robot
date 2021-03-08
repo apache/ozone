@@ -21,6 +21,7 @@ Test Timeout        5 minutes
 
 *** Variables ***
 ${PIPELINE}
+${SCM}       scm
 
 *** Test Cases ***
 Create pipeline
@@ -34,7 +35,7 @@ List pipelines
                         Should contain   ${output}   Factor:ONE
 
 List pipelines with explicit host
-    ${output} =         Execute          ozone admin pipeline list --scm scm
+    ${output} =         Execute          ozone admin pipeline list --scm ${SCM}
                         Should contain   ${output}   Factor:ONE
 
 Deactivate pipeline
