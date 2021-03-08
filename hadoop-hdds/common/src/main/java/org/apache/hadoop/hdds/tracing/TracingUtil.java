@@ -116,7 +116,7 @@ public final class TracingUtil {
    * @param <T> the type of the interface
    * @param conf configuration
    *
-   * @return A new interface which implements interfce but delegate all the
+   * @return A new interface which implements interface but delegate all the
    * calls to the delegate and also enables tracing.
    */
   public static <T> T createProxy(
