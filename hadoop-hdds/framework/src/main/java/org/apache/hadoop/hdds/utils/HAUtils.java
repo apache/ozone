@@ -290,11 +290,8 @@ public final class HAUtils {
   }
 
   /**
-   * Unwrap exception to check if it is some kind of access control problem
-=======
    * Unwrap exception to check if it is some kind of access control problem.
->>>>>>> fix cs
-   * ({@link AccessControlException}
+   * {@link AccessControlException}
    */
   public static boolean isAccessControlException(Exception ex) {
     if (ex instanceof ServiceException) {
