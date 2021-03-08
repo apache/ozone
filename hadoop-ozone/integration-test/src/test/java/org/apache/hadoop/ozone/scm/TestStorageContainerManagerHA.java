@@ -44,6 +44,7 @@ import org.junit.Test;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
+import java.util.UUID;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -52,7 +53,6 @@ import org.junit.Rule;
 import org.junit.rules.Timeout;
 
 import java.io.IOException;
-import java.util.UUID;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;

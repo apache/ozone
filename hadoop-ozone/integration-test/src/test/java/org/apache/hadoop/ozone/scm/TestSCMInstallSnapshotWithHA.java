@@ -240,9 +240,17 @@ public class TestSCMInstallSnapshotWithHA {
     // Find the inactive SCM
     String followerId = getInactiveSCM(cluster).getScmId();
     StorageContainerManager follower = cluster.getSCM(followerId);
+    //cluster.startInactiveSCM(followerId);
+    follower.start();
+    follower.exitSafeMode();
     // Do some transactions so that the log index increases
     writeToIncreaseLogIndex(leaderSCM, 100);
+    File oldLocation =
+        follower.getScmMetadataStore().getStore().getDbLocation();
 
+    SCMStateMachine sm =
+        follower.getScmHAManager().getRatisServer().getSCMStateMachine();
+    TermIndex termIndex = sm.getLastAppliedTermIndex();
     DBCheckpoint leaderDbCheckpoint = leaderSCM.getScmMetadataStore().getStore()
         .getCheckpoint(false);
     Path leaderCheckpointLocation = leaderDbCheckpoint.getCheckpointLocation();

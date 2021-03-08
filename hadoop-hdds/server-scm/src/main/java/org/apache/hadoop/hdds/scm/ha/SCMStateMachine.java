@@ -40,9 +40,12 @@ import org.apache.ratis.proto.RaftProtos;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.Message;
+import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftGroupMemberId;
 import org.apache.ratis.protocol.RaftPeerId;
+import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.ratis.server.storage.RaftStorage;
 import org.apache.ratis.statemachine.SnapshotInfo;
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.statemachine.TransactionContext;
@@ -70,6 +73,7 @@ public class SCMStateMachine extends BaseStateMachine {
   private SCMHADBTransactionBuffer transactionBuffer;
   private final SimpleStateMachineStorage storage =
       new SimpleStateMachineStorage();
+  private RaftGroupId raftGroupId;
   private final AtomicBoolean isInitialized;
   private ExecutorService installSnapshotExecutor;
 
@@ -109,6 +113,19 @@ public class SCMStateMachine extends BaseStateMachine {
     return transactionBuffer == null ?
         null :
         transactionBuffer.getLatestSnapshot();
+  }
+
+  /**
+   * Initializes the State Machine with the given server, group and storage.
+   */
+  @Override
+  public void initialize(RaftServer server, RaftGroupId id,
+      RaftStorage raftStorage) throws IOException {
+    getLifeCycle().startAndTransition(() -> {
+      super.initialize(server, id, raftStorage);
+      this.raftGroupId = id;
+      storage.init(raftStorage);
+    });
   }
 
   @Override

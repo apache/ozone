@@ -17,19 +17,14 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
-import java.util.Optional;
 import java.util.Iterator;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -275,46 +270,6 @@ public class SCMRatisServerImpl implements SCMRatisServer {
     }
   }
 
-  @VisibleForTesting
-  public static void validateRatisGroupExists(OzoneConfiguration conf,
-      String clusterId) throws IOException {
-    final SCMHAConfiguration haConf = conf.getObject(SCMHAConfiguration.class);
-    final RaftProperties properties = RatisUtil.newRaftProperties(haConf, conf);
-    final RaftGroupId raftGroupId = buildRaftGroupId(clusterId);
-    final AtomicBoolean found = new AtomicBoolean(false);
-    RaftServerConfigKeys.storageDir(properties).parallelStream().forEach(
-        (dir) -> Optional.ofNullable(dir.listFiles()).map(Arrays::stream)
-            .orElse(Stream.empty()).filter(File::isDirectory).forEach(sub -> {
-              try {
-                LOG.info("{}: found a subdirectory {}", raftGroupId, sub);
-                RaftGroupId groupId = null;
-                try {
-                  groupId = RaftGroupId.valueOf(UUID.fromString(sub.getName()));
-                } catch (Exception e) {
-                  LOG.info("{}: The directory {} is not a group directory;"
-                      + " ignoring it. ", raftGroupId, sub.getAbsolutePath());
-                }
-                if (groupId != null) {
-                  if (groupId.equals(raftGroupId)) {
-                    LOG.info(
-                        "{} : The directory {} found a group directory for "
-                            + "cluster {}", raftGroupId, sub.getAbsolutePath(),
-                        clusterId);
-                    found.set(true);
-                  }
-                }
-              } catch (Exception e) {
-                LOG.warn(
-                    raftGroupId + ": Failed to find the group directory "
-                        + sub.getAbsolutePath() + ".", e);
-              }
-            }));
-    if (!found.get()) {
-      throw new IOException(
-          "Could not find any ratis group with id " + raftGroupId);
-    }
-  }
-
   private static RaftGroup buildRaftGroup(SCMNodeDetails details,
       String scmId, String clusterId) {
     Preconditions.checkNotNull(scmId);
@@ -333,7 +288,8 @@ public class SCMRatisServerImpl implements SCMRatisServer {
     return group;
   }
 
-  private static RaftGroupId buildRaftGroupId(String clusterId) {
+  @VisibleForTesting
+  public static RaftGroupId buildRaftGroupId(String clusterId) {
     Preconditions.checkNotNull(clusterId);
     return RaftGroupId.valueOf(
         UUID.fromString(clusterId.replace(OzoneConsts.CLUSTER_ID_PREFIX, "")));

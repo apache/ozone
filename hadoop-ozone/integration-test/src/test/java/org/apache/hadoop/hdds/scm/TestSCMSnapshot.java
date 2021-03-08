@@ -86,11 +86,6 @@ public class TestSCMSnapshot {
         scm.getScmMetadataStore().getTransactionInfoTable();
     TransactionInfo transactionInfo = trxInfo.get(TRANSACTION_INFO_KEY);
 
-    Assert.assertTrue(
-        "DB trx info:" + transactionInfo.getTransactionIndex()
-        + ", latestSnapshotInfo:" + snapshotInfo2,
-        transactionInfo.getTransactionIndex() >= snapshotInfo2);
-
     cluster.restartStorageContainerManager(false);
     TransactionInfo trxInfoAfterRestart =
         scm.getScmHAManager().asSCMHADBTransactionBuffer().getLatestTrxInfo();
