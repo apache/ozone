@@ -54,6 +54,7 @@ import com.google.common.collect.Lists;
 import static java.lang.Math.min;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_MAX_RETRY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_MAX_RETRY_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator.DEL_TXN_ID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -338,7 +339,7 @@ public class DeletedBlockLogImplV2
       ArrayList<DeletedBlocksTransaction> txsToBeAdded = new ArrayList<>();
       for (Map.Entry< Long, List< Long > > entry :
           containerBlocksMap.entrySet()) {
-        long nextTXID = sequenceIdGen.getNextId("delTxnId");
+        long nextTXID = sequenceIdGen.getNextId(DEL_TXN_ID);
         DeletedBlocksTransaction tx = constructNewTransaction(nextTXID,
             entry.getKey(), entry.getValue());
         txsToBeAdded.add(tx);
