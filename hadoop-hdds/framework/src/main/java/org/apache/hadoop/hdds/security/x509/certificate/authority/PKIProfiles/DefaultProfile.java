@@ -77,7 +77,7 @@ public class DefaultProfile implements PKIProfile {
       GeneralName.otherName,
   };
   // Map that handles all the Extensions lookup and validations.
-  private static final Map<ASN1ObjectIdentifier, BiFunction<Extension,
+  protected static final Map<ASN1ObjectIdentifier, BiFunction<Extension,
       PKIProfile, Boolean>> EXTENSIONS_MAP = Stream.of(
       new SimpleEntry<>(Extension.keyUsage, VALIDATE_KEY_USAGE),
       new SimpleEntry<>(Extension.subjectAlternativeName, VALIDATE_SAN),
@@ -267,7 +267,7 @@ public class DefaultProfile implements PKIProfile {
    */
   @Override
   public ASN1ObjectIdentifier[] getSupportedExtensions() {
-    return EXTENSIONS_MAP.keySet().toArray(new ASN1ObjectIdentifier[0]);
+    return getExtensionsMap().keySet().toArray(new ASN1ObjectIdentifier[0]);
   }
 
   /**
@@ -275,7 +275,7 @@ public class DefaultProfile implements PKIProfile {
    */
   @Override
   public boolean isSupportedExtension(Extension extension) {
-    return EXTENSIONS_MAP.containsKey(extension.getExtnId());
+    return getExtensionsMap().containsKey(extension.getExtnId());
   }
 
   /**
@@ -292,7 +292,7 @@ public class DefaultProfile implements PKIProfile {
     }
 
     BiFunction<Extension, PKIProfile, Boolean> func =
-        EXTENSIONS_MAP.get(extension.getExtnId());
+        getExtensionsMap().get(extension.getExtnId());
 
     if (func != null) {
       return func.apply(extension, this);
@@ -337,5 +337,12 @@ public class DefaultProfile implements PKIProfile {
   @Override
   public boolean isCA() {
     return false;
+  }
+
+
+  @Override
+  public Map<ASN1ObjectIdentifier, BiFunction< Extension, PKIProfile,
+      Boolean>> getExtensionsMap() {
+    return EXTENSIONS_MAP;
   }
 }

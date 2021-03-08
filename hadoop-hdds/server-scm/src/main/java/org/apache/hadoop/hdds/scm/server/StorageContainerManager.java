@@ -32,6 +32,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
 import com.google.protobuf.BlockingService;
 
+import java.nio.file.Paths;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.Collection;
@@ -66,6 +67,8 @@ import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.ScmInfo;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.DefaultCAProfile;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.DefaultProfile;
 import org.apache.hadoop.hdds.utils.HASecurityUtils;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
@@ -214,7 +217,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private final LeaseManager<Long> commandWatcherLeaseManager;
 
   private SCMSafeModeManager scmSafeModeManager;
-  private CertificateServer certificateServer;
+  private CertificateServer rootCertificateServer;
+  private CertificateServer scmCertificateServer;
+  private SCMCertStore scmCertStore;
+
   private GrpcTlsConfig grpcTlsConfig;
 
   private JvmPauseMonitor jvmPauseMonitor;
@@ -305,7 +311,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       // if no Security, we do not create a Certificate Server at all.
       // This allows user to boot SCM without security temporarily
       // and then come back and enable it without any impact.
-      certificateServer = null;
+      rootCertificateServer = null;
       securityProtocolServer = null;
     }
 
@@ -554,25 +560,44 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    */
   private void initializeCAnSecurityProtocol(OzoneConfiguration conf,
       SCMConfigurator configurator) throws IOException {
-    if(configurator.getCertificateServer() != null) {
-      this.certificateServer = configurator.getCertificateServer();
-    } else {
-      // This assumes that SCM init has run, and DB metadata stores are created.
-      certificateServer = initializeCertificateServer(
-          getScmStorageConfig().getClusterID(),
-          getScmStorageConfig().getScmId());
+    if (this.scmMetadataStore == null) {
+      LOG.error("Cannot initialize Certificate Server without a valid meta " +
+          "data layer.");
+      throw new SCMException("Cannot initialize CA without a valid metadata " +
+          "store", ResultCodes.SCM_NOT_INITIALIZED);
     }
-    // TODO: Support Intermediary CAs in future.
-    certificateServer.init(new SecurityConfig(conf),
-        CertificateServer.CAType.SELF_SIGNED_CA);
+    // This assumes that SCM init has run, and DB metadata stores are created.
+    scmCertStore = new SCMCertStore(this.scmMetadataStore,
+        getLastSequenceIdForCRL());
+
+    // Start Root Certificate Server on only primary SCM.
+    if (scmStorageConfig.getPrimaryScmNodeId().equals(
+        scmStorageConfig.getScmId())) {
+      if (configurator.getCertificateServer() != null) {
+        this.rootCertificateServer = configurator.getCertificateServer();
+      } else {
+        rootCertificateServer = initializeRootCertificateServer(
+            getScmStorageConfig().getClusterID(),
+            getScmStorageConfig().getScmId());
+      }
+      rootCertificateServer.init(new SecurityConfig(conf),
+          CertificateServer.CAType.SELF_SIGNED_CA);
+    } else {
+      rootCertificateServer = null;
+    }
+
     securityProtocolServer = new SCMSecurityProtocolServer(conf,
-        certificateServer, this);
+        rootCertificateServer, this);
     grpcTlsConfig = createTlsClientConfigForSCM(new SecurityConfig(conf),
-            certificateServer);
+        rootCertificateServer);
   }
 
-  public CertificateServer getCertificateServer() {
-    return certificateServer;
+  public CertificateServer getRootCertificateServer() {
+    return rootCertificateServer;
+  }
+
+  public CertificateServer getScmCertificateServer() {
+    return scmCertificateServer;
   }
 
   // For Internal gRPC client from SCM to DN with gRPC TLS
@@ -649,20 +674,14 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    * @param clusterID - Cluster ID
    * @param scmID     - SCM ID
    */
-  private CertificateServer initializeCertificateServer(String clusterID,
+  private CertificateServer initializeRootCertificateServer(String clusterID,
       String scmID) throws IOException {
     // TODO: Support Certificate Server loading via Class Name loader.
     // So it is easy to use different Certificate Servers if needed.
-    String subject = "scm@" + InetAddress.getLocalHost().getHostName();
-    if(this.scmMetadataStore == null) {
-      LOG.error("Cannot initialize Certificate Server without a valid meta " +
-          "data layer.");
-      throw new SCMException("Cannot initialize CA without a valid metadata " +
-          "store", ResultCodes.SCM_NOT_INITIALIZED);
-    }
-    SCMCertStore certStore = new SCMCertStore(this.scmMetadataStore,
-        getLastSequenceIdForCRL());
-    return new DefaultCAServer(subject, clusterID, scmID, certStore);
+    String subject = "scm-rootca@" + InetAddress.getLocalHost().getHostName();
+
+    return new DefaultCAServer(subject, clusterID, scmID, scmCertStore,
+        new DefaultCAProfile(), Paths.get("scm", "ca").toString());
   }
 
   long getLastSequenceIdForCRL() throws IOException {
@@ -1075,6 +1094,14 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
             scmStorageConfig.getScmId())) {
       HASecurityUtils.initializeSecurity(scmStorageConfig.getClusterID(),
           scmStorageConfig.getScmId(), configuration, scmAddress);
+      String subject = "scm-@"+InetAddress.getLocalHost().getHostName();
+      scmCertificateServer = new DefaultCAServer(subject,
+          scmStorageConfig.getClusterID(), scmStorageConfig.getScmId(),
+          scmCertStore, new DefaultProfile(), Paths.get("scm").toString());
+      // INTERMEDIARY_CA which issues certs to DN and OM.
+      scmCertificateServer.init(new SecurityConfig(configuration),
+          CertificateServer.CAType.INTERMEDIARY_CA);
+
     }
 
     setStartTime();

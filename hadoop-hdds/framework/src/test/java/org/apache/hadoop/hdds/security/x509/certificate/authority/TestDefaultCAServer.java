@@ -23,6 +23,7 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.DefaultProfile;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.test.LambdaTestUtils;
@@ -38,6 +39,7 @@ import org.junit.rules.TemporaryFolder;
 
 import java.io.IOException;
 import java.math.BigInteger;
+import java.nio.file.Paths;
 import java.security.KeyPair;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
@@ -56,6 +58,7 @@ import static junit.framework.TestCase.assertTrue;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.OM;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.SCM;
+import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateServer.CAType.SELF_SIGNED_CA;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.fail;
@@ -81,12 +84,13 @@ public class TestDefaultCAServer {
     SecurityConfig securityConfig = new SecurityConfig(conf);
     CertificateServer testCA = new DefaultCAServer("testCA",
         RandomStringUtils.randomAlphabetic(4),
-        RandomStringUtils.randomAlphabetic(4), caStore);
-    testCA.init(securityConfig, CertificateServer.CAType.SELF_SIGNED_CA);
+        RandomStringUtils.randomAlphabetic(4), caStore,
+        new DefaultProfile(), Paths.get("scm", "ca").toString());
+    testCA.init(securityConfig, SELF_SIGNED_CA);
     X509CertificateHolder first = testCA.getCACertificate();
     assertNotNull(first);
     //Init is idempotent.
-    testCA.init(securityConfig, CertificateServer.CAType.SELF_SIGNED_CA);
+    testCA.init(securityConfig, SELF_SIGNED_CA);
     X509CertificateHolder second = testCA.getCACertificate();
     assertEquals(first, second);
 
@@ -106,10 +110,11 @@ public class TestDefaultCAServer {
     SecurityConfig securityConfig = new SecurityConfig(conf);
     CertificateServer testCA = new DefaultCAServer("testCA",
         RandomStringUtils.randomAlphabetic(4),
-        RandomStringUtils.randomAlphabetic(4), caStore);
+        RandomStringUtils.randomAlphabetic(4), caStore,
+        new DefaultProfile(), Paths.get("scm", "ca").toString());
     Consumer<SecurityConfig> caInitializer =
         ((DefaultCAServer) testCA).processVerificationStatus(
-        DefaultCAServer.VerificationStatus.MISSING_CERTIFICATE);
+        DefaultCAServer.VerificationStatus.MISSING_CERTIFICATE, SELF_SIGNED_CA);
     try {
 
       caInitializer.accept(securityConfig);
@@ -126,10 +131,11 @@ public class TestDefaultCAServer {
     SecurityConfig securityConfig = new SecurityConfig(conf);
     CertificateServer testCA = new DefaultCAServer("testCA",
         RandomStringUtils.randomAlphabetic(4),
-        RandomStringUtils.randomAlphabetic(4), caStore);
+        RandomStringUtils.randomAlphabetic(4), caStore,
+        new DefaultProfile(), Paths.get("scm", "ca").toString());
     Consumer<SecurityConfig> caInitializer =
         ((DefaultCAServer) testCA).processVerificationStatus(
-            DefaultCAServer.VerificationStatus.MISSING_KEYS);
+            DefaultCAServer.VerificationStatus.MISSING_KEYS, SELF_SIGNED_CA);
     try {
 
       caInitializer.accept(securityConfig);
@@ -175,9 +181,9 @@ public class TestDefaultCAServer {
     String csrString = CertificateSignRequest.getEncodedString(csr);
 
     CertificateServer testCA = new DefaultCAServer("testCA",
-        clusterId, scmId, caStore);
+        clusterId, scmId, caStore, new DefaultProfile(), Paths.get("scm", "ca").toString());
     testCA.init(new SecurityConfig(conf),
-        CertificateServer.CAType.SELF_SIGNED_CA);
+        SELF_SIGNED_CA);
 
     Future<X509CertificateHolder> holder = testCA.requestCertificate(csrString,
         CertificateApprover.ApprovalType.TESTING_AUTOMATIC, SCM);
@@ -217,9 +223,10 @@ public class TestDefaultCAServer {
 
     CertificateServer testCA = new DefaultCAServer("testCA",
         RandomStringUtils.randomAlphabetic(4),
-        RandomStringUtils.randomAlphabetic(4), caStore);
+        RandomStringUtils.randomAlphabetic(4), caStore,
+        new DefaultProfile(), Paths.get("scm", "ca").toString());
     testCA.init(new SecurityConfig(conf),
-        CertificateServer.CAType.SELF_SIGNED_CA);
+        SELF_SIGNED_CA);
 
     Future<X509CertificateHolder> holder = testCA.requestCertificate(csrString,
         CertificateApprover.ApprovalType.TESTING_AUTOMATIC, OM);
@@ -235,9 +242,10 @@ public class TestDefaultCAServer {
     Date now = new Date();
 
     CertificateServer testCA = new DefaultCAServer("testCA",
-        clusterId, scmId, caStore);
+        clusterId, scmId, caStore, new DefaultProfile(),
+        Paths.get("scm", "ca").toString());
     testCA.init(new SecurityConfig(conf),
-        CertificateServer.CAType.SELF_SIGNED_CA);
+        SELF_SIGNED_CA);
 
     KeyPair keyPair =
         new HDDSKeyGenerator(conf).generateKey();
@@ -301,9 +309,10 @@ public class TestDefaultCAServer {
 
     CertificateServer testCA = new DefaultCAServer("testCA",
         RandomStringUtils.randomAlphabetic(4),
-        RandomStringUtils.randomAlphabetic(4), caStore);
+        RandomStringUtils.randomAlphabetic(4), caStore,
+        new DefaultProfile(), Paths.get("scm", "ca").toString());
     testCA.init(new SecurityConfig(conf),
-        CertificateServer.CAType.SELF_SIGNED_CA);
+        SELF_SIGNED_CA);
 
     LambdaTestUtils.intercept(ExecutionException.class, "ScmId and " +
             "ClusterId in CSR subject are incorrect",
