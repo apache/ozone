@@ -236,6 +236,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     LOG.info("Shutting down StorageContainerManager " + scm.getScmId());
 
     scm.stop();
+    scmhaService.removeInstance(scm);
   }
 
   public void restartStorageContainerManager(StorageContainerManager scm, boolean waitForSCM)
@@ -244,9 +245,10 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
     LOG.info("Restarting SCM in cluster " + this.getClass());
     OzoneConfiguration scmConf = scm.getConfiguration();
-    scm.stop();
+    shutdownStorageContainerManager(scm);
     scm.join();
     scm = TestUtils.getScmSimple(scmConf);
+    scmhaService.addInstance(scm);
     scm.start();
     if (waitForSCM) {
       waitForClusterToBeReady();
@@ -707,6 +709,14 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
     public List<Type> getServices() {
       return services;
+    }
+
+    public boolean removeInstance(Type t) {
+      return services.remove(t);
+    }
+
+    public boolean addInstance(Type t) {
+      return services.add(t);
     }
 
     public boolean isServiceActive(String id) {

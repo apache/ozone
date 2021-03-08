@@ -20,35 +20,34 @@ package org.apache.hadoop.ozone;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.ozone.failure.Failures;
 import org.apache.hadoop.ozone.loadgenerators.AgedDirLoadGenerator;
-import org.apache.hadoop.ozone.loadgenerators.RandomDirLoadGenerator;
 import org.apache.hadoop.ozone.loadgenerators.NestedDirLoadGenerator;
-
+import org.apache.hadoop.ozone.loadgenerators.RandomDirLoadGenerator;
 import picocli.CommandLine;
 
 import java.util.concurrent.Callable;
 
 /**
- * Chaos cluster for Ozone Manager.
+ * Chaos cluster for Storage Container Manager.
  */
 @CommandLine.Command(
-    name = "om",
-    description = "run chaos cluster across Ozone Managers",
+    name = "scm",
+    description = "run chaos cluster across Storage Container Managers",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
-public class TestOzoneManagerMiniChaosOzoneCluster extends
+public class TestStorageContainerManagerMiniChaosOzoneCluster extends
     TestMiniChaosOzoneCluster implements Callable<Void> {
 
   @Override
   public Void call() throws Exception {
-    setNumManagers(3, 1,true);
+    setNumManagers(3, 3,true);
     setNumDatanodes(3);
 
     addLoadClasses(AgedDirLoadGenerator.class);
     addLoadClasses(RandomDirLoadGenerator.class);
     addLoadClasses(NestedDirLoadGenerator.class);
 
-    addFailureClasses(Failures.OzoneManagerRestartFailure.class);
-    addFailureClasses(Failures.OzoneManagerStartStopFailure.class);
+    addFailureClasses(Failures.StorageContainerManagerRestartFailure.class);
+    addFailureClasses(Failures.StorageContainerManagerStartStopFailure.class);
 
     startChaosCluster();
     return null;
