@@ -540,37 +540,35 @@ public class SCMNodeManager implements NodeManager {
           layoutVersionReport.toString().replaceAll("\n", "\\\\n"));
     }
 
-    if (layoutVersionReport != null) {
-      int scmSlv = scmLayoutVersionManager.getSoftwareLayoutVersion();
-      int scmMlv = scmLayoutVersionManager.getMetadataLayoutVersion();
-      int dnSlv = layoutVersionReport.getSoftwareLayoutVersion();
-      int dnMlv = layoutVersionReport.getMetadataLayoutVersion();
+    int scmSlv = scmLayoutVersionManager.getSoftwareLayoutVersion();
+    int scmMlv = scmLayoutVersionManager.getMetadataLayoutVersion();
+    int dnSlv = layoutVersionReport.getSoftwareLayoutVersion();
+    int dnMlv = layoutVersionReport.getMetadataLayoutVersion();
 
-      // If the data node slv is > scm slv => log error condition
-      if (dnSlv > scmSlv) {
-        LOG.error("Rogue data node in the cluster : {}. " +
-                "DataNode SoftwareLayoutVersion = {}, SCM " +
-                "SoftwareLayoutVersion = {}",
-            datanodeDetails.getHostName(), dnSlv, scmSlv);
-      }
+    // If the data node slv is > scm slv => log error condition
+    if (dnSlv > scmSlv) {
+      LOG.error("Invalid data node in the cluster : {}. " +
+              "DataNode SoftwareLayoutVersion = {}, SCM " +
+              "SoftwareLayoutVersion = {}",
+          datanodeDetails.getHostName(), dnSlv, scmSlv);
+    }
 
-      // If the datanode slv < scm slv, it can not be allowed to be part of
-      // any pipeline. However it can be allowed to join the cluster
-      if (dnMlv < scmMlv) {
-        LOG.warn("Data node {} can not be used in any pipeline in the " +
-                "cluster. " + "DataNode MetadataLayoutVersion = {}, SCM " +
-                "MetadataLayoutVersion = {}",
-            datanodeDetails.getHostName(), dnMlv, scmMlv);
+    // If the datanode slv < scm slv, it can not be allowed to be part of
+    // any pipeline. However it can be allowed to join the cluster
+    if (dnMlv < scmMlv) {
+      LOG.warn("Data node {} can not be used in any pipeline in the " +
+              "cluster. " + "DataNode MetadataLayoutVersion = {}, SCM " +
+              "MetadataLayoutVersion = {}",
+          datanodeDetails.getHostName(), dnMlv, scmMlv);
 
-        // Send Finalize command to the data node. Its OK to
-        // send Finalize command multiple times.
-        scmNodeEventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
-            new CommandForDatanode<>(datanodeDetails.getUuid(),
-                new FinalizeNewLayoutVersionCommand(true,
-                    LayoutVersionProto.newBuilder()
-                        .setSoftwareLayoutVersion(dnSlv)
-                        .setMetadataLayoutVersion(dnSlv).build())));
-      }
+      // Send Finalize command to the data node. Its OK to
+      // send Finalize command multiple times.
+      scmNodeEventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
+          new CommandForDatanode<>(datanodeDetails.getUuid(),
+              new FinalizeNewLayoutVersionCommand(true,
+                  LayoutVersionProto.newBuilder()
+                      .setSoftwareLayoutVersion(dnSlv)
+                      .setMetadataLayoutVersion(dnSlv).build())));
     }
   }
 

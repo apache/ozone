@@ -133,7 +133,7 @@ public class ReconNodeManager extends SCMNodeManager {
         commandForDatanode.getCommand().getType())) {
       super.onMessage(commandForDatanode, ignored);
     } else {
-      LOG.info("Ignoring unsupported command {} for Datanode {}.",
+      LOG.debug("Ignoring unsupported command {} for Datanode {}.",
           commandForDatanode.getCommand().getType(),
           commandForDatanode.getDatanodeId());
     }
