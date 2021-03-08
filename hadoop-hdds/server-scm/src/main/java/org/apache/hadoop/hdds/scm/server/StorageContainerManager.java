@@ -597,8 +597,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       rootCertificateServer = null;
     }
 
-
-
     String subject = "scm@"+InetAddress.getLocalHost().getHostName();
     if (configurator.getCertificateServer() != null) {
       this.scmCertificateServer = configurator.getCertificateServer();

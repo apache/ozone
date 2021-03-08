@@ -93,16 +93,6 @@ public class TestDefaultCAServer {
     testCA.init(securityConfig, SELF_SIGNED_CA);
     X509CertificateHolder second = testCA.getCACertificate();
     assertEquals(first, second);
-
-    // we only support Self Signed CA for now.
-    try {
-      testCA.init(securityConfig, CertificateServer.CAType.INTERMEDIARY_CA);
-      fail("code should not reach here, exception should have been thrown.");
-    } catch (IllegalStateException e) {
-      // This is a run time exception, hence it is not caught by the junit
-      // expected Exception.
-      assertTrue(e.toString().contains("Not implemented"));
-    }
   }
 
   @Test
