@@ -2253,9 +2253,34 @@ public abstract class TestOzoneRpcClientAbstract {
     volume.createBucket(bucketName);
     OzoneBucket bucket = volume.getBucket(bucketName);
 
-    doMultipartUpload(bucket, keyName, (byte)98);
-  }
+    // Add ACL on Bucket
+    OzoneAcl acl1 = new OzoneAcl(USER, "Monday", ACLType.ALL, DEFAULT);
+    OzoneAcl acl2 = new OzoneAcl(USER, "Friday", ACLType.ALL, DEFAULT);
+    OzoneAcl acl3 = new OzoneAcl(USER, "Jan", ACLType.ALL, ACCESS);
+    OzoneAcl acl4 = new OzoneAcl(USER, "Feb", ACLType.ALL, ACCESS);
+    bucket.addAcls(acl1);
+    bucket.addAcls(acl2);
+    bucket.addAcls(acl3);
+    bucket.addAcls(acl4);
 
+    doMultipartUpload(bucket, keyName, (byte)98);
+    OzoneObj keyObj = OzoneObjInfo.Builder.newBuilder().setBucketName(bucketName)
+        .setVolumeName(volumeName).setKeyName(keyName)
+        .setResType(OzoneObj.ResourceType.KEY)
+        .setStoreType(OzoneObj.StoreType.OZONE).build();
+    List<OzoneAcl> aclList = store.getAcl(keyObj);
+    // key should inherit bucket's DEFAULT type acl
+    Assert.assertTrue(aclList.stream().anyMatch(
+        acl -> acl.getName().equals(acl1.getName())));
+    Assert.assertTrue(aclList.stream().anyMatch(
+        acl -> acl.getName().equals(acl2.getName())));
+
+    // kye should not inherit bucket's ACCESS type acl
+    Assert.assertFalse(aclList.stream().anyMatch(
+        acl -> acl.getName().equals(acl3.getName())));
+    Assert.assertFalse(aclList.stream().anyMatch(
+        acl -> acl.getName().equals(acl4.getName())));
+  }
 
   @Test
   public void testMultipartUploadOverride() throws Exception {
