@@ -598,7 +598,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     rootCertificateServer.init(new SecurityConfig(configuration),
         CertificateServer.CAType.INTERMEDIARY_CA);
 
-    String subject = "scm-@"+InetAddress.getLocalHost().getHostName();
+    String subject = "scm@"+InetAddress.getLocalHost().getHostName();
     if (configurator.getCertificateServer() != null) {
       this.scmCertificateServer = configurator.getCertificateServer();
     } else {
