@@ -101,7 +101,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
       server = newRaftServer(scmId, conf).setGroup(group).build();
       server.start();
       // TODO: Timeout and sleep interval should be made configurable
-      waitforLeaderToBeReady(server, 60000, group);
+      waitForLeaderToBeReady(server, 60000, group);
     } finally {
       if (server != null) {
         server.close();
@@ -137,7 +137,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
     }
   }
 
-  private static void waitforLeaderToBeReady(RaftServer server, long timeout,
+  private static void waitForLeaderToBeReady(RaftServer server, long timeout,
       RaftGroup group)
       throws IOException {
     boolean ready;
