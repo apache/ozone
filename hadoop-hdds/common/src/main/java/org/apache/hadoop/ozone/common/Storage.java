@@ -126,7 +126,7 @@ public abstract class Storage {
    * version file properties.
    * @return the instance of the storageInfo class
    */
-  protected StorageInfo getStorageInfo() {
+  public StorageInfo getStorageInfo() {
     return storageInfo;
   }
 

@@ -160,11 +160,11 @@ public class SCMSecurityProtocolServerSideTranslatorPB
         .getDataNodeCertificate(request.getDatanodeDetails(),
             request.getCSR());
     SCMGetCertResponseProto.Builder builder =
-        SCMGetCertResponseProto
-            .newBuilder()
+        SCMGetCertResponseProto.newBuilder()
             .setResponseCode(ResponseCode.success)
             .setX509Certificate(certificate)
-            .setX509CACertificate(impl.getCACertificate());
+            .setX509CACertificate(impl.getCACertificate())
+            .setX509RootCACertificate(impl.getCACertificate());
 
     return builder.build();
 

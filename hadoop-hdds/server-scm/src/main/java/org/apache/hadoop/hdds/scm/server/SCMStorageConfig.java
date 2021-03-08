@@ -28,6 +28,7 @@ import java.util.Properties;
 import java.util.UUID;
 
 import static org.apache.hadoop.ozone.OzoneConsts.PRIMARY_SCM_NODE_ID;
+import static org.apache.hadoop.ozone.OzoneConsts.SCM_CERT_SERIAL_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.STORAGE_DIR;
 
@@ -57,6 +58,10 @@ public class SCMStorageConfig extends Storage {
     } else {
       getStorageInfo().setProperty(SCM_ID, scmId);
     }
+  }
+
+  public void setScmCertSerialId(String certSerialId) throws IOException {
+    getStorageInfo().setProperty(SCM_CERT_SERIAL_ID, certSerialId);
   }
 
   /**

@@ -839,4 +839,9 @@ public abstract class DefaultCertificateClient implements CertificateClient {
                 Client.getRpcTimeout(conf)));
     return scmSecurityClient;
   }
+
+  @Override
+  public String getComponentName() {
+    return null;
+  }
 }

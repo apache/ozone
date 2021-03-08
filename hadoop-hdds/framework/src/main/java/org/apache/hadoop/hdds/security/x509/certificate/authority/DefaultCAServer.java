@@ -27,13 +27,11 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.DefaultProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.PKIProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.SelfSignedCertificate;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
-import org.apache.hadoop.hdds.utils.HASecurityUtils;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.cert.X509CertificateHolder;
@@ -162,18 +160,12 @@ public class DefaultCAServer implements CertificateServer {
     /* In future we will split this code to have different kind of CAs.
      * Right now, we have only self-signed CertificateServer.
      */
-    if (type == CAType.SELF_SIGNED_CA) {
-      VerificationStatus status = verifySelfSignedCA(securityConfig);
-      Consumer<SecurityConfig> caInitializer =
-          processVerificationStatus(status, type);
-      caInitializer.accept(securityConfig);
-      crlApprover = new DefaultCRLApprover(securityConfig,
-          getCAKeys().getPrivate());
-      return;
-    }
-
-    LOG.error("We support only Self-Signed CAs for now.");
-    throw new IllegalStateException("Not implemented functionality requested.");
+    VerificationStatus status = verifySelfSignedCA(securityConfig);
+    Consumer<SecurityConfig> caInitializer =
+        processVerificationStatus(status, type);
+    caInitializer.accept(securityConfig);
+    crlApprover = new DefaultCRLApprover(securityConfig,
+        getCAKeys().getPrivate());
   }
 
   @Override
@@ -270,8 +262,10 @@ public class DefaultCAServer implements CertificateServer {
         getCAKeys().getPrivate(),
         getCACertificate(), java.sql.Date.valueOf(beginDate),
         java.sql.Date.valueOf(endDate), csr, scmID, clusterID);
-    store.storeValidCertificate(xcert.getSerialNumber(),
-        CertificateCodec.getX509Certificate(xcert), role);
+    if (store != null) {
+      store.storeValidCertificate(xcert.getSerialNumber(),
+          CertificateCodec.getX509Certificate(xcert), role);
+    }
     return xcert;
   }
 
