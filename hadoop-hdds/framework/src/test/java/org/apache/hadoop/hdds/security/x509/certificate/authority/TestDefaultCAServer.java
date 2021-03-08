@@ -181,7 +181,8 @@ public class TestDefaultCAServer {
     String csrString = CertificateSignRequest.getEncodedString(csr);
 
     CertificateServer testCA = new DefaultCAServer("testCA",
-        clusterId, scmId, caStore, new DefaultProfile(), Paths.get("scm", "ca").toString());
+        clusterId, scmId, caStore, new DefaultProfile(),
+        Paths.get("scm", "ca").toString());
     testCA.init(new SecurityConfig(conf),
         SELF_SIGNED_CA);
 

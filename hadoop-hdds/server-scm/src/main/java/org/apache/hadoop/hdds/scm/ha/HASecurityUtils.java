@@ -23,7 +23,6 @@ import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslator
 import org.apache.hadoop.hdds.scm.server.SCMCertStore;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateApprover;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateServer;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.DefaultCAServer;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.DefaultCAProfile;
@@ -50,6 +49,8 @@ import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.concurrent.ExecutionException;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.SCM;
+import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateApprover.ApprovalType.KERBEROS_TRUSTED;
 import static org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest.getEncodedString;
 
 public final class HASecurityUtils {
@@ -242,9 +243,7 @@ public final class HASecurityUtils {
 
     try {
       X509CertificateHolder certificateHolder = rootCAServer.
-          requestCertificate(csr,
-              CertificateApprover.ApprovalType.KERBEROS_TRUSTED,
-              HddsProtos.NodeType.SCM).get();
+          requestCertificate(csr, KERBEROS_TRUSTED, SCM).get();
 
       X509CertificateHolder rootCAServerCACertificateHolder =
         rootCAServer.getCACertificate();

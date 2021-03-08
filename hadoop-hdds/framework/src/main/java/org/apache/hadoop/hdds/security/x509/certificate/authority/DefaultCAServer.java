@@ -453,15 +453,14 @@ public class DefaultCAServer implements CertificateServer {
                 "verification.");
           }
         };
-      } else
-        if (type == CAType.INTERMEDIARY_CA) {
-          // for this certificates are generated during bootstrap/start. If
-          // both certs are missing, something is wrong during bootstrap/start.
-          consumer = (arg) -> {
-          throw new IllegalStateException("INTERMEDIARY_CA Should not be in " +
-              "Iniitialize State");
-        } ;
-    }
+      } else if (type == CAType.INTERMEDIARY_CA) {
+        // for this certificates are generated during bootstrap/start. If
+        // both certs are missing, something is wrong during bootstrap/start.
+        consumer = (arg) -> {
+          throw new IllegalStateException("INTERMEDIARY_CA Should not be" +
+              " in Iniitialize State during startup.");
+        };
+      }
       break;
     default:
       /* Make CheckStyle happy */
