@@ -41,10 +41,10 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.states.ContainerState;
 import org.apache.hadoop.hdds.scm.container.states.ContainerStateMap;
 import org.apache.hadoop.hdds.scm.ha.CheckedConsumer;
-import org.apache.hadoop.hdds.scm.ha.DBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.ha.ExecutionUtil;
 import org.apache.hadoop.hdds.scm.ha.SCMHAInvocationHandler;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
+import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
@@ -303,16 +303,12 @@ public final class ContainerStateManagerImpl
     try {
       if (!containers.contains(containerID)) {
         ExecutionUtil.create(() -> {
-          containerStore.putWithBatch(
-              transactionBuffer.getCurrentBatchOperation(),
-              containerID, container);
+          transactionBuffer.addToBuffer(containerStore, containerID, container);
           containers.addContainer(container);
           pipelineManager.addContainerToPipeline(pipelineID, containerID);
         }).onException(() -> {
           containers.removeContainer(containerID);
-          containerStore.deleteWithBatch(
-              transactionBuffer.getCurrentBatchOperation(),
-              containerID);
+          transactionBuffer.removeFromBuffer(containerStore, containerID);
         }).execute();
       }
     } finally {
@@ -348,13 +344,10 @@ public final class ContainerStateManagerImpl
         if (newState.getNumber() > oldState.getNumber()) {
           ExecutionUtil.create(() -> {
             containers.updateState(id, oldState, newState);
-            containerStore.putWithBatch(
-                transactionBuffer.getCurrentBatchOperation(),
-                id, containers.getContainerInfo(id));
+            transactionBuffer.addToBuffer(containerStore, id,
+                containers.getContainerInfo(id));
           }).onException(() -> {
-            containerStore.putWithBatch(
-                transactionBuffer.getCurrentBatchOperation(),
-                id, oldInfo);
+            transactionBuffer.addToBuffer(containerStore, id, oldInfo);
             containers.updateState(id, newState, oldState);
           }).execute();
           containerStateChangeActions.getOrDefault(event, info -> {
@@ -488,9 +481,7 @@ public final class ContainerStateManagerImpl
       final ContainerID cid = ContainerID.getFromProtobuf(id);
       final ContainerInfo containerInfo = containers.getContainerInfo(cid);
       ExecutionUtil.create(() -> {
-        containerStore.deleteWithBatch(
-            transactionBuffer.getCurrentBatchOperation(),
-            cid);
+        transactionBuffer.removeFromBuffer(containerStore, cid);
         containers.removeContainer(cid);
       }).onException(() -> containerStore.put(cid, containerInfo)).execute();
     } finally {
@@ -564,7 +555,6 @@ public final class ContainerStateManagerImpl
     public ContainerStateManagerV2 build() throws IOException {
       Preconditions.checkNotNull(conf);
       Preconditions.checkNotNull(pipelineMgr);
-      Preconditions.checkNotNull(scmRatisServer);
       Preconditions.checkNotNull(table);
 
       final ContainerStateManagerV2 csm = new ContainerStateManagerImpl(

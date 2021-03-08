@@ -21,9 +21,10 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
-import org.apache.hadoop.hdds.scm.ha.DBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.ha.SCMHAInvocationHandler;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
+import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
@@ -60,8 +61,10 @@ public class DeletedBlockLogStateManagerImpl
         OZONE_SCM_BLOCK_DELETION_MAX_RETRY_DEFAULT);
     this.deletedTable = deletedTable;
     this.transactionBuffer = txBuffer;
-    this.deletingTxIDs = ConcurrentHashMap.newKeySet();
-    this.skippingRetryTxIDs = ConcurrentHashMap.newKeySet();
+    final boolean isRatisEnabled = SCMHAUtils.isSCMHAEnabled(conf);
+    this.deletingTxIDs = isRatisEnabled ? ConcurrentHashMap.newKeySet() : null;
+    this.skippingRetryTxIDs =
+        isRatisEnabled ? ConcurrentHashMap.newKeySet() : null;
   }
 
   public TableIterator<Long, TypedTable.KeyValue<Long,
@@ -89,8 +92,9 @@ public class DeletedBlockLogStateManagerImpl
             throw new IllegalStateException("");
           }
 
-          if (!deletingTxIDs.contains(txID) &&
-              !skippingRetryTxIDs.contains(txID)) {
+          if ((deletingTxIDs == null || !deletingTxIDs.contains(txID)) && (
+              skippingRetryTxIDs == null || !skippingRetryTxIDs
+                  .contains(txID))) {
             nextTx = next;
             if (LOG.isTraceEnabled()) {
               LOG.trace("DeletedBlocksTransaction matching txID:{}",
@@ -160,18 +164,18 @@ public class DeletedBlockLogStateManagerImpl
   public void addTransactionsToDB(ArrayList<DeletedBlocksTransaction> txs)
       throws IOException {
     for (DeletedBlocksTransaction tx : txs) {
-      deletedTable.putWithBatch(
-          transactionBuffer.getCurrentBatchOperation(), tx.getTxID(), tx);
+      transactionBuffer.addToBuffer(deletedTable, tx.getTxID(), tx);
     }
   }
 
   @Override
   public void removeTransactionsFromDB(ArrayList<Long> txIDs)
       throws IOException {
-    deletingTxIDs.addAll(txIDs);
+    if (deletingTxIDs != null) {
+      deletingTxIDs.addAll(txIDs);
+    }
     for (Long txID : txIDs) {
-      deletedTable.deleteWithBatch(
-          transactionBuffer.getCurrentBatchOperation(), txID);
+      transactionBuffer.removeFromBuffer(deletedTable, txID);
     }
   }
 
@@ -194,14 +198,17 @@ public class DeletedBlockLogStateManagerImpl
       // then set the retry value to -1, stop retrying, admins can
       // analyze those blocks and purge them manually by SCMCli.
       DeletedBlocksTransaction.Builder builder = block.toBuilder().setCount(-1);
-      deletedTable.putWithBatch(
-          transactionBuffer.getCurrentBatchOperation(), txID, builder.build());
-      skippingRetryTxIDs.add(txID);
+      transactionBuffer.addToBuffer(deletedTable, txID, builder.build());
+      if (skippingRetryTxIDs != null) {
+        skippingRetryTxIDs.add(txID);
+      }
     }
   }
 
-
   public void onFlush() {
+    // onFlush() can be invoked only when ratis is enabled.
+    Preconditions.checkNotNull(deletingTxIDs);
+    Preconditions.checkNotNull(skippingRetryTxIDs);
     deletingTxIDs.clear();
     skippingRetryTxIDs.clear();
   }
@@ -255,7 +262,6 @@ public class DeletedBlockLogStateManagerImpl
 
     public DeletedBlockLogStateManager build() {
       Preconditions.checkNotNull(conf);
-      Preconditions.checkNotNull(scmRatisServer);
       Preconditions.checkNotNull(table);
 
       final DeletedBlockLogStateManager impl =

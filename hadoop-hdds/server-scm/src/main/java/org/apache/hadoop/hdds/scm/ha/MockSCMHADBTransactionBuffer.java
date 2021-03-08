@@ -20,23 +20,23 @@ import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.ratis.statemachine.SnapshotInfo;
 
 import java.io.IOException;
 
-public class MockDBTransactionBuffer implements DBTransactionBuffer {
+public class MockSCMHADBTransactionBuffer implements SCMHADBTransactionBuffer {
   private DBStore dbStore;
   private BatchOperation currentBatchOperation;
 
-  public MockDBTransactionBuffer() {
+  public MockSCMHADBTransactionBuffer() {
   }
 
-  public MockDBTransactionBuffer(DBStore store) {
+  public MockSCMHADBTransactionBuffer(DBStore store) {
     this.dbStore = store;
   }
 
-  @Override
-  public BatchOperation getCurrentBatchOperation() {
+  private BatchOperation getCurrentBatchOperation() {
     if (currentBatchOperation == null) {
       if (dbStore != null) {
         currentBatchOperation = dbStore.initBatchOperation();
@@ -45,6 +45,18 @@ public class MockDBTransactionBuffer implements DBTransactionBuffer {
       }
     }
     return currentBatchOperation;
+  }
+
+  @Override
+  public void addToBuffer(Table table, Object key, Object value)
+      throws IOException {
+    table.putWithBatch(getCurrentBatchOperation(), key, value);
+  }
+
+  @Override
+  public void removeFromBuffer(Table table, Object key)
+      throws IOException {
+    table.deleteWithBatch(getCurrentBatchOperation(), key);
   }
 
   @Override
@@ -70,7 +82,7 @@ public class MockDBTransactionBuffer implements DBTransactionBuffer {
   @Override
   public void flush() throws IOException {
     if (dbStore != null) {
-      dbStore.commitBatchOperation(currentBatchOperation);
+      dbStore.commitBatchOperation(getCurrentBatchOperation());
       currentBatchOperation.close();
       currentBatchOperation = null;
     }

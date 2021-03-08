@@ -61,7 +61,7 @@ public class InterSCMGrpcService extends
   public void download(CopyDBCheckpointRequestProto request,
       StreamObserver<CopyDBCheckpointResponseProto> responseObserver) {
     try {
-      scm.getScmHAManager().getDBTransactionBuffer().flush();
+      scm.getScmHAManager().asSCMHADBTransactionBuffer().flush();
       Table<String, TransactionInfo> transactionInfoTable =
           Arrays.stream(new SCMDBDefinition().getColumnFamilies())
               .filter(t -> t.getValueType() == TransactionInfo.class)

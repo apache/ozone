@@ -22,13 +22,14 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.ha.DBTransactionBuffer;
-import org.apache.hadoop.hdds.scm.ha.MockDBTransactionBuffer;
+import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBuffer;
+import org.apache.hadoop.hdds.scm.ha.MockSCMHADBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -83,24 +84,25 @@ public class TestDeletedBlockLog {
   private ContainerManagerV2 containerManager;
   private StorageContainerManager scm;
   private List<DatanodeDetails> dnList;
-  private DBTransactionBuffer dbTransactionBuffer;
+  private SCMHADBTransactionBuffer scmHADBTransactionBuffer;
 
   @Before
   public void setup() throws Exception {
     testDir = GenericTestUtils.getTestDir(
         TestDeletedBlockLog.class.getSimpleName());
     conf = new OzoneConfiguration();
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
     conf.setInt(OZONE_SCM_BLOCK_DELETION_MAX_RETRY, 20);
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     scm = TestUtils.getScm(conf);
     containerManager = Mockito.mock(ContainerManagerV2.class);
-    dbTransactionBuffer =
-        new MockDBTransactionBuffer(scm.getScmMetadataStore().getStore());
+    scmHADBTransactionBuffer =
+        new MockSCMHADBTransactionBuffer(scm.getScmMetadataStore().getStore());
     deletedBlockLog = new DeletedBlockLogImplV2(conf,
         containerManager,
         scm.getScmHAManager().getRatisServer(),
         scm.getScmMetadataStore().getDeletedBlocksTXTable(),
-        dbTransactionBuffer,
+        scmHADBTransactionBuffer,
         scm.getScmContext(),
         scm.getSequenceIdGen());
     dnList = new ArrayList<>(3);
@@ -164,26 +166,23 @@ public class TestDeletedBlockLog {
 
   private void addTransactions(Map<Long, List<Long>> containerBlocksMap)
       throws IOException {
-    dbTransactionBuffer.getCurrentBatchOperation();
     deletedBlockLog.addTransactions(containerBlocksMap);
-    dbTransactionBuffer.flush();
+    scmHADBTransactionBuffer.flush();
   }
 
   private void incrementCount(List<Long> txIDs) throws IOException {
-    dbTransactionBuffer.getCurrentBatchOperation();
     deletedBlockLog.incrementCount(txIDs);
-    dbTransactionBuffer.flush();
+    scmHADBTransactionBuffer.flush();
   }
 
   private void commitTransactions(
       List<DeleteBlockTransactionResult> transactionResults,
       DatanodeDetails... dns) throws IOException {
-    dbTransactionBuffer.getCurrentBatchOperation();
     for (DatanodeDetails dnDetails : dns) {
       deletedBlockLog
           .commitTransactions(transactionResults, dnDetails.getUuid());
     }
-    dbTransactionBuffer.flush();
+    scmHADBTransactionBuffer.flush();
   }
 
   private void commitTransactions(
@@ -333,7 +332,7 @@ public class TestDeletedBlockLog {
         containerManager,
         scm.getScmHAManager().getRatisServer(),
         scm.getScmMetadataStore().getDeletedBlocksTXTable(),
-        dbTransactionBuffer,
+        scmHADBTransactionBuffer,
         scm.getScmContext(),
         scm.getSequenceIdGen());
     List<DeletedBlocksTransaction> blocks =
@@ -351,7 +350,7 @@ public class TestDeletedBlockLog {
         containerManager,
         scm.getScmHAManager().getRatisServer(),
         scm.getScmMetadataStore().getDeletedBlocksTXTable(),
-        dbTransactionBuffer,
+        scmHADBTransactionBuffer,
         scm.getScmContext(),
         scm.getSequenceIdGen());
     blocks = getTransactions(BLOCKS_PER_TXN * 40);

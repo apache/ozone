@@ -18,6 +18,7 @@ package org.apache.hadoop.hdds.scm.ha;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.slf4j.Logger;
@@ -202,8 +203,8 @@ public class SequenceIdGenerator {
       }
 
       try {
-        sequenceIdTable.putWithBatch(transactionBuffer
-            .getCurrentBatchOperation(), sequenceIdName, newLastId);
+        transactionBuffer
+            .addToBuffer(sequenceIdTable, sequenceIdName, newLastId);
       } catch (IOException ioe) {
         throw new RuntimeException("Failed to put lastId to Batch", ioe);
       }

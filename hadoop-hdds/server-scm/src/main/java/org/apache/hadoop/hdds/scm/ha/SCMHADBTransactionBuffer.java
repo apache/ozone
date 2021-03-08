@@ -16,11 +16,10 @@
  */
 package org.apache.hadoop.hdds.scm.ha;
 
+import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
-import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.ratis.statemachine.SnapshotInfo;
 
-import java.io.Closeable;
 import java.io.IOException;
 
 /**
@@ -28,9 +27,8 @@ import java.io.IOException;
  * to flush a batch into SCM DB. This buffer also maintains a latest transaction
  * info to indicate the information of the latest transaction in the buffer.
  */
-public interface DBTransactionBuffer extends Closeable {
-
-  BatchOperation getCurrentBatchOperation();
+public interface SCMHADBTransactionBuffer
+    extends DBTransactionBuffer {
 
   void updateLatestTrxInfo(TransactionInfo info);
 
