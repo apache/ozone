@@ -126,7 +126,7 @@ message AllocateScmBlockRequestProto {
   required uint64 size = 1;
   required uint32 numBlocks = 2;
 
-  //deprected, use RatisReplicationConfig
+  //deprecated, use RatisReplicationConfig
   required ReplicationType type = 3;
   
   required hadoop.hdds.ReplicationFactor factor = 4;
