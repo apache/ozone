@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
+import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.ratis.server.protocol.TermIndex;
 
 import java.io.IOException;
@@ -46,6 +47,13 @@ public interface SCMHAManager {
    * Returns DB transaction buffer.
    */
   DBTransactionBuffer getDBTransactionBuffer();
+
+  /**
+   * Returns the DBTransactionBuffer as SCMHADBTransactionBuffer if its
+   * valid.
+   * @return
+   */
+  SCMHADBTransactionBuffer asSCMHADBTransactionBuffer();
 
   /**
    * Stops the HA service.

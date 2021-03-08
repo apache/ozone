@@ -27,6 +27,7 @@ import java.util.Map;
 import com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
+import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftClientReply;
@@ -61,7 +62,7 @@ public final class MockSCMHAManager implements SCMHAManager {
    * Creates MockSCMHAManager instance.
    */
   private MockSCMHAManager(boolean isLeader) {
-    this(isLeader, new MockDBTransactionBuffer());
+    this(isLeader, new MockSCMHADBTransactionBuffer());
   }
 
   private MockSCMHAManager(boolean isLeader, DBTransactionBuffer buffer) {
@@ -97,6 +98,11 @@ public final class MockSCMHAManager implements SCMHAManager {
   @Override
   public DBTransactionBuffer getDBTransactionBuffer() {
     return transactionBuffer;
+  }
+
+  @Override
+  public SCMHADBTransactionBuffer asSCMHADBTransactionBuffer() {
+    return null;
   }
 
   @Override

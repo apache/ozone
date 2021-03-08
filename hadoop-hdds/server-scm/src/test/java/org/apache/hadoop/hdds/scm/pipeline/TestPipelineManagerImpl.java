@@ -27,8 +27,8 @@ import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.hdds.scm.ha.DBTransactionBuffer;
-import org.apache.hadoop.hdds.scm.ha.MockDBTransactionBuffer;
+import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBuffer;
+import org.apache.hadoop.hdds.scm.ha.MockSCMHADBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
@@ -113,7 +113,7 @@ public class TestPipelineManagerImpl {
   }
 
   private PipelineManagerV2Impl createPipelineManager(
-      boolean isLeader, DBTransactionBuffer buffer) throws IOException {
+      boolean isLeader, SCMHADBTransactionBuffer buffer) throws IOException {
     return PipelineManagerV2Impl.newPipelineManager(conf,
         MockSCMHAManager.getInstance(isLeader, buffer),
         new MockNodeManager(true, 20),
@@ -125,7 +125,8 @@ public class TestPipelineManagerImpl {
 
   @Test
   public void testCreatePipeline() throws Exception {
-    DBTransactionBuffer buffer1 = new MockDBTransactionBuffer(dbStore);
+    SCMHADBTransactionBuffer buffer1 =
+        new MockSCMHADBTransactionBuffer(dbStore);
     PipelineManagerV2Impl pipelineManager =
         createPipelineManager(true, buffer1);
     Assert.assertTrue(pipelineManager.getPipelines().isEmpty());
@@ -141,7 +142,8 @@ public class TestPipelineManagerImpl {
     buffer1.close();
     pipelineManager.close();
 
-    DBTransactionBuffer buffer2 = new MockDBTransactionBuffer(dbStore);
+    SCMHADBTransactionBuffer buffer2 =
+        new MockSCMHADBTransactionBuffer(dbStore);
     PipelineManagerV2Impl pipelineManager2 =
         createPipelineManager(true, buffer2);
     // Should be able to load previous pipelines.
@@ -173,7 +175,7 @@ public class TestPipelineManagerImpl {
 
   @Test
   public void testUpdatePipelineStates() throws Exception {
-    DBTransactionBuffer buffer = new MockDBTransactionBuffer(dbStore);
+    SCMHADBTransactionBuffer buffer = new MockSCMHADBTransactionBuffer(dbStore);
     PipelineManagerV2Impl pipelineManager =
         createPipelineManager(true, buffer);
     Table<PipelineID, Pipeline> pipelineStore =
@@ -450,7 +452,8 @@ public class TestPipelineManagerImpl {
 
   @Test
   public void testPipelineOpenOnlyWhenLeaderReported() throws Exception {
-    DBTransactionBuffer buffer1 = new MockDBTransactionBuffer(dbStore);
+    SCMHADBTransactionBuffer buffer1 =
+        new MockSCMHADBTransactionBuffer(dbStore);
     PipelineManagerV2Impl pipelineManager =
         createPipelineManager(true, buffer1);
 

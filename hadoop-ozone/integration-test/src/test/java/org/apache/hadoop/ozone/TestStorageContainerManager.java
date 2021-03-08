@@ -76,6 +76,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -298,8 +299,10 @@ public class TestStorageContainerManager {
       // empty again.
       GenericTestUtils.waitFor(() -> {
         try {
-          cluster.getStorageContainerManager().getScmHAManager()
-              .getDBTransactionBuffer().flush();
+          if (SCMHAUtils.isSCMHAEnabled(cluster.getConf())) {
+            cluster.getStorageContainerManager().getScmHAManager()
+                .asSCMHADBTransactionBuffer().flush();
+          }
           return delLog.getNumOfValidTransactions() == 0;
         } catch (IOException e) {
           return false;
@@ -326,8 +329,10 @@ public class TestStorageContainerManager {
       // eventually these TX will success.
       GenericTestUtils.waitFor(() -> {
         try {
-          cluster.getStorageContainerManager().getScmHAManager()
-              .getDBTransactionBuffer().flush();
+          if (SCMHAUtils.isSCMHAEnabled(cluster.getConf())) {
+            cluster.getStorageContainerManager().getScmHAManager()
+                .asSCMHADBTransactionBuffer().flush();
+          }
           return delLog.getFailedTransactions().size() == 0;
         } catch (IOException e) {
           return false;
@@ -699,7 +704,9 @@ public class TestStorageContainerManager {
       Map<Long, List<Long>> containerBlocksMap)
       throws IOException {
     delLog.addTransactions(containerBlocksMap);
-    scm.getScmHAManager().getDBTransactionBuffer().flush();
+    if (SCMHAUtils.isSCMHAEnabled(scm.getConfiguration())) {
+      scm.getScmHAManager().asSCMHADBTransactionBuffer().flush();
+    }
   }
 
   @SuppressWarnings("visibilitymodifier")

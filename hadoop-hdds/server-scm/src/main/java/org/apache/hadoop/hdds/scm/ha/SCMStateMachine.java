@@ -44,11 +44,13 @@ import org.apache.ratis.protocol.RaftGroupMemberId;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.statemachine.SnapshotInfo;
+import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.statemachine.TransactionContext;
 import org.apache.ratis.statemachine.impl.BaseStateMachine;
 
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.ratis.statemachine.impl.SimpleStateMachineStorage;
+import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.LifeCycle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,14 +67,14 @@ public class SCMStateMachine extends BaseStateMachine {
   private StorageContainerManager scm;
   private SCMRatisServer ratisServer;
   private Map<RequestType, Object> handlers;
-  private DBTransactionBuffer transactionBuffer;
+  private SCMHADBTransactionBuffer transactionBuffer;
   private final SimpleStateMachineStorage storage =
       new SimpleStateMachineStorage();
   private final AtomicBoolean isInitialized;
   private ExecutorService installSnapshotExecutor;
 
   public SCMStateMachine(final StorageContainerManager scm,
-      final SCMRatisServer ratisServer, DBTransactionBuffer buffer)
+      final SCMRatisServer ratisServer, SCMHADBTransactionBuffer buffer)
       throws SCMException {
     this.scm = scm;
     this.ratisServer = ratisServer;
@@ -124,6 +126,7 @@ public class SCMStateMachine extends BaseStateMachine {
           .build());
     } catch (Exception ex) {
       applyTransactionFuture.completeExceptionally(ex);
+      ExitUtils.terminate(1, ex.getMessage(), ex, StateMachine.LOG);
     }
     return applyTransactionFuture;
   }
