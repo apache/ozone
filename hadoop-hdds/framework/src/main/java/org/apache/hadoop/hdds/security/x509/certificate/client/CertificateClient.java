@@ -76,6 +76,12 @@ public interface CertificateClient {
   X509Certificate getCACertificate();
 
   /**
+   * Return the latest Root CA certificate known to the client.
+   * @return latest Root CA certificate known to the client.
+   */
+  X509Certificate getRootCACertificate();
+
+  /**
    * Verifies if this certificate is part of a trusted chain.
    * @param certificate - certificate.
    * @return true if it trusted, false otherwise.
@@ -158,6 +164,15 @@ public interface CertificateClient {
    *
    */
   void storeCertificate(String pemEncodedCert, boolean force, boolean caCert)
+      throws CertificateException;
+
+  /**
+   * Store RootCA certificate.
+   * @param pemEncodedCert
+   * @param force
+   * @throws CertificateException
+   */
+  void storeRootCACertificate(String pemEncodedCert, boolean force)
       throws CertificateException;
 
   /**

@@ -1473,6 +1473,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         String pemEncodedRootCert = response.getX509CACertificate();
         client.storeCertificate(pemEncodedRootCert, true, true);
         client.storeCertificate(pemEncodedCert, true);
+
+        // Store Root CA certificate if available.
+        if (response.hasX509RootCACertificate()) {
+          client.storeRootCACertificate(response.getX509RootCACertificate(),
+              true);
+        }
         // Persist om cert serial id.
         omStore.setOmCertSerialId(CertificateCodec.
             getX509Certificate(pemEncodedCert).getSerialNumber().toString());

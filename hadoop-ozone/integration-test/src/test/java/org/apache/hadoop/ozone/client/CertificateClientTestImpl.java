@@ -104,6 +104,11 @@ public class CertificateClientTestImpl implements CertificateClient {
   }
 
   @Override
+  public X509Certificate getRootCACertificate() {
+    return x509Certificate;
+  }
+
+  @Override
   public boolean verifyCertificate(X509Certificate certificate) {
     return true;
   }
@@ -148,6 +153,11 @@ public class CertificateClientTestImpl implements CertificateClient {
 
   @Override
   public void storeCertificate(String cert, boolean force, boolean caCert)
+      throws CertificateException {
+  }
+
+  @Override
+  public void storeRootCACertificate(String cert, boolean force)
       throws CertificateException {
   }
 

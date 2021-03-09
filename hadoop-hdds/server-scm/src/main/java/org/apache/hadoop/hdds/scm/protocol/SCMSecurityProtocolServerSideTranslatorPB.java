@@ -167,7 +167,7 @@ public class SCMSecurityProtocolServerSideTranslatorPB
             .setResponseCode(ResponseCode.success)
             .setX509Certificate(certificate)
             .setX509CACertificate(impl.getCACertificate())
-            .setX509RootCACertificate(impl.getCACertificate());
+            .setX509RootCACertificate(impl.getRootCACertificate());
 
     return builder.build();
 
