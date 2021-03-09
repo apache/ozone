@@ -39,6 +39,18 @@ Execute AWSS3Cli
     ${output} =       Execute                     aws s3 --endpoint-url ${ENDPOINT_URL} ${command}
     [return]          ${output}
 
+Install aws cli
+    ${rc}              ${output} =                 Run And Return Rc And Output           which apt-get
+    Run Keyword if     '${rc}' == '0'              Install aws cli s3 debian
+    ${rc}              ${output} =                 Run And Return Rc And Output           yum --help
+    Run Keyword if     '${rc}' == '0'              Install aws cli s3 centos
+
+Install aws cli s3 centos
+    Execute            sudo -E yum install -y awscli
+
+Install aws cli s3 debian
+    Execute            sudo -E apt-get install -y awscli
+
 Setup v2 headers
                         Set Environment Variable   AWS_ACCESS_KEY_ID       ANYID
                         Set Environment Variable   AWS_SECRET_ACCESS_KEY   ANYKEY
@@ -80,6 +92,7 @@ Create bucket with name
 
 Setup s3 tests
     Run Keyword        Generate random prefix
+    Run Keyword        Install aws cli
     Run Keyword if    '${OZONE_S3_SET_CREDENTIALS}' == 'true'    Setup v4 headers
     ${BUCKET} =        Run Keyword if                            '${BUCKET}' == 'generated'            Create bucket
     ...                ELSE                                      Set Variable    ${BUCKET}
