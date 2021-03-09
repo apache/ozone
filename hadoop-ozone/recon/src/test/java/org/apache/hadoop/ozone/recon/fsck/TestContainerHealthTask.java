@@ -78,7 +78,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     ContainerReplica healthyReplicaMock = mock(ContainerReplica.class);
     when(healthyReplicaMock.getState()).thenReturn(State.CLOSED);
 
-    // Create 6 containers. The first 5 will have various unhealty states
+    // Create 6 containers. The first 5 will have various unhealthy states
     // defined below. The container with ID=6 will be healthy.
     List<ContainerInfo> mockContainers = getMockContainers(6);
     when(scmMock.getContainerManager()).thenReturn(containerManagerMock);

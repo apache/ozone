@@ -259,7 +259,7 @@ public abstract class ContainerData {
   }
 
   /**
-   * Retuns metadata of the container.
+   * Returns metadata of the container.
    * @return metadata
    */
   public Map<String, String> getMetadata() {

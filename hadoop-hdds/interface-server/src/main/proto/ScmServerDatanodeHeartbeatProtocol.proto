@@ -309,7 +309,7 @@ message SCMCommandProto {
 
 /**
  * SCM informs a datanode to register itself again.
- * With recieving this command, datanode will transit to REGISTER state.
+ * With receiving this command, datanode will transit to REGISTER state.
  */
 message ReregisterCommandProto {}
 
@@ -321,7 +321,7 @@ message DeleteBlocksCommandProto {
 }
 
 // The deleted blocks which are stored in deletedBlock.db of scm.
-// We don't use BlockID because this only contians multiple localIDs
+// We don't use BlockID because this only contains multiple localIDs
 // of the same containerID.
 message DeletedBlocksTransaction {
   required int64 txID = 1;
@@ -453,7 +453,7 @@ message SetNodeOperationalStateCommandProto {
  * it needs to do a registration.
  *
  * If registration is need datanode moves into REGISTER state. It will
- * send a register call with DatanodeDetailsProto data structure and presist
+ * send a register call with DatanodeDetailsProto data structure and persist
  * that info.
  *
  * The response to the command contains clusterID. This information is
