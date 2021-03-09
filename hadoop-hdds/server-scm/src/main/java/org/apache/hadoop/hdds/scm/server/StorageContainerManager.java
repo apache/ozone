@@ -1090,32 +1090,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       LOG.error("SCM HttpServer failed to start.", ex);
     }
 
-
-    // For primary do this during SCM startup, as it requires SCM Security
-    // protocol server, Ratis Server and SCMMetadataStore setup.
-
-    List<SCMNodeInfo> scmNodeInfoList = SCMNodeInfo.buildNodeInfo(
-        configuration);
-    Preconditions.checkNotNull(scmNodeInfoList, "scmNodeInfoList is null");
-
-    InetSocketAddress scmAddress = null;
-    if (SCMHAUtils.getScmServiceId(configuration) != null) {
-      for (SCMNodeInfo scmNodeInfo : scmNodeInfoList) {
-        if (scmHANodeDetails.getLocalNodeDetails().getNodeId() != null
-            && scmHANodeDetails.getLocalNodeDetails().getNodeId().equals(
-            scmNodeInfo.getNodeId())) {
-          scmAddress =
-              NetUtils.createSocketAddr(scmNodeInfo.getScmClientAddress());
-        }
-      }
-    } else  {
-      scmAddress = NetUtils.createSocketAddr(
-          scmNodeInfoList.get(0).getScmClientAddress());
-    }
-
-    Preconditions.checkNotNull(scmAddress,
-        "SCM Client Address is null");
-
     setStartTime();
   }
 
