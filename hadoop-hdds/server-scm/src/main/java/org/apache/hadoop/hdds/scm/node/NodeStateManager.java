@@ -199,12 +199,12 @@ public class NodeStateManager implements Runnable, Closeable {
     skippedHealthChecks = 0;
     checkPaused = false; // accessed only from test functions
 
-     layoutMatchCondition =
+    layoutMatchCondition =
         (layout) -> layout.getMetadataLayoutVersion() ==
-            layoutVersionManager.getMetadataLayoutVersion();
-     layoutMisMatchCondition =
+             layoutVersionManager.getMetadataLayoutVersion();
+    layoutMisMatchCondition =
         (layout) -> layout.getMetadataLayoutVersion() !=
-            layoutVersionManager.getMetadataLayoutVersion();
+             layoutVersionManager.getMetadataLayoutVersion();
 
     scheduleNextHealthCheck();
   }
