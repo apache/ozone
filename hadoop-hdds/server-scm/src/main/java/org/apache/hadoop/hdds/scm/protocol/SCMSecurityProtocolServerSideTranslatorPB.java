@@ -33,6 +33,8 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecuri
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityResponse;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.Status;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolPB;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 
@@ -54,14 +56,17 @@ public class SCMSecurityProtocolServerSideTranslatorPB
       LoggerFactory.getLogger(SCMSecurityProtocolServerSideTranslatorPB.class);
 
   private final SCMSecurityProtocol impl;
+  private final StorageContainerManager scm;
 
   private OzoneProtocolMessageDispatcher<SCMSecurityRequest,
       SCMSecurityResponse, ProtocolMessageEnum>
       dispatcher;
 
   public SCMSecurityProtocolServerSideTranslatorPB(SCMSecurityProtocol impl,
+      StorageContainerManager storageContainerManager,
       ProtocolMessageMetrics messageMetrics) {
     this.impl = impl;
+    this.scm = storageContainerManager;
     this.dispatcher =
         new OzoneProtocolMessageDispatcher<>("ScmSecurityProtocol",
             messageMetrics, LOG);
@@ -70,62 +75,73 @@ public class SCMSecurityProtocolServerSideTranslatorPB
   @Override
   public SCMSecurityResponse submitRequest(RpcController controller,
       SCMSecurityRequest request) throws ServiceException {
+    if (!scm.checkLeader()) {
+      throw new ServiceException(scm.getScmHAManager()
+          .getRatisServer()
+          .triggerNotLeaderException());
+    }
     return dispatcher.processRequest(request, this::processRequest,
         request.getCmdType(), request.getTraceID());
   }
 
-  public SCMSecurityResponse processRequest(SCMSecurityRequest request)
-      throws ServiceException {
+  public SCMSecurityResponse processRequest(SCMSecurityRequest request) {
+    SCMSecurityResponse.Builder scmSecurityResponse =
+        SCMSecurityResponse.newBuilder().setCmdType(request.getCmdType())
+        .setStatus(Status.OK);
     try {
       switch (request.getCmdType()) {
       case GetCertificate:
-        return SCMSecurityResponse.newBuilder()
-            .setCmdType(request.getCmdType())
-            .setStatus(Status.OK)
-            .setGetCertResponseProto(
-                getCertificate(request.getGetCertificateRequest()))
-            .build();
+        return scmSecurityResponse.setGetCertResponseProto(
+            getCertificate(request.getGetCertificateRequest())).build();
       case GetCACertificate:
-        return SCMSecurityResponse.newBuilder()
-            .setCmdType(request.getCmdType())
-            .setStatus(Status.OK)
-            .setGetCertResponseProto(
-                getCACertificate(request.getGetCACertificateRequest()))
-            .build();
+        return scmSecurityResponse.setGetCertResponseProto(
+            getCACertificate(request.getGetCACertificateRequest())).build();
       case GetOMCertificate:
-        return SCMSecurityResponse.newBuilder()
-            .setCmdType(request.getCmdType())
-            .setStatus(Status.OK)
-            .setGetCertResponseProto(
-                getOMCertificate(request.getGetOMCertRequest()))
+        return scmSecurityResponse.setGetCertResponseProto(
+            getOMCertificate(request.getGetOMCertRequest()))
             .build();
       case GetDataNodeCertificate:
-        return SCMSecurityResponse.newBuilder()
-            .setCmdType(request.getCmdType())
-            .setStatus(Status.OK)
-            .setGetCertResponseProto(
-                getDataNodeCertificate(request.getGetDataNodeCertRequest()))
+        return scmSecurityResponse.setGetCertResponseProto(
+            getDataNodeCertificate(request.getGetDataNodeCertRequest()))
             .build();
       case ListCertificate:
-        return SCMSecurityResponse.newBuilder()
-            .setCmdType(request.getCmdType())
-            .setStatus(Status.OK)
-            .setListCertificateResponseProto(
-                listCertificate(request.getListCertificateRequest()))
+        return scmSecurityResponse.setListCertificateResponseProto(
+            listCertificate(request.getListCertificateRequest()))
             .build();
       case GetSCMCertificate:
-        return SCMSecurityResponse.newBuilder()
-            .setCmdType(request.getCmdType())
-            .setStatus(Status.OK)
-            .setGetCertResponseProto(getSCMCertificate(
-                request.getGetSCMCertificateRequest()))
-            .build();
+        return scmSecurityResponse.setGetCertResponseProto(getSCMCertificate(
+            request.getGetSCMCertificateRequest())).build();
       default:
         throw new IllegalArgumentException(
             "Unknown request type: " + request.getCmdType());
       }
     } catch (IOException e) {
-      throw new ServiceException(e);
+      scmSecurityResponse.setSuccess(false);
+      scmSecurityResponse.setStatus(exceptionToResponseStatus(e));
+      // If actual cause is set in SCMSecurityException, set message with
+      // actual cause message.
+      if (e.getMessage() != null) {
+        scmSecurityResponse.setMessage(e.getMessage());
+      } else {
+        if (e.getCause() != null && e.getCause().getMessage() != null) {
+          scmSecurityResponse.setMessage(e.getCause().getMessage());
+        }
+      }
+      return scmSecurityResponse.build();
+    }
+  }
+
+  /**
+   * Convert exception to corresponsing status.
+   * @param ex
+   * @return SCMSecurityProtocolProtos.Status code of the error.
+   */
+  private Status exceptionToResponseStatus(IOException ex) {
+    if (ex instanceof SCMSecurityException) {
+      return Status.values()[
+          ((SCMSecurityException) ex).getErrorCode().ordinal()];
+    } else {
+      return Status.INTERNAL_ERROR;
     }
   }
 

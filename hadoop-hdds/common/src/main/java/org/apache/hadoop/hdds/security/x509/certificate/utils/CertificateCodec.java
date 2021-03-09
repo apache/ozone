@@ -50,6 +50,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.nio.file.attribute.PosixFilePermission.OWNER_EXECUTE;
 import static java.nio.file.attribute.PosixFilePermission.OWNER_READ;
 import static java.nio.file.attribute.PosixFilePermission.OWNER_WRITE;
+import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.PEM_ENCODE_FAILED;
 
 /**
  * A class used to read and write X.509 certificates  PEM encoded Streams.
@@ -125,7 +126,7 @@ public class CertificateCodec {
       LOG.error("Error in encoding certificate." + certificate
           .getSubjectDN().toString(), e);
       throw new SCMSecurityException("PEM Encoding failed for certificate." +
-          certificate.getSubjectDN().toString(), e);
+          certificate.getSubjectDN().toString(), e, PEM_ENCODE_FAILED);
     }
   }
 
