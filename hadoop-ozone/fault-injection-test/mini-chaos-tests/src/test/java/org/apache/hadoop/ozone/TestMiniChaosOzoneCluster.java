@@ -59,8 +59,10 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
           " be removed in later versions.")
   private static int numOzoneManagers = 1;
 
-  @Option(names = {"-s", "--num-storage-container-manager", "--numStorageContainerManagers"},
-      description = "num of storageContainerManagers. Full name --numStorageContainerManagers will" +
+  @Option(names = {"-s", "--num-storage-container-manager",
+      "--numStorageContainerManagers"},
+      description = "num of storageContainerManagers." +
+          "Full name --numStorageContainerManagers will" +
           " be removed in later versions.")
   private static int numStorageContainerManagerss = 1;
 
@@ -153,7 +155,7 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
     numOzoneManagers = nOms;
 
     if (numScms > 1 || enableHA) {
-     scmServiceId = SCM_SERVICE_ID;
+      scmServiceId = SCM_SERVICE_ID;
     }
     numStorageContainerManagerss = numScms;
   }

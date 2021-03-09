@@ -123,7 +123,8 @@ public abstract class Failures {
     public void validateFailure(MiniOzoneChaosCluster cluster) {
       if (cluster.getStorageContainerManagersList().size() < 3) {
         throw new IllegalArgumentException("Not enough number of " +
-            "StorageContainerManagers to test chaos on StorageContainerManagers. Set number of " +
+            "StorageContainerManagers to test chaos on" +
+            "StorageContainerManagers. Set number of " +
             "StorageContainerManagers to at least 3");
       }
     }
@@ -132,7 +133,8 @@ public abstract class Failures {
   /**
    * Start/Stop Ozone Manager to induce failure.
    */
-  public static class StorageContainerManagerStartStopFailure extends ScmFailures {
+  public static class StorageContainerManagerStartStopFailure
+      extends ScmFailures {
     public void fail(MiniOzoneChaosCluster cluster) {
       // Get the number of OzoneManager to fail in the cluster.
       boolean shouldStop = cluster.shouldStopScm();
@@ -155,7 +157,8 @@ public abstract class Failures {
   /**
    * Start/Stop Ozone Manager to induce failure.
    */
-  public static class StorageContainerManagerRestartFailure extends ScmFailures {
+  public static class StorageContainerManagerRestartFailure
+      extends ScmFailures {
     @Override
     public void fail(MiniOzoneChaosCluster cluster) {
       boolean failureMode = FailureManager.isFastRestart();

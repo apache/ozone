@@ -121,7 +121,8 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
 
   void startChaos(long initialDelay, long period, TimeUnit timeUnit) {
     LOG.info("Starting Chaos with failure period:{} unit:{} numDataNodes:{} " +
-            "numOzoneManagers:{} numStorageContainerManagers:{}", period, timeUnit, numDatanodes,
+            "numOzoneManagers:{} numStorageContainerManagers:{}",
+        period, timeUnit, numDatanodes,
         numOzoneManagers, numStorageContainerManagers);
     failureManager.start(initialDelay, period, timeUnit);
   }
@@ -433,8 +434,9 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
     failedScmSet.add(scm);
   }
 
-  public void restartStorageContainerManager(StorageContainerManager scm, boolean waitForScm)
-      throws IOException, TimeoutException, InterruptedException, AuthenticationException {
+  public void restartStorageContainerManager(StorageContainerManager scm,
+      boolean waitForScm) throws IOException, TimeoutException,
+      InterruptedException, AuthenticationException {
     super.restartStorageContainerManager(scm, waitForScm);
     failedOmSet.remove(scm);
   }
