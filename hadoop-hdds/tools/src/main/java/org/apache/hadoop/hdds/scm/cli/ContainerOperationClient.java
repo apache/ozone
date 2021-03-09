@@ -187,7 +187,7 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   /**
-   * Creates a pipeline over the machines choosen by the SCM.
+   * Creates a pipeline over the machines chosen by the SCM.
    *
    * @param client   - Client
    * @param pipeline - pipeline to be createdon Datanodes.

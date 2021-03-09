@@ -359,7 +359,7 @@ public class TestOzoneContainer {
       Assert.assertEquals(ContainerProtos.Result.SUCCESS,
           response.getResult());
 
-      // Close the contianer.
+      // Close the container.
       request = ContainerTestHelper.getCloseContainer(
           client.getPipeline(), containerID);
       response = client.sendCommand(request);
