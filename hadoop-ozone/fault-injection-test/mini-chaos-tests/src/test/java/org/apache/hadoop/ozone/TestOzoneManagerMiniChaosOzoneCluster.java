@@ -40,7 +40,7 @@ public class TestOzoneManagerMiniChaosOzoneCluster extends
 
   @Override
   public Void call() throws Exception {
-    setNumManagers(3,1,true);
+    setNumManagers(3, 1, true);
     setNumDatanodes(3);
 
     addLoadClasses(AgedDirLoadGenerator.class);

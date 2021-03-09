@@ -39,7 +39,7 @@ public class TestStorageContainerManagerMiniChaosOzoneCluster extends
 
   @Override
   public Void call() throws Exception {
-    setNumManagers(3,3,true);
+    setNumManagers(3, 3, true);
     setNumDatanodes(3);
 
     addLoadClasses(AgedDirLoadGenerator.class);

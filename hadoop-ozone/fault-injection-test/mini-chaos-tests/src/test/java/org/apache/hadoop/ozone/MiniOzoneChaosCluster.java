@@ -438,7 +438,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
       boolean waitForScm) throws IOException, TimeoutException,
       InterruptedException, AuthenticationException {
     super.restartStorageContainerManager(scm, waitForScm);
-    failedOmSet.remove(scm);
+    failedScmSet.remove(scm);
   }
 
   // Should the selected node be stopped or started.
