@@ -33,7 +33,6 @@ import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.conf.Parameters;
 import org.apache.ratis.grpc.GrpcConfigKeys;
 import org.apache.ratis.grpc.GrpcTlsConfig;
@@ -124,17 +123,25 @@ public final class HASecurityUtils {
 
     // Get host name.
     String hostname = scmAddress.getAddress().getHostName();
-    String ip = scmAddress.getAddress().getHostAddress();
 
-    String subject;
-    if (builder.hasDnsName()) {
-      subject = UserGroupInformation.getCurrentUser().getShortUserName()
-          + "@" + hostname;
-    } else {
-      // With only IP in alt.name, certificate validation would fail if subject
-      // isn't a hostname either, so omit username.
-      subject = hostname;
+    try {
+      DomainValidator validator = DomainValidator.getInstance();
+      // Add all valid ips.
+      OzoneSecurityUtil.getValidInetsForCurrentHost().forEach(
+          ip -> {
+            builder.addIpAddress(ip.getHostAddress());
+            if(validator.isValid(ip.getCanonicalHostName())) {
+              builder.addDnsName(ip.getCanonicalHostName());
+            }
+          });
+    } catch (IOException e) {
+      throw new org.apache.hadoop.hdds.security.x509
+          .exceptions.CertificateException(
+          "Error while adding ip to CA self signed certificate", e,
+          CSR_ERROR);
     }
+
+    String subject = "scm@"+ hostname;
 
     builder.setKey(keyPair)
         .setConfiguration(config)
@@ -143,17 +150,17 @@ public final class HASecurityUtils {
         .setSubject(subject);
 
 
-    LOG.info("Creating csr for SCM->hostName:{},ip:{},scmId:{},clusterId:{}," +
-            "subject:{}", hostname, ip, fetchedSCMId,
+    LOG.info("Creating csr for SCM->hostName:{},scmId:{},clusterId:{}," +
+            "subject:{}", hostname, fetchedSCMId,
         scmStorageConfig.getClusterID(), subject);
+
+    PKCS10CertificationRequest csr = builder.build();
 
     HddsProtos.ScmNodeDetailsProto scmNodeDetailsProto =
         HddsProtos.ScmNodeDetailsProto.newBuilder()
             .setClusterId(scmStorageConfig.getClusterID())
             .setHostName(scmAddress.getHostName())
             .setScmNodeId(fetchedSCMId).build();
-
-    PKCS10CertificationRequest csr = builder.build();
 
     SCMSecurityProtocolClientSideTranslatorPB secureScmClient =
         HddsServerUtil.getScmSecurityClient(config);
@@ -187,13 +194,11 @@ public final class HASecurityUtils {
       } else {
         throw new RuntimeException("Unable to retrieve SCM certificate chain");
       }
-    }catch (IOException | CertificateException e) {
+    } catch (IOException | CertificateException e) {
       LOG.error("Error while storing SCM signed certificate.", e);
       throw new RuntimeException(e);
     }
-
   }
-
 
   private static void getPrimarySCMSignedCert(CertificateClient client,
       OzoneConfiguration config, String fetchedSCMId,
