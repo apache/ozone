@@ -529,7 +529,8 @@ public class TestStorageContainerManager {
       String clusterId) throws IOException {
     final SCMHAConfiguration haConf = conf.getObject(SCMHAConfiguration.class);
     final RaftProperties properties = RatisUtil.newRaftProperties(haConf, conf);
-    final RaftGroupId raftGroupId = SCMRatisServerImpl.buildRaftGroupId(clusterId);
+    final RaftGroupId raftGroupId =
+        SCMRatisServerImpl.buildRaftGroupId(clusterId);
     final AtomicBoolean found = new AtomicBoolean(false);
     RaftServerConfigKeys.storageDir(properties).parallelStream().forEach(
         (dir) -> Optional.ofNullable(dir.listFiles()).map(Arrays::stream)

@@ -81,9 +81,6 @@ public class TestSCMSnapshot {
             "index 1 {}", snapshotInfo2, snapshotInfo1),
         snapshotInfo2 > snapshotInfo1);
 
-    Table<String, TransactionInfo> trxInfo =
-        scm.getScmMetadataStore().getTransactionInfoTable();
-
     cluster.restartStorageContainerManager(false);
     TransactionInfo trxInfoAfterRestart =
         scm.getScmHAManager().asSCMHADBTransactionBuffer().getLatestTrxInfo();
