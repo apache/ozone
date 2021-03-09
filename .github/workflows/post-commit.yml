@@ -264,14 +264,14 @@ jobs:
     steps:
       - name: Checkout project
         uses: actions/checkout@v2
-      - name: Run a full build
-        uses: ./.github/buildenv
-        with:
-          args: ./hadoop-ozone/dev-support/checks/build.sh
       - name: Download artifacts
         uses: actions/download-artifact@v2
         with:
           path: target/artifacts
+      - name: Untar binaries
+        run: |
+          mkdir -p hadoop-ozone/dist/target
+          tar xzvf target/artifacts/ozone-bin/hadoop-ozone*.tar.gz -C hadoop-ozone/dist/target
       - name: Calculate combined coverage
         run: ./hadoop-ozone/dev-support/checks/coverage.sh
       - name: Setup java 11
