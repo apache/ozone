@@ -18,10 +18,36 @@
 # This script can be run only if the cluster is already started 
 # one, and initialized (but not data is written, yet).
 
+set -e
+COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+
+cd "${COMPOSE_DIR}"
+
+# shellcheck source=/dev/null
+source "${COMPOSE_DIR}/../testlib.sh"
+
+#read OZONE_VOLUME from here
+# shellcheck source=/dev/null
+source "$COMPOSE_DIR"/.env
+
+rm -rf "${OZONE_VOLUME}"/{dn1,dn2,dn3,om,recon,s3g,scm}
+mkdir -p "${OZONE_VOLUME}"/{dn1,dn2,dn3,om,recon,s3g,scm}
+
+
+#During the first start, all the required VERSION and metadata files will be created
+start_docker_env
+
+#data generation requires offline cluster
 docker-compose stop
 
+#generate metadadata (-n1 means: only one container is generated)
 docker-compose run scm ozone freon cgscm -n 1
 docker-compose run om ozone freon cgom -n 1
-docker-compose run dn1 ozone freon cgdn -n 1
-docker-compose run dn2 ozone freon cgdn -n 1
-docker-compose run dn2 ozone freon cgdn -n 1
+
+#generate real data (and metadata) on datanodes.
+docker-compose run dn1 ozone freon cgdn -n 1 --datanodes=3 --index=1
+docker-compose run dn2 ozone freon cgdn -n 1 --datanodes=3 --index=2
+docker-compose run dn3 ozone freon cgdn -n 1 --datanodes=3 --index=3
+
+#start docker env with the generated data
+start_docker_env
