@@ -157,6 +157,13 @@ public class NodeStateManager implements Runnable, Closeable {
   private LayoutVersionManager layoutVersionManager;
 
   /**
+   * Conditions to check whether a node's metadata layout version matches
+   * that of SCM.
+   */
+  private Predicate<LayoutVersionProto> layoutMatchCondition;
+  private Predicate<LayoutVersionProto> layoutMisMatchCondition;
+
+  /**
    * Constructs a NodeStateManager instance with the given configuration.
    *
    * @param conf Configuration
@@ -191,6 +198,13 @@ public class NodeStateManager implements Runnable, Closeable {
 
     skippedHealthChecks = 0;
     checkPaused = false; // accessed only from test functions
+
+     layoutMatchCondition =
+        (layout) -> layout.getMetadataLayoutVersion() ==
+            layoutVersionManager.getMetadataLayoutVersion();
+     layoutMisMatchCondition =
+        (layout) -> layout.getMetadataLayoutVersion() !=
+            layoutVersionManager.getMetadataLayoutVersion();
 
     scheduleNextHealthCheck();
   }
@@ -278,10 +292,21 @@ public class NodeStateManager implements Runnable, Closeable {
    * @throws NodeAlreadyExistsException if the node is already present
    */
   public void addNode(DatanodeDetails datanodeDetails,
-                      LayoutVersionProto layoutInfo)
-      throws NodeAlreadyExistsException {
+      LayoutVersionProto layoutInfo) throws NodeAlreadyExistsException {
     NodeStatus newNodeStatus = newNodeStatus(datanodeDetails);
     nodeStateMap.addNode(datanodeDetails, newNodeStatus, layoutInfo);
+    UUID dnID = datanodeDetails.getUuid();
+    try {
+      updateLastKnownLayoutVersion(datanodeDetails, layoutInfo);
+      DatanodeInfo dnInfo = nodeStateMap.getNodeInfo(dnID);
+      NodeStatus status = nodeStateMap.getNodeStatus(dnID);
+
+      updateNodeLayoutVersionState(dnInfo, layoutMatchCondition, status,
+          NodeLifeCycleEvent.LAYOUT_MATCH);
+    } catch (NodeNotFoundException ex) {
+      LOG.error("Inconsistent NodeStateMap| Datanode with ID {} was " +
+          "added but not found in  map: {}", dnID, nodeStateMap);
+    }
     eventPublisher.fireEvent(SCMEvents.NEW_NODE, datanodeDetails);
   }
 
@@ -699,12 +724,7 @@ public class NodeStateManager implements Runnable, Closeable {
         (lastHbTime) -> lastHbTime < healthyNodeDeadline;
     Predicate<Long> deadNodeCondition =
         (lastHbTime) -> lastHbTime < staleNodeDeadline;
-    Predicate<LayoutVersionProto> layoutMatchCondition =
-        (layout) -> layout.getMetadataLayoutVersion() ==
-            layoutVersionManager.getMetadataLayoutVersion();
-    Predicate<LayoutVersionProto> layoutMisMatchCondition =
-        (layout) -> layout.getMetadataLayoutVersion() !=
-            layoutVersionManager.getMetadataLayoutVersion();
+
     try {
       for(DatanodeInfo node : nodeStateMap.getAllDatanodeInfos()) {
         NodeStatus status = nodeStateMap.getNodeStatus(node.getUuid());
