@@ -102,7 +102,7 @@ public class TestOzoneAddress {
     Assert.assertEquals("vol1", address.getVolumeName());
     Assert.assertEquals("bucket", address.getBucketName());
     Assert.assertEquals("prefix", address.getKeyName());
-    Assert.assertTrue("this not be a prefix",
+    Assert.assertTrue("this should be a prefix",
         address.isPrefix());
 
   }

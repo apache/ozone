@@ -27,7 +27,7 @@ import picocli.CommandLine;
 import java.io.IOException;
 
 /**
- * Add ACL to bucket.
+ * Add ACL to prefix.
  */
 @CommandLine.Command(name = AclHandler.ADD_ACL_NAME,
     description = AclHandler.ADD_ACL_DESC)
