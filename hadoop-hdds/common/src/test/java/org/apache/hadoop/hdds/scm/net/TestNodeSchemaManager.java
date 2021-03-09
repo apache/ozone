@@ -50,7 +50,7 @@ public class TestNodeSchemaManager {
   }
 
   @Rule
-  public Timeout testTimeout = Timeout.seconds(300);
+  public Timeout testTimeout = Timeout.seconds(30);
 
   @Test(expected = IllegalArgumentException.class)
   public void testFailure1() {
