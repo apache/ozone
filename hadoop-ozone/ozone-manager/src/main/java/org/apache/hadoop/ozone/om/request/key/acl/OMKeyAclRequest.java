@@ -119,7 +119,7 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
                 new CacheKey<>(dbKey),
                 new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
       }else{
-        throw new OMException("Set acl operation failed",ACL_SET_FAILED);
+        throw new OMException("Set acl operation failed", ACL_SET_FAILED);
       }
 
       omClientResponse = onSuccess(omResponse, omKeyInfo, operationResult);

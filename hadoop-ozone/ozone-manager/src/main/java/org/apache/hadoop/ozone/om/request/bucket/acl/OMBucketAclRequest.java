@@ -134,7 +134,7 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
             new CacheKey<>(dbBucketKey),
             new CacheValue<>(Optional.of(omBucketInfo), transactionLogIndex));
       }else{
-        throw new OMException("Set acl operation failed",ACL_SET_FAILED);
+        throw new OMException("Set acl operation failed", ACL_SET_FAILED);
       }
 
       omClientResponse = onSuccess(omResponse, omBucketInfo, operationResult);
