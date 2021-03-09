@@ -30,6 +30,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.ACL_SET_FAILED;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
@@ -132,6 +133,8 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
         omMetadataManager.getBucketTable().addCacheEntry(
             new CacheKey<>(dbBucketKey),
             new CacheValue<>(Optional.of(omBucketInfo), transactionLogIndex));
+      }else{
+        throw new OMException("Set acl operation failed",ACL_SET_FAILED);
       }
 
       omClientResponse = onSuccess(omResponse, omBucketInfo, operationResult);

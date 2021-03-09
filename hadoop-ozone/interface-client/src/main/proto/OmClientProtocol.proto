@@ -321,6 +321,8 @@ enum Status {
 
     QUOTA_ERROR = 67;
 
+    ACL_SET_FAILED = 68;
+
 }
 
 /**

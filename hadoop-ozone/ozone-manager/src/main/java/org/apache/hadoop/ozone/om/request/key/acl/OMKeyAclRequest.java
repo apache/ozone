@@ -26,6 +26,7 @@ import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.ACL_SET_FAILED;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
@@ -97,25 +98,29 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
       operationResult = apply(omKeyInfo, trxnLogIndex);
       omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
-      // Update the modification time when updating ACLs of Key.
-      long modificationTime = omKeyInfo.getModificationTime();
-      if (getOmRequest().getAddAclRequest().hasObj() && operationResult) {
-        modificationTime = getOmRequest().getAddAclRequest()
-            .getModificationTime();
-      } else if (getOmRequest().getSetAclRequest().hasObj()){
-        modificationTime = getOmRequest().getSetAclRequest()
-            .getModificationTime();
-      } else if (getOmRequest().getRemoveAclRequest().hasObj()
-          && operationResult) {
-        modificationTime = getOmRequest().getRemoveAclRequest()
-            .getModificationTime();
-      }
-      omKeyInfo.setModificationTime(modificationTime);
+      if(operationResult) {
+        // Update the modification time when updating ACLs of Key.
+        long modificationTime = omKeyInfo.getModificationTime();
+        if (getOmRequest().getAddAclRequest().hasObj() && operationResult) {
+          modificationTime = getOmRequest().getAddAclRequest()
+                  .getModificationTime();
+        } else if (getOmRequest().getSetAclRequest().hasObj()) {
+          modificationTime = getOmRequest().getSetAclRequest()
+                  .getModificationTime();
+        } else if (getOmRequest().getRemoveAclRequest().hasObj()
+                && operationResult) {
+          modificationTime = getOmRequest().getRemoveAclRequest()
+                  .getModificationTime();
+        }
+        omKeyInfo.setModificationTime(modificationTime);
 
-      // update cache.
-      omMetadataManager.getKeyTable().addCacheEntry(
-          new CacheKey<>(dbKey),
-          new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
+        // update cache.
+        omMetadataManager.getKeyTable().addCacheEntry(
+                new CacheKey<>(dbKey),
+                new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
+      }else{
+        throw new OMException("Set acl operation failed",ACL_SET_FAILED);
+      }
 
       omClientResponse = onSuccess(omResponse, omKeyInfo, operationResult);
       result = Result.SUCCESS;

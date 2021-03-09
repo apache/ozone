@@ -27,6 +27,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.ACL_SET_FAILED;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.volume.OMVolumeRequest;
@@ -88,15 +89,12 @@ public abstract class OMVolumeAclRequest extends OMVolumeRequest {
       omVolumeArgs = getVolumeInfo(omMetadataManager, volume);
 
       // result is false upon add existing acl or remove non-existing acl
-      boolean applyAcl = true;
       try {
         omVolumeAclOp.apply(ozoneAcls, omVolumeArgs);
       } catch (OMException ex) {
-        applyAcl = false;
+          throw new OMException("Set acl operation failed",ACL_SET_FAILED);
       }
 
-      // Update only when
-      if (applyAcl) {
         // Update the modification time when updating ACLs of Volume.
         long modificationTime = omVolumeArgs.getModificationTime();
         if (getOmRequest().getAddAclRequest().hasObj()) {
@@ -117,9 +115,9 @@ public abstract class OMVolumeAclRequest extends OMVolumeRequest {
         omMetadataManager.getVolumeTable().addCacheEntry(
             new CacheKey<>(omMetadataManager.getVolumeKey(volume)),
             new CacheValue<>(Optional.of(omVolumeArgs), trxnLogIndex));
-      }
 
-      omClientResponse = onSuccess(omResponse, omVolumeArgs, applyAcl);
+
+      omClientResponse = onSuccess(omResponse, omVolumeArgs, true);
       result = Result.SUCCESS;
     } catch (IOException ex) {
       result = Result.FAILURE;
