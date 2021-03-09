@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.scm.protocol.RatisReplicationConfig;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -119,7 +120,7 @@ public class BenchMarkSCM {
   public void allocateBlockBenchMark(BenchMarkSCM state,
       Blackhole bh) throws IOException {
     BenchMarkSCM.blockManager
-        .allocateBlock(50, ReplicationType.RATIS, ReplicationFactor.THREE,
+        .allocateBlock(50, new RatisReplicationConfig(ReplicationFactor.THREE),
             "Genesis", new ExcludeList());
   }
 }

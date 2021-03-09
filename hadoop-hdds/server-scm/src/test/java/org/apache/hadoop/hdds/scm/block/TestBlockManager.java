@@ -18,23 +18,23 @@
 package org.apache.hadoop.hdds.scm.block;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.ArrayList;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.TestUtils;
-import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.container.CloseContainerEventHandler;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
@@ -44,11 +44,14 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
+import org.apache.hadoop.hdds.scm.protocol.RatisReplicationConfig;
+import org.apache.hadoop.hdds.scm.protocol.ReplicationConfig;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -93,6 +96,7 @@ public class TestBlockManager {
   @Rule
   public TemporaryFolder folder= new TemporaryFolder();
   private SCMMetadataStore scmMetadataStore;
+  private ReplicationConfig replicationConfig;
 
   @Before
   public void setUp() throws Exception {
@@ -152,6 +156,7 @@ public class TestBlockManager {
     CloseContainerEventHandler closeContainerHandler =
         new CloseContainerEventHandler(pipelineManager, mapping);
     eventQueue.addHandler(SCMEvents.CLOSE_CONTAINER, closeContainerHandler);
+    replicationConfig = new RatisReplicationConfig(ReplicationFactor.THREE);
     factor = HddsProtos.ReplicationFactor.THREE;
     type = HddsProtos.ReplicationType.RATIS;
 
@@ -173,7 +178,7 @@ public class TestBlockManager {
     pipelineManager.createPipeline(type, factor);
     TestUtils.openAllRatisPipelines(pipelineManager);
     AllocatedBlock block = blockManager.allocateBlock(DEFAULT_BLOCK_SIZE,
-        type, factor, OzoneConsts.OZONE, new ExcludeList());
+        replicationConfig, OzoneConsts.OZONE, new ExcludeList());
     Assert.assertNotNull(block);
   }
 
@@ -190,7 +195,7 @@ public class TestBlockManager {
     excludeList
         .addPipeline(pipelineManager.getPipelines(type, factor).get(0).getId());
     AllocatedBlock block = blockManager
-        .allocateBlock(DEFAULT_BLOCK_SIZE, type, factor, OzoneConsts.OZONE,
+        .allocateBlock(DEFAULT_BLOCK_SIZE, replicationConfig, OzoneConsts.OZONE,
             excludeList);
     Assert.assertNotNull(block);
     for (PipelineID id : excludeList.getPipelineIds()) {
@@ -201,7 +206,7 @@ public class TestBlockManager {
       excludeList.addPipeline(pipeline.getId());
     }
     block = blockManager
-        .allocateBlock(DEFAULT_BLOCK_SIZE, type, factor, OzoneConsts.OZONE,
+        .allocateBlock(DEFAULT_BLOCK_SIZE, replicationConfig, OzoneConsts.OZONE,
             excludeList);
     Assert.assertNotNull(block);
     Assert.assertTrue(
@@ -223,7 +228,7 @@ public class TestBlockManager {
       CompletableFuture.supplyAsync(() -> {
         try {
           future.complete(blockManager
-              .allocateBlock(DEFAULT_BLOCK_SIZE, type, factor,
+              .allocateBlock(DEFAULT_BLOCK_SIZE, replicationConfig,
                   OzoneConsts.OZONE,
                   new ExcludeList()));
         } catch (IOException e) {
@@ -264,7 +269,7 @@ public class TestBlockManager {
         try {
           List<AllocatedBlock> blockList;
           AllocatedBlock block = blockManager
-                  .allocateBlock(DEFAULT_BLOCK_SIZE, type, factor,
+                  .allocateBlock(DEFAULT_BLOCK_SIZE, replicationConfig,
                           OzoneConsts.OZONE,
                           new ExcludeList());
           long containerId = block.getBlockID().getContainerID();
@@ -324,7 +329,7 @@ public class TestBlockManager {
         try {
           List<AllocatedBlock> blockList;
           AllocatedBlock block = blockManager
-                  .allocateBlock(DEFAULT_BLOCK_SIZE, type, factor,
+                  .allocateBlock(DEFAULT_BLOCK_SIZE, replicationConfig,
                           OzoneConsts.OZONE,
                           new ExcludeList());
           long containerId = block.getBlockID().getContainerID();
@@ -391,7 +396,7 @@ public class TestBlockManager {
         try {
           List<AllocatedBlock> blockList;
           AllocatedBlock block = blockManager
-              .allocateBlock(DEFAULT_BLOCK_SIZE, type, factor,
+              .allocateBlock(DEFAULT_BLOCK_SIZE, replicationConfig,
                   OzoneConsts.OZONE,
                   new ExcludeList());
           long containerId = block.getBlockID().getContainerID();
@@ -437,7 +442,7 @@ public class TestBlockManager {
     long size = 6 * GB;
     thrown.expectMessage("Unsupported block size");
     blockManager.allocateBlock(size,
-        type, factor, OzoneConsts.OZONE, new ExcludeList());
+        replicationConfig, OzoneConsts.OZONE, new ExcludeList());
   }
 
 
@@ -449,14 +454,14 @@ public class TestBlockManager {
     thrown.expectMessage("SafeModePrecheck failed for "
         + "allocateBlock");
     blockManager.allocateBlock(DEFAULT_BLOCK_SIZE,
-        type, factor, OzoneConsts.OZONE, new ExcludeList());
+        replicationConfig, OzoneConsts.OZONE, new ExcludeList());
   }
 
   @Test
   public void testAllocateBlockSucInSafeMode() throws Exception {
     // Test2: Exit safe mode and then try allocateBock again.
     Assert.assertNotNull(blockManager.allocateBlock(DEFAULT_BLOCK_SIZE,
-        type, factor, OzoneConsts.OZONE, new ExcludeList()));
+        replicationConfig, OzoneConsts.OZONE, new ExcludeList()));
   }
 
   @Test(timeout = 10000)
@@ -468,13 +473,13 @@ public class TestBlockManager {
     TestUtils.openAllRatisPipelines(pipelineManager);
 
     AllocatedBlock allocatedBlock = blockManager
-        .allocateBlock(DEFAULT_BLOCK_SIZE, type, factor, OzoneConsts.OZONE,
+        .allocateBlock(DEFAULT_BLOCK_SIZE, replicationConfig, OzoneConsts.OZONE,
             new ExcludeList());
     // block should be allocated in different pipelines
     GenericTestUtils.waitFor(() -> {
       try {
         AllocatedBlock block = blockManager
-            .allocateBlock(DEFAULT_BLOCK_SIZE, type, factor, OzoneConsts.OZONE,
+            .allocateBlock(DEFAULT_BLOCK_SIZE, replicationConfig, OzoneConsts.OZONE,
                 new ExcludeList());
         return !block.getPipeline().getId()
             .equals(allocatedBlock.getPipeline().getId());
@@ -518,7 +523,7 @@ public class TestBlockManager {
     GenericTestUtils.waitFor(() -> {
       try {
         blockManager
-            .allocateBlock(DEFAULT_BLOCK_SIZE, type, factor, OzoneConsts.OZONE,
+            .allocateBlock(DEFAULT_BLOCK_SIZE, replicationConfig, OzoneConsts.OZONE,
                 new ExcludeList());
       } catch (IOException e) {
       }
@@ -542,7 +547,7 @@ public class TestBlockManager {
     GenericTestUtils.waitFor(() -> {
       try {
         blockManager
-            .allocateBlock(DEFAULT_BLOCK_SIZE, type, factor, OzoneConsts.OZONE,
+            .allocateBlock(DEFAULT_BLOCK_SIZE, replicationConfig, OzoneConsts.OZONE,
                 new ExcludeList());
       } catch (IOException e) {
       }
@@ -559,7 +564,7 @@ public class TestBlockManager {
     }
     Assert.assertEquals(0, pipelineManager.getPipelines(type, factor).size());
     Assert.assertNotNull(blockManager
-        .allocateBlock(DEFAULT_BLOCK_SIZE, type, factor, OzoneConsts.OZONE,
+        .allocateBlock(DEFAULT_BLOCK_SIZE, replicationConfig, OzoneConsts.OZONE,
             new ExcludeList()));
   }
 

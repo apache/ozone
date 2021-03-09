@@ -44,6 +44,9 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.protocol.ECReplicationConfig;
+import org.apache.hadoop.hdds.scm.protocol.RatisReplicationConfig;
+import org.apache.hadoop.hdds.scm.protocol.ReplicationConfig;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ipc.ProtobufHelper;
@@ -134,20 +137,39 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
    * @throws IOException
    */
   @Override
-  public List<AllocatedBlock> allocateBlock(long size, int num,
-      HddsProtos.ReplicationType type, HddsProtos.ReplicationFactor factor,
-      String owner, ExcludeList excludeList) throws IOException {
+  public List<AllocatedBlock> allocateBlock(
+      long size, int num,
+      ReplicationConfig replicationConfig,
+      String owner, ExcludeList excludeList
+  ) throws IOException {
     Preconditions.checkArgument(size > 0, "block size must be greater than 0");
 
-    AllocateScmBlockRequestProto request =
+    final AllocateScmBlockRequestProto.Builder requestBuilder =
         AllocateScmBlockRequestProto.newBuilder()
             .setSize(size)
             .setNumBlocks(num)
-            .setType(type)
-            .setFactor(factor)
+            .setType(replicationConfig.getReplicationType())
             .setOwner(owner)
-            .setExcludeList(excludeList.getProtoBuf())
-            .build();
+            .setExcludeList(excludeList.getProtoBuf());
+
+    switch (replicationConfig.getReplicationType()) {
+    case STAND_ALONE:
+      break;
+    case EC:
+      requestBuilder.setEcReplicationConfig(
+          ((ECReplicationConfig) replicationConfig).toProto());
+      break;
+    case RATIS:
+      requestBuilder.setRatisReplicationConfig(
+          ((RatisReplicationConfig) replicationConfig).toProto());
+      break;
+    default:
+      throw new IllegalArgumentException(
+          "Unsupported replication type " + replicationConfig
+              .getReplicationType());
+    }
+
+    AllocateScmBlockRequestProto request = requestBuilder.build();
 
     SCMBlockLocationRequest wrapper = createSCMBlockRequest(
         Type.AllocateScmBlock)

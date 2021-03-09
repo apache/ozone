@@ -18,30 +18,30 @@
 
 package org.apache.hadoop.ozone.scm.pipeline;
 
+import java.io.IOException;
+import java.util.Optional;
+
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineMetrics;
+import org.apache.hadoop.hdds.scm.protocol.RatisReplicationConfig;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
-
-import java.io.IOException;
-import java.util.Optional;
-
-import org.junit.Rule;
-import org.junit.rules.Timeout;
 import static org.apache.hadoop.test.MetricsAsserts.assertCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
+import org.junit.After;
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.Timeout;
 
 /**
  * Test cases to verify the metrics exposed by SCMPipelineManager.
@@ -107,8 +107,7 @@ public class TestSCMPipelineMetrics {
   public void testNumBlocksAllocated() throws IOException {
     AllocatedBlock block =
         cluster.getStorageContainerManager().getScmBlockManager()
-            .allocateBlock(5, HddsProtos.ReplicationType.RATIS,
-                HddsProtos.ReplicationFactor.ONE, "Test", new ExcludeList());
+            .allocateBlock(5, new RatisReplicationConfig(ReplicationFactor.ONE), "Test", new ExcludeList());
     MetricsRecordBuilder metrics =
         getMetrics(SCMPipelineMetrics.class.getSimpleName());
     Pipeline pipeline = block.getPipeline();

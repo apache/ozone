@@ -30,14 +30,14 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ScmOps;
+import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.PipelineRequestInformation;
+import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmUtils;
-import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
-import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
@@ -46,6 +46,9 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
+import org.apache.hadoop.hdds.scm.protocol.RatisReplicationConfig;
+import org.apache.hadoop.hdds.scm.protocol.ReplicationConfig;
+import org.apache.hadoop.hdds.scm.protocol.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
 import org.apache.hadoop.hdds.scm.safemode.SafeModePrecheck;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -153,11 +156,11 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
    * @throws IOException on failure.
    */
   @Override
-  public AllocatedBlock allocateBlock(final long size, ReplicationType type,
-      ReplicationFactor factor, String owner, ExcludeList excludeList)
+  public AllocatedBlock allocateBlock(final long size, ReplicationConfig config,
+      String owner, ExcludeList excludeList)
       throws IOException {
     if (LOG.isTraceEnabled()) {
-      LOG.trace("Size : {} , type : {}, factor : {} ", size, type, factor);
+      LOG.trace("Size : {} , config: {}", size, config);
     }
     ScmUtils.preCheck(ScmOps.allocateBlock, safeModePrecheck);
     if (size < 0 || size > containerSize) {
@@ -181,6 +184,17 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
     */
 
     ContainerInfo containerInfo;
+
+    //TODO we need to continue the refactor to use ReplicationConfig everywhere
+    //in downstream managers.
+    final HddsProtos.ReplicationType type = config.getReplicationType();
+    HddsProtos.ReplicationFactor factor = HddsProtos.ReplicationFactor.THREE;
+
+    if (config.getReplicationType() == HddsProtos.ReplicationType.RATIS) {
+      factor = ((RatisReplicationConfig) config).getReplicationFactor();
+    } else if (config.getReplicationType() == ReplicationType.STAND_ALONE){
+      factor = ((StandaloneReplicationConfig) config).getReplicationFactor();
+    }
 
     while (true) {
       List<Pipeline> availablePipelines =

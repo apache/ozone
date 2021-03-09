@@ -24,6 +24,8 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.AllocateBlockResponse;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.AllocateScmBlockRequestProto;
@@ -160,8 +162,14 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
       throws IOException {
     List<AllocatedBlock> allocatedBlocks =
         impl.allocateBlock(request.getSize(),
-            request.getNumBlocks(), request.getType(),
-            request.getFactor(), request.getOwner(),
+            request.getNumBlocks(),
+            parseReplicationConfig(
+                request.getType(),
+                request.getFactor(),
+                request.hasFactor(),
+                request.getEcReplicationConfig(),
+                request.getRatisReplicationConfig()),
+            request.getOwner(),
             ExcludeList.getFromProtoBuf(request.getExcludeList()));
 
     AllocateScmBlockResponseProto.Builder builder =
@@ -181,8 +189,37 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
     return builder.build();
   }
 
+  private ReplicationConfig parseReplicationConfig(
+      ReplicationType type,
+      ReplicationFactor factor,
+      boolean legacy,
+      HddsProtos.ECReplicationConfig ecReplicationConfig,
+      HddsProtos.RatisReplicationConfig ratisReplicationConfig
+  ) {
+    switch (type) {
+    case RATIS:
+      if (legacy) {
+        return new RatisReplicationConfig(factor);
+      } else {
+        return new RatisReplicationConfig(ratisReplicationConfig);
+      }
+    case STAND_ALONE:
+      if (legacy) {
+        return new StandaloneReplicationConfig(factor);
+      } else {
+        return new StandaloneReplicationConfig(ReplicationFactor.THREE);
+      }
+    case EC:
+      return new ECReplicationConfig(ecReplicationConfig);
+    default:
+      throw new UnsupportedOperationException(
+          "Unsupported replication type " + type);
+    }
+  }
+
   public DeleteScmKeyBlocksResponseProto deleteScmKeyBlocks(
-      DeleteScmKeyBlocksRequestProto req)
+      DeleteScmKeyBlocksRequestProto req
+  )
       throws IOException {
     DeleteScmKeyBlocksResponseProto.Builder resp =
         DeleteScmKeyBlocksResponseProto.newBuilder();
