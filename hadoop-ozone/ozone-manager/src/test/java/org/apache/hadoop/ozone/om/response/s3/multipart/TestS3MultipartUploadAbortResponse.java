@@ -43,10 +43,10 @@ public class TestS3MultipartUploadAbortResponse
 
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
-    String keyName = UUID.randomUUID().toString();
+    String keyName = getKeyName();
     String multipartUploadID = UUID.randomUUID().toString();
-    String multipartKey = omMetadataManager.getMultipartKey(volumeName,
-        bucketName, keyName, multipartUploadID);
+    String multipartKey = getMultipartKey(volumeName, bucketName, keyName,
+        multipartUploadID);
 
     OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
         .setVolumeName(volumeName).setBucketName(bucketName)
@@ -82,10 +82,10 @@ public class TestS3MultipartUploadAbortResponse
 
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
-    String keyName = UUID.randomUUID().toString();
+    String keyName = getKeyName();
     String multipartUploadID = UUID.randomUUID().toString();
-    String multipartKey = omMetadataManager.getMultipartKey(volumeName,
-        bucketName, keyName, multipartUploadID);
+    String multipartKey = getMultipartKey(volumeName, bucketName, keyName,
+        multipartUploadID);
 
     OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
         .setVolumeName(volumeName).setBucketName(bucketName)
@@ -152,6 +152,16 @@ public class TestS3MultipartUploadAbortResponse
     ro = omMetadataManager.getDeletedTable().get(part2DeletedKeyName);
     Assert.assertEquals(OmKeyInfo.getFromProtobuf(part2.getPartKeyInfo()),
         ro.getOmKeyInfoList().get(0));
+  }
+
+  protected String getKeyName() {
+    return UUID.randomUUID().toString();
+  }
+
+  protected String getMultipartKey(String volumeName, String bucketName,
+      String keyName, String multipartUploadID) {
+    return omMetadataManager.getMultipartKey(volumeName,
+        bucketName, keyName, multipartUploadID);
   }
 
 }

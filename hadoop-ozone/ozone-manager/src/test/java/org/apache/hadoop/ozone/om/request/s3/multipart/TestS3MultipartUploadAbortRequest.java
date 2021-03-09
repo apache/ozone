@@ -50,16 +50,18 @@ public class TestS3MultipartUploadAbortRequest extends TestS3MultipartRequest {
   public void testValidateAndUpdateCache() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
-    String keyName = UUID.randomUUID().toString();
+    String keyName = getKeyName();
 
     TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager);
+
+    createParentPath(volumeName, bucketName);
 
     OMRequest initiateMPURequest = doPreExecuteInitiateMPU(volumeName,
         bucketName, keyName);
 
     S3InitiateMultipartUploadRequest s3InitiateMultipartUploadRequest =
-        new S3InitiateMultipartUploadRequest(initiateMPURequest);
+        getS3InitiateMultipartUploadReq(initiateMPURequest);
 
     OMClientResponse omClientResponse =
         s3InitiateMultipartUploadRequest.validateAndUpdateCache(ozoneManager,
@@ -73,15 +75,15 @@ public class TestS3MultipartUploadAbortRequest extends TestS3MultipartRequest {
             multipartUploadID);
 
     S3MultipartUploadAbortRequest s3MultipartUploadAbortRequest =
-        new S3MultipartUploadAbortRequest(abortMPURequest);
+        getS3MultipartUploadAbortReq(abortMPURequest);
 
     omClientResponse =
         s3MultipartUploadAbortRequest.validateAndUpdateCache(ozoneManager, 2L,
             ozoneManagerDoubleBufferHelper);
 
 
-    String multipartKey = omMetadataManager.getMultipartKey(volumeName,
-        bucketName, keyName, multipartUploadID);
+    String multipartKey = getMultipartKey(volumeName, bucketName, keyName,
+        multipartUploadID);
 
     // Check table and response.
     Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
@@ -108,7 +110,7 @@ public class TestS3MultipartUploadAbortRequest extends TestS3MultipartRequest {
             multipartUploadID);
 
     S3MultipartUploadAbortRequest s3MultipartUploadAbortRequest =
-        new S3MultipartUploadAbortRequest(abortMPURequest);
+        getS3MultipartUploadAbortReq(abortMPURequest);
 
     OMClientResponse omClientResponse =
         s3MultipartUploadAbortRequest.validateAndUpdateCache(ozoneManager, 2L,
@@ -176,5 +178,20 @@ public class TestS3MultipartUploadAbortRequest extends TestS3MultipartRequest {
         OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND,
         omClientResponse.getOMResponse().getStatus());
 
+  }
+
+  protected String getKeyName() {
+    return UUID.randomUUID().toString();
+  }
+
+  protected void createParentPath(String volumeName, String bucketName)
+      throws Exception {
+    // no parent hierarchy
+  }
+
+  protected String getMultipartKey(String volumeName, String bucketName,
+      String keyName, String multipartUploadID) {
+    return omMetadataManager.getMultipartKey(volumeName,
+        bucketName, keyName, multipartUploadID);
   }
 }

@@ -34,9 +34,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
-import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -433,22 +431,11 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
     return dataSize;
   }
 
-  private String preparePartName(String requestedVolume,
+  protected String preparePartName(String requestedVolume,
       String requestedBucket, String keyName, PartKeyInfo partKeyInfo,
       OMMetadataManager omMetadataManager) {
 
-    String partName;
-    if (OzoneManagerRatisUtils.isBucketFSOptimized()) {
-      String parentPath = OzoneFSUtils.getParent(keyName);
-      StringBuffer keyPath = new StringBuffer(parentPath);
-      keyPath.append(partKeyInfo.getPartName());
-
-      partName = omMetadataManager.getOzoneKey(requestedVolume,
-              requestedBucket, keyPath.toString());
-    } else {
-      partName = partKeyInfo.getPartName();
-    }
-    return partName;
+    return partKeyInfo.getPartName();
   }
 
   private static String failureMessage(String volume, String bucket,

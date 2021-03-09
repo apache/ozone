@@ -123,8 +123,8 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
-      multipartKey = omMetadataManager.getMultipartKey(
-          volumeName, bucketName, keyName, keyArgs.getMultipartUploadID());
+      multipartKey = getMultipartKey(keyArgs.getMultipartUploadID(),
+          volumeName, bucketName, keyName, omMetadataManager);
 
       OmKeyInfo omKeyInfo =
           omMetadataManager.getOpenKeyTable().get(multipartKey);
@@ -166,19 +166,14 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
           new CacheKey<>(multipartKey),
           new CacheValue<>(Optional.absent(), trxnLogIndex));
 
-      omClientResponse = new S3MultipartUploadAbortResponse(
-          omResponse.setAbortMultiPartUploadResponse(
-              MultipartUploadAbortResponse.newBuilder()).build(),
-          multipartKey, multipartKeyInfo, ozoneManager.isRatisEnabled(),
-          omBucketInfo.copyObject());
+      omClientResponse = getOmClientResponse(ozoneManager, multipartKeyInfo,
+          multipartKey, omResponse, omBucketInfo);
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
       result = Result.FAILURE;
       exception = ex;
-      omClientResponse =
-          new S3MultipartUploadAbortResponse(createErrorOMResponse(omResponse,
-              exception));
+      omClientResponse = getOmClientResponse(exception, omResponse);
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
@@ -211,5 +206,33 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
     }
 
     return omClientResponse;
+  }
+
+  protected OMClientResponse getOmClientResponse(IOException exception,
+      OMResponse.Builder omResponse) {
+
+    return new S3MultipartUploadAbortResponse(createErrorOMResponse(omResponse,
+            exception));
+  }
+
+  protected OMClientResponse getOmClientResponse(OzoneManager ozoneManager,
+      OmMultipartKeyInfo multipartKeyInfo, String multipartKey,
+      OMResponse.Builder omResponse, OmBucketInfo omBucketInfo) {
+
+    OMClientResponse omClientResponse = new S3MultipartUploadAbortResponse(
+        omResponse.setAbortMultiPartUploadResponse(
+            MultipartUploadAbortResponse.newBuilder()).build(),
+        multipartKey, multipartKeyInfo, ozoneManager.isRatisEnabled(),
+        omBucketInfo.copyObject());
+    return omClientResponse;
+  }
+
+  protected String getMultipartKey(String multipartUploadID, String volumeName,
+      String bucketName, String keyName, OMMetadataManager omMetadataManager)
+      throws IOException {
+
+    String multipartKey = omMetadataManager.getMultipartKey(
+        volumeName, bucketName, keyName, multipartUploadID);
+    return multipartKey;
   }
 }

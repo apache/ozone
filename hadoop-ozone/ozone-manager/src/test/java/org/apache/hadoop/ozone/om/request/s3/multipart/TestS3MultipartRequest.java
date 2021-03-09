@@ -183,7 +183,7 @@ public class TestS3MultipartRequest {
 
 
     S3MultipartUploadAbortRequest s3MultipartUploadAbortRequest =
-        new S3MultipartUploadAbortRequest(omRequest);
+        getS3MultipartUploadAbortReq(omRequest);
 
     OMRequest modifiedRequest =
         s3MultipartUploadAbortRequest.preExecute(ozoneManager);
@@ -260,6 +260,11 @@ public class TestS3MultipartRequest {
   protected S3InitiateMultipartUploadRequest getS3InitiateMultipartUploadReq(
           OMRequest initiateMPURequest) {
     return new S3InitiateMultipartUploadRequest(initiateMPURequest);
+  }
+
+  protected S3MultipartUploadAbortRequest getS3MultipartUploadAbortReq(
+      OMRequest omRequest) {
+    return new S3MultipartUploadAbortRequest(omRequest);
   }
 
 }

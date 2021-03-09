@@ -92,7 +92,7 @@ public class S3MultipartUploadCommitPartRequestV1
         getOmRequest());
     OMClientResponse omClientResponse = null;
     OzoneManagerProtocolProtos.PartKeyInfo oldPartKeyInfo = null;
-    String openKey = null;
+    String openFileKey = null;
     OmKeyInfo omKeyInfo = null;
     String multipartKey = null;
     OmMultipartKeyInfo multipartKeyInfo = null;
@@ -127,14 +127,15 @@ public class S3MultipartUploadCommitPartRequestV1
 
       long clientID = multipartCommitUploadPartRequest.getClientID();
 
-      openKey = omMetadataManager.getOpenFileName(parentID, fileName, clientID);
+      openFileKey = omMetadataManager.getOpenFileName(parentID, fileName,
+          clientID);
 
       omKeyInfo = OMFileRequest.getOmKeyInfoFromFileTable(true,
-              omMetadataManager, openKey, keyName);
+              omMetadataManager, openFileKey, keyName);
 
       if (omKeyInfo == null) {
         throw new OMException("Failed to commit Multipart Upload key, as " +
-            openKey + " entry is not found in the openKey table",
+            openFileKey + " entry is not found in the openFileTable",
             KEY_NOT_FOUND);
       }
 
@@ -150,7 +151,7 @@ public class S3MultipartUploadCommitPartRequestV1
 
       /**
        * Format of PartName stored into MultipartInfoTable is,
-       * "fileName + ClientID".
+       * "<parentID>/fileName + ClientID".
        *
        * Contract is that all part names present in a multipart info will
        * have same key prefix path.
@@ -159,7 +160,9 @@ public class S3MultipartUploadCommitPartRequestV1
        *        /vol1/buck1/a/b/c/part-1, /vol1/buck1/a/b/c/part-2,
        *        /vol1/buck1/a/b/c/part-n
        */
-      dbPartName = fileName + clientID;
+      String ozoneFileKey = omMetadataManager.getOzonePathKey(parentID,
+          fileName);
+      dbPartName = ozoneFileKey + clientID;
 
       if (multipartKeyInfo == null) {
         // This can occur when user started uploading part by the time commit
@@ -204,7 +207,7 @@ public class S3MultipartUploadCommitPartRequestV1
               trxnLogIndex));
 
       omMetadataManager.getOpenKeyTable().addCacheEntry(
-          new CacheKey<>(openKey),
+          new CacheKey<>(openFileKey),
           new CacheValue<>(Optional.absent(), trxnLogIndex));
 
       long scmBlockSize = ozoneManager.getScmBlockSize();
@@ -228,7 +231,7 @@ public class S3MultipartUploadCommitPartRequestV1
               .setPartName(fullKeyPartName));
 
       omClientResponse = new S3MultipartUploadCommitPartResponseV1(
-          omResponse.build(), multipartKey, openKey,
+          omResponse.build(), multipartKey, openFileKey,
           multipartKeyInfo, oldPartKeyInfo, omKeyInfo,
           ozoneManager.isRatisEnabled(),
           omBucketInfo.copyObject());
@@ -238,8 +241,8 @@ public class S3MultipartUploadCommitPartRequestV1
       result = Result.FAILURE;
       exception = ex;
       omClientResponse = new S3MultipartUploadCommitPartResponseV1(
-          createErrorOMResponse(omResponse, exception), multipartKey, openKey,
-          multipartKeyInfo, oldPartKeyInfo, omKeyInfo,
+          createErrorOMResponse(omResponse, exception), multipartKey,
+          openFileKey, multipartKeyInfo, oldPartKeyInfo, omKeyInfo,
           ozoneManager.isRatisEnabled(), copyBucketInfo);
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
