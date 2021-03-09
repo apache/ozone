@@ -82,7 +82,7 @@ public class TestScmSafeMode {
 
 
   @Rule
-  public Timeout timeout = new Timeout(1000 * 200);
+  public Timeout timeout = Timeout.seconds(200);
 
   /**
    * Create a MiniDFSCluster for testing.

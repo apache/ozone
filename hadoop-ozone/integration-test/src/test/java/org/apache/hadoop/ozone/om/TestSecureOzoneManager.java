@@ -68,7 +68,7 @@ public class TestSecureOzoneManager {
   private Path metaDir;
 
   @Rule
-  public Timeout timeout = new Timeout(1000 * 25);
+  public Timeout timeout = Timeout.seconds(25);
 
   /**
    * Create a MiniDFSCluster for testing.

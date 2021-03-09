@@ -69,7 +69,7 @@ public class TestSCMSafeModeManager {
   private List<ContainerInfo> containers = Collections.emptyList();
 
   @Rule
-  public Timeout timeout = new Timeout(1000 * 300);
+  public Timeout timeout = Timeout.seconds(300);
 
   @Rule
   public final TemporaryFolder tempDir = new TemporaryFolder();
