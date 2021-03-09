@@ -44,6 +44,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 
+import com.jcraft.jsch.IO;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -889,7 +890,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   }
 
   private static InetSocketAddress getScmAddress(SCMHANodeDetails haDetails,
-      ConfigurationSource conf) {
+      ConfigurationSource conf) throws IOException {
     List<SCMNodeInfo> scmNodeInfoList = SCMNodeInfo.buildNodeInfo(
         conf);
     Preconditions.checkNotNull(scmNodeInfoList, "scmNodeInfoList is null");
@@ -905,12 +906,20 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         }
       }
     } else  {
-      scmAddress = NetUtils.createSocketAddr(
-          scmNodeInfoList.get(0).getScmClientAddress());
+      // Get Local host and use scm client port
+      if (scmNodeInfoList.get(0).getScmClientAddress() == null) {
+        LOG.error("SCM Address not able to figure out from config, finding " +
+            "hostname from InetAddress.");
+        scmAddress =
+            NetUtils.createSocketAddr(InetAddress.getLocalHost().getHostName(),
+                ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT);
+      } else {
+        scmAddress = NetUtils.createSocketAddr(
+            scmNodeInfoList.get(0).getScmClientAddress());
+      }
     }
 
-    Preconditions.checkNotNull(scmAddress,
-        "SCM Client Address is null");
+
     return scmAddress;
   }
 
