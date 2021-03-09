@@ -399,4 +399,7 @@ public final class OzoneConsts {
 
   public static final long DEFAULT_OM_UPDATE_ID = -1L;
 
+  // Layout Version written into Meta Table ONLY during finalization.
+  public static final String LAYOUT_VERSION_KEY = "#LAYOUTVERSION";
+
 }

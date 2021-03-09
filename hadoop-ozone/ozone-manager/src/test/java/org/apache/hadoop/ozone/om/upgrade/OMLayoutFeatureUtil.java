@@ -23,7 +23,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 
 /**
@@ -59,7 +58,7 @@ public class OMLayoutFeatureUtil {
     Path tempDirWithPrefix = Files.createTempDirectory("TestAspect");
     configuration.set("ozone.metadata.dirs",
         tempDirWithPrefix.toAbsolutePath().toString());
-    return new OMLayoutVersionManager(new OMStorage(configuration));
+    return new OMLayoutVersionManager(0);
   }
 
 }

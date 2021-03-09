@@ -28,7 +28,7 @@ import java.io.IOException;
 /**
  * Response for finalizeUpgrade request.
  */
-@CleanupTableInfo(cleanupAll = true)
+@CleanupTableInfo()
 public class OMFinalizeUpgradeResponse extends OMClientResponse {
   public OMFinalizeUpgradeResponse(
       OzoneManagerProtocolProtos.OMResponse omResponse) {

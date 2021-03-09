@@ -18,15 +18,19 @@
 
 package org.apache.hadoop.ozone.om.upgrade;
 
+import static org.apache.hadoop.ozone.OzoneConsts.LAYOUT_VERSION_KEY;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_DONE;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_IN_PROGRESS;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_REQUIRED;
 
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 
 import java.io.IOException;
 import java.util.concurrent.Callable;
+
 import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
+import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 
 /**
  * UpgradeFinalizer implementation for the Ozone Manager service.
@@ -100,6 +104,7 @@ public class OMUpgradeFinalizer extends BasicUpgradeFinalizer<OzoneManager,
         for (OMLayoutFeature f : versionManager.unfinalizedFeatures()) {
           finalizeFeature(f);
           updateLayoutVersionInVersionFile(f, ozoneManager.getOmStorage());
+          updateLayoutVersionInDB(f, ozoneManager);
           versionManager.finalized(f);
         }
 
@@ -134,5 +139,18 @@ public class OMUpgradeFinalizer extends BasicUpgradeFinalizer<OzoneManager,
       removeFinalizationMarkFromVersionFile(feature,
           ozoneManager.getOmStorage());
     }
+  }
+
+  /**
+   * Write down Layout version of a finalized feature to DB on finalization.
+   * @param f layout feature
+   * @param om OM instance
+   * @throws IOException on Error.
+   */
+  private void updateLayoutVersionInDB(LayoutFeature f, OzoneManager om)
+      throws IOException {
+    OMMetadataManager omMetadataManager = om.getMetadataManager();
+    omMetadataManager.getMetaTable().put(LAYOUT_VERSION_KEY,
+        String.valueOf(f.layoutVersion()));
   }
 }

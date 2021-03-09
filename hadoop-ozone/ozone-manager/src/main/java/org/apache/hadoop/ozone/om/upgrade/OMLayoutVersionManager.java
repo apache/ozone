@@ -27,8 +27,6 @@ import java.lang.reflect.Modifier;
 import java.util.HashSet;
 import java.util.Set;
 
-import org.apache.hadoop.ozone.common.Storage;
-import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.upgrade.AbstractLayoutVersionManager;
@@ -57,9 +55,9 @@ public final class OMLayoutVersionManager
   private LayoutVersionInstanceFactory<Class<? extends OMClientRequest>>
       requestFactory;
 
-  public OMLayoutVersionManager(OMStorage omStorage) throws OMException {
+  public OMLayoutVersionManager(int layoutVersion) throws OMException {
     requestFactory = new LayoutVersionInstanceFactory<>();
-    init(omStorage);
+    init(layoutVersion);
   }
 
   public OMLayoutVersionManager() throws IOException {
@@ -73,9 +71,9 @@ public final class OMLayoutVersionManager
    * @param storage to read the current layout version.
    * @throws OMException on error.
    */
-  private void init(Storage storage) throws OMException {
+  private void init(int layoutVersion) throws OMException {
     try {
-      init(storage.getLayoutVersion(), OMLayoutFeature.values());
+      init(layoutVersion, OMLayoutFeature.values());
     } catch (IOException e) {
       throw new OMException(
           String.format("Cannot initialize VersionManager. Metadata " +
