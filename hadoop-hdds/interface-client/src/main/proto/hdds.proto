@@ -242,6 +242,10 @@ message RatisReplicationConfig {
     required ReplicationFactor factor = 1;
 }
 
+message StandaloneReplicationConfig {
+    required ReplicationFactor factor = 1;
+}
+
 message ECReplicationConfig {
     required int32 data = 1;
     required int32 parity = 2;

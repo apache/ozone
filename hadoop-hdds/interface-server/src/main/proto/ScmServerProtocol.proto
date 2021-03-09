@@ -129,13 +129,14 @@ message AllocateScmBlockRequestProto {
   //deprecated, use RatisReplicationConfig
   required ReplicationType type = 3;
   
-  required hadoop.hdds.ReplicationFactor factor = 4;
+  optional hadoop.hdds.ReplicationFactor factor = 4;
   required string owner = 5;
   optional ExcludeListProto excludeList = 7;
 
-  //based on replication type, at least one should be included
+  //based on replication type, at least one of these should be included
   optional hadoop.hdds.RatisReplicationConfig ratisReplicationConfig = 8;
   optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 9;
+  optional hadoop.hdds.StandaloneReplicationConfig standaloneReplicationConfig = 10;
 }
 
 /**
