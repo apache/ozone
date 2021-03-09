@@ -22,6 +22,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
 import java.util.ArrayList;
@@ -61,5 +62,14 @@ public class TestS3MultipartUploadAbortResponseV1
       OzoneManagerProtocolProtos.OMResponse omResponse) {
     return new S3MultipartUploadAbortResponseV1(omResponse, multipartKey,
         omMultipartKeyInfo, true, omBucketInfo);
+  }
+
+  @Override
+  public OzoneManagerProtocolProtos.PartKeyInfo createPartKeyInfo(
+      String volumeName, String bucketName, String keyName, int partNumber) {
+
+    String fileName = OzoneFSUtils.getFileName(keyName);
+    return createPartKeyInfoV1(volumeName, bucketName, parentID, fileName,
+        partNumber);
   }
 }

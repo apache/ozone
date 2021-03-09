@@ -161,7 +161,7 @@ public class TestS3MultipartResponse {
       int partNumber) {
     return PartKeyInfo.newBuilder()
         .setPartNumber(partNumber)
-        .setPartName(omMetadataManager.getMultipartKey(parentID, fileName,
+        .setPartName(omMetadataManager.getOzonePathKey(parentID, fileName +
                 UUID.randomUUID().toString()))
         .setPartKeyInfo(KeyInfo.newBuilder()
             .setVolumeName(volumeName)

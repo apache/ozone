@@ -581,6 +581,9 @@ public class TestOzoneClientMultipartUploadV1 {
         omKeyInfo.getKeyName());
     Assert.assertEquals(uploadID, omMultipartKeyInfo.getUploadID());
 
+    long parentID = getParentID(volumeName, bucketName, keyName,
+        metadataMgr);
+
     TreeMap<Integer, OzoneManagerProtocolProtos.PartKeyInfo> partKeyInfoMap =
         omMultipartKeyInfo.getPartKeyInfoMap();
     for (Map.Entry<Integer, OzoneManagerProtocolProtos.PartKeyInfo> entry :
@@ -592,8 +595,11 @@ public class TestOzoneClientMultipartUploadV1 {
       Assert.assertEquals(OzoneFSUtils.getFileName(keyName),
           currentKeyPartInfo.getKeyName());
 
-      Assert.assertEquals(OzoneFSUtils.getFileName(partName),
-          partKeyInfo.getPartName());
+      // prepare dbPartName <parentID>/partFileName
+      String partFileName = OzoneFSUtils.getFileName(partName);
+      String dbPartName = metadataMgr.getOzonePathKey(parentID, partFileName);
+
+      Assert.assertEquals(dbPartName, partKeyInfo.getPartName());
     }
     return multipartKey;
   }
@@ -603,18 +609,24 @@ public class TestOzoneClientMultipartUploadV1 {
       throws IOException {
 
     String fileName = OzoneFSUtils.getFileName(keyName);
-    Iterator<Path> pathComponents = Paths.get(keyName).iterator();
-    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
-    OmBucketInfo omBucketInfo =
-        omMetadataManager.getBucketTable().get(bucketKey);
-    long bucketId = omBucketInfo.getObjectID();
-    long parentID = OMFileRequest.getParentID(bucketId, pathComponents,
-        keyName, omMetadataManager);
+    long parentID = getParentID(volumeName, bucketName, keyName,
+        omMetadataManager);
 
     String multipartKey = omMetadataManager.getMultipartKey(parentID,
         fileName, multipartUploadID);
 
     return multipartKey;
+  }
+
+  private long getParentID(String volumeName, String bucketName,
+      String keyName, OMMetadataManager omMetadataManager) throws IOException {
+    Iterator<Path> pathComponents = Paths.get(keyName).iterator();
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    OmBucketInfo omBucketInfo =
+        omMetadataManager.getBucketTable().get(bucketKey);
+    long bucketId = omBucketInfo.getObjectID();
+    return OMFileRequest.getParentID(bucketId, pathComponents,
+        keyName, omMetadataManager);
   }
 
   private String initiateMultipartUpload(OzoneBucket bucket, String keyName,
