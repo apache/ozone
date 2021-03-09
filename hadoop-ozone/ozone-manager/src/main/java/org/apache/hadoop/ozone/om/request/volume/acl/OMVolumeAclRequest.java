@@ -92,7 +92,7 @@ public abstract class OMVolumeAclRequest extends OMVolumeRequest {
       try {
         omVolumeAclOp.apply(ozoneAcls, omVolumeArgs);
       } catch (OMException ex) {
-          throw new OMException("Set acl operation failed", ACL_SET_FAILED);
+        throw new OMException("Set acl operation failed", ACL_SET_FAILED);
       }
 
       // Update the modification time when updating ACLs of Volume.
@@ -113,8 +113,8 @@ public abstract class OMVolumeAclRequest extends OMVolumeRequest {
 
       // update cache.
       omMetadataManager.getVolumeTable().addCacheEntry(
-      new CacheKey<>(omMetadataManager.getVolumeKey(volume)),
-      new CacheValue<>(Optional.of(omVolumeArgs), trxnLogIndex));
+        new CacheKey<>(omMetadataManager.getVolumeKey(volume)),
+        new CacheValue<>(Optional.of(omVolumeArgs), trxnLogIndex));
 
 
       omClientResponse = onSuccess(omResponse, omVolumeArgs, true);
