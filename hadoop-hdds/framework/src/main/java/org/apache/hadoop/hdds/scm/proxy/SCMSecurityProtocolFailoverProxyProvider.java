@@ -125,7 +125,7 @@ public class SCMSecurityProtocolFailoverProxyProvider implements
   }
 
   @Override
-  public ProxyInfo<SCMSecurityProtocolPB> getProxy() {
+  public synchronized ProxyInfo<SCMSecurityProtocolPB> getProxy() {
     ProxyInfo currentProxyInfo = scmProxies.get(getCurrentProxySCMNodeId());
     if (currentProxyInfo == null) {
       currentProxyInfo = createSCMProxy(getCurrentProxySCMNodeId());
@@ -220,7 +220,7 @@ public class SCMSecurityProtocolFailoverProxyProvider implements
                 exception.getCause().getClass().getSimpleName(),
                 exception.getCause().getMessage());
           } else {
-            LOG.debug("RetryProxy: OM {}: {}", getCurrentProxySCMNodeId(),
+            LOG.debug("RetryProxy: SCM {}: {}", getCurrentProxySCMNodeId(),
                 exception.getMessage());
           }
         }
@@ -258,10 +258,12 @@ public class SCMSecurityProtocolFailoverProxyProvider implements
 
   @Override
   public void close() throws IOException {
-    for (ProxyInfo<SCMSecurityProtocolPB> proxyInfo : scmProxies.values()) {
-      if (proxyInfo != null) {
-        RPC.stopProxy(proxyInfo.proxy);
+    for (Map.Entry<String, ProxyInfo<SCMSecurityProtocolPB>> proxy :
+        scmProxies.entrySet()) {
+      if (proxy.getValue() != null) {
+        RPC.stopProxy(proxy.getValue());
       }
+      scmProxies.remove(proxy.getKey());
     }
   }
 

@@ -69,11 +69,11 @@ public class SCMSecurityException extends IOException {
 
   /**
    * Ctor.
-   * @param message - Message.
+   * @param cause - Actual cause.
    * @param error   - error code.
    */
-  public SCMSecurityException(Exception message, ErrorCode error) {
-    super(message);
+  public SCMSecurityException(Exception cause, ErrorCode error) {
+    super(cause);
     this.errorCode = error;
   }
 

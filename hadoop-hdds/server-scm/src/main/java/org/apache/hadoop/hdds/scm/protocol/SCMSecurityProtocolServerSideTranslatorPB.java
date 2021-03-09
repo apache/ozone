@@ -119,15 +119,13 @@ public class SCMSecurityProtocolServerSideTranslatorPB
       scmSecurityResponse.setSuccess(false);
       scmSecurityResponse.setStatus(exceptionToResponseStatus(e));
       // If actual cause is set in SCMSecurityException, set message with
-      // actuall cause message.
-      if (e instanceof SCMSecurityException) {
-        if (e.getCause() != null && e.getCause().getMessage() != null) {
-          scmSecurityResponse.setMessage(e.getCause().getMessage());
-          return scmSecurityResponse.build();
-        }
-      }
+      // actual cause message.
       if (e.getMessage() != null) {
         scmSecurityResponse.setMessage(e.getMessage());
+      } else {
+        if (e.getCause() != null && e.getCause().getMessage() != null) {
+          scmSecurityResponse.setMessage(e.getCause().getMessage());
+        }
       }
       return scmSecurityResponse.build();
     }
