@@ -54,6 +54,8 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.SCM;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateApprover.ApprovalType.KERBEROS_TRUSTED;
 import static org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest.getEncodedString;
 import static org.apache.hadoop.hdds.security.x509.exceptions.CertificateException.ErrorCode.CSR_ERROR;
+import static org.apache.hadoop.ozone.OzoneConsts.CA_PATH;
+import static org.apache.hadoop.ozone.OzoneConsts.STORAGE_DIR;
 
 public final class HASecurityUtils {
 
@@ -308,7 +310,7 @@ public final class HASecurityUtils {
     String subject = "scm-rootca@" + InetAddress.getLocalHost().getHostName();
 
     return new DefaultCAServer(subject, clusterID, scmID, scmCertStore,
-        new DefaultCAProfile(), Paths.get("scm", "ca").toString());
+        new DefaultCAProfile(), Paths.get(STORAGE_DIR, CA_PATH).toString());
   }
 
   /**

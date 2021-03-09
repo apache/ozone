@@ -145,6 +145,7 @@ import org.slf4j.LoggerFactory;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.OzoneConsts.CRL_SEQUENCE_ID_KEY;
+import static org.apache.hadoop.ozone.OzoneConsts.STORAGE_DIR;
 
 /**
  * StorageContainerManager is the main entry point for the service that
@@ -603,7 +604,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     } else {
       scmCertificateServer = new DefaultCAServer(subject,
           scmStorageConfig.getClusterID(), scmStorageConfig.getScmId(),
-          scmCertStore, new DefaultProfile(), Paths.get("scm").toString());
+          scmCertStore, new DefaultProfile(), Paths.get(STORAGE_DIR).toString());
     }
     // INTERMEDIARY_CA which issues certs to DN and OM.
     scmCertificateServer.init(new SecurityConfig(configuration),

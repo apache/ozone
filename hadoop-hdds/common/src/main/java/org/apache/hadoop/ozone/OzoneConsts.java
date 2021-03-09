@@ -418,4 +418,6 @@ public final class OzoneConsts {
 
   // CRL Sequence Id
   public static final String CRL_SEQUENCE_ID_KEY = "CRL_SEQUENCE_ID";
+
+  public static final String CA_PATH = "ca";
 }
