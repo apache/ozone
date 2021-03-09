@@ -63,6 +63,7 @@ import java.util.concurrent.Future;
 import java.util.function.Consumer;
 
 import static org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest.getCertificationRequest;
+import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.UNABLE_TO_ISSUE_CERTIFICATE;
 import static org.apache.hadoop.hdds.security.x509.exceptions.CertificateException.ErrorCode.CSR_ERROR;
 
 /**
@@ -254,7 +255,8 @@ public class DefaultCAServer implements CertificateServer {
       }
     } catch (CertificateException | IOException | OperatorCreationException e) {
       LOG.error("Unable to issue a certificate.", e);
-      xcertHolder.completeExceptionally(new SCMSecurityException(e));
+      xcertHolder.completeExceptionally(
+          new SCMSecurityException(e, UNABLE_TO_ISSUE_CERTIFICATE));
     }
     return xcertHolder;
   }

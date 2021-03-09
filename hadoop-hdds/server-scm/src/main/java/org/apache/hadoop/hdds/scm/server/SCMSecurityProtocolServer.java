@@ -54,6 +54,9 @@ import org.bouncycastle.cert.X509CertificateHolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.CERTIFICATE_NOT_FOUND;
+import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_CA_CERT_FAILED;
+import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_CERTIFICATE_FAILED;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateApprover.ApprovalType.KERBEROS_TRUSTED;
 
 /**
@@ -91,7 +94,8 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
     BlockingService secureProtoPbService =
         SCMSecurityProtocolProtos.SCMSecurityProtocolService
             .newReflectiveBlockingService(
-                new SCMSecurityProtocolServerSideTranslatorPB(this, metrics));
+                new SCMSecurityProtocolServerSideTranslatorPB(this,
+                    scm, metrics));
     this.rpcServer =
         StorageContainerManager.startRpcServer(
             conf,
@@ -181,12 +185,32 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
       return CertificateCodec.getPEMEncodedString(future.get());
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
-      throw new IOException("generate" + nodeType.toString() + "Certificate " +
-          "operation failed. ", e);
+      throw generateException(e, nodeType);
     } catch (ExecutionException e) {
-      throw new IOException("generate" + nodeType.toString() + "Certificate " +
-          "operation failed.", e);
+      if (e.getCause() != null) {
+        if (e.getCause() instanceof SCMSecurityException) {
+          throw (SCMSecurityException) e.getCause();
+        } else {
+          throw generateException(e, nodeType);
+        }
+      } else {
+        throw generateException(e, nodeType);
+      }
     }
+  }
+
+  private SCMSecurityException generateException(Exception ex, NodeType role) {
+    SCMSecurityException.ErrorCode errorCode;
+    if (role == NodeType.SCM) {
+      errorCode = SCMSecurityException.ErrorCode.GET_SCM_CERTIFICATE_FAILED;
+    } else if (role == NodeType.OM) {
+      errorCode = SCMSecurityException.ErrorCode.GET_OM_CERTIFICATE_FAILED;
+    } else {
+      errorCode = SCMSecurityException.ErrorCode.GET_DN_CERTIFICATE_FAILED;
+    }
+    return new SCMSecurityException("generate " + role.toString() +
+        " Certificate operation failed", ex, errorCode);
+
   }
 
   /**
@@ -206,10 +230,12 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
         return CertificateCodec.getPEMEncodedString(certificate);
       }
     } catch (CertificateException e) {
-      throw new IOException("getCertificate operation failed. ", e);
+      throw new SCMSecurityException("getCertificate operation failed. ", e,
+          GET_CERTIFICATE_FAILED);
     }
     LOGGER.debug("Certificate with serial id {} not found.", certSerialId);
-    throw new IOException("Certificate not found");
+    throw new SCMSecurityException("Certificate not found",
+        CERTIFICATE_NOT_FOUND);
   }
 
   /**
@@ -224,7 +250,8 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
       return CertificateCodec.getPEMEncodedString(
           certificateServer.getCACertificate());
     } catch (CertificateException e) {
-      throw new IOException("getRootCertificate operation failed. ", e);
+      throw new SCMSecurityException("getRootCertificate operation failed. ",
+          e, GET_CA_CERT_FAILED);
     }
   }
 
@@ -249,7 +276,8 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
         String certStr = CertificateCodec.getPEMEncodedString(cert);
         results.add(certStr);
       } catch (SCMSecurityException e) {
-        throw new IOException("listCertificate operation failed. ", e);
+        throw new SCMSecurityException("listCertificate operation failed.",
+            e, e.getErrorCode());
       }
     }
     return results;
