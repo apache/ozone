@@ -252,12 +252,28 @@ public class S3MultipartUploadCompleteRequestV1
             new CacheValue<>(Optional.absent(), transactionLogIndex));
   }
 
+  @Override
   protected void updatePrefixFSOInfo(OmKeyInfo dbOpenKeyInfo,
                                      OmKeyInfo.Builder builder) {
     // updates parentID and fileName
     builder.setParentObjectID(dbOpenKeyInfo.getParentObjectID());
     builder.setFileName(dbOpenKeyInfo.getFileName());
   }
+
+  @Override
+  protected String preparePartName(String requestedVolume,
+      String requestedBucket, String keyName, PartKeyInfo partKeyInfo,
+      OMMetadataManager omMetadataManager) {
+
+    String parentPath = OzoneFSUtils.getParent(keyName);
+    StringBuffer keyPath = new StringBuffer(parentPath);
+    String partFileName = OzoneFSUtils.getFileName(partKeyInfo.getPartName());
+    keyPath.append(partFileName);
+
+    return omMetadataManager.getOzoneKey(requestedVolume,
+        requestedBucket, keyPath.toString());
+  }
+
 
   private static String failureMessage(String volume, String bucket,
                                        String keyName) {

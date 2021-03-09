@@ -116,8 +116,8 @@ public class TestS3MultipartResponse {
                 .setKeyName(keyName)
                 .setMultipartUploadID(multipartUploadID)).build();
 
-    return new S3InitiateMultipartUploadResponse(omResponse, multipartKeyInfo,
-        omKeyInfo);
+    return getS3InitiateMultipartUploadResp(multipartKeyInfo, omKeyInfo,
+        omResponse);
   }
 
   public S3MultipartUploadAbortResponse createS3AbortMPUResponse(
@@ -130,10 +130,9 @@ public class TestS3MultipartResponse {
         .setAbortMultiPartUploadResponse(
             MultipartUploadAbortResponse.newBuilder().build()).build();
 
-    return new S3MultipartUploadAbortResponse(omResponse, multipartKey,
-        omMultipartKeyInfo, true, omBucketInfo);
+    return getS3MultipartUploadAbortResp(multipartKey,
+        omMultipartKeyInfo, omBucketInfo, omResponse);
   }
-
 
   public void addPart(int partNumber, PartKeyInfo partKeyInfo,
       OmMultipartKeyInfo omMultipartKeyInfo) {
@@ -162,7 +161,7 @@ public class TestS3MultipartResponse {
       int partNumber) {
     return PartKeyInfo.newBuilder()
         .setPartNumber(partNumber)
-        .setPartName(omMetadataManager.getMultipartKey(parentID, fileName,
+        .setPartName(omMetadataManager.getOzonePathKey(parentID, fileName +
                 UUID.randomUUID().toString()))
         .setPartKeyInfo(KeyInfo.newBuilder()
             .setVolumeName(volumeName)
@@ -294,5 +293,19 @@ public class TestS3MultipartResponse {
     String fileName = OzoneFSUtils.getFileName(keyName);
     return omMetadataManager.getMultipartKey(parentID, fileName,
             multipartUploadID);
+  }
+
+  protected S3InitiateMultipartUploadResponse getS3InitiateMultipartUploadResp(
+      OmMultipartKeyInfo multipartKeyInfo, OmKeyInfo omKeyInfo,
+      OMResponse omResponse) {
+    return new S3InitiateMultipartUploadResponse(omResponse, multipartKeyInfo,
+        omKeyInfo);
+  }
+
+  protected S3MultipartUploadAbortResponse getS3MultipartUploadAbortResp(
+      String multipartKey, OmMultipartKeyInfo omMultipartKeyInfo,
+      OmBucketInfo omBucketInfo, OMResponse omResponse) {
+    return new S3MultipartUploadAbortResponse(omResponse, multipartKey,
+        omMultipartKeyInfo, true, omBucketInfo);
   }
 }
