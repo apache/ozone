@@ -39,7 +39,7 @@ import java.io.IOException;
 import java.net.URI;
 
 /**
- * Test Ozone Prefix Parser
+ * Test Ozone Prefix Parser.
  */
 public class TestOzoneFileSystemPrefixParser {
 
@@ -74,7 +74,7 @@ public class TestOzoneFileSystemPrefixParser {
     String rootPath = String
         .format("%s://%s.%s/", OzoneConsts.OZONE_URI_SCHEME, bucketName,
             volumeName);
-      fs = FileSystem.get(new URI(rootPath + "/test.txt"), configuration);
+    fs = FileSystem.get(new URI(rootPath + "/test.txt"), configuration);
   }
 
   @After
@@ -89,17 +89,16 @@ public class TestOzoneFileSystemPrefixParser {
   public void testPrefixParsing() throws Exception {
     Path dir = new Path("/a/b/c/d/e");
     fs.mkdirs(dir);
-
     Path file = new Path("/a/b/c/file1");
-    try(FSDataOutputStream os = fs.create(file)) {
-
-    }
+    FSDataOutputStream os = fs.create(file);
+    os.close();
 
     cluster.stop();
     PrefixParser parser = new PrefixParser();
 
     parser.parse(volumeName, bucketName,
-        OMStorage.getOmDbDir(configuration).getPath(), "/a/b/c");
+        OMStorage.getOmDbDir(configuration).getPath(),
+        dir.getParent().getParent().toString());
   }
 
 }

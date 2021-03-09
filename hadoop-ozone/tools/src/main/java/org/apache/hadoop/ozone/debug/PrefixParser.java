@@ -91,22 +91,22 @@ public class PrefixParser implements Callable<Void>, SubcommandWithParent {
     return null;
   }
 
-  public static void main(String [] args) throws Exception {
+  public static void main(String[] args) throws Exception {
     new PrefixParser().call();
   }
 
-  public void parse(String volume, String bucket, String dbPath,
-                    String filePath) throws Exception {
-    if (!Files.exists(Paths.get(dbPath))) {
-      System.out.println("DB path not exist:" + dbPath);
+  public void parse(String vol, String buck, String db,
+                    String file) throws Exception {
+    if (!Files.exists(Paths.get(db))) {
+      System.out.println("DB path not exist:" + db);
       return;
     }
 
-    System.out.println("FilePath is:" + filePath);
-    System.out.println("Db Path is:" + dbPath);
+    System.out.println("FilePath is:" + file);
+    System.out.println("Db Path is:" + db);
 
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(OMConfigKeys.OZONE_OM_DB_DIRS, dbPath);
+    conf.set(OMConfigKeys.OZONE_OM_DB_DIRS, db);
     OzoneManagerRatisUtils.setBucketFSOptimized(true);
 
     OmMetadataManagerImpl metadataManager =
@@ -116,10 +116,10 @@ public class PrefixParser implements Callable<Void>, SubcommandWithParent {
     org.apache.hadoop.fs.Path effectivePath =
         new org.apache.hadoop.fs.Path("/");
 
-    Path p = Paths.get(filePath);
+    Path p = Paths.get(file);
 
     // First get the info about the bucket
-    String bucketKey = metadataManager.getBucketKey(volume, bucket);
+    String bucketKey = metadataManager.getBucketKey(vol, buck);
     OmBucketInfo info = metadataManager.getBucketTable().get(bucketKey);
     long lastObjectId = info.getObjectID();
     WithParentObjectId objectBucketId = new WithParentObjectId();
@@ -159,7 +159,7 @@ public class PrefixParser implements Callable<Void>, SubcommandWithParent {
         table.getRangeKVs(null, 1000, filter);
 
     for (Table.KeyValue
-        <String, ? extends WithParentObjectId> info : infoList) {
+      <String, ? extends WithParentObjectId> info : infoList) {
       Path key = Paths.get(info.getKey());
       dumpInfo(type, getEffectivePath(effectivePath,
           key.getName(1).toString()), info.getValue(), info.getKey());
@@ -168,7 +168,7 @@ public class PrefixParser implements Callable<Void>, SubcommandWithParent {
 
   private org.apache.hadoop.fs.Path getEffectivePath(
       org.apache.hadoop.fs.Path currentPath, String name) {
-   return new org.apache.hadoop.fs.Path(currentPath, name);
+    return new org.apache.hadoop.fs.Path(currentPath, name);
   }
 
   private void dumpInfo(String level, org.apache.hadoop.fs.Path effectivePath,
