@@ -23,10 +23,10 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -167,6 +167,9 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
           .setUpdateID(transactionLogIndex)
           .build();
 
+      OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
+          omMetadataManager.getBucketKey(volumeName, bucketName));
+
       omKeyInfo = new OmKeyInfo.Builder()
           .setVolumeName(volumeName)
           .setBucketName(bucketName)
@@ -177,7 +180,8 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
           .setReplicationFactor(keyArgs.getFactor())
           .setOmKeyLocationInfos(Collections.singletonList(
               new OmKeyLocationInfoGroup(0, new ArrayList<>())))
-          .setAcls(OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()))
+          .setAcls(getAclsForKey(keyArgs, bucketInfo,
+              ozoneManager.getPrefixManager()))
           .setObjectID(objectID)
           .setUpdateID(transactionLogIndex)
           .setFileEncryptionInfo(keyArgs.hasFileEncryptionInfo() ?
