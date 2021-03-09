@@ -113,8 +113,8 @@ public abstract class OMVolumeAclRequest extends OMVolumeRequest {
 
       // update cache.
       omMetadataManager.getVolumeTable().addCacheEntry(
-        new CacheKey<>(omMetadataManager.getVolumeKey(volume)),
-        new CacheValue<>(Optional.of(omVolumeArgs), trxnLogIndex));
+          new CacheKey<>(omMetadataManager.getVolumeKey(volume)),
+          new CacheValue<>(Optional.of(omVolumeArgs), trxnLogIndex));
 
 
       omClientResponse = onSuccess(omResponse, omVolumeArgs, true);
