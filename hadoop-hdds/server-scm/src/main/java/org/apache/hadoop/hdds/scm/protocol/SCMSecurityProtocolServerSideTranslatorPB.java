@@ -111,6 +111,9 @@ public class SCMSecurityProtocolServerSideTranslatorPB
       case GetSCMCertificate:
         return scmSecurityResponse.setGetCertResponseProto(getSCMCertificate(
             request.getGetSCMCertificateRequest())).build();
+      case GetRootCACertificate:
+        return scmSecurityResponse.setGetCertResponseProto(
+            getRootCACertificate()).build();
       default:
         throw new IllegalArgumentException(
             "Unknown request type: " + request.getCmdType());
@@ -183,12 +186,16 @@ public class SCMSecurityProtocolServerSideTranslatorPB
 
     String certificate = impl.getSCMCertificate(request.getScmDetails(),
         request.getCSR());
+
+    // For SCM root CA and CA are same, as the root CA generates the signed
+    // certificate for SCM nodes.
     SCMGetCertResponseProto.Builder builder =
         SCMGetCertResponseProto
             .newBuilder()
             .setResponseCode(ResponseCode.success)
             .setX509Certificate(certificate)
-            .setX509CACertificate(impl.getCACertificate());
+            .setX509CACertificate(impl.getRootCACertificate())
+            .setX509RootCACertificate(impl.getRootCACertificate());
 
     return builder.build();
 
@@ -210,7 +217,8 @@ public class SCMSecurityProtocolServerSideTranslatorPB
             .newBuilder()
             .setResponseCode(ResponseCode.success)
             .setX509Certificate(certificate)
-            .setX509CACertificate(impl.getCACertificate());
+            .setX509CACertificate(impl.getCACertificate())
+            .setX509RootCACertificate(impl.getRootCACertificate());
     return builder.build();
 
   }
@@ -240,6 +248,16 @@ public class SCMSecurityProtocolServerSideTranslatorPB
             .setX509Certificate(certificate);
     return builder.build();
 
+  }
+
+  public SCMGetCertResponseProto getRootCACertificate() throws IOException {
+    String rootCACertificate = impl.getRootCACertificate();
+    SCMGetCertResponseProto.Builder builder =
+        SCMGetCertResponseProto
+            .newBuilder()
+            .setResponseCode(ResponseCode.success)
+            .setX509RootCACertificate(rootCACertificate);
+    return builder.build();
   }
 
   public SCMListCertificateResponseProto listCertificate(

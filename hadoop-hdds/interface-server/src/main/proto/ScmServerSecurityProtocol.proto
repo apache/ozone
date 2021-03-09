@@ -79,6 +79,7 @@ enum Type {
     GetCACertificate = 4;
     ListCertificate = 5;
     GetSCMCertificate = 6;
+    GetRootCACertificate = 7;
 }
 
 enum Status {
@@ -131,6 +132,9 @@ message SCMGetCertificateRequestProto {
 * Proto request to get CA certificate.
 */
 message SCMGetCACertificateRequestProto {
+}
+
+message SCMGetRootCACertificateRequestProto {
 }
 
 /**

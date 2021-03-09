@@ -272,6 +272,16 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
 
   }
 
+  @Override
+  public String getRootCACertificate() throws IOException {
+    SCMGetCACertificateRequestProto protoIns = SCMGetCACertificateRequestProto
+        .getDefaultInstance();
+    return submitRequest(Type.GetCACertificate,
+        builder -> builder.setGetCACertificateRequest(protoIns))
+        .getGetCertResponseProto().getX509Certificate();
+
+  }
+
   /**
    *
    * @param role            - node type: OM/SCM/DN.

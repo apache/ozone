@@ -253,6 +253,17 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
     LOGGER.debug("Getting CA certificate.");
     try {
       return CertificateCodec.getPEMEncodedString(
+          storageContainerManager.getScmCertificateServer().getCACertificate());
+    } catch (CertificateException e) {
+      throw new IOException("getRootCertificate operation failed. ", e);
+    }
+  }
+
+  @Override
+  public String getRootCACertificate() throws IOException {
+    LOGGER.debug("Getting Root CA certificate.");
+    try {
+      return CertificateCodec.getPEMEncodedString(
           rootCertificateServer.getCACertificate());
     } catch (CertificateException e) {
       throw new SCMSecurityException("getRootCertificate operation failed. ",

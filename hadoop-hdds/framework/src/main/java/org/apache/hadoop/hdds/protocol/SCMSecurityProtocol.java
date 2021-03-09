@@ -94,6 +94,13 @@ public interface SCMSecurityProtocol {
   String getCACertificate() throws IOException;
 
   /**
+   * Get Root CA certificate.
+   * @return
+   * @throws IOException
+   */
+  String getRootCACertificate() throws IOException;
+
+  /**
    * Get list of certificates meet the query criteria.
    *
    * @param type            - node type: OM/SCM/DN.
