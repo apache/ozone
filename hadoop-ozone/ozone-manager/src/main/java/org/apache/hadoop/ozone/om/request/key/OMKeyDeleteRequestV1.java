@@ -103,7 +103,7 @@ public class OMKeyDeleteRequestV1 extends OMKeyDeleteRequest {
 
       // check Acl
       checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
-          IAccessAuthorizer.ACLType.DELETE, OzoneObj.ResourceType.KEY);
+          IAccessAuthorizer.ACLType.DELETE, OzoneObj.ResourceType.KEY, true);
 
       acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
           volumeName, bucketName);

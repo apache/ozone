@@ -318,6 +318,26 @@ public abstract class OMKeyRequest extends OMClientRequest {
   }
 
   /**
+   * Check Acls for the ozone key.
+   * @param ozoneManager
+   * @param volume
+   * @param bucket
+   * @param key
+   * @param aclType
+   * @param resourceType
+   * @throws IOException
+   */
+  protected void checkKeyAcls(OzoneManager ozoneManager, String volume,
+      String bucket, String key, IAccessAuthorizer.ACLType aclType,
+      OzoneObj.ResourceType resourceType, boolean recursiveAccessCheck)
+      throws IOException {
+    if (ozoneManager.getAclsEnabled()) {
+      checkAcls(ozoneManager, resourceType, OzoneObj.StoreType.OZONE, aclType,
+          volume, bucket, key, recursiveAccessCheck);
+    }
+  }
+
+  /**
    * Check Acls for the ozone key with volumeOwner.
    * @param ozoneManager
    * @param volume

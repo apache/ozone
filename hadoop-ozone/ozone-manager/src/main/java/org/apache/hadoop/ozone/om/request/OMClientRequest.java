@@ -187,6 +187,29 @@ public abstract class OMClientRequest implements RequestAuditor {
   }
 
   /**
+   * Check Acls of ozone object.
+   * @param ozoneManager
+   * @param resType
+   * @param storeType
+   * @param aclType
+   * @param vol
+   * @param bucket
+   * @param key
+   * @throws IOException
+   */
+  @SuppressWarnings("parameternumber")
+  public void checkAcls(OzoneManager ozoneManager,
+      OzoneObj.ResourceType resType,
+      OzoneObj.StoreType storeType, IAccessAuthorizer.ACLType aclType,
+      String vol, String bucket, String key, boolean recursiveAccessCheck)
+      throws IOException {
+    ozoneManager.checkAcls(resType, storeType, aclType, vol, bucket, key,
+        createUGI(), getRemoteAddress(), getHostName(), true,
+        ozoneManager.getVolumeOwner(vol, aclType, resType),
+        recursiveAccessCheck);
+  }
+
+  /**
    * Check Acls of ozone object with volOwner given.
    * @param ozoneManager
    * @param resType

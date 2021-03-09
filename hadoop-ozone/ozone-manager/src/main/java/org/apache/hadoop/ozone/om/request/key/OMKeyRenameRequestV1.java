@@ -104,7 +104,8 @@ public class OMKeyRenameRequestV1 extends OMKeyRenameRequest {
       // check Acls to see if user has access to perform delete operation on
       // old key and create operation on new key
       checkKeyAcls(ozoneManager, volumeName, bucketName, fromKeyName,
-              IAccessAuthorizer.ACLType.DELETE, OzoneObj.ResourceType.KEY);
+              IAccessAuthorizer.ACLType.DELETE, OzoneObj.ResourceType.KEY,
+          true);
       checkKeyAcls(ozoneManager, volumeName, bucketName, toKeyName,
               IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
 

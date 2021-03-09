@@ -20,11 +20,20 @@ package org.apache.hadoop.ozone.om.request.key;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.om.OzonePrefixPathImpl;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.security.acl.OzonePrefixPath;
 import org.apache.hadoop.util.Time;
+import org.junit.Assert;
+import org.junit.Test;
+
+import java.io.IOException;
+import java.util.List;
 
 /**
  * Tests OmKeyDelete request layout version V1.
@@ -52,6 +61,7 @@ public class TestOMKeyDeleteRequestV1 extends TestOMKeyDeleteRequest {
                     HddsProtos.ReplicationFactor.ONE,
                     parentId + 1,
                     parentId, 100, Time.now());
+    omKeyInfo.setKeyName(fileName);
     TestOMRequestUtils.addFileToKeyTable(false, false,
             fileName, omKeyInfo, -1, 50, omMetadataManager);
     return omKeyInfo.getPath();
@@ -65,5 +75,41 @@ public class TestOMKeyDeleteRequestV1 extends TestOMKeyDeleteRequest {
     // this configuration to populate prefix tables.
     OzoneManagerRatisUtils.setBucketFSOptimized(true);
     return config;
+  }
+
+  @Test
+  public void testOzonePrefixPathViewer() throws Exception {
+    // Add volume, bucket and key entries to OM DB.
+    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager);
+
+    String ozoneKey = addKeyToTable();
+
+    OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable().get(ozoneKey);
+
+    // As we added manually to key table.
+    Assert.assertNotNull(omKeyInfo);
+
+    OzonePrefixPathImpl ozonePrefixPath = new OzonePrefixPathImpl(keyManager);
+    verifyPath(ozonePrefixPath, "c", "c/d");
+    verifyPath(ozonePrefixPath, "c/d", "c/d/e");
+    verifyPath(ozonePrefixPath, "c/d/e", "c/d/e/file1");
+
+    try {
+      ozonePrefixPath.getChildren(volumeName, bucketName, "c/d/e/file1");
+      Assert.fail("Should throw INVALID_KEY_NAME as the given path is a file.");
+    } catch (OMException ome) {
+      Assert.assertEquals(OMException.ResultCodes.INVALID_KEY_NAME,
+          ome.getResult());
+    }
+  }
+
+  private void verifyPath(OzonePrefixPath ozonePrefixPath, String pathName,
+                          String expectedPath)
+      throws IOException {
+    List<OzoneFileStatus> statuses = ozonePrefixPath.getChildren(volumeName,
+        bucketName, pathName);
+    Assert.assertEquals(1, statuses.size());
+    Assert.assertEquals(expectedPath, statuses.get(0).getTrimmedName());
   }
 }

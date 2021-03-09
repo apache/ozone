@@ -1829,6 +1829,57 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
+   * CheckAcls for the ozone object.
+   *
+   * @return true if permission granted, false if permission denied.
+   * @throws OMException ResultCodes.PERMISSION_DENIED if permission denied
+   *                     and throwOnPermissionDenied set to true.
+   */
+  @SuppressWarnings("parameternumber")
+  public boolean checkAcls(ResourceType resType, StoreType storeType,
+      ACLType aclType, String vol, String bucket, String key,
+      UserGroupInformation ugi, InetAddress remoteAddress, String hostName,
+      boolean throwIfPermissionDenied, String volumeOwner,
+      boolean recursiveAccessCheck)
+      throws OMException {
+    OzoneObj obj = OzoneObjInfo.Builder.newBuilder()
+        .setResType(resType)
+        .setStoreType(storeType)
+        .setVolumeName(vol)
+        .setBucketName(bucket)
+        .setKeyName(key).build();
+    RequestContext context = RequestContext.newBuilder()
+        .setClientUgi(ugi)
+        .setIp(remoteAddress)
+        .setHost(hostName)
+        .setAclType(ACLIdentityType.USER)
+        .setAclRights(aclType)
+        .setOwnerName(volumeOwner)
+        .setRecursiveAccessCheck(recursiveAccessCheck)
+        .setOzonePrefixPath(new OzonePrefixPathImpl(keyManager))
+        .build();
+    if (!accessAuthorizer.checkAccess(obj, context)) {
+      if (throwIfPermissionDenied) {
+        LOG.warn("User {} doesn't have {} permission to access {} /{}/{}/{}",
+            context.getClientUgi().getUserName(), context.getAclRights(),
+            obj.getResourceType(), obj.getVolumeName(), obj.getBucketName(),
+            obj.getKeyName());
+        throw new OMException("User " + context.getClientUgi().getUserName() +
+            " doesn't have " + context.getAclRights() +
+            " permission to access " + obj.getResourceType() + " " +
+            obj.getVolumeName() + " " + obj.getBucketName() + " " +
+            obj.getKeyName(),
+            ResultCodes.PERMISSION_DENIED);
+      }
+      return false;
+    } else {
+      return true;
+    }
+  }
+
+
+
+  /**
    * Return true if Ozone acl's are enabled, else false.
    *
    * @return boolean
