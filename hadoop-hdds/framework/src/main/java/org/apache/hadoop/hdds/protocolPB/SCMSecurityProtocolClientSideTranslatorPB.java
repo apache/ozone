@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.function.Consumer;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
@@ -37,7 +38,10 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecuri
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityRequest.Builder;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityResponse;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.Type;
+import org.apache.hadoop.hdds.scm.proxy.SCMSecurityProtocolFailoverProxyProvider;
+import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.io.retry.RetryProxy;
 import org.apache.hadoop.ipc.ProtobufHelper;
 import org.apache.hadoop.ipc.ProtocolTranslator;
 import org.apache.hadoop.ipc.RPC;
@@ -58,10 +62,20 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
    */
   private static final RpcController NULL_RPC_CONTROLLER = null;
   private final SCMSecurityProtocolPB rpcProxy;
+  private SCMSecurityProtocolFailoverProxyProvider failoverProxyProvider;
 
   public SCMSecurityProtocolClientSideTranslatorPB(
       SCMSecurityProtocolPB rpcProxy) {
     this.rpcProxy = rpcProxy;
+  }
+
+  public SCMSecurityProtocolClientSideTranslatorPB(
+      SCMSecurityProtocolFailoverProxyProvider proxyProvider) {
+    Preconditions.checkState(proxyProvider != null);
+    this.failoverProxyProvider = proxyProvider;
+    this.rpcProxy = (SCMSecurityProtocolPB) RetryProxy.create(
+        SCMSecurityProtocolPB.class, failoverProxyProvider,
+        failoverProxyProvider.getRetryPolicy());
   }
 
   /**
@@ -80,12 +94,29 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
       SCMSecurityRequest wrapper = builder.build();
 
       response = rpcProxy.submitRequest(NULL_RPC_CONTROLLER, wrapper);
+
+      handleError(response);
+
     } catch (ServiceException ex) {
       throw ProtobufHelper.getRemoteException(ex);
     }
     return response;
   }
 
+  /**
+   * If response is not successful, throw exception.
+   * @param resp - SCMSecurityResponse
+   * @return if response is success, return response, else throw exception.
+   * @throws SCMSecurityException
+   */
+  private SCMSecurityResponse handleError(SCMSecurityResponse resp)
+      throws SCMSecurityException {
+    if (resp.getStatus() != SCMSecurityProtocolProtos.Status.OK) {
+      throw new SCMSecurityException(resp.getMessage(),
+          SCMSecurityException.ErrorCode.values()[resp.getStatus().ordinal()]);
+    }
+    return resp;
+  }
   /**
    * Closes this stream and releases any system resources associated
    * with it. If the stream is already closed then invoking this

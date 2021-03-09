@@ -83,6 +83,19 @@ enum Type {
 
 enum Status {
     OK = 1;
+    INVALID_CSR = 2;
+    UNABLE_TO_ISSUE_CERTIFICATE = 3;
+    GET_DN_CERTIFICATE_FAILED = 4;
+    GET_OM_CERTIFICATE_FAILED = 5;
+    GET_SCM_CERTIFICATE_FAILED = 6;
+    GET_CERTIFICATE_FAILED = 7;
+    GET_CA_CERT_FAILED = 8;
+    CERTIFICATE_NOT_FOUND = 9;
+    PEM_ENCODE_FAILED = 10;
+    INTERNAL_ERROR = 11;
+    DEFAULT = 12;
+    MISSING_BLOCK_TOKEN = 13;
+    BLOCK_TOKEN_VERIFICATION_FAILED = 14;
 }
 /**
 * This message is send by data node to prove its identity and get an SCM
