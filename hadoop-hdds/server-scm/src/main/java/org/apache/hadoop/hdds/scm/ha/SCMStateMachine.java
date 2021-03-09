@@ -73,7 +73,6 @@ public class SCMStateMachine extends BaseStateMachine {
   private SCMHADBTransactionBuffer transactionBuffer;
   private final SimpleStateMachineStorage storage =
       new SimpleStateMachineStorage();
-  private RaftGroupId raftGroupId;
   private final AtomicBoolean isInitialized;
   private ExecutorService installSnapshotExecutor;
 
@@ -123,7 +122,6 @@ public class SCMStateMachine extends BaseStateMachine {
       RaftStorage raftStorage) throws IOException {
     getLifeCycle().startAndTransition(() -> {
       super.initialize(server, id, raftStorage);
-      this.raftGroupId = id;
       storage.init(raftStorage);
     });
   }
@@ -263,7 +261,6 @@ public class SCMStateMachine extends BaseStateMachine {
       LOG.info("Current Snapshot Index {}, takeSnapshot took {} ms",
           lastAppliedIndex, Time.monotonicNow() - startTime);
     }
-    super.takeSnapshot();
     return lastAppliedIndex;
   }
 
@@ -294,7 +291,9 @@ public class SCMStateMachine extends BaseStateMachine {
     getLifeCycle().transition(LifeCycle.State.PAUSED);
   }
 
-  public void stop() throws IOException {
+  @Override
+  public void close() throws IOException {
+    super.close();
     transactionBuffer.close();
     HadoopExecutors.
         shutdown(installSnapshotExecutor, LOG, 5, TimeUnit.SECONDS);
@@ -304,14 +303,13 @@ public class SCMStateMachine extends BaseStateMachine {
    * lastAppliedIndex. This should be done after uploading new state to the
    * StateMachine.
    */
-  public void unpause(long newLastAppliedSnaphsotIndex,
-      long newLastAppliedSnapShotTermIndex) {
+  public void unpause(long newLastAppliedSnapShotTerm,
+      long newLastAppliedSnapshotIndex) {
     getLifeCycle().startAndTransition(() -> {
       try {
         transactionBuffer.init();
         this.setLastAppliedTermIndex(TermIndex
-            .valueOf(newLastAppliedSnapShotTermIndex,
-                newLastAppliedSnaphsotIndex));
+            .valueOf(newLastAppliedSnapShotTerm, newLastAppliedSnapshotIndex));
       } catch (IOException ioe) {
         LOG.error("Failed to unpause ", ioe);
       }

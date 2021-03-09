@@ -255,7 +255,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
       // to the installed checkpoint's snapshot index.
       try {
         reloadSCMState();
-        getRatisServer().getSCMStateMachine().unpause(lastAppliedIndex, term);
+        getRatisServer().getSCMStateMachine().unpause(term, lastAppliedIndex);
         LOG.info("Reloaded SCM state with Term: {} and Index: {}", term,
             lastAppliedIndex);
       } catch (Exception ex) {
@@ -307,7 +307,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
   public void shutdown() throws IOException {
     if (ratisServer != null) {
       ratisServer.stop();
-      ratisServer.getSCMStateMachine().stop();
+      ratisServer.getSCMStateMachine().close();
       grpcServer.stop();
     }
   }

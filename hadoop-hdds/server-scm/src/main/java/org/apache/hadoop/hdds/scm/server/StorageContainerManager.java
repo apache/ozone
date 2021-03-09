@@ -1116,14 +1116,15 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (jvmPauseMonitor != null) {
       jvmPauseMonitor.stop();
     }
-    IOUtils.cleanupWithLogger(LOG, containerManager);
-    IOUtils.cleanupWithLogger(LOG, pipelineManager);
 
     try {
       scmHAManager.shutdown();
     } catch (Exception ex) {
       LOG.error("SCM HA Manager stop failed", ex);
     }
+
+    IOUtils.cleanupWithLogger(LOG, containerManager);
+    IOUtils.cleanupWithLogger(LOG, pipelineManager);
 
     try {
       scmMetadataStore.stop();

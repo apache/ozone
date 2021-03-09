@@ -37,7 +37,6 @@ import java.util.UUID;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
-import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 
 public class TestSCMSnapshot {
   private static MiniOzoneCluster cluster;
@@ -84,7 +83,6 @@ public class TestSCMSnapshot {
 
     Table<String, TransactionInfo> trxInfo =
         scm.getScmMetadataStore().getTransactionInfoTable();
-    TransactionInfo transactionInfo = trxInfo.get(TRANSACTION_INFO_KEY);
 
     cluster.restartStorageContainerManager(false);
     TransactionInfo trxInfoAfterRestart =

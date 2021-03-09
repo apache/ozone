@@ -166,6 +166,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
 
   @Override
   public void start() throws IOException {
+    LOG.info("starting ratis server {}", server.getPeer().getAddress());
     server.start();
   }
 
@@ -215,6 +216,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
 
   @Override
   public void stop() throws IOException {
+    LOG.info("stopping ratis server {}", server.getPeer().getAddress());
     server.close();
   }
 
