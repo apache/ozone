@@ -358,7 +358,8 @@ public class TestHddsDispatcher {
     ContainerProtos.ReadChunkRequestProto.Builder readChunkRequest =
         ContainerProtos.ReadChunkRequestProto.newBuilder()
             .setBlockID(writeChunk.getBlockID())
-            .setChunkData(writeChunk.getChunkData());
+            .setChunkData(writeChunk.getChunkData())
+            .setReadChunkVersion(ContainerProtos.ReadChunkVersion.V1);
     return ContainerCommandRequestProto.newBuilder()
         .setCmdType(ContainerProtos.Type.ReadChunk)
         .setContainerID(writeChunk.getBlockID().getContainerID())

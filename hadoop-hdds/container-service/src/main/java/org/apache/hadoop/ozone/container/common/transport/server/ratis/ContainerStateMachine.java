@@ -572,7 +572,8 @@ public class ContainerStateMachine extends BaseStateMachine {
     ReadChunkRequestProto.Builder readChunkRequestProto =
         ReadChunkRequestProto.newBuilder()
             .setBlockID(writeChunkRequestProto.getBlockID())
-            .setChunkData(chunkInfo);
+            .setChunkData(chunkInfo)
+            .setReadChunkVersion(ContainerProtos.ReadChunkVersion.V1);
     ContainerCommandRequestProto dataContainerCommandProto =
         ContainerCommandRequestProto.newBuilder(requestProto)
             .setCmdType(Type.ReadChunk).setReadChunk(readChunkRequestProto)

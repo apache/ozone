@@ -406,7 +406,7 @@ enum ReadChunkVersion {
 message  ReadChunkRequestProto  {
   required DatanodeBlockID blockID = 1;
   required ChunkInfo chunkData = 2;
-  optional ReadChunkVersion readChunkVersion = 3 [default = V0];
+  optional ReadChunkVersion readChunkVersion = 3;
 }
 
 message  ReadChunkResponseProto {
@@ -457,7 +457,7 @@ message PutSmallFileResponseProto {
 
 message GetSmallFileRequestProto {
   required GetBlockRequestProto block = 1;
-  optional ReadChunkVersion readChunkVersion = 3 [default = V0];
+  optional ReadChunkVersion readChunkVersion = 2;
 }
 
 message GetSmallFileResponseProto {
