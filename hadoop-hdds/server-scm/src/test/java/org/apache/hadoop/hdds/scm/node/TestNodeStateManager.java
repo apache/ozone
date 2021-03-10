@@ -43,6 +43,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static junit.framework.TestCase.assertEquals;
+import static junit.framework.TestCase.assertNull;
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayoutVersionProto;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 
@@ -183,8 +184,7 @@ public class TestNodeStateManager {
     eventPublisher.clearEvents();
     nsm.checkNodesHealth();
     assertEquals(NodeState.HEALTHY, nsm.getNodeStatus(dn).getHealth());
-    assertEquals(SCMEvents.READ_ONLY_HEALTHY_TO_HEALTHY_NODE,
-        eventPublisher.getLastEvent());
+    assertNull(eventPublisher.getLastEvent());
 
     // Set the heartbeat old enough to make it stale
     dni.updateLastHeartbeatTime(now - staleLimit);

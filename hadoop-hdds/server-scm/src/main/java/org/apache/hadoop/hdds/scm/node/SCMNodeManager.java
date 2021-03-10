@@ -369,8 +369,6 @@ public class SCMNodeManager implements NodeManager {
 
         clusterMap.add(datanodeDetails);
         nodeStateManager.addNode(datanodeDetails, layoutInfo);
-        nodeStateManager.updateLastKnownLayoutVersion(datanodeDetails,
-            layoutInfo);
         // Check that datanode in nodeStateManager has topology parent set
         DatanodeDetails dn = nodeStateManager.getNode(datanodeDetails);
         Preconditions.checkState(dn.getParent() != null);
