@@ -38,6 +38,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import java.io.IOException;
 import java.util.Map;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
 
@@ -84,13 +85,12 @@ public abstract class OMKeyAclRequestV1 extends OMKeyAclRequest {
           .acquireWriteLock(BUCKET_LOCK, volume, bucket);
       OzoneFileStatus keyStatus = OMFileRequest
           .getOMKeyInfoIfExists(omMetadataManager, volume, bucket, key, 0);
+      if (keyStatus == null) {
+        throw new OMException("Key not found. Key:" + key, KEY_NOT_FOUND);
+      }
       omKeyInfo = keyStatus.getKeyInfo();
       String dbKey = omKeyInfo.getPath();
       boolean isDirectory = keyStatus.isDirectory();
-      if (omKeyInfo == null) {
-        throw new OMException(OMException.ResultCodes.KEY_NOT_FOUND);
-      }
-
       operationResult = apply(omKeyInfo, trxnLogIndex);
       omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
