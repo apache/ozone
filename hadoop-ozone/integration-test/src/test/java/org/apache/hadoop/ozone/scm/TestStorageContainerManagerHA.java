@@ -220,12 +220,12 @@ public class TestStorageContainerManagerHA {
         scm1.getSCMNodeId());
     conf2.set(ScmConfigKeys.OZONE_SCM_PRIMORDIAL_NODE_ID_KEY,
         scm1.getSCMNodeId());
-    Assert.assertFalse(StorageContainerManager.scmBootstrap(conf1));
+    Assert.assertTrue(StorageContainerManager.scmBootstrap(conf1));
     scm1.getScmHAManager().shutdown();
     Assert.assertTrue(
         StorageContainerManager.scmInit(conf1, scm1.getClusterId()));
     Assert.assertTrue(StorageContainerManager.scmBootstrap(conf2));
-    Assert.assertFalse(
+    Assert.assertTrue(
         StorageContainerManager.scmInit(conf2, scm2.getClusterId()));
   }
 }
