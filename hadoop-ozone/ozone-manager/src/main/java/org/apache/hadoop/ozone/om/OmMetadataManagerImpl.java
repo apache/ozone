@@ -143,7 +143,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   public static final String PREFIX_TABLE = "prefixTable";
   public static final String TRANSACTION_INFO_TABLE =
       "transactionInfoTable";
-  public static final String META_TABLE = "metadataTable";
+  public static final String META_TABLE = "metaTable";
 
   static final String[] ALL_TABLES = new String[] {
       USER_TABLE,

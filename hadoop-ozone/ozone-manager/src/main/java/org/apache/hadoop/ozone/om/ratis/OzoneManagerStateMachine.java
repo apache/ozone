@@ -136,7 +136,6 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
 
   @Override
   public void reinitialize() throws IOException {
-    LOG.info("!!!! reinitialize called.");
     getLifeCycle().startAndTransition(() -> {
       loadSnapshotInfoFromDB();
       this.ozoneManagerDoubleBuffer = buildDoubleBufferForRatis();
@@ -355,7 +354,6 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       handler.updateDoubleBuffer(ozoneManagerDoubleBuffer);
       this.setLastAppliedTermIndex(TermIndex.valueOf(
           newLastAppliedSnapShotTermIndex, newLastAppliedSnaphsotIndex));
-      LOG.info("Unpause done in OMSM {}!!", this.toString());
     });
   }
 

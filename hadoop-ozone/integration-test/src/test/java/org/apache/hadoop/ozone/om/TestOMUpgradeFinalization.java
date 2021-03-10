@@ -190,8 +190,6 @@ public class TestOMUpgradeFinalization {
     waitFor(() -> {
       LifeCycle.State lifeCycleState = downedOM.getOmRatisServer()
           .getOmStateMachine().getLifeCycle().getCurrentState();
-      System.out.println("!!!! OMSM = {}" + downedOM.getOmRatisServer()
-          .getOmStateMachine().toString() + ", State = " + lifeCycleState);
       return !lifeCycleState.isPausingOrPaused();
     }, 1000, 60000);
 
