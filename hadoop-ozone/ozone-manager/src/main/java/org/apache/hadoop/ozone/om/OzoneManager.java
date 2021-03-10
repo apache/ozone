@@ -1126,9 +1126,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (certClient != null) {
       // on a upgraded cluster rootCA certificate will be null. As the OM has
       // already got the certificate before upgrade.
+      // With this change client key put is being stuck.
+      // TODO: try with all CA's passed to client.
       if (certClient.getRootCACertificate() != null) {
         caCertPem = CertificateCodec.getPEMEncodedString(
-            certClient.getRootCACertificate());
+            certClient.getCACertificate());
       } else {
         caCertPem = CertificateCodec.getPEMEncodedString(
             certClient.getCACertificate());
