@@ -695,9 +695,8 @@ public class TestOzoneClientMultipartUploadV1 {
       volume.createBucket(bucketName);
       OzoneBucket bucket = volume.getBucket(bucketName);
 
-
-      OzoneMultipartUploadPartListParts ozoneMultipartUploadPartListParts =
-          bucket.listParts(keyName, "random", -1, 2);
+      bucket.listParts(keyName, "random", -1, 2);
+      Assert.fail("Should throw exception as partNumber is an invalid number!");
     } catch (IllegalArgumentException ex) {
       GenericTestUtils.assertExceptionContains("Should be greater than or "
           + "equal to zero", ex);
@@ -716,9 +715,8 @@ public class TestOzoneClientMultipartUploadV1 {
       volume.createBucket(bucketName);
       OzoneBucket bucket = volume.getBucket(bucketName);
 
-
-      OzoneMultipartUploadPartListParts ozoneMultipartUploadPartListParts =
-          bucket.listParts(keyName, "random", 1,  -1);
+      bucket.listParts(keyName, "random", 1, -1);
+      Assert.fail("Should throw exception as max parts is an invalid number!");
     } catch (IllegalArgumentException ex) {
       GenericTestUtils.assertExceptionContains("Max Parts Should be greater "
           + "than zero", ex);
