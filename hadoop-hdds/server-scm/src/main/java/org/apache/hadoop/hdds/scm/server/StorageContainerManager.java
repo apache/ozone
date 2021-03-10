@@ -750,7 +750,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           "SCM bootstrap command can only be executed in non-Primordial SCM "
               + "{}, self id {} "
               + "Ignoring it.", primordialSCM, selfNodeId);
-      return false;
+      return true;
     }
     OzoneConfiguration config =
         SCMHAUtils.removeSelfId(conf,
@@ -808,7 +808,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           "SCM init command can only be executed in Primordial SCM {}, "
               + "self id {} "
               + "Ignoring it.", primordialSCM, selfNodeId);
-      return false;
+      return true;
     }
     if (state != StorageState.INITIALIZED) {
       try {
