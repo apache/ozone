@@ -19,7 +19,7 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <artifactId>hadoop-ozone-fault-injection-test</artifactId>
-    <groupId>org.apache.hadoop</groupId>
+    <groupId>org.apache.ozone</groupId>
     <version>1.1.0-SNAPSHOT</version>
   </parent>
   <version>1.1.0-SNAPSHOT</version>
@@ -34,22 +34,22 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>hadoop-hdds-test-utils</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>hadoop-ozone-filesystem</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>hadoop-ozone-integration-test</artifactId>
       <scope>test</scope>
       <type>test-jar</type>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>hadoop-hdds-hadoop-dependency-test</artifactId>
       <scope>test</scope>
     </dependency>
