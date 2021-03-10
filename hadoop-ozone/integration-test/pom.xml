@@ -18,7 +18,7 @@
 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
-    <groupId>org.apache.hadoop</groupId>
+    <groupId>org.apache.ozone</groupId>
     <artifactId>hadoop-ozone</artifactId>
     <version>1.1.0-SNAPSHOT</version>
   </parent>
@@ -31,20 +31,20 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <dependencies>
 
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>hadoop-ozone-common</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>hadoop-hdds-test-utils</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>hadoop-hdds-server-scm</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>hadoop-ozone-ozone-manager</artifactId>
     </dependency>
     <dependency>
@@ -54,31 +54,31 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     </dependency>
 
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>hadoop-ozone-s3gateway</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>hadoop-ozone-csi</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>hadoop-ozone-recon</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>hadoop-ozone-client</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>hadoop-ozone-filesystem</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>hadoop-ozone-tools</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>hadoop-hdds-tools</artifactId>
     </dependency>
     <dependency>
@@ -87,13 +87,13 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>hadoop-ozone-ozone-manager</artifactId>
       <scope>test</scope>
       <type>test-jar</type>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>hadoop-hdds-common</artifactId>
       <type>test-jar</type>
       <scope>test</scope>
@@ -151,19 +151,19 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>hadoop-hdds-server-scm</artifactId>
       <scope>test</scope>
       <type>test-jar</type>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>hadoop-hdds-container-service</artifactId>
       <scope>test</scope>
       <type>test-jar</type>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>hadoop-hdds-hadoop-dependency-test</artifactId>
       <scope>test</scope>
     </dependency>
