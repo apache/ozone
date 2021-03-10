@@ -22,7 +22,7 @@
   </parent>
   <modelVersion>4.0.0</modelVersion>
   <artifactId>hadoop-ozone-reconcodegen</artifactId>
-  <name>Apache Hadoop Ozone Recon CodeGen</name>
+  <name>Apache Ozone Recon CodeGen</name>
   <dependencies>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
