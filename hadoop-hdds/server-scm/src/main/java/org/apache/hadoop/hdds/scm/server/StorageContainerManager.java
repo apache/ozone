@@ -631,7 +631,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       // certificate is not persisted to DB. As we don't have Metadatstore
       // and ratis server initialized with statemachine. We need to do only
       // for primary scm, for other bootstrapped scm's certificates will be
-      // persiisted via ratis.
+      // persisted via ratis.
       if (scmCertStore.getCertificateByID(certSerial, VALID_CERTS) == null) {
         scmCertStore.storeValidCertificate(
             certSerial, scmCertificateClient.getCertificate(), SCM);

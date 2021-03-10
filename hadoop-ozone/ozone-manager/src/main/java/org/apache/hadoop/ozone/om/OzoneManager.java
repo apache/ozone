@@ -1131,7 +1131,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             certClient.getRootCACertificate());
       } else {
         caCertPem = CertificateCodec.getPEMEncodedString(
-            certClient.getCertificate());
+            certClient.getCACertificate());
       }
     }
     // Set metrics and start metrics back ground thread
