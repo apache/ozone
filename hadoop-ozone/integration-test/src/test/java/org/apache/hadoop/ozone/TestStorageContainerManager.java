@@ -27,6 +27,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys
     .HDDS_SCM_SAFEMODE_PIPELINE_CREATION;
 import static org.junit.Assert.fail;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.scm.TestUtils;
 import static org.mockito.Matchers.argThat;
 import static org.mockito.Matchers.eq;
@@ -49,7 +50,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Stream;
+import java.util.Arrays;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -75,9 +80,7 @@ import org.apache.hadoop.hdds.scm.container.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.hdds.scm.ha.SCMContext;
-import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
-import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
+import org.apache.hadoop.hdds.scm.ha.*;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
@@ -100,6 +103,9 @@ import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.Time;
+import org.apache.ratis.conf.RaftProperties;
+import org.apache.ratis.protocol.RaftGroupId;
+import org.apache.ratis.server.RaftServerConfigKeys;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
@@ -493,7 +499,7 @@ public class TestStorageContainerManager {
     final UUID clusterId = UUID.randomUUID();
     // This will initialize SCM
     StorageContainerManager.scmInit(conf, clusterId.toString());
-    SCMRatisServerImpl.validateRatisGroupExists(conf, clusterId.toString());
+    validateRatisGroupExists(conf, clusterId.toString());
   }
 
   @Test
@@ -513,6 +519,78 @@ public class TestStorageContainerManager {
       StorageContainerManager.scmInit(conf, clusterId.toString());
       SCMStorageConfig scmStore = new SCMStorageConfig(conf);
       Assert.assertNotEquals(clusterId.toString(), scmStore.getClusterID());
+    } finally {
+      cluster.shutdown();
+    }
+  }
+
+  @VisibleForTesting
+  public static void validateRatisGroupExists(OzoneConfiguration conf,
+      String clusterId) throws IOException {
+    final SCMHAConfiguration haConf = conf.getObject(SCMHAConfiguration.class);
+    final RaftProperties properties = RatisUtil.newRaftProperties(haConf, conf);
+    final RaftGroupId raftGroupId =
+        SCMRatisServerImpl.buildRaftGroupId(clusterId);
+    final AtomicBoolean found = new AtomicBoolean(false);
+    RaftServerConfigKeys.storageDir(properties).parallelStream().forEach(
+        (dir) -> Optional.ofNullable(dir.listFiles()).map(Arrays::stream)
+            .orElse(Stream.empty()).filter(File::isDirectory).forEach(sub -> {
+              try {
+                LOG.info("{}: found a subdirectory {}", raftGroupId, sub);
+                RaftGroupId groupId = null;
+                try {
+                  groupId = RaftGroupId.valueOf(UUID.fromString(sub.getName()));
+                } catch (Exception e) {
+                  LOG.info("{}: The directory {} is not a group directory;"
+                      + " ignoring it. ", raftGroupId, sub.getAbsolutePath());
+                }
+                if (groupId != null) {
+                  if (groupId.equals(raftGroupId)) {
+                    LOG.info(
+                        "{} : The directory {} found a group directory for "
+                            + "cluster {}", raftGroupId, sub.getAbsolutePath(),
+                        clusterId);
+                    found.set(true);
+                  }
+                }
+              } catch (Exception e) {
+                LOG.warn(
+                    raftGroupId + ": Failed to find the group directory "
+                        + sub.getAbsolutePath() + ".", e);
+              }
+            }));
+    if (!found.get()) {
+      throw new IOException(
+          "Could not find any ratis group with id " + raftGroupId);
+    }
+  }
+  @Test
+  public void testSCMReinitializationWithHAEnabled() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, false);
+    final String path = GenericTestUtils.getTempPath(
+        UUID.randomUUID().toString());
+    Path scmPath = Paths.get(path, "scm-meta");
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, scmPath.toString());
+    //This will set the cluster id in the version file
+    MiniOzoneCluster cluster =
+        MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3).build();
+    cluster.waitForClusterToBeReady();
+    try {
+      final String clusterId =
+          cluster.getStorageContainerManager().getClusterId();
+      // validate there is no ratis group pre existing
+      try {
+        validateRatisGroupExists(conf, clusterId);
+        Assert.fail();
+      } catch (IOException ioe) {
+        // Exception is expected here
+      }
+      conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
+      // This will re-initialize SCM
+      StorageContainerManager.scmInit(conf, clusterId);
+      // Ratis group with cluster id exists now
+      validateRatisGroupExists(conf, clusterId);
     } finally {
       cluster.shutdown();
     }

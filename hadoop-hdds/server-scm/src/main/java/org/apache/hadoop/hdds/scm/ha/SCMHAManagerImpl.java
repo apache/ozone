@@ -230,7 +230,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
         // Pause the State Machine so that no new transactions can be applied.
         // This action also clears the SCM Double Buffer so that if there
         // are any pending transactions in the buffer, they are discarded.
-
+        getRatisServer().getSCMStateMachine().pause();
       } catch (Exception e) {
         LOG.error("Failed to stop/ pause the services. Cannot proceed with "
             + "installing the new checkpoint.");
@@ -250,32 +250,33 @@ public class SCMHAManagerImpl implements SCMHAManager {
         LOG.error("Failed to install Snapshot from {} as SCM failed to replace"
             + " DB with downloaded checkpoint. Reloading old SCM state.", e);
       }
+      // Reload the DB store with the new checkpoint.
+      // Restart (unpause) the state machine and update its last applied index
+      // to the installed checkpoint's snapshot index.
+      try {
+        reloadSCMState();
+        getRatisServer().getSCMStateMachine().unpause(term, lastAppliedIndex);
+        LOG.info("Reloaded SCM state with Term: {} and Index: {}", term,
+            lastAppliedIndex);
+      } catch (Exception ex) {
+        String errorMsg =
+            "Failed to reload SCM state and instantiate services.";
+        exitManager.exitSystem(1, errorMsg, ex, LOG);
+      }
+
+      // Delete the backup DB
+      try {
+        if (dbBackup != null) {
+          FileUtils.deleteFully(dbBackup);
+        }
+      } catch (Exception e) {
+        LOG.error("Failed to delete the backup of the original DB {}",
+            dbBackup);
+      }
     } else {
       LOG.warn("Cannot proceed with InstallSnapshot as SCM is at TermIndex {} "
           + "and checkpoint has lower TermIndex {}. Reloading old "
           + "state of SCM.", termIndex, checkpointTrxnInfo.getTermIndex());
-    }
-
-    // Reload the DB store with the new checkpoint.
-    // Restart (unpause) the state machine and update its last applied index
-    // to the installed checkpoint's snapshot index.
-    try {
-      reloadSCMState();
-      getRatisServer().getSCMStateMachine().unpause(lastAppliedIndex, term);
-      LOG.info("Reloaded SCM state with Term: {} and Index: {}", term,
-          lastAppliedIndex);
-    } catch (Exception ex) {
-      String errorMsg = "Failed to reload SCM state and instantiate services.";
-      exitManager.exitSystem(1, errorMsg, ex, LOG);
-    }
-
-    // Delete the backup DB
-    try {
-      if (dbBackup != null) {
-        FileUtils.deleteFully(dbBackup);
-      }
-    } catch (Exception e) {
-      LOG.error("Failed to delete the backup of the original DB {}", dbBackup);
     }
 
     if (lastAppliedIndex != checkpointTrxnInfo.getTransactionIndex()) {
@@ -284,8 +285,6 @@ public class SCMHAManagerImpl implements SCMHAManager {
       return null;
     }
 
-    // TODO: We should only return the snpashotIndex to the leader.
-    //  Should be fixed after RATIS-586
     TermIndex newTermIndex = TermIndex.valueOf(term, lastAppliedIndex);
     return newTermIndex;
   }
@@ -308,7 +307,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
   public void shutdown() throws IOException {
     if (ratisServer != null) {
       ratisServer.stop();
-      ratisServer.getSCMStateMachine().stop();
+      ratisServer.getSCMStateMachine().close();
       grpcServer.stop();
     }
   }
@@ -334,7 +333,8 @@ public class SCMHAManagerImpl implements SCMHAManager {
     scm.getScmMetadataStore().stop();
   }
 
-  void startServices() throws IOException {
+  @VisibleForTesting
+   public void startServices() throws IOException {
 
    // TODO: Fix the metrics ??
     final SCMMetadataStore metadataStore = scm.getScmMetadataStore();

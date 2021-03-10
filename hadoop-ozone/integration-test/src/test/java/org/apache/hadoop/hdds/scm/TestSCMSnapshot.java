@@ -25,7 +25,6 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -37,7 +36,6 @@ import java.util.UUID;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
-import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 
 public class TestSCMSnapshot {
   private static MiniOzoneCluster cluster;
@@ -81,15 +79,6 @@ public class TestSCMSnapshot {
         String.format("Snapshot index 2 {} should greater than Snapshot " +
             "index 1 {}", snapshotInfo2, snapshotInfo1),
         snapshotInfo2 > snapshotInfo1);
-
-    Table<String, TransactionInfo> trxInfo =
-        scm.getScmMetadataStore().getTransactionInfoTable();
-    TransactionInfo transactionInfo = trxInfo.get(TRANSACTION_INFO_KEY);
-
-    Assert.assertTrue(
-        "DB trx info:" + transactionInfo.getTransactionIndex()
-        + ", latestSnapshotInfo:" + snapshotInfo2,
-        transactionInfo.getTransactionIndex() >= snapshotInfo2);
 
     cluster.restartStorageContainerManager(false);
     TransactionInfo trxInfoAfterRestart =

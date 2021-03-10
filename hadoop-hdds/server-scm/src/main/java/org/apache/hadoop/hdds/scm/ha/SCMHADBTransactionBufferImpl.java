@@ -138,6 +138,5 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
 
   @Override
   public void close() throws IOException {
-    flush();
   }
 }
