@@ -68,7 +68,7 @@ public class TestVolumeSet {
   }
 
   @Rule
-  public Timeout testTimeout = new Timeout(300000);
+  public Timeout testTimeout = Timeout.seconds(300);
 
   @Before
   public void setup() throws Exception {

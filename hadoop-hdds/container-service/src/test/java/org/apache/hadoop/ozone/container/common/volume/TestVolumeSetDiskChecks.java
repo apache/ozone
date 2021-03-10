@@ -58,7 +58,7 @@ public class TestVolumeSetDiskChecks {
       TestVolumeSetDiskChecks.class);
 
   @Rule
-  public Timeout globalTimeout = new Timeout(30_000);
+  public Timeout globalTimeout = Timeout.seconds(30);
 
   @Rule
   public ExpectedException thrown = ExpectedException.none();
