@@ -1141,9 +1141,6 @@ public class TestSCMNodeManager {
       //TODO: wait for EventQueue to be processed
       eventQueue.processAll(8000L);
 
-      assertEquals(1, nodeManager.getNodeCount(
-          NodeStatus.inServiceHealthyReadOnly()));
-      Thread.sleep(3 * 1000);
       assertEquals(1, nodeManager
           .getNodeCount(NodeStatus.inServiceHealthy()));
       assertEquals(volumeCount / 2,
