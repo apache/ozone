@@ -161,7 +161,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
         RatisUtil.newRaftProperties(haConf, conf);
     return RaftServer.newBuilder().setServerId(RaftPeerId.getRaftPeerId(scmId))
         .setProperties(serverProperties)
-        .setStateMachine(new SCMStateMachine(false));
+        .setStateMachine(new SCMStateMachine());
   }
 
   @Override

@@ -59,7 +59,7 @@ public final class TransactionInfo {
     this.transactionIndex = transactionIndex;
   }
 
-  public boolean isInitialized() {
+  public boolean isDefault() {
     return transactionIndex == -1 && term == 0;
   }
 
