@@ -22,11 +22,13 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneTestUtils;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
+import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
@@ -48,6 +50,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -564,6 +567,214 @@ public class TestOzoneClientMultipartUploadV1 {
     // Since deleteTable operation is performed via
     // batchOp - Table.putWithBatch(), which is an async operation and
     // not making any assertion for the same.
+  }
+
+  @Test
+  public void testListMultipartUploadParts() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String parentDir = "a/b/c/d/e/f";
+    String keyName = parentDir + UUID.randomUUID().toString();
+
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    Map<Integer, String> partsMap = new TreeMap<>();
+    String uploadID = initiateMultipartUpload(bucket, keyName, STAND_ALONE,
+        ONE);
+    String partName1 = uploadPart(bucket, keyName, uploadID, 1,
+        generateData(OzoneConsts.OM_MULTIPART_MIN_SIZE, (byte)97));
+    partsMap.put(1, partName1);
+
+    String partName2 =uploadPart(bucket, keyName, uploadID, 2,
+        generateData(OzoneConsts.OM_MULTIPART_MIN_SIZE, (byte)97));
+    partsMap.put(2, partName2);
+
+    String partName3 =uploadPart(bucket, keyName, uploadID, 3,
+        generateData(OzoneConsts.OM_MULTIPART_MIN_SIZE, (byte)97));
+    partsMap.put(3, partName3);
+
+    OzoneMultipartUploadPartListParts ozoneMultipartUploadPartListParts =
+        bucket.listParts(keyName, uploadID, 0, 3);
+
+    Assert.assertEquals(STAND_ALONE,
+        ozoneMultipartUploadPartListParts.getReplicationType());
+    Assert.assertEquals(3,
+        ozoneMultipartUploadPartListParts.getPartInfoList().size());
+
+    Assert.assertEquals(partsMap.get(ozoneMultipartUploadPartListParts
+            .getPartInfoList().get(0).getPartNumber()),
+        ozoneMultipartUploadPartListParts.getPartInfoList().get(0)
+            .getPartName());
+    Assert.assertEquals(partsMap.get(ozoneMultipartUploadPartListParts
+            .getPartInfoList().get(1).getPartNumber()),
+        ozoneMultipartUploadPartListParts.getPartInfoList().get(1)
+            .getPartName());
+    Assert.assertEquals(partsMap.get(ozoneMultipartUploadPartListParts
+            .getPartInfoList().get(2).getPartNumber()),
+        ozoneMultipartUploadPartListParts.getPartInfoList().get(2)
+            .getPartName());
+
+    Assert.assertFalse(ozoneMultipartUploadPartListParts.isTruncated());
+  }
+
+  @Test
+  public void testListMultipartUploadPartsWithContinuation()
+      throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    Map<Integer, String> partsMap = new TreeMap<>();
+    String uploadID = initiateMultipartUpload(bucket, keyName, STAND_ALONE,
+        ONE);
+    String partName1 = uploadPart(bucket, keyName, uploadID, 1,
+        generateData(OzoneConsts.OM_MULTIPART_MIN_SIZE, (byte)97));
+    partsMap.put(1, partName1);
+
+    String partName2 =uploadPart(bucket, keyName, uploadID, 2,
+        generateData(OzoneConsts.OM_MULTIPART_MIN_SIZE, (byte)97));
+    partsMap.put(2, partName2);
+
+    String partName3 =uploadPart(bucket, keyName, uploadID, 3,
+        generateData(OzoneConsts.OM_MULTIPART_MIN_SIZE, (byte)97));
+    partsMap.put(3, partName3);
+
+    OzoneMultipartUploadPartListParts ozoneMultipartUploadPartListParts =
+        bucket.listParts(keyName, uploadID, 0, 2);
+
+    Assert.assertEquals(STAND_ALONE,
+        ozoneMultipartUploadPartListParts.getReplicationType());
+
+    Assert.assertEquals(2,
+        ozoneMultipartUploadPartListParts.getPartInfoList().size());
+
+    Assert.assertEquals(partsMap.get(ozoneMultipartUploadPartListParts
+            .getPartInfoList().get(0).getPartNumber()),
+        ozoneMultipartUploadPartListParts.getPartInfoList().get(0)
+            .getPartName());
+    Assert.assertEquals(partsMap.get(ozoneMultipartUploadPartListParts
+            .getPartInfoList().get(1).getPartNumber()),
+        ozoneMultipartUploadPartListParts.getPartInfoList().get(1)
+            .getPartName());
+
+    // Get remaining
+    Assert.assertTrue(ozoneMultipartUploadPartListParts.isTruncated());
+    ozoneMultipartUploadPartListParts = bucket.listParts(keyName, uploadID,
+        ozoneMultipartUploadPartListParts.getNextPartNumberMarker(), 2);
+
+    Assert.assertEquals(1,
+        ozoneMultipartUploadPartListParts.getPartInfoList().size());
+    Assert.assertEquals(partsMap.get(ozoneMultipartUploadPartListParts
+            .getPartInfoList().get(0).getPartNumber()),
+        ozoneMultipartUploadPartListParts.getPartInfoList().get(0)
+            .getPartName());
+
+
+    // As we don't have any parts for this, we should get false here
+    Assert.assertFalse(ozoneMultipartUploadPartListParts.isTruncated());
+
+  }
+
+  @Test
+  public void testListPartsInvalidPartMarker() throws Exception {
+    try {
+      String volumeName = UUID.randomUUID().toString();
+      String bucketName = UUID.randomUUID().toString();
+      String keyName = UUID.randomUUID().toString();
+
+      store.createVolume(volumeName);
+      OzoneVolume volume = store.getVolume(volumeName);
+      volume.createBucket(bucketName);
+      OzoneBucket bucket = volume.getBucket(bucketName);
+
+
+      OzoneMultipartUploadPartListParts ozoneMultipartUploadPartListParts =
+          bucket.listParts(keyName, "random", -1, 2);
+    } catch (IllegalArgumentException ex) {
+      GenericTestUtils.assertExceptionContains("Should be greater than or "
+          + "equal to zero", ex);
+    }
+  }
+
+  @Test
+  public void testListPartsInvalidMaxParts() throws Exception {
+    try {
+      String volumeName = UUID.randomUUID().toString();
+      String bucketName = UUID.randomUUID().toString();
+      String keyName = UUID.randomUUID().toString();
+
+      store.createVolume(volumeName);
+      OzoneVolume volume = store.getVolume(volumeName);
+      volume.createBucket(bucketName);
+      OzoneBucket bucket = volume.getBucket(bucketName);
+
+
+      OzoneMultipartUploadPartListParts ozoneMultipartUploadPartListParts =
+          bucket.listParts(keyName, "random", 1,  -1);
+    } catch (IllegalArgumentException ex) {
+      GenericTestUtils.assertExceptionContains("Max Parts Should be greater "
+          + "than zero", ex);
+    }
+  }
+
+  @Test
+  public void testListPartsWithPartMarkerGreaterThanPartCount()
+      throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+
+    String uploadID = initiateMultipartUpload(bucket, keyName, STAND_ALONE,
+        ONE);
+    uploadPart(bucket, keyName, uploadID, 1,
+        generateData(OzoneConsts.OM_MULTIPART_MIN_SIZE, (byte)97));
+
+
+    OzoneMultipartUploadPartListParts ozoneMultipartUploadPartListParts =
+        bucket.listParts(keyName, uploadID, 100, 2);
+
+    // Should return empty
+
+    Assert.assertEquals(0,
+        ozoneMultipartUploadPartListParts.getPartInfoList().size());
+    Assert.assertEquals(STAND_ALONE,
+        ozoneMultipartUploadPartListParts.getReplicationType());
+
+    // As we don't have any parts with greater than partNumberMarker and list
+    // is not truncated, so it should return false here.
+    Assert.assertFalse(ozoneMultipartUploadPartListParts.isTruncated());
+
+  }
+
+  @Test
+  public void testListPartsWithInvalidUploadID() throws Exception {
+    OzoneTestUtils
+        .expectOmException(NO_SUCH_MULTIPART_UPLOAD_ERROR, () -> {
+          String volumeName = UUID.randomUUID().toString();
+          String bucketName = UUID.randomUUID().toString();
+          String keyName = UUID.randomUUID().toString();
+
+          store.createVolume(volumeName);
+          OzoneVolume volume = store.getVolume(volumeName);
+          volume.createBucket(bucketName);
+          OzoneBucket bucket = volume.getBucket(bucketName);
+          OzoneMultipartUploadPartListParts ozoneMultipartUploadPartListParts =
+              bucket.listParts(keyName, "random", 100, 2);
+        });
   }
 
   private String verifyUploadedPart(String volumeName, String bucketName,
