@@ -40,9 +40,12 @@ import org.apache.ratis.proto.RaftProtos;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.Message;
+import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftGroupMemberId;
 import org.apache.ratis.protocol.RaftPeerId;
+import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.ratis.server.storage.RaftStorage;
 import org.apache.ratis.statemachine.SnapshotInfo;
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.statemachine.TransactionContext;
@@ -109,6 +112,18 @@ public class SCMStateMachine extends BaseStateMachine {
     return transactionBuffer == null ?
         null :
         transactionBuffer.getLatestSnapshot();
+  }
+
+  /**
+   * Initializes the State Machine with the given server, group and storage.
+   */
+  @Override
+  public void initialize(RaftServer server, RaftGroupId id,
+      RaftStorage raftStorage) throws IOException {
+    getLifeCycle().startAndTransition(() -> {
+      super.initialize(server, id, raftStorage);
+      storage.init(raftStorage);
+    });
   }
 
   @Override
@@ -246,7 +261,6 @@ public class SCMStateMachine extends BaseStateMachine {
       LOG.info("Current Snapshot Index {}, takeSnapshot took {} ms",
           lastAppliedIndex, Time.monotonicNow() - startTime);
     }
-    super.takeSnapshot();
     return lastAppliedIndex;
   }
 
@@ -277,7 +291,10 @@ public class SCMStateMachine extends BaseStateMachine {
     getLifeCycle().transition(LifeCycle.State.PAUSED);
   }
 
-  public void stop() {
+  @Override
+  public void close() throws IOException {
+    super.close();
+    transactionBuffer.close();
     HadoopExecutors.
         shutdown(installSnapshotExecutor, LOG, 5, TimeUnit.SECONDS);
   }
@@ -286,14 +303,13 @@ public class SCMStateMachine extends BaseStateMachine {
    * lastAppliedIndex. This should be done after uploading new state to the
    * StateMachine.
    */
-  public void unpause(long newLastAppliedSnaphsotIndex,
-      long newLastAppliedSnapShotTermIndex) {
+  public void unpause(long newLastAppliedSnapShotTerm,
+      long newLastAppliedSnapshotIndex) {
     getLifeCycle().startAndTransition(() -> {
       try {
         transactionBuffer.init();
         this.setLastAppliedTermIndex(TermIndex
-            .valueOf(newLastAppliedSnapShotTermIndex,
-                newLastAppliedSnaphsotIndex));
+            .valueOf(newLastAppliedSnapShotTerm, newLastAppliedSnapshotIndex));
       } catch (IOException ioe) {
         LOG.error("Failed to unpause ", ioe);
       }

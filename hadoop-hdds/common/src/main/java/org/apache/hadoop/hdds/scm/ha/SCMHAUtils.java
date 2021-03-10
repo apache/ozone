@@ -56,6 +56,16 @@ public final class SCMHAUtils {
         ScmConfigKeys.OZONE_SCM_HA_ENABLE_DEFAULT);
   }
 
+  public static String getPrimordialSCM(ConfigurationSource conf) {
+    return conf.get(ScmConfigKeys.OZONE_SCM_PRIMORDIAL_NODE_ID_KEY);
+  }
+
+  public static boolean isPrimordialSCM(ConfigurationSource conf,
+      String selfNodeId) {
+    String primordialNode = getPrimordialSCM(conf);
+    return isSCMHAEnabled(conf) && primordialNode != null && primordialNode
+        .equals(selfNodeId);
+  }
   /**
    * Get a collection of all scmNodeIds for the given scmServiceId.
    */
