@@ -261,7 +261,7 @@ public class BasicUpgradeFinalizer<T, V extends AbstractLayoutVersionManager>
   }
 
   protected void emitNOOPMsg(String feature) {
-    String msg = "No finalization work defined for feature: " + feature + ".";
+    String msg = "No onFinalize work defined for feature: " + feature + ".";
 
     logAndEmit(msg);
   }
@@ -277,7 +277,7 @@ public class BasicUpgradeFinalizer<T, V extends AbstractLayoutVersionManager>
   }
 
   protected void emitStartingFinalizationActionMsg(String feature) {
-    String msg = "Executing finalization of feature: " + feature + ".";
+    String msg = "Executing onFinalize action of feature: " + feature + ".";
     logAndEmit(msg);
   }
 
