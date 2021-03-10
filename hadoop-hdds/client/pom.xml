@@ -18,7 +18,7 @@
 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
-    <groupId>org.apache.hadoop</groupId>
+    <groupId>org.apache.ozone</groupId>
     <artifactId>hadoop-hdds</artifactId>
     <version>1.1.0-SNAPSHOT</version>
   </parent>
@@ -31,16 +31,16 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
 
   <dependencies>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>hadoop-hdds-test-utils</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>hadoop-hdds-common</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>hadoop-hdds-common</artifactId>
       <type>test-jar</type>
       <scope>test</scope>
@@ -52,7 +52,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     </dependency>
 
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>hadoop-hdds-hadoop-dependency-test</artifactId>
       <scope>test</scope>
     </dependency>

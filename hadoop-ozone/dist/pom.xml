@@ -17,7 +17,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
-    <groupId>org.apache.hadoop</groupId>
+    <groupId>org.apache.ozone</groupId>
     <artifactId>hadoop-ozone</artifactId>
     <version>1.1.0-SNAPSHOT</version>
   </parent>
@@ -179,47 +179,47 @@
 
   <dependencies>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>hadoop-hdds-tools</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>hadoop-hdds-server-scm</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>hadoop-hdds-container-service</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>hadoop-ozone-s3gateway</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>hadoop-ozone-csi</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>hadoop-ozone-ozone-manager</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>hadoop-ozone-tools</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>hadoop-ozone-common</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>hadoop-ozone-datanode</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>hadoop-hdds-docs</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>hadoop-ozone-insight</artifactId>
     </dependency>
   </dependencies>
@@ -233,11 +233,11 @@
       </activation>
       <dependencies>
         <dependency>
-          <groupId>org.apache.hadoop</groupId>
+          <groupId>org.apache.ozone</groupId>
           <artifactId>hadoop-ozone-filesystem-hadoop2</artifactId>
         </dependency>
         <dependency>
-          <groupId>org.apache.hadoop</groupId>
+          <groupId>org.apache.ozone</groupId>
           <artifactId>hadoop-ozone-filesystem-hadoop3</artifactId>
         </dependency>
       </dependencies>
@@ -252,7 +252,7 @@
 
       <dependencies>
         <dependency>
-          <groupId>org.apache.hadoop</groupId>
+          <groupId>org.apache.ozone</groupId>
           <artifactId>hadoop-ozone-recon</artifactId>
         </dependency>
       </dependencies>
@@ -300,7 +300,7 @@
                       <destFileName>jacoco-core.jar</destFileName>
                     </artifactItem>
                     <artifactItem>
-                      <groupId>org.apache.hadoop</groupId>
+                      <groupId>org.apache.ozone</groupId>
                       <artifactId>hadoop-hdds-test-utils</artifactId>
                      </artifactItem>
                     </artifactItems>
