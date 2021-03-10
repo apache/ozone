@@ -178,7 +178,7 @@ public final class OzoneFSUtils {
     if (fileName != null) {
       return fileName.toString();
     }
-    // failed to find a parent directory.
+    // no parent directory.
     return "";
   }
 
