@@ -149,7 +149,7 @@
     <value/>
     <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>
     <description>Reserved space in bytes per volume. Always leave this much space free for non dfs use.
-       Such as /dir1:100, /dir2:200, means dir1 reserves 100 bytes and dir2 reserves 200 bytes.
+       Such as /dir1:100B, /dir2:200MB, means dir1 reserves 100 bytes and dir2 reserves 200 MB.
     </description>
   </property>
   <property>

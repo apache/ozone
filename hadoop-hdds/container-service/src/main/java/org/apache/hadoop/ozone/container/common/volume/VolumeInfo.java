@@ -24,6 +24,7 @@ import java.util.Collection;
 
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.StorageSize;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckParams;
 
@@ -94,12 +95,19 @@ public final class VolumeInfo {
     for (String reserve : reserveList) {
       String[] words = reserve.split(":");
       if (words.length < 2) {
-        throw new IllegalArgumentException(
-            "Reserved space should config in pair");
+        LOG.error("Reserved space should config in pair, but current is {}",
+            reserve);
+        continue;
       }
 
       if (words[0].trim().equals(rootDir)) {
-        return Long.parseLong(words[1].trim());
+        try {
+          StorageSize size = StorageSize.parse(words[1].trim());
+          return (long) size.getUnit().toBytes(size.getValue());
+        } catch (Exception e) {
+          LOG.error("Failed to parse StorageSize:{}", words[1].trim(), e);
+          return 0;
+        }
       }
     }
 

@@ -25,6 +25,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageSize;
 import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.fs.SpaceUsagePersistence;
@@ -52,7 +53,7 @@ public class TestHddsVolume {
   private static final String DATANODE_UUID = UUID.randomUUID().toString();
   private static final String CLUSTER_ID = UUID.randomUUID().toString();
   private static final OzoneConfiguration CONF = new OzoneConfiguration();
-  private static final int RESERVED_SPACE = 100;
+  private static final String RESERVED_SPACE = "100B";
 
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();
@@ -150,10 +151,13 @@ public class TestHddsVolume {
 
     // Volume.getAvailable() should succeed even when usage thread
     // is shutdown.
+    StorageSize size = StorageSize.parse(RESERVED_SPACE);
+    long reservedSpaceInBytes = (long) size.getUnit().toBytes(size.getValue());
+
     assertEquals(spaceUsage.getCapacity(),
-        volume.getCapacity() + RESERVED_SPACE);
+        volume.getCapacity() + reservedSpaceInBytes);
     assertEquals(spaceUsage.getAvailable(),
-        volume.getAvailable() + RESERVED_SPACE);
+        volume.getAvailable() + reservedSpaceInBytes);
   }
 
 }
