@@ -180,7 +180,7 @@ public class NodeStateManager implements Runnable, Closeable {
     this.state2EventMap = new HashMap<>();
     initialiseState2EventMap();
     Set<NodeState> finalStates = new HashSet<>();
-    this.nodeHealthSM = new StateMachine<>(NodeState.HEALTHY_READONLY,
+    this.nodeHealthSM = new StateMachine<>(NodeState.HEALTHY,
         finalStates);
     initializeStateMachines();
     heartbeatCheckerIntervalMs = HddsServerUtil
@@ -301,10 +301,12 @@ public class NodeStateManager implements Runnable, Closeable {
       DatanodeInfo dnInfo = nodeStateMap.getNodeInfo(dnID);
       NodeStatus status = nodeStateMap.getNodeStatus(dnID);
 
-      updateNodeLayoutVersionState(dnInfo, layoutMatchCondition, status,
-          NodeLifeCycleEvent.LAYOUT_MATCH);
+      // State machine starts nodes as HEALTHY. If there is a layout
+      // mismatch, this node should be moved to HEALTHY_READONLY.
+      updateNodeLayoutVersionState(dnInfo, layoutMisMatchCondition, status,
+          NodeLifeCycleEvent.LAYOUT_MISMATCH);
     } catch (NodeNotFoundException ex) {
-      LOG.error("Inconsistent NodeStateMap| Datanode with ID {} was " +
+      LOG.error("Inconsistent NodeStateMap! Datanode with ID {} was " +
           "added but not found in  map: {}", dnID, nodeStateMap);
     }
     eventPublisher.fireEvent(SCMEvents.NEW_NODE, datanodeDetails);
