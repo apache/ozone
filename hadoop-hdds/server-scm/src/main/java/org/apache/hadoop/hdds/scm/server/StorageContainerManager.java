@@ -923,6 +923,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
               scmStorageConfig.getScmId(), conf,
               scmAddress, true);
         }
+        // Update version file with primary scm information.
+        scmStorageConfig.setPrimaryScmNodeId(scmStorageConfig.getScmId());
+        scmStorageConfig.getStorageInfo().writeTo(
+            scmStorageConfig.getVersionFile());
         SCMRatisServerImpl.reinitialize(clusterId, scmStorageConfig.getScmId(),
             haDetails.getLocalNodeDetails(), conf);
       }
