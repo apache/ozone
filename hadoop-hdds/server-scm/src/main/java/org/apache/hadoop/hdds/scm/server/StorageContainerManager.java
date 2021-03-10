@@ -23,6 +23,7 @@ package org.apache.hadoop.hdds.scm.server;
 
 import javax.management.ObjectName;
 import java.io.IOException;
+import java.math.BigInteger;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import com.google.common.annotations.VisibleForTesting;
@@ -67,6 +68,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.ScmInfo;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.DefaultProfile;
 import org.apache.hadoop.hdds.scm.ha.HASecurityUtils;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
@@ -142,8 +144,10 @@ import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.SCM;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ha.HASecurityUtils.initializeRootCertificateServer;
+import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore.CertType.VALID_CERTS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.OzoneConsts.CRL_SEQUENCE_ID_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_CA_CERT_STORAGE_DIR;
@@ -298,11 +302,13 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
 
 
-    scmCertificateClient =
-        new SCMCertificateClient(new SecurityConfig(configuration),
-            scmStorageConfig.getScmCertSerialId());
-
-
+    if (scmStorageConfig.getPrimaryScmNodeId() != null) {
+      scmCertificateClient =
+          new SCMCertificateClient(new SecurityConfig(configuration),
+              scmStorageConfig.getScmCertSerialId());
+    } else {
+      scmCertificateClient = null;
+    }
 
     /**
      * Important : This initialization sequence is assumed by some of our tests.
@@ -617,6 +623,18 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         }
       } else {
         rootCertificateServer = null;
+      }
+
+      BigInteger certSerial =
+          scmCertificateClient.getCertificate().getSerialNumber();
+      // Store the certificate in DB. On primary SCM when init happens, the
+      // certificate is not persisted to DB. As we don't have Metadatstore
+      // and ratis server initialized with statemachine. We need to do only
+      // for primary scm, for other bootstrapped scm's certificates will be
+      // persiisted via ratis.
+      if (scmCertStore.getCertificateByID(certSerial, VALID_CERTS) == null) {
+        scmCertStore.storeValidCertificate(
+            certSerial, scmCertificateClient.getCertificate(), SCM);
       }
     } else {
       // On a upgraded cluster primary scm nodeId will not be set as init will

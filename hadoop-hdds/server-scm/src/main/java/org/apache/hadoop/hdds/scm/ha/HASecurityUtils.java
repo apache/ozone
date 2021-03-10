@@ -119,44 +119,9 @@ public final class HASecurityUtils {
       OzoneConfiguration config, String fetchedSCMId,
       SCMStorageConfig scmStorageConfig, InetSocketAddress scmAddress)
       throws IOException {
-    CertificateSignRequest.Builder builder = client.getCSRBuilder();
-    KeyPair keyPair = new KeyPair(client.getPublicKey(),
-        client.getPrivateKey());
 
-    // Get host name.
-    String hostname = scmAddress.getAddress().getHostName();
-
-    try {
-      DomainValidator validator = DomainValidator.getInstance();
-      // Add all valid ips.
-      OzoneSecurityUtil.getValidInetsForCurrentHost().forEach(
-          ip -> {
-            builder.addIpAddress(ip.getHostAddress());
-            if(validator.isValid(ip.getCanonicalHostName())) {
-              builder.addDnsName(ip.getCanonicalHostName());
-            }
-          });
-    } catch (IOException e) {
-      throw new org.apache.hadoop.hdds.security.x509
-          .exceptions.CertificateException(
-          "Error while adding ip to CA self signed certificate", e,
-          CSR_ERROR);
-    }
-
-    String subject = "scm@"+ hostname;
-
-    builder.setKey(keyPair)
-        .setConfiguration(config)
-        .setScmID(fetchedSCMId)
-        .setClusterID(scmStorageConfig.getClusterID())
-        .setSubject(subject);
-
-
-    LOG.info("Creating csr for SCM->hostName:{},scmId:{},clusterId:{}," +
-            "subject:{}", hostname, fetchedSCMId,
-        scmStorageConfig.getClusterID(), subject);
-
-    PKCS10CertificationRequest csr = builder.build();
+    PKCS10CertificationRequest csr = generateCSR(client, scmStorageConfig,
+        config, scmAddress, fetchedSCMId);
 
     HddsProtos.ScmNodeDetailsProto scmNodeDetailsProto =
         HddsProtos.ScmNodeDetailsProto.newBuilder()
@@ -206,46 +171,9 @@ public final class HASecurityUtils {
       OzoneConfiguration config, String fetchedSCMId,
       SCMStorageConfig scmStorageConfig, InetSocketAddress scmAddress)
       throws IOException {
-    CertificateSignRequest.Builder builder = client.getCSRBuilder();
-    KeyPair keyPair = new KeyPair(client.getPublicKey(),
-        client.getPrivateKey());
 
-    // Get host name.
-    String hostname = scmAddress.getAddress().getHostName();
-
-
-    try {
-      DomainValidator validator = DomainValidator.getInstance();
-      // Add all valid ips.
-      OzoneSecurityUtil.getValidInetsForCurrentHost().forEach(
-          ip -> {
-            builder.addIpAddress(ip.getHostAddress());
-            if(validator.isValid(ip.getCanonicalHostName())) {
-              builder.addDnsName(ip.getCanonicalHostName());
-            }
-          });
-    } catch (IOException e) {
-      throw new org.apache.hadoop.hdds.security.x509
-          .exceptions.CertificateException(
-          "Error while adding ip to CA self signed certificate", e,
-          CSR_ERROR);
-    }
-
-    String subject = "scm@"+ hostname;
-
-    builder.setKey(keyPair)
-        .setConfiguration(config)
-        .setScmID(fetchedSCMId)
-        .setClusterID(scmStorageConfig.getClusterID())
-        .setSubject(subject);
-
-
-    LOG.info("Creating csr for SCM->hostName:{},scmId:{},clusterId:{}," +
-            "subject:{}", hostname, fetchedSCMId,
-        scmStorageConfig.getClusterID(), subject);
-
-    PKCS10CertificationRequest csr = builder.build();
-
+    PKCS10CertificationRequest csr = generateCSR(client, scmStorageConfig,
+        config, scmAddress, fetchedSCMId);
 
     CertificateServer rootCAServer =
         initializeRootCertificateServer(scmStorageConfig.getClusterID(),
@@ -335,5 +263,31 @@ public final class HASecurityUtils {
     }
 
     return parameters;
+  }
+
+  private static PKCS10CertificationRequest generateCSR(CertificateClient client,
+      SCMStorageConfig scmStorageConfig, OzoneConfiguration config,
+      InetSocketAddress scmAddress, String fetchedSCMId) throws IOException {
+    CertificateSignRequest.Builder builder = client.getCSRBuilder();
+    KeyPair keyPair = new KeyPair(client.getPublicKey(),
+        client.getPrivateKey());
+
+    // Get host name.
+    String hostname = scmAddress.getAddress().getHostName();
+
+    String subject = "scm@"+ hostname;
+
+    builder.setKey(keyPair)
+        .setConfiguration(config)
+        .setScmID(fetchedSCMId)
+        .setClusterID(scmStorageConfig.getClusterID())
+        .setSubject(subject);
+
+
+    LOG.info("Creating csr for SCM->hostName:{},scmId:{},clusterId:{}," +
+            "subject:{}", hostname, fetchedSCMId,
+        scmStorageConfig.getClusterID(), subject);
+
+    return builder.build();
   }
 }
