@@ -262,9 +262,10 @@ public final class HASecurityUtils {
     return parameters;
   }
 
-  private static PKCS10CertificationRequest generateCSR(CertificateClient client,
-      SCMStorageConfig scmStorageConfig, OzoneConfiguration config,
-      InetSocketAddress scmAddress, String fetchedSCMId) throws IOException {
+  private static PKCS10CertificationRequest generateCSR(
+      CertificateClient client, SCMStorageConfig scmStorageConfig,
+      OzoneConfiguration config, InetSocketAddress scmAddress,
+      String fetchedSCMId) throws IOException {
     CertificateSignRequest.Builder builder = client.getCSRBuilder();
     KeyPair keyPair = new KeyPair(client.getPublicKey(),
         client.getPrivateKey());
