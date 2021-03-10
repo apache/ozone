@@ -289,6 +289,9 @@ public class SCMStateMachine extends BaseStateMachine {
 
   @Override
   public void close() throws IOException {
+    if (!isInitialized) {
+      return;
+    }
     super.close();
     transactionBuffer.close();
     HadoopExecutors.
