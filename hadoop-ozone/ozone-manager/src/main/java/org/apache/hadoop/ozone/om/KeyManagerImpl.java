@@ -1416,8 +1416,8 @@ public class KeyManagerImpl implements KeyManager {
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
         bucketName);
     try {
-      String multipartKey = metadataManager.getMultipartKey(volumeName,
-          bucketName, keyName, uploadID);
+      String multipartKey = getMultipartKey(volumeName, bucketName,
+          keyName, uploadID);
 
       OmMultipartKeyInfo multipartKeyInfo =
           metadataManager.getMultipartInfoTable().get(multipartKey);
@@ -1445,8 +1445,10 @@ public class KeyManagerImpl implements KeyManager {
           // than part number marker
           if (partKeyInfoEntry.getKey() > partNumberMarker) {
             PartKeyInfo partKeyInfo = partKeyInfoEntry.getValue();
+            String partName = getPartName(partKeyInfo, volumeName, bucketName,
+                keyName);
             OmPartInfo omPartInfo = new OmPartInfo(partKeyInfo.getPartNumber(),
-                partKeyInfo.getPartName(),
+                partName,
                 partKeyInfo.getPartKeyInfo().getModificationTime(),
                 partKeyInfo.getPartKeyInfo().getDataSize());
             omPartInfoList.add(omPartInfo);
@@ -1503,6 +1505,56 @@ public class KeyManagerImpl implements KeyManager {
     } finally {
       metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
           bucketName);
+    }
+  }
+
+  private String getPartName(PartKeyInfo partKeyInfo, String volName,
+                             String buckName, String keyName) {
+
+    String partName = partKeyInfo.getPartName();
+
+    if (OzoneManagerRatisUtils.isBucketFSOptimized()) {
+      String parentDir = OzoneFSUtils.getParentDir(keyName);
+      String partFileName = OzoneFSUtils.getFileName(partKeyInfo.getPartName());
+
+      StringBuilder fullKeyPartName = new StringBuilder();
+      fullKeyPartName.append(OZONE_URI_DELIMITER);
+      fullKeyPartName.append(volName);
+      fullKeyPartName.append(OZONE_URI_DELIMITER);
+      fullKeyPartName.append(buckName);
+      if (StringUtils.isNotEmpty(parentDir)) {
+        fullKeyPartName.append(OZONE_URI_DELIMITER);
+        fullKeyPartName.append(parentDir);
+      }
+      fullKeyPartName.append(OZONE_URI_DELIMITER);
+      fullKeyPartName.append(partFileName);
+
+      return fullKeyPartName.toString();
+    }
+    return partName;
+  }
+
+  private String getMultipartKey(String volumeName, String bucketName,
+      String keyName, String uploadID) throws IOException {
+
+    if (OzoneManagerRatisUtils.isBucketFSOptimized()) {
+      OMMetadataManager metaMgr = ozoneManager.getMetadataManager();
+      String fileName = OzoneFSUtils.getFileName(keyName);
+      Iterator<Path> pathComponents = Paths.get(keyName).iterator();
+      String bucketKey = metaMgr.getBucketKey(volumeName, bucketName);
+      OmBucketInfo omBucketInfo =
+          metaMgr.getBucketTable().get(bucketKey);
+      long bucketId = omBucketInfo.getObjectID();
+      long parentID = OMFileRequest.getParentID(bucketId, pathComponents,
+          keyName, metaMgr);
+
+      String multipartKey = metaMgr.getMultipartKey(parentID, fileName,
+          uploadID);
+
+      return multipartKey;
+    } else {
+      return metadataManager.getMultipartKey(volumeName,
+          bucketName, keyName, uploadID);
     }
   }
 
