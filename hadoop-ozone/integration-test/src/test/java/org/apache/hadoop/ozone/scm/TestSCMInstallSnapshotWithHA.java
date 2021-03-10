@@ -18,6 +18,7 @@ package org.apache.hadoop.ozone.scm;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -231,6 +232,7 @@ public class TestSCMInstallSnapshotWithHA {
         "logIndex is less than it's lastAppliedIndex", newTermIndex);
     Assert.assertEquals(followerTermIndex,
         followerSM.getLastAppliedTermIndex());
+    Assert.assertFalse(followerSM.getLifeCycleState().isPausingOrPaused());
   }
 
   @Test
@@ -240,9 +242,17 @@ public class TestSCMInstallSnapshotWithHA {
     // Find the inactive SCM
     String followerId = getInactiveSCM(cluster).getScmId();
     StorageContainerManager follower = cluster.getSCM(followerId);
+    //cluster.startInactiveSCM(followerId);
+    follower.start();
+    follower.exitSafeMode();
     // Do some transactions so that the log index increases
     writeToIncreaseLogIndex(leaderSCM, 100);
+    File oldDBLocation =
+        follower.getScmMetadataStore().getStore().getDbLocation();
 
+    SCMStateMachine sm =
+        follower.getScmHAManager().getRatisServer().getSCMStateMachine();
+    TermIndex termIndex = sm.getLastAppliedTermIndex();
     DBCheckpoint leaderDbCheckpoint = leaderSCM.getScmMetadataStore().getStore()
         .getCheckpoint(false);
     Path leaderCheckpointLocation = leaderDbCheckpoint.getCheckpointLocation();
@@ -251,6 +261,16 @@ public class TestSCMInstallSnapshotWithHA {
             new SCMDBDefinition());
 
     Assert.assertNotNull(leaderCheckpointLocation);
+    // Take a backup of the current DB
+    String dbBackupName =
+        "SCM_CHECKPOINT_BACKUP" + termIndex.getIndex() + "_" + System
+            .currentTimeMillis();
+    File dbDir = oldDBLocation.getParentFile();
+    File checkpointBackup = new File(dbDir, dbBackupName);
+
+    // Take a backup of the leader checkpoint
+    Files.copy(leaderCheckpointLocation.toAbsolutePath(),
+        checkpointBackup.toPath());
     // Corrupt the leader checkpoint and install that on the follower. The
     // operation should fail and  should shutdown.
     boolean delete = true;
@@ -278,6 +298,18 @@ public class TestSCMInstallSnapshotWithHA {
 
     Assert.assertTrue(logCapture.getOutput()
         .contains("Failed to reload SCM state and instantiate services."));
+    Assert.assertTrue(sm.getLifeCycleState().isPausingOrPaused());
+
+    // Verify correct reloading
+    HAUtils
+        .replaceDBWithCheckpoint(leaderCheckpointTrxnInfo.getTransactionIndex(),
+            oldDBLocation, checkpointBackup.toPath(),
+            OzoneConsts.SCM_DB_BACKUP_PREFIX);
+    scmhaManager.startServices();
+    sm.unpause(leaderCheckpointTrxnInfo.getTerm(),
+        leaderCheckpointTrxnInfo.getTransactionIndex());
+    Assert.assertTrue(sm.getLastAppliedTermIndex()
+        .equals(leaderCheckpointTrxnInfo.getTermIndex()));
   }
 
   private List<ContainerInfo> writeToIncreaseLogIndex(

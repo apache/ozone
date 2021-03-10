@@ -292,6 +292,20 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_NODE_ID_KEY =
       "ozone.scm.node.id";
 
+  /**
+   * Optional config, if being set will cause scm --init to only take effect on
+   * the specific node and ignore scm --bootstrap cmd.
+   * Similarly, scm --init will be ignored on the non-primordial scm nodes.
+   * With the config set, applications/admins can safely execute init and
+   * bootstrap commands safely on all scm instances, for example kubernetes
+   * deployments.
+   *
+   * If a cluster is upgraded from non-ratis to ratis based SCM, scm --init
+   * needs to re-run for switching from
+   * non-ratis based SCM to ratis-based SCM on the primary node.
+   */
+  public static final String OZONE_SCM_PRIMORDIAL_NODE_ID_KEY =
+      "ozone.scm.primordial.node.id";
   // The path where datanode ID is to be written to.
   // if this value is not set then container startup will fail.
   public static final String OZONE_SCM_DATANODE_ID_DIR =

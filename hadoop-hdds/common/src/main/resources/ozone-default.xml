@@ -1920,6 +1920,22 @@
     </description>
   </property>
   <property>
+    <name>ozone.scm.primordial.node.id</name>
+    <value></value>
+    <tag>OZONE, SCM, HA</tag>
+    <description>
+      optional config, if being set will cause scm --init to only take effect on
+      the specific node and ignore scm --bootstrap cmd.
+      Similarly, scm --init will be ignored on the non-primordial scm nodes.
+      With the config set, applications/admins can safely execute init and
+      bootstrap commands safely on all scm instances.
+
+      If a cluster is upgraded from non-ratis to ratis based SCM, scm --init
+      needs to re-run for switching from
+      non-ratis based SCM to ratis-based SCM on the primary node.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.ratis.enable</name>
     <value>false</value>
     <tag>OZONE, SCM, HA, RATIS</tag>
