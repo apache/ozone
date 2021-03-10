@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
 import java.io.IOException;
+import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -167,8 +168,16 @@ public class OzoneContainer {
     blockDeletingService =
         new BlockDeletingService(this, svcInterval.toMillis(), serviceTimeout,
             TimeUnit.MILLISECONDS, config);
+
+    List<X509Certificate> x509Certificates = new ArrayList<>();
+    if (certClient != null) {
+      x509Certificates.add(certClient.getCACertificate());
+      if (certClient.getRootCACertificate() != null) {
+        x509Certificates.add(certClient.getRootCACertificate());
+      }
+    }
     tlsClientConfig = RatisHelper.createTlsClientConfig(
-        secConf, certClient != null ? certClient.getCACertificate() : null);
+        secConf, x509Certificates);
 
     isStarted = new AtomicBoolean(false);
   }

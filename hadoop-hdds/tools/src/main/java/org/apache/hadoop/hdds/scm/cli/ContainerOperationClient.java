@@ -18,6 +18,8 @@
 package org.apache.hadoop.hdds.scm.cli;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -98,9 +100,18 @@ public class ContainerOperationClient implements ScmClient {
           (OzoneConfiguration) securityConfig.getConfiguration());
       String caCertificate =
           scmSecurityProtocolClient.getCACertificate();
+      String rootcaCert = scmSecurityProtocolClient.getRootCACertificate();
+      List<String> caCerts;
+      if (rootcaCert != null) {
+        caCerts = new ArrayList<>(2);
+        caCerts.add(caCertificate);
+        caCerts.add(rootcaCert);
+      } else {
+        caCerts = Collections.singletonList(caCertificate);
+      }
       manager = new XceiverClientManager(conf,
           conf.getObject(XceiverClientManager.ScmClientConfig.class),
-          caCertificate);
+          caCerts);
     } else {
       manager = new XceiverClientManager(conf);
     }

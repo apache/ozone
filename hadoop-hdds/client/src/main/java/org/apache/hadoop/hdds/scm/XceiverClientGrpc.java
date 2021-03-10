@@ -82,7 +82,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   private final long timeout;
   private SecurityConfig secConfig;
   private final boolean topologyAwareRead;
-  private X509Certificate caCert;
+  private List<X509Certificate> caCert;
   // Cache the DN which returned the GetBlock command so that the ReadChunk
   // command can be sent to the same DN.
   private Map<DatanodeBlockID, DatanodeDetails> getBlockDNcache;
@@ -96,7 +96,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
    * @param caCert   - SCM ca certificate.
    */
   public XceiverClientGrpc(Pipeline pipeline, ConfigurationSource config,
-      X509Certificate caCert) {
+      List<X509Certificate> caCert) {
     super();
     Preconditions.checkNotNull(pipeline);
     Preconditions.checkNotNull(config);

@@ -22,6 +22,8 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 
@@ -68,7 +70,7 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
   //TODO : change this to SCM configuration class
   private final ConfigurationSource conf;
   private final Cache<String, XceiverClientSpi> clientCache;
-  private X509Certificate caCert;
+  private List<X509Certificate> caCert;
 
   private static XceiverClientMetrics metrics;
   private boolean isSecurityEnabled;
@@ -86,7 +88,7 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
 
   public XceiverClientManager(ConfigurationSource conf,
       ScmClientConfig clientConf,
-      String caCertPem) throws IOException {
+      List<String> caCertPem) throws IOException {
     Preconditions.checkNotNull(clientConf);
     Preconditions.checkNotNull(conf);
     long staleThresholdMs = clientConf.getStaleThreshold(MILLISECONDS);
@@ -94,8 +96,12 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
     this.isSecurityEnabled = OzoneSecurityUtil.isSecurityEnabled(conf);
     if (isSecurityEnabled) {
       Preconditions.checkNotNull(caCertPem);
+      Preconditions.checkState(caCertPem.size() >= 1);
       try {
-        this.caCert = CertificateCodec.getX509Cert(caCertPem);
+        this.caCert = new ArrayList<>(caCertPem.size());
+        for (String ca : caCertPem) {
+          caCert.add(CertificateCodec.getX509Cert(ca));
+        }
       } catch (CertificateException ex) {
         throw new SCMSecurityException("Error: Fail to get SCM CA certificate",
             ex);

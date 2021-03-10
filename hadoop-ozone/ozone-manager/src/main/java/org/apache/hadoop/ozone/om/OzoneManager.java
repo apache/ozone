@@ -261,6 +261,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private OzoneBlockTokenSecretManager blockTokenMgr;
   private CertificateClient certClient;
   private String caCertPem = null;
+  private List<String> caCertPemList = new ArrayList<>();
   private static boolean testSecureOmFlag = false;
   private final Text omRpcAddressTxt;
   private final OzoneConfiguration configuration;
@@ -1126,15 +1127,17 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (certClient != null) {
       // on a upgraded cluster rootCA certificate will be null. As the OM has
       // already got the certificate before upgrade.
-      // With this change client key put is being stuck.
-      // TODO: try with all CA's passed to client.
+      // With only root CA being passed, client key put is being stuck.
+      // TODO: try with all CA's passed to client. This will work for non-HA
+      // For HA OM need to get all 3 SCM CA's + root CA and pass on to client.
       if (certClient.getRootCACertificate() != null) {
         caCertPem = CertificateCodec.getPEMEncodedString(
-            certClient.getCACertificate());
-      } else {
-        caCertPem = CertificateCodec.getPEMEncodedString(
-            certClient.getCACertificate());
+            certClient.getRootCACertificate());
+        caCertPemList.add(caCertPem);
       }
+      caCertPem = CertificateCodec.getPEMEncodedString(
+            certClient.getCACertificate());
+      caCertPemList.add(caCertPem);
     }
     // Set metrics and start metrics back ground thread
     metrics.setNumVolumes(metadataManager.countRowsInTable(metadataManager
@@ -2685,7 +2688,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   @Override
   public ServiceInfoEx getServiceInfo() throws IOException {
-    return new ServiceInfoEx(getServiceList(), caCertPem);
+    return new ServiceInfoEx(getServiceList(), caCertPem, caCertPemList);
   }
 
   @Override

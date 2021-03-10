@@ -450,9 +450,9 @@ public class OzoneManagerRequestHandler implements RequestHandler {
 
     ServiceInfoEx serviceInfoEx = impl.getServiceInfo();
 
-    List<OzoneManagerProtocolProtos.ServiceInfo> serviceInfoProtos =
+    List< OzoneManagerProtocolProtos.ServiceInfo > serviceInfoProtos =
         new ArrayList<>();
-    List<ServiceInfo> serviceInfos = serviceInfoEx.getServiceInfoList();
+    List< ServiceInfo > serviceInfos = serviceInfoEx.getServiceInfoList();
     for (ServiceInfo info : serviceInfos) {
       serviceInfoProtos.add(info.getProtobuf());
     }
@@ -460,6 +460,10 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     resp.addAllServiceInfo(serviceInfoProtos);
     if (serviceInfoEx.getCaCertificate() != null) {
       resp.setCaCertificate(serviceInfoEx.getCaCertificate());
+    }
+
+    for (String ca : serviceInfoEx.getCaCertPemList()) {
+      resp.addCaCerts(ca);
     }
     return resp.build();
   }

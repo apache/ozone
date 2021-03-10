@@ -81,7 +81,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
 
   public static XceiverClientRatis newXceiverClientRatis(
       org.apache.hadoop.hdds.scm.pipeline.Pipeline pipeline,
-      ConfigurationSource ozoneConf, X509Certificate caCert) {
+      ConfigurationSource ozoneConf, List<X509Certificate> caCert) {
     final String rpcType = ozoneConf
         .get(ScmConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_KEY,
             ScmConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_DEFAULT);
