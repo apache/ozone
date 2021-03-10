@@ -67,7 +67,6 @@ import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.ScmInfo;
-import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.DefaultCAProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.DefaultProfile;
 import org.apache.hadoop.hdds.scm.ha.HASecurityUtils;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
@@ -144,6 +143,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ha.HASecurityUtils.initializeRootCertificateServer;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.OzoneConsts.CRL_SEQUENCE_ID_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_CA_CERT_STORAGE_DIR;
@@ -609,7 +609,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         if (configurator.getCertificateServer() != null) {
           this.rootCertificateServer = configurator.getCertificateServer();
         } else {
-          rootCertificateServer = HASecurityUtils.initializeRootCertificateServer(
+          rootCertificateServer = initializeRootCertificateServer(
               getScmStorageConfig().getClusterID(),
               getScmStorageConfig().getScmId(), scmCertStore);
           rootCertificateServer.init(new SecurityConfig(configuration),
