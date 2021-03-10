@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.ozone.om.upgrade;
 
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
@@ -299,6 +301,12 @@ public class TestOMUpgradeFinalizer {
         .thenAnswer((Answer<Integer>) ignore -> storedLayoutVersion);
 
     when(mock.getOmStorage()).thenReturn(st);
+
+    Table mockTable = mock(Table.class);
+    OMMetadataManager mockMetadataMgr = mock(OMMetadataManager.class);
+    when(mockMetadataMgr.getMetaTable()).thenReturn(mockTable);
+
+    when(mock.getMetadataManager()).thenReturn(mockMetadataMgr);
     return mock;
   }
 }

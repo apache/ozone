@@ -553,7 +553,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     if (withNewSnapshot) {
       Integer layoutVersionInDB = getLayoutVersionInDB();
-      if (layoutVersionInDB == null ||
+      if (layoutVersionInDB != null &&
           versionManager.getMetadataLayoutVersion() < layoutVersionInDB) {
         LOG.info("New OM snapshot received with higher layout version {}. " +
             "Attempting to finalize current OM to that version.",

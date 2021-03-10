@@ -175,9 +175,17 @@ public class TestOMUpgradeFinalization {
     waitForFinalization(omClient);
     cluster.restartOzoneManager(downedOM, true);
 
-    waitFor(() -> downedOM.getOmRatisServer()
-            .getOmStateMachine().getLifeCycleState().isPausingOrPaused(),
-        1000, 60000);
+    try {
+      waitFor(() -> downedOM.getOmRatisServer()
+              .getOmStateMachine().getLifeCycleState().isPausingOrPaused(),
+          1000, 60000);
+    } catch (TimeoutException timeEx) {
+      LifeCycle.State state = downedOM.getOmRatisServer()
+          .getOmStateMachine().getLifeCycle().getCurrentState();
+      if (state != LifeCycle.State.RUNNING) {
+        Assert.fail("OM State Machine State expected to be in RUNNING state.");
+      }
+    }
 
     waitFor(() -> {
       LifeCycle.State lifeCycleState = downedOM.getOmRatisServer()
@@ -240,7 +248,7 @@ public class TestOMUpgradeFinalization {
       } catch (IOException e) {
         Assert.fail(e.getMessage());
       }
-      return null;
+      return false;
     }, 2000, 20000);
   }
 
