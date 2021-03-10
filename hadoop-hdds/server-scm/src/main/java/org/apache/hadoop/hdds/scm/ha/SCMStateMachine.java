@@ -266,6 +266,10 @@ public class SCMStateMachine extends BaseStateMachine {
 
   @Override
   public void notifyTermIndexUpdated(long term, long index) {
+    if (!isInitialized.get()) {
+      return;
+    }
+
     if (transactionBuffer != null) {
       transactionBuffer.updateLatestTrxInfo(
           TransactionInfo.builder().setCurrentTerm(term)
@@ -294,6 +298,9 @@ public class SCMStateMachine extends BaseStateMachine {
   @Override
   public void close() throws IOException {
     super.close();
+    if (!isInitialized.get()) {
+      return;
+    }
     transactionBuffer.close();
     HadoopExecutors.
         shutdown(installSnapshotExecutor, LOG, 5, TimeUnit.SECONDS);
@@ -306,6 +313,9 @@ public class SCMStateMachine extends BaseStateMachine {
   public void unpause(long newLastAppliedSnapShotTerm,
       long newLastAppliedSnapshotIndex) {
     getLifeCycle().startAndTransition(() -> {
+      if (!isInitialized.get()) {
+        return;
+      }
       try {
         transactionBuffer.init();
         this.setLastAppliedTermIndex(TermIndex
