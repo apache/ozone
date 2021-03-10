@@ -2262,10 +2262,10 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneAcl acl2 = new OzoneAcl(USER, "Friday", ACLType.ALL, DEFAULT);
     OzoneAcl acl3 = new OzoneAcl(USER, "Jan", ACLType.ALL, ACCESS);
     OzoneAcl acl4 = new OzoneAcl(USER, "Feb", ACLType.ALL, ACCESS);
-    bucket.addAcls(acl1);
-    bucket.addAcls(acl2);
-    bucket.addAcls(acl3);
-    bucket.addAcls(acl4);
+    bucket.addAcl(acl1);
+    bucket.addAcl(acl2);
+    bucket.addAcl(acl3);
+    bucket.addAcl(acl4);
 
     doMultipartUpload(bucket, keyName, (byte)98);
     OzoneObj keyObj = OzoneObjInfo.Builder.newBuilder()
