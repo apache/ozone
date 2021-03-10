@@ -67,6 +67,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.ScmInfo;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.DefaultCAProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.DefaultProfile;
 import org.apache.hadoop.hdds.scm.ha.HASecurityUtils;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
@@ -146,6 +147,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT_
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.OzoneConsts.CRL_SEQUENCE_ID_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_CA_CERT_STORAGE_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.SCM_CA_PATH;
 
 /**
  * StorageContainerManager is the main entry point for the service that
@@ -583,33 +585,52 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         getLastSequenceIdForCRL());
 
     // Start Root Certificate Server on only primary SCM.
-    if (scmStorageConfig.getPrimaryScmNodeId().equals(
-        scmStorageConfig.getScmId())) {
+    String primaryScmNodeId = scmStorageConfig.getPrimaryScmNodeId();
+
+    // If primary SCM node Id is set it means this is a cluster which has
+    // performed init with SCM HA version code.
+    if (primaryScmNodeId != null) {
+      // Start specific instance SCM CA server.
+      String subject = "scm@"+InetAddress.getLocalHost().getHostName();
       if (configurator.getCertificateServer() != null) {
-        this.rootCertificateServer = configurator.getCertificateServer();
+        this.scmCertificateServer = configurator.getCertificateServer();
       } else {
-        rootCertificateServer = HASecurityUtils.initializeRootCertificateServer(
-            getScmStorageConfig().getClusterID(),
-            getScmStorageConfig().getScmId(), scmCertStore);
-        rootCertificateServer.init(new SecurityConfig(configuration),
-            CertificateServer.CAType.SELF_SIGNED_CA);
+        scmCertificateServer = new DefaultCAServer(subject,
+            scmStorageConfig.getClusterID(), scmStorageConfig.getScmId(),
+            scmCertStore, new DefaultProfile(),
+            Paths.get(SCM_CA_CERT_STORAGE_DIR).toString());
+        // INTERMEDIARY_CA which issues certs to DN and OM.
+        scmCertificateServer.init(new SecurityConfig(configuration),
+            CertificateServer.CAType.INTERMEDIARY_CA);
+      }
+
+      // If this is primary SCM start Root CA
+      if (primaryScmNodeId.equals(scmStorageConfig.getScmId())) {
+        if (configurator.getCertificateServer() != null) {
+          this.rootCertificateServer = configurator.getCertificateServer();
+        } else {
+          rootCertificateServer = HASecurityUtils.initializeRootCertificateServer(
+              getScmStorageConfig().getClusterID(),
+              getScmStorageConfig().getScmId(), scmCertStore);
+          rootCertificateServer.init(new SecurityConfig(configuration),
+              CertificateServer.CAType.SELF_SIGNED_CA);
+        }
+      } else {
+        rootCertificateServer = null;
       }
     } else {
-      rootCertificateServer = null;
+      // On a upgraded cluster primary scm nodeId will not be set as init will
+      // not be run again after upgrade. So for a upgraded cluster where init
+      // has not happened again we will have setup like before where it has
+      // one CA server which is issuing certificates to DN and OM.
+      String subject = "scm-ca@" + InetAddress.getLocalHost().getHostName();
+      rootCertificateServer = new DefaultCAServer(subject,
+          getScmStorageConfig().getClusterID(),
+          getScmStorageConfig().getScmId(), scmCertStore,
+          new DefaultProfile(),
+          Paths.get(SCM_CA_CERT_STORAGE_DIR, SCM_CA_PATH).toString());
+      scmCertificateServer = rootCertificateServer;
     }
-
-    String subject = "scm@"+InetAddress.getLocalHost().getHostName();
-    if (configurator.getCertificateServer() != null) {
-      this.scmCertificateServer = configurator.getCertificateServer();
-    } else {
-      scmCertificateServer = new DefaultCAServer(subject,
-          scmStorageConfig.getClusterID(), scmStorageConfig.getScmId(),
-          scmCertStore, new DefaultProfile(),
-          Paths.get(SCM_CA_CERT_STORAGE_DIR).toString());
-    }
-    // INTERMEDIARY_CA which issues certs to DN and OM.
-    scmCertificateServer.init(new SecurityConfig(configuration),
-        CertificateServer.CAType.INTERMEDIARY_CA);
 
     securityProtocolServer = new SCMSecurityProtocolServer(conf,
         rootCertificateServer, this);
@@ -882,7 +903,26 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       LOG.info("SCM already initialized. Reusing existing cluster id for sd={}"
               + ";cid={};layoutVersion={}", scmStorageConfig.getStorageDir(),
           clusterId, scmStorageConfig.getLayoutVersion());
+
+      InetSocketAddress scmAddress = getScmAddress(haDetails, conf);
+
+      // On already initialized cluster, doing init again.
+      // For security performing following steps are done
+      // 1. Create a cert client and generate Public, private Key pair and
+      // get a signed certificate from root CA which was already initialized.
+
+      // This will help once after SCM is started, it will start with Root CA
+      // and sub SCM CA. Now cluster will have a mix of certificates signed
+      // by SCM CA and Root CA. This is a temporary solution to make cluster
+      // work when non-HA cluster is moved to HA. (Long term solution will be
+      // to revoke and issue certificates again before adding new nodes).
+
       if (SCMHAUtils.isSCMHAEnabled(conf)) {
+        if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
+          HASecurityUtils.initializeSecurity(scmStorageConfig,
+              scmStorageConfig.getScmId(), conf,
+              scmAddress, true);
+        }
         SCMRatisServerImpl.reinitialize(clusterId, scmStorageConfig.getScmId(),
             haDetails.getLocalNodeDetails(), conf);
       }
