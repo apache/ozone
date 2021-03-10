@@ -39,14 +39,14 @@ public final class S3Acl {
   private static final Logger LOG = LoggerFactory.getLogger(S3Acl.class);
 
   // ACL put related headers
-  public static final String grantRead = "x-amz-grant-read";
-  public static final String grantWrite = "x-amz-grant-write";
-  public static final String grantReadACP = "x-amz-grant-read-acp";
-  public static final String grantWriteACP = "x-amz-grant-write-acp";
-  public static final String grantFullControl = "x-amz-grant-full-control";
+  public static final String GRANT_READ = "x-amz-grant-read";
+  public static final String GRANT_WRITE = "x-amz-grant-write";
+  public static final String GRANT_READ_CAP = "x-amz-grant-read-acp";
+  public static final String GRANT_WRITE_CAP = "x-amz-grant-write-acp";
+  public static final String GRANT_FULL_CONTROL = "x-amz-grant-full-control";
 
   // Not supported headers at current stage, may support it in future
-  public static final String cannedAclHeader = "x-amz-acl";
+  public static final String CANNED_ACL_HEADER = "x-amz-acl";
 
   /**
    * https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html.
@@ -149,6 +149,9 @@ public final class S3Acl {
       }
       return null;
     }
+  }
+
+  private S3Acl() {
   }
 
   public static boolean isGranteeTypeSupported(String typeStr) {

@@ -424,11 +424,11 @@ public class BucketEndpoint extends EndpointBase {
    */
   public Response putAcl(String bucketName, HttpHeaders httpHeaders,
       InputStream body) throws IOException, OS3Exception {
-    String grantReads = httpHeaders.getHeaderString(S3Acl.grantRead);
-    String grantWrites = httpHeaders.getHeaderString(S3Acl.grantWrite);
-    String grantReadACP = httpHeaders.getHeaderString(S3Acl.grantReadACP);
-    String grantWriteACP = httpHeaders.getHeaderString(S3Acl.grantWriteACP);
-    String grantFull = httpHeaders.getHeaderString(S3Acl.grantFullControl);
+    String grantReads = httpHeaders.getHeaderString(S3Acl.GRANT_READ);
+    String grantWrites = httpHeaders.getHeaderString(S3Acl.GRANT_WRITE);
+    String grantReadACP = httpHeaders.getHeaderString(S3Acl.GRANT_READ_CAP);
+    String grantWriteACP = httpHeaders.getHeaderString(S3Acl.GRANT_WRITE_CAP);
+    String grantFull = httpHeaders.getHeaderString(S3Acl.GRANT_FULL_CONTROL);
 
     try {
       OzoneBucket bucket = getBucket(bucketName);

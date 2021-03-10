@@ -1,0 +1,24 @@
+<AccessControlPolicy xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+ <Owner>
+   <ID>852b113e7a2f25102679df27bb0ae12b3f85be6BucketOwnerCanonicalUserID</ID>
+   <DisplayName>owner</DisplayName>
+ </Owner>
+ <AccessControlList>
+   <Grant>
+     <Grantee xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xsi:type="CanonicalUser">
+       <ID>852b113e7a2f25102679df27bb0ae12b3f85be6BucketOwnerCanonicalUserID
+       </ID>
+       <DisplayName>owner</DisplayName>
+     </Grantee>
+     <Permission>FULL_CONTROL</Permission>
+    </Grant>
+    <Grant>
+      <Grantee xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+               xsi:type="CanonicalUser">
+        <ID xmlns="">f30716ab7115dcb44a5ef76e9d74b8e20567f63TestAccountCanonicalUserID</ID>
+      </Grantee>
+      <Permission xmlns="">READ_ACP</Permission>
+     </Grant>
+ </AccessControlList>
+</AccessControlPolicy>

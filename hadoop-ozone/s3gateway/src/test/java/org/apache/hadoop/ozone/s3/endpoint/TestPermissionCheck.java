@@ -205,7 +205,7 @@ public class TestPermissionCheck {
     when(servletRequest.getParameterMap()).thenReturn(parameterMap);
 
     when(parameterMap.containsKey("acl")).thenReturn(true);
-    when(headers.getHeaderString(S3Acl.grantRead))
+    when(headers.getHeaderString(S3Acl.GRANT_READ))
         .thenReturn(S3Acl.ACLIdentityType.USER.getHeaderType() + "=root");
     BucketEndpoint bucketEndpoint = new BucketEndpoint();
     bucketEndpoint.setClient(client);
@@ -229,7 +229,7 @@ public class TestPermissionCheck {
     when(servletRequest.getParameterMap()).thenReturn(parameterMap);
 
     when(parameterMap.containsKey("acl")).thenReturn(true);
-    when(headers.getHeaderString(S3Acl.grantRead))
+    when(headers.getHeaderString(S3Acl.GRANT_READ))
         .thenReturn(S3Acl.ACLIdentityType.USER.getHeaderType() + "=root");
     BucketEndpoint bucketEndpoint = new BucketEndpoint();
     bucketEndpoint.setClient(client);
