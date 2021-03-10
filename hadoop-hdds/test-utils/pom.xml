@@ -24,8 +24,8 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   </parent>
   <artifactId>hadoop-hdds-test-utils</artifactId>
   <version>1.1.0-SNAPSHOT</version>
-  <description>Apache Hadoop Distributed Data Store Test Utils</description>
-  <name>Apache Hadoop HDDS Test Utils</name>
+  <description>Apache Ozone Distributed Data Store Test Utils</description>
+  <name>Apache Ozone HDDS Test Utils</name>
   <packaging>jar</packaging>
 
   <properties>
