@@ -74,7 +74,7 @@ import static org.mockito.Mockito.times;
 public class TestKeyValueHandler {
 
   @Rule
-  public TestRule timeout = new Timeout(300000);
+  public TestRule timeout = Timeout.seconds(300);
 
   private static final String DATANODE_UUID = UUID.randomUUID().toString();
 
