@@ -97,6 +97,7 @@ enum Status {
     DEFAULT = 12;
     MISSING_BLOCK_TOKEN = 13;
     BLOCK_TOKEN_VERIFICATION_FAILED = 14;
+    GET_ROOT_CA_CERT_FAILED = 15;
 }
 /**
 * This message is send by data node to prove its identity and get an SCM

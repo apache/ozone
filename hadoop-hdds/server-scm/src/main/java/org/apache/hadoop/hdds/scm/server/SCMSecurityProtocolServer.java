@@ -57,6 +57,7 @@ import org.slf4j.LoggerFactory;
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.CERTIFICATE_NOT_FOUND;
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_CA_CERT_FAILED;
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_CERTIFICATE_FAILED;
+import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_ROOT_CA_CERT_FAILED;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateApprover.ApprovalType.KERBEROS_TRUSTED;
 
 /**
@@ -255,7 +256,8 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
       return CertificateCodec.getPEMEncodedString(
           storageContainerManager.getScmCertificateServer().getCACertificate());
     } catch (CertificateException e) {
-      throw new IOException("getRootCertificate operation failed. ", e);
+      throw new SCMSecurityException("getCACertificate operation failed. ",
+          e, GET_CA_CERT_FAILED);
     }
   }
 
@@ -266,8 +268,8 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
       return CertificateCodec.getPEMEncodedString(
           rootCertificateServer.getCACertificate());
     } catch (CertificateException e) {
-      throw new SCMSecurityException("getRootCertificate operation failed. ",
-          e, GET_CA_CERT_FAILED);
+      throw new SCMSecurityException("getRootCACertificate operation failed. ",
+          e, GET_ROOT_CA_CERT_FAILED);
     }
   }
 

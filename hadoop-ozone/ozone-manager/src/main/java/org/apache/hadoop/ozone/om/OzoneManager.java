@@ -1124,8 +1124,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     startSecretManagerIfNecessary();
 
     if (certClient != null) {
-      caCertPem = CertificateCodec.getPEMEncodedString(
-          certClient.getCACertificate());
+      // on a upgraded cluster rootCA certificate will be null. As the OM has
+      // already got the certificate before upgrade.
+      if (certClient.getRootCACertificate() != null) {
+        caCertPem = CertificateCodec.getPEMEncodedString(
+            certClient.getRootCACertificate());
+      } else {
+        caCertPem = CertificateCodec.getPEMEncodedString(
+            certClient.getCertificate());
+      }
     }
     // Set metrics and start metrics back ground thread
     metrics.setNumVolumes(metadataManager.countRowsInTable(metadataManager
