@@ -19,8 +19,15 @@ Resource            ../ozone-lib/shell.robot
 Test Timeout        5 minutes
 
 *** Variables ***
-${KEY_NAME_SUFFIX}    ${EMPTY}
+${SUFFIX}    ${EMPTY}
 
 *** Test Cases ***
 Key Can Be Read
-    Key Should Match Local File    /vol1/bucket1/key-${KEY_NAME_SUFFIX}    /etc/passwd
+    Key Should Match Local File    /vol1/bucket1/key-${SUFFIX}    /etc/passwd
+
+Dir Can Be Listed
+    Execute    ozone fs -ls o3fs://bucket1.vol1/dir-${SUFFIX}
+
+File Can Be Get
+    Execute    ozone fs -get o3fs://bucket1.vol1/dir-${SUFFIX}/passwd /tmp/passwd-${SUFFIX}
+    [teardown]    Execute    rm /tmp/passwd-${SUFFIX}

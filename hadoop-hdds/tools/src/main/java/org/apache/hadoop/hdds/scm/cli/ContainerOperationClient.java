@@ -17,12 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.cli;
 
-import javax.net.SocketFactory;
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.util.List;
-import java.util.Map;
-
+import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
@@ -53,16 +48,20 @@ import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import com.google.common.base.Preconditions;
+import javax.net.SocketFactory;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.util.List;
+import java.util.Map;
+
 import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForClients;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClient;
 import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * This class provides the client-facing APIs of container operations.
@@ -515,7 +514,6 @@ public class ContainerOperationClient implements ScmClient {
    * @return returns true if operation is successful.
    * @throws IOException
    */
-  @Override
   public boolean forceExitSafeMode() throws IOException {
     return storageContainerLocationClient.forceExitSafeMode();
   }
@@ -546,5 +544,21 @@ public class ContainerOperationClient implements ScmClient {
       String upgradeClientID, boolean force) throws IOException {
     return storageContainerLocationClient.queryUpgradeFinalizationProgress(
         upgradeClientID, force);
+  }
+
+  /**
+   * Get Datanode Usage information by ipaddress or uuid.
+   *
+   * @param ipaddress - datanode ipaddress String
+   * @param uuid - datanode uuid String
+   * @return List of DatanodeUsageInfo. Each element contains info such as
+   * capacity, SCMused, and remaining space.
+   * @throws IOException
+   */
+  @Override
+  public List<HddsProtos.DatanodeUsageInfo> getDatanodeUsageInfo(
+      String ipaddress, String uuid) throws IOException {
+    return storageContainerLocationClient.getDatanodeUsageInfo(ipaddress,
+        uuid);
   }
 }

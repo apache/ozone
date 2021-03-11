@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.recon.api.types;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 
 import javax.xml.bind.annotation.XmlAccessType;
@@ -39,6 +40,9 @@ public final class DatanodeMetadata {
 
   @XmlElement(name = "state")
   private NodeState state;
+
+  @XmlElement(name = "opState")
+  private NodeOperationalState opState;
 
   @XmlElement(name = "lastHeartbeat")
   private long lastHeartbeat;
@@ -74,6 +78,7 @@ public final class DatanodeMetadata {
     this.hostname = builder.hostname;
     this.uuid = builder.uuid;
     this.state = builder.state;
+    this.opState = builder.opState;
     this.lastHeartbeat = builder.lastHeartbeat;
     this.datanodeStorageReport = builder.datanodeStorageReport;
     this.pipelines = builder.pipelines;
@@ -92,6 +97,10 @@ public final class DatanodeMetadata {
 
   public NodeState getState() {
     return state;
+  }
+
+  public NodeOperationalState getOperationalState() {
+    return opState;
   }
 
   public long getLastHeartbeat() {
@@ -154,6 +163,7 @@ public final class DatanodeMetadata {
     private String hostname;
     private String uuid;
     private NodeState state;
+    private NodeOperationalState opState;
     private long lastHeartbeat;
     private DatanodeStorageReport datanodeStorageReport;
     private List<DatanodePipeline> pipelines;
@@ -177,6 +187,11 @@ public final class DatanodeMetadata {
 
     public Builder withState(NodeState state) {
       this.state = state;
+      return this;
+    }
+
+    public Builder withOperationalState(NodeOperationalState opState) {
+      this.opState = opState;
       return this;
     }
 

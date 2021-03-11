@@ -65,7 +65,8 @@ public class TestListInfoSubcommand {
   }
 
   @Test
-  public void testDataNodeOperationalStateIncludedInOutput() throws Exception {
+  public void testDataNodeOperationalStateAndHealthIncludedInOutput()
+      throws Exception {
     ScmClient scmClient = mock(ScmClient.class);
     Mockito.when(scmClient.queryNode(any(HddsProtos.NodeOperationalState.class),
         any(HddsProtos.NodeState.class), any(HddsProtos.QueryScope.class),
@@ -89,12 +90,25 @@ public class TestListInfoSubcommand {
         "^Operational State:\\s+DECOMMISSIONING$", Pattern.MULTILINE);
     m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
+    for (HddsProtos.NodeState state : HddsProtos.NodeState.values()) {
+      p = Pattern.compile(
+          "^Health State:\\s+"+state+"$", Pattern.MULTILINE);
+      m = p.matcher(outContent.toString(DEFAULT_ENCODING));
+      assertTrue(m.find());
+    }
+    // Ensure the nodes are ordered by health state HEALTHY,
+    // HEALTHY_READONLY, STALE, DEAD
+    p = Pattern.compile(".+HEALTHY.+STALE.+DEAD.+HEALTHY_READONLY.+",
+        Pattern.DOTALL);
+
+    m = p.matcher(outContent.toString(DEFAULT_ENCODING));
+    assertTrue(m.find());
   }
 
   private List<HddsProtos.Node> getNodeDetails() {
     List<HddsProtos.Node> nodes = new ArrayList<>();
 
-    for (int i=0; i<2; i++) {
+    for (int i=0; i<4; i++) {
       HddsProtos.DatanodeDetailsProto.Builder dnd =
           HddsProtos.DatanodeDetailsProto.newBuilder();
       dnd.setHostName("host" + i);
@@ -109,11 +123,20 @@ public class TestListInfoSubcommand {
       if (i == 0) {
         builder.addNodeOperationalStates(
             HddsProtos.NodeOperationalState.IN_SERVICE);
-      } else {
+        builder.addNodeStates(HddsProtos.NodeState.STALE);
+      } else if (i == 1) {
         builder.addNodeOperationalStates(
             HddsProtos.NodeOperationalState.DECOMMISSIONING);
+        builder.addNodeStates(HddsProtos.NodeState.DEAD);
+      } else if (i == 2) {
+        builder.addNodeOperationalStates(
+            HddsProtos.NodeOperationalState.IN_SERVICE);
+        builder.addNodeStates(HddsProtos.NodeState.HEALTHY_READONLY);
+      } else {
+        builder.addNodeOperationalStates(
+            HddsProtos.NodeOperationalState.IN_SERVICE);
+        builder.addNodeStates(HddsProtos.NodeState.HEALTHY);
       }
-      builder.addNodeStates(HddsProtos.NodeState.HEALTHY);
       builder.setNodeID(dnd.build());
       nodes.add(builder.build());
     }

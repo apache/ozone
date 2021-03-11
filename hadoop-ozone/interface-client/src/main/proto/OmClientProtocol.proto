@@ -769,12 +769,15 @@ message KeyLocation {
     // get the up to date pipeline information. This will need o3fs
     // provide not only a OM delegation token but also a SCM delegation token
     optional hadoop.hdds.Pipeline pipeline = 7;
+
+    optional int32 partNumber = 9 [default = -1];
 }
 
 message KeyLocationList {
     optional uint64 version = 1;
     repeated KeyLocation keyLocations = 2;
     optional FileEncryptionInfoProto fileEncryptionInfo = 3;
+    optional bool isMultipartKey = 4 [default = false];
 }
 
 message KeyInfo {

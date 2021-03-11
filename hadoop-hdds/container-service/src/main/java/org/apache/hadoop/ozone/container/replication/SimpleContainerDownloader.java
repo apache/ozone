@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.container.replication;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -31,6 +30,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -51,11 +51,11 @@ public class SimpleContainerDownloader implements ContainerDownloader {
 
   private final Path workingDirectory;
   private final SecurityConfig securityConfig;
-  private final X509Certificate caCert;
+  private final CertificateClient certClient;
 
   public SimpleContainerDownloader(
       ConfigurationSource conf,
-      X509Certificate caCert
+      CertificateClient certClient
   ) {
 
     String workDirString =
@@ -68,7 +68,7 @@ public class SimpleContainerDownloader implements ContainerDownloader {
       workingDirectory = Paths.get(workDirString);
     }
     securityConfig = new SecurityConfig(conf);
-    this.caCert = caCert;
+    this.certClient = certClient;
   }
 
   @Override
@@ -133,7 +133,7 @@ public class SimpleContainerDownloader implements ContainerDownloader {
     GrpcReplicationClient grpcReplicationClient =
         new GrpcReplicationClient(datanode.getIpAddress(),
             datanode.getPort(Name.REPLICATION).getValue(),
-            workingDirectory, securityConfig, caCert);
+            workingDirectory, securityConfig, certClient);
     result = grpcReplicationClient.download(containerId)
         .thenApply(r -> {
           try {

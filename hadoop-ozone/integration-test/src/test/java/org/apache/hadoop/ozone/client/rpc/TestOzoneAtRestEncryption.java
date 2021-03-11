@@ -22,10 +22,16 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Random;
+import java.util.TreeMap;
 import java.util.UUID;
 
+import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.kms.KMSClientProvider;
 import org.apache.hadoop.crypto.key.kms.server.MiniKMS;
@@ -48,6 +54,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.io.MultipartCryptoKeyInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -55,21 +62,25 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.test.GenericTestUtils;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
+import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
+import static org.apache.hadoop.hdds.client.ReplicationType.STAND_ALONE;
+
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 
 /**
  * This class is to test all the public facing APIs of Ozone Client.
  */
-@Ignore
-public class TestOzoneAtRestEncryption extends TestOzoneRpcClient {
+public class TestOzoneAtRestEncryption {
 
   private static MiniOzoneCluster cluster = null;
   private static MiniKMS miniKMS;
@@ -83,15 +94,15 @@ public class TestOzoneAtRestEncryption extends TestOzoneRpcClient {
   private static File testDir;
   private static OzoneConfiguration conf;
   private static final String TEST_KEY = "key1";
+  private static final Random RANDOM = new Random();
 
+  private static final int MPU_PART_MIN_SIZE = 256 * 1024; // 256KB
+  private static final int BLOCK_SIZE = 64 * 1024; // 64KB
+  private static final int CHUNK_SIZE = 16 * 1024; // 16KB
+  private static final int DEFAULT_CRYPTO_BUFFER_SIZE = 8 * 1024; // 8KB
+  // (this is the default Crypto Buffer size as determined by the config
+  // hadoop.security.crypto.buffer.size)
 
-    /**
-     * Create a MiniOzoneCluster for testing.
-     * <p>
-     * Ozone is made active by setting OZONE_ENABLED = true
-     *
-     * @throws IOException
-     */
   @BeforeClass
   public static void init() throws Exception {
     testDir = GenericTestUtils.getTestDir(
@@ -115,6 +126,9 @@ public class TestOzoneAtRestEncryption extends TestOzoneRpcClient {
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(10)
         .setScmId(SCM_ID)
+        .setBlockSize(BLOCK_SIZE)
+        .setChunkSize(CHUNK_SIZE)
+        .setStreamBufferSizeUnit(StorageUnit.BYTES)
         .setCertificateClient(certificateClientTest)
         .build();
     cluster.getOzoneManager().startSecretManager();
@@ -124,6 +138,7 @@ public class TestOzoneAtRestEncryption extends TestOzoneRpcClient {
     storageContainerLocationClient =
         cluster.getStorageContainerLocationClient();
     ozoneManager = cluster.getOzoneManager();
+    ozoneManager.setMinMultipartUploadPartSize(MPU_PART_MIN_SIZE);
     TestOzoneRpcClient.setCluster(cluster);
     TestOzoneRpcClient.setOzClient(ozClient);
     TestOzoneRpcClient.setOzoneManager(ozoneManager);
@@ -136,11 +151,9 @@ public class TestOzoneAtRestEncryption extends TestOzoneRpcClient {
     createKey(TEST_KEY, cluster.getOzoneManager().getKmsProvider(), conf);
   }
 
-
-
-    /**
-     * Close OzoneClient and shutdown MiniOzoneCluster.
-     */
+  /**
+   * Close OzoneClient and shutdown MiniOzoneCluster.
+   */
   @AfterClass
   public static void shutdown() throws IOException {
     if(ozClient != null) {
@@ -271,6 +284,14 @@ public class TestOzoneAtRestEncryption extends TestOzoneRpcClient {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     String objectKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
         keyName);
+
+    GenericTestUtils.waitFor(() -> {
+      try {
+        return omMetadataManager.getDeletedTable().isExist(objectKey);
+      } catch (IOException e) {
+        return false;
+      }
+    }, 500, 100000);
     RepeatedOmKeyInfo deletedKeys =
         omMetadataManager.getDeletedTable().get(objectKey);
     Map<String, String> deletedKeyMetadata =
@@ -322,5 +343,152 @@ public class TestOzoneAtRestEncryption extends TestOzoneRpcClient {
     options.setBitLength(128);
     provider.createKey(keyName, options);
     provider.flush();
+  }
+
+  @Test
+  public void testMPUwithOnePart() throws Exception {
+    testMultipartUploadWithEncryption(1);
+  }
+
+  @Test
+  public void testMPUwithTwoParts() throws Exception {
+    testMultipartUploadWithEncryption(2);
+  }
+
+  public void testMultipartUploadWithEncryption(int numParts) throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = "mpu_test_key_" + numParts;
+
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    BucketArgs bucketArgs = BucketArgs.newBuilder()
+        .setBucketEncryptionKey(TEST_KEY).build();
+    volume.createBucket(bucketName, bucketArgs);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    // Initiate multipart upload
+    String uploadID = initiateMultipartUpload(bucket, keyName, STAND_ALONE,
+        ONE);
+
+    // Upload Parts
+    Map<Integer, String> partsMap = new TreeMap<>();
+    List<byte[]> partsData = new ArrayList<>();
+    int keySize = 0;
+    for (int i = 1; i <= numParts; i++) {
+      // Generate random data with different sizes for each part.
+      // Adding a random int with a cap at 8K (the default crypto buffer
+      // size) to get parts whose last byte does not coincide with crypto
+      // buffer boundary.
+      byte[] data = generateRandomData((MPU_PART_MIN_SIZE * i) +
+          RANDOM.nextInt(DEFAULT_CRYPTO_BUFFER_SIZE));
+      String partName = uploadPart(bucket, keyName, uploadID, i, data);
+      partsMap.put(i, partName);
+      partsData.add(data);
+      keySize += data.length;
+    }
+
+    // Combine the parts data into 1 byte array for verification
+    byte[] inputData = new byte[keySize];
+    int dataCopied = 0;
+    for (int i = 1; i <= numParts; i++) {
+      byte[] partBytes = partsData.get(i - 1);
+      System.arraycopy(partBytes, 0, inputData, dataCopied, partBytes.length);
+      dataCopied += partBytes.length;
+    }
+
+    // Complete MPU
+    completeMultipartUpload(bucket, keyName, uploadID, partsMap);
+
+    // Read different data lengths and starting from different offsets and
+    // verify the data matches.
+    Random random = new Random();
+    int randomSize = random.nextInt(keySize/2);
+    int randomOffset = random.nextInt(keySize - randomSize);
+
+    int[] readDataSizes = {keySize, keySize / 3 + 1, BLOCK_SIZE,
+        BLOCK_SIZE * 2 + 1, CHUNK_SIZE, CHUNK_SIZE / 4 - 1,
+        DEFAULT_CRYPTO_BUFFER_SIZE, DEFAULT_CRYPTO_BUFFER_SIZE / 2, 1,
+        randomSize};
+
+    int[] readFromPositions = {0, DEFAULT_CRYPTO_BUFFER_SIZE + 10, CHUNK_SIZE,
+        BLOCK_SIZE - DEFAULT_CRYPTO_BUFFER_SIZE + 1, BLOCK_SIZE, keySize / 3,
+        keySize - 1, randomOffset};
+
+    // Create an input stream to read the data
+    OzoneInputStream inputStream = bucket.readKey(keyName);
+    Assert.assertTrue(inputStream instanceof MultipartCryptoKeyInputStream);
+    MultipartCryptoKeyInputStream cryptoInputStream =
+        (MultipartCryptoKeyInputStream) inputStream;
+
+    for (int readDataLen : readDataSizes) {
+      for (int readFromPosition : readFromPositions) {
+        // Check that offset + buffer size does not exceed the key size
+        if (readFromPosition + readDataLen > keySize) {
+          continue;
+        }
+
+        byte[] readData = new byte[readDataLen];
+        cryptoInputStream.seek(readFromPosition);
+        inputStream.read(readData, 0, readDataLen);
+
+        assertReadContent(inputData, readData, readFromPosition);
+      }
+    }
+  }
+
+  private static byte[] generateRandomData(int length) {
+    byte[] bytes = new byte[length];
+    RANDOM.nextBytes(bytes);
+    return bytes;
+  }
+
+  private String initiateMultipartUpload(OzoneBucket bucket, String keyName,
+      ReplicationType replicationType, ReplicationFactor replicationFactor)
+      throws Exception {
+    OmMultipartInfo multipartInfo = bucket.initiateMultipartUpload(keyName,
+        replicationType, replicationFactor);
+
+    String uploadID = multipartInfo.getUploadID();
+    Assert.assertNotNull(uploadID);
+    return uploadID;
+  }
+
+  private String uploadPart(OzoneBucket bucket, String keyName,
+      String uploadID, int partNumber, byte[] data) throws Exception {
+    OzoneOutputStream ozoneOutputStream = bucket.createMultipartKey(keyName,
+        data.length, partNumber, uploadID);
+    ozoneOutputStream.write(data, 0, data.length);
+    ozoneOutputStream.close();
+
+    OmMultipartCommitUploadPartInfo omMultipartCommitUploadPartInfo =
+        ozoneOutputStream.getCommitUploadPartInfo();
+
+    Assert.assertNotNull(omMultipartCommitUploadPartInfo);
+    Assert.assertNotNull(omMultipartCommitUploadPartInfo.getPartName());
+    return omMultipartCommitUploadPartInfo.getPartName();
+  }
+
+  private void completeMultipartUpload(OzoneBucket bucket, String keyName,
+      String uploadID, Map<Integer, String> partsMap) throws Exception {
+    OmMultipartUploadCompleteInfo omMultipartUploadCompleteInfo = bucket
+        .completeMultipartUpload(keyName, uploadID, partsMap);
+
+    Assert.assertNotNull(omMultipartUploadCompleteInfo);
+    Assert.assertEquals(omMultipartUploadCompleteInfo.getBucket(), bucket
+        .getName());
+    Assert.assertEquals(omMultipartUploadCompleteInfo.getVolume(), bucket
+        .getVolumeName());
+    Assert.assertEquals(omMultipartUploadCompleteInfo.getKey(), keyName);
+    Assert.assertNotNull(omMultipartUploadCompleteInfo.getHash());
+  }
+
+  private static void assertReadContent(byte[] inputData, byte[] readData,
+      int offset) {
+    byte[] inputDataForComparison = Arrays.copyOfRange(inputData, offset,
+        offset + readData.length);
+    Assert.assertArrayEquals("Read data does not match input data at offset " +
+        offset + " and length " + readData.length,
+        inputDataForComparison, readData);
   }
 }
