@@ -29,8 +29,6 @@ import java.util.*;
  * path. Also, it stores directory node related metdata details.
  */
 public class OmDirectoryInfo extends WithParentObjectId {
-  private long parentObjectID; // pointer to parent directory
-
   private String name; // directory name
 
   private long creationTime;

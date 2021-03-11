@@ -56,29 +56,6 @@ public final class OmKeyInfo extends WithParentObjectId {
   private FileEncryptionInfo encInfo;
 
   /**
-   * A pointer to parent directory used for path traversal. ParentID will be
-   * used only when the key is created into a FileSystemOptimized(FSO) bucket.
-   * <p>
-   * For example, if a key "a/b/key1" created into a FSOBucket then each
-   * path component will be assigned an ObjectId and linked to its parent path
-   * component using parent's objectID.
-   * <p>
-   * Say, Bucket's ObjectID = 512, which is the parent for its immediate child
-   * element.
-   * <p>
-   * ------------------------------------------|
-   * PathComponent |   ObjectID   |   ParentID |
-   * ------------------------------------------|
-   *      a        |     1024     |     512    |
-   * ------------------------------------------|
-   *      b        |     1025     |     1024   |
-   * ------------------------------------------|
-   *     key1      |     1026     |     1025   |
-   * ------------------------------------------|
-   */
-  private long parentObjectID;
-
-  /**
    * Represents leaf node name. This also will be used when the keyName is
    * created on a FileSystemOptimized(FSO) bucket. For example, the user given
    * keyName is "a/b/key1" then the fileName stores "key1".

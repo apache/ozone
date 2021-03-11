@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.*;
@@ -154,12 +155,11 @@ public class PrefixParser implements Callable<Void>, SubcommandWithParent {
       throws IOException {
     MetadataKeyFilters.KeyPrefixFilter filter = getPrefixFilter(lastObjectId);
 
-    List<? extends Table.KeyValue
+    List<? extends KeyValue
         <String, ? extends WithParentObjectId>> infoList =
         table.getRangeKVs(null, 1000, filter);
 
-    for (Table.KeyValue
-      <String, ? extends WithParentObjectId> info : infoList) {
+    for (KeyValue<String, ? extends WithParentObjectId> info :infoList) {
       Path key = Paths.get(info.getKey());
       dumpInfo(type, getEffectivePath(effectivePath,
           key.getName(1).toString()), info.getValue(), info.getKey());
