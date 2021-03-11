@@ -145,12 +145,9 @@ public final class OmKeyInfo extends WithObjectID {
    *
    * @param locationInfoList list of locationInfo
    */
-  public void updateLocationInfoList(List<OmKeyLocationInfo> locationInfoList,
-      boolean isMpu) {
+  public void updateLocationInfoList(List<OmKeyLocationInfo> locationInfoList) {
     long latestVersion = getLatestVersionLocations().getVersion();
     OmKeyLocationInfoGroup keyLocationInfoGroup = getLatestVersionLocations();
-
-    keyLocationInfoGroup.setMultipartKey(isMpu);
     // Updates the latest locationList in the latest version only with
     // given locationInfoList here.
     // TODO : The original allocated list and the updated list here may vary
@@ -163,8 +160,6 @@ public final class OmKeyInfo extends WithObjectID {
         .setCreateVersion(latestVersion));
     keyLocationInfoGroup.addAll(latestVersion, locationInfoList);
   }
-
-
 
   /**
    * Append a set of blocks to the latest version. Note that these blocks are

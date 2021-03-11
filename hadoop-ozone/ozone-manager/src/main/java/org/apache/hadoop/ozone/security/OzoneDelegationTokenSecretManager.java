@@ -342,7 +342,6 @@ public class OzoneDelegationTokenSecretManager
    * @throws InvalidToken for invalid token
    * @throws AccessControlException if the user isn't allowed to cancel
    */
-  @Override
   public OzoneTokenIdentifier cancelToken(Token<OzoneTokenIdentifier> token,
       String canceller) throws IOException {
     OzoneTokenIdentifier id = OzoneTokenIdentifier.readProtoBuf(

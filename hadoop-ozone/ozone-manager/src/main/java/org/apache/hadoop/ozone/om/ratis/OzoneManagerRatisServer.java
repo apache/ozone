@@ -33,8 +33,6 @@ import java.util.concurrent.TimeUnit;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ipc.ProtobufRpcEngine.Server;
@@ -54,10 +52,8 @@ import com.google.common.base.Strings;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.ServiceException;
 import org.apache.ratis.RaftConfigKeys;
-import org.apache.ratis.conf.Parameters;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.grpc.GrpcConfigKeys;
-import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.netty.NettyConfigKeys;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.exceptions.LeaderNotReadyException;
@@ -262,12 +258,10 @@ public final class OzoneManagerRatisServer {
    * @param raftPeers peer nodes in the raft ring
    * @throws IOException
    */
-  @SuppressWarnings({"parameternumber", "java:S107"})
   private OzoneManagerRatisServer(ConfigurationSource conf,
       OzoneManager om,
       String raftGroupIdStr, RaftPeerId localRaftPeerId,
-      InetSocketAddress addr, List<RaftPeer> raftPeers,
-      SecurityConfig secConfig, CertificateClient certClient)
+      InetSocketAddress addr, List<RaftPeer> raftPeers)
       throws IOException {
     this.ozoneManager = om;
     this.omRatisAddress = addr;
@@ -288,12 +282,10 @@ public final class OzoneManagerRatisServer {
 
     this.omStateMachine = getStateMachine(conf);
 
-    Parameters parameters = createServerTlsParameters(secConfig, certClient);
     this.server = RaftServer.newBuilder()
         .setServerId(this.raftPeerId)
         .setGroup(this.raftGroup)
         .setProperties(serverProperties)
-        .setParameters(parameters)
         .setStateMachine(omStateMachine)
         .build();
   }
@@ -303,8 +295,7 @@ public final class OzoneManagerRatisServer {
    */
   public static OzoneManagerRatisServer newOMRatisServer(
       ConfigurationSource ozoneConf, OzoneManager omProtocol,
-      OMNodeDetails omNodeDetails, List<OMNodeDetails> peerNodes,
-      SecurityConfig secConfig, CertificateClient certClient)
+      OMNodeDetails omNodeDetails, List<OMNodeDetails> peerNodes)
       throws IOException {
 
     // RaftGroupId is the omServiceId
@@ -348,7 +339,7 @@ public final class OzoneManagerRatisServer {
     }
 
     return new OzoneManagerRatisServer(ozoneConf, omProtocol, omServiceId,
-        localRaftPeerId, ratisAddr, raftPeers, secConfig, certClient);
+        localRaftPeerId, ratisAddr, raftPeers);
   }
 
   public RaftGroup getRaftGroup() {
@@ -645,22 +636,4 @@ public final class OzoneManagerRatisServer {
   public RaftGroupId getRaftGroupId() {
     return raftGroupId;
   }
-
-  private static Parameters createServerTlsParameters(SecurityConfig conf,
-      CertificateClient caClient) {
-    Parameters parameters = new Parameters();
-
-    if (conf.isSecurityEnabled() && conf.isGrpcTlsEnabled()) {
-      GrpcTlsConfig config = new GrpcTlsConfig(
-          caClient.getPrivateKey(), caClient.getCertificate(),
-          caClient.getCACertificate(), true);
-      GrpcConfigKeys.Server.setTlsConf(parameters, config);
-      GrpcConfigKeys.Admin.setTlsConf(parameters, config);
-      GrpcConfigKeys.Client.setTlsConf(parameters, config);
-      GrpcConfigKeys.TLS.setConf(parameters, config);
-    }
-
-    return parameters;
-  }
-
 }

@@ -186,7 +186,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       // Update the block length for each block
       List<OmKeyLocationInfo> allocatedLocationInfoList =
           omKeyInfo.getLatestVersionLocations().getLocationList();
-      omKeyInfo.updateLocationInfoList(locationInfoList, false);
+      omKeyInfo.updateLocationInfoList(locationInfoList);
 
       // Set the UpdateID to current transactionLogIndex
       omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());

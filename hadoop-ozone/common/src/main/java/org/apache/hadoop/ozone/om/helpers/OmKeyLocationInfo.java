@@ -42,26 +42,21 @@ public final class OmKeyLocationInfo {
 
   private Pipeline pipeline;
 
-  // PartNumber is set for Multipart upload Keys.
-  private int partNumber = -1;
-
   private OmKeyLocationInfo(BlockID blockID, Pipeline pipeline, long length,
-                            long offset, int partNumber) {
+                            long offset) {
     this.blockID = blockID;
     this.pipeline = pipeline;
     this.length = length;
     this.offset = offset;
-    this.partNumber = partNumber;
   }
 
   private OmKeyLocationInfo(BlockID blockID, Pipeline pipeline, long length,
-      long offset, Token<OzoneBlockTokenIdentifier> token, int partNumber) {
+      long offset, Token<OzoneBlockTokenIdentifier> token) {
     this.blockID = blockID;
     this.pipeline = pipeline;
     this.length = length;
     this.offset = offset;
     this.token = token;
-    this.partNumber = partNumber;
   }
 
   public void setCreateVersion(long version) {
@@ -116,14 +111,6 @@ public final class OmKeyLocationInfo {
     this.pipeline = pipeline;
   }
 
-  public void setPartNumber(int partNumber) {
-    this.partNumber = partNumber;
-  }
-
-  public int getPartNumber() {
-    return partNumber;
-  }
-
   /**
    * Builder of OmKeyLocationInfo.
    */
@@ -133,7 +120,6 @@ public final class OmKeyLocationInfo {
     private long offset;
     private Token<OzoneBlockTokenIdentifier> token;
     private Pipeline pipeline;
-    private int partNumber;
 
     public Builder setBlockID(BlockID blockId) {
       this.blockID = blockId;
@@ -161,14 +147,8 @@ public final class OmKeyLocationInfo {
       return this;
     }
 
-    public Builder setPartNumber(int partNum) {
-      this.partNumber = partNum;
-      return this;
-    }
-
     public OmKeyLocationInfo build() {
-      return new OmKeyLocationInfo(blockID, pipeline, length, offset, token,
-          partNumber);
+      return new OmKeyLocationInfo(blockID, pipeline, length, offset, token);
     }
   }
 
@@ -181,7 +161,7 @@ public final class OmKeyLocationInfo {
         .setBlockID(blockID.getProtobuf())
         .setLength(length)
         .setOffset(offset)
-        .setCreateVersion(createVersion).setPartNumber(partNumber);
+        .setCreateVersion(createVersion);
     if (this.token != null) {
       builder.setToken(OzonePBHelper.protoFromToken(token));
     }
@@ -209,7 +189,7 @@ public final class OmKeyLocationInfo {
         BlockID.getFromProtobuf(keyLocation.getBlockID()),
         getPipeline(keyLocation),
         keyLocation.getLength(),
-        keyLocation.getOffset(), keyLocation.getPartNumber());
+        keyLocation.getOffset());
     if(keyLocation.hasToken()) {
       info.token = (Token<OzoneBlockTokenIdentifier>)
               OzonePBHelper.tokenFromProto(keyLocation.getToken());
@@ -219,15 +199,14 @@ public final class OmKeyLocationInfo {
   }
 
   @Override
-  public String  toString() {
+  public String toString() {
     return "{blockID={containerID=" + blockID.getContainerID() +
         ", localID=" + blockID.getLocalID() + "}" +
         ", length=" + length +
         ", offset=" + offset +
         ", token=" + token +
         ", pipeline=" + pipeline +
-        ", createVersion=" + createVersion  + ", partNumber=" + partNumber
-        + '}';
+        ", createVersion=" + createVersion + '}';
   }
 
   @Override

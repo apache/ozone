@@ -23,13 +23,12 @@ import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
+
 import java.io.IOException;
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
 import java.util.Collections;
-import java.util.Date;
 import java.util.List;
-import java.util.Optional;
 
 /**
  *
@@ -43,13 +42,8 @@ public class MockCAStore implements CertificateStore {
   }
 
   @Override
-  public Optional<Long> revokeCertificates(
-      List<BigInteger> serialIDs,
-      X509CertificateHolder caCertificateHolder,
-      CRLReason reason,
-      Date revocationTime,
-      CRLApprover approver) throws IOException {
-    return Optional.empty();
+  public void revokeCertificate(BigInteger serialID) throws IOException {
+
   }
 
   @Override

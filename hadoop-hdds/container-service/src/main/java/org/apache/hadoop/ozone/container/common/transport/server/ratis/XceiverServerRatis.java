@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -46,7 +45,6 @@ import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
@@ -79,9 +77,9 @@ import io.opentracing.Scope;
 import io.opentracing.Span;
 import io.opentracing.util.GlobalTracer;
 import org.apache.ratis.RaftConfigKeys;
-import org.apache.ratis.conf.Parameters;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.grpc.GrpcConfigKeys;
+import org.apache.ratis.grpc.GrpcFactory;
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.netty.NettyConfigKeys;
 import org.apache.ratis.proto.RaftProtos;
@@ -102,14 +100,12 @@ import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.RaftServerConfigKeys;
-import org.apache.ratis.server.RaftServerRpc;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.util.SizeInBytes;
 import org.apache.ratis.util.TimeDuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.hadoop.hdds.DatanodeVersions.SEPARATE_RATIS_PORTS_AVAILABLE;
 
 /**
  * Creates a ratis server endpoint that acts as the communication layer for
@@ -127,9 +123,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     return CALL_ID_COUNTER.getAndIncrement() & Long.MAX_VALUE;
   }
 
-  private int serverPort;
-  private int adminPort;
-  private int clientPort;
+  private int port;
   private final RaftServer server;
   private final List<ThreadPoolExecutor> chunkExecutors;
   private final ContainerDispatcher dispatcher;
@@ -155,14 +149,14 @@ public final class XceiverServerRatis implements XceiverServerSpi {
    */
   private EnumMap<StorageType, List<String>> ratisVolumeMap;
 
-  private XceiverServerRatis(DatanodeDetails dd,
+  private XceiverServerRatis(DatanodeDetails dd, int port,
       ContainerDispatcher dispatcher, ContainerController containerController,
-      StateContext context, ConfigurationSource conf, Parameters parameters)
+      StateContext context, GrpcTlsConfig tlsConfig, ConfigurationSource conf)
       throws IOException {
     this.conf = conf;
     Objects.requireNonNull(dd, "id == null");
     datanodeDetails = dd;
-    assignPorts();
+    this.port = port;
     RaftProperties serverProperties = newRaftProperties();
     this.context = context;
     this.dispatcher = dispatcher;
@@ -179,39 +173,16 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     RaftServer.Builder builder =
         RaftServer.newBuilder().setServerId(raftPeerId)
             .setProperties(serverProperties)
-            .setStateMachineRegistry(this::getStateMachine)
-            .setParameters(parameters);
+            .setStateMachineRegistry(this::getStateMachine);
+    if (tlsConfig != null) {
+      builder.setParameters(GrpcFactory.newRaftParameters(tlsConfig));
+    }
     this.server = builder.build();
     this.requestTimeout = conf.getTimeDuration(
         HddsConfigKeys.HDDS_DATANODE_RATIS_SERVER_REQUEST_TIMEOUT,
         HddsConfigKeys.HDDS_DATANODE_RATIS_SERVER_REQUEST_TIMEOUT_DEFAULT,
         TimeUnit.MILLISECONDS);
     initializeRatisVolumeMap();
-  }
-
-  private void assignPorts() {
-    clientPort = determinePort(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_PORT,
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_PORT_DEFAULT);
-
-    if (datanodeDetails.getInitialVersion() >= SEPARATE_RATIS_PORTS_AVAILABLE) {
-      adminPort = determinePort(
-          OzoneConfigKeys.DFS_CONTAINER_RATIS_ADMIN_PORT,
-          OzoneConfigKeys.DFS_CONTAINER_RATIS_ADMIN_PORT_DEFAULT);
-      serverPort = determinePort(
-          OzoneConfigKeys.DFS_CONTAINER_RATIS_SERVER_PORT,
-          OzoneConfigKeys.DFS_CONTAINER_RATIS_SERVER_PORT_DEFAULT);
-    } else {
-      adminPort = clientPort;
-      serverPort = clientPort;
-    }
-  }
-
-  private int determinePort(String key, int defaultValue) {
-    boolean randomPort = conf.getBoolean(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT,
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT_DEFAULT);
-    return randomPort ? 0 : conf.getInt(key, defaultValue);
   }
 
   private ContainerStateMachine getStateMachine(RaftGroupId gid) {
@@ -291,11 +262,9 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
     // Set the ratis port number
     if (rpc == SupportedRpcType.GRPC) {
-      GrpcConfigKeys.Admin.setPort(properties, adminPort);
-      GrpcConfigKeys.Client.setPort(properties, clientPort);
-      GrpcConfigKeys.Server.setPort(properties, serverPort);
+      GrpcConfigKeys.Server.setPort(properties, port);
     } else if (rpc == SupportedRpcType.NETTY) {
-      NettyConfigKeys.Server.setPort(properties, serverPort);
+      NettyConfigKeys.Server.setPort(properties, port);
     }
 
     long snapshotThreshold =
@@ -447,66 +416,69 @@ public final class XceiverServerRatis implements XceiverServerSpi {
       DatanodeDetails datanodeDetails, ConfigurationSource ozoneConf,
       ContainerDispatcher dispatcher, ContainerController containerController,
       CertificateClient caClient, StateContext context) throws IOException {
-    Parameters parameters = createTlsParameters(
-        new SecurityConfig(ozoneConf), caClient);
+    int localPort = ozoneConf.getInt(
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_PORT,
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_PORT_DEFAULT);
 
-    return new XceiverServerRatis(datanodeDetails, dispatcher,
-        containerController, context, ozoneConf, parameters);
+    // Get an available port on current node and
+    // use that as the container port
+    if (ozoneConf.getBoolean(OzoneConfigKeys
+            .DFS_CONTAINER_RATIS_IPC_RANDOM_PORT,
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT_DEFAULT)) {
+      localPort = 0;
+    }
+    GrpcTlsConfig tlsConfig = createTlsServerConfigForDN(
+          new SecurityConfig(ozoneConf), caClient);
+
+    return new XceiverServerRatis(datanodeDetails, localPort, dispatcher,
+        containerController, context, tlsConfig, ozoneConf);
   }
 
   // For gRPC server running DN container service with gPRC TLS
+  // No mTLS as the channel is shared for for external client, which
+  // does not have SCM CA issued certificates.
   // In summary:
   // authenticate from server to client is via TLS.
   // authenticate from client to server is via block token (or container token).
   // DN Ratis server act as both SSL client and server and we must pass TLS
   // configuration for both.
-  private static Parameters createTlsParameters(SecurityConfig conf,
+  static GrpcTlsConfig createTlsServerConfigForDN(SecurityConfig conf,
       CertificateClient caClient) {
-    Parameters parameters = new Parameters();
-
     if (conf.isSecurityEnabled() && conf.isGrpcTlsEnabled()) {
-      GrpcTlsConfig serverConfig = new GrpcTlsConfig(
-          caClient.getPrivateKey(), caClient.getCertificate(),
-          caClient.getCACertificate(), true);
-      GrpcConfigKeys.Server.setTlsConf(parameters, serverConfig);
-      GrpcConfigKeys.Admin.setTlsConf(parameters, serverConfig);
-
-      GrpcTlsConfig clientConfig = new GrpcTlsConfig(
+      return new GrpcTlsConfig(
           caClient.getPrivateKey(), caClient.getCertificate(),
           caClient.getCACertificate(), false);
-      GrpcConfigKeys.Client.setTlsConf(parameters, clientConfig);
     }
-
-    return parameters;
+    return null;
   }
 
   @Override
   public void start() throws IOException {
     if (!isStarted) {
-      LOG.info("Starting {} {}", getClass().getSimpleName(), server.getId());
+      LOG.info("Starting {} {} at port {}", getClass().getSimpleName(),
+          server.getId(), getIPCPort());
       for (ThreadPoolExecutor executor : chunkExecutors) {
         executor.prestartAllCoreThreads();
       }
       server.start();
 
-      RaftServerRpc serverRpc = server.getServerRpc();
-      clientPort = getRealPort(serverRpc.getClientServerAddress(),
-          Port.Name.RATIS);
-      adminPort = getRealPort(serverRpc.getAdminServerAddress(),
-          Port.Name.RATIS_ADMIN);
-      serverPort = getRealPort(serverRpc.getInetSocketAddress(),
-          Port.Name.RATIS_SERVER);
+      int realPort = server.getServerRpc()
+          .getInetSocketAddress()
+          .getPort();
+
+      if (port == 0) {
+        LOG.info("{} {} is started using port {}", getClass().getSimpleName(),
+            server.getId(), realPort);
+        port = realPort;
+      }
+
+      //register the real port to the datanode details.
+      datanodeDetails.setPort(DatanodeDetails
+          .newPort(DatanodeDetails.Port.Name.RATIS,
+              realPort));
 
       isStarted = true;
     }
-  }
-
-  private int getRealPort(InetSocketAddress address, Port.Name name) {
-    int realPort = address.getPort();
-    datanodeDetails.setPort(DatanodeDetails.newPort(name, realPort));
-    LOG.info("{} {} is started using port {} for {}",
-        getClass().getSimpleName(), server.getId(), realPort, name);
-    return realPort;
   }
 
   @Override
@@ -528,7 +500,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
   @Override
   public int getIPCPort() {
-    return clientPort;
+    return port;
   }
 
   /**

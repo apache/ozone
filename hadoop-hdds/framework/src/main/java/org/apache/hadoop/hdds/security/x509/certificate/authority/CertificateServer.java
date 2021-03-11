@@ -24,17 +24,13 @@ import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateApprover.ApprovalType;
-import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 
 import java.io.IOException;
-import java.math.BigInteger;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
-import java.util.Date;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.Future;
 
 /**
@@ -51,7 +47,7 @@ public interface CertificateServer {
    * @throws SCMSecurityException - Throws if the init fails.
    */
   void init(SecurityConfig securityConfig, CAType type)
-      throws IOException;
+      throws SCMSecurityException;
 
   /**
    * Returns the CA Certificate for this CA.
@@ -108,25 +104,26 @@ public interface CertificateServer {
   /**
    * Revokes a Certificate issued by this CertificateServer.
    *
-   * @param serialIDs       - List of serial IDs of Certificates to be revoked.
-   * @param reason          - Reason for revocation.
-   * @param securityConfig  - Security Configuration.
-   * @param revocationTime  - Revocation time for the certificates.
-   * @return Future that gives a list of certificates that were revoked.
+   * @param certificate - Certificate to revoke
+   * @param approver - Approval process to follow.
+   * @return Future that tells us what happened.
+   * @throws SCMSecurityException - on Error.
    */
-  Future<Optional<Long>> revokeCertificates(
-      List<BigInteger> serialIDs,
-      CRLReason reason,
-      Date revocationTime,
-      SecurityConfig securityConfig);
+  Future<Boolean> revokeCertificate(X509Certificate certificate,
+      ApprovalType approver) throws SCMSecurityException;
+
+  /**
+   * TODO : CRL, OCSP etc. Later. This is the start of a CertificateServer
+   * framework.
+   */
 
   /**
    * List certificates.
    * @param role            - role: OM/SCM/DN
    * @param startSerialId   - start certificate serial id
    * @param count           - max number of certificates returned in a batch
-   * @return List of X509 Certificates.
-   * @throws IOException - On Failure
+   * @return
+   * @throws IOException
    */
   List<X509Certificate> listCertificate(NodeType role,
       long startSerialId, int count, boolean isRevoked) throws IOException;

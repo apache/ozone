@@ -23,6 +23,5 @@ package org.apache.hadoop.hdds.utils.db;
  */
 public interface BatchOperation extends AutoCloseable {
 
-  @Override
   void close();
 }

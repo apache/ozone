@@ -91,7 +91,6 @@ public class ReferenceCountedDB implements Closeable {
     return store;
   }
 
-  @Override
   public void close() {
     decrementReference();
   }

@@ -23,6 +23,7 @@ import java.util.Objects;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneFileStatusProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneFileStatusProto.Builder;
 
+import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 
 /**
@@ -93,13 +94,14 @@ public class OzoneFileStatus {
     return !isDirectory();
   }
 
-  public OzoneFileStatusProto getProtobuf(int clientVersion) {
+  public OzoneFileStatusProto getProtobuf() {
+
     Builder builder = OzoneFileStatusProto.newBuilder()
         .setBlockSize(blockSize)
         .setIsDirectory(isDirectory);
     //key info can be null for the fake root entry.
     if (keyInfo != null) {
-      builder.setKeyInfo(keyInfo.getProtobuf(clientVersion));
+      builder.setKeyInfo(keyInfo.getProtobuf(CURRENT_VERSION));
     }
     return builder.build();
   }

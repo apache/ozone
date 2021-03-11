@@ -39,7 +39,6 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
   protected static class Factory implements InnerNode.Factory<InnerNodeImpl> {
     protected Factory() {}
 
-    @Override
     public InnerNodeImpl newInnerNode(String name, String location,
         InnerNode parent, int level, int cost) {
       return new InnerNodeImpl(name, location, parent, level, cost);
@@ -81,7 +80,6 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
    * relative level. If level is 1, means node itself. If level is 2, means its
    * direct children, and so on.
    **/
-  @Override
   public int getNumOfNodes(int level) {
     Preconditions.checkArgument(level > 0);
     int count = 0;
@@ -128,7 +126,6 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
    * @param node node to be added
    * @return true if the node is added, false if is only updated
    */
-  @Override
   public boolean add(Node node) {
     if (!isAncestor(node)) {
       throw new IllegalArgumentException(node.getNetworkName()
@@ -165,7 +162,6 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
    * Remove node <i>node</i> from the subtree of this node.
    * @param node node to be deleted
    */
-  @Override
   public void remove(Node node) {
     if (!isAncestor(node)) {
       throw new IllegalArgumentException(node.getNetworkName()
@@ -210,7 +206,6 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
    *
    * @return null if the node is not found
    */
-  @Override
   public Node getNode(String loc) {
     if (loc == null) {
       return null;
@@ -254,7 +249,6 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
    * @param leafIndex an indexed leaf of the node
    * @return the leaf node corresponding to the given index.
    */
-  @Override
   public Node getLeaf(int leafIndex) {
     Preconditions.checkArgument(leafIndex >= 0);
     // children are leaves
@@ -320,7 +314,6 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
    *   means picking the 3th available node, which is n5.
    *
    */
-  @Override
   public Node getLeaf(int leafIndex, List<String> excludedScopes,
       Collection<Node> excludedNodes, int ancestorGen) {
     Preconditions.checkArgument(leafIndex >= 0 && ancestorGen >= 0);

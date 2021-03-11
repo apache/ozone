@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
-import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
@@ -28,7 +27,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Recommission one or more datanodes.
  * Place decommissioned or maintenance nodes back into service.
  */
 @Command(
@@ -38,20 +36,11 @@ import java.util.List;
     versionProvider = HddsVersionProvider.class)
 public class RecommissionSubCommand extends ScmSubcommand {
 
-  @CommandLine.Spec
-  private CommandLine.Model.CommandSpec spec;
-
   @CommandLine.Parameters(description = "List of fully qualified host names")
-  private List<String> hosts = new ArrayList<>();
+  private List<String> hosts = new ArrayList<String>();
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
-    if (hosts.size() > 0) {
-      scmClient.recommissionNodes(hosts);
-      System.out.println("Started recommissioning datanode(s):\n" +
-          String.join("\n", hosts));
-    } else {
-      GenericCli.missingSubcommand(spec);
-    }
+    scmClient.recommissionNodes(hosts);
   }
 }

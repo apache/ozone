@@ -17,16 +17,17 @@
  */
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
+import java.util.concurrent.Callable;
+
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.cli.OzoneAdmin;
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
+
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Spec;
-
-import java.util.concurrent.Callable;
 
 /**
  * Subcommand for datanode related operations.
@@ -40,8 +41,7 @@ import java.util.concurrent.Callable;
         ListInfoSubcommand.class,
         DecommissionSubCommand.class,
         MaintenanceSubCommand.class,
-        RecommissionSubCommand.class,
-        UsageInfoSubcommand.class
+        RecommissionSubCommand.class
     })
 @MetaInfServices(SubcommandWithParent.class)
 public class DatanodeCommands implements Callable<Void>, SubcommandWithParent {

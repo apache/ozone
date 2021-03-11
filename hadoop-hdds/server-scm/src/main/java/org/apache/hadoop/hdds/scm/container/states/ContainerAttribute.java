@@ -230,10 +230,7 @@ public class ContainerAttribute<T> {
       throws SCMException {
     Preconditions.checkNotNull(currentKey);
     Preconditions.checkNotNull(newKey);
-    // Return if container attribute not changed
-    if (currentKey == newKey) {
-      return;
-    }
+
     boolean removed = false;
     try {
       removed = remove(currentKey, value);

@@ -308,7 +308,6 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     return cache.get(cacheKey);
   }
 
-  @Override
   public Iterator<Map.Entry<CacheKey<KEY>, CacheValue<VALUE>>> cacheIterator() {
     return cache.iterator();
   }

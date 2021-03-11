@@ -77,7 +77,6 @@ public class NodeImpl implements Node {
   /**
    * @return this node's name
    */
-  @Override
   public String getNetworkName() {
     return name;
   }
@@ -86,7 +85,6 @@ public class NodeImpl implements Node {
    * Set this node's name, can be hostname or Ipaddress.
    * @param networkName it's network name
    */
-  @Override
   public void setNetworkName(String networkName) {
     this.name = networkName;
     this.path = getPath();
@@ -95,7 +93,6 @@ public class NodeImpl implements Node {
   /**
    * @return this node's network location
    */
-  @Override
   public String getNetworkLocation() {
     return location;
   }
@@ -114,7 +111,6 @@ public class NodeImpl implements Node {
    * @return this node's full path in network topology. It's the concatenation
    * of location and name.
    */
-  @Override
   public String getNetworkFullPath() {
     return path;
   }
@@ -122,7 +118,6 @@ public class NodeImpl implements Node {
   /**
    * @return this node's parent
    */
-  @Override
   public InnerNode getParent() {
     return parent;
   }
@@ -131,7 +126,6 @@ public class NodeImpl implements Node {
    * @return this node's ancestor, generation 0 is itself, generation 1 is
    * node's parent, and so on.
    */
-  @Override
   public Node getAncestor(int generation) {
     Preconditions.checkArgument(generation >= 0);
     Node current = this;
@@ -147,7 +141,6 @@ public class NodeImpl implements Node {
    *
    * @param parent the parent
    */
-  @Override
   public void setParent(InnerNode parent) {
     this.parent = parent;
   }
@@ -156,7 +149,6 @@ public class NodeImpl implements Node {
    * @return this node's level in the tree.
    * E.g. the root of a tree returns 0 and its children return 1
    */
-  @Override
   public int getLevel() {
     return this.level;
   }
@@ -166,7 +158,6 @@ public class NodeImpl implements Node {
    *
    * @param level the level
    */
-  @Override
   public void setLevel(int level) {
     this.level = level;
   }
@@ -177,13 +168,11 @@ public class NodeImpl implements Node {
    * datacenter is 5.
    * Be default the cost of leaf datanode is 0, all other inner node is 1.
    */
-  @Override
   public int getCost() {
     return this.cost;
   }
 
   /** @return the leaf nodes number under this node. */
-  @Override
   public int getNumOfLeaves() {
     return 1;
   }
@@ -194,7 +183,6 @@ public class NodeImpl implements Node {
    * @param node a node
    * @return true if this node is an ancestor of <i>node</i>
    */
-  @Override
   public boolean isAncestor(Node node) {
     return this.getNetworkFullPath().equals(PATH_SEPARATOR_STR) ||
         node.getNetworkLocation().startsWith(this.getNetworkFullPath()) ||

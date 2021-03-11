@@ -108,8 +108,8 @@ public class NodeDecommissionManager {
       try {
         addr = InetAddress.getByName(host.getHostname());
       } catch (UnknownHostException e) {
-        throw new InvalidHostStringException("Unable to resolve host "
-            + host.getRawHostname(), e);
+        throw new InvalidHostStringException("Unable to resolve the host "
+            +host.getRawHostname(), e);
       }
       String dnsName;
       if (useHostnames) {
@@ -119,17 +119,15 @@ public class NodeDecommissionManager {
       }
       List<DatanodeDetails> found = nodeManager.getNodesByAddress(dnsName);
       if (found.size() == 0) {
-        throw new InvalidHostStringException("Host " + host.getRawHostname()
-            + " (" + dnsName + ") is not running any datanodes registered"
-            + " with SCM."
-            + " Please check the host name.");
+        throw new InvalidHostStringException("The string " +
+            host.getRawHostname()+" resolved to "+dnsName +
+            " is not found in SCM");
       } else if (found.size() == 1) {
         if (host.getPort() != -1 &&
             !validateDNPortMatch(host.getPort(), found.get(0))) {
-          throw new InvalidHostStringException("Host " + host.getRawHostname()
-              + " is running a datanode registered with SCM,"
-              + " but the port number doesn't match."
-              + " Please check the port number.");
+          throw new InvalidHostStringException("The string "+
+              host.getRawHostname()+" matched a single datanode, but the "+
+              "given port is not used by that Datanode");
         }
         results.add(found.get(0));
       } else if (found.size() > 1) {
@@ -141,10 +139,9 @@ public class NodeDecommissionManager {
           }
         }
         if (match == null) {
-          throw new InvalidHostStringException("Host " + host.getRawHostname()
-              + " is running multiple datanodes registered with SCM,"
-              + " but no port numbers match."
-              + " Please check the port number.");
+          throw new InvalidHostStringException("The string " +
+              host.getRawHostname()+ "matched multiple Datanodes, but no "+
+              "datanode port matched the given port");
         }
         results.add(match);
       }
@@ -284,8 +281,8 @@ public class NodeDecommissionManager {
         // NodeNotFoundException here expect if the node is remove in the
         // very short window between validation and starting decom. Therefore
         // log a warning and ignore the exception
-        LOG.warn("Host {} was not found in SCM. Ignoring the request to "+
-            "recommission it.", dn.getHostName());
+        LOG.warn("The host {} was not found in SCM. Ignoring the request to "+
+            "recommission it", dn.getHostName());
       }
     }
   }

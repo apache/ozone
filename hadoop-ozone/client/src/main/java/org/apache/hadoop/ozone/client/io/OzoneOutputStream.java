@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.client.io;
 
-import org.apache.hadoop.crypto.CryptoOutputStream;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 
 import java.io.IOException;
@@ -64,12 +63,6 @@ public class OzoneOutputStream extends OutputStream {
   public OmMultipartCommitUploadPartInfo getCommitUploadPartInfo() {
     if (outputStream instanceof KeyOutputStream) {
       return ((KeyOutputStream) outputStream).getCommitUploadPartInfo();
-    } else  if (outputStream instanceof CryptoOutputStream) {
-      OutputStream wrappedStream =
-          ((CryptoOutputStream) outputStream).getWrappedStream();
-      if (wrappedStream instanceof KeyOutputStream) {
-        return ((KeyOutputStream) wrappedStream).getCommitUploadPartInfo();
-      }
     }
     // Otherwise return null.
     return null;
