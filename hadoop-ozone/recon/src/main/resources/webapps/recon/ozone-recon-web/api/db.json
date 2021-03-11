@@ -20,6 +20,7 @@
         "hostname": "localhost1.storage.enterprise.com",
         "uuid": "b590734e-a5f2-11ea-bb37-0242ac130002",
         "state": "HEALTHY",
+        "opState": "IN_SERVICE",
         "lastHeartbeat": 1574728876059,
         "storageReport": {
           "capacity": 62725623808,
@@ -51,6 +52,7 @@
         "hostname": "localhost2.storage.enterprise.com",
         "uuid": "b5907812-a5f2-11ea-bb37-0242ac130002",
         "state": "HEALTHY",
+        "opState": "DECOMMISSIONING",
         "lastHeartbeat": 1574724876059,
         "storageReport": {
           "capacity": 549755813888,
@@ -80,8 +82,105 @@
       },
       {
         "hostname": "localhost3.storage.enterprise.com",
+        "uuid": "b5907812-a5f2-11ea-bb37-0242ac130002",
+        "state": "HEALTHY",
+        "opState": "DECOMMISSIONED",
+        "lastHeartbeat": 1574724876059,
+        "storageReport": {
+          "capacity": 549755813888,
+          "used": 450971566080,
+          "remaining": 95784247808
+        },
+        "pipelines": [
+          {
+            "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
+            "replicationType": "RATIS",
+            "replicationFactor": 3,
+            "leaderNode": "localhost1.storage.enterprise.com"
+          },
+          {
+            "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
+            "replicationType": "RATIS",
+            "replicationFactor": 1,
+            "leaderNode": "localhost2.storage.enterprise.com"
+          }
+        ],
+        "containers": 8192,
+        "leaderCount": 1,
+        "version": "0.6.0-SNAPSHOT",
+        "setupTime": 1574724805059,
+        "revision": "caf471111cdb9168ec013f4526bb997aa513e079",
+        "buildDate": "2020-07-20T15:45Z"
+      },
+      {
+        "hostname": "localhost4.storage.enterprise.com",
+        "uuid": "b5907812-a5f2-11ea-bb37-0242ac130002",
+        "state": "HEALTHY",
+        "opState": "ENTERING_MAINTENANCE",
+        "lastHeartbeat": 1574724876059,
+        "storageReport": {
+          "capacity": 549755813888,
+          "used": 450971566080,
+          "remaining": 95784247808
+        },
+        "pipelines": [
+          {
+            "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
+            "replicationType": "RATIS",
+            "replicationFactor": 3,
+            "leaderNode": "localhost1.storage.enterprise.com"
+          },
+          {
+            "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
+            "replicationType": "RATIS",
+            "replicationFactor": 1,
+            "leaderNode": "localhost2.storage.enterprise.com"
+          }
+        ],
+        "containers": 8192,
+        "leaderCount": 1,
+        "version": "0.6.0-SNAPSHOT",
+        "setupTime": 1574724805059,
+        "revision": "caf471111cdb9168ec013f4526bb997aa513e079",
+        "buildDate": "2020-07-20T15:45Z"
+      },
+      {
+        "hostname": "localhost5.storage.enterprise.com",
+        "uuid": "b5907812-a5f2-11ea-bb37-0242ac130002",
+        "state": "HEALTHY",
+        "opState": "IN_MAINTENANCE",
+        "lastHeartbeat": 1574724876059,
+        "storageReport": {
+          "capacity": 549755813888,
+          "used": 450971566080,
+          "remaining": 95784247808
+        },
+        "pipelines": [
+          {
+            "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
+            "replicationType": "RATIS",
+            "replicationFactor": 3,
+            "leaderNode": "localhost1.storage.enterprise.com"
+          },
+          {
+            "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
+            "replicationType": "RATIS",
+            "replicationFactor": 1,
+            "leaderNode": "localhost2.storage.enterprise.com"
+          }
+        ],
+        "containers": 8192,
+        "leaderCount": 1,
+        "version": "0.6.0-SNAPSHOT",
+        "setupTime": 1574724805059,
+        "revision": "caf471111cdb9168ec013f4526bb997aa513e079",
+        "buildDate": "2020-07-20T15:45Z"
+      },
+      {
+        "hostname": "localhost6.storage.enterprise.com",
         "uuid": "b5907934-a5f2-11ea-bb37-0242ac130002",
         "state": "STALE",
+        "opState": "IN_SERVICE",
         "lastHeartbeat": 1343544879843,
         "storageReport": {
           "capacity": 140737488355328,
@@ -116,9 +215,162 @@
         "buildDate": "2020-07-19T13:45Z"
       },
       {
-        "hostname": "localhost4.storage.enterprise.com",
+        "hostname": "localhost7.storage.enterprise.com",
+        "uuid": "b5907934-a5f2-11ea-bb37-0242ac130002",
+        "state": "STALE",
+        "opState": "DECOMMISSIONING",
+        "lastHeartbeat": 1343544879843,
+        "storageReport": {
+          "capacity": 140737488355328,
+          "used": 43980465111040,
+          "remaining": 86757023244288
+        },
+        "pipelines": [
+          {
+            "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
+            "replicationType": "RATIS",
+            "replicationFactor": 3,
+            "leaderNode": "localhost1.storage.enterprise.com"
+          },
+          {
+            "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
+            "replicationType": "RATIS",
+            "replicationFactor": 1,
+            "leaderNode": "localhost3.storage.enterprise.com"
+          },
+          {
+            "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
+            "replicationType": "STAND_ALONE",
+            "replicationFactor": 1,
+            "leaderNode": "localhost3.storage.enterprise.com"
+          }
+        ],
+        "containers": 43,
+        "leaderCount": 2,
+        "version": "0.6.0-SNAPSHOT",
+        "setupTime": 1343544679543,
+        "revision": "aaf470000cdb9168ec013f4526bb997aa513e079",
+        "buildDate": "2020-07-19T13:45Z"
+      },
+      {
+        "hostname": "localhost8.storage.enterprise.com",
+        "uuid": "b5907934-a5f2-11ea-bb37-0242ac130002",
+        "state": "STALE",
+        "opState": "DECOMMISSIONED",
+        "lastHeartbeat": 1343544879843,
+        "storageReport": {
+          "capacity": 140737488355328,
+          "used": 43980465111040,
+          "remaining": 86757023244288
+        },
+        "pipelines": [
+          {
+            "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
+            "replicationType": "RATIS",
+            "replicationFactor": 3,
+            "leaderNode": "localhost1.storage.enterprise.com"
+          },
+          {
+            "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
+            "replicationType": "RATIS",
+            "replicationFactor": 1,
+            "leaderNode": "localhost3.storage.enterprise.com"
+          },
+          {
+            "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
+            "replicationType": "STAND_ALONE",
+            "replicationFactor": 1,
+            "leaderNode": "localhost3.storage.enterprise.com"
+          }
+        ],
+        "containers": 43,
+        "leaderCount": 2,
+        "version": "0.6.0-SNAPSHOT",
+        "setupTime": 1343544679543,
+        "revision": "aaf470000cdb9168ec013f4526bb997aa513e079",
+        "buildDate": "2020-07-19T13:45Z"
+      },
+      {
+        "hostname": "localhost9.storage.enterprise.com",
+        "uuid": "b5907934-a5f2-11ea-bb37-0242ac130002",
+        "state": "STALE",
+        "opState": "ENTERING_MAINTENANCE",
+        "lastHeartbeat": 1343544879843,
+        "storageReport": {
+          "capacity": 140737488355328,
+          "used": 43980465111040,
+          "remaining": 86757023244288
+        },
+        "pipelines": [
+          {
+            "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
+            "replicationType": "RATIS",
+            "replicationFactor": 3,
+            "leaderNode": "localhost1.storage.enterprise.com"
+          },
+          {
+            "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
+            "replicationType": "RATIS",
+            "replicationFactor": 1,
+            "leaderNode": "localhost3.storage.enterprise.com"
+          },
+          {
+            "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
+            "replicationType": "STAND_ALONE",
+            "replicationFactor": 1,
+            "leaderNode": "localhost3.storage.enterprise.com"
+          }
+        ],
+        "containers": 43,
+        "leaderCount": 2,
+        "version": "0.6.0-SNAPSHOT",
+        "setupTime": 1343544679543,
+        "revision": "aaf470000cdb9168ec013f4526bb997aa513e079",
+        "buildDate": "2020-07-19T13:45Z"
+      },
+      {
+        "hostname": "localhost10.storage.enterprise.com",
+        "uuid": "b5907934-a5f2-11ea-bb37-0242ac130002",
+        "state": "STALE",
+        "opState": "IN_MAINTENANCE",
+        "lastHeartbeat": 1343544879843,
+        "storageReport": {
+          "capacity": 140737488355328,
+          "used": 43980465111040,
+          "remaining": 86757023244288
+        },
+        "pipelines": [
+          {
+            "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
+            "replicationType": "RATIS",
+            "replicationFactor": 3,
+            "leaderNode": "localhost1.storage.enterprise.com"
+          },
+          {
+            "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
+            "replicationType": "RATIS",
+            "replicationFactor": 1,
+            "leaderNode": "localhost3.storage.enterprise.com"
+          },
+          {
+            "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
+            "replicationType": "STAND_ALONE",
+            "replicationFactor": 1,
+            "leaderNode": "localhost3.storage.enterprise.com"
+          }
+        ],
+        "containers": 43,
+        "leaderCount": 2,
+        "version": "0.6.0-SNAPSHOT",
+        "setupTime": 1343544679543,
+        "revision": "aaf470000cdb9168ec013f4526bb997aa513e079",
+        "buildDate": "2020-07-19T13:45Z"
+      },
+      {
+        "hostname": "localhost11.storage.enterprise.com",
         "uuid": "b5907a06-a5f2-11ea-bb37-0242ac130002",
         "state": "DEAD",
+        "opState": "IN_SERVICE",
         "lastHeartbeat": 1074724876059,
         "storageReport": {
           "capacity": 140737488355328,
@@ -134,9 +386,10 @@
         "buildDate": "2020-07-19T13:45Z"
       },
       {
-        "hostname": "localhost5.storage.enterprise.com",
+        "hostname": "localhost12.storage.enterprise.com",
         "uuid": "b5907ac4-a5f2-11ea-bb37-0242ac130002",
-        "state": "DECOMMISSIONING",
+        "state": "DEAD",
+        "opState": "DECOMMISSIONING",
         "lastHeartbeat": 1574724876059,
         "storageReport": {
           "capacity": 805306368000,
@@ -165,9 +418,10 @@
         "buildDate": "2020-07-19T13:45Z"
       },
       {
-        "hostname": "localhost6.storage.enterprise.com",
+        "hostname": "localhost13.storage.enterprise.com",
         "uuid": "b5907b82-a5f2-11ea-bb37-0242ac130002",
-        "state": "HEALTHY",
+        "state": "DEAD",
+        "opState": "DECOMMISSIONED",
         "lastHeartbeat": 1574724876059,
         "storageReport": {
           "capacity": 140737488355328,
@@ -196,9 +450,10 @@
         "buildDate": "2020-07-19T13:45Z"
       },
       {
-        "hostname": "localhost7.storage.enterprise.com",
+        "hostname": "localhost14.storage.enterprise.com",
         "uuid": "b5907c40-a5f2-11ea-bb37-0242ac130002",
-        "state": "HEALTHY",
+        "state": "DEAD",
+        "opState": "ENTERING_MAINTENANCE",
         "lastHeartbeat": 1574724876059,
         "storageReport": {
           "capacity": 549755813888,
@@ -233,9 +488,10 @@
         "buildDate": "2020-07-19T13:45Z"
       },
       {
-        "hostname": "localhost8.storage.enterprise.com",
+        "hostname": "localhost15.storage.enterprise.com",
         "uuid": "b5907cf4-a5f2-11ea-bb37-0242ac130002",
-        "state": "DECOMMISSIONED",
+        "state": "DEAD",
+        "opState": "IN_MAINTENANCE",
         "lastHeartbeat": 1574724876059,
         "storageReport": {
           "capacity": 140737488355328,
@@ -264,9 +520,10 @@
         "buildDate": "2020-07-20T15:45Z"
       },
       {
-        "hostname": "localhost9.storage.enterprise.com",
+        "hostname": "localhost16.storage.enterprise.com",
         "uuid": "b5907f4c-a5f2-11ea-bb37-0242ac130002",
         "state": "HEALTHY",
+        "opState": "IN_SERVICE",
         "lastHeartbeat": 1574724874011,
         "storageReport": {
           "capacity": 140737488355328,
@@ -295,9 +552,10 @@
         "buildDate": "2020-07-20T15:45Z"
       },
       {
-        "hostname": "localhost10.storage.enterprise.com",
+        "hostname": "localhost17.storage.enterprise.com",
         "uuid": "b590801e-a5f2-11ea-bb37-0242ac130002",
         "state": "HEALTHY",
+        "opState": "IN_SERVICE",
         "lastHeartbeat": 1574723876959,
         "storageReport": {
           "capacity": 140737488355328,
@@ -332,9 +590,10 @@
         "buildDate": "2020-07-20T15:45Z"
       },
       {
-        "hostname": "localhost11.storage.enterprise.com",
+        "hostname": "localhost18.storage.enterprise.com",
         "uuid": "b59080e6-a5f2-11ea-bb37-0242ac130002",
         "state": "STALE",
+        "opState": "IN_SERVICE",
         "lastHeartbeat": 1474724876783,
         "storageReport": {
           "capacity": 140737488355328,
@@ -363,9 +622,10 @@
         "buildDate": "2020-07-20T10:45Z"
       },
       {
-        "hostname": "localhost12.storage.enterprise.com",
+        "hostname": "localhost19.storage.enterprise.com",
         "uuid": "b59081a4-a5f2-11ea-bb37-0242ac130002",
         "state": "HEALTHY",
+        "opState": "IN_SERVICE",
         "lastHeartbeat": 1574724796532,
         "storageReport": {
           "capacity": 140737488355328,

@@ -621,7 +621,7 @@ public class KeyManagerImpl implements KeyManager {
       keyInfo.setModificationTime(Time.now());
 
       //update the block length for each block
-      keyInfo.updateLocationInfoList(locationInfoList);
+      keyInfo.updateLocationInfoList(locationInfoList, false);
       metadataManager.getStore().move(
           openKey,
           objectKey,
@@ -1116,7 +1116,7 @@ public class KeyManagerImpl implements KeyManager {
 
       // set the data size and location info list
       keyInfo.setDataSize(omKeyArgs.getDataSize());
-      keyInfo.updateLocationInfoList(omKeyArgs.getLocationInfoList());
+      keyInfo.updateLocationInfoList(omKeyArgs.getLocationInfoList(), true);
 
       partName = metadataManager.getOzoneKey(volumeName, bucketName, keyName)
           + clientID;

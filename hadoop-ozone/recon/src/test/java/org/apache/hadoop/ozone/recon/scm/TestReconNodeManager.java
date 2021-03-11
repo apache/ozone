@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -81,7 +82,7 @@ public class TestReconNodeManager {
   }
 
   @Test
-  public void testReconNodeDB() throws IOException {
+  public void testReconNodeDB() throws IOException, NodeNotFoundException {
     ReconStorageConfig scmStorageConfig = new ReconStorageConfig(conf);
     EventQueue eventQueue = new EventQueue();
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
@@ -116,6 +117,18 @@ public class TestReconNodeManager {
     reconNodeManager.addDatanodeCommand(datanodeDetails.getUuid(),
         new ReregisterCommand());
 
+    // OperationalState sanity check
+    final DatanodeDetails dnDetails =
+        reconNodeManager.getNodeByUuid(datanodeDetails.getUuidString());
+    assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
+        dnDetails.getPersistedOpState());
+    assertEquals(dnDetails.getPersistedOpState(),
+        reconNodeManager.getNodeStatus(dnDetails)
+            .getOperationalState());
+    assertEquals(dnDetails.getPersistedOpStateExpiryEpochSec(),
+        reconNodeManager.getNodeStatus(dnDetails)
+            .getOpStateExpiryEpochSeconds());
+
     // Upon processing the heartbeat, the illegal command should be filtered out
     List<SCMCommand> returnedCmds =
         reconNodeManager.processHeartbeat(datanodeDetails,
@@ -123,6 +136,23 @@ public class TestReconNodeManager {
     assertEquals(1, returnedCmds.size());
     assertEquals(SCMCommandProto.Type.reregisterCommand,
         returnedCmds.get(0).getType());
+
+    // Now feed a DECOMMISSIONED heartbeat of the same DN
+    datanodeDetails.setPersistedOpState(
+        HddsProtos.NodeOperationalState.DECOMMISSIONED);
+    datanodeDetails.setPersistedOpStateExpiryEpochSec(12345L);
+    reconNodeManager.processHeartbeat(datanodeDetails,
+        defaultLayoutVersionProto());
+    // Check both persistedOpState and NodeStatus#operationalState
+    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONED,
+        dnDetails.getPersistedOpState());
+    assertEquals(dnDetails.getPersistedOpState(),
+        reconNodeManager.getNodeStatus(dnDetails)
+            .getOperationalState());
+    assertEquals(12345L, dnDetails.getPersistedOpStateExpiryEpochSec());
+    assertEquals(dnDetails.getPersistedOpStateExpiryEpochSec(),
+        reconNodeManager.getNodeStatus(dnDetails)
+            .getOpStateExpiryEpochSeconds());
 
     // Close the DB, and recreate the instance of Recon Node Manager.
     eventQueue.close();

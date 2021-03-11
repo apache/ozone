@@ -18,14 +18,12 @@
 
 package org.apache.hadoop.ozone.container.replication;
 
-import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.security.cert.X509Certificate;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -34,6 +32,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CopyContai
 import org.apache.hadoop.hdds.protocol.datanode.proto.IntraDatanodeProtocolServiceGrpc;
 import org.apache.hadoop.hdds.protocol.datanode.proto.IntraDatanodeProtocolServiceGrpc.IntraDatanodeProtocolServiceStub;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.ozone.OzoneConsts;
 
 import com.google.common.base.Preconditions;
@@ -62,7 +61,7 @@ public class GrpcReplicationClient implements AutoCloseable{
 
   public GrpcReplicationClient(
       String host, int port, Path workingDir,
-      SecurityConfig secConfig, X509Certificate caCert
+      SecurityConfig secConfig, CertificateClient certClient
   ) throws IOException {
     NettyChannelBuilder channelBuilder =
         NettyChannelBuilder.forAddress(host, port)
@@ -73,14 +72,13 @@ public class GrpcReplicationClient implements AutoCloseable{
       channelBuilder.useTransportSecurity();
 
       SslContextBuilder sslContextBuilder = GrpcSslContexts.forClient();
-      if (caCert != null) {
-        sslContextBuilder.trustManager(caCert);
+      if (certClient != null) {
+        sslContextBuilder
+            .trustManager(certClient.getCACertificate())
+            .clientAuth(ClientAuth.REQUIRE)
+            .keyManager(certClient.getPrivateKey(),
+                certClient.getCertificate());
       }
-
-      sslContextBuilder.clientAuth(ClientAuth.REQUIRE);
-      sslContextBuilder.keyManager(
-          new File(secConfig.getCertificateFileName()),
-          new File(secConfig.getPrivateKeyFileName()));
       if (secConfig.useTestCert()) {
         channelBuilder.overrideAuthority("localhost");
       }

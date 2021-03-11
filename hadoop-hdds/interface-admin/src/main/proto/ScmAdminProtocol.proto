@@ -66,9 +66,10 @@ message ScmContainerLocationRequest {
   optional DecommissionNodesRequestProto decommissionNodesRequest = 27;
   optional RecommissionNodesRequestProto recommissionNodesRequest = 28;
   optional StartMaintenanceNodesRequestProto startMaintenanceNodesRequest = 29;
-  optional FinalizeScmUpgradeRequestProto finalizeScmUpgradeRequest = 30;
+  optional DatanodeUsageInfoRequestProto DatanodeUsageInfoRequest = 30;
+  optional FinalizeScmUpgradeRequestProto finalizeScmUpgradeRequest = 31;
   optional QueryUpgradeFinalizationProgressRequestProto
-  queryUpgradeFinalizationProgressRequest = 31;
+  queryUpgradeFinalizationProgressRequest = 32;
 }
 
 message ScmContainerLocationResponse {
@@ -106,9 +107,10 @@ message ScmContainerLocationResponse {
   optional DecommissionNodesResponseProto decommissionNodesResponse = 27;
   optional RecommissionNodesResponseProto recommissionNodesResponse = 28;
   optional StartMaintenanceNodesResponseProto startMaintenanceNodesResponse = 29;
-  optional FinalizeScmUpgradeResponseProto finalizeScmUpgradeResponse = 30;
+  optional DatanodeUsageInfoResponseProto DatanodeUsageInfoResponse = 30;
+  optional FinalizeScmUpgradeResponseProto finalizeScmUpgradeResponse = 31;
   optional QueryUpgradeFinalizationProgressResponseProto
-  queryUpgradeFinalizationProgressResponse = 31;
+  queryUpgradeFinalizationProgressResponse = 32;
   enum Status {
     OK = 1;
     CONTAINER_ALREADY_EXISTS = 2;
@@ -144,6 +146,7 @@ enum Type {
   StartMaintenanceNodes = 24;
   FinalizeScmUpgrade = 25;
   QueryUpgradeFinalizationProgress = 26;
+  DatanodeUsageInfo = 27;
 }
 
 /**
@@ -259,6 +262,18 @@ message NodeQueryResponseProto {
 }
 
 /*
+  Usage info request message containing ip and uuid.
+*/
+message DatanodeUsageInfoRequestProto {
+  optional string ipaddress = 1;
+  optional string uuid = 2;
+}
+
+message DatanodeUsageInfoResponseProto {
+  repeated DatanodeUsageInfo info = 1;
+}
+
+/*
   Decommission a list of hosts
 */
 message DecommissionNodesRequestProto {
@@ -306,7 +321,7 @@ message PipelineRequestProto {
   optional string traceID = 5;
 }
 
-message  PipelineResponseProto {
+message PipelineResponseProto {
   enum Error {
     success = 1;
     errorPipelineAlreadyExists = 2;
