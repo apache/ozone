@@ -21,6 +21,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collection;
@@ -137,7 +138,7 @@ public class GeneratorDatanode extends BaseGenerator {
 
     final Path hddsDir = Paths.get(firstStorageDir, "hdds");
     if (!Files.exists(hddsDir)) {
-      throw new NoSuchFieldException(hddsDir
+      throw new NoSuchFileException(hddsDir
           + " doesn't exist. Please start a real cluster to initialize the "
           + "VERSION descriptors, and re-start this generator after the files"
           + " are created (but after cluster is stopped).");
