@@ -214,6 +214,7 @@ message SCMListContainerRequestProto {
   required uint32 count = 1;
   optional uint64 startContainerID = 2;
   optional string traceID = 3;
+  optional LifeCycleState state = 4;
 }
 
 message SCMListContainerResponseProto {
