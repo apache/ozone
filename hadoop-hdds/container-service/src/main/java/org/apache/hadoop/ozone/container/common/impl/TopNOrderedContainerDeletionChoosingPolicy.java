@@ -73,12 +73,11 @@ public class TopNOrderedContainerDeletionChoosingPolicy
     // container but with container we also return an integer so that total
     // blocks don't exceed the number of blocks to be deleted in an interval.
 
-    int flag = 0;
     for (KeyValueContainerData entry : orderedList) {
       if (entry.getNumPendingDeletionBlocks() > 0) {
         totalBlocks -= entry.getNumPendingDeletionBlocks();
-        result.add(new ContainerBlockInfo(entry,
-            ((KeyValueContainerData) entry).getNumPendingDeletionBlocks()));
+        result.add(
+            new ContainerBlockInfo(entry, entry.getNumPendingDeletionBlocks()));
         if (totalBlocks <= 0) {
           break;
         }
