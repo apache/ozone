@@ -631,8 +631,8 @@ public class KeyValueHandler extends Handler {
     try {
       if (kvContainer.getContainerData().getState() == State.UNHEALTHY) {
         throw new StorageContainerException(
-            "The container replica is unhealthy.",
-            CONTAINER_UNHEALTHY);
+            "The container(" + kvContainer.getContainerData().getContainerID() +
+            ") replica is unhealthy.", CONTAINER_UNHEALTHY);
       }
     } finally {
       kvContainer.readUnlock();
