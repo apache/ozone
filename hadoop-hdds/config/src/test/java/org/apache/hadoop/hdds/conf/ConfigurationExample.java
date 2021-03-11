@@ -26,7 +26,7 @@ import java.util.concurrent.TimeUnit;
 public class ConfigurationExample extends ConfigurationExampleParent {
 
   @Config(key = "address", defaultValue = "localhost", description = "Client "
-      + "addres (To test string injection).", tags = ConfigTag.MANAGEMENT)
+      + "address (To test string injection).", tags = ConfigTag.MANAGEMENT)
   private String clientAddress;
 
   @Config(key = "bind.host", defaultValue = "0.0.0.0", description = "Bind "

@@ -535,7 +535,7 @@ public final class HddsUtils {
    * passwords from the CredentialProvider API before falling back to
    * clear text in config - if falling back is allowed.
    * @param conf Configuration instance
-   * @param alias name of the credential to retreive
+   * @param alias name of the credential to retrieve
    * @return String credential value or null
    */
   static String getPassword(ConfigurationSource conf, String alias) {

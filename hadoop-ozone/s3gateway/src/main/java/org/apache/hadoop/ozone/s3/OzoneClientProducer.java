@@ -74,7 +74,7 @@ public class OzoneClientProducer {
   }
   
   @PreDestroy
-  public void destory() throws IOException {
+  public void destroy() throws IOException {
     client.close();
   }
 

@@ -84,7 +84,7 @@ public class SimpleMockNodeManager implements NodeManager {
   }
 
   /**
-   * If the given node was registed with the nodeManager, return the
+   * If the given node was registered with the nodeManager, return the
    * NodeStatus for the node. Otherwise return a NodeStatus of "In Service
    * and Healthy".
    * @param datanodeDetails DatanodeDetails

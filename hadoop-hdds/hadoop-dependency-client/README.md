@@ -21,7 +21,7 @@ which are not required for the parts used in Ozone.
 The exclude rules should be updated on each version bump. If Hadoop introduce new dependencies we need to exclude them (unless they are required).
 
 
-For the reference here are the minimal jar files wich are required by Ozone:
+For the reference here are the minimal jar files which are required by Ozone:
 
 
 ```

@@ -59,7 +59,7 @@ public class TestOMEpochForNonRatis {
   private static String omId;
 
   @Rule
-  public Timeout timeout = new Timeout(240_000);
+  public Timeout timeout = Timeout.seconds(240);
 
   @BeforeClass
   public static void init() throws Exception {

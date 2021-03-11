@@ -132,7 +132,7 @@ public class TestStorageContainerManager {
    * Set the timeout for every test.
    */
   @Rule
-  public Timeout testTimeout = new Timeout(900000);
+  public Timeout testTimeout = Timeout.seconds(900);
 
   @Rule
   public ExpectedException thrown = ExpectedException.none();
