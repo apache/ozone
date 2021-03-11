@@ -65,15 +65,9 @@ public class RandomContainerDeletionChoosingPolicy
       if (((KeyValueContainerData) entry).getNumPendingDeletionBlocks() > 0) {
         blockCount -=
             ((KeyValueContainerData) entry).getNumPendingDeletionBlocks();
-        if (blockCount >= 0) {
-          result.add(new ContainerBlockInfo(entry,
-              ((KeyValueContainerData) entry).getNumPendingDeletionBlocks()));
-        } else if (flag == 0 && blockCount < 0) {
-          result.add(new ContainerBlockInfo(entry,
-              ((KeyValueContainerData) entry).getNumPendingDeletionBlocks()
-                  + blockCount));
-          flag = 1;
-        } else {
+        result.add(new ContainerBlockInfo(entry,
+            ((KeyValueContainerData) entry).getNumPendingDeletionBlocks()));
+        if (blockCount <= 0) {
           break;
         }
         if (LOG.isDebugEnabled()) {

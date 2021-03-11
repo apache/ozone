@@ -102,6 +102,7 @@ public class TestContainerDeletionChoosingPolicy {
           layout,
           ContainerTestHelper.CONTAINER_MAX_SIZE, UUID.randomUUID().toString(),
           UUID.randomUUID().toString());
+      data.incrPendingDeletionBlocks(new Random().nextInt(numContainers) + 1);
       data.closeContainer();
       KeyValueContainer container = new KeyValueContainer(data, conf);
       containerSet.addContainer(container);
@@ -117,13 +118,12 @@ public class TestContainerDeletionChoosingPolicy {
     List<ContainerBlockInfo> result0 = blockDeletingService
         .chooseContainerForBlockDeletion(blockLimitPerInterval, deletionPolicy);
 
-    if (result0.size() > 0) {
-      long totPendingBlocks = 0;
-      for (ContainerBlockInfo pr : result0) {
-        totPendingBlocks += pr.getBlocks();
-      }
-      Assert.assertTrue(totPendingBlocks >= blockLimitPerInterval);
+    long totPendingBlocks = 0;
+    for (ContainerBlockInfo pr : result0) {
+      totPendingBlocks += pr.getBlocks();
     }
+    Assert.assertTrue(totPendingBlocks >= blockLimitPerInterval);
+
 
     // test random choosing
     List<ContainerBlockInfo> result1 = blockDeletingService
@@ -131,17 +131,16 @@ public class TestContainerDeletionChoosingPolicy {
     List<ContainerBlockInfo> result2 = blockDeletingService
         .chooseContainerForBlockDeletion(numContainers, deletionPolicy);
 
-    if (result1.size() > 0 && result2.size() > 0) {
-      boolean hasShuffled = false;
-      for (int i = 0; i < numContainers; i++) {
-        if (result1.get(i).getContainerData().getContainerID() != result2
-            .get(i).getContainerData().getContainerID()) {
-          hasShuffled = true;
-          break;
-        }
+    boolean hasShuffled = false;
+    for (int i = 0; i < numContainers; i++) {
+      if (result1.get(i).getContainerData().getContainerID() != result2.get(i)
+          .getContainerData().getContainerID()) {
+        hasShuffled = true;
+        break;
       }
-      Assert.assertTrue("Chosen container results were same", hasShuffled);
     }
+    Assert.assertTrue("Chosen container results were same", hasShuffled);
+
   }
 
   @Test
@@ -184,7 +183,6 @@ public class TestContainerDeletionChoosingPolicy {
       Assert.assertTrue(
           containerSet.getContainerMapCopy().containsKey(containerId));
     }
-
     numberOfBlocks.sort(Collections.reverseOrder());
     int blockLimitPerInterval = 5;
     blockDeletingService = getBlockDeletingService();
@@ -192,13 +190,12 @@ public class TestContainerDeletionChoosingPolicy {
         new TopNOrderedContainerDeletionChoosingPolicy();
     List<ContainerBlockInfo> result0 = blockDeletingService
         .chooseContainerForBlockDeletion(blockLimitPerInterval, deletionPolicy);
-    if (result0.size() > 0) {
-      long totPendingBlocks = 0;
-      for (ContainerBlockInfo pr : result0) {
-        totPendingBlocks += pr.getBlocks();
-      }
-      Assert.assertTrue(totPendingBlocks >= blockLimitPerInterval);
+    long totPendingBlocks = 0;
+    for (ContainerBlockInfo pr : result0) {
+      totPendingBlocks += pr.getBlocks();
     }
+    Assert.assertTrue(totPendingBlocks >= blockLimitPerInterval);
+
 
     List<ContainerBlockInfo> result1 = blockDeletingService
         .chooseContainerForBlockDeletion(numContainers + 1, deletionPolicy);

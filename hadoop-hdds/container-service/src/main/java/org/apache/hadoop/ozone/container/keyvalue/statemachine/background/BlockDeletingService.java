@@ -58,11 +58,10 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 
 import com.google.common.collect.Lists;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_LIMIT_PER_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V1;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
 
@@ -106,18 +105,17 @@ public class BlockDeletingService extends BackgroundService {
       throw new RuntimeException(e);
     }
     this.conf = conf;
-    this.blockLimitPerInterval =
-        conf.getInt(OZONE_BLOCK_DELETING_LIMIT_PER_INTERVAL,
-            OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER_DEFAULT);
+    DatanodeConfiguration subject = conf.getObject(DatanodeConfiguration.class);
+    this.blockLimitPerInterval = subject.getBlockDeletionLimit();
   }
 
   public static class ContainerBlockInfo {
     private final ContainerData containerData;
-    private final Long blocks;
+    private final Long numBlocksToDelete;
 
     public ContainerBlockInfo(ContainerData containerData, Long blocks) {
       this.containerData = containerData;
-      this.blocks = blocks;
+      this.numBlocksToDelete = blocks;
     }
 
     public ContainerData getContainerData() {
@@ -125,7 +123,7 @@ public class BlockDeletingService extends BackgroundService {
     }
 
     public Long getBlocks() {
-      return blocks;
+      return numBlocksToDelete;
     }
 
   }
@@ -143,17 +141,17 @@ public class BlockDeletingService extends BackgroundService {
       // configured.
       containers = chooseContainerForBlockDeletion(blockLimitPerInterval,
               containerDeletionPolicy);
+
+      BlockDeletingTask containerTask = null;
+      for (ContainerBlockInfo container : containers) {
+        containerTask = new BlockDeletingTask(container.containerData,
+            TASK_PRIORITY_DEFAULT, container.numBlocksToDelete);
+        queue.add(containerTask);
+      }
       if (containers.size() > 0) {
         LOG.info("Plan to choose {} blocks for block deletion, "
-                + "actually returns {} valid containers.",
-            blockLimitPerInterval, containers.size());
-      }
-
-      for (ContainerBlockInfo container : containers) {
-        BlockDeletingTask containerTask =
-            new BlockDeletingTask(container.containerData,
-                TASK_PRIORITY_DEFAULT, container.blocks);
-        queue.add(containerTask);
+                + "actually deleting {} blocks.", blockLimitPerInterval,
+            containerTask.blocksToDelete);
       }
     } catch (StorageContainerException e) {
       LOG.warn("Failed to initiate block deleting tasks, "
@@ -256,13 +254,13 @@ public class BlockDeletingService extends BackgroundService {
 
     private final int priority;
     private final KeyValueContainerData containerData;
-    private final long blockDeletionLimitPerInterval;
+    private final long blocksToDelete;
 
     BlockDeletingTask(ContainerData containerName, int priority,
-        long blockDeletionLimitPerInterval) {
+        long blocksToDelete) {
       this.priority = priority;
       this.containerData = (KeyValueContainerData) containerName;
-      this.blockDeletionLimitPerInterval = blockDeletionLimitPerInterval;
+      this.blocksToDelete = blocksToDelete;
     }
 
     @Override
@@ -313,9 +311,8 @@ public class BlockDeletingService extends BackgroundService {
         // # of blocks to delete is throttled
         KeyPrefixFilter filter = MetadataKeyFilters.getDeletingKeyFilter();
         List<? extends Table.KeyValue<String, BlockData>> toDeleteBlocks =
-            blockDataTable.getSequentialRangeKVs(null,
-                (int) blockDeletionLimitPerInterval,
-                filter);
+            blockDataTable
+                .getSequentialRangeKVs(null, (int) blocksToDelete, filter);
         if (toDeleteBlocks.isEmpty()) {
           LOG.debug("No under deletion block found in container : {}",
               containerData.getContainerID());
@@ -336,10 +333,6 @@ public class BlockDeletingService extends BackgroundService {
             handler.deleteBlock(container, entry.getValue());
             blocksDeleted++;
             succeedBlocks.add(blockName);
-            if (blocksDeleted == blockDeletionLimitPerInterval) {
-              blocksDeleted = 0;
-              break;
-            }
           } catch (InvalidProtocolBufferException e) {
             LOG.error("Failed to parse block info for block {}", blockName, e);
           } catch (IOException e) {
@@ -394,14 +387,13 @@ public class BlockDeletingService extends BackgroundService {
             deleteTxns = dnStoreTwoImpl.getDeleteTransactionTable();
         List<DeletedBlocksTransaction> delBlocks = new ArrayList<>();
         int totalBlocks = 0;
-        int blockLimit = 0;
+        int numBlocks = 0;
         try (TableIterator<Long,
             ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> iter =
             dnStoreTwoImpl.getDeleteTransactionTable().iterator()) {
-          while (iter.hasNext() && (blockLimit
-              < blockDeletionLimitPerInterval)) {
+          while (iter.hasNext() && (numBlocks < blocksToDelete)) {
             DeletedBlocksTransaction delTx = iter.next().getValue();
-            blockLimit += delTx.getLocalIDList().size();
+            numBlocks += delTx.getLocalIDList().size();
             delBlocks.add(delTx);
           }
         }
@@ -424,8 +416,6 @@ public class BlockDeletingService extends BackgroundService {
 
         // Once blocks are deleted... remove the blockID from blockDataTable
         // and also remove the transactions from txnTable.
-        int counter = 0;
-        int flag = 0;
         try(BatchOperation batch = meta.getStore().getBatchHandler()
             .initBatchOperation()) {
           for (DeletedBlocksTransaction delTx : delBlocks) {
@@ -470,9 +460,6 @@ public class BlockDeletingService extends BackgroundService {
           try {
             handler.deleteBlock(container, blkInfo);
             blocksDeleted++;
-            if (blocksDeleted == blockDeletionLimitPerInterval) {
-              return blocksDeleted;
-            }
           } catch (InvalidProtocolBufferException e) {
             LOG.error("Failed to parse block info for block {}", blk, e);
           } catch (IOException e) {
