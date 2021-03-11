@@ -29,8 +29,6 @@ import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.certificate.client.OMCertificateClient;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.ha.ratis.RatisSnapshotInfo;
@@ -79,8 +77,6 @@ public class TestOzoneManagerRatisServer {
   private OzoneManager ozoneManager;
   private OMNodeDetails omNodeDetails;
   private TermIndex initialTermIndex;
-  private SecurityConfig secConfig;
-  private OMCertificateClient certClient;
 
   @Before
   public void init() throws Exception {
@@ -112,10 +108,8 @@ public class TestOzoneManagerRatisServer {
     initialTermIndex = TermIndex.valueOf(0, 0);
     RatisSnapshotInfo omRatisSnapshotInfo = new RatisSnapshotInfo();
     when(ozoneManager.getSnapshotInfo()).thenReturn(omRatisSnapshotInfo);
-    secConfig = new SecurityConfig(conf);
-    certClient = new OMCertificateClient(secConfig);
     omRatisServer = OzoneManagerRatisServer.newOMRatisServer(conf, ozoneManager,
-      omNodeDetails, Collections.emptyList(), secConfig, certClient);
+      omNodeDetails, Collections.emptyList());
     omRatisServer.start();
   }
 
@@ -155,7 +149,7 @@ public class TestOzoneManagerRatisServer {
 
     // Start new Ratis server. It should pick up and load the new SnapshotInfo
     omRatisServer = OzoneManagerRatisServer.newOMRatisServer(conf, ozoneManager,
-        omNodeDetails, Collections.emptyList(), secConfig, certClient);
+        omNodeDetails, Collections.emptyList());
     omRatisServer.start();
     TermIndex lastAppliedTermIndex =
         omRatisServer.getLastAppliedTermIndex();
@@ -225,7 +219,7 @@ public class TestOzoneManagerRatisServer {
     omRatisServer.stop();
     OzoneManagerRatisServer newOmRatisServer = OzoneManagerRatisServer
         .newOMRatisServer(newConf, ozoneManager, nodeDetails,
-            Collections.emptyList(), secConfig, certClient);
+            Collections.emptyList());
     newOmRatisServer.start();
 
     UUID uuid = UUID.nameUUIDFromBytes(customOmServiceId.getBytes(UTF_8));

@@ -139,7 +139,6 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
    * @return XceiverClientSpi connected to a container
    * @throws IOException if a XceiverClientSpi cannot be acquired
    */
-  @Override
   public XceiverClientSpi acquireClient(Pipeline pipeline)
       throws IOException {
     return acquireClient(pipeline, false);
@@ -155,7 +154,6 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
    * @return XceiverClientSpi connected to a container
    * @throws IOException if a XceiverClientSpi cannot be acquired
    */
-  @Override
   public XceiverClientSpi acquireClientForReadData(Pipeline pipeline)
       throws IOException {
     return acquireClient(pipeline, true);
@@ -181,7 +179,6 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
    * @param client client to release
    * @param invalidateClient if true, invalidates the client in cache
    */
-  @Override
   public void releaseClient(XceiverClientSpi client, boolean invalidateClient) {
     releaseClient(client, invalidateClient, false);
   }
@@ -192,7 +189,6 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
    * @param client client to release
    * @param invalidateClient if true, invalidates the client in cache
    */
-  @Override
   public void releaseClientForReadData(XceiverClientSpi client,
       boolean invalidateClient) {
     releaseClient(client, invalidateClient, true);

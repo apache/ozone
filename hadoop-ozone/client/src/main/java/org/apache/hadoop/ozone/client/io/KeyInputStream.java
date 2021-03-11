@@ -22,9 +22,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -96,47 +94,6 @@ public class KeyInputStream extends InputStream
         xceiverClientFactory, verifyChecksum, retryFunction);
 
     return new LengthInputStream(keyInputStream, keyInputStream.length);
-  }
-
-  public static List<LengthInputStream> getStreamsFromKeyInfo(OmKeyInfo keyInfo,
-      XceiverClientFactory xceiverClientFactory, boolean verifyChecksum,
-      Function<OmKeyInfo, OmKeyInfo> retryFunction) {
-    List<OmKeyLocationInfo> keyLocationInfos = keyInfo
-        .getLatestVersionLocations().getBlocksLatestVersionOnly();
-
-    List<LengthInputStream> lengthInputStreams = new ArrayList<>();
-
-    // Iterate through each block info in keyLocationInfos and assign it the
-    // corresponding part in the partsToBlockMap. Also increment each part's
-    // length accordingly.
-    Map<Integer, List<OmKeyLocationInfo>> partsToBlocksMap = new HashMap<>();
-    Map<Integer, Long> partsLengthMap = new HashMap<>();
-
-    for (OmKeyLocationInfo omKeyLocationInfo: keyLocationInfos) {
-      int partNumber = omKeyLocationInfo.getPartNumber();
-
-      if (!partsToBlocksMap.containsKey(partNumber)) {
-        partsToBlocksMap.put(partNumber, new ArrayList<>());
-        partsLengthMap.put(partNumber, 0L);
-      }
-      // Add Block to corresponding partNumber in partsToBlocksMap
-      partsToBlocksMap.get(partNumber).add(omKeyLocationInfo);
-      // Update the part length
-      partsLengthMap.put(partNumber,
-          partsLengthMap.get(partNumber) + omKeyLocationInfo.getLength());
-    }
-
-    // Create a KeyInputStream for each part.
-    for (Map.Entry<Integer, List<OmKeyLocationInfo>> entry :
-        partsToBlocksMap.entrySet()) {
-      KeyInputStream keyInputStream = new KeyInputStream();
-      keyInputStream.initialize(keyInfo, entry.getValue(),
-          xceiverClientFactory, verifyChecksum, retryFunction);
-      lengthInputStreams.add(new LengthInputStream(keyInputStream,
-          partsLengthMap.get(entry.getKey())));
-    }
-
-    return lengthInputStreams;
   }
 
   private synchronized void initialize(OmKeyInfo keyInfo,

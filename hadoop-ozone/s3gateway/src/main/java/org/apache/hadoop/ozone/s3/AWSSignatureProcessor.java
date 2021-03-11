@@ -346,19 +346,16 @@ public class AWSSignatureProcessor implements SignatureProcessor {
     return Hex.encode(md.digest()).toLowerCase();
   }
 
-  @Override
   public String getAwsAccessId() {
     return (v4Header != null ? v4Header.getAccessKeyID() :
         v2Header != null ? v2Header.getAccessKeyID() : "");
   }
 
-  @Override
   public String getSignature() {
     return (v4Header != null ? v4Header.getSignature() :
         v2Header != null ? v2Header.getSignature() : "");
   }
 
-  @Override
   public String getStringToSign() throws Exception {
     return stringToSign;
   }
@@ -379,7 +376,6 @@ public class AWSSignatureProcessor implements SignatureProcessor {
     this.v2Header = v2Header;
   }
 
-  @Override
   public Exception getException() {
     return this.exception;
   }

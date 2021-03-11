@@ -159,10 +159,6 @@ public class SCMNodeManager implements NodeManager {
     }
   }
 
-  protected NodeStateManager getNodeStateManager() {
-    return nodeStateManager;
-  }
-
   /**
    * Returns all datanode that are in the given state. This function works by
    * taking a snapshot of the current collection and then returning the list
@@ -407,12 +403,6 @@ public class SCMNodeManager implements NodeManager {
     return commandQueue.getCommand(datanodeDetails.getUuid());
   }
 
-  boolean opStateDiffers(DatanodeDetails dnDetails, NodeStatus nodeStatus) {
-    return nodeStatus.getOperationalState() != dnDetails.getPersistedOpState()
-        || nodeStatus.getOpStateExpiryEpochSeconds()
-        != dnDetails.getPersistedOpStateExpiryEpochSec();
-  }
-
   /**
    * If the operational state or expiry reported in the datanode heartbeat do
    * not match those store in SCM, queue a command to update the state persisted
@@ -424,10 +414,12 @@ public class SCMNodeManager implements NodeManager {
    * @param reportedDn The DatanodeDetails taken from the node heartbeat.
    * @throws NodeNotFoundException
    */
-  protected void updateDatanodeOpState(DatanodeDetails reportedDn)
+  private void updateDatanodeOpState(DatanodeDetails reportedDn)
       throws NodeNotFoundException {
     NodeStatus scmStatus = getNodeStatus(reportedDn);
-    if (opStateDiffers(reportedDn, scmStatus)) {
+    if (scmStatus.getOperationalState() != reportedDn.getPersistedOpState()
+        || scmStatus.getOpStateExpiryEpochSeconds()
+        != reportedDn.getPersistedOpStateExpiryEpochSec()) {
       LOG.info("Scheduling a command to update the operationalState " +
           "persisted on {} as the reported value does not " +
           "match the value stored in SCM ({}, {})",
@@ -821,7 +813,7 @@ public class SCMNodeManager implements NodeManager {
    */
   @Override
   public void onMessage(CommandForDatanode commandForDatanode,
-                        EventPublisher ignored) {
+      EventPublisher ignored) {
     addDatanodeCommand(commandForDatanode.getDatanodeId(),
         commandForDatanode.getCommand());
   }

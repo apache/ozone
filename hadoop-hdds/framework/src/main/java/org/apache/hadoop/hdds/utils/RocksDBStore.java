@@ -45,8 +45,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.apache.hadoop.hdds.utils.HddsServerUtil.toIOException;
-
 /**
  * RocksDB implementation of ozone metadata store.
  */
@@ -97,6 +95,16 @@ public class RocksDBStore implements MetadataStore {
       LOG.debug("[Option] maxOpenFiles= {}", options.maxOpenFiles());
       LOG.debug("[Option] writeBufferSize= {}", options.writeBufferSize());
     }
+  }
+
+  public static IOException toIOException(String msg, RocksDBException e) {
+    String statusCode = e.getStatus() == null ? "N/A" :
+        e.getStatus().getCodeString();
+    String errMessage = e.getMessage() == null ? "Unknown error" :
+        e.getMessage();
+    String output = msg + "; status : " + statusCode
+        + "; message : " + errMessage;
+    return new IOException(output, e);
   }
 
   @Override

@@ -24,8 +24,6 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos
     .ExtendedDatanodeDetailsProto;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.PipelineID;
@@ -41,8 +39,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
-import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
@@ -111,7 +107,6 @@ import java.net.URI;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Callable;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Test for Recon API endpoints.
@@ -381,11 +376,6 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
 
   private void testDatanodeResponse(DatanodeMetadata datanodeMetadata)
       throws IOException {
-    // Check NodeState and NodeOperationalState field existence
-    Assert.assertEquals(NodeState.HEALTHY, datanodeMetadata.getState());
-    Assert.assertEquals(NodeOperationalState.IN_SERVICE,
-        datanodeMetadata.getOperationalState());
-
     String hostname = datanodeMetadata.getHostname();
     switch (hostname) {
     case HOST1:
@@ -453,43 +443,6 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
           reconScm.getPipelineManager()
               .getContainersInPipeline(pipeline.getId()).size() == 1);
     });
-
-    // Change Node OperationalState with NodeManager
-    final NodeManager nodeManager = reconScm.getScmNodeManager();
-    final DatanodeDetails dnDetailsInternal =
-        nodeManager.getNodeByUuid(datanodeDetails.getUuidString());
-    // Backup existing state and sanity check
-    final NodeStatus nStatus = nodeManager.getNodeStatus(dnDetailsInternal);
-    final NodeOperationalState backupOpState =
-        dnDetailsInternal.getPersistedOpState();
-    final long backupOpStateExpiry =
-        dnDetailsInternal.getPersistedOpStateExpiryEpochSec();
-    assertEquals(backupOpState, nStatus.getOperationalState());
-    assertEquals(backupOpStateExpiry, nStatus.getOpStateExpiryEpochSeconds());
-
-    dnDetailsInternal.setPersistedOpState(NodeOperationalState.DECOMMISSIONING);
-    dnDetailsInternal.setPersistedOpStateExpiryEpochSec(666L);
-    nodeManager.setNodeOperationalState(dnDetailsInternal,
-        NodeOperationalState.DECOMMISSIONING, 666L);
-    // Check if the endpoint response reflects the change
-    response = nodeEndpoint.getDatanodes();
-    datanodesResponse = (DatanodesResponse) response.getEntity();
-    // Order of datanodes in the response is random
-    AtomicInteger count = new AtomicInteger();
-    datanodesResponse.getDatanodes().forEach(metadata -> {
-      if (metadata.getUuid().equals(dnDetailsInternal.getUuidString())) {
-        count.incrementAndGet();
-        assertEquals(NodeOperationalState.DECOMMISSIONING,
-            metadata.getOperationalState());
-      }
-    });
-    assertEquals(1, count.get());
-
-    // Restore state
-    dnDetailsInternal.setPersistedOpState(backupOpState);
-    dnDetailsInternal.setPersistedOpStateExpiryEpochSec(backupOpStateExpiry);
-    nodeManager.setNodeOperationalState(dnDetailsInternal,
-        backupOpState, backupOpStateExpiry);
   }
 
   @Test

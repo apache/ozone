@@ -72,7 +72,6 @@ public abstract class Failures {
    * Restart Ozone Manager to induce failure.
    */
   public static class OzoneManagerRestartFailure extends OzoneFailures {
-    @Override
     public void fail(MiniOzoneChaosCluster cluster) {
       boolean failureMode = FailureManager.isFastRestart();
       Set<OzoneManager> oms = cluster.omToFail();
@@ -92,7 +91,6 @@ public abstract class Failures {
    * Start/Stop Ozone Manager to induce failure.
    */
   public static class OzoneManagerStartStopFailure extends OzoneFailures {
-    @Override
     public void fail(MiniOzoneChaosCluster cluster) {
       // Get the number of OzoneManager to fail in the cluster.
       boolean shouldStop = cluster.shouldStop();
@@ -126,7 +124,6 @@ public abstract class Failures {
    * Restart Datanodes to induce failure.
    */
   public static class DatanodeRestartFailure extends DatanodeFailures {
-    @Override
     public void fail(MiniOzoneChaosCluster cluster) {
       boolean failureMode = FailureManager.isFastRestart();
       Set<DatanodeDetails> dns = cluster.dnToFail();
@@ -144,7 +141,6 @@ public abstract class Failures {
    * Start/Stop Datanodes to induce failure.
    */
   public static class DatanodeStartStopFailure extends DatanodeFailures {
-    @Override
     public void fail(MiniOzoneChaosCluster cluster) {
       // Get the number of datanodes to fail in the cluster.
       Set<DatanodeDetails> dns = cluster.dnToFail();

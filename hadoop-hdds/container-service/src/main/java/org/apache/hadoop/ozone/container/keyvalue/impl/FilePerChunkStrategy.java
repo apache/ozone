@@ -216,8 +216,6 @@ public class FilePerChunkStrategy implements ChunkManager {
     possibleFiles.add(finalChunkFile);
     if (dispatcherContext != null && dispatcherContext.isReadFromTmpFile()) {
       possibleFiles.add(getTmpChunkFile(finalChunkFile, dispatcherContext));
-      // HDDS-2372. Read finalChunkFile after tmpChunkFile to solve race
-      // condition between read and commit.
       possibleFiles.add(finalChunkFile);
     }
 

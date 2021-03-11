@@ -30,9 +30,6 @@ public class OzoneInputStream extends InputStream implements CanUnbuffer {
 
   private final InputStream inputStream;
 
-  public OzoneInputStream() {
-    inputStream = null;
-  }
   /**
    * Constructs OzoneInputStream with KeyInputStream.
    *

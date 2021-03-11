@@ -21,15 +21,9 @@ package org.apache.hadoop.hdds.scm.server;
 
 import java.io.IOException;
 import java.math.BigInteger;
-import java.security.cert.CRLException;
-import java.security.cert.X509CRL;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
-
 import java.util.List;
-import java.util.Date;
-import java.util.Optional;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -37,15 +31,9 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
-import org.apache.hadoop.hdds.security.x509.certificate.authority.CRLApprover;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
-import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.bouncycastle.asn1.x509.CRLReason;
-import org.bouncycastle.cert.X509CertificateHolder;
-import org.bouncycastle.cert.X509v2CRLBuilder;
-import org.bouncycastle.operator.OperatorCreationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,12 +49,11 @@ public class SCMCertStore implements CertificateStore {
       LoggerFactory.getLogger(SCMCertStore.class);
   private SCMMetadataStore scmMetadataStore;
   private final Lock lock;
-  private AtomicLong crlSequenceId;
 
-  public SCMCertStore(SCMMetadataStore dbStore, long sequenceId) {
+  public SCMCertStore(SCMMetadataStore dbStore) {
     this.scmMetadataStore = dbStore;
     lock = new ReentrantLock();
-    crlSequenceId = new AtomicLong(sequenceId);
+
   }
 
   @Override
@@ -123,75 +110,39 @@ public class SCMCertStore implements CertificateStore {
   }
 
   @Override
-  public Optional<Long> revokeCertificates(
-      List<BigInteger> serialIDs,
-      X509CertificateHolder caCertificateHolder,
-      CRLReason reason,
-      Date revocationTime,
-      CRLApprover crlApprover)
-      throws IOException {
-    Date now = new Date();
-    X509v2CRLBuilder builder =
-        new X509v2CRLBuilder(caCertificateHolder.getIssuer(), now);
-    List<X509Certificate> certsToRevoke = new ArrayList<>();
-    X509CRL crl;
-    Optional<Long> sequenceId = Optional.empty();
+  public void revokeCertificate(BigInteger serialID) throws IOException {
     lock.lock();
     try {
-      for (BigInteger serialID: serialIDs) {
-        X509Certificate cert =
-            getCertificateByID(serialID, CertType.VALID_CERTS);
-        if (cert == null && LOG.isWarnEnabled()) {
-          LOG.warn("Trying to revoke a certificate that is not valid. " +
-              "Serial ID: {}", serialID.toString());
-        } else if (getCertificateByID(serialID, CertType.REVOKED_CERTS)
-            != null) {
-          LOG.warn("Trying to revoke a certificate that is already revoked.");
-        } else {
-          builder.addCRLEntry(serialID, revocationTime,
-              reason.getValue().intValue());
-          certsToRevoke.add(cert);
-        }
+      X509Certificate cert = getCertificateByID(serialID, CertType.VALID_CERTS);
+      if (cert == null) {
+        LOG.error("trying to revoke a certificate that is not valid. Serial: " +
+            "{}", serialID.toString());
+        throw new SCMSecurityException("Trying to revoke an invalid " +
+            "certificate.");
       }
-      if (!certsToRevoke.isEmpty()) {
-        try {
-          crl = crlApprover.sign(builder);
-        } catch (OperatorCreationException | CRLException e) {
-          throw new SCMSecurityException("Unable to create Certificate " +
-              "Revocation List.", e);
-        }
-        // let us do this in a transaction.
-        try (BatchOperation batch =
-                 scmMetadataStore.getStore().initBatchOperation()) {
-          // Move the certificates from Valid Certs table to Revoked Certs Table
-          // only if the revocation time has passed.
-          if (now.after(revocationTime) || now.equals(revocationTime)) {
-            for (X509Certificate cert : certsToRevoke) {
-              scmMetadataStore.getRevokedCertsTable()
-                  .putWithBatch(batch, cert.getSerialNumber(), cert);
-              scmMetadataStore.getValidCertsTable()
-                  .deleteWithBatch(batch, cert.getSerialNumber());
-            }
-          }
-          long id = crlSequenceId.incrementAndGet();
-          CRLInfo crlInfo = new CRLInfo.Builder()
-              .setX509CRL(crl)
-              .setCreationTimestamp(now.getTime())
-              .build();
-          scmMetadataStore.getCRLInfoTable().putWithBatch(
-              batch, id, crlInfo);
+      // TODO : Check if we are trying to revoke an expired certificate.
 
-          // Update the CRL Sequence Id Table with the last sequence id.
-          scmMetadataStore.getCRLSequenceIdTable().putWithBatch(batch,
-              CRL_SEQUENCE_ID_KEY, id);
-          scmMetadataStore.getStore().commitBatchOperation(batch);
-          sequenceId = Optional.of(id);
+      if (getCertificateByID(serialID, CertType.REVOKED_CERTS) != null) {
+        LOG.error("Trying to revoke a certificate that is already revoked.");
+        throw new SCMSecurityException("Trying to revoke an already revoked " +
+            "certificate.");
+      }
+
+      // let is do this in a transaction.
+      try (BatchOperation batch =
+               scmMetadataStore.getStore().initBatchOperation();) {
+        scmMetadataStore.getRevokedCertsTable()
+            .putWithBatch(batch, serialID, cert);
+        if (scmMetadataStore.getValidSCMCertsTable().get(serialID) != null) {
+          scmMetadataStore.getValidSCMCertsTable().deleteWithBatch(batch,
+              serialID);
         }
+        scmMetadataStore.getValidCertsTable().deleteWithBatch(batch, serialID);
+        scmMetadataStore.getStore().commitBatchOperation(batch);
       }
     } finally {
       lock.unlock();
     }
-    return sequenceId;
   }
 
   @Override

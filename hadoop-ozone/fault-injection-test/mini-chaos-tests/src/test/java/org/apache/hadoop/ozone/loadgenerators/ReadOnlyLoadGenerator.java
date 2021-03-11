@@ -43,7 +43,6 @@ public class ReadOnlyLoadGenerator extends LoadGenerator {
   }
 
 
-  @Override
   public void initialize() throws Exception {
     for (int index = 0; index < NUM_KEYS; index++) {
       ByteBuffer buffer = dataBuffer.getBuffer(index);

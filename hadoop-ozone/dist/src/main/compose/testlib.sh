@@ -23,6 +23,8 @@ RESULT_DIR_INSIDE="/tmp/smoketest/$(basename "$COMPOSE_ENV_NAME")/result"
 OM_HA_PARAM=""
 if [[ -n "${OM_SERVICE_ID}" ]] && [[ "${OM_SERVICE_ID}" != "om" ]]; then
   OM_HA_PARAM="--om-service-id=${OM_SERVICE_ID}"
+else
+  OM_SERVICE_ID=om
 fi
 
 : ${SCM:=scm}
@@ -137,8 +139,7 @@ start_docker_env(){
   export OZONE_SAFEMODE_MIN_DATANODES="${datanode_count}"
   docker-compose --no-ansi down
   if ! { docker-compose --no-ansi up -d --scale datanode="${datanode_count}" \
-      && wait_for_safemode_exit \
-      && wait_for_om_leader ; }; then
+      && wait_for_safemode_exit ; }; then
     OUTPUT_NAME="$COMPOSE_ENV_NAME"
     stop_docker_env
     return 1
@@ -176,7 +177,7 @@ execute_robot_test(){
     && docker-compose exec -T "$CONTAINER" robot \
       -v KEY_NAME:"${OZONE_BUCKET_KEY_NAME}" \
       -v OM_HA_PARAM:"${OM_HA_PARAM}" \
-      -v OM_SERVICE_ID:"${OM_SERVICE_ID:-om}" \
+      -v OM_SERVICE_ID:"${OM_SERVICE_ID}" \
       -v OZONE_DIR:"${OZONE_DIR}" \
       -v SECURITY_ENABLED:"${SECURITY_ENABLED}" \
       -v SCM:"${SCM}" \
