@@ -19,14 +19,8 @@ Resource            ../ozone-lib/shell.robot
 Test Timeout        5 minutes
 
 *** Variables ***
-${SUFFIX}    ${EMPTY}
+${KEY_NAME_SUFFIX}    ${EMPTY}
 
 *** Test Cases ***
 Key Can Be Written
-    Create Key    /vol1/bucket1/key-${SUFFIX}    /etc/passwd
-
-Dir Can Be Created
-    Execute    ozone fs -mkdir o3fs://bucket1.vol1/dir-${SUFFIX}
-
-File Can Be Put
-    Execute    ozone fs -put /etc/passwd o3fs://bucket1.vol1/dir-${SUFFIX}/
+    Create Key    /vol1/bucket1/key-${KEY_NAME_SUFFIX}    /etc/passwd

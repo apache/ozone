@@ -169,11 +169,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
     newKeyArgs.setKeyName(keyPath);
 
-    if (keyArgs.getIsMultipartKey()) {
-      getFileEncryptionInfoForMpuKey(keyArgs, newKeyArgs, ozoneManager);
-    } else {
-      generateRequiredEncryptionInfo(keyArgs, newKeyArgs, ozoneManager);
-    }
+    generateRequiredEncryptionInfo(keyArgs, newKeyArgs, ozoneManager);
 
     newCreateKeyRequest =
         createKeyRequest.toBuilder().setKeyArgs(newKeyArgs)

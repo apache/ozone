@@ -208,7 +208,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     return userTable;
   }
 
-  @Override
   public Table<OzoneTokenIdentifier, Long> getDelegationTokenTable() {
     return dTokenTable;
   }
@@ -732,13 +731,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     return result;
   }
 
-  @Override
   public Iterator<Map.Entry<CacheKey<String>, CacheValue<OmBucketInfo>>>
       getBucketIterator(){
     return bucketTable.cacheIterator();
   }
 
-  @Override
   public TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
       getKeyIterator(){
     return keyTable.iterator();

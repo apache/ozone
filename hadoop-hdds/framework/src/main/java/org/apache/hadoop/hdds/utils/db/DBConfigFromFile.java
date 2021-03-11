@@ -35,8 +35,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 
-import static org.apache.hadoop.hdds.utils.HddsServerUtil.toIOException;
-
 /**
  * A Class that controls the standard config options of RocksDB.
  * <p>
@@ -136,7 +134,7 @@ public final class DBConfigFromFile {
               env, options, cfDescs, true);
 
         } catch (RocksDBException rdEx) {
-          toIOException("Unable to find/open Options file.", rdEx);
+          RDBTable.toIOException("Unable to find/open Options file.", rdEx);
         }
       }
     }

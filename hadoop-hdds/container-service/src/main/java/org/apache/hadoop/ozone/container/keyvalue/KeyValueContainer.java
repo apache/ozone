@@ -553,7 +553,6 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   /**
    * Acquire read lock.
    */
-  @Override
   public void readLock() {
     this.lock.readLock().lock();
 
@@ -562,7 +561,6 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   /**
    * Release read lock.
    */
-  @Override
   public void readUnlock() {
     this.lock.readLock().unlock();
   }
@@ -570,7 +568,6 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   /**
    * Check if the current thread holds read lock.
    */
-  @Override
   public boolean hasReadLock() {
     return this.lock.readLock().tryLock();
   }
@@ -578,7 +575,6 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   /**
    * Acquire write lock.
    */
-  @Override
   public void writeLock() {
     // TODO: The lock for KeyValueContainer object should not be exposed
     // publicly.
@@ -588,7 +584,6 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   /**
    * Release write lock.
    */
-  @Override
   public void writeUnlock() {
     this.lock.writeLock().unlock();
 
@@ -597,7 +592,6 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   /**
    * Check if the current thread holds write lock.
    */
-  @Override
   public boolean hasWriteLock() {
     return this.lock.writeLock().isHeldByCurrentThread();
   }
@@ -712,7 +706,6 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
         .getContainerID() + OzoneConsts.DN_CONTAINER_DB);
   }
 
-  @Override
   public boolean scanMetaData() {
     long containerId = containerData.getContainerID();
     KeyValueContainerCheck checker =
@@ -727,7 +720,6 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
         || containerData.getState() == ContainerDataProto.State.QUASI_CLOSED;
   }
 
-  @Override
   public boolean scanData(DataTransferThrottler throttler, Canceler canceler) {
     if (!shouldScanData()) {
       throw new IllegalStateException("The checksum verification can not be" +

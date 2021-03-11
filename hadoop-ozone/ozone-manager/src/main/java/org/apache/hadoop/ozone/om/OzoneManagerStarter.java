@@ -119,7 +119,6 @@ public class OzoneManagerStarter extends GenericCli {
    */
   static class OMStarterHelper implements OMStarterInterface{
 
-    @Override
     public void start(OzoneConfiguration conf) throws IOException,
         AuthenticationException {
       OzoneManager om = OzoneManager.createOm(conf);
@@ -127,7 +126,6 @@ public class OzoneManagerStarter extends GenericCli {
       om.join();
     }
 
-    @Override
     public boolean init(OzoneConfiguration conf) throws IOException,
         AuthenticationException {
       return OzoneManager.omInit(conf);

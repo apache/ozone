@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
-import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
@@ -37,11 +36,8 @@ import java.util.List;
     versionProvider = HddsVersionProvider.class)
 public class MaintenanceSubCommand extends ScmSubcommand {
 
-  @CommandLine.Spec
-  private CommandLine.Model.CommandSpec spec;
-
   @CommandLine.Parameters(description = "List of fully qualified host names")
-  private List<String> hosts = new ArrayList<>();
+  private List<String> hosts = new ArrayList<String>();
 
   @CommandLine.Option(names = {"--end"},
       description = "Automatically end maintenance after the given hours. "+
@@ -50,12 +46,6 @@ public class MaintenanceSubCommand extends ScmSubcommand {
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
-    if (hosts.size() > 0) {
-      scmClient.startMaintenanceNodes(hosts, endInHours);
-      System.out.println("Entering maintenance mode on datanode(s):\n" +
-          String.join("\n", hosts));
-    } else {
-      GenericCli.missingSubcommand(spec);
-    }
+    scmClient.startMaintenanceNodes(hosts, endInHours);
   }
 }

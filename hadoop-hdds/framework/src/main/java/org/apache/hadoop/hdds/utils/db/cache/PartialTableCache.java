@@ -95,7 +95,6 @@ public class PartialTableCache<CACHEKEY extends CacheKey,
     epochEntries.add(new EpochEntry<>(value.getEpoch(), cacheKey));
   }
 
-  @Override
   public void cleanup(List<Long> epochs) {
     executorService.execute(() -> evictCache(epochs));
   }
@@ -111,7 +110,6 @@ public class PartialTableCache<CACHEKEY extends CacheKey,
   }
 
   @VisibleForTesting
-  @Override
   public void evictCache(List<Long> epochs) {
     EpochEntry<CACHEKEY> currentEntry;
     CACHEKEY cachekey;
@@ -149,7 +147,6 @@ public class PartialTableCache<CACHEKEY extends CacheKey,
     }
   }
 
-  @Override
   public CacheResult<CACHEVALUE> lookup(CACHEKEY cachekey) {
 
     CACHEVALUE cachevalue = cache.get(cachekey);
@@ -166,7 +163,6 @@ public class PartialTableCache<CACHEKEY extends CacheKey,
     }
   }
 
-  @Override
   @VisibleForTesting
   public Set<EpochEntry<CACHEKEY>> getEpochEntrySet() {
     return epochEntries;

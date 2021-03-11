@@ -176,20 +176,8 @@
   <property>
     <name>dfs.container.ratis.ipc</name>
     <value>9858</value>
-    <tag>OZONE, CONTAINER, PIPELINE, RATIS</tag>
-    <description>The ipc port number of container for clients.</description>
-  </property>
-  <property>
-    <name>dfs.container.ratis.admin.port</name>
-    <value>9857</value>
     <tag>OZONE, CONTAINER, PIPELINE, RATIS, MANAGEMENT</tag>
-    <description>The ipc port number of container for admin requests.</description>
-  </property>
-  <property>
-    <name>dfs.container.ratis.server.port</name>
-    <value>9856</value>
-    <tag>OZONE, CONTAINER, PIPELINE, RATIS, MANAGEMENT</tag>
-    <description>The ipc port number of container for server-server communication.</description>
+    <description>The ipc port number of container.</description>
   </property>
   <property>
     <name>dfs.container.ratis.ipc.random.port</name>
@@ -987,17 +975,7 @@
     <tag>OZONE, MANAGEMENT</tag>
     <description>
       Retry count for the RPC from Datanode to SCM. The rpc-retry-interval
-      is 1s by default. Make sure rpc-retry-count * (rpc-timeout +
-      rpc-retry-interval) is less than hdds.heartbeat.interval.
-    </description>
-  </property>
-  <property>
-    <name>ozone.scm.heartbeat.rpc-retry-interval</name>
-    <value>1s</value>
-    <tag>OZONE, MANAGEMENT</tag>
-    <description>
-      Retry interval for the RPC from Datanode to SCM.
-      Make sure rpc-retry-count * (rpc-timeout + rpc-retry-interval)
+      is 1s. Make sure rpc-retry-count * (rpc-timeout + rpc-retry-interval)
       is less than hdds.heartbeat.interval.
     </description>
   </property>

@@ -58,7 +58,6 @@ public class OMKeysDeleteResponse extends AbstractOMKeyDeleteResponse {
     super(omResponse);
   }
 
-  @Override
   public void checkAndUpdateDB(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
     if (getOMResponse().getStatus() == OK ||

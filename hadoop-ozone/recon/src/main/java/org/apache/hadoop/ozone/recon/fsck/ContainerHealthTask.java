@@ -68,7 +68,6 @@ public class ContainerHealthTask extends ReconScmTask {
     interval = reconTaskConfig.getMissingContainerTaskInterval().toMillis();
   }
 
-  @Override
   public synchronized void run() {
     try {
       while (canRun()) {

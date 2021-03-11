@@ -22,21 +22,15 @@ import java.io.IOException;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.server.http.BaseHttpServer;
-import org.apache.hadoop.ozone.OzoneConsts;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_DB_CHECKPOINT_HTTP_ENDPOINT;
 
 /**
  * HttpServer2 wrapper for the Ozone Storage Container Manager.
  */
 public class StorageContainerManagerHttpServer extends BaseHttpServer {
 
-  public StorageContainerManagerHttpServer(MutableConfigurationSource conf,
-                                           StorageContainerManager scm)
+  public StorageContainerManagerHttpServer(MutableConfigurationSource conf)
       throws IOException {
     super(conf, "scm");
-    addServlet("dbCheckpoint", OZONE_OM_DB_CHECKPOINT_HTTP_ENDPOINT,
-        SCMDBCheckpointServlet.class);
-    getWebAppContext().setAttribute(OzoneConsts.SCM_CONTEXT_ATTRIBUTE, scm);
   }
 
   @Override protected String getHttpAddressKey() {

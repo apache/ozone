@@ -250,11 +250,6 @@ public final class ScmConfigKeys {
   public static final int OZONE_SCM_HEARTBEAT_RPC_RETRY_COUNT_DEFAULT =
       15;
 
-  public static final String OZONE_SCM_HEARTBEAT_RPC_RETRY_INTERVAL =
-      "ozone.scm.heartbeat.rpc-retry-interval";
-  public static final String OZONE_SCM_HEARTBEAT_RPC_RETRY_INTERVAL_DEFAULT =
-      "1s";
-
   /**
    * Defines how frequently we will log the missing of heartbeat to a specific
    * SCM. In the default case we will write a warning message for each 10

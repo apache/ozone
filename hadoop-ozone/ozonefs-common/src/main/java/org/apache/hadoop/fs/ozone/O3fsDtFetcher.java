@@ -50,12 +50,10 @@ public class O3fsDtFetcher implements DtFetcher {
   /**
    * Returns the service name for O3fs, which is also a valid URL prefix.
    */
-  @Override
   public Text getServiceName() {
     return new Text(SERVICE_NAME);
   }
 
-  @Override
   public boolean isTokenRequired() {
     return UserGroupInformation.isSecurityEnabled();
   }
@@ -68,7 +66,6 @@ public class O3fsDtFetcher implements DtFetcher {
    *  @param url  - the URL to which the request is sent
    *  @return a Token, or null if fetch fails.
    */
-  @Override
   public Token<?> addDelegationTokens(Configuration conf, Credentials creds,
       String renewer, String url) throws Exception {
     if (!url.startsWith(getServiceName().toString())) {

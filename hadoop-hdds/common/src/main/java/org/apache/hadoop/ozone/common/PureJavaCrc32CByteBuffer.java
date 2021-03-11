@@ -24,8 +24,7 @@ package org.apache.hadoop.ozone.common;
  * Similar to {@link org.apache.hadoop.util.PureJavaCrc32C}
  * except that this class implement {@link ChecksumByteBuffer}.
  */
-public final class PureJavaCrc32CByteBuffer extends
-    ChecksumByteBuffer.CrcIntTable {
+final class PureJavaCrc32CByteBuffer extends ChecksumByteBuffer.CrcIntTable {
   @Override
   int[] getTable() {
     return T;

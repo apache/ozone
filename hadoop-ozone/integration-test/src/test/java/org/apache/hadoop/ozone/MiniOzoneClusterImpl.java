@@ -71,19 +71,13 @@ import org.apache.hadoop.test.GenericTestUtils;
 
 import org.apache.commons.io.FileUtils;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
-import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.RATIS;
-import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.RATIS_ADMIN;
-import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.RATIS_SERVER;
-import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.STANDALONE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_IPC_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_ADMIN_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_SERVER_PORT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_HTTP_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
@@ -179,18 +173,15 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     this.reconServer = reconServer;
   }
 
-  @Override
   public OzoneConfiguration getConf() {
     return conf;
   }
 
-  @Override
   public String getOMServiceId() {
     // Non-HA cluster doesn't have OM Service Id.
     return null;
   }
 
-  @Override
   public String getSCMServiceId() {
     // Non-HA cluster doesn't have OM Service Id.
     return null;
@@ -388,17 +379,14 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     stopDatanode(datanodeService);
     // ensure same ports are used across restarts.
     OzoneConfiguration config = datanodeService.getConf();
-    DatanodeDetails dn = datanodeService.getDatanodeDetails();
+    int currentPort = datanodeService.getDatanodeDetails()
+        .getPort(DatanodeDetails.Port.Name.STANDALONE).getValue();
+    config.setInt(DFS_CONTAINER_IPC_PORT, currentPort);
     config.setBoolean(DFS_CONTAINER_IPC_RANDOM_PORT, false);
+    int ratisPort = datanodeService.getDatanodeDetails()
+        .getPort(DatanodeDetails.Port.Name.RATIS).getValue();
+    config.setInt(DFS_CONTAINER_RATIS_IPC_PORT, ratisPort);
     config.setBoolean(DFS_CONTAINER_RATIS_IPC_RANDOM_PORT, false);
-    config.setInt(DFS_CONTAINER_IPC_PORT,
-        dn.getPort(STANDALONE).getValue());
-    config.setInt(DFS_CONTAINER_RATIS_IPC_PORT,
-        dn.getPort(RATIS).getValue());
-    config.setInt(DFS_CONTAINER_RATIS_ADMIN_PORT,
-        dn.getPort(RATIS_ADMIN).getValue());
-    config.setInt(DFS_CONTAINER_RATIS_SERVER_PORT,
-        dn.getPort(RATIS_SERVER).getValue());
     hddsDatanodes.remove(i);
     if (waitForDatanode) {
       // wait for node to be removed from SCM healthy node list.

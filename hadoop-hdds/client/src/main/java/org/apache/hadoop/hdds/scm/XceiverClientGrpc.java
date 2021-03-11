@@ -559,7 +559,6 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     return null;
   }
 
-  @Override
   public long getReplicatedMinCommitIndex() {
     return 0;
   }
