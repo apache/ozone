@@ -94,8 +94,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
     try {
       server = newRaftServer(scmId, conf).setGroup(group).build();
       server.start();
-      // TODO: Timeout and sleep interval should be made configurable
-      waitForLeaderToBeReady(server, 60000, group);
+      waitForLeaderToBeReady(server, conf, group);
     } finally {
       if (server != null) {
         server.close();
@@ -131,26 +130,29 @@ public class SCMRatisServerImpl implements SCMRatisServer {
     }
   }
 
-  private static void waitForLeaderToBeReady(RaftServer server, long timeout,
-      RaftGroup group)
-      throws IOException {
+  private static void waitForLeaderToBeReady(RaftServer server,
+      OzoneConfiguration conf, RaftGroup group) throws IOException {
     boolean ready;
     long st = Time.monotonicNow();
+    final SCMHAConfiguration haConf = conf.getObject(SCMHAConfiguration.class);
+    long waitTimeout = haConf.getLeaderReadyWaitTimeout();
+    long retryInterval = haConf.getLeaderReadyCheckInterval();
+
     do {
       ready = server.getDivision(group.getGroupId()).getInfo().isLeaderReady();
       if (!ready) {
         try {
-          Thread.sleep(2000);
+          Thread.sleep(retryInterval);
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
         }
       }
-    } while (!ready && Time.monotonicNow() - st < timeout);
+    } while (!ready && Time.monotonicNow() - st < waitTimeout);
 
     if (!ready) {
       throw new IOException(String
           .format("Ratis group %s is not ready in %d ms", group.getGroupId(),
-              timeout));
+                  waitTimeout));
     }
   }
 
