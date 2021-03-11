@@ -27,7 +27,9 @@ import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
+import java.util.Date;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * This interface allows the DefaultCA to be portable and use different DB
@@ -51,12 +53,26 @@ public interface CertificateStore {
       X509Certificate certificate, NodeType role) throws IOException;
 
   /**
-   * Moves a certificate in a transactional manner from valid certificate to
-   * revoked certificate state.
-   * @param serialID - Serial ID of the certificate.
-   * @throws IOException
+   * Adds the certificates to be revoked to a new CRL and moves all the
+   * certificates in a transactional manner from valid certificate to
+   * revoked certificate state. Returns an empty {@code Optional} instance if
+   * the certificates were invalid / not found / already revoked and no CRL
+   * was generated. Otherwise, returns the newly generated CRL sequence ID.
+   * @param serialIDs - List of Serial IDs of Certificates to be revoked.
+   * @param caCertificateHolder - X509 Certificate Holder of the CA.
+   * @param reason - CRLReason for revocation.
+   * @param revocationTime - Revocation Time for the certificates.
+   * @param approver - CRL approver to sign the CRL.
+   * @return An empty {@code Optional} instance if no CRL was generated.
+   * Otherwise, returns the newly generated CRL sequence ID.
+   * @throws IOException - on failure.
    */
-  void revokeCertificate(BigInteger serialID) throws IOException;
+  Optional<Long> revokeCertificates(List<BigInteger> serialIDs,
+                                    X509CertificateHolder caCertificateHolder,
+                                    CRLReason reason,
+                                    Date revocationTime,
+                                    CRLApprover approver)
+      throws IOException;
 
   /**
    * Deletes an expired certificate from the store. Please note: We don't
@@ -69,9 +85,9 @@ public interface CertificateStore {
   /**
    * Retrieves a Certificate based on the Serial number of that certificate.
    * @param serialID - ID of the certificate.
-   * @param certType
+   * @param certType - Whether its Valid or Revoked certificate.
    * @return X509Certificate
-   * @throws IOException
+   * @throws IOException - on failure.
    */
   X509Certificate getCertificateByID(BigInteger serialID, CertType certType)
       throws IOException;
@@ -83,7 +99,7 @@ public interface CertificateStore {
    * @param count - max number of certs returned.
    * @param certType cert type (valid/revoked).
    * @return list of X509 certificates.
-   * @throws IOException
+   * @throws IOException - on failure.
    */
   List<X509Certificate> listCertificate(NodeType role,
       BigInteger startSerialID, int count, CertType certType)

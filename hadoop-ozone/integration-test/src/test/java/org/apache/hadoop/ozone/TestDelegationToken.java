@@ -108,7 +108,7 @@ public final class TestDelegationToken {
       .getLogger(TestDelegationToken.class);
 
   @Rule
-  public Timeout timeout = new Timeout(80_000);
+  public Timeout timeout = Timeout.seconds(80);
 
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();

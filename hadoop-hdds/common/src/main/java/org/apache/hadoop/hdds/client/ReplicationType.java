@@ -24,8 +24,8 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
  * The replication type to be used while writing key into ozone.
  */
 public enum ReplicationType {
-    RATIS,
-    STAND_ALONE,
+  RATIS,
+  STAND_ALONE,
   CHAINED;
 
   public static ReplicationType fromProto(

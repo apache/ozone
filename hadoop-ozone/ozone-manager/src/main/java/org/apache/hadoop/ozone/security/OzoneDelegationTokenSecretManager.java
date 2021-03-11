@@ -328,7 +328,7 @@ public class OzoneDelegationTokenSecretManager
       OzoneTokenIdentifier ozoneTokenIdentifier, long expiryTime) {
     //TODO: Instead of having in-memory map inside this class, we can use
     // cache from table and make this table cache clean up policy NEVER. In
-    // this way, we don't need to maintain seperate in-memory map. To do this
+    // this way, we don't need to maintain separate in-memory map. To do this
     // work we need to merge HA/Non-HA code.
     TokenInfo tokenInfo = new TokenInfo(expiryTime, token.getPassword(),
         ozoneTokenIdentifier.getTrackingId());
@@ -342,6 +342,7 @@ public class OzoneDelegationTokenSecretManager
    * @throws InvalidToken for invalid token
    * @throws AccessControlException if the user isn't allowed to cancel
    */
+  @Override
   public OzoneTokenIdentifier cancelToken(Token<OzoneTokenIdentifier> token,
       String canceller) throws IOException {
     OzoneTokenIdentifier id = OzoneTokenIdentifier.readProtoBuf(

@@ -90,7 +90,7 @@ public class BlockInputStream extends InputStream
   // BlockInputStream i.e offset of the data to be read next from this block
   private int chunkIndex;
 
-  // Position of the BlockInputStream is maintainted by this variable till
+  // Position of the BlockInputStream is maintained by this variable till
   // the stream is initialized. This position is w.r.t to the block only and
   // not the key.
   // For the above example, if we seek to position 240 before the stream is
@@ -413,6 +413,13 @@ public class BlockInputStream extends InputStream
   public synchronized void close() {
     releaseClient();
     xceiverClientFactory = null;
+
+    final List<ChunkInputStream> inputStreams = this.chunkStreams;
+    if (inputStreams != null) {
+      for (ChunkInputStream is : inputStreams) {
+        is.close();
+      }
+    }
   }
 
   private void releaseClient() {

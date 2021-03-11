@@ -15,24 +15,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-export COMPOSE_DIR
+_mydir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
-export SECURITY_ENABLED=false
-export OM_SERVICE_ID="id1"
+export OZONE_UPGRADE_FROM="$(basename ${_mydir})"
+export RESULT_DIR="${_mydir}/result"
 
-# shellcheck source=/dev/null
-source "$COMPOSE_DIR/../testlib.sh"
-
-start_docker_env
-
-execute_robot_test scm s3
-
-execute_robot_test scm freon
-
-execute_robot_test scm basic/links.robot
-
-stop_docker_env
-
-generate_report
-
+cd "${_mydir}/.."
+source upgrade_to_current.sh

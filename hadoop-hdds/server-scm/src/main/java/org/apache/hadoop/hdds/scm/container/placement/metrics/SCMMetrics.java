@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.container.placement.metrics;
 
+import org.apache.hadoop.hdds.utils.DBCheckpointMetrics;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
@@ -52,7 +53,14 @@ public class SCMMetrics {
   @Metric private MutableCounterLong containerReportReadCount;
   @Metric private MutableCounterLong containerReportWriteCount;
 
+  private DBCheckpointMetrics dbCheckpointMetrics;
+
+  public DBCheckpointMetrics getDBCheckpointMetrics() {
+    return dbCheckpointMetrics;
+  }
+
   public SCMMetrics() {
+    dbCheckpointMetrics = DBCheckpointMetrics.create("SCM Metrics");
   }
 
   public static SCMMetrics create() {

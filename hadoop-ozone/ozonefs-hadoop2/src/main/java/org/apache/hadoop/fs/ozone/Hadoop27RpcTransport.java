@@ -18,16 +18,17 @@
 package org.apache.hadoop.fs.ozone;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
 
-import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.io.retry.RetryProxy;
+import org.apache.hadoop.ipc.ProtobufHelper;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
+import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -38,36 +39,55 @@ import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 
 /**
- * Hadoop RPC based transport (wihout HA support).
+ * Hadoop RPC based transport with failover support.
  */
 public class Hadoop27RpcTransport implements OmTransport {
 
   private static final RpcController NULL_RPC_CONTROLLER = null;
 
-  private final OzoneManagerProtocolPB proxy;
+  private final OzoneManagerProtocolPB rpcProxy;
 
-  public Hadoop27RpcTransport(
-      ConfigurationSource conf) throws IOException {
-    InetSocketAddress socket = OmUtils.getOmAddressForClients(conf);
-    long version = RPC.getProtocolVersion(OzoneManagerProtocolPB.class);
-    OzoneConfiguration ozoneConfiguration = OzoneConfiguration.of(conf);
+  private final OMFailoverProxyProvider omFailoverProxyProvider;
 
-    RPC.setProtocolEngine(ozoneConfiguration,
+  public Hadoop27RpcTransport(ConfigurationSource conf,
+      UserGroupInformation ugi, String omServiceId) throws IOException {
+
+    RPC.setProtocolEngine(OzoneConfiguration.of(conf),
         OzoneManagerProtocolPB.class,
         ProtobufRpcEngine.class);
-    proxy = RPC.getProtocolProxy(OzoneManagerProtocolPB.class, version,
-        socket, UserGroupInformation.getCurrentUser(),
-        ozoneConfiguration,
-        NetUtils.getDefaultSocketFactory(ozoneConfiguration),
-        getRpcTimeout(ozoneConfiguration), null).getProxy();
+
+    this.omFailoverProxyProvider = new OMFailoverProxyProvider(conf, ugi,
+        omServiceId);
+
+    int maxFailovers = conf.getInt(
+        OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY,
+        OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_DEFAULT);
+
+    rpcProxy = createRetryProxy(omFailoverProxyProvider, maxFailovers);
+
   }
 
   @Override
   public OMResponse submitRequest(OMRequest payload) throws IOException {
     try {
-      return proxy.submitRequest(NULL_RPC_CONTROLLER, payload);
+      OMResponse omResponse =
+          rpcProxy.submitRequest(NULL_RPC_CONTROLLER, payload);
+
+      if (omResponse.hasLeaderOMNodeId() && omFailoverProxyProvider != null) {
+        String leaderOmId = omResponse.getLeaderOMNodeId();
+
+        // Failover to the OM node returned by OMResponse leaderOMNodeId if
+        // current proxy is not pointing to that node.
+        omFailoverProxyProvider.performFailoverIfRequired(leaderOmId);
+      }
+      return omResponse;
     } catch (ServiceException e) {
-      throw new IOException("Service exception during the OM call", e);
+      OMNotLeaderException notLeaderException =
+          OMFailoverProxyProvider.getNotLeaderException(e);
+      if (notLeaderException == null) {
+        throw ProtobufHelper.getRemoteException(e);
+      }
+      throw new IOException("Could not determine or connect to OM Leader.");
     }
   }
 
@@ -76,12 +96,23 @@ public class Hadoop27RpcTransport implements OmTransport {
     return null;
   }
 
-  @Override
-  public void close() throws IOException {
+  /**
+   * Creates a {@link RetryProxy} encapsulating the
+   * {@link OMFailoverProxyProvider}. The retry proxy fails over on network
+   * exception or if the current proxy is not the leader OM.
+   */
+  private OzoneManagerProtocolPB createRetryProxy(
+      OMFailoverProxyProvider failoverProxyProvider, int maxFailovers) {
+
+    OzoneManagerProtocolPB proxy = (OzoneManagerProtocolPB) RetryProxy.create(
+        OzoneManagerProtocolPB.class, failoverProxyProvider,
+        failoverProxyProvider.getRetryPolicy(maxFailovers));
+    return proxy;
   }
 
-  private int getRpcTimeout(OzoneConfiguration conf) {
-    return conf.getInt(CommonConfigurationKeys.IPC_CLIENT_RPC_TIMEOUT_KEY,
-        CommonConfigurationKeys.IPC_CLIENT_RPC_TIMEOUT_DEFAULT);
+  @Override
+  public void close() throws IOException {
+    omFailoverProxyProvider.close();
   }
+
 }

@@ -58,9 +58,12 @@ Check if Recon picks up DN heartbeats
                         Should contain      ${result}       datanode_3
 
     ${result} =         Execute                             curl --negotiate -u : -LSs ${API_ENDPOINT_URL}/clusterState
-                        Should contain      ${result}       \"totalDatanodes\":3
-                        Should contain      ${result}       \"healthyDatanodes\":3
-                        Should contain      ${result}       \"pipelines\":4
+                        Should contain      ${result}       \"totalDatanodes\"
+                        Should contain      ${result}       \"healthyDatanodes\"
+                        Should contain      ${result}       \"pipelines\"
+
+    ${result} =         Execute                             curl --negotiate -u : -LSs ${API_ENDPOINT_URL}/containers/1/replicaHistory
+                        Should contain      ${result}       \"containerId\":1
 
 Check if Recon Web UI is up
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit HTTP user

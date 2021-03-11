@@ -100,6 +100,10 @@ public final class DatanodeIdYaml {
               portEntry.getValue()));
         }
       }
+
+      builder.setInitialVersion(datanodeDetailsYaml.getInitialVersion())
+          .setCurrentVersion(datanodeDetailsYaml.getCurrentVersion());
+
       datanodeDetails = builder.build();
     }
 
@@ -117,16 +121,19 @@ public final class DatanodeIdYaml {
     private String persistedOpState;
     private long persistedOpStateExpiryEpochSec = 0;
     private Map<String, Integer> portDetails;
+    private int initialVersion;
+    private int currentVersion;
 
     public DatanodeDetailsYaml() {
       // Needed for snake-yaml introspection.
     }
 
+    @SuppressWarnings({"parameternumber", "java:S107"}) // required for yaml
     private DatanodeDetailsYaml(String uuid, String ipAddress,
-                                String hostName, String certSerialId,
-                                String persistedOpState,
-                                long persistedOpStateExpiryEpochSec,
-                                Map<String, Integer> portDetails) {
+        String hostName, String certSerialId,
+        String persistedOpState, long persistedOpStateExpiryEpochSec,
+        Map<String, Integer> portDetails,
+        int initialVersion, int currentVersion) {
       this.uuid = uuid;
       this.ipAddress = ipAddress;
       this.hostName = hostName;
@@ -134,6 +141,8 @@ public final class DatanodeIdYaml {
       this.persistedOpState = persistedOpState;
       this.persistedOpStateExpiryEpochSec = persistedOpStateExpiryEpochSec;
       this.portDetails = portDetails;
+      this.initialVersion = initialVersion;
+      this.currentVersion = currentVersion;
     }
 
     public String getUuid() {
@@ -191,6 +200,22 @@ public final class DatanodeIdYaml {
     public void setPortDetails(Map<String, Integer> portDetails) {
       this.portDetails = portDetails;
     }
+
+    public int getInitialVersion() {
+      return initialVersion;
+    }
+
+    public void setInitialVersion(int version) {
+      this.initialVersion = version;
+    }
+
+    public int getCurrentVersion() {
+      return currentVersion;
+    }
+
+    public void setCurrentVersion(int version) {
+      this.currentVersion = version;
+    }
   }
 
   private static DatanodeDetailsYaml getDatanodeDetailsYaml(
@@ -207,6 +232,7 @@ public final class DatanodeIdYaml {
     if (datanodeDetails.getPersistedOpState() != null) {
       persistedOpString = datanodeDetails.getPersistedOpState().name();
     }
+
     return new DatanodeDetailsYaml(
         datanodeDetails.getUuid().toString(),
         datanodeDetails.getIpAddress(),
@@ -214,6 +240,8 @@ public final class DatanodeIdYaml {
         datanodeDetails.getCertSerialId(),
         persistedOpString,
         datanodeDetails.getPersistedOpStateExpiryEpochSec(),
-        portDetails);
+        portDetails,
+        datanodeDetails.getInitialVersion(),
+        datanodeDetails.getCurrentVersion());
   }
 }

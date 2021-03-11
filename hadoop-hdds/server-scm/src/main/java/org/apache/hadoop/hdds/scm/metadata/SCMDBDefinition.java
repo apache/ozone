@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.TransactionInfoCodec;
@@ -85,7 +86,7 @@ public class SCMDBDefinition implements DBDefinition {
 
   public static final DBColumnFamilyDefinition<ContainerID, ContainerInfo>
       CONTAINERS =
-      new DBColumnFamilyDefinition<ContainerID, ContainerInfo>(
+      new DBColumnFamilyDefinition<>(
           "containers",
           ContainerID.class,
           new ContainerIDCodec(),

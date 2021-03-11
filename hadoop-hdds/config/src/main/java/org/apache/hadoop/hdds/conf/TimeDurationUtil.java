@@ -65,64 +65,78 @@ public final class TimeDurationUtil {
 
   enum ParsedTimeDuration {
     NS {
+      @Override
       TimeUnit unit() {
         return TimeUnit.NANOSECONDS;
       }
 
+      @Override
       String suffix() {
         return "ns";
       }
     },
     US {
+      @Override
       TimeUnit unit() {
         return TimeUnit.MICROSECONDS;
       }
 
+      @Override
       String suffix() {
         return "us";
       }
     },
     MS {
+      @Override
       TimeUnit unit() {
         return TimeUnit.MILLISECONDS;
       }
 
+      @Override
       String suffix() {
         return "ms";
       }
     },
     S {
+      @Override
       TimeUnit unit() {
         return TimeUnit.SECONDS;
       }
 
+      @Override
       String suffix() {
         return "s";
       }
     },
     M {
+      @Override
       TimeUnit unit() {
         return TimeUnit.MINUTES;
       }
 
+      @Override
       String suffix() {
         return "m";
       }
     },
     H {
+      @Override
       TimeUnit unit() {
         return TimeUnit.HOURS;
       }
 
+      @Override
       String suffix() {
         return "h";
       }
     },
     D {
+      @Override
       TimeUnit unit() {
         return TimeUnit.DAYS;
       }
 
+      @Override
       String suffix() {
         return "d";
       }
