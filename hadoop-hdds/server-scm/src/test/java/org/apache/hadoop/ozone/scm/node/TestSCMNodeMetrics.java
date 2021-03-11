@@ -195,9 +195,9 @@ public class TestSCMNodeMetrics {
 
     MetricsRecordBuilder metricsSource = getMetrics(SCMNodeMetrics.SOURCE_NAME);
 
-    assertGauge("InServiceHealthyNodes", 0,
+    assertGauge("InServiceHealthyNodes", 1,
         getMetrics(SCMNodeMetrics.class.getSimpleName()));
-    assertGauge("InServiceHealthyReadonlyNodes", 1,
+    assertGauge("InServiceHealthyReadonlyNodes", 0,
         getMetrics(SCMNodeMetrics.class.getSimpleName()));
     assertGauge("InServiceStaleNodes", 0,
         getMetrics(SCMNodeMetrics.class.getSimpleName()));

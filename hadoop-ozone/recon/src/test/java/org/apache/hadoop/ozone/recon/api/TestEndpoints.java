@@ -700,6 +700,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .setContainerReport(containerReportsProto)
             .setDatanodeDetails(extendedDatanodeDetailsProto
                 .getDatanodeDetails())
+            .setDataNodeLayoutVersion(defaultLayoutVersionProto())
             .build();
     reconScm.getDatanodeProtocolServer().sendHeartbeat(heartbeatRequestProto);
     LambdaTestUtils.await(30000, 1000, check);
