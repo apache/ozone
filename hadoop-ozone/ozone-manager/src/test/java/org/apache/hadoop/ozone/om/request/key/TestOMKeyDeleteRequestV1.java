@@ -33,7 +33,9 @@ import org.junit.Assert;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.util.Iterator;
 import java.util.List;
+import java.util.NoSuchElementException;
 
 /**
  * Tests OmKeyDelete request layout version V1.
@@ -90,13 +92,14 @@ public class TestOMKeyDeleteRequestV1 extends TestOMKeyDeleteRequest {
     // As we added manually to key table.
     Assert.assertNotNull(omKeyInfo);
 
-    OzonePrefixPathImpl ozonePrefixPath = new OzonePrefixPathImpl(keyManager);
+    OzonePrefixPathImpl ozonePrefixPath = new OzonePrefixPathImpl(volumeName,
+        bucketName, keyManager);
     verifyPath(ozonePrefixPath, "c", "c/d");
     verifyPath(ozonePrefixPath, "c/d", "c/d/e");
     verifyPath(ozonePrefixPath, "c/d/e", "c/d/e/file1");
 
     try {
-      ozonePrefixPath.getChildren(volumeName, bucketName, "c/d/e/file1");
+      ozonePrefixPath.getChildren("c/d/e/file1");
       Assert.fail("Should throw INVALID_KEY_NAME as the given path is a file.");
     } catch (OMException ome) {
       Assert.assertEquals(OMException.ResultCodes.INVALID_KEY_NAME,
@@ -107,9 +110,15 @@ public class TestOMKeyDeleteRequestV1 extends TestOMKeyDeleteRequest {
   private void verifyPath(OzonePrefixPath ozonePrefixPath, String pathName,
                           String expectedPath)
       throws IOException {
-    List<OzoneFileStatus> statuses = ozonePrefixPath.getChildren(volumeName,
-        bucketName, pathName);
-    Assert.assertEquals(1, statuses.size());
-    Assert.assertEquals(expectedPath, statuses.get(0).getTrimmedName());
+    Iterator<? extends OzoneFileStatus> pathItr = ozonePrefixPath.getChildren(
+        pathName);
+    Assert.assertTrue("Failed to list keyPaths", pathItr.hasNext());
+    Assert.assertEquals(expectedPath, pathItr.next().getTrimmedName());
+    try{
+      pathItr.next();
+      Assert.fail("Reached end of the list!");
+    } catch (NoSuchElementException nse){
+      // expected
+    }
   }
 }

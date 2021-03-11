@@ -28,6 +28,7 @@ import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.OzonePrefixPathImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -42,6 +43,8 @@ import org.apache.hadoop.ozone.om.response.key.OMKeyRenameResponseV1;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.*;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
+import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -103,9 +106,21 @@ public class OMKeyRenameRequestV1 extends OMKeyRenameRequest {
 
       // check Acls to see if user has access to perform delete operation on
       // old key and create operation on new key
-      checkKeyAcls(ozoneManager, volumeName, bucketName, fromKeyName,
-              IAccessAuthorizer.ACLType.DELETE, OzoneObj.ResourceType.KEY,
-          true);
+      OzoneObj obj = OzoneObjInfo.Builder.newBuilder()
+          .setResType(OzoneObj.ResourceType.KEY)
+          .setStoreType(OzoneObj.StoreType.OZONE)
+          .setVolumeName(volumeName)
+          .setBucketName(bucketName)
+          .setKeyName(fromKeyName).build();
+      RequestContext.Builder contextBuilder = RequestContext.newBuilder()
+          .setAclRights(IAccessAuthorizer.ACLType.DELETE)
+          .setRecursiveAccessCheck(true)
+          .setOzonePrefixPath(new OzonePrefixPathImpl(volumeName, bucketName,
+              ozoneManager.getKeyManager()));
+      // check Acl fromKeyName
+      checkKeyAcls(ozoneManager, obj, contextBuilder);
+
+      // check Acl toKeyName
       checkKeyAcls(ozoneManager, volumeName, bucketName, toKeyName,
               IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
 

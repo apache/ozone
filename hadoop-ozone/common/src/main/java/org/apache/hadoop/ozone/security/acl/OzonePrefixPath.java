@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.security.acl;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 
 import java.io.IOException;
-import java.util.List;
+import java.util.Iterator;
 
 public interface OzonePrefixPath {
 
@@ -47,13 +47,9 @@ public interface OzonePrefixPath {
    * Say, KeyPrefix = "a" will return immediate children [a/b1, a/b2, a/b3].
    * Say, KeyPrefix = "a/b2" will return children [a/b2/d1, a/b2/d2, a/b2/d3].
    *
-   * @param volumeName volume name
-   * @param bucketName bucket name
    * @param keyPrefix  keyPrefix name
    * @return list of immediate files or directories under the given keyPrefix.
    * @throws IOException
    */
-  List<OzoneFileStatus> getChildren(String volumeName,
-      String bucketName, String keyPrefix) throws IOException;
-
+  Iterator<? extends OzoneFileStatus> getChildren(String keyPrefix) throws IOException;
 }

@@ -1835,29 +1835,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * @throws OMException ResultCodes.PERMISSION_DENIED if permission denied
    *                     and throwOnPermissionDenied set to true.
    */
-  @SuppressWarnings("parameternumber")
-  public boolean checkAcls(ResourceType resType, StoreType storeType,
-      ACLType aclType, String vol, String bucket, String key,
-      UserGroupInformation ugi, InetAddress remoteAddress, String hostName,
-      boolean throwIfPermissionDenied, String volumeOwner,
-      boolean recursiveAccessCheck)
+  public boolean checkAcls(OzoneObj obj, RequestContext context,
+                           boolean throwIfPermissionDenied)
       throws OMException {
-    OzoneObj obj = OzoneObjInfo.Builder.newBuilder()
-        .setResType(resType)
-        .setStoreType(storeType)
-        .setVolumeName(vol)
-        .setBucketName(bucket)
-        .setKeyName(key).build();
-    RequestContext context = RequestContext.newBuilder()
-        .setClientUgi(ugi)
-        .setIp(remoteAddress)
-        .setHost(hostName)
-        .setAclType(ACLIdentityType.USER)
-        .setAclRights(aclType)
-        .setOwnerName(volumeOwner)
-        .setRecursiveAccessCheck(recursiveAccessCheck)
-        .setOzonePrefixPath(new OzonePrefixPathImpl(keyManager))
-        .build();
+
     if (!accessAuthorizer.checkAccess(obj, context)) {
       if (throwIfPermissionDenied) {
         LOG.warn("User {} doesn't have {} permission to access {} /{}/{}/{}",

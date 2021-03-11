@@ -38,6 +38,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -187,26 +188,26 @@ public abstract class OMClientRequest implements RequestAuditor {
   }
 
   /**
-   * Check Acls of ozone object.
+   * Check Acls for the ozone key.
    * @param ozoneManager
-   * @param resType
-   * @param storeType
-   * @param aclType
-   * @param vol
-   * @param bucket
-   * @param key
+   * @param obj
+   * @param ctxtBuilder
    * @throws IOException
    */
-  @SuppressWarnings("parameternumber")
-  public void checkAcls(OzoneManager ozoneManager,
-      OzoneObj.ResourceType resType,
-      OzoneObj.StoreType storeType, IAccessAuthorizer.ACLType aclType,
-      String vol, String bucket, String key, boolean recursiveAccessCheck)
+  protected void checkKeyAcls(OzoneManager ozoneManager, OzoneObj obj,
+                              RequestContext.Builder ctxtBuilder)
       throws IOException {
-    ozoneManager.checkAcls(resType, storeType, aclType, vol, bucket, key,
-        createUGI(), getRemoteAddress(), getHostName(), true,
-        ozoneManager.getVolumeOwner(vol, aclType, resType),
-        recursiveAccessCheck);
+
+    if (ozoneManager.getAclsEnabled()) {
+      String volumeOwner = ozoneManager.getVolumeOwner(obj.getVolumeName(),
+          ctxtBuilder.getAclRights(), obj.getResourceType());
+      ctxtBuilder.setClientUgi(createUGI());
+      ctxtBuilder.setIp(getRemoteAddress());
+      ctxtBuilder.setHost(getHostName());
+      ctxtBuilder.setAclType(IAccessAuthorizer.ACLIdentityType.USER);
+      ctxtBuilder.setOwnerName(volumeOwner);
+      ozoneManager.checkAcls(obj, ctxtBuilder.build(), true);
+    }
   }
 
   /**

@@ -77,7 +77,7 @@ public class TestRequestContext {
             null, "serviceId",
             IAccessAuthorizer.ACLIdentityType.GROUP,
             IAccessAuthorizer.ACLType.CREATE, "owner", true,
-            new OzonePrefixPathImpl(mockKeyManager));
+            new OzonePrefixPathImpl("vol1", "buck1", mockKeyManager));
     Assert.assertTrue("Wrongly sets recursive flag value",
             context.isRecursiveAccessCheck());
     Assert.assertNotNull("unexpected path accessor",
@@ -92,7 +92,7 @@ public class TestRequestContext {
     return RequestContext.getBuilder(
             UserGroupInformation.createRemoteUser(username), null, null,
             type, ownerName, recursiveAccessCheck,
-            new OzonePrefixPathImpl(mockKeyManager)).build();
+            new OzonePrefixPathImpl("vol1", "buck1", mockKeyManager)).build();
   }
 
   private RequestContext getUserRequestContext(String username,

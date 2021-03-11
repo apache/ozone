@@ -23,39 +23,105 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.security.acl.OzonePrefixPath;
 
 import java.io.IOException;
+import java.util.Iterator;
 import java.util.List;
+import java.util.NoSuchElementException;
 
 public class OzonePrefixPathImpl implements OzonePrefixPath {
 
+  private String volumeName;
+  private String bucketName;
   private KeyManager keyManager;
+  private int batchSize = 1000; // TODO: can be configurable.
 
-  public OzonePrefixPathImpl(KeyManager keyManagerImpl){
+  public OzonePrefixPathImpl(String volumeName, String bucketName,
+                             KeyManager keyManagerImpl) {
+    this.volumeName = volumeName;
+    this.bucketName = bucketName;
     this.keyManager = keyManagerImpl;
   }
 
   @Override
-  public List<OzoneFileStatus> getChildren(String volumeName,
-      String bucketName, String keyPrefix) throws IOException {
+  public Iterator<? extends OzoneFileStatus> getChildren(String keyPrefix)
+      throws IOException {
 
-    OmKeyArgs omKeyArgs = new OmKeyArgs.Builder()
-        .setVolumeName(volumeName)
-        .setBucketName(bucketName)
-        .setKeyName(keyPrefix)
-        .setRefreshPipeline(false)
-        .build();
+    return new PathIterator(keyPrefix);
+  }
 
-    List<OzoneFileStatus> statuses = keyManager.listStatus(omKeyArgs, false,
-        null, Integer.MAX_VALUE);
+  class PathIterator implements Iterator<OzoneFileStatus> {
+    private Iterator<OzoneFileStatus> currentIterator;
+    private String keyPrefix;
+    private OzoneFileStatus currentValue;
 
-    if (statuses.size() == 1) {
-      OzoneFileStatus keyStatus = statuses.get(0);
-      if (keyStatus.isFile() && StringUtils.equals(keyPrefix,
-          keyStatus.getTrimmedName())) {
-        throw new OMException("Invalid KeyPath, file name: " + keyPrefix +
-            " is not allowed.", OMException.ResultCodes.INVALID_KEY_NAME);
+    /**
+     * Creates an Iterator to iterate over all sub paths of the given keyPrefix.
+     *
+     * @param keyPrefix
+     */
+    PathIterator(String keyPrefix) throws IOException {
+      this.keyPrefix = keyPrefix;
+      this.currentValue = null;
+      List<OzoneFileStatus> statuses = getNextListOfKeys("");
+      if (statuses.size() == 1) {
+        OzoneFileStatus keyStatus = statuses.get(0);
+        if (keyStatus.isFile() && StringUtils.equals(keyPrefix,
+            keyStatus.getTrimmedName())) {
+          throw new OMException("Invalid keyPrefix: " + keyPrefix +
+              ", file type is not allowed, expected directory type.",
+              OMException.ResultCodes.INVALID_KEY_NAME);
+        }
       }
+      this.currentIterator = statuses.iterator();
     }
 
-    return statuses;
+    @Override
+    public boolean hasNext() {
+      if (!currentIterator.hasNext() && currentValue != null) {
+        try {
+          currentIterator =
+              getNextListOfKeys(currentValue.getTrimmedName()).iterator();
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }
+      }
+      return currentIterator.hasNext();
+    }
+
+    @Override
+    public OzoneFileStatus next() {
+      if (hasNext()) {
+        currentValue = currentIterator.next();
+        return currentValue;
+      }
+      throw new NoSuchElementException();
+    }
+
+    /**
+     * Gets the next set of key list using keyManager OM interface.
+     *
+     * @param prevKey
+     * @return {@code List<OzoneFileStatus>}
+     */
+    List<OzoneFileStatus> getNextListOfKeys(String prevKey) throws
+        IOException {
+
+      OmKeyArgs omKeyArgs = new OmKeyArgs.Builder()
+          .setVolumeName(volumeName)
+          .setBucketName(bucketName)
+          .setKeyName(keyPrefix)
+          .setRefreshPipeline(false)
+          .build();
+
+      List<OzoneFileStatus> statuses = keyManager.listStatus(omKeyArgs, false,
+          prevKey, batchSize);
+
+      // ListStatuses with non-null startKey will add startKey as first element
+      // in the resultList. Remove startKey element as it is duplicated one.
+      if (!statuses.isEmpty() && StringUtils.equals(prevKey,
+          statuses.get(0).getTrimmedName())) {
+        statuses.remove(0);
+      }
+      return statuses;
+    }
   }
 }

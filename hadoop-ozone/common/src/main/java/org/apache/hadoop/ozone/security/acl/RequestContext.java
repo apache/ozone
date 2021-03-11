@@ -43,7 +43,7 @@ public class RequestContext {
    */
   private final boolean recursiveAccessCheck;
 
-  private OzonePrefixPath ozonePrefixPath;
+  private final OzonePrefixPath ozonePrefixPath;
 
   @SuppressWarnings("parameternumber")
   public RequestContext(String host, InetAddress ip,
