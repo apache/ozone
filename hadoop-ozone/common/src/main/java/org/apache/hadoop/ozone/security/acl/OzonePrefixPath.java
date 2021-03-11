@@ -21,11 +21,15 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import java.io.IOException;
 import java.util.Iterator;
 
+/**
+ * Interface used to lists immediate children(sub-paths) for a given keyPrefix.
+ */
 public interface OzonePrefixPath {
 
   /**
    * Lists immediate children(files or a directories) of the given keyPrefix.
-   * It won't do recursive traversal.
+   * It won't do recursive traversal. The given keyPrefix parameter should be a
+   * directory type.
    *
    * Assume following is the Ozone FS tree structure.
    *
@@ -51,5 +55,6 @@ public interface OzonePrefixPath {
    * @return list of immediate files or directories under the given keyPrefix.
    * @throws IOException
    */
-  Iterator<? extends OzoneFileStatus> getChildren(String keyPrefix) throws IOException;
+  Iterator<? extends OzoneFileStatus> getChildren(String keyPrefix)
+      throws IOException;
 }
