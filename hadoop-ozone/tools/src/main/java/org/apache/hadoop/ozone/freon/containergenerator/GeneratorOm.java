@@ -80,12 +80,14 @@ public class GeneratorOm extends BaseGenerator implements
 
   private Timer timer;
 
+  private OzoneConfiguration config;
+
   @Override
   public Void call() throws Exception {
     init();
     setThreadNo(1);
 
-    OzoneConfiguration config = createOzoneConfiguration();
+    config = createOzoneConfiguration();
 
     File metaDir = OMStorage.getOmDbDir(config);
 
@@ -120,7 +122,7 @@ public class GeneratorOm extends BaseGenerator implements
 
       long containerId = getContainerIdOffset() + index;
 
-      int keyPerContainer = getKeysPerContainer();
+      int keyPerContainer = getKeysPerContainer(config);
       BatchOperation omKeyTableBatchOperation = omDb.initBatchOperation();
       for (long localId = 0; localId < keyPerContainer; localId++) {
         BlockID blockId = new BlockID(containerId, localId);

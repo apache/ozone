@@ -187,7 +187,7 @@ public class GeneratorDatanode extends BaseGenerator {
 
       SplittableRandom random = new SplittableRandom(containerId);
 
-      int keyPerContainer = getKeysPerContainer();
+      int keyPerContainer = getKeysPerContainer(config);
 
       final KeyValueContainer container = createContainer(containerId);
 
@@ -268,7 +268,7 @@ public class GeneratorDatanode extends BaseGenerator {
         ChunkLayOutVersion.getConfiguredVersion(config);
     KeyValueContainerData keyValueContainerData =
         new KeyValueContainerData(containerId, layoutVersion,
-            getContainerSize(),
+            getContainerSize(config),
             getPrefix(), datanodeId);
 
     KeyValueContainer keyValueContainer =

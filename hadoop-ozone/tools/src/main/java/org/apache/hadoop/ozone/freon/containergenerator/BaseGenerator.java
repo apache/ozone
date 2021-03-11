@@ -19,6 +19,9 @@ package org.apache.hadoop.ozone.freon.containergenerator;
 
 import java.util.concurrent.Callable;
 
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.freon.BaseFreonGenerator;
 
 import picocli.CommandLine.Option;
@@ -38,8 +41,8 @@ public abstract class BaseGenerator extends BaseFreonGenerator implements
   private int keySize;
 
   @Option(names = {"--size"},
-      description = "Size of generated containers",
-      defaultValue = "5000000000")
+      description = "Size of generated containers (default is defined by "
+          + "ozone.scm.container.size)")
   private long containerSize;
 
   @Option(names = {"--from"},
@@ -51,16 +54,24 @@ public abstract class BaseGenerator extends BaseFreonGenerator implements
     return userId;
   }
 
-  public int getKeysPerContainer() {
-    return (int) (getContainerSize() / getKeySize());
+  public int getKeysPerContainer(ConfigurationSource conf) {
+    return (int) (getContainerSize(conf) / getKeySize());
   }
 
   public long getContainerIdOffset() {
     return containerIdOffset;
   }
 
-  public long getContainerSize() {
-    return containerSize;
+  public long getContainerSize(ConfigurationSource conf) {
+    if (containerSize == 0) {
+      final Double defaultContainerSize =
+          conf.getStorageSize(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
+              ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,
+              StorageUnit.BYTES);
+      return defaultContainerSize.longValue();
+    } else {
+      return containerSize;
+    }
   }
 
   public int getKeySize() {
