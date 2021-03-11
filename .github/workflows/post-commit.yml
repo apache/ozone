@@ -77,6 +77,7 @@ jobs:
           - author
           - bats
           - checkstyle
+          - docs
           - findbugs
           - rat
           - unit
@@ -93,7 +94,7 @@ jobs:
             maven-repo-${{ hashFiles('**/pom.xml') }}-8
             maven-repo-${{ hashFiles('**/pom.xml') }}
             maven-repo-
-        if: ${{ !contains('author,bats', matrix.check) }}
+        if: ${{ !contains('author,bats,docs', matrix.check) }}
       - name: Execute tests
         run: hadoop-ozone/dev-support/checks/${{ matrix.check }}.sh
       - name: Summary of failures
