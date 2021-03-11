@@ -25,6 +25,7 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collection;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.SplittableRandom;
 import java.util.concurrent.Callable;
@@ -144,14 +145,7 @@ public class GeneratorDatanode extends BaseGenerator {
           + " are created (but after cluster is stopped).");
     }
 
-    final Path scmSpecificDir = Files.list(hddsDir)
-        .filter(Files::isDirectory)
-        .findFirst().get().getFileName();
-    if (scmSpecificDir == null) {
-      throw new IllegalArgumentException(
-          "SCM specific datanode directory doesn't exist");
-    }
-    scmId = scmSpecificDir.toString();
+    scmId = getScmIdFromStoragePath(hddsDir);
 
     final File versionFile = new File(firstStorageDir, "hdds/VERSION");
     Properties props = DatanodeVersionFile.readFrom(versionFile);
@@ -177,6 +171,23 @@ public class GeneratorDatanode extends BaseGenerator {
     timer = getMetrics().timer("datanode-generator");
     runTests(this::generateData);
     return null;
+  }
+
+  private String getScmIdFromStoragePath(Path hddsDir)
+      throws IOException {
+    final Optional<Path> scmSpecificDir = Files.list(hddsDir)
+        .filter(Files::isDirectory)
+        .findFirst();
+    if (!scmSpecificDir.isPresent()) {
+      throw new NoSuchFileException(
+          "SCM specific datanode directory doesn't exist " + hddsDir);
+    }
+    final Path scmDirName = scmSpecificDir.get().getFileName();
+    if (scmDirName == null) {
+      throw new IllegalArgumentException(
+          "SCM specific datanode directory doesn't exist");
+    }
+    return scmDirName.toString();
   }
 
   private void generateData(long index) throws Exception {
