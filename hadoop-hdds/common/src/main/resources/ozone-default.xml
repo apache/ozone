@@ -969,7 +969,17 @@
     <tag>OZONE, MANAGEMENT</tag>
     <description>
       Retry count for the RPC from Datanode to SCM. The rpc-retry-interval
-      is 1s. Make sure rpc-retry-count * (rpc-timeout + rpc-retry-interval)
+      is 1s by default. Make sure rpc-retry-count * (rpc-timeout +
+      rpc-retry-interval) is less than hdds.heartbeat.interval.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.heartbeat.rpc-retry-interval</name>
+    <value>1s</value>
+    <tag>OZONE, MANAGEMENT</tag>
+    <description>
+      Retry interval for the RPC from Datanode to SCM.
+      Make sure rpc-retry-count * (rpc-timeout + rpc-retry-interval)
       is less than hdds.heartbeat.interval.
     </description>
   </property>
