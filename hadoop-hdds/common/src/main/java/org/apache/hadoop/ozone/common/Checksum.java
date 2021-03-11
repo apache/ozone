@@ -145,6 +145,13 @@ public class Checksum {
     return computeChecksum(ChunkBuffer.wrap(data));
   }
 
+  public ChecksumData computeChecksum(List<ByteString> byteStrings)
+      throws OzoneChecksumException {
+    final List<ByteBuffer> buffers =
+        BufferUtils.getReadOnlyByteBuffers(byteStrings);
+    return computeChecksum(ChunkBuffer.wrap(buffers));
+  }
+
   public ChecksumData computeChecksum(ChunkBuffer data)
       throws OzoneChecksumException {
     if (checksumType == ChecksumType.NONE) {

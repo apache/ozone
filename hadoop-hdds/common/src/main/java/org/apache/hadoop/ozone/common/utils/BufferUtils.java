@@ -71,6 +71,10 @@ public final class BufferUtils {
     return buffers;
   }
 
+  public static ByteString concatByteStrings(List<ByteString> byteStrings) {
+    return byteStrings.stream().reduce(ByteString::concat).orElse(null);
+  }
+
   /**
    * Return the summation of the length of all ByteStrings.
    */
