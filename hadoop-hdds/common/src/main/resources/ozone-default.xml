@@ -2507,4 +2507,14 @@
       filesystem semantics.
     </description>
   </property>
+
+  <property>
+    <name>ozone.fs.trash.interval</name>
+    <tag>OZONE, OM</tag>
+    <value>0</value>
+    <description>
+      The interval after which keys in trash would get deleted permanently.
+    </description>
+  </property>
+
 </configuration>
