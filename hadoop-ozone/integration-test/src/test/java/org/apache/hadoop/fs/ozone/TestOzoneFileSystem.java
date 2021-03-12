@@ -799,8 +799,8 @@ public class TestOzoneFileSystem {
     String testKeyName = "testKey2";
     Path path = new Path(OZONE_URI_DELIMITER, testKeyName);
     ContractTestUtils.touch(fs, path);
-    Assert.assertTrue(trash.getConf().getClass("fs.trash.classname",
-        TrashPolicy.class).
+    Assert.assertTrue(trash.getConf().getClass(
+        "fs.trash.classname", TrashPolicy.class).
         isAssignableFrom(TrashPolicyOzone.class));
     Assert.assertEquals(1, trash.getConf().
         getInt(OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY, 0));
