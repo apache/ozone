@@ -1287,7 +1287,7 @@ public class TestOzoneFileSystem {
           cluster.getOzoneManager().getKeyManager());
       Assert.fail("Non-existent key name!");
     } catch (OMException ome) {
-      Assert.assertEquals(OMException.ResultCodes.FILE_NOT_FOUND,
+      Assert.assertEquals(OMException.ResultCodes.KEY_NOT_FOUND,
           ome.getResult());
     }
 

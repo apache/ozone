@@ -27,6 +27,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
+
 public class OzonePrefixPathImpl implements OzonePrefixPath {
 
   private String volumeName;
@@ -47,7 +49,16 @@ public class OzonePrefixPathImpl implements OzonePrefixPath {
         .setKeyName(keyPrefix)
         .setRefreshPipeline(false)
         .build();
-    pathStatus = keyManager.getFileStatus(omKeyArgs);
+    try {
+      pathStatus = keyManager.getFileStatus(omKeyArgs);
+    } catch (OMException ome) {
+      // In existing code non-FSO code, ozone client delete and rename expects
+      // KNF error code. So converting FNF to KEY_NOT_FOUND error code.
+      if (ome.getResult() == OMException.ResultCodes.FILE_NOT_FOUND) {
+        throw new OMException(ome.getMessage(), KEY_NOT_FOUND);
+      }
+      throw ome;
+    }
   }
 
   @Override

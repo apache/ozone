@@ -52,8 +52,10 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 
 /**
  * Base class for file requests.
@@ -607,11 +609,20 @@ public final class OMFileRequest {
       OMMetadataManager omMetadataMgr, String volumeName, String bucketName,
       String keyName, long scmBlockSize) throws IOException {
 
+    OMFileRequest.validateBucket(omMetadataMgr, volumeName, bucketName);
+
     Path keyPath = Paths.get(keyName);
     Iterator<Path> elements = keyPath.iterator();
     String bucketKey = omMetadataMgr.getBucketKey(volumeName, bucketName);
     OmBucketInfo omBucketInfo =
             omMetadataMgr.getBucketTable().get(bucketKey);
+    if (null == omBucketInfo) {
+      // if the volume exists but bucket does not exist, throw bucket not found
+      // exception
+      LOG.error("bucket not found: {}/{} ", volumeName, bucketName);
+      throw new OMException("Bucket not found",
+          BUCKET_NOT_FOUND);
+    }
 
     long lastKnownParentId = omBucketInfo.getObjectID();
     OmDirectoryInfo omDirInfo = null;
@@ -931,5 +942,37 @@ public final class OMFileRequest {
     }
 
     return lastKnownParentId;
+  }
+
+  /**
+   * Validates volume and bucket existence.
+   *
+   * @param metadataManager
+   * @param volumeName
+   * @param bucketName
+   * @throws IOException
+   */
+  public static void validateBucket(OMMetadataManager metadataManager,
+      String volumeName, String bucketName)
+      throws IOException {
+
+    String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
+    // Check if bucket exists
+    if (metadataManager.getBucketTable().get(bucketKey) == null) {
+      String volumeKey = metadataManager.getVolumeKey(volumeName);
+      // If the volume also does not exist, we should throw volume not found
+      // exception
+      if (metadataManager.getVolumeTable().get(volumeKey) == null) {
+        LOG.error("volume not found: {}", volumeName);
+        throw new OMException("Volume not found",
+            VOLUME_NOT_FOUND);
+      }
+
+      // if the volume exists but bucket does not exist, throw bucket not found
+      // exception
+      LOG.error("bucket not found: {}/{} ", volumeName, bucketName);
+      throw new OMException("Bucket not found",
+          BUCKET_NOT_FOUND);
+    }
   }
 }
