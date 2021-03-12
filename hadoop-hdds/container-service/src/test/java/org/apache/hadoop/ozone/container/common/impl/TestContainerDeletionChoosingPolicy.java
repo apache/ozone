@@ -97,12 +97,13 @@ public class TestContainerDeletionChoosingPolicy {
     containerSet = new ContainerSet();
 
     int numContainers = 10;
+    Random random = new Random();
     for (int i = 0; i < numContainers; i++) {
       KeyValueContainerData data = new KeyValueContainerData(i,
           layout,
           ContainerTestHelper.CONTAINER_MAX_SIZE, UUID.randomUUID().toString(),
           UUID.randomUUID().toString());
-      data.incrPendingDeletionBlocks(new Random().nextInt(numContainers) + 1);
+      data.incrPendingDeletionBlocks(random.nextInt(numContainers) + 1);
       data.closeContainer();
       KeyValueContainer container = new KeyValueContainer(data, conf);
       containerSet.addContainer(container);

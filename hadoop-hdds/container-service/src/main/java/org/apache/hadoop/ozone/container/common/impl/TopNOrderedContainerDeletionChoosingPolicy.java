@@ -86,9 +86,6 @@ public class TopNOrderedContainerDeletionChoosingPolicy
                   + "pending deletion blocks num: {}.", entry.getContainerID(),
               entry.getNumPendingDeletionBlocks());
         }
-        if (totalBlocks == 0) {
-          break;
-        }
       } else {
         LOG.debug("Stop looking for next container, there is no"
             + " pending deletion block contained in remaining containers.");

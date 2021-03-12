@@ -60,7 +60,6 @@ public class RandomContainerDeletionChoosingPolicy
     // container but with container we also return an integer so that total
     // blocks don't exceed the number of blocks to be deleted in an interval.
 
-    int flag = 0;
     for (ContainerData entry : shuffled) {
       if (((KeyValueContainerData) entry).getNumPendingDeletionBlocks() > 0) {
         blockCount -=
@@ -74,9 +73,6 @@ public class RandomContainerDeletionChoosingPolicy
           LOG.debug("Select container {} for block deletion, "
                   + "pending deletion blocks num: {}.", entry.getContainerID(),
               ((KeyValueContainerData) entry).getNumPendingDeletionBlocks());
-        }
-        if (blockCount == 0) {
-          break;
         }
       }
     }
