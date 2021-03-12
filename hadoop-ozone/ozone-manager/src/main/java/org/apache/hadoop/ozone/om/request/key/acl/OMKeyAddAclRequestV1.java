@@ -141,8 +141,8 @@ public class OMKeyAddAclRequestV1 extends OMKeyAclRequestV1 {
       OzoneManagerProtocolProtos.OMResponse.Builder omResponse,
       OmKeyInfo omKeyInfo, boolean operationResult, boolean isDirectory) {
     omResponse.setSuccess(operationResult);
-    omResponse.setSetAclResponse(
-        OzoneManagerProtocolProtos.SetAclResponse.newBuilder()
+    omResponse.setAddAclResponse(
+        OzoneManagerProtocolProtos.AddAclResponse.newBuilder()
             .setResponse(operationResult));
     return new OMKeyAclResponseV1(omResponse.build(), omKeyInfo, isDirectory);
   }
