@@ -6,6 +6,9 @@ import org.junit.Test;
 
 import java.math.BigInteger;
 
+/**
+ * Class to test BigIntegerCodec serialize and deserialize.
+ */
 public class TestBigIntegerCodec {
 
   @Test
