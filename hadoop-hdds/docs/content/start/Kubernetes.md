@@ -45,7 +45,7 @@ kubectl get pod
 Access the services
 ```
 
-Now you can access any of the services. By default the services are not published but you can access them with port-foward rules.
+Now you can access any of the services. By default the services are not published but you can access them with port-forward rules.
 
 ```
 kubectl port-forward s3g-0 9878:9878

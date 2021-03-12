@@ -272,7 +272,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
         .build();
   }
 
-  private List< OzoneAcl > getAclsForKey(KeyArgs keyArgs,
+  protected List< OzoneAcl > getAclsForKey(KeyArgs keyArgs,
       OmBucketInfo bucketInfo, PrefixManager prefixManager) {
     List<OzoneAcl> acls = new ArrayList<>();
 
@@ -541,6 +541,37 @@ public abstract class OMKeyRequest extends OMClientRequest {
         if (encryptionInfo.isPresent()) {
           newKeyArgs.setFileEncryptionInfo(
               OMPBHelper.convert(encryptionInfo.get()));
+        }
+      }
+    }
+  }
+
+  protected void getFileEncryptionInfoForMpuKey(KeyArgs keyArgs,
+      KeyArgs.Builder newKeyArgs, OzoneManager ozoneManager)
+      throws IOException {
+
+    String volumeName = keyArgs.getVolumeName();
+    String bucketName = keyArgs.getBucketName();
+
+    boolean acquireLock = false;
+    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+
+    if (ozoneManager.getKmsProvider() != null) {
+      acquireLock = omMetadataManager.getLock().acquireReadLock(
+          BUCKET_LOCK, volumeName, bucketName);
+      try {
+        OmKeyInfo omKeyInfo = omMetadataManager.getOpenKeyTable().get(
+            omMetadataManager.getMultipartKey(volumeName, bucketName,
+                keyArgs.getKeyName(), keyArgs.getMultipartUploadID()));
+
+        if (omKeyInfo != null && omKeyInfo.getFileEncryptionInfo() != null) {
+          newKeyArgs.setFileEncryptionInfo(
+              OMPBHelper.convert(omKeyInfo.getFileEncryptionInfo()));
+        }
+      } finally {
+        if (acquireLock) {
+          omMetadataManager.getLock().releaseReadLock(
+              BUCKET_LOCK, volumeName, bucketName);
         }
       }
     }

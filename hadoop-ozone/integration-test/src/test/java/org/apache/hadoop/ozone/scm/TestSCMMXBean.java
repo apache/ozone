@@ -62,7 +62,7 @@ public class TestSCMMXBean {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = new Timeout(300000);
+  public Timeout timeout = Timeout.seconds(300);
 
   public static final Log LOG = LogFactory.getLog(TestSCMMXBean.class);
   private static int numOfDatanodes = 3;

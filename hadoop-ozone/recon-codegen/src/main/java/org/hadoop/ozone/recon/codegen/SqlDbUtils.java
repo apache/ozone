@@ -74,6 +74,7 @@ public final class SqlDbUtils {
    */
   public static OutputStream disableDerbyLogFile(){
     return new OutputStream() {
+      @Override
       public void write(int b) throws IOException {
         // Ignore all log messages
       }

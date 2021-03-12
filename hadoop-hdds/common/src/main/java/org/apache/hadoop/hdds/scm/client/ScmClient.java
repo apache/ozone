@@ -287,4 +287,17 @@ public interface ScmClient extends Closeable {
    * returns the list of ratis peer roles. Currently only include peer address.
    */
   List<String> getScmRatisRoles() throws IOException;
+
+  /**
+   * Get usage information of datanode by ipaddress or uuid.
+   *
+   * @param ipaddress datanode ipaddress String
+   * @param uuid datanode uuid String
+   * @return List of DatanodeUsageInfo. Each element contains info such as
+   * capacity, SCMused, and remaining space.
+   * @throws IOException
+   */
+  List<HddsProtos.DatanodeUsageInfo> getDatanodeUsageInfo(String ipaddress,
+                                                  String uuid)
+      throws IOException;
 }

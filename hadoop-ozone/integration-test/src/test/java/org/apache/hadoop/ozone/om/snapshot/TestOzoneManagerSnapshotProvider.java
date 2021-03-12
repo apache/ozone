@@ -56,7 +56,7 @@ public class TestOzoneManagerSnapshotProvider {
   private int numOfOMs = 3;
 
   @Rule
-  public Timeout timeout = new Timeout(300_000);
+  public Timeout timeout = Timeout.seconds(300);
 
   /**
    * Create a MiniDFSCluster for testing.

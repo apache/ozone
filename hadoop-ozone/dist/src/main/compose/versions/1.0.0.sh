@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -14,6 +15,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-HDDS_VERSION=${hdds.version}
-OZONE_RUNNER_VERSION=${docker.ozone-runner.version}
-OZONE_OPTS=
+ozone_logical_version() {
+  echo 2
+}
+
+ozone_version_load() {
+  export OZONE_ADMIN_COMMAND=admin
+  export OZONE_SAFEMODE_STATUS_COMMAND='ozone admin safemode status --verbose'
+}
+
+ozone_version_unload() {
+  unset OZONE_ADMIN_COMMAND
+  unset OZONE_SAFEMODE_STATUS_COMMAND
+}

@@ -648,6 +648,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setBucketName(args.getBucketName())
         .setKeyName(args.getKeyName())
         .setDataSize(args.getDataSize())
+        .setType(args.getType())
+        .setFactor(args.getFactor())
         .addAllKeyLocations(locationInfoList.stream()
             // TODO use OM version?
             .map(info -> info.getProtobuf(CURRENT_VERSION))
@@ -784,6 +786,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    * @param bucket - Name of the bucket.
    * @throws IOException
    */
+  @Override
   public void deleteBucket(String volume, String bucket) throws IOException {
     DeleteBucketRequest.Builder req = DeleteBucketRequest.newBuilder();
     req.setVolumeName(volume);
@@ -1043,6 +1046,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     return response;
   }
 
+  @Override
   public List<ServiceInfo> getServiceList() throws IOException {
     ServiceListRequest req = ServiceListRequest.newBuilder().build();
 
@@ -1180,6 +1184,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    * @return OzoneFileStatus for the key.
    * @throws IOException
    */
+  @Override
   public OzoneFileStatus getFileStatus(OmKeyArgs args) throws IOException {
     KeyArgs keyArgs = KeyArgs.newBuilder()
         .setVolumeName(args.getVolumeName())

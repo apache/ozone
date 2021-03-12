@@ -34,4 +34,4 @@ S3 Gateway Web UI
                         Should contain      ${result}       Location
                         Should contain      ${result}       /static/
     ${result} =         Execute                             curl --negotiate -u : -v ${ENDPOINT_URL}/static/index.html
-                        Should contain      ${result}       Apache Hadoop Ozone S3
+                        Should contain      ${result}       Apache Ozone S3
