@@ -27,10 +27,8 @@ import java.security.cert.X509CRL;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 
-import java.util.Iterator;
 import java.util.List;
 import java.util.Date;
-import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
@@ -63,7 +61,7 @@ import static org.apache.hadoop.hdds.security.x509.certificate.authority.Certifi
 /**
  * A Certificate Store class that persists certificates issued by SCM CA.
  */
-public class SCMCertStore implements CertificateStore {
+public final class SCMCertStore implements CertificateStore {
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMCertStore.class);
   private SCMMetadataStore scmMetadataStore;
@@ -287,13 +285,13 @@ public class SCMCertStore implements CertificateStore {
 
   public static class Builder {
 
-    private SCMMetadataStore scmMetadataStore;
+    private SCMMetadataStore metadataStore;
     private long crlSequenceId;
     private SCMRatisServer scmRatisServer;
 
 
     public Builder setMetadaStore(SCMMetadataStore scmMetadataStore) {
-      this.scmMetadataStore = scmMetadataStore;
+      this.metadataStore = scmMetadataStore;
       return this;
     }
 
@@ -308,7 +306,7 @@ public class SCMCertStore implements CertificateStore {
     }
 
     public CertificateStore build() {
-      final SCMCertStore scmCertStore = new SCMCertStore(scmMetadataStore,
+      final SCMCertStore scmCertStore = new SCMCertStore(metadataStore,
           crlSequenceId);
 
       final SCMHAInvocationHandler scmhaInvocationHandler =
