@@ -2517,4 +2517,13 @@
     </description>
   </property>
 
+  <property>
+    <name>ozone.fs.trash.checkpoint.interval</name>
+    <tag>OZONE, OM</tag>
+    <value>0</value>
+    <description>
+      The interval after which trash checkpoints would get created.
+    </description>
+  </property>
+
 </configuration>
