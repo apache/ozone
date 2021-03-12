@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.container.common.statemachine;
 
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ClosePipelineInfo;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction.Action.CLOSE;
 import static org.apache.hadoop.test.GenericTestUtils.waitFor;
 import static org.junit.Assert.assertEquals;
@@ -49,6 +50,7 @@ import com.google.protobuf.Descriptors.Descriptor;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineAction;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
 import org.apache.hadoop.ozone.container.common.states.DatanodeState;
 import org.apache.hadoop.test.LambdaTestUtils;
@@ -392,12 +394,28 @@ public class TestStateContext {
     stateContext.addEndpoint(scm1);
     stateContext.addEndpoint(scm2);
 
-    // Add PipelineAction. Should be added to all endpoints.
-    stateContext.addPipelineActionIfAbsent(
-        PipelineAction.newBuilder().setAction(
-            PipelineAction.Action.CLOSE).build());
+    final ClosePipelineInfo closePipelineInfo = ClosePipelineInfo.newBuilder()
+        .setPipelineID(PipelineID.randomId().getProtobuf())
+        .setReason(ClosePipelineInfo.Reason.PIPELINE_FAILED)
+        .setDetailedReason("Test").build();
+    final PipelineAction pipelineAction = PipelineAction.newBuilder()
+        .setClosePipeline(closePipelineInfo)
+        .setAction(PipelineAction.Action.CLOSE)
+        .build();
 
+    // Add PipelineAction. Should be added to all endpoints.
+    stateContext.addPipelineActionIfAbsent(pipelineAction);
+
+    pipelineActions = stateContext.getPendingPipelineAction(scm2, 10);
+    assertEquals(1, pipelineActions.size());
+    // The pipeline action is dequeued from scm2 now, but still in scm1
+
+    // The same pipeline action will not be added if it already exists
+    stateContext.addPipelineActionIfAbsent(pipelineAction);
     pipelineActions = stateContext.getPendingPipelineAction(scm1, 10);
+    assertEquals(1, pipelineActions.size());
+    // The pipeline action should have been be added back to the scm2
+    pipelineActions = stateContext.getPendingPipelineAction(scm2, 10);
     assertEquals(1, pipelineActions.size());
 
     // Add ContainerAction. Should be added to all endpoints.
@@ -546,5 +564,41 @@ public class TestStateContext {
     subject.execute(executorService, 2, TimeUnit.SECONDS);
     assertEquals(1, awaited.get());
     assertEquals(1, executed.get());
+  }
+
+  @Test
+  public void testGetReports() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    DatanodeStateMachine datanodeStateMachineMock =
+        mock(DatanodeStateMachine.class);
+
+    StateContext ctx = new StateContext(conf, DatanodeStates.getInitState(),
+        datanodeStateMachineMock);
+    InetSocketAddress scm1 = new InetSocketAddress("scm1", 9001);
+    ctx.addEndpoint(scm1);
+    InetSocketAddress scm2 = new InetSocketAddress("scm2", 9001);
+    ctx.addEndpoint(scm2);
+    // Check initial state
+    assertEquals(0, ctx.getAllAvailableReports(scm1).size());
+    assertEquals(0, ctx.getAllAvailableReports(scm2).size());
+
+    Map<String, Integer> expectedReportCount = new HashMap<>();
+
+    // Add a bunch of ContainerReports
+    batchAddReports(ctx, StateContext.CONTAINER_REPORTS_PROTO_NAME, 128);
+    batchAddReports(ctx, StateContext.NODE_REPORT_PROTO_NAME, 128);
+    batchAddReports(ctx, StateContext.PIPELINE_REPORTS_PROTO_NAME, 128);
+    batchAddReports(ctx,
+        StateContext.INCREMENTAL_CONTAINER_REPORT_PROTO_NAME, 128);
+
+    // Should only keep the latest one
+    expectedReportCount.put(StateContext.CONTAINER_REPORTS_PROTO_NAME, 1);
+    expectedReportCount.put(StateContext.NODE_REPORT_PROTO_NAME, 1);
+    expectedReportCount.put(StateContext.PIPELINE_REPORTS_PROTO_NAME, 1);
+    // Should keep less or equal than maxLimit depending on other reports' size.
+    expectedReportCount.put(
+        StateContext.INCREMENTAL_CONTAINER_REPORT_PROTO_NAME, 97);
+    checkReportCount(ctx.getReports(scm1, 100), expectedReportCount);
+    checkReportCount(ctx.getReports(scm2, 100), expectedReportCount);
   }
 }

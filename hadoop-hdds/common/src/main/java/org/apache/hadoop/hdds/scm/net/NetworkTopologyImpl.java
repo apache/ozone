@@ -86,6 +86,7 @@ public class NetworkTopologyImpl implements NetworkTopology{
    * @exception IllegalArgumentException if add a node to a leave or node to be
    * added is not a leaf
    */
+  @Override
   public void add(Node node) {
     Preconditions.checkArgument(node != null, "node cannot be null");
     if (node instanceof InnerNode) {
@@ -120,6 +121,7 @@ public class NetworkTopologyImpl implements NetworkTopology{
    * existing datanode is removed from the system.
    * @param node node to be removed; cannot be null
    */
+  @Override
   public void remove(Node node) {
     Preconditions.checkArgument(node != null, "node cannot be null");
     if (node instanceof InnerNode) {
@@ -143,6 +145,7 @@ public class NetworkTopologyImpl implements NetworkTopology{
    * @param node a node
    * @return true if <i>node</i> is already in the tree; false otherwise
    */
+  @Override
   public boolean contains(Node node) {
     Preconditions.checkArgument(node != null, "node cannot be null");
     netlock.readLock().lock();
@@ -164,6 +167,7 @@ public class NetworkTopologyImpl implements NetworkTopology{
    * Compare the specified ancestor generation of each node for equality.
    * @return true if their specified generation ancestor are equal
    */
+  @Override
   public boolean isSameAncestor(Node node1, Node node2, int ancestorGen) {
     if (node1 == null || node2 == null || ancestorGen <= 0) {
       return false;
@@ -180,6 +184,7 @@ public class NetworkTopologyImpl implements NetworkTopology{
    * Compare the direct parent of each node for equality.
    * @return true if their parent are the same
    */
+  @Override
   public boolean isSameParent(Node node1, Node node2) {
     if (node1 == null || node2 == null) {
       return false;
@@ -201,6 +206,7 @@ public class NetworkTopologyImpl implements NetworkTopology{
    * @param ancestorGen  the ancestor generation
    * @return the ancestor. If no ancestor is found, then null is returned.
    */
+  @Override
   public Node getAncestor(Node node, int ancestorGen) {
     if (node == null) {
       return null;
@@ -219,6 +225,7 @@ public class NetworkTopologyImpl implements NetworkTopology{
    * @param loc a path string representing a node, can be leaf or inner node
    * @return a reference to the node, null if the node is not in the tree
    */
+  @Override
   public Node getNode(String loc) {
     loc = NetUtils.normalize(loc);
     netlock.readLock().lock();
@@ -239,6 +246,7 @@ public class NetworkTopologyImpl implements NetworkTopology{
    * @return the number of leaf nodes for InnerNode, 1 for leaf node, 0 if node
    * doesn't exist
    */
+  @Override
   public int getNumOfLeafNode(String loc) {
     netlock.readLock().lock();
     try {
@@ -256,6 +264,7 @@ public class NetworkTopologyImpl implements NetworkTopology{
    * Return the max level of this tree, start from 1 for ROOT. For example,
    * topology like "/rack/node" has the max level '3'.
    */
+  @Override
   public int getMaxLevel() {
     return maxLevel;
   }
@@ -265,6 +274,7 @@ public class NetworkTopologyImpl implements NetworkTopology{
    * @param level topology level, start from 1, which means ROOT
    * @return the number of nodes on the level
    */
+  @Override
   public int getNumOfNodes(int level) {
     Preconditions.checkArgument(level > 0 && level <= maxLevel,
         "Invalid level");
@@ -283,6 +293,7 @@ public class NetworkTopologyImpl implements NetworkTopology{
    *              ones in <i>scope</i>; otherwise, choose one from <i>scope</i>.
    * @return the chosen node
    */
+  @Override
   public Node chooseRandom(String scope) {
     if (scope == null) {
       scope = ROOT;
@@ -305,6 +316,7 @@ public class NetworkTopologyImpl implements NetworkTopology{
    *                      starts with ~
    * @return the chosen node
    */
+  @Override
   public Node chooseRandom(String scope, List<String> excludedScopes) {
     return chooseRandom(scope, excludedScopes, null, null,
         ANCESTOR_GENERATION_DEFAULT);
@@ -322,6 +334,7 @@ public class NetworkTopologyImpl implements NetworkTopology{
    *
    * @return the chosen node
    */
+  @Override
   public Node chooseRandom(String scope, Collection<Node> excludedNodes) {
     if (scope == null) {
       scope = ROOT;
@@ -355,6 +368,7 @@ public class NetworkTopologyImpl implements NetworkTopology{
    *
    * @return the chosen node
    */
+  @Override
   public Node chooseRandom(String scope, Collection<Node> excludedNodes,
       int ancestorGen) {
     if (scope == null) {
@@ -388,6 +402,7 @@ public class NetworkTopologyImpl implements NetworkTopology{
    *                     excludedNodes if affinityNode is null
    * @return the chosen node
    */
+  @Override
   public Node chooseRandom(String scope, List<String> excludedScopes,
       Collection<Node> excludedNodes, Node affinityNode, int ancestorGen) {
     if (scope == null) {
@@ -457,6 +472,7 @@ public class NetworkTopologyImpl implements NetworkTopology{
    *   from subtree /dc1. LeafIndex 1, so we pick the 2nd available node n4.
    *
    */
+  @Override
   public Node getNode(int leafIndex, String scope, List<String> excludedScopes,
       Collection<Node> excludedNodes, Node affinityNode, int ancestorGen) {
     Preconditions.checkArgument(leafIndex >= 0);
@@ -582,6 +598,7 @@ public class NetworkTopologyImpl implements NetworkTopology{
    * are the same or {@link Integer#MAX_VALUE} if node1 or node2 do not belong
    * to the cluster
    */
+  @Override
   public int getDistanceCost(Node node1, Node node2) {
     if ((node1 != null && node2 != null && node1.equals(node2)) ||
         (node1 == null && node2 == null))  {
@@ -637,6 +654,7 @@ public class NetworkTopologyImpl implements NetworkTopology{
    * @param nodes     Available replicas with the requested data
    * @param activeLen Number of active nodes at the front of the array
    */
+  @Override
   public List<? extends Node> sortByDistanceCost(Node reader,
       List<? extends Node> nodes, int activeLen) {
     /** Sort weights for the nodes array */

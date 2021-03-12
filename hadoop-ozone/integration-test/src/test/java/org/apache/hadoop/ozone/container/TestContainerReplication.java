@@ -60,7 +60,7 @@ public class TestContainerReplication {
    * Set the timeout for every test.
    */
   @Rule
-  public Timeout testTimeout = new Timeout(300000);
+  public Timeout testTimeout = Timeout.seconds(300);;
 
   private static final String VOLUME = "vol1";
   private static final String BUCKET = "bucket1";

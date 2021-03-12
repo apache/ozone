@@ -193,12 +193,24 @@ public final class CertificateSignRequest {
       return this;
     }
 
-    // Support SAN extenion with DNS and RFC822 Name
+    // Support SAN extension with DNS and RFC822 Name
     // other name type will be added as needed.
     public CertificateSignRequest.Builder addDnsName(String dnsName) {
       Preconditions.checkNotNull(dnsName, "dnsName cannot be null");
       this.addAltName(GeneralName.dNSName, dnsName);
       return this;
+    }
+
+    public boolean hasDnsName() {
+      if (altNames == null || altNames.isEmpty()) {
+        return false;
+      }
+      for (GeneralName name : altNames) {
+        if (name.getTagNo() == GeneralName.dNSName) {
+          return true;
+        }
+      }
+      return false;
     }
 
     // IP address is subject to change which is optional for now.

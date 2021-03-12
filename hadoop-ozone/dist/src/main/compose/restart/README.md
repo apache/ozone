@@ -12,4 +12,11 @@
   limitations under the License. See accompanying LICENSE file.
 -->
 
-The scripts in this directory define version-specific behavior required for [`testlib.sh`](../../testlib.sh).  For example the `ozone admin` command was renamed from `ozone scmcli` in 1.0.0.
+# Compose file for restart
+
+This directory contains a sample cluster definition and script for
+testing restart of the cluster with the same version.
+
+Data for each container is persisted in mounted volume (by default it's
+`data` under the `compose/restart` directory, but can be overridden via
+`OZONE_VOLUME` environment variable).

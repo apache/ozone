@@ -234,7 +234,7 @@ public class OzoneManagerLock {
       throw new RuntimeException(errorMessage);
     } else {
       // When acquiring multiple user locks, the reason for doing lexical
-      // order comparision is to avoid deadlock scenario.
+      // order comparison is to avoid deadlock scenario.
 
       // Example: 1st thread acquire lock(ozone, hdfs)
       // 2nd thread acquire lock(hdfs, ozone).

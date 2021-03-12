@@ -60,6 +60,7 @@ public class DNCertificateClient extends DefaultCertificateClient {
         .setDigitalSignature(true);
   }
 
+  @Override
   public Logger getLogger() {
     return LOG;
   }

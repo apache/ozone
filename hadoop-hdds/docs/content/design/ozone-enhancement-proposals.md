@@ -76,7 +76,7 @@ The easiest way to create a design doc is to create a new markdown file in a PR 
 
 A very common practice of today is to create design doc on google docs and upload it to the JIRA.
 
- 1. Publicy available: YES, anybody can download it from the Jira.
+ 1. Publicly available: YES, anybody can download it from the Jira.
  2. Archived: YES, it's available from Apache infra.
  3. Editable: NO, It's harder to reuse the text to import to the docs or create a new design doc.
  4. Commentable: PARTIAL, Not as easy as a text file or the original google docs, but a good structure with numbered section may help
@@ -137,7 +137,7 @@ Defined in the markdown header. Proposed statuses:
 
  * `outdated`: Code has been changed and design doc doesn't reflect any more the state of the current code.
 
- Note: the _accepted_ design docs won't be visible as part of the documentation or only under a dedicated section to clearly comminucate that it's not ready, yet.
+ Note: the _accepted_ design docs won't be visible as part of the documentation or only under a dedicated section to clearly communicate that it's not ready, yet.
 
 3. Problem statement (Motivation / Abstract)
 

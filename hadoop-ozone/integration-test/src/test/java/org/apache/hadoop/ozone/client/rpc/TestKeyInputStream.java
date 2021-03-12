@@ -86,8 +86,6 @@ public class TestKeyInputStream {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestKeyInputStream.class);
 
-  private static final int TIMEOUT = 300_000;
-
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf = new OzoneConfiguration();
   private OzoneClient client;
@@ -166,7 +164,7 @@ public class TestKeyInputStream {
   }
 
   @Rule
-  public Timeout timeout = new Timeout(TIMEOUT);
+  public Timeout timeout = Timeout.seconds(300);
 
   /**
    * Shutdown MiniDFSCluster.

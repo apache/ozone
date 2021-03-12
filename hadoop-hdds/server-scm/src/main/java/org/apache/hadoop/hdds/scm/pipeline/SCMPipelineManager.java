@@ -363,6 +363,7 @@ public class SCMPipelineManager implements
     }
   }
 
+  @Override
   public List<Pipeline> getPipelines(ReplicationType type,
       Pipeline.PipelineState state) {
     lock.readLock().lock();
@@ -724,6 +725,7 @@ public class SCMPipelineManager implements
    * @param  pipeline
    * @return healthy volume count
    */
+  @Override
   public int minHealthyVolumeNum(Pipeline pipeline) {
     return nodeManager.minHealthyVolumeNum(pipeline.getNodes());
   }
@@ -734,6 +736,7 @@ public class SCMPipelineManager implements
    * @param  pipeline
    * @return healthy volume count
    */
+  @Override
   public int minPipelineLimit(Pipeline pipeline) {
     return nodeManager.minPipelineLimit(pipeline.getNodes());
   }

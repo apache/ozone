@@ -50,6 +50,7 @@ public class OMCertificateClient extends DefaultCertificateClient {
     super(securityConfig, LOG, null, COMPONENT_NAME);
   }
 
+  @Override
   protected InitResponse handleCase(InitCase init) throws
       CertificateException {
     switch (init) {
@@ -119,6 +120,7 @@ public class OMCertificateClient extends DefaultCertificateClient {
   }
 
 
+  @Override
   public Logger getLogger() {
     return LOG;
   }
