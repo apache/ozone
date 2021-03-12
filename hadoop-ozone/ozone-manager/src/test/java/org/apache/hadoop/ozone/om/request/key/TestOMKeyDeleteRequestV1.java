@@ -91,8 +91,13 @@ public class TestOMKeyDeleteRequestV1 extends TestOMKeyDeleteRequest {
     // As we added manually to key table.
     Assert.assertNotNull(omKeyInfo);
 
+    // OzonePrefixPathImpl on a directory
     OzonePrefixPathImpl ozonePrefixPath = new OzonePrefixPathImpl(volumeName,
-        bucketName, keyManager);
+        bucketName, "c", keyManager);
+    OzoneFileStatus status = ozonePrefixPath.getOzonePrefixPath();
+    Assert.assertNotNull(status);
+    Assert.assertEquals("c", status.getTrimmedName());
+    Assert.assertTrue(status.isDirectory());
     verifyPath(ozonePrefixPath, "c", "c/d");
     verifyPath(ozonePrefixPath, "c/d", "c/d/e");
     verifyPath(ozonePrefixPath, "c/d/e", "c/d/e/file1");
@@ -104,6 +109,15 @@ public class TestOMKeyDeleteRequestV1 extends TestOMKeyDeleteRequest {
       Assert.assertEquals(OMException.ResultCodes.INVALID_KEY_NAME,
           ome.getResult());
     }
+
+    // OzonePrefixPathImpl on a file
+    ozonePrefixPath = new OzonePrefixPathImpl(volumeName,
+        bucketName, "c/d/e/file1", keyManager);
+    status = ozonePrefixPath.getOzonePrefixPath();
+    Assert.assertNotNull(status);
+    Assert.assertEquals("c/d/e/file1", status.getTrimmedName());
+    Assert.assertEquals("c/d/e/file1", status.getKeyInfo().getKeyName());
+    Assert.assertTrue(status.isFile());
   }
 
   private void verifyPath(OzonePrefixPath ozonePrefixPath, String pathName,

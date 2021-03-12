@@ -22,6 +22,8 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.Assert;
 import org.junit.Test;
 
+import java.io.IOException;
+
 import static org.mockito.Mockito.mock;
 
 /**
@@ -30,7 +32,7 @@ import static org.mockito.Mockito.mock;
 public class TestRequestContext {
 
   @Test
-  public void testRecursiveAccessFlag() {
+  public void testRecursiveAccessFlag() throws IOException {
     RequestContext context = getUserRequestContext("om",
             IAccessAuthorizer.ACLType.CREATE, false, "volume1",
             true);
@@ -77,7 +79,7 @@ public class TestRequestContext {
             null, "serviceId",
             IAccessAuthorizer.ACLIdentityType.GROUP,
             IAccessAuthorizer.ACLType.CREATE, "owner", true,
-            new OzonePrefixPathImpl("vol1", "buck1", mockKeyManager));
+            new OzonePrefixPathImpl("vol1", "buck1", "file", mockKeyManager));
     Assert.assertTrue("Wrongly sets recursive flag value",
             context.isRecursiveAccessCheck());
     Assert.assertNotNull("unexpected path accessor",
@@ -86,13 +88,14 @@ public class TestRequestContext {
 
   private RequestContext getUserRequestContext(String username,
       IAccessAuthorizer.ACLType type, boolean isOwner, String ownerName,
-      boolean recursiveAccessCheck) {
+      boolean recursiveAccessCheck) throws IOException {
 
     KeyManager mockKeyManager = mock(KeyManager.class);
     return RequestContext.getBuilder(
             UserGroupInformation.createRemoteUser(username), null, null,
             type, ownerName, recursiveAccessCheck,
-            new OzonePrefixPathImpl("vol1", "buck1", mockKeyManager)).build();
+            new OzonePrefixPathImpl("vol1", "buck1",
+                "file", mockKeyManager)).build();
   }
 
   private RequestContext getUserRequestContext(String username,

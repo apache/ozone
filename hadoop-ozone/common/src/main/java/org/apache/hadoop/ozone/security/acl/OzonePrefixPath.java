@@ -27,6 +27,13 @@ import java.util.Iterator;
 public interface OzonePrefixPath {
 
   /**
+   * Returns file status for the given key path.
+   *
+   * @return OzoneFileStatus for the given path.
+   */
+  OzoneFileStatus getOzonePrefixPath();
+
+  /**
    * Lists immediate children(files or a directories) of the given keyPrefix.
    * It won't do recursive traversal. The given keyPrefix parameter should be a
    * directory type.

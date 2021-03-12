@@ -51,6 +51,7 @@ import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzonePrefixPathImpl;
 import org.apache.hadoop.ozone.om.TrashPolicyOzone;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
@@ -1269,8 +1270,8 @@ public class TestOzoneFileSystem {
   }
 
   @Test
-  public void testListStatusForACLCheck() throws Exception {
-    String keyName = "testListStatusForACLCheck";
+  public void testListStatusOnLargeDirectoryForACLCheck() throws Exception {
+    String keyName = "testListStatusOnLargeDirectoryForACLCheck";
     Path root = new Path(OZONE_URI_DELIMITER, keyName);
     Set<String> paths = new TreeSet<>();
     int numDirs = LISTING_PAGE_SIZE + LISTING_PAGE_SIZE / 2;
@@ -1280,9 +1281,24 @@ public class TestOzoneFileSystem {
       paths.add(keyName + OM_KEY_PREFIX + p.getName());
     }
 
+    // unknown keyname
+    try {
+      new OzonePrefixPathImpl(getVolumeName(), getBucketName(), "invalidKey",
+          cluster.getOzoneManager().getKeyManager());
+      Assert.fail("Non-existent key name!");
+    } catch (OMException ome) {
+      Assert.assertEquals(OMException.ResultCodes.FILE_NOT_FOUND,
+          ome.getResult());
+    }
+
     OzonePrefixPathImpl ozonePrefixPath =
-        new OzonePrefixPathImpl(getVolumeName(), getBucketName(),
+        new OzonePrefixPathImpl(getVolumeName(), getBucketName(), keyName,
             cluster.getOzoneManager().getKeyManager());
+
+    OzoneFileStatus status = ozonePrefixPath.getOzonePrefixPath();
+    Assert.assertNotNull(status);
+    Assert.assertEquals(keyName, status.getTrimmedName());
+    Assert.assertTrue(status.isDirectory());
 
     Iterator<? extends OzoneFileStatus> pathItr =
         ozonePrefixPath.getChildren(keyName);

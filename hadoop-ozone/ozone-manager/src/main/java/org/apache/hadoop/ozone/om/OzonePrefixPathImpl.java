@@ -33,12 +33,26 @@ public class OzonePrefixPathImpl implements OzonePrefixPath {
   private String bucketName;
   private KeyManager keyManager;
   private int batchSize = 1000; // TODO: can be configurable.
+  private OzoneFileStatus pathStatus;
 
   public OzonePrefixPathImpl(String volumeName, String bucketName,
-                             KeyManager keyManagerImpl) {
+      String keyPrefix, KeyManager keyManagerImpl) throws IOException {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.keyManager = keyManagerImpl;
+
+    OmKeyArgs omKeyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyPrefix)
+        .setRefreshPipeline(false)
+        .build();
+    pathStatus = keyManager.getFileStatus(omKeyArgs);
+  }
+
+  @Override
+  public OzoneFileStatus getOzonePrefixPath() {
+    return pathStatus;
   }
 
   @Override

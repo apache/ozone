@@ -26,7 +26,6 @@ import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.OzonePrefixPathImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -43,10 +42,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteK
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
-import org.apache.hadoop.ozone.security.acl.OzoneObj;
-import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
-import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -97,26 +92,13 @@ public class OMKeyDeleteRequestV1 extends OMKeyDeleteRequest {
     boolean acquiredLock = false;
     OMClientResponse omClientResponse = null;
     Result result = null;
-    OmVolumeArgs omVolumeArgs = null;
     OmBucketInfo omBucketInfo = null;
     try {
       keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
       volumeName = keyArgs.getVolumeName();
       bucketName = keyArgs.getBucketName();
 
-      OzoneObj obj = OzoneObjInfo.Builder.newBuilder()
-          .setResType(OzoneObj.ResourceType.KEY)
-          .setStoreType(OzoneObj.StoreType.OZONE)
-          .setVolumeName(volumeName)
-          .setBucketName(bucketName)
-          .setKeyName(keyName).build();
-      RequestContext.Builder contextBuilder = RequestContext.newBuilder()
-          .setAclRights(IAccessAuthorizer.ACLType.DELETE)
-          .setRecursiveAccessCheck(true)
-          .setOzonePrefixPath(new OzonePrefixPathImpl(volumeName, bucketName,
-              ozoneManager.getKeyManager()));
-      // check Acl
-      checkKeyAcls(ozoneManager, obj, contextBuilder);
+      checkACLs(ozoneManager, volumeName, bucketName, keyName);
 
       acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
           volumeName, bucketName);

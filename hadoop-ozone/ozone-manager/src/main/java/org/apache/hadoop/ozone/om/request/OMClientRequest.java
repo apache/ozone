@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.audit.AuditEventStatus;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.OzonePrefixPathImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
@@ -38,6 +39,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
@@ -208,6 +210,40 @@ public abstract class OMClientRequest implements RequestAuditor {
       ctxtBuilder.setOwnerName(volumeOwner);
       ozoneManager.checkAcls(obj, ctxtBuilder.build(), true);
     }
+  }
+
+  /**
+   * Check Acls for the ozone key.
+   * @param ozoneManager
+   * @param volumeName
+   * @param bucketName
+   * @param keyName
+   * @throws IOException
+   */
+  protected void checkACLs(OzoneManager ozoneManager, String volumeName,
+      String bucketName, String keyName) throws IOException {
+
+    OzoneObj obj = OzoneObjInfo.Builder.newBuilder()
+        .setResType(OzoneObj.ResourceType.KEY)
+        .setStoreType(OzoneObj.StoreType.OZONE)
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName).build();
+
+    // TODO: Presently not populating sub-paths under a single bucket
+    //  lock. Need to revisit this to handle any concurrent operations
+    //  along with this.
+    OzonePrefixPathImpl pathViewer = new OzonePrefixPathImpl(volumeName,
+        bucketName, keyName, ozoneManager.getKeyManager());
+    boolean isDirectory = pathViewer.getOzonePrefixPath().isDirectory();
+
+    RequestContext.Builder contextBuilder = RequestContext.newBuilder()
+        .setAclRights(IAccessAuthorizer.ACLType.DELETE)
+        .setRecursiveAccessCheck(isDirectory) // recursive checks for a dir
+        .setOzonePrefixPath(pathViewer);
+
+    // check Acl
+    checkKeyAcls(ozoneManager, obj, contextBuilder);
   }
 
   /**
