@@ -226,7 +226,7 @@ public class OMFileCreateRequestV1 extends OMFileCreateRequest {
       exception = ex;
       omMetrics.incNumCreateFileFails();
       omResponse.setCmdType(Type.CreateFile);
-      omClientResponse = new OMFileCreateResponse(createErrorOMResponse(
+      omClientResponse = new OMFileCreateResponseV1(createErrorOMResponse(
             omResponse, exception));
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,

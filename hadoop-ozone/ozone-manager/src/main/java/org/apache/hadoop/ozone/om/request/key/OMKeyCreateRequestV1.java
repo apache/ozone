@@ -212,7 +212,7 @@ public class OMKeyCreateRequestV1 extends OMKeyCreateRequest {
       exception = ex;
       omMetrics.incNumKeyAllocateFails();
       omResponse.setCmdType(Type.CreateKey);
-      omClientResponse = new OMKeyCreateResponse(
+      omClientResponse = new OMKeyCreateResponseV1(
               createErrorOMResponse(omResponse, exception));
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,

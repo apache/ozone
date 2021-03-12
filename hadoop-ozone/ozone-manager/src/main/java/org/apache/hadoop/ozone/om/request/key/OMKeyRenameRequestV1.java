@@ -197,7 +197,7 @@ public class OMKeyRenameRequestV1 extends OMKeyRenameRequest {
     } catch (IOException ex) {
       result = Result.FAILURE;
       exception = ex;
-      omClientResponse = new OMKeyRenameResponse(createErrorOMResponse(
+      omClientResponse = new OMKeyRenameResponseV1(createErrorOMResponse(
               omResponse, exception));
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,

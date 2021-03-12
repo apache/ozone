@@ -29,12 +29,14 @@ import javax.annotation.Nonnull;
 import java.util.List;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
 
 /**
  * Response for CreateKey request layout version V1.
  */
-@CleanupTableInfo(cleanupTables = {DIRECTORY_TABLE, OPEN_FILE_TABLE})
+@CleanupTableInfo(cleanupTables = {DIRECTORY_TABLE, FILE_TABLE,
+    OPEN_FILE_TABLE})
 public class OMKeyCreateResponseV1 extends OMFileCreateResponseV1 {
 
   public OMKeyCreateResponseV1(@Nonnull OMResponse omResponse,
@@ -44,5 +46,14 @@ public class OMKeyCreateResponseV1 extends OMFileCreateResponseV1 {
                                @Nonnull OmBucketInfo omBucketInfo) {
     super(omResponse, omKeyInfo, parentDirInfos, openKeySessionID,
             omBucketInfo);
+  }
+
+  /**
+   * For when the request is not successful.
+   * For a successful request, the other constructor should be used.
+   */
+  public OMKeyCreateResponseV1(@Nonnull OMResponse omResponse) {
+    super(omResponse);
+    checkStatusNotOK();
   }
 }

@@ -167,7 +167,7 @@ public class OMAllocateBlockRequestV1 extends OMAllocateBlockRequest {
     } catch (IOException ex) {
       omMetrics.incNumBlockAllocateCallFails();
       exception = ex;
-      omClientResponse = new OMAllocateBlockResponse(createErrorOMResponse(
+      omClientResponse = new OMAllocateBlockResponseV1(createErrorOMResponse(
               omResponse, exception));
       LOG.error("Allocate Block failed. Volume:{}, Bucket:{}, OpenKey:{}. " +
               "Exception:{}", volumeName, bucketName, openKeyName, exception);

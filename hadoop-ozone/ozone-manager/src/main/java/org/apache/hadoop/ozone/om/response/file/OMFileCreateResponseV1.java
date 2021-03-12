@@ -33,12 +33,14 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
 
 /**
  * Response for create file request layout version V1.
  */
-@CleanupTableInfo(cleanupTables = {DIRECTORY_TABLE, OPEN_FILE_TABLE})
+@CleanupTableInfo(cleanupTables = {DIRECTORY_TABLE, FILE_TABLE,
+    OPEN_FILE_TABLE})
 public class OMFileCreateResponseV1 extends OMFileCreateResponse {
 
   private List<OmDirectoryInfo> parentDirInfos;
@@ -51,6 +53,15 @@ public class OMFileCreateResponseV1 extends OMFileCreateResponse {
     super(omResponse, omKeyInfo, new ArrayList<>(), openKeySessionID,
         omBucketInfo);
     this.parentDirInfos = parentDirInfos;
+  }
+
+  /**
+   * For when the request is not successful.
+   * For a successful request, the other constructor should be used.
+   */
+  public OMFileCreateResponseV1(@Nonnull OMResponse omResponse) {
+    super(omResponse);
+    checkStatusNotOK();
   }
 
   @Override

@@ -217,7 +217,7 @@ public class S3InitiateMultipartUploadRequestV1
     } catch (IOException ex) {
       result = Result.FAILURE;
       exception = ex;
-      omClientResponse = new S3InitiateMultipartUploadResponse(
+      omClientResponse = new S3InitiateMultipartUploadResponseV1(
           createErrorOMResponse(omResponse, exception));
     } finally {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
