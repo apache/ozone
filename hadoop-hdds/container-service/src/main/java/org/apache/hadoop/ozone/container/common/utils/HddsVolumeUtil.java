@@ -153,8 +153,10 @@ public final class HddsVolumeUtil {
     return lv;
   }
 
-  private static String getProperty(Properties props, String propName, File
-      versionFile)
+  public static String getProperty(
+      Properties props, String propName, File
+      versionFile
+  )
       throws InconsistentStorageStateException {
     String value = props.getProperty(propName);
     if (StringUtils.isBlank(value)) {

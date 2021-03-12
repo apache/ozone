@@ -30,15 +30,15 @@ Check replicationmanager with explicit host
                         Should contain   ${output}   ReplicationManager
                         Should contain   ${output}   Running
 
-Start replicationmanager
-    ${output} =         Execute          ozone admin replicationmanager start
-                        Should contain   ${output}   Starting ReplicationManager
-                        Wait Until Keyword Succeeds    30sec    5sec    Execute          ozone admin replicationmanager status | grep -q 'is Running'
-
 Stop replicationmanager
     ${output} =         Execute          ozone admin replicationmanager stop
                         Should contain   ${output}   Stopping ReplicationManager
                         Wait Until Keyword Succeeds    30sec    5sec    Execute          ozone admin replicationmanager status | grep -q 'is Not Running'
+
+Start replicationmanager
+    ${output} =         Execute          ozone admin replicationmanager start
+                        Should contain   ${output}   Starting ReplicationManager
+                        Wait Until Keyword Succeeds    30sec    5sec    Execute          ozone admin replicationmanager status | grep -q 'is Running'
 
 Incomplete command
     ${output} =         Execute And Ignore Error     ozone admin replicationmanager

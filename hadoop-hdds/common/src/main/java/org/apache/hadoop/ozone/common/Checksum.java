@@ -75,8 +75,10 @@ public class Checksum {
   /** The algorithms for {@link ChecksumType}. */
   enum Algorithm {
     NONE(() -> data -> ByteString.EMPTY),
-    CRC32(() -> newChecksumByteBufferFunction(PureJavaCrc32ByteBuffer::new)),
-    CRC32C(() -> newChecksumByteBufferFunction(PureJavaCrc32CByteBuffer::new)),
+    CRC32(() ->
+        newChecksumByteBufferFunction(ChecksumByteBufferFactory::crc32Impl)),
+    CRC32C(() ->
+        newChecksumByteBufferFunction(ChecksumByteBufferFactory::crc32CImpl)),
     SHA256(() -> newMessageDigestFunction("SHA-256")),
     MD5(() -> newMessageDigestFunction("MD5"));
 
