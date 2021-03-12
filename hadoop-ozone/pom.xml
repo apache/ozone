@@ -20,8 +20,8 @@
   </parent>
   <artifactId>hadoop-ozone</artifactId>
   <version>1.1.0-SNAPSHOT</version>
-  <description>Apache Hadoop Ozone Project</description>
-  <name>Apache Hadoop Ozone</name>
+  <description>Apache Ozone Project</description>
+  <name>Apache Ozone</name>
   <packaging>pom</packaging>
 
   <properties>

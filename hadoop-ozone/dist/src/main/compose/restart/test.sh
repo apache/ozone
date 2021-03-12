@@ -23,18 +23,11 @@ export COMPOSE_DIR
 
 export OZONE_VOLUME
 
-mkdir -p "${OZONE_VOLUME}"/{dn1,dn2,dn3,om,recon,s3g,scm}
-
-if [[ -n "${OZONE_VOLUME_OWNER}" ]]; then
-  current_user=$(whoami)
-  if [[ "${OZONE_VOLUME_OWNER}" != "${current_user}" ]]; then
-    chown -R "${OZONE_VOLUME_OWNER}" "${OZONE_VOLUME}" \
-      || sudo chown -R "${OZONE_VOLUME_OWNER}" "${OZONE_VOLUME}"
-  fi
-fi
-
 # shellcheck source=/dev/null
 source "${COMPOSE_DIR}/../testlib.sh"
+
+mkdir -p "${OZONE_VOLUME}"/{dn1,dn2,dn3,om,recon,s3g,scm}
+fix_data_dir_permissions
 
 # prepare pre-upgrade cluster
 start_docker_env

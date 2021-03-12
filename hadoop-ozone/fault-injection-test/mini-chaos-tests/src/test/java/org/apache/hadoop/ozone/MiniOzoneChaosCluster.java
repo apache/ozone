@@ -307,7 +307,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
     }
   }
 
-  // OzoneManager specifc
+  // OzoneManager specific
   public static int getNumberOfOmToFail() {
     return 1;
   }
@@ -348,7 +348,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
     return RandomUtils.nextBoolean();
   }
 
-  // Datanode specifc
+  // Datanode specific
   private int getNumberOfDnToFail() {
     return RandomUtils.nextBoolean() ? 1 : 2;
   }
