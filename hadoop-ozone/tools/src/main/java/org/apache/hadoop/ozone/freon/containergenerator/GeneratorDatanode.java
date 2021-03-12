@@ -78,7 +78,7 @@ import picocli.CommandLine.Option;
 public class GeneratorDatanode extends BaseGenerator {
 
   @Option(names = {"--datanodes"},
-      description = "Number of datanodes (to generate only subsequent of the "
+      description = "Number of datanodes (to generate only a subset of the "
           + "required containers).",
       defaultValue = "3")
   private int datanodes;
@@ -90,7 +90,7 @@ public class GeneratorDatanode extends BaseGenerator {
   private int datanodeIndex;
 
   @Option(names = {"--zero"},
-      description = "User zero bytes instead of random data.",
+      description = "Use zero bytes instead of random data.",
       defaultValue = "false")
   private boolean zero;
 
