@@ -167,10 +167,38 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
 
   @Override
   public List<ContainerInfo> getContainers(final LifeCycleState state) {
-    return containerStateManager.getContainerIDs(state).stream()
+    final List<ContainerID> containersIds =
+        new ArrayList<>(containerStateManager.getContainerIDs(state));
+    Collections.sort(containersIds);
+    return containersIds.stream()
         .map(ContainerID::getProtobuf)
         .map(containerStateManager::getContainer)
         .filter(Objects::nonNull).collect(Collectors.toList());
+  }
+
+  @Override
+  public List<ContainerInfo> listContainer(
+      ContainerID startContainerID,
+      int count, HddsProtos.LifeCycleState state) {
+    lock.lock();
+    try {
+      scmContainerManagerMetrics.incNumListContainersOps();
+      List<ContainerInfo> containersIds;
+      if (state == null) {
+        containersIds = getContainers(startContainerID, count);
+      } else {
+        containersIds = getContainers(state);
+      }
+      return containersIds;
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  @Override
+  public List<ContainerInfo> listContainer(ContainerID startContainerID,
+                                           int count) {
+    return listContainer(startContainerID, count, null);
   }
 
   @Override
