@@ -43,6 +43,14 @@ public class OMAllocateBlockResponseV1 extends OMAllocateBlockResponse {
     super(omResponse, omKeyInfo, clientID, omBucketInfo);
   }
 
+  /**
+   * For when the request is not successful.
+   * For a successful request, the other constructor should be used.
+   */
+  public OMAllocateBlockResponseV1(@Nonnull OMResponse omResponse) {
+    super(omResponse);
+  }
+
   @Override
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {

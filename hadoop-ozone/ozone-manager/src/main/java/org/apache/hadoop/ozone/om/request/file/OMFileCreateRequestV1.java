@@ -31,7 +31,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.om.response.file.OMFileCreateResponse;
 import org.apache.hadoop.ozone.om.response.file.OMFileCreateResponseV1;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateFileRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateFileResponse;
@@ -226,7 +225,7 @@ public class OMFileCreateRequestV1 extends OMFileCreateRequest {
       exception = ex;
       omMetrics.incNumCreateFileFails();
       omResponse.setCmdType(Type.CreateFile);
-      omClientResponse = new OMFileCreateResponse(createErrorOMResponse(
+      omClientResponse = new OMFileCreateResponseV1(createErrorOMResponse(
             omResponse, exception));
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
