@@ -53,6 +53,14 @@ public class OMFileCreateResponseV1 extends OMFileCreateResponse {
     this.parentDirInfos = parentDirInfos;
   }
 
+  /**
+   * For when the request is not successful.
+   * For a successful request, the other constructor should be used.
+   */
+  public OMFileCreateResponseV1(@Nonnull OMResponse omResponse) {
+    super(omResponse);
+  }
+
   @Override
   public void addToDBBatch(OMMetadataManager omMetadataMgr,
                               BatchOperation batchOp) throws IOException {

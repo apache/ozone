@@ -54,6 +54,14 @@ public class S3InitiateMultipartUploadResponseV1 extends
     this.parentDirInfos = parentDirInfos;
   }
 
+  /**
+   * For when the request is not successful.
+   * For a successful request, the other constructor should be used.
+   */
+  public S3InitiateMultipartUploadResponseV1(@Nonnull OMResponse omResponse) {
+    super(omResponse);
+  }
+
   @Override
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
