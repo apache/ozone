@@ -52,7 +52,6 @@ public class OMKeyRenameResponseV1 extends OMKeyRenameResponse {
    */
   public OMKeyRenameResponseV1(@Nonnull OMResponse omResponse) {
     super(omResponse);
-    checkStatusNotOK();
   }
 
   @Override

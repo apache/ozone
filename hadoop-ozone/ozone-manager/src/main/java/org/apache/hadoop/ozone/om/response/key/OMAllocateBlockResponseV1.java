@@ -49,7 +49,6 @@ public class OMAllocateBlockResponseV1 extends OMAllocateBlockResponse {
    */
   public OMAllocateBlockResponseV1(@Nonnull OMResponse omResponse) {
     super(omResponse);
-    checkStatusNotOK();
   }
 
   @Override

@@ -59,7 +59,6 @@ public class OMFileCreateResponseV1 extends OMFileCreateResponse {
    */
   public OMFileCreateResponseV1(@Nonnull OMResponse omResponse) {
     super(omResponse);
-    checkStatusNotOK();
   }
 
   @Override

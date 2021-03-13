@@ -52,6 +52,5 @@ public class OMKeyCreateResponseV1 extends OMFileCreateResponseV1 {
    */
   public OMKeyCreateResponseV1(@Nonnull OMResponse omResponse) {
     super(omResponse);
-    checkStatusNotOK();
   }
 }

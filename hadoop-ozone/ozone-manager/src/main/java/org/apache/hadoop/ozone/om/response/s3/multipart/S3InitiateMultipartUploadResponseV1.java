@@ -60,7 +60,6 @@ public class S3InitiateMultipartUploadResponseV1 extends
    */
   public S3InitiateMultipartUploadResponseV1(@Nonnull OMResponse omResponse) {
     super(omResponse);
-    checkStatusNotOK();
   }
 
   @Override
