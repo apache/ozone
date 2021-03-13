@@ -46,6 +46,14 @@ public class OMKeyRenameResponseV1 extends OMKeyRenameResponse {
     this.isRenameDirectory = isRenameDirectory;
   }
 
+  /**
+   * For when the request is not successful.
+   * For a successful request, the other constructor should be used.
+   */
+  public OMKeyRenameResponseV1(@Nonnull OMResponse omResponse) {
+    super(omResponse);
+  }
+
   @Override
   public void addToDBBatch(OMMetadataManager omMetadataManager,
                            BatchOperation batchOperation) throws IOException {

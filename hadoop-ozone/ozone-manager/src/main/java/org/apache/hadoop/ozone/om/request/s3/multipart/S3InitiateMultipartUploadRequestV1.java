@@ -35,7 +35,6 @@ import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequestV1;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.om.response.s3.multipart.S3InitiateMultipartUploadResponse;
 import org.apache.hadoop.ozone.om.response.s3.multipart.S3InitiateMultipartUploadResponseV1;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartInfoInitiateRequest;
@@ -217,7 +216,7 @@ public class S3InitiateMultipartUploadRequestV1
     } catch (IOException ex) {
       result = Result.FAILURE;
       exception = ex;
-      omClientResponse = new S3InitiateMultipartUploadResponse(
+      omClientResponse = new S3InitiateMultipartUploadResponseV1(
           createErrorOMResponse(omResponse, exception));
     } finally {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
