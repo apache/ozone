@@ -45,4 +45,12 @@ public class OMKeyCreateResponseV1 extends OMFileCreateResponseV1 {
     super(omResponse, omKeyInfo, parentDirInfos, openKeySessionID,
             omBucketInfo);
   }
+
+  /**
+   * For when the request is not successful.
+   * For a successful request, the other constructor should be used.
+   */
+  public OMKeyCreateResponseV1(@Nonnull OMResponse omResponse) {
+    super(omResponse);
+  }
 }

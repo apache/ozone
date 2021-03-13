@@ -34,7 +34,6 @@ import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.om.response.key.OMAllocateBlockResponse;
 import org.apache.hadoop.ozone.om.response.key.OMAllocateBlockResponseV1;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AllocateBlockRequest;
@@ -167,7 +166,7 @@ public class OMAllocateBlockRequestV1 extends OMAllocateBlockRequest {
     } catch (IOException ex) {
       omMetrics.incNumBlockAllocateCallFails();
       exception = ex;
-      omClientResponse = new OMAllocateBlockResponse(createErrorOMResponse(
+      omClientResponse = new OMAllocateBlockResponseV1(createErrorOMResponse(
               omResponse, exception));
       LOG.error("Allocate Block failed. Volume:{}, Bucket:{}, OpenKey:{}. " +
               "Exception:{}", volumeName, bucketName, openKeyName, exception);
