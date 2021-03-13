@@ -39,8 +39,7 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
 /**
  * Response for create file request layout version V1.
  */
-@CleanupTableInfo(cleanupTables = {DIRECTORY_TABLE, FILE_TABLE,
-    OPEN_FILE_TABLE})
+@CleanupTableInfo(cleanupTables = {DIRECTORY_TABLE, OPEN_FILE_TABLE})
 public class OMFileCreateResponseV1 extends OMFileCreateResponse {
 
   private List<OmDirectoryInfo> parentDirInfos;
