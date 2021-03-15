@@ -39,7 +39,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
 import org.apache.hadoop.hdds.scm.ha.SCMHAInvocationHandler;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
-import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CRLApprover;
@@ -75,7 +74,6 @@ public final class SCMCertStore implements CertificateStore {
   }
 
   @Override
-  @Replicate
   public void storeValidCertificate(BigInteger serialID,
       X509Certificate certificate, NodeType role)
       throws IOException {

@@ -21,6 +21,8 @@ import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.container.ContainerStateManagerV2;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
+import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.apache.ratis.server.RaftServer;
 import org.junit.Assert;
@@ -29,6 +31,8 @@ import org.junit.Test;
 
 import java.io.IOException;
 import java.lang.reflect.Proxy;
+import java.math.BigInteger;
+import java.security.KeyPair;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
@@ -37,10 +41,11 @@ import java.util.concurrent.ExecutionException;
  */
 public class TestReplicationAnnotation {
   private SCMHAInvocationHandler scmhaInvocationHandler;
+  private SCMRatisServer scmRatisServer;
 
   @Before
   public void setup() {
-    SCMRatisServer ratisServer = new SCMRatisServer() {
+    scmRatisServer = new SCMRatisServer() {
       @Override
       public void start() throws IOException {
       }
@@ -86,13 +91,14 @@ public class TestReplicationAnnotation {
         return null;
       }
     };
-
-    scmhaInvocationHandler = new SCMHAInvocationHandler(
-        RequestType.CONTAINER, null, ratisServer);
   }
 
   @Test
   public void testReplicateAnnotationBasic() throws Throwable {
+
+    scmhaInvocationHandler = new SCMHAInvocationHandler(
+        RequestType.CONTAINER, null, scmRatisServer);
+
     ContainerStateManagerV2 proxy =
         (ContainerStateManagerV2) Proxy.newProxyInstance(
         SCMHAInvocationHandler.class.getClassLoader(),
@@ -102,7 +108,30 @@ public class TestReplicationAnnotation {
       proxy.addContainer(HddsProtos.ContainerInfoProto.getDefaultInstance());
       Assert.fail("Cannot reach here: should have seen a IOException");
     } catch (IOException ignore) {
-      // Expecting to hit here.
+      Assert.assertNotNull(ignore.getMessage() != null);
+      Assert.assertEquals("submitRequest is called.",
+          ignore.getMessage());
     }
+
+    scmhaInvocationHandler = new SCMHAInvocationHandler(
+        RequestType.CERT_STORE, null, scmRatisServer);
+
+    CertificateStore certificateStore =
+        (CertificateStore) Proxy.newProxyInstance(
+        SCMHAInvocationHandler.class.getClassLoader(),
+        new Class<?>[]{CertificateStore.class}, scmhaInvocationHandler);
+
+    KeyPair keyPair = KeyStoreTestUtil.generateKeyPair("RSA");
+    try {
+      certificateStore.storeValidCertificate(BigInteger.valueOf(100L),
+          KeyStoreTestUtil.generateCertificate("CN=Test", keyPair, 30,
+          "SHA256withRSA"), HddsProtos.NodeType.SCM);
+      Assert.fail("Cannot reach here: should have seen a IOException");
+    } catch (IOException ignore) {
+      Assert.assertNotNull(ignore.getMessage() != null);
+      Assert.assertEquals("submitRequest is called.",
+          ignore.getMessage());
+    }
+
   }
 }
