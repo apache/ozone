@@ -66,7 +66,7 @@ public final class OMLayoutVersionManager
   public OMLayoutVersionManager() throws IOException {
     requestFactory = new LayoutVersionInstanceFactory<>();
     OMLayoutFeature[] features = OMLayoutFeature.values();
-    init(features[features.length - 1].layoutVersion());
+    init(features[features.length - 1].layoutVersion(), features);
   }
 
   /**
