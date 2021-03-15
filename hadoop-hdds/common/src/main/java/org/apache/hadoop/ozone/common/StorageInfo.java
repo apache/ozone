@@ -66,6 +66,9 @@ public class StorageInfo {
   private static final String UPGRADING_TO_LAYOUT_VERSION =
       "upgradingToLayoutVersion";
 
+  private static final String FIRST_UPGRADE_ACTION_LAYOUT_VERSION =
+      "firstUpgradeActionLayoutVersion";
+
   private static final int INVALID_LAYOUT_VERSION = -1;
 
   /**
@@ -139,6 +142,20 @@ public class StorageInfo {
           "being upgraded from 0.5.0.");
       setProperty(LAYOUT_VERSION, "0");
     }
+  }
+
+  public int getFirstUpgradeActionLayoutVersion() {
+    String upgradingTo =
+        properties.getProperty(FIRST_UPGRADE_ACTION_LAYOUT_VERSION);
+    if (upgradingTo != null) {
+      return Integer.parseInt(upgradingTo);
+    }
+    return INVALID_LAYOUT_VERSION;
+  }
+
+  public void setFirstUpgradeActionLayoutVersion(int layoutVersion) {
+    properties.setProperty(
+        FIRST_UPGRADE_ACTION_LAYOUT_VERSION, Integer.toString(layoutVersion));
   }
 
   public String getProperty(String key) {

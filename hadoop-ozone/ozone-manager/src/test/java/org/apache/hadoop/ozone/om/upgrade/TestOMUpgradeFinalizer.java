@@ -38,6 +38,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 
+import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON_FINALIZE;
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.LAYOUT_FEATURE_FINALIZATION_FAILED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.ALREADY_FINALIZED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_DONE;
@@ -156,7 +157,7 @@ public class TestOMUpgradeFinalizer {
     Optional<OmUpgradeAction> action = Optional.of(om -> om.getVersion());
     OzoneManager om = mockOzoneManager(0);
     Iterable<OMLayoutFeature> lfs = mockFeatures("feature-1", "feature-2");
-    when(lfs.iterator().next().onFinalizeAction()).thenReturn(action);
+    when(lfs.iterator().next().action(ON_FINALIZE)).thenReturn(action);
     setupVersionManagerMockToFinalize(lfs);
 
     OMUpgradeFinalizer finalizer = new OMUpgradeFinalizer(versionManager);
@@ -202,7 +203,7 @@ public class TestOMUpgradeFinalizer {
 
     OzoneManager om = mockOzoneManager(0);
     Iterable<OMLayoutFeature> lfs = mockFeatures("feature-1", "feature-2");
-    when(lfs.iterator().next().onFinalizeAction()).thenReturn(action);
+    when(lfs.iterator().next().action(ON_FINALIZE)).thenReturn(action);
     setupVersionManagerMockToFinalize(lfs);
 
     OMUpgradeFinalizer finalizer = new OMUpgradeFinalizer(versionManager);

@@ -19,9 +19,20 @@
 package org.apache.hadoop.hdds.upgrade;
 
 
+import static org.apache.hadoop.ozone.upgrade.UpgradeActionHdds.Component.SCM;
+
 import java.io.IOException;
+import java.util.Set;
 
 import org.apache.hadoop.ozone.upgrade.AbstractLayoutVersionManager;
+import org.apache.hadoop.ozone.upgrade.UpgradeActionHdds;
+import org.reflections.Reflections;
+import org.reflections.scanners.SubTypesScanner;
+import org.reflections.scanners.TypeAnnotationsScanner;
+import org.reflections.util.ClasspathHelper;
+import org.reflections.util.ConfigurationBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Class to manage layout versions and features for Storage Container Manager
@@ -31,12 +42,54 @@ import org.apache.hadoop.ozone.upgrade.AbstractLayoutVersionManager;
 public class HDDSLayoutVersionManager extends
     AbstractLayoutVersionManager<HDDSLayoutFeature> {
 
+  private static final Logger LOG =
+      LoggerFactory.getLogger(HDDSLayoutVersionManager.class);
+
   public HDDSLayoutVersionManager(int layoutVersion) throws IOException {
     init(layoutVersion, HDDSLayoutFeature.values());
+    registerUpgradeActions();
   }
 
   public static int maxLayoutVersion() {
     HDDSLayoutFeature[] features = HDDSLayoutFeature.values();
     return features[features.length - 1].layoutVersion();
+  }
+
+  /**
+   * Scan classpath and register all actions to layout features.
+   */
+  private void registerUpgradeActions() {
+    Reflections reflections = new Reflections(new ConfigurationBuilder()
+        .setUrls(ClasspathHelper.forPackage("org.apache.hadoop.hdds"))
+        .setScanners(new TypeAnnotationsScanner(), new SubTypesScanner())
+        .useParallelExecutor());
+    Set<Class<?>> typesAnnotatedWith =
+        reflections.getTypesAnnotatedWith(UpgradeActionHdds.class);
+    typesAnnotatedWith.forEach(actionClass -> {
+      if (HDDSUpgradeAction.class.isAssignableFrom(actionClass)) {
+        try {
+          HDDSUpgradeAction action =
+              (HDDSUpgradeAction) actionClass.newInstance();
+          UpgradeActionHdds annotation =
+              actionClass.getAnnotation(UpgradeActionHdds.class);
+          HDDSLayoutFeature feature = annotation.feature();
+          if (feature.layoutVersion() > metadataLayoutVersion) {
+            LOG.info("Registering Upgrade Action : {}", action.name());
+            if (annotation.component() == SCM) {
+              feature.addScmAction(annotation.type(), action);
+            } else {
+              feature.addDatanodeAction(annotation.type(), action);
+            }
+          }
+        } catch (Exception e) {
+          LOG.error("Cannot instantiate Upgrade Action class {}",
+              actionClass.getSimpleName(), e);
+        }
+      } else {
+        LOG.warn("Found upgrade action class not of type " +
+                "org.apache.hadoop.hdds.upgrade.HDDSUpgradeAction : {}",
+            actionClass.getName());
+      }
+    });
   }
 }

@@ -1182,6 +1182,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     metadataManager.start(configuration);
     startSecretManagerIfNecessary();
 
+    upgradeFinalizer.runPrefinalizeStateActions(omStorage);
 
     if (certClient != null) {
       caCertPem = CertificateCodec.getPEMEncodedString(

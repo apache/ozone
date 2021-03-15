@@ -36,6 +36,7 @@ import org.apache.hadoop.ozone.upgrade.LayoutVersionInstanceFactory;
 import org.apache.hadoop.ozone.upgrade.VersionFactoryKey;
 import org.reflections.Reflections;
 import org.reflections.scanners.SubTypesScanner;
+import org.reflections.scanners.TypeAnnotationsScanner;
 import org.reflections.util.ClasspathHelper;
 import org.reflections.util.ConfigurationBuilder;
 import org.slf4j.Logger;
@@ -65,7 +66,7 @@ public final class OMLayoutVersionManager
   public OMLayoutVersionManager() throws IOException {
     requestFactory = new LayoutVersionInstanceFactory<>();
     OMLayoutFeature[] features = OMLayoutFeature.values();
-    init(features[features.length - 1].layoutVersion(), features);
+    init(features[features.length - 1].layoutVersion());
   }
 
   /**
@@ -84,7 +85,41 @@ public final class OMLayoutVersionManager
           e,
           NOT_SUPPORTED_OPERATION);
     }
+    registerUpgradeActions();
     registerOzoneManagerRequests();
+  }
+
+  /**
+   * Scan classpath and register all actions to layout features.
+   */
+  private void registerUpgradeActions() {
+    Reflections reflections = new Reflections(new ConfigurationBuilder()
+        .setUrls(ClasspathHelper.forPackage("org.apache.hadoop.ozone.om"))
+        .setScanners(new TypeAnnotationsScanner(), new SubTypesScanner())
+        .useParallelExecutor());
+    Set<Class<?>> typesAnnotatedWith =
+        reflections.getTypesAnnotatedWith(UpgradeActionOm.class);
+    typesAnnotatedWith.forEach(actionClass -> {
+      if (OmUpgradeAction.class.isAssignableFrom(actionClass)) {
+        try {
+          OmUpgradeAction action = (OmUpgradeAction) actionClass.newInstance();
+          UpgradeActionOm annotation =
+              actionClass.getAnnotation(UpgradeActionOm.class);
+          OMLayoutFeature feature = annotation.feature();
+          if (feature.layoutVersion() > metadataLayoutVersion) {
+            LOG.info("Registering Upgrade Action : {}", action.name());
+            feature.addAction(annotation.type(), action);
+          }
+        } catch (Exception e) {
+          LOG.error("Cannot instantiate Upgrade Action class {}",
+              actionClass.getSimpleName(), e);
+        }
+      } else {
+        LOG.warn("Found upgrade action class not of type " +
+                "org.apache.hadoop.ozone.om.upgrade.OmUpgradeActionn : {}",
+            actionClass.getName());
+      }
+    });
   }
 
   private void registerOzoneManagerRequests() {
@@ -120,7 +155,8 @@ public final class OMLayoutVersionManager
     Reflections reflections = new Reflections(new ConfigurationBuilder()
         .setUrls(ClasspathHelper.forPackage(OM_REQUEST_CLASS_PACKAGE))
         .setScanners(new SubTypesScanner())
-        .setExpandSuperTypes(false));
+        .setExpandSuperTypes(false)
+        .useParallelExecutor());
     Set<Class<? extends OMClientRequest>> validRequests = new HashSet<>();
 
     Set<Class<? extends OMClientRequest>> subTypes =

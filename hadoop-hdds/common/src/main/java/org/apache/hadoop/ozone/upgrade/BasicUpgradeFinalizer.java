@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.upgrade;
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.LAYOUT_FEATURE_FINALIZATION_FAILED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.PERSIST_UPGRADE_TO_LAYOUT_VERSION_FAILED;
+import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.PREFINALIZE_STATE_VALIDATION_FAILED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.REMOVE_UPGRADE_TO_LAYOUT_VERSION_FAILED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.UPDATE_LAYOUT_VERSION_FAILED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_REQUIRED;
@@ -41,7 +42,8 @@ import org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes;
  * UpgradeFinalizer implementation for the Storage Container Manager service.
  */
 @SuppressWarnings("checkstyle:VisibilityModifier")
-public class BasicUpgradeFinalizer<T, V extends AbstractLayoutVersionManager>
+public abstract class BasicUpgradeFinalizer
+    <T, V extends AbstractLayoutVersionManager>
     implements UpgradeFinalizer<T> {
 
   protected V versionManager;
@@ -144,15 +146,55 @@ public class BasicUpgradeFinalizer<T, V extends AbstractLayoutVersionManager>
     putFinalizationMarkIntoVersionFile(feature, config);
 
     emitStartingFinalizationActionMsg(feature.name());
-    try {
-      UpgradeAction<T> newaction = action.get();
-      newaction.executeAction(component);
-    } catch (Exception e) {
-      logFinalizationFailureAndThrow(e, feature.name());
-    }
+
+    runOnFinalizeAction(feature, action.get());
+
     emitFinishFinalizationActionMsg(feature.name());
 
     removeFinalizationMarkFromVersionFile(feature, config);
+  }
+
+  private void runOnFinalizeAction(LayoutFeature feature, UpgradeAction action)
+      throws UpgradeException {
+    try {
+      action.execute(component);
+    } catch (Exception e) {
+      logFinalizationFailureAndThrow(e, feature.name());
+    }
+  }
+
+  protected void runValidationAction(LayoutFeature f, UpgradeAction action)
+      throws UpgradeException {
+    try {
+      LOG.info("Executing pre-finalize validation {}", action.name());
+      action.execute(component);
+    } catch (Exception ex) {
+      LOG.error("Exception while running pre finalized state validations " +
+          "for feature {}", f.name());
+      throw new UpgradeException(PREFINALIZE_STATE_VALIDATION_FAILED);
+    }
+  }
+
+  protected void runFirstUpgradeAction(LayoutFeature f,
+                                       UpgradeAction action,
+                                       Storage storage)
+      throws UpgradeException {
+    try {
+      int versionOnDisk = storage.getFirstUpgradeActionLayoutVersion();
+      if (f.layoutVersion() > versionOnDisk) {
+        LOG.info("Executing first upgrade action {}", action.name());
+        action.execute(component);
+      } else {
+        LOG.info("Skipping action {} since it has already been run.",
+            action.name());
+      }
+      storage.setFirstUpgradeActionLayoutVersion(f.layoutVersion());
+      persistStorage(storage);
+    } catch (Exception ex) {
+      LOG.error("Exception while running first upgrade run actions " +
+          "for feature {}", f.name());
+      throw new UpgradeException(PREFINALIZE_STATE_VALIDATION_FAILED);
+    }
   }
 
   protected void updateLayoutVersionInVersionFile(LayoutFeature feature,

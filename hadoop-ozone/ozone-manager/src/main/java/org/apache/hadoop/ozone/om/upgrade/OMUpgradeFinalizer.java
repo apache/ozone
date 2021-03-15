@@ -18,15 +18,22 @@
 
 package org.apache.hadoop.ozone.om.upgrade;
 
+import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON_FIRST_UPGRADE_START;
+import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON_FINALIZE;
+import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.UNFINALIZED_STATE_VALIDATION;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_DONE;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_IN_PROGRESS;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_REQUIRED;
 
+import org.apache.hadoop.ozone.common.Storage;
+import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
 
 import java.io.IOException;
+import java.util.Optional;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
+import org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeAction;
 
 /**
  * UpgradeFinalizer implementation for the Ozone Manager service.
@@ -97,8 +104,11 @@ public class OMUpgradeFinalizer extends BasicUpgradeFinalizer<OzoneManager,
         emitStartingMsg();
         versionManager.setUpgradeState(FINALIZATION_IN_PROGRESS);
 
+        OMStorage omStorage = ozoneManager.getOmStorage();
+
         for (OMLayoutFeature f : versionManager.unfinalizedFeatures()) {
-          finalizeFeature(f);
+          Optional<? extends UpgradeAction> action = f.action(ON_FINALIZE);
+          finalizeFeature(f, omStorage, action);
           updateLayoutVersionInVersionFile(f, ozoneManager.getOmStorage());
           versionManager.finalized(f);
         }
@@ -111,28 +121,26 @@ public class OMUpgradeFinalizer extends BasicUpgradeFinalizer<OzoneManager,
         isDone = true;
       }
     }
+  }
 
-    private void finalizeFeature(OMLayoutFeature feature)
-        throws IOException {
-      OmUpgradeAction action = feature.onFinalizeAction().orElse(NOOP);
-
-      if (action == NOOP) {
-        emitNOOPMsg(feature.name());
-        return;
+  public void runPrefinalizeStateActions(Storage storage) throws IOException {
+    LOG.info("Running pre-finalized state validations for unfinalized " +
+        "layout features.");
+    for (OMLayoutFeature f : versionManager.unfinalizedFeatures()) {
+      Optional<? extends UpgradeAction> action =
+          f.action(UNFINALIZED_STATE_VALIDATION);
+      if (action.isPresent()) {
+        runValidationAction(f, action.get());
       }
+    }
 
-      putFinalizationMarkIntoVersionFile(feature, ozoneManager.getOmStorage());
-
-      emitStartingFinalizationActionMsg(feature.name());
-      try {
-        action.executeAction(ozoneManager);
-      } catch (Exception e) {
-        logFinalizationFailureAndThrow(e, feature.name());
+    LOG.info("Running first upgrade commands for unfinalized layout features.");
+    for (OMLayoutFeature f : versionManager.unfinalizedFeatures()) {
+      Optional<? extends UpgradeAction> action =
+          f.action(ON_FIRST_UPGRADE_START);
+      if (action.isPresent()) {
+        runFirstUpgradeAction(f, action.get(), storage);
       }
-      emitFinishFinalizationActionMsg(feature.name());
-
-      removeFinalizationMarkFromVersionFile(feature,
-          ozoneManager.getOmStorage());
     }
   }
 }
