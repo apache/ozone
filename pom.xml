@@ -242,6 +242,13 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
   <dependencyManagement>
     <dependencies>
+      <!-- Update jaeger.version and remove this manual inclusion of libthrift
+      once jaeger-client is updated to include the fix. -->
+      <dependency>
+        <groupId>org.apache.thrift</groupId>
+        <artifactId>libthrift</artifactId>
+        <version>0.14.1</version>
+      </dependency>
       <dependency>
         <groupId>com.squareup.okhttp</groupId>
         <artifactId>okhttp</artifactId>
@@ -1345,21 +1352,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>io.jaegertracing</groupId>
         <artifactId>jaeger-client</artifactId>
         <version>${jaeger.version}</version>
-        <!-- Update jaeger.version and remove the exclusion of libthrift
-        once jaeger-client is updated to include the fix. -->
-        <exclusions>
-          <exclusion>
-            <groupId>org.apache.thrift</groupId>
-            <artifactId>libthrift</artifactId>
-          </exclusion>
-        </exclusions>
-      </dependency>
-      <!-- Update jaeger.version and remove this manual inclusion of libthrift
-      once jaeger-client is updated to include the fix. -->
-      <dependency>
-        <groupId>org.apache.thrift</groupId>
-        <artifactId>libthrift</artifactId>
-        <version>0.14.1</version>
       </dependency>
       <dependency>
         <groupId>io.opentracing</groupId>
