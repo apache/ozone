@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.Assert;
 
 import java.io.IOException;
 import java.net.URI;
@@ -99,13 +100,15 @@ public class TestOzoneFileSystemPrefixParser {
     parser.parse(volumeName, bucketName,
         OMStorage.getOmDbDir(configuration).getPath(),
         dir.getParent().getParent().toString());
+
+    assertPrefixStats(parser, 1, 1, 3, 0, 1 ,1);
   }
 
   @Test
   public void testPrefixParseFile() throws Exception {
     Path dir = new Path("/a/b/c/d/e");
     fs.mkdirs(dir);
-    Path file = new Path("/a/b/c/file1");
+    Path file = new Path("/a/b/file1");
     FSDataOutputStream os = fs.create(file);
     os.close();
 
@@ -115,5 +118,63 @@ public class TestOzoneFileSystemPrefixParser {
     parser.parse(volumeName, bucketName,
         OMStorage.getOmDbDir(configuration).getPath(),
         file.toString());
+
+    assertPrefixStats(parser, 1, 1, 2, 1, 1 ,1);
   }
+
+  private void assertPrefixStats(PrefixParser parser, int volumeCount,
+      int bucketCount, int intermediateDirCount, int nonExistentDirCount,
+      int fileCount, int dirCount) {
+    Assert.assertEquals(volumeCount,
+        parser.getParserStats(PrefixParser.Types.VOLUME));
+    Assert.assertEquals(bucketCount,
+        parser.getParserStats(PrefixParser.Types.BUCKET));
+    Assert.assertEquals(intermediateDirCount,
+        parser.getParserStats(PrefixParser.Types.INTERMEDIATE_DIRECTORY));
+    Assert.assertEquals(nonExistentDirCount,
+        parser.getParserStats(PrefixParser.Types.NON_EXISTENT_DIRECTORY));
+    Assert.assertEquals(fileCount,
+        parser.getParserStats(PrefixParser.Types.FILE));
+    Assert.assertEquals(dirCount,
+        parser.getParserStats(PrefixParser.Types.DIRECTORY));
+  }
+
+  @Test
+  public void testPrefixParseWithInvalidPaths() throws Exception {
+    Path dir = new Path("/a/b/c/d/e");
+    fs.mkdirs(dir);
+    Path file = new Path("/a/b/file1");
+    FSDataOutputStream os = fs.create(file);
+    os.close();
+
+    cluster.stop();
+
+    PrefixParser invalidVolumeParser = new PrefixParser();
+    String invalidVolumeName =
+        RandomStringUtils.randomAlphabetic(10).toLowerCase();
+    invalidVolumeParser.parse(invalidVolumeName, bucketName,
+        OMStorage.getOmDbDir(configuration).getPath(),
+        file.toString());
+    assertPrefixStats(invalidVolumeParser, 0, 0, 0, 0, 0, 0);
+
+    PrefixParser invalidBucketParser = new PrefixParser();
+    String invalidBucketName =
+        RandomStringUtils.randomAlphabetic(10).toLowerCase();
+    invalidBucketParser.parse(volumeName, invalidBucketName,
+        OMStorage.getOmDbDir(configuration).getPath(),
+        file.toString());
+    assertPrefixStats(invalidBucketParser, 1, 0, 0, 0, 0, 0);
+
+
+    Path invalidIntermediateDir = new Path(file.getParent(), "xyz");
+    PrefixParser invalidIntermediateDirParser = new PrefixParser();
+    invalidIntermediateDirParser.parse(volumeName, bucketName,
+        OMStorage.getOmDbDir(configuration).getPath(),
+        invalidIntermediateDir.toString());
+
+    assertPrefixStats(invalidIntermediateDirParser, 1, 1, 2, 1, 1, 1);
+
+  }
+
+
 }

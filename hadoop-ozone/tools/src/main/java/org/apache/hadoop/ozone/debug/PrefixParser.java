@@ -50,6 +50,17 @@ import picocli.CommandLine.Spec;
 @MetaInfServices(SubcommandWithParent.class)
 public class PrefixParser implements Callable<Void>, SubcommandWithParent {
 
+  public enum Types {
+    VOLUME,
+    BUCKET,
+    FILE,
+    DIRECTORY,
+    INTERMEDIATE_DIRECTORY,
+    NON_EXISTENT_DIRECTORY,
+  }
+
+  private final int parserStats[] = new int[Types.values().length];
+
   @Spec
   private CommandSpec spec;
 
@@ -119,13 +130,27 @@ public class PrefixParser implements Callable<Void>, SubcommandWithParent {
 
     Path p = Paths.get(file);
 
+    String volumeKey = metadataManager.getVolumeKey(vol);
+    if (!metadataManager.getVolumeTable().isExist(volumeKey)) {
+      System.out.println("Invalid Volume:" + vol);
+      metadataManager.stop();
+      return;
+    }
+
+    parserStats[Types.VOLUME.ordinal()]++;
     // First get the info about the bucket
     String bucketKey = metadataManager.getBucketKey(vol, buck);
     OmBucketInfo info = metadataManager.getBucketTable().get(bucketKey);
+    if (info == null) {
+      System.out.println("Invalid Bucket:" + buck);
+      metadataManager.stop();
+      return;
+    }
+
     long lastObjectId = info.getObjectID();
     WithParentObjectId objectBucketId = new WithParentObjectId();
     objectBucketId.setObjectID(lastObjectId);
-    dumpInfo("Bucket", effectivePath, objectBucketId, bucketKey);
+    dumpInfo(Types.BUCKET, effectivePath, objectBucketId, bucketKey);
 
     Iterator<Path> pathIterator =  p.iterator();
     while(pathIterator.hasNext()) {
@@ -138,30 +163,32 @@ public class PrefixParser implements Callable<Void>, SubcommandWithParent {
       org.apache.hadoop.fs.Path tmpPath =
           getEffectivePath(effectivePath, elem.toString());
       if (directoryInfo == null) {
-        System.out.println("Given path contains a file at:" +
+        System.out.println("Given path contains a non-existent directory at:" +
             tmpPath);
         System.out.println("Dumping files and dirs at level:" +
             tmpPath.getParent());
         System.out.println();
+        parserStats[Types.NON_EXISTENT_DIRECTORY.ordinal()]++;
         break;
       }
 
       effectivePath = tmpPath;
 
-      dumpInfo("Intermediate Dir", effectivePath,
+      dumpInfo(Types.INTERMEDIATE_DIRECTORY, effectivePath,
           directoryInfo, path);
       lastObjectId = directoryInfo.getObjectID();
     }
 
     // at the last level, now parse both file and dir table
-    dumpTableInfo("Directory", effectivePath,
+    dumpTableInfo(Types.DIRECTORY, effectivePath,
         metadataManager.getDirectoryTable(), lastObjectId);
 
-    dumpTableInfo("File", effectivePath,
+    dumpTableInfo(Types.FILE, effectivePath,
         metadataManager.getKeyTable(), lastObjectId);
+    metadataManager.stop();
   }
 
-  private void dumpTableInfo(String type,
+  private void dumpTableInfo(Types type,
       org.apache.hadoop.fs.Path effectivePath,
       Table<String, ? extends WithParentObjectId> table, long lastObjectId)
       throws IOException {
@@ -183,8 +210,9 @@ public class PrefixParser implements Callable<Void>, SubcommandWithParent {
     return new org.apache.hadoop.fs.Path(currentPath, name);
   }
 
-  private void dumpInfo(String level, org.apache.hadoop.fs.Path effectivePath,
+  private void dumpInfo(Types level, org.apache.hadoop.fs.Path effectivePath,
                         WithParentObjectId id,  String key) {
+    parserStats[level.ordinal()]++;
     System.out.println("Type:" + level);
     System.out.println("Path: " + effectivePath);
     System.out.println("DB Path: " + key);
@@ -197,5 +225,9 @@ public class PrefixParser implements Callable<Void>, SubcommandWithParent {
   private static MetadataKeyFilters.KeyPrefixFilter getPrefixFilter(long id) {
     return (new MetadataKeyFilters.KeyPrefixFilter())
         .addFilter(Long.toString(id));
+  }
+
+  public int getParserStats(Types type) {
+    return parserStats[type.ordinal()];
   }
 }
