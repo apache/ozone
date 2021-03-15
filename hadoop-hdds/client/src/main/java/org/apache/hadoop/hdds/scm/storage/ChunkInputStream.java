@@ -78,7 +78,7 @@ public class ChunkInputStream extends InputStream
   private int bufferIndex;
   // bufferOffsets[i] stores the index of the first data byte in buffer i
   // (buffers.get(i)) w.r.t first byte in the buffers.
-  // Let's each buffer has a capacity of 40 bytes. The bufferOffset for
+  // Let's say each buffer has a capacity of 40 bytes. The bufferOffset for
   // the first buffer would always be 0 as this would be the first data byte
   // in buffers. BufferOffset for the 2nd buffer would be 40 as bytes 0-39
   // would be stored in buffer 0. Hence, bufferOffsets[0] = 0,
@@ -105,8 +105,7 @@ public class ChunkInputStream extends InputStream
   ChunkInputStream(ChunkInfo chunkInfo, BlockID blockId,
       XceiverClientFactory xceiverClientFactory,
       Supplier<Pipeline> pipelineSupplier,
-      boolean verifyChecksum,
-      Token<? extends TokenIdentifier> token) {
+      boolean verifyChecksum, Token<? extends TokenIdentifier> token) {
     this.chunkInfo = chunkInfo;
     this.length = chunkInfo.getLen();
     this.blockID = blockId;
