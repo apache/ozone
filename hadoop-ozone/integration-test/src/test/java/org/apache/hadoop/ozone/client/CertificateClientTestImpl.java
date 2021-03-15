@@ -183,4 +183,9 @@ public class CertificateClientTestImpl implements CertificateClient {
     return securityConfig.getProvider();
   }
 
+  @Override
+  public String getComponentName() {
+    return null;
+  }
+
 }
