@@ -1698,12 +1698,16 @@ public class KeyManagerImpl implements KeyManager {
     String volume = obj.getVolumeName();
     String bucket = obj.getBucketName();
     String keyName = obj.getKeyName();
-
+    OmKeyInfo keyInfo;
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volume, bucket);
     try {
       validateBucket(volume, bucket);
       String objectKey = metadataManager.getOzoneKey(volume, bucket, keyName);
-      OmKeyInfo keyInfo = metadataManager.getKeyTable().get(objectKey);
+      if (OzoneManagerRatisUtils.isBucketFSOptimized()) {
+        keyInfo = getOmKeyInfoV1(volume, bucket, keyName);
+      } else {
+        keyInfo = getOmKeyInfo(volume, bucket, keyName);
+      }
       if (keyInfo == null) {
         throw new OMException("Key not found. Key:" + objectKey, KEY_NOT_FOUND);
       }
