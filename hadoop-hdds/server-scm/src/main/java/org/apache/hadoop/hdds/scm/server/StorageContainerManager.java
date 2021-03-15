@@ -64,6 +64,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.ScmInfo;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.scm.ScmConfig;
@@ -293,6 +294,17 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     // Creates the SCM DBs or opens them if it exists.
     // A valid pointer to the store is required by all the other services below.
     initalizeMetadataStore(conf, configurator);
+
+    eventQueue = new EventQueue();
+    serviceManager = new SCMServiceManager();
+
+    long watcherTimeout =
+        conf.getTimeDuration(ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT,
+            HDDS_SCM_WATCHER_TIMEOUT_DEFAULT, TimeUnit.MILLISECONDS);
+    commandWatcherLeaseManager = new LeaseManager<>("CommandWatcher",
+        watcherTimeout);
+    initializeSystemManagers(conf, configurator);
+
     // Authenticate SCM if security is enabled, this initialization can only
     // be done after the metadata store is initialized.
     if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
@@ -304,16 +316,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       certificateServer = null;
       securityProtocolServer = null;
     }
-
-    eventQueue = new EventQueue();
-    serviceManager = new SCMServiceManager();
-
-    long watcherTimeout =
-        conf.getTimeDuration(ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT,
-            HDDS_SCM_WATCHER_TIMEOUT_DEFAULT, TimeUnit.MILLISECONDS);
-    commandWatcherLeaseManager = new LeaseManager<>("CommandWatcher",
-        watcherTimeout);
-    initializeSystemManagers(conf, configurator);
 
     CloseContainerEventHandler closeContainerHandler =
         new CloseContainerEventHandler(
@@ -657,8 +659,12 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       throw new SCMException("Cannot initialize CA without a valid metadata " +
           "store", ResultCodes.SCM_NOT_INITIALIZED);
     }
-    SCMCertStore certStore = new SCMCertStore(this.scmMetadataStore,
-        getLastSequenceIdForCRL());
+
+    CertificateStore certStore =
+        new SCMCertStore.Builder().setMetadaStore(scmMetadataStore)
+            .setRatisServer(scmHAManager.getRatisServer())
+            .setCRLSequenceId(getLastSequenceIdForCRL()).build();
+
     return new DefaultCAServer(subject, clusterID, scmID, certStore);
   }
 
