@@ -65,12 +65,12 @@ public class PrefixParser implements Callable<Void>, SubcommandWithParent {
 
   @CommandLine.Option(names = {"--bucket"},
       required = true,
-      description = "bucket in /vol/bucket format")
+      description = "bucket name")
   private String bucket;
 
   @CommandLine.Option(names = {"--volume"},
       required = true,
-      description = "volume in /vol/bucket format")
+      description = "volume name")
   private String volume;
 
   public String getDbPath() {
@@ -129,15 +129,27 @@ public class PrefixParser implements Callable<Void>, SubcommandWithParent {
 
     Iterator<Path> pathIterator =  p.iterator();
     while(pathIterator.hasNext()) {
-      Path ss = pathIterator.next();
+      Path elem = pathIterator.next();
       String path =
-          metadataManager.getOzonePathKey(lastObjectId, ss.toString());
+          metadataManager.getOzonePathKey(lastObjectId, elem.toString());
       OmDirectoryInfo directoryInfo =
           metadataManager.getDirectoryTable().get(path);
-      effectivePath = getEffectivePath(effectivePath, ss.toString());
+
+      org.apache.hadoop.fs.Path tmpPath =
+          getEffectivePath(effectivePath, elem.toString());
+      if (directoryInfo == null) {
+        System.out.println("Given path contains a file at:" +
+            tmpPath);
+        System.out.println("Dumping files and dirs at level:" +
+            tmpPath.getParent());
+        System.out.println();
+        break;
+      }
+
+      effectivePath = tmpPath;
 
       dumpInfo("Intermediate Dir", effectivePath,
-          directoryInfo, directoryInfo.getName());
+          directoryInfo, path);
       lastObjectId = directoryInfo.getObjectID();
     }
 

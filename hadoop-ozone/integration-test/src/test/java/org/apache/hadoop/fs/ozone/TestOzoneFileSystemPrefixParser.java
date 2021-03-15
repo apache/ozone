@@ -86,7 +86,7 @@ public class TestOzoneFileSystemPrefixParser {
   }
 
   @Test
-  public void testPrefixParsing() throws Exception {
+  public void testPrefixParseDir() throws Exception {
     Path dir = new Path("/a/b/c/d/e");
     fs.mkdirs(dir);
     Path file = new Path("/a/b/c/file1");
@@ -101,4 +101,19 @@ public class TestOzoneFileSystemPrefixParser {
         dir.getParent().getParent().toString());
   }
 
+  @Test
+  public void testPrefixParseFile() throws Exception {
+    Path dir = new Path("/a/b/c/d/e");
+    fs.mkdirs(dir);
+    Path file = new Path("/a/b/c/file1");
+    FSDataOutputStream os = fs.create(file);
+    os.close();
+
+    cluster.stop();
+    PrefixParser parser = new PrefixParser();
+
+    parser.parse(volumeName, bucketName,
+        OMStorage.getOmDbDir(configuration).getPath(),
+        file.toString());
+  }
 }
