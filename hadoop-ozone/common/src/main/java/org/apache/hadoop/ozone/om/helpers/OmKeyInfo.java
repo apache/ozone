@@ -42,7 +42,7 @@ import com.google.common.base.Preconditions;
  * This is returned from OM to client, and client use class to talk to
  * datanode. Also, this is the metadata written to om.db on server side.
  */
-public final class OmKeyInfo extends WithObjectID {
+public final class OmKeyInfo extends WithParentObjectId {
   private final String volumeName;
   private final String bucketName;
   // name of key client specified
@@ -54,29 +54,6 @@ public final class OmKeyInfo extends WithObjectID {
   private HddsProtos.ReplicationType type;
   private HddsProtos.ReplicationFactor factor;
   private FileEncryptionInfo encInfo;
-
-  /**
-   * A pointer to parent directory used for path traversal. ParentID will be
-   * used only when the key is created into a FileSystemOptimized(FSO) bucket.
-   * <p>
-   * For example, if a key "a/b/key1" created into a FSOBucket then each
-   * path component will be assigned an ObjectId and linked to its parent path
-   * component using parent's objectID.
-   * <p>
-   * Say, Bucket's ObjectID = 512, which is the parent for its immediate child
-   * element.
-   * <p>
-   * ------------------------------------------|
-   * PathComponent |   ObjectID   |   ParentID |
-   * ------------------------------------------|
-   *      a        |     1024     |     512    |
-   * ------------------------------------------|
-   *      b        |     1025     |     1024   |
-   * ------------------------------------------|
-   *     key1      |     1026     |     1025   |
-   * ------------------------------------------|
-   */
-  private long parentObjectID;
 
   /**
    * Represents leaf node name. This also will be used when the keyName is
