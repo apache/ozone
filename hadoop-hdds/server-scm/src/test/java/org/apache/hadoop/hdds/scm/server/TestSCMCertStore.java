@@ -73,7 +73,7 @@ public class TestSCMCertStore {
 
   private OzoneConfiguration config;
   private SCMMetadataStore scmMetadataStore;
-  private SCMCertStore scmCertStore;
+  private CertificateStore scmCertStore;
   private SecurityConfig securityConfig;
   private X509Certificate x509Certificate;
   private KeyPair keyPair;
@@ -96,7 +96,10 @@ public class TestSCMCertStore {
   @Before
   public void initDbStore() throws IOException {
     scmMetadataStore = new SCMMetadataStoreImpl(config);
-    scmCertStore = new SCMCertStore(scmMetadataStore, INITIAL_SEQUENCE_ID);
+    scmCertStore = new SCMCertStore.Builder().setRatisServer(null)
+        .setCRLSequenceId(INITIAL_SEQUENCE_ID)
+        .setMetadaStore(scmMetadataStore)
+        .build();
   }
 
   @Before

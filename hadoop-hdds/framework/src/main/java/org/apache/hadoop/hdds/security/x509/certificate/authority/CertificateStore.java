@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.hdds.security.x509.certificate.authority;
 
+import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
@@ -49,6 +50,7 @@ public interface CertificateStore {
    * @param role - OM/DN/SCM.
    * @throws IOException - on Failure.
    */
+  @Replicate
   void storeValidCertificate(BigInteger serialID,
       X509Certificate certificate, NodeType role) throws IOException;
 

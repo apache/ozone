@@ -20,6 +20,7 @@
 package org.apache.hadoop.hdds.scm.server;
 
 import java.io.IOException;
+import java.lang.reflect.Proxy;
 import java.math.BigInteger;
 import java.security.cert.CRLException;
 import java.security.cert.X509CRL;
@@ -35,6 +36,9 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
+import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
+import org.apache.hadoop.hdds.scm.ha.SCMHAInvocationHandler;
+import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CRLApprover;
@@ -56,14 +60,14 @@ import static org.apache.hadoop.hdds.security.x509.certificate.authority.Certifi
 /**
  * A Certificate Store class that persists certificates issued by SCM CA.
  */
-public class SCMCertStore implements CertificateStore {
+public final class SCMCertStore implements CertificateStore {
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMCertStore.class);
   private SCMMetadataStore scmMetadataStore;
   private final Lock lock;
   private AtomicLong crlSequenceId;
 
-  public SCMCertStore(SCMMetadataStore dbStore, long sequenceId) {
+  private SCMCertStore(SCMMetadataStore dbStore, long sequenceId) {
     this.scmMetadataStore = dbStore;
     lock = new ReentrantLock();
     crlSequenceId = new AtomicLong(sequenceId);
@@ -275,5 +279,42 @@ public class SCMCertStore implements CertificateStore {
   @Override
   public void reinitialize(SCMMetadataStore metadataStore) {
     this.scmMetadataStore = metadataStore;
+  }
+
+  public static class Builder {
+
+    private SCMMetadataStore metadataStore;
+    private long crlSequenceId;
+    private SCMRatisServer scmRatisServer;
+
+
+    public Builder setMetadaStore(SCMMetadataStore scmMetadataStore) {
+      this.metadataStore = scmMetadataStore;
+      return this;
+    }
+
+    public Builder setCRLSequenceId(long sequenceId) {
+      this.crlSequenceId = sequenceId;
+      return this;
+    }
+
+    public Builder setRatisServer(final SCMRatisServer ratisServer) {
+      scmRatisServer = ratisServer;
+      return this;
+    }
+
+    public CertificateStore build() {
+      final SCMCertStore scmCertStore = new SCMCertStore(metadataStore,
+          crlSequenceId);
+
+      final SCMHAInvocationHandler scmhaInvocationHandler =
+          new SCMHAInvocationHandler(SCMRatisProtocol.RequestType.CERT_STORE,
+              scmCertStore, scmRatisServer);
+
+      return (CertificateStore) Proxy.newProxyInstance(
+          SCMHAInvocationHandler.class.getClassLoader(),
+          new Class<?>[]{CertificateStore.class}, scmhaInvocationHandler);
+
+    }
   }
 }
