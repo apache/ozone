@@ -50,8 +50,11 @@ import org.apache.hadoop.ozone.om.request.key.OMKeyRenameRequestV1;
 import org.apache.hadoop.ozone.om.request.key.OMKeysRenameRequest;
 import org.apache.hadoop.ozone.om.request.key.OMTrashRecoverRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeyAddAclRequest;
+import org.apache.hadoop.ozone.om.request.key.acl.OMKeyAddAclRequestV1;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeyRemoveAclRequest;
+import org.apache.hadoop.ozone.om.request.key.acl.OMKeyRemoveAclRequestV1;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeySetAclRequest;
+import org.apache.hadoop.ozone.om.request.key.acl.OMKeySetAclRequestV1;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixAddAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixRemoveAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixSetAclRequest;
@@ -230,6 +233,9 @@ public final class OzoneManagerRatisUtils {
       } else if (ObjectType.BUCKET == type) {
         return new OMBucketAddAclRequest(omRequest);
       } else if (ObjectType.KEY == type) {
+        if (isBucketFSOptimized()){
+          return new OMKeyAddAclRequestV1(omRequest);
+        }
         return new OMKeyAddAclRequest(omRequest);
       } else {
         return new OMPrefixAddAclRequest(omRequest);
@@ -241,6 +247,9 @@ public final class OzoneManagerRatisUtils {
       } else if (ObjectType.BUCKET == type) {
         return new OMBucketRemoveAclRequest(omRequest);
       } else if (ObjectType.KEY == type) {
+        if (isBucketFSOptimized()){
+          return new OMKeyRemoveAclRequestV1(omRequest);
+        }
         return new OMKeyRemoveAclRequest(omRequest);
       } else {
         return new OMPrefixRemoveAclRequest(omRequest);
@@ -252,6 +261,9 @@ public final class OzoneManagerRatisUtils {
       } else if (ObjectType.BUCKET == type) {
         return new OMBucketSetAclRequest(omRequest);
       } else if (ObjectType.KEY == type) {
+        if (isBucketFSOptimized()){
+          return new OMKeySetAclRequestV1(omRequest);
+        }
         return new OMKeySetAclRequest(omRequest);
       } else {
         return new OMPrefixSetAclRequest(omRequest);
