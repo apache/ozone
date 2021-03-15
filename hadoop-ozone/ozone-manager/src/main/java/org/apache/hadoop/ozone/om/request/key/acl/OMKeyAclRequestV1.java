@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.ObjectParser;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.response.key.acl.OMKeyAclResponseV1;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -142,6 +143,19 @@ public abstract class OMKeyAclRequestV1 extends OMKeyAclRequest {
         ozoneManager.getAuditLogger(), auditMap);
 
     return omClientResponse;
+  }
+
+  /**
+   * Get the om client response on failure case with lock.
+   *
+   * @param omResponse
+   * @param exception
+   * @return OMClientResponse
+   */
+  @Override OMClientResponse onFailure(
+      OzoneManagerProtocolProtos.OMResponse.Builder omResponse,
+      IOException exception) {
+    return new OMKeyAclResponseV1(createErrorOMResponse(omResponse, exception));
   }
 
   abstract OMClientResponse onSuccess(
