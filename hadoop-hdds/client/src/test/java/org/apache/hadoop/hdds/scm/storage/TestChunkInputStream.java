@@ -229,8 +229,9 @@ public class TestChunkInputStream {
     ChunkInputStream subject = new ChunkInputStream(chunkInfo, null,
         clientFactory, pipelineRef::get, false, null) {
       @Override
-      protected List<ByteBuffer> readChunk(ChunkInfo readChunkInfo) {
-        return ByteString.copyFrom(chunkData).asReadOnlyByteBufferList();
+      protected ByteBuffer[] readChunk(ChunkInfo readChunkInfo) {
+        return ByteString.copyFrom(chunkData).asReadOnlyByteBufferList()
+            .toArray(new ByteBuffer[0]);
       }
     };
 
