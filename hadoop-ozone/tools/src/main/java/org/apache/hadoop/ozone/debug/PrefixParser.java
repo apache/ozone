@@ -59,7 +59,7 @@ public class PrefixParser implements Callable<Void>, SubcommandWithParent {
     NON_EXISTENT_DIRECTORY,
   }
 
-  private final int parserStats[] = new int[Types.values().length];
+  private final int[] parserStats = new int[Types.values().length];
 
   @Spec
   private CommandSpec spec;

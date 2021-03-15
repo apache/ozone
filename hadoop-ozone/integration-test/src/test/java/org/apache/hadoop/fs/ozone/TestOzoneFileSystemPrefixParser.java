@@ -101,7 +101,7 @@ public class TestOzoneFileSystemPrefixParser {
         OMStorage.getOmDbDir(configuration).getPath(),
         dir.getParent().getParent().toString());
 
-    assertPrefixStats(parser, 1, 1, 3, 0, 1 ,1);
+    assertPrefixStats(parser, 1, 1, 3, 0, 1, 1);
   }
 
   @Test
@@ -119,7 +119,7 @@ public class TestOzoneFileSystemPrefixParser {
         OMStorage.getOmDbDir(configuration).getPath(),
         file.toString());
 
-    assertPrefixStats(parser, 1, 1, 2, 1, 1 ,1);
+    assertPrefixStats(parser, 1, 1, 2, 1, 1, 1);
   }
 
   private void assertPrefixStats(PrefixParser parser, int volumeCount,
