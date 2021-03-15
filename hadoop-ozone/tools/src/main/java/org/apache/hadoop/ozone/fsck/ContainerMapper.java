@@ -34,6 +34,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 
 
@@ -93,7 +94,8 @@ public class ContainerMapper {
             Table.KeyValue<String, OmKeyInfo> keyValue =
                 keyValueTableIterator.next();
             OmKeyInfo omKeyInfo = keyValue.getValue();
-            byte[] value = omKeyInfo.getProtobuf(true).toByteArray();
+            byte[] value = omKeyInfo.getProtobuf(true, CURRENT_VERSION)
+                .toByteArray();
             OmKeyInfo keyInfo = OmKeyInfo.getFromProtobuf(
                 OzoneManagerProtocolProtos.KeyInfo.parseFrom(value));
             for (OmKeyLocationInfoGroup keyLocationInfoGroup : keyInfo

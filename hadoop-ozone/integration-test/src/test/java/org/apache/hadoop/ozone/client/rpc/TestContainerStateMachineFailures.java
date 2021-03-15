@@ -64,6 +64,7 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.test.LambdaTestUtils;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
@@ -94,6 +95,7 @@ public class TestContainerStateMachineFailures {
   private static String volumeName;
   private static String bucketName;
   private static XceiverClientManager xceiverClientManager;
+  private static Random random;
 
   /**
    * Create a MiniDFSCluster for testing.
@@ -151,6 +153,7 @@ public class TestContainerStateMachineFailures {
     bucketName = volumeName;
     objectStore.createVolume(volumeName);
     objectStore.getVolume(volumeName).createBucket(bucketName);
+    random = new Random();
   }
 
   /**
@@ -169,7 +172,7 @@ public class TestContainerStateMachineFailures {
             objectStore.getVolume(volumeName).getBucket(bucketName)
                     .createKey("ratis", 1024, ReplicationType.RATIS,
                             ReplicationFactor.ONE, new HashMap<>());
-    byte[] testData = "ratis".getBytes();
+    byte[] testData = "ratis".getBytes(UTF_8);
     // First write and flush creates a container in the datanode
     key.write(testData);
     key.flush();
@@ -226,9 +229,9 @@ public class TestContainerStateMachineFailures {
                     .createKey("ratis", 1024, ReplicationType.RATIS,
                             ReplicationFactor.ONE, new HashMap<>());
     // First write and flush creates a container in the datanode
-    key.write("ratis".getBytes());
+    key.write("ratis".getBytes(UTF_8));
     key.flush();
-    key.write("ratis".getBytes());
+    key.write("ratis".getBytes(UTF_8));
     KeyOutputStream groupOutputStream = (KeyOutputStream) key
             .getOutputStream();
     List<OmKeyLocationInfo> locationInfoList =
@@ -310,9 +313,9 @@ public class TestContainerStateMachineFailures {
                     .createKey("ratis", 1024, ReplicationType.RATIS,
                             ReplicationFactor.ONE, new HashMap<>());
     // First write and flush creates a container in the datanode
-    key.write("ratis".getBytes());
+    key.write("ratis".getBytes(UTF_8));
     key.flush();
-    key.write("ratis".getBytes());
+    key.write("ratis".getBytes(UTF_8));
     KeyOutputStream groupOutputStream = (KeyOutputStream) key.
             getOutputStream();
     List<OmKeyLocationInfo> locationInfoList =
@@ -400,9 +403,9 @@ public class TestContainerStateMachineFailures {
                     .createKey("ratis", 1024, ReplicationType.RATIS,
                             ReplicationFactor.ONE, new HashMap<>());
     // First write and flush creates a container in the datanode
-    key.write("ratis".getBytes());
+    key.write("ratis".getBytes(UTF_8));
     key.flush();
-    key.write("ratis".getBytes());
+    key.write("ratis".getBytes(UTF_8));
     KeyOutputStream groupOutputStream = (KeyOutputStream) key.getOutputStream();
     List<OmKeyLocationInfo> locationInfoList =
             groupOutputStream.getLocationInfoList();
@@ -473,9 +476,9 @@ public class TestContainerStateMachineFailures {
                     .createKey("ratis-1", 1024, ReplicationType.RATIS,
                             ReplicationFactor.ONE, new HashMap<>());
     // First write and flush creates a container in the datanode
-    key.write("ratis".getBytes());
+    key.write("ratis".getBytes(UTF_8));
     key.flush();
-    key.write("ratis".getBytes());
+    key.write("ratis".getBytes(UTF_8));
     KeyOutputStream groupOutputStream = (KeyOutputStream) key
             .getOutputStream();
     List<OmKeyLocationInfo> locationInfoList =
@@ -530,7 +533,7 @@ public class TestContainerStateMachineFailures {
       try {
         xceiverClient.sendCommand(ContainerTestHelper
                 .getWriteChunkRequest(pipeline, omKeyLocationInfo.getBlockID(),
-                        1024, new Random().nextInt(), null));
+                        1024, random.nextInt(), null));
         latch.countDown();
       } catch (IOException e) {
         latch.countDown();

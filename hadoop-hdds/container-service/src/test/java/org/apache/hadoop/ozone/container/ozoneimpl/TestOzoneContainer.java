@@ -277,7 +277,7 @@ public class TestOzoneContainer {
       chunkList.clear();
       for (int ci = 0; ci < chunksPerBlock; ci++) {
         String chunkName = strBlock + bi + strChunk + ci;
-        long offset = ci * datalen;
+        long offset = ci * (long) datalen;
         ChunkInfo info = new ChunkInfo(chunkName, offset, datalen);
         usedBytes += datalen;
         chunkList.add(info.getProtoBufMessage());

@@ -24,9 +24,9 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   </parent>
   <artifactId>hadoop-hdds-server-framework</artifactId>
   <version>1.1.0-SNAPSHOT</version>
-  <description>Apache Hadoop Distributed Data Store Server Framework
+  <description>Apache Ozone Distributed Data Store Server Framework
   </description>
-  <name>Apache Hadoop HDDS Server Framework</name>
+  <name>Apache Ozone HDDS Server Framework</name>
   <packaging>jar</packaging>
 
   <dependencies>
@@ -128,4 +128,17 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <type>test-jar</type>
     </dependency>
   </dependencies>
+
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>com.github.spotbugs</groupId>
+        <artifactId>spotbugs-maven-plugin</artifactId>
+        <configuration>
+          <excludeFilterFile>${basedir}/dev-support/findbugsExcludeFile.xml</excludeFilterFile>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
 </project>

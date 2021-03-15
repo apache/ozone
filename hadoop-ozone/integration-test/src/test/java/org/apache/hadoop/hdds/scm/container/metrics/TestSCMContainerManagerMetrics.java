@@ -39,6 +39,7 @@ import org.junit.Test;
 import java.io.IOException;
 import java.util.HashMap;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys
     .HDDS_SCM_SAFEMODE_PIPELINE_CREATION;
@@ -57,7 +58,7 @@ public class TestSCMContainerManagerMetrics {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = new Timeout(300000);
+  public Timeout timeout = Timeout.seconds(300);
 
   private MiniOzoneCluster cluster;
   private StorageContainerManager scm;
@@ -164,7 +165,7 @@ public class TestSCMContainerManagerMetrics {
             new HashMap<>());
 
     String data = "file data";
-    ozoneOutputStream.write(data.getBytes(), 0, data.length());
+    ozoneOutputStream.write(data.getBytes(UTF_8), 0, data.length());
     ozoneOutputStream.close();
 
 

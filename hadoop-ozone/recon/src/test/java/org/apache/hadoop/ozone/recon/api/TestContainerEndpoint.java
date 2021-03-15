@@ -30,6 +30,7 @@ import static org.junit.Assert.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -39,16 +40,18 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
@@ -64,7 +67,8 @@ import org.apache.hadoop.ozone.recon.api.types.MissingContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.MissingContainersResponse;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersResponse;
-import org.apache.hadoop.ozone.recon.persistence.ContainerSchemaManager;
+import org.apache.hadoop.ozone.recon.persistence.ContainerHistory;
+import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
@@ -76,14 +80,12 @@ import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTask;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
-import org.hadoop.ozone.recon.schema.tables.pojos.ContainerHistory;
 import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
-import org.mockito.Mockito;
 
 /**
  * Test for container endpoint.
@@ -93,14 +95,21 @@ public class TestContainerEndpoint {
   @Rule
   public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
+  private OzoneStorageContainerManager ozoneStorageContainerManager;
+  private ReconContainerManager reconContainerManager;
   private ContainerDBServiceProvider containerDbServiceProvider;
   private ContainerEndpoint containerEndpoint;
   private boolean isSetupDone = false;
-  private ContainerSchemaManager containerSchemaManager;
+  private ContainerHealthSchemaManager containerHealthSchemaManager;
   private ReconOMMetadataManager reconOMMetadataManager;
   private ContainerID containerID = new ContainerID(1L);
   private PipelineID pipelineID;
   private long keyCount = 5L;
+
+  private UUID uuid1;
+  private UUID uuid2;
+  private UUID uuid3;
+  private UUID uuid4;
 
   private void initializeInjector() throws Exception {
     reconOMMetadataManager = getTestReconOmMetadataManager(
@@ -110,41 +119,31 @@ public class TestContainerEndpoint {
     Pipeline pipeline = getRandomPipeline();
     pipelineID = pipeline.getId();
 
-    // Mock ReconStorageContainerManagerFacade and other SCM related methods
-    OzoneStorageContainerManager mockReconSCM =
-        mock(ReconStorageContainerManagerFacade.class);
-    ContainerManager mockContainerManager =
-        mock(ReconContainerManager.class);
-
-    when(mockContainerManager.getContainer(Mockito.any(ContainerID.class)))
-        .thenReturn(
-        new ContainerInfo.Builder()
-            .setContainerID(containerID.getId())
-            .setNumberOfKeys(keyCount)
-            .setReplicationFactor(ReplicationFactor.THREE)
-            .setPipelineID(pipelineID)
-            .build());
-    when(mockReconSCM.getContainerManager())
-        .thenReturn(mockContainerManager);
-
     ReconTestInjector reconTestInjector =
         new ReconTestInjector.Builder(temporaryFolder)
             .withReconSqlDb()
             .withReconOm(reconOMMetadataManager)
             .withOmServiceProvider(mock(OzoneManagerServiceProviderImpl.class))
-            .withReconScm(mockReconSCM)
+            // No longer using mock reconSCM as we need nodeDB in Facade
+            //  to establish datanode UUID to hostname mapping
+            .addBinding(OzoneStorageContainerManager.class,
+                ReconStorageContainerManagerFacade.class)
             .withContainerDB()
             .addBinding(StorageContainerServiceProvider.class,
                 mock(StorageContainerServiceProviderImpl.class))
             .addBinding(ContainerEndpoint.class)
-            .addBinding(ContainerSchemaManager.class)
+            .addBinding(ContainerHealthSchemaManager.class)
             .build();
 
+    ozoneStorageContainerManager =
+        reconTestInjector.getInstance(OzoneStorageContainerManager.class);
+    reconContainerManager = (ReconContainerManager)
+        ozoneStorageContainerManager.getContainerManager();
     containerDbServiceProvider =
         reconTestInjector.getInstance(ContainerDBServiceProvider.class);
     containerEndpoint = reconTestInjector.getInstance(ContainerEndpoint.class);
-    containerSchemaManager =
-        reconTestInjector.getInstance(ContainerSchemaManager.class);
+    containerHealthSchemaManager =
+        reconTestInjector.getInstance(ContainerHealthSchemaManager.class);
   }
 
   @Before
@@ -230,7 +229,6 @@ public class TestContainerEndpoint {
 
   @Test
   public void testGetKeysForContainer() {
-
     Response response = containerEndpoint.getKeysForContainer(1L, -1, "");
 
     KeysResponse data = (KeysResponse) response.getEntity();
@@ -323,7 +321,6 @@ public class TestContainerEndpoint {
 
   @Test
   public void testGetContainers() {
-
     Response response = containerEndpoint.getContainers(-1, 0L);
 
     ContainersResponse responseObject =
@@ -404,7 +401,7 @@ public class TestContainerEndpoint {
   }
 
   @Test
-  public void testGetMissingContainers() {
+  public void testGetMissingContainers() throws IOException {
     Response response = containerEndpoint.getMissingContainers();
 
     MissingContainersResponse responseObject =
@@ -426,12 +423,18 @@ public class TestContainerEndpoint {
     ArrayList<UnhealthyContainers> missingList =
         new ArrayList<UnhealthyContainers>();
     missingList.add(missing);
-    containerSchemaManager.insertUnhealthyContainerRecords(missingList);
+    containerHealthSchemaManager.insertUnhealthyContainerRecords(missingList);
+
+    putContainerInfos(1);
     // Add container history for id 1
-    containerSchemaManager.upsertContainerHistory(1L, "host1", 1L);
-    containerSchemaManager.upsertContainerHistory(1L, "host2", 2L);
-    containerSchemaManager.upsertContainerHistory(1L, "host3", 3L);
-    containerSchemaManager.upsertContainerHistory(1L, "host4", 4L);
+    final UUID u1 = newDatanode("host1", "127.0.0.1");
+    final UUID u2 = newDatanode("host2", "127.0.0.2");
+    final UUID u3 = newDatanode("host3", "127.0.0.3");
+    final UUID u4 = newDatanode("host4", "127.0.0.4");
+    reconContainerManager.upsertContainerHistory(1L, u1, 1L);
+    reconContainerManager.upsertContainerHistory(1L, u2, 2L);
+    reconContainerManager.upsertContainerHistory(1L, u3, 3L);
+    reconContainerManager.upsertContainerHistory(1L, u4, 4L);
 
     response = containerEndpoint.getMissingContainers();
     responseObject = (MissingContainersResponse) response.getEntity();
@@ -454,8 +457,29 @@ public class TestContainerEndpoint {
     });
   }
 
+  ContainerInfo newContainerInfo(long containerId) {
+    return new ContainerInfo.Builder()
+        .setContainerID(containerId)
+        .setReplicationType(HddsProtos.ReplicationType.RATIS)
+        .setState(HddsProtos.LifeCycleState.OPEN)
+        .setOwner("owner1")
+        .setNumberOfKeys(keyCount)
+        .setReplicationFactor(ReplicationFactor.THREE)
+        .setPipelineID(pipelineID)
+        .build();
+  }
+
+  void putContainerInfos(int num) throws IOException {
+    for (int i = 1; i <= num; i++) {
+      final ContainerInfo info = newContainerInfo(i);
+      reconContainerManager.getContainerStore().put(new ContainerID(i), info);
+      reconContainerManager.getContainerStateManager().addContainerInfo(
+          i, info, null, null);
+    }
+  }
+
   @Test
-  public void testUnhealthyContainers() {
+  public void testUnhealthyContainers() throws IOException {
     Response response = containerEndpoint.getUnhealthyContainers(1000, 1);
 
     UnhealthyContainersResponse responseObject =
@@ -468,6 +492,11 @@ public class TestContainerEndpoint {
 
     assertEquals(Collections.EMPTY_LIST, responseObject.getContainers());
 
+    putContainerInfos(14);
+    uuid1 = newDatanode("host1", "127.0.0.1");
+    uuid2 = newDatanode("host2", "127.0.0.2");
+    uuid3 = newDatanode("host3", "127.0.0.3");
+    uuid4 = newDatanode("host4", "127.0.0.4");
     createUnhealthyRecords(5, 4, 3, 2);
 
     response = containerEndpoint.getUnhealthyContainers(1000, 1);
@@ -544,7 +573,7 @@ public class TestContainerEndpoint {
   }
 
   @Test
-  public void testUnhealthyContainersFilteredResponse() {
+  public void testUnhealthyContainersFilteredResponse() throws IOException {
     String missing =  UnHealthyContainerStates.MISSING.toString();
 
     Response response = containerEndpoint
@@ -559,9 +588,14 @@ public class TestContainerEndpoint {
     assertEquals(0, responseObject.getMisReplicatedCount());
     assertEquals(Collections.EMPTY_LIST, responseObject.getContainers());
 
+    putContainerInfos(5);
+    uuid1 = newDatanode("host1", "127.0.0.1");
+    uuid2 = newDatanode("host2", "127.0.0.2");
+    uuid3 = newDatanode("host3", "127.0.0.3");
+    uuid4 = newDatanode("host4", "127.0.0.4");
     createUnhealthyRecords(5, 4, 3, 2);
 
-    response =  containerEndpoint.getUnhealthyContainers(missing, 1000, 1);
+    response = containerEndpoint.getUnhealthyContainers(missing, 1000, 1);
 
     responseObject = (UnhealthyContainersResponse) response.getEntity();
     // Summary should have the count for all unhealthy:
@@ -592,7 +626,12 @@ public class TestContainerEndpoint {
   }
 
   @Test
-  public void testUnhealthyContainersPaging() {
+  public void testUnhealthyContainersPaging() throws IOException {
+    putContainerInfos(6);
+    uuid1 = newDatanode("host1", "127.0.0.1");
+    uuid2 = newDatanode("host2", "127.0.0.2");
+    uuid3 = newDatanode("host3", "127.0.0.3");
+    uuid4 = newDatanode("host4", "127.0.0.4");
     createUnhealthyRecords(5, 4, 3, 2);
     UnhealthyContainersResponse firstBatch =
         (UnhealthyContainersResponse) containerEndpoint.getUnhealthyContainers(
@@ -618,47 +657,75 @@ public class TestContainerEndpoint {
   }
 
   @Test
-  public void testGetReplicaHistoryForContainer() {
-    // Add container history for id 1
-    containerSchemaManager.upsertContainerHistory(1L, "host1", 1L);
-    containerSchemaManager.upsertContainerHistory(1L, "host2", 2L);
-    containerSchemaManager.upsertContainerHistory(1L, "host3", 3L);
-    containerSchemaManager.upsertContainerHistory(1L, "host4", 4L);
-    containerSchemaManager.upsertContainerHistory(1L, "host1", 5L);
+  public void testGetReplicaHistoryForContainer() throws IOException {
+    // Add container history for container id 1
+    final UUID u1 = newDatanode("host1", "127.0.0.1");
+    final UUID u2 = newDatanode("host2", "127.0.0.2");
+    final UUID u3 = newDatanode("host3", "127.0.0.3");
+    final UUID u4 = newDatanode("host4", "127.0.0.4");
+    reconContainerManager.upsertContainerHistory(1L, u1, 1L);
+    reconContainerManager.upsertContainerHistory(1L, u2, 2L);
+    reconContainerManager.upsertContainerHistory(1L, u3, 3L);
+    reconContainerManager.upsertContainerHistory(1L, u4, 4L);
+
+    reconContainerManager.upsertContainerHistory(1L, u1, 5L);
 
     Response response = containerEndpoint.getReplicaHistoryForContainer(1L);
     List<ContainerHistory> histories =
         (List<ContainerHistory>) response.getEntity();
     Set<String> datanodes = Collections.unmodifiableSet(
-        new HashSet<>(Arrays.asList("host1", "host2", "host3", "host4")));
+        new HashSet<>(Arrays.asList(
+            u1.toString(), u2.toString(), u3.toString(), u4.toString())));
     Assert.assertEquals(4, histories.size());
     histories.forEach(history -> {
-      Assert.assertTrue(datanodes.contains(history.getDatanodeHost()));
-      if (history.getDatanodeHost().equals("host1")) {
-        Assert.assertEquals(1L, (long) history.getFirstReportTimestamp());
-        Assert.assertEquals(5L, (long) history.getLastReportTimestamp());
+      Assert.assertTrue(datanodes.contains(history.getDatanodeUuid()));
+      if (history.getDatanodeUuid().equals(u1.toString())) {
+        Assert.assertEquals("host1", history.getDatanodeHost());
+        Assert.assertEquals(1L, history.getFirstSeenTime());
+        Assert.assertEquals(5L, history.getLastSeenTime());
       }
     });
+
+    // Check getLatestContainerHistory
+    List<ContainerHistory> hist1 = reconContainerManager
+        .getLatestContainerHistory(1L, 10);
+    Assert.assertTrue(hist1.size() <= 10);
+    // Descending order by last report timestamp
+    for (int i = 0; i < hist1.size() - 1; i++) {
+      Assert.assertTrue(hist1.get(i).getLastSeenTime()
+          >= hist1.get(i + 1).getLastSeenTime());
+    }
+  }
+
+  UUID newDatanode(String hostName, String ipAddress) throws IOException {
+    final UUID uuid = UUID.randomUUID();
+    reconContainerManager.getNodeDB().put(uuid,
+        DatanodeDetails.newBuilder()
+            .setUuid(uuid)
+            .setHostName(hostName)
+            .setIpAddress(ipAddress)
+            .build());
+    return uuid;
   }
 
   private void createUnhealthyRecords(int missing, int overRep, int underRep,
       int misRep) {
     int cid = 0;
-    for (int i=0; i<missing; i++) {
-      createUnhealthyRecord(++cid,
-          UnHealthyContainerStates.MISSING.toString(), 3, 0, 3, null);
+    for (int i = 0; i < missing; i++) {
+      createUnhealthyRecord(++cid, UnHealthyContainerStates.MISSING.toString(),
+          3, 0, 3, null);
     }
-    for (int i=0; i<overRep; i++) {
+    for (int i = 0; i < overRep; i++) {
       createUnhealthyRecord(++cid,
           UnHealthyContainerStates.OVER_REPLICATED.toString(),
           3, 5, -2, null);
     }
-    for (int i=0; i<underRep; i++) {
+    for (int i = 0; i < underRep; i++) {
       createUnhealthyRecord(++cid,
           UnHealthyContainerStates.UNDER_REPLICATED.toString(),
           3, 1, 2, null);
     }
-    for (int i=0; i<misRep; i++) {
+    for (int i = 0; i < misRep; i++) {
       createUnhealthyRecord(++cid,
           UnHealthyContainerStates.MIS_REPLICATED.toString(),
           2, 1, 1, "some reason");
@@ -677,14 +744,13 @@ public class TestContainerEndpoint {
     missing.setReplicaDelta(delta);
     missing.setReason(reason);
 
-    ArrayList<UnhealthyContainers> missingList =
-        new ArrayList<UnhealthyContainers>();
+    ArrayList<UnhealthyContainers> missingList = new ArrayList<>();
     missingList.add(missing);
-    containerSchemaManager.insertUnhealthyContainerRecords(missingList);
+    containerHealthSchemaManager.insertUnhealthyContainerRecords(missingList);
 
-    containerSchemaManager.upsertContainerHistory(cID, "host1", 1L);
-    containerSchemaManager.upsertContainerHistory(cID, "host2", 2L);
-    containerSchemaManager.upsertContainerHistory(cID, "host3", 3L);
-    containerSchemaManager.upsertContainerHistory(cID, "host4", 4L);
+    reconContainerManager.upsertContainerHistory(cID, uuid1, 1L);
+    reconContainerManager.upsertContainerHistory(cID, uuid2, 2L);
+    reconContainerManager.upsertContainerHistory(cID, uuid3, 3L);
+    reconContainerManager.upsertContainerHistory(cID, uuid4, 4L);
   }
 }

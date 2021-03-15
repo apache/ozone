@@ -61,6 +61,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.test.GenericTestUtils;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT;
@@ -102,6 +103,7 @@ public class TestDeleteWithSlowFollower {
 
     conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 200,
         TimeUnit.MILLISECONDS);
+    conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 1);
     // Make the stale, dead and server failure timeout higher so that a dead
     // node is not detecte at SCM as well as the pipeline close action
     // never gets initiated early at Datanode in the test.
@@ -196,7 +198,7 @@ public class TestDeleteWithSlowFollower {
         objectStore.getVolume(volumeName).getBucket(bucketName)
             .createKey(keyName, 0, ReplicationType.RATIS,
                 ReplicationFactor.THREE, new HashMap<>());
-    byte[] testData = "ratis".getBytes();
+    byte[] testData = "ratis".getBytes(UTF_8);
     // First write and flush creates a container in the datanode
     key.write(testData);
     key.flush();

@@ -31,10 +31,18 @@
 <h2>Node counts</h2>
 
 <table class="table table-bordered table-striped" class="col-md-6">
+    <thead>
+    <tr>
+        <th class="col-md-3"></th>
+        <th>HEALTHY</th>
+        <th>STALE</th>
+        <th>DEAD</th>
+    </tr>
+    </thead>
     <tbody>
-    <tr ng-repeat="typestat in $ctrl.nodemanagermetrics.NodeCount | orderBy:'key':false:$ctrl.nodeOrder">
-        <td>{{typestat.key}}</td>
-        <td>{{typestat.value}}</td>
+    <tr ng-repeat="nodeOpState in $ctrl.nodemanagermetrics.NodeCount | orderBy:'key':false:$ctrl.nodeOpStateOrder">
+        <td>{{nodeOpState.key}}</td>
+        <td ng-repeat="nodeState in nodeOpState.value | orderBy:'key':false:$ctrl.nodeStateOrder">{{nodeState.value}}</td>
     </tr>
     </tbody>
 </table>

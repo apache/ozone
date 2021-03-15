@@ -203,6 +203,8 @@ public final class ScmConfigKeys {
       "hdds.rest.http-address";
   public static final String HDDS_REST_HTTP_ADDRESS_DEFAULT = "0.0.0.0:9880";
   public static final String HDDS_DATANODE_DIR_KEY = "hdds.datanode.dir";
+  public static final String HDDS_DATANODE_DIR_DU_RESERVED =
+      "hdds.datanode.dir.du.reserved";
   public static final String HDDS_REST_CSRF_ENABLED_KEY =
       "hdds.rest.rest-csrf.enabled";
   public static final boolean HDDS_REST_CSRF_ENABLED_DEFAULT = false;
@@ -245,6 +247,11 @@ public final class ScmConfigKeys {
       "ozone.scm.heartbeat.rpc-retry-count";
   public static final int OZONE_SCM_HEARTBEAT_RPC_RETRY_COUNT_DEFAULT =
       15;
+
+  public static final String OZONE_SCM_HEARTBEAT_RPC_RETRY_INTERVAL =
+      "ozone.scm.heartbeat.rpc-retry-interval";
+  public static final String OZONE_SCM_HEARTBEAT_RPC_RETRY_INTERVAL_DEFAULT =
+      "1s";
 
   /**
    * Defines how frequently we will log the missing of heartbeat to a specific

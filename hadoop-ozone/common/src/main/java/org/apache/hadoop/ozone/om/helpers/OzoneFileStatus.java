@@ -93,14 +93,13 @@ public class OzoneFileStatus {
     return !isDirectory();
   }
 
-  public OzoneFileStatusProto getProtobuf() {
-
+  public OzoneFileStatusProto getProtobuf(int clientVersion) {
     Builder builder = OzoneFileStatusProto.newBuilder()
         .setBlockSize(blockSize)
         .setIsDirectory(isDirectory);
     //key info can be null for the fake root entry.
     if (keyInfo != null) {
-      builder.setKeyInfo(keyInfo.getProtobuf());
+      builder.setKeyInfo(keyInfo.getProtobuf(clientVersion));
     }
     return builder.build();
   }

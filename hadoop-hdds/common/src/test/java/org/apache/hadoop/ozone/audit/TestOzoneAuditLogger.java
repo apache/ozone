@@ -212,7 +212,7 @@ public class TestOzoneAuditLogger {
     assertEquals(0, lines.size());
   }
 
-  private class TestException extends Exception{
+  private static class TestException extends Exception{
     TestException(String message) {
       super(message);
     }

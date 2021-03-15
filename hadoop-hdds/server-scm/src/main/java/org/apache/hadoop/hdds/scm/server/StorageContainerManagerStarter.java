@@ -140,17 +140,20 @@ public class StorageContainerManagerStarter extends GenericCli {
    */
   static class SCMStarterHelper implements SCMStarterInterface {
 
+    @Override
     public void start(OzoneConfiguration conf) throws Exception {
       StorageContainerManager stm = StorageContainerManager.createSCM(conf);
       stm.start();
       stm.join();
     }
 
+    @Override
     public boolean init(OzoneConfiguration conf, String clusterId)
         throws IOException{
       return StorageContainerManager.scmInit(conf, clusterId);
     }
 
+    @Override
     public String generateClusterId() {
       return StorageInfo.newClusterID();
     }

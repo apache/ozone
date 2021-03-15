@@ -49,7 +49,6 @@ import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.transport.server
       .XceiverServerSpi;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
-import org.apache.hadoop.ozone.web.utils.OzoneUtils;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
@@ -97,7 +96,6 @@ public class TestCSMMetrics {
       throws Exception {
     final List<XceiverServerSpi> servers = new ArrayList<>();
     XceiverClientSpi client = null;
-    String containerName = OzoneUtils.getRequestID();
     try {
       final Pipeline pipeline = MockPipeline.createPipeline(numDatanodes);
       final OzoneConfiguration conf = new OzoneConfiguration();

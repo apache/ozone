@@ -31,6 +31,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.security.KeyPair;
 import java.security.PrivateKey;
+import java.security.PrivilegedExceptionAction;
 import java.security.PublicKey;
 import java.security.cert.CertificateException;
 import java.util.ArrayList;
@@ -324,6 +325,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   // execution, we can get from ozoneManager.
   private long maxUserVolumeCount;
 
+  private int minMultipartUploadPartSize = OzoneConsts.OM_MULTIPART_MIN_SIZE;
+
   private final ScmClient scmClient;
   private final long scmBlockSize;
   private final int preallocateBlocksMax;
@@ -360,15 +363,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     omStorage = new OMStorage(conf);
     omId = omStorage.getOmId();
-
-    // In case of single OM Node Service there will be no OM Node ID
-    // specified, set it to value from om storage
-    if (this.omNodeDetails.getOMNodeId() == null) {
-      this.omNodeDetails = OMHANodeDetails.getOMNodeDetails(conf,
-          omNodeDetails.getOMServiceId(),
-          omStorage.getOmId(), omNodeDetails.getRpcAddress(),
-          omNodeDetails.getRatisPort());
-    }
 
     loginOMUserIfSecurityEnabled(conf);
 
@@ -643,6 +637,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * Class which schedule saving metrics to a file.
    */
   private class ScheduleOMMetricsWriteTask extends TimerTask {
+    @Override
     public void run() {
       saveOmMetrics();
     }
@@ -1284,7 +1279,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throw new IOException("Cannot start trash emptier with negative interval."
               + " Set " + FS_TRASH_INTERVAL_KEY + " to a positive value.");
     }
-    FileSystem fs = new TrashOzoneFileSystem(this);
+
+    OzoneManager i = this;
+    FileSystem fs = SecurityUtil.doAsLoginUser(
+        new PrivilegedExceptionAction<FileSystem>() {
+          @Override
+          public FileSystem run() throws IOException {
+            return new TrashOzoneFileSystem(i);
+          }
+        });
     this.emptier = new Thread(new OzoneTrash(fs, conf, this).
       getEmptier(), "Trash Emptier");
     this.emptier.setDaemon(true);
@@ -1327,7 +1330,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         RatisDropwizardExports.
             registerRatisMetricReporters(ratisMetricsMap);
         omRatisServer = OzoneManagerRatisServer.newOMRatisServer(
-            configuration, this, omNodeDetails, peerNodes);
+            configuration, this, omNodeDetails, peerNodes,
+            secConfig, certClient);
       }
       LOG.info("OzoneManager Ratis server initialized at port {}",
           omRatisServer.getServerPort());
@@ -1453,8 +1457,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     String hostname = omRpcAdd.getAddress().getHostName();
     String ip = omRpcAdd.getAddress().getHostAddress();
 
-    String subject = UserGroupInformation.getCurrentUser()
-        .getShortUserName() + "@" + hostname;
+    String subject;
+    if (builder.hasDnsName()) {
+      subject = UserGroupInformation.getCurrentUser().getShortUserName()
+          + "@" + hostname;
+    } else {
+      // With only IP in alt.name, certificate validation would fail if subject
+      // isn't a hostname either, so omit username.
+      subject = hostname;
+    }
 
     builder.setCA(false)
         .setKey(keyPair)
@@ -1697,11 +1708,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   private void checkAcls(ResourceType resType, StoreType store,
       ACLType acl, String vol, String bucket, String key)
-      throws OMException {
+      throws IOException {
+    UserGroupInformation user = ProtobufRpcEngine.Server.getRemoteUser();
+    InetAddress remoteIp = ProtobufRpcEngine.Server.getRemoteIp();
     checkAcls(resType, store, acl, vol, bucket, key,
-        ProtobufRpcEngine.Server.getRemoteUser(),
-        ProtobufRpcEngine.Server.getRemoteIp(),
-        ProtobufRpcEngine.Server.getRemoteIp().getHostName(),
+        user != null ? user : getRemoteUser(),
+        remoteIp != null ? remoteIp : omRpcAddress.getAddress(),
+        remoteIp != null ? remoteIp.getHostName() : omRpcAddress.getHostName(),
         true, getVolumeOwner(vol, acl, resType));
   }
 
@@ -3551,7 +3564,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   /**
    * Return list of OzoneAdministrators.
    */
-  private Collection<String> getOzoneAdmins(OzoneConfiguration conf)
+  Collection<String> getOzoneAdmins(OzoneConfiguration conf)
       throws IOException {
     Collection<String> ozAdmins =
         conf.getTrimmedStringCollection(OZONE_ADMINISTRATORS);
@@ -3614,14 +3627,20 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throws IOException {
 
     Pair<String, String> resolved;
-    if (isAclEnabled) {
-      resolved = resolveBucketLink(requested, new HashSet<>(),
-              Server.getRemoteUser(),
-              Server.getRemoteIp(),
-              Server.getRemoteIp().getHostName());
-    } else {
-      resolved = resolveBucketLink(requested, new HashSet<>(),
-          null, null, null);
+    try {
+      if (isAclEnabled) {
+        InetAddress remoteIp = Server.getRemoteIp();
+        resolved = resolveBucketLink(requested, new HashSet<>(),
+            Server.getRemoteUser(),
+            remoteIp,
+            remoteIp != null ? remoteIp.getHostName() :
+                omRpcAddress.getHostName());
+      } else {
+        resolved = resolveBucketLink(requested, new HashSet<>(),
+            null, null, null);
+      }
+    } catch (Throwable t) {
+      throw t;
     }
     return new ResolvedBucket(requested, resolved);
   }
@@ -3778,6 +3797,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     return omVolumeArgs.build();
+  }
+
+  public int getMinMultipartUploadPartSize() {
+    return minMultipartUploadPartSize;
+  }
+
+  @VisibleForTesting
+  public void setMinMultipartUploadPartSize(int partSizeForTest) {
+    this.minMultipartUploadPartSize = partSizeForTest;
   }
 
 }

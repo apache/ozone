@@ -15,7 +15,7 @@
   limitations under the License.
 -->
 
-# History of Apache Hadoop Ozone project
+# History of Apache Ozone project
 
 Ozone development was started on a feature branch HDFS-7240 as part of the Apache Hadoop HDFS project. Based on the Jira information the first Ozone commit was the commit of [HDFS-8456 Ozone: Introduce STORAGE_CONTAINER_SERVICE as a new NodeType.](https://issues.apache.org/jira/browse/HDFS-8456) in May 2015.
 

@@ -126,7 +126,7 @@ void *FailureInjectorFs::fifs_init(
     cfg->attr_timeout = 0;
     cfg->negative_timeout = 0;
     
-    /* Create a separete GRPC server thread to accept failure injection. */
+    /* Create a seperate GRPC server thread to accept failure injection. */
     std::thread th(&RunGrpcService::RunServer, mGrpcSever);
     th.detach();
 

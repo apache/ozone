@@ -39,7 +39,6 @@ import org.junit.Test;
 import org.mockito.Mockito;
 
 import java.io.IOException;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -501,9 +500,6 @@ public class TestContainerReportHandler {
         = ContainerReplicaProto.State.OPEN;
     final ContainerInfo containerOne = getContainer(LifeCycleState.OPEN);
 
-    final Set<ContainerID> containerIDSet = new HashSet<>();
-    containerIDSet.add(containerOne.containerID());
-
     containerStateManager.loadContainer(containerOne);
     // Container loaded, no replicas reported from DNs. Expect zeros for
     // usage values.
@@ -571,9 +567,6 @@ public class TestContainerReportHandler {
     final ContainerReplicaProto.State replicaState
         = ContainerReplicaProto.State.CLOSED;
     final ContainerInfo containerOne = getContainer(LifeCycleState.CLOSED);
-
-    final Set<ContainerID> containerIDSet = new HashSet<>();
-    containerIDSet.add(containerOne.containerID());
 
     containerStateManager.loadContainer(containerOne);
     // Container loaded, no replicas reported from DNs. Expect zeros for

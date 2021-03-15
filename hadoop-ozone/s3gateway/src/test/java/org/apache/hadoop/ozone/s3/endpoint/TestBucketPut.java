@@ -95,8 +95,6 @@ public class TestBucketPut {
 
   @Test
   public void testBucketPut() throws Exception {
-    String auth = generateAuthHeader();
-
     Response response = bucketEndpoint.put(bucketName, null);
     assertEquals(200, response.getStatus());
     assertNotNull(response.getLocation());

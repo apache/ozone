@@ -53,6 +53,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 
 /**
@@ -107,7 +108,7 @@ public class TestCloseContainerByPipeline {
     OzoneOutputStream key = objectStore.getVolume("test").getBucket("test")
         .createKey(keyName, 1024, ReplicationType.RATIS, ReplicationFactor.ONE,
             new HashMap<>());
-    key.write(keyName.getBytes());
+    key.write(keyName.getBytes(UTF_8));
     key.close();
 
     //get the name of a valid container
@@ -161,7 +162,7 @@ public class TestCloseContainerByPipeline {
     OzoneOutputStream key = objectStore.getVolume("test").getBucket("test")
         .createKey("standalone", 1024, ReplicationType.RATIS,
             ReplicationFactor.ONE, new HashMap<>());
-    key.write("standalone".getBytes());
+    key.write("standalone".getBytes(UTF_8));
     key.close();
 
     //get the name of a valid container
@@ -217,7 +218,7 @@ public class TestCloseContainerByPipeline {
     OzoneOutputStream key = objectStore.getVolume("test").getBucket("test")
         .createKey("ratis", 1024, ReplicationType.RATIS,
             ReplicationFactor.THREE, new HashMap<>());
-    key.write("ratis".getBytes());
+    key.write("ratis".getBytes(UTF_8));
     key.close();
 
     //get the name of a valid container
@@ -278,7 +279,7 @@ public class TestCloseContainerByPipeline {
     OzoneOutputStream key = objectStore.getVolume("test").getBucket("test")
         .createKey(keyName, 1024, ReplicationType.RATIS,
             ReplicationFactor.ONE, new HashMap<>());
-    key.write(keyName.getBytes());
+    key.write(keyName.getBytes(UTF_8));
     key.close();
 
     OmKeyArgs keyArgs =

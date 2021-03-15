@@ -67,6 +67,8 @@ import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.LengthInputStream;
+import org.apache.hadoop.ozone.client.io.MultipartCryptoKeyInputStream;
+import org.apache.hadoop.ozone.client.io.OzoneCryptoInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
@@ -110,6 +112,8 @@ import org.apache.hadoop.security.token.Token;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
+import static org.apache.hadoop.ozone.OzoneConsts.OLD_QUOTA_DEFAULT;
+
 import org.apache.logging.log4j.util.Strings;
 import org.apache.ratis.protocol.ClientId;
 import org.slf4j.Logger;
@@ -238,8 +242,8 @@ public class RpcClient implements ClientProtocol {
         ugi.getUserName() : volArgs.getAdmin();
     String owner = volArgs.getOwner() == null ?
         ugi.getUserName() : volArgs.getOwner();
-    long quotaInNamespace = getQuotaValue(volArgs.getQuotaInNamespace());
-    long quotaInBytes = getQuotaValue(volArgs.getQuotaInBytes());
+    long quotaInNamespace = volArgs.getQuotaInNamespace();
+    long quotaInBytes = volArgs.getQuotaInBytes();
     List<OzoneAcl> listOfAcls = new ArrayList<>();
     //User ACL
     listOfAcls.add(new OzoneAcl(ACLIdentityType.USER,
@@ -293,6 +297,14 @@ public class RpcClient implements ClientProtocol {
     HddsClientUtils.verifyResourceName(volumeName);
     verifyCountsQuota(quotaInNamespace);
     verifySpaceQuota(quotaInBytes);
+    // If the volume is old, we need to remind the user on the client side
+    // that it is not recommended to enable quota.
+    OmVolumeArgs omVolumeArgs = ozoneManagerClient.getVolumeInfo(volumeName);
+    if (omVolumeArgs.getQuotaInNamespace() == OLD_QUOTA_DEFAULT) {
+      LOG.warn("Volume {} is created before version 1.1.0, usedNamespace " +
+          "may be inaccurate and it is not recommended to enable quota.",
+          volumeName);
+    }
     ozoneManagerClient.setQuota(volumeName, quotaInNamespace, quotaInBytes);
   }
 
@@ -418,8 +430,8 @@ public class RpcClient implements ClientProtocol {
         .setStorageType(storageType)
         .setSourceVolume(bucketArgs.getSourceVolume())
         .setSourceBucket(bucketArgs.getSourceBucket())
-        .setQuotaInBytes(getQuotaValue(bucketArgs.getQuotaInBytes()))
-        .setQuotaInNamespace(getQuotaValue(bucketArgs.getQuotaInNamespace()))
+        .setQuotaInBytes(bucketArgs.getQuotaInBytes())
+        .setQuotaInNamespace(bucketArgs.getQuotaInNamespace())
         .setAcls(listOfAcls.stream().distinct().collect(Collectors.toList()));
 
     if (bek != null) {
@@ -451,24 +463,16 @@ public class RpcClient implements ClientProtocol {
   }
 
   private static void verifyCountsQuota(long quota) throws OMException {
-    if (quota < OzoneConsts.QUOTA_RESET) {
+    if (quota < OzoneConsts.QUOTA_RESET || quota == 0) {
       throw new IllegalArgumentException("Invalid values for quota : " +
           "counts quota is :" + quota + ".");
     }
   }
 
   private static void verifySpaceQuota(long quota) throws OMException {
-    if (quota < OzoneConsts.QUOTA_RESET) {
+    if (quota < OzoneConsts.QUOTA_RESET || quota == 0) {
       throw new IllegalArgumentException("Invalid values for quota : " +
           "space quota is :" + quota + ".");
-    }
-  }
-
-  private static long getQuotaValue(long quota) throws OMException {
-    if (quota == 0) {
-      return OzoneConsts.QUOTA_RESET;
-    } else {
-      return quota;
     }
   }
 
@@ -588,6 +592,16 @@ public class RpcClient implements ClientProtocol {
         .setBucketName(bucketName)
         .setQuotaInBytes(quotaInBytes)
         .setQuotaInNamespace(quotaInNamespace);
+    // If the bucket is old, we need to remind the user on the client side
+    // that it is not recommended to enable quota.
+    OmBucketInfo omBucketInfo = ozoneManagerClient.getBucketInfo(
+        volumeName, bucketName);
+    if (omBucketInfo.getQuotaInNamespace() == OLD_QUOTA_DEFAULT ||
+        omBucketInfo.getUsedBytes() == OLD_QUOTA_DEFAULT) {
+      LOG.warn("Bucket {} is created before version 1.1.0, usedBytes or " +
+          "usedNamespace may be inaccurate and it is not recommended to " +
+          "enable quota.", bucketName);
+    }
     ozoneManagerClient.setBucketProperty(builder.build());
 
   }
@@ -930,7 +944,17 @@ public class RpcClient implements ClientProtocol {
     keyOutputStream.addPreallocateBlocks(
         openKey.getKeyInfo().getLatestVersionLocations(),
         openKey.getOpenVersion());
-    return new OzoneOutputStream(keyOutputStream);
+    FileEncryptionInfo feInfo = keyOutputStream.getFileEncryptionInfo();
+    if (feInfo != null) {
+      KeyProvider.KeyVersion decrypted = getDEK(feInfo);
+      final CryptoOutputStream cryptoOut =
+          new CryptoOutputStream(keyOutputStream,
+              OzoneKMSUtil.getCryptoCodec(conf, feInfo),
+              decrypted.getMaterial(), feInfo.getIV());
+      return new OzoneOutputStream(cryptoOut);
+    } else {
+      return new OzoneOutputStream(keyOutputStream);
+    }
   }
 
   @Override
@@ -1180,23 +1204,18 @@ public class RpcClient implements ClientProtocol {
   private OzoneInputStream createInputStream(
       OmKeyInfo keyInfo, Function<OmKeyInfo, OmKeyInfo> retryFunction)
       throws IOException {
-    LengthInputStream lengthInputStream = KeyInputStream
-        .getFromOmKeyInfo(keyInfo, xceiverClientManager,
-            clientConfig.isChecksumVerify(), retryFunction);
+    // When Key is not MPU or when Key is MPU and encryption is not enabled
+    // Need to revisit for GDP.
     FileEncryptionInfo feInfo = keyInfo.getFileEncryptionInfo();
-    if (feInfo != null) {
-      final KeyProvider.KeyVersion decrypted = getDEK(feInfo);
-      final CryptoInputStream cryptoIn =
-          new CryptoInputStream(lengthInputStream.getWrappedStream(),
-              OzoneKMSUtil.getCryptoCodec(conf, feInfo),
-              decrypted.getMaterial(), feInfo.getIV());
-      return new OzoneInputStream(cryptoIn);
-    } else {
-      try{
-        GDPRSymmetricKey gk;
-        Map<String, String> keyInfoMetadata = keyInfo.getMetadata();
-        if(Boolean.valueOf(keyInfoMetadata.get(OzoneConsts.GDPR_FLAG))){
-          gk = new GDPRSymmetricKey(
+
+    if (feInfo == null) {
+      LengthInputStream lengthInputStream = KeyInputStream
+          .getFromOmKeyInfo(keyInfo, xceiverClientManager,
+              clientConfig.isChecksumVerify(), retryFunction);
+      try {
+        Map< String, String > keyInfoMetadata = keyInfo.getMetadata();
+        if (Boolean.valueOf(keyInfoMetadata.get(OzoneConsts.GDPR_FLAG))) {
+          GDPRSymmetricKey gk = new GDPRSymmetricKey(
               keyInfoMetadata.get(OzoneConsts.GDPR_SECRET),
               keyInfoMetadata.get(OzoneConsts.GDPR_ALGORITHM)
           );
@@ -1204,11 +1223,39 @@ public class RpcClient implements ClientProtocol {
           return new OzoneInputStream(
               new CipherInputStream(lengthInputStream, gk.getCipher()));
         }
-      }catch (Exception ex){
+      } catch (Exception ex) {
         throw new IOException(ex);
       }
+      return new OzoneInputStream(lengthInputStream.getWrappedStream());
+    } else if (!keyInfo.getLatestVersionLocations().isMultipartKey()) {
+      // Regular Key with FileEncryptionInfo
+      LengthInputStream lengthInputStream = KeyInputStream
+          .getFromOmKeyInfo(keyInfo, xceiverClientManager,
+              clientConfig.isChecksumVerify(), retryFunction);
+      final KeyProvider.KeyVersion decrypted = getDEK(feInfo);
+      final CryptoInputStream cryptoIn =
+          new CryptoInputStream(lengthInputStream.getWrappedStream(),
+              OzoneKMSUtil.getCryptoCodec(conf, feInfo),
+              decrypted.getMaterial(), feInfo.getIV());
+      return new OzoneInputStream(cryptoIn);
+    } else {
+      // Multipart Key with FileEncryptionInfo
+      List<LengthInputStream> lengthInputStreams = KeyInputStream
+          .getStreamsFromKeyInfo(keyInfo, xceiverClientManager,
+              clientConfig.isChecksumVerify(), retryFunction);
+      final KeyProvider.KeyVersion decrypted = getDEK(feInfo);
+
+      List<OzoneCryptoInputStream> cryptoInputStreams = new ArrayList<>();
+      for(LengthInputStream lengthInputStream : lengthInputStreams) {
+        final OzoneCryptoInputStream ozoneCryptoInputStream =
+            new OzoneCryptoInputStream(lengthInputStream,
+                OzoneKMSUtil.getCryptoCodec(conf, feInfo),
+                decrypted.getMaterial(), feInfo.getIV());
+        cryptoInputStreams.add(ozoneCryptoInputStream);
+      }
+      return new MultipartCryptoKeyInputStream(keyInfo.getKeyName(),
+          cryptoInputStreams);
     }
-    return new OzoneInputStream(lengthInputStream.getWrappedStream());
   }
 
   private OzoneOutputStream createOutputStream(OpenKeySession openKey,
@@ -1275,6 +1322,7 @@ public class RpcClient implements ClientProtocol {
     return (dtService != null) ? dtService.toString() : null;
   }
 
+  @Override
   @VisibleForTesting
   public OzoneManagerProtocol getOzoneManagerClient() {
     return ozoneManagerClient;

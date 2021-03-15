@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.scm.block;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
@@ -41,10 +40,9 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerBlocksDeletionACKProto
     .DeleteBlockTransactionResult;
-import org.apache.hadoop.test.GenericTestUtils;
-import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -54,7 +52,6 @@ import org.mockito.Mockito;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -78,7 +75,7 @@ import static org.mockito.Mockito.when;
  */
 public class TestDeletedBlockLog {
 
-  private static DeletedBlockLogImpl deletedBlockLog;
+  private DeletedBlockLogImpl deletedBlockLog;
   private static final int BLOCKS_PER_TXN = 5;
   private OzoneConfiguration conf;
   private File testDir;
@@ -239,6 +236,53 @@ public class TestDeletedBlockLog {
   }
 
   @Test
+  public void testIncrementCountLessFrequentWritingToDB() throws Exception {
+    OzoneConfiguration testConf = OzoneConfiguration.of(conf);
+    testConf.setInt(OZONE_SCM_BLOCK_DELETION_MAX_RETRY, 120);
+
+    deletedBlockLog = new DeletedBlockLogImpl(testConf, containerManager,
+        scm.getScmMetadataStore());
+
+    for (Map.Entry<Long, List<Long>> entry :
+        generateData(1).entrySet()) {
+      deletedBlockLog.addTransaction(entry.getKey(), entry.getValue());
+    }
+
+    List<DeletedBlocksTransaction> blocks =
+        getTransactions(40 * BLOCKS_PER_TXN);
+    List<Long> txIDs = blocks.stream().map(DeletedBlocksTransaction::getTxID)
+        .collect(Collectors.toList());
+
+    for (int i = 0; i < 50; i++) {
+      deletedBlockLog.incrementCount(txIDs);
+    }
+    blocks = getTransactions(40 * BLOCKS_PER_TXN);
+    for (DeletedBlocksTransaction block : blocks) {
+      // block count should not be updated as there are only 50 retries.
+      Assert.assertEquals(0, block.getCount());
+    }
+
+    for (int i = 0; i < 60; i++) {
+      deletedBlockLog.incrementCount(txIDs);
+    }
+    blocks = getTransactions(40 * BLOCKS_PER_TXN);
+    for (DeletedBlocksTransaction block : blocks) {
+      // block count should be updated to 100 as there are already 110 retries.
+      Assert.assertEquals(100, block.getCount());
+    }
+
+    for (int i = 0; i < 50; i++) {
+      deletedBlockLog.incrementCount(txIDs);
+    }
+    blocks = getTransactions(40 * BLOCKS_PER_TXN);
+    for (DeletedBlocksTransaction block : blocks) {
+      // block count should be updated to -1 as retry count exceeds maxRetry
+      // (i.e. 160 > maxRetry which is 120).
+      Assert.assertEquals(-1, block.getCount());
+    }
+  }
+
+  @Test
   public void testCommitTransactions() throws Exception {
     for (Map.Entry<Long, List<Long>> entry : generateData(50).entrySet()){
       deletedBlockLog.addTransaction(entry.getKey(), entry.getValue());
@@ -271,11 +315,7 @@ public class TestDeletedBlockLog {
     Random random = new Random();
     int added = 0, committed = 0;
     List<DeletedBlocksTransaction> blocks = new ArrayList<>();
-    List<Long> txIDs = new ArrayList<>();
-    byte[] latestTxid = StringUtils.string2Bytes("#LATEST_TXID#");
-    MetadataKeyFilters.MetadataKeyFilter avoidLatestTxid =
-        (preKey, currentKey, nextKey) ->
-            !Arrays.equals(latestTxid, currentKey);
+    List<Long> txIDs;
     // Randomly add/get/commit/increase transactions.
     for (int i = 0; i < 100; i++) {
       int state = random.nextInt(4);
@@ -300,7 +340,7 @@ public class TestDeletedBlockLog {
         // verify the number of added and committed.
         try (TableIterator<Long,
             ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> iter =
-            scm.getScmMetadataStore().getDeletedBlocksTXTable().iterator()) {
+            deletedBlockLog.getIterator()) {
           AtomicInteger count = new AtomicInteger();
           iter.forEachRemaining((keyValue) -> count.incrementAndGet());
           Assert.assertEquals(added, count.get() + committed);
@@ -328,6 +368,15 @@ public class TestDeletedBlockLog {
     blocks = getTransactions(BLOCKS_PER_TXN * 40);
     Assert.assertEquals(40, blocks.size());
     commitTransactions(blocks);
+
+    // close db and reopen it again to make sure
+    // currentTxnID = 50
+    deletedBlockLog.close();
+    deletedBlockLog = new DeletedBlockLogImpl(conf, containerManager,
+        scm.getScmMetadataStore());
+    blocks = getTransactions(BLOCKS_PER_TXN * 40);
+    Assert.assertEquals(0, blocks.size());
+    Assert.assertEquals((long)deletedBlockLog.getCurrentTXID(), 50L);
   }
 
   @Test

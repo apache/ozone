@@ -531,6 +531,7 @@ public class BasicRootedOzoneClientAdapterImpl
     }
   }
 
+  @Override
   public FileStatusAdapter getFileStatus(String path, URI uri,
       Path qualifiedPath, String userName) throws IOException {
     incrementCounter(Statistic.OBJECTS_QUERY, 1);
@@ -706,6 +707,7 @@ public class BasicRootedOzoneClientAdapterImpl
    * @return A list of FileStatusAdapter.
    * @throws IOException Bucket exception or FileNotFoundException.
    */
+  @Override
   public List<FileStatusAdapter> listStatus(String pathStr, boolean recursive,
       String startPath, long numEntries, URI uri,
       Path workingDir, String username) throws IOException {

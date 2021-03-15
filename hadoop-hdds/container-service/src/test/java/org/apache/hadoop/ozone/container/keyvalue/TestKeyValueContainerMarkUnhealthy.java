@@ -66,7 +66,7 @@ public class TestKeyValueContainerMarkUnhealthy {
   public TemporaryFolder folder = new TemporaryFolder();
 
   @Rule
-  public Timeout timeout = new Timeout(600_000);
+  public Timeout timeout = Timeout.seconds(600);
 
   @Rule
   public ExpectedException thrown = ExpectedException.none();

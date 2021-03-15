@@ -1,13 +1,9 @@
-Apache Hadoop Ozone Contribution guideline
+Apache Ozone Contribution guideline
 ===
 
-Ozone is a part of the Apache Hadoop project. The bug tracking system for Ozone is under the [Apache Jira project named HDDS](https://issues.apache.org/jira/projects/HDDS/).
+Ozone is an Apache project. The bug tracking system for Ozone is under the [Apache Jira project named HDDS](https://issues.apache.org/jira/projects/HDDS/).
 
-If you are familiar with contributing to Apache Hadoop, then you already know everything you need to know to start filing Ozone bugs and submitting patches.
-
-If you have never contributed to Apache Hadoop before, then you may find it useful to read [How To Contribute](https://cwiki.apache.org/confluence/display/HADOOP/How+To+Contribute+to+Ozone).
-
-This document summarize the contribution process and defines the differences.  
+This document summarize the contribution process:
 
 ## What can I contribute?
 
@@ -18,7 +14,7 @@ We welcome contributions of:
    * [All open and unassigned Ozone jiras](https://s.apache.org/OzoneUnassignedJiras)
  * **Documentation Improvements**: You can submit improvements to either:
      * Ozone website. Instructions are here: [Modifying the Ozone Website](https://cwiki.apache.org/confluence/display/HADOOP/Modifying+the+Ozone+Website)
-     * Developer docs. These are markdown files [checked into the Apache Hadoop Source tree](https://github.com/apache/hadoop-ozone/tree/master/hadoop-hdds/docs/content).
+     * Developer docs. These are markdown files [checked into the Apache Ozone Source tree](https://github.com/apache/ozone/tree/master/hadoop-hdds/docs/content).
  * The [wiki pages](https://cwiki.apache.org/confluence/display/HADOOP/Ozone+Contributor+Guide): Please contact us at ozone-dev@hadoop.apache.org and we can provide you write access to the wiki.
  * **Testing**: We always need help to improve our testing
       * Unit Tests (JUnit / Java)
@@ -44,7 +40,7 @@ Requirements to compile the code:
 * Unix System
 * JDK 1.8 or higher
 * Maven 3.5 or later
-* Internet connection for first build (to fetch all Maven and Hadoop dependencies)
+* Internet connection for first build (to fetch all Maven and Ozone dependencies)
 
 Additional requirements to run your first pseudo cluster:
 
@@ -166,6 +162,15 @@ To start Ozone from IntelliJ:
 2. Execute the `./hadoop-ozone/dev-support/intellij/install-runconfigs.sh` helper script.
 3. Start the IDE
 4. New runner definitions are available from the Run menu.
+
+You can use the installed Run configurations in the following order:
+
+1. StorageContainerManagerInit (to initialize the SCM dir)
+2. StorageContainerManger (to start SCM)
+3. OzoneManagerInit (to initialize OM, it requires SCM)
+4. OzoneManager
+5. Recon (required by datanode)
+6. Datanode1, Datanode2, Datanode3
 
 ### Setting up Checkstyle
 

@@ -44,6 +44,7 @@ public class LoadCommandHandler implements Callable<Void> {
   @ParentCommand
   private AuditParser auditParser;
 
+  @Override
   public Void call() throws Exception {
     if (DatabaseHelper.setup(auditParser.getDatabase(), logs)) {
       System.out.println(logs + " has been loaded successfully");

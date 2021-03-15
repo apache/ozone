@@ -18,19 +18,18 @@
 package org.apache.hadoop.hdds.scm.protocol;
 
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmInfo;
-import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.security.KerberosInfo;
 
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
-
-import org.apache.hadoop.security.KerberosInfo;
 
 /**
  * ContainerLocationProtocol is used by an HDFS node to find the set of nodes
@@ -105,8 +104,27 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * @return a list of container.
    * @throws IOException
    */
-  List<ContainerInfo> listContainer(long startContainerID, int count)
-      throws IOException;
+  List<ContainerInfo> listContainer(long startContainerID,
+      int count) throws IOException;
+
+  /**
+   * Ask SCM a list of containers with a range of container names
+   * and the limit of count.
+   * Search container names between start name(exclusive), and
+   * use prefix name to filter the result. the max size of the
+   * searching range cannot exceed the value of count.
+   *
+   * @param startContainerID start container ID.
+   * @param count count, if count {@literal <} 0, the max size is unlimited.(
+   *              Usually the count will be replace with a very big
+   *              value instead of being unlimited in case the db is very big)
+   * @param state Container with this state will be returned.
+   *
+   * @return a list of container.
+   * @throws IOException
+   */
+  List<ContainerInfo> listContainer(long startContainerID,
+      int count, HddsProtos.LifeCycleState state) throws IOException;
 
   /**
    * Deletes a container in SCM.
@@ -123,11 +141,12 @@ public interface StorageContainerLocationProtocol extends Closeable {
    *  state acts like a wildcard returning all nodes in that state.
    * @param opState The node operational state
    * @param state The node health
+   * @param clientVersion
    * @return List of Datanodes.
    */
   List<HddsProtos.Node> queryNode(HddsProtos.NodeOperationalState opState,
       HddsProtos.NodeState state, HddsProtos.QueryScope queryScope,
-      String poolName) throws IOException;
+      String poolName, int clientVersion) throws IOException;
 
   void decommissionNodes(List<String> nodes) throws IOException;
 
@@ -240,4 +259,16 @@ public interface StorageContainerLocationProtocol extends Closeable {
    */
   boolean getReplicationManagerStatus() throws IOException;
 
+  /**
+   * Get Datanode usage information by ip or uuid.
+   *
+   * @param ipaddress - datanode IP address String
+   * @param uuid - datanode UUID String
+   * @return List of DatanodeUsageInfo. Each element contains info such as
+   * capacity, SCMused, and remaining space.
+   * @throws IOException
+   */
+  List<HddsProtos.DatanodeUsageInfo> getDatanodeUsageInfo(String ipaddress,
+                                                          String uuid)
+      throws IOException;
 }

@@ -18,18 +18,21 @@
 
 package org.apache.hadoop.hdds.scm.node.states;
 
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
+
+import static junit.framework.TestCase.assertEquals;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-
-import java.util.List;
-import java.util.UUID;
-
-import static junit.framework.TestCase.assertEquals;
 
 /**
  * Class to test the NodeStateMap class, which is an internal class used by
@@ -119,15 +122,61 @@ public class TestNodeStateMap {
         map.getNodeCount(NodeOperationalState.DECOMMISSIONING, null));
   }
 
-  private void addNodeWithState(DatanodeDetails dn,
-      NodeOperationalState opState, NodeState health)
+  /**
+   * Test if container list is iterable even if it's modified from other thread.
+   */
+  @Test
+  public void testConcurrency() throws Exception {
+    NodeStateMap nodeStateMap = new NodeStateMap();
+
+    final DatanodeDetails datanodeDetails =
+        MockDatanodeDetails.randomDatanodeDetails();
+
+    nodeStateMap.addNode(datanodeDetails, NodeStatus.inServiceHealthy());
+
+    UUID dnUuid = datanodeDetails.getUuid();
+
+    nodeStateMap.addContainer(dnUuid, new ContainerID(1L));
+    nodeStateMap.addContainer(dnUuid, new ContainerID(2L));
+    nodeStateMap.addContainer(dnUuid, new ContainerID(3L));
+
+    CountDownLatch elementRemoved = new CountDownLatch(1);
+    CountDownLatch loopStarted = new CountDownLatch(1);
+
+    new Thread(() -> {
+      try {
+        loopStarted.await();
+        nodeStateMap.removeContainer(dnUuid, new ContainerID(1L));
+        elementRemoved.countDown();
+      } catch (Exception e) {
+        e.printStackTrace();
+      }
+
+    }).start();
+
+    boolean first = true;
+    for (ContainerID key : nodeStateMap.getContainers(dnUuid)) {
+      if (first) {
+        loopStarted.countDown();
+        elementRemoved.await();
+      }
+      first = false;
+      System.out.println(key);
+    }
+  }
+
+  private void addNodeWithState(
+      DatanodeDetails dn,
+      NodeOperationalState opState, NodeState health
+  )
       throws NodeAlreadyExistsException {
     NodeStatus status = new NodeStatus(opState, health);
     map.addNode(dn, status);
   }
 
   private void addRandomNodeWithState(
-      NodeOperationalState opState, NodeState health)
+      NodeOperationalState opState, NodeState health
+  )
       throws NodeAlreadyExistsException {
     DatanodeDetails dn = generateDatanode();
     addNodeWithState(dn, opState, health);

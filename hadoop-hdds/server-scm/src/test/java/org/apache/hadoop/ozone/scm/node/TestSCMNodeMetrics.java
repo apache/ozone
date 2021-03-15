@@ -35,7 +35,6 @@ import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.node.SCMNodeMetrics;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventQueue;
-import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 
 import static org.apache.hadoop.test.MetricsAsserts.assertGauge;
 import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
@@ -84,13 +83,10 @@ public class TestSCMNodeMetrics {
   /**
    * Verifies heartbeat processing count.
    *
-   * @throws InterruptedException
    */
   @Test
-  public void testHBProcessing() throws InterruptedException {
+  public void testHBProcessing() {
     long hbProcessed = getCounter("NumHBProcessed");
-
-    NodeReportProto nodeReport = createNodeReport();
 
     nodeManager.processHeartbeat(registeredDatanode);
 
@@ -169,8 +165,6 @@ public class TestSCMNodeMetrics {
         .addStorageReport(storageReport).build();
 
     nodeManager.processNodeReport(registeredDatanode, nodeReport);
-
-    MetricsRecordBuilder metricsSource = getMetrics(SCMNodeMetrics.SOURCE_NAME);
 
     assertGauge("InServiceHealthyNodes", 1,
         getMetrics(SCMNodeMetrics.class.getSimpleName()));

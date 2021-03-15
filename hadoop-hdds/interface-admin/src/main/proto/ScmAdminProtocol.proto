@@ -40,6 +40,7 @@ message ScmContainerLocationRequest {
   // A string that identifies this command, we generate  Trace ID in Ozone
   // frontend and this allows us to trace that command all over ozone.
   optional string traceID = 2;
+  optional uint32 version = 3;
 
   optional ContainerRequestProto containerRequest = 6;
   optional GetContainerRequestProto getContainerRequest = 7;
@@ -65,6 +66,7 @@ message ScmContainerLocationRequest {
   optional DecommissionNodesRequestProto decommissionNodesRequest = 27;
   optional RecommissionNodesRequestProto recommissionNodesRequest = 28;
   optional StartMaintenanceNodesRequestProto startMaintenanceNodesRequest = 29;
+  optional DatanodeUsageInfoRequestProto DatanodeUsageInfoRequest = 30;
 }
 
 message ScmContainerLocationResponse {
@@ -102,6 +104,7 @@ message ScmContainerLocationResponse {
   optional DecommissionNodesResponseProto decommissionNodesResponse = 27;
   optional RecommissionNodesResponseProto recommissionNodesResponse = 28;
   optional StartMaintenanceNodesResponseProto startMaintenanceNodesResponse = 29;
+  optional DatanodeUsageInfoResponseProto DatanodeUsageInfoResponse = 30;
   enum Status {
     OK = 1;
     CONTAINER_ALREADY_EXISTS = 2;
@@ -135,6 +138,7 @@ enum Type {
   DecommissionNodes = 22;
   RecommissionNodes = 23;
   StartMaintenanceNodes = 24;
+  DatanodeUsageInfo = 25;
 }
 
 /**
@@ -208,6 +212,7 @@ message SCMListContainerRequestProto {
   required uint32 count = 1;
   optional uint64 startContainerID = 2;
   optional string traceID = 3;
+  optional LifeCycleState state = 4;
 }
 
 message SCMListContainerResponseProto {
@@ -247,6 +252,18 @@ message NodeQueryRequestProto {
 
 message NodeQueryResponseProto {
   repeated Node datanodes = 1;
+}
+
+/*
+  Usage info request message containing ip and uuid.
+*/
+message DatanodeUsageInfoRequestProto {
+  optional string ipaddress = 1;
+  optional string uuid = 2;
+}
+
+message DatanodeUsageInfoResponseProto {
+  repeated DatanodeUsageInfo info = 1;
 }
 
 /*
@@ -297,7 +314,7 @@ message PipelineRequestProto {
   optional string traceID = 5;
 }
 
-message  PipelineResponseProto {
+message PipelineResponseProto {
   enum Error {
     success = 1;
     errorPipelineAlreadyExists = 2;

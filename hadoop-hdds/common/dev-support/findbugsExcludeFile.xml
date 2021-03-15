@@ -27,4 +27,14 @@
     <Method name="update" />
     <Bug pattern="SF_SWITCH_FALLTHROUGH,SF_SWITCH_NO_DEFAULT" />
   </Match>
+
+  <!-- Test -->
+  <Match>
+    <Class name="org.apache.hadoop.hdds.TestHddsUtils"></Class>
+    <Bug pattern="DMI_HARDCODED_ABSOLUTE_FILENAME" />
+  </Match>
+  <Match>
+    <Class name="~org\.apache\.hadoop\.hdds\.scm\.net\.TestNodeSchemaLoader\$.*"></Class>
+    <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD" />
+  </Match>
 </FindBugsFilter>

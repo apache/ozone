@@ -38,7 +38,7 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = new Timeout(300000);
+  public Timeout timeout = Timeout.seconds(300);
 
   @Override
   public void initializeMemberVariables() {
@@ -54,6 +54,8 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
     errorIfMissingXmlProps = true;
     xmlPropsToSkipCompare.add("hadoop.tags.custom");
     xmlPropsToSkipCompare.add("ozone.om.nodes.EXAMPLEOMSERVICEID");
+    xmlPropsToSkipCompare.add("ozone.om.leader.election.minimum.timeout" +
+        ".duration"); // Deprecated config
     addPropertiesNotInXml();
   }
 

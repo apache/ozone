@@ -47,3 +47,7 @@ Create Random File
     ${content} =             Set Variable   "Random string"
     Create File              ${tmpfile}    ${content}
     [Return]                 ${tmpfile}
+
+List All Processes
+    ${output} =    Execute    ps aux
+    [return]    ${output}

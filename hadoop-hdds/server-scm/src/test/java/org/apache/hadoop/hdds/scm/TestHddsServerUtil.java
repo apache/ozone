@@ -37,7 +37,7 @@ import org.junit.rules.Timeout;
 public class TestHddsServerUtil {
 
   @Rule
-  public Timeout timeout = new Timeout(300000);
+  public Timeout timeout = Timeout.seconds(300);
 
   @Rule
   public ExpectedException thrown= ExpectedException.none();

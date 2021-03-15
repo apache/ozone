@@ -53,6 +53,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic
     .NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
@@ -67,8 +68,8 @@ public class TestSCMContainerPlacementPolicyMetrics {
 
   private MiniOzoneCluster cluster;
   private MetricsRecordBuilder metrics;
-  private static OzoneClient ozClient = null;
-  private static ObjectStore store = null;
+  private OzoneClient ozClient = null;
+  private ObjectStore store = null;
 
   @Before
   public void setup() throws Exception {
@@ -110,9 +111,9 @@ public class TestSCMContainerPlacementPolicyMetrics {
 
     // Write data into a key
     try (OzoneOutputStream out = bucket.createKey(keyName,
-        value.getBytes().length, ReplicationType.RATIS,
+        value.getBytes(UTF_8).length, ReplicationType.RATIS,
         THREE, new HashMap<>())) {
-      out.write(value.getBytes());
+      out.write(value.getBytes(UTF_8));
     }
 
     // close container

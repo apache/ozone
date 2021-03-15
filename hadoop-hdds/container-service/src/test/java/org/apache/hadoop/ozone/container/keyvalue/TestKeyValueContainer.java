@@ -343,8 +343,6 @@ public class TestKeyValueContainer {
         keyValueContainerData.getState());
 
     //Check state in the .container file
-    String containerMetaDataPath = keyValueContainerData
-        .getMetadataPath();
     File containerFile = keyValueContainer.getContainerFile();
 
     keyValueContainerData = (KeyValueContainerData) ContainerDataYaml

@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.util.List;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -59,6 +60,11 @@ public class ListSubcommand extends ScmSubcommand {
       defaultValue = "20", showDefaultValue = Visibility.ALWAYS)
   private int count;
 
+  @Option(names = {"--state"},
+      description = "Container state(OPEN, CLOSING, QUASI_CLOSED, CLOSED, " +
+          "DELETING, DELETED)")
+  private HddsProtos.LifeCycleState state;
+
   private static final ObjectWriter WRITER;
 
   static {
@@ -81,7 +87,7 @@ public class ListSubcommand extends ScmSubcommand {
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     List<ContainerInfo> containerList =
-        scmClient.listContainer(startId, count);
+        scmClient.listContainer(startId, count, state);
 
     // Output data list
     for (ContainerInfo container : containerList) {

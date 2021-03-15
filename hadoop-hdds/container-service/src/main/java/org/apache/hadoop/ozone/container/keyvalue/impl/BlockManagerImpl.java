@@ -78,6 +78,7 @@ public class BlockManagerImpl implements BlockManager {
    * @return length of the block.
    * @throws IOException
    */
+  @Override
   public long putBlock(Container container, BlockData data) throws IOException {
     return putBlock(container, data, true);
   }
@@ -91,6 +92,7 @@ public class BlockManagerImpl implements BlockManager {
    * @return length of the block.
    * @throws IOException
    */
+  @Override
   public long putBlock(Container container, BlockData data,
       boolean incrKeyCount) throws IOException {
     Preconditions.checkNotNull(data, "BlockData cannot be null for put " +
@@ -128,8 +130,10 @@ public class BlockManagerImpl implements BlockManager {
               .initBatchOperation()) {
         db.getStore().getBlockDataTable().putWithBatch(
             batch, Long.toString(data.getLocalID()), data);
-        db.getStore().getMetadataTable().putWithBatch(
-            batch, OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID, bcsId);
+        if (bcsId != 0) {
+          db.getStore().getMetadataTable().putWithBatch(
+              batch, OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID, bcsId);
+        }
 
         // Set Bytes used, this bytes used will be updated for every write and
         // only get committed for every put block. In this way, when datanode
@@ -151,7 +155,9 @@ public class BlockManagerImpl implements BlockManager {
         db.getStore().getBatchHandler().commitBatchOperation(batch);
       }
 
-      container.updateBlockCommitSequenceId(bcsId);
+      if (bcsId != 0) {
+        container.updateBlockCommitSequenceId(bcsId);
+      }
       // Increment block count finally here for in-memory.
       if (incrKeyCount) {
         container.getContainerData().incrKeyCount();
@@ -236,6 +242,7 @@ public class BlockManagerImpl implements BlockManager {
    * @param blockID - ID of the block.
    * @throws StorageContainerException
    */
+  @Override
   public void deleteBlock(Container container, BlockID blockID) throws
       IOException {
     Preconditions.checkNotNull(blockID, "block ID cannot be null.");
@@ -318,6 +325,7 @@ public class BlockManagerImpl implements BlockManager {
   /**
    * Shutdown KeyValueContainerManager.
    */
+  @Override
   public void shutdown() {
     BlockUtils.shutdownCache(ContainerCache.getInstance(config));
   }

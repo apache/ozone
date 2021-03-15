@@ -68,13 +68,13 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY
 @RunWith(Parameterized.class)
 @Ignore("TODO:HDDS-1157")
 public class TestOzoneContainerWithTLS {
-  private final static Logger LOG = LoggerFactory.getLogger(
+  private static final Logger LOG = LoggerFactory.getLogger(
       TestOzoneContainerWithTLS.class);
   /**
    * Set the timeout for every test.
    */
   @Rule
-  public Timeout testTimeout = new Timeout(300000);
+  public Timeout testTimeout = Timeout.seconds(300);
 
   @Rule
   public TemporaryFolder tempFolder = new TemporaryFolder();

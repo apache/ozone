@@ -46,7 +46,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * Test Node Storage Map.
  */
 public class TestSCMNodeStorageStatMap {
-  private final static int DATANODE_COUNT = 100;
+  private static final int DATANODE_COUNT = 100;
   private final long capacity = 10L * OzoneConsts.GB;
   private final long used = 2L * OzoneConsts.GB;
   private final long remaining = capacity - used;

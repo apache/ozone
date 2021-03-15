@@ -145,6 +145,14 @@
     </description>
   </property>
   <property>
+    <name>hdds.datanode.dir.du.reserved</name>
+    <value/>
+    <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>
+    <description>Reserved space in bytes per volume. Always leave this much space free for non dfs use.
+       Such as /dir1:100B, /dir2:200MB, means dir1 reserves 100 bytes and dir2 reserves 200 MB.
+    </description>
+  </property>
+  <property>
     <name>hdds.datanode.volume.choosing.policy</name>
     <value/>
     <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>
@@ -167,8 +175,20 @@
   <property>
     <name>dfs.container.ratis.ipc</name>
     <value>9858</value>
+    <tag>OZONE, CONTAINER, PIPELINE, RATIS</tag>
+    <description>The ipc port number of container for clients.</description>
+  </property>
+  <property>
+    <name>dfs.container.ratis.admin.port</name>
+    <value>9857</value>
     <tag>OZONE, CONTAINER, PIPELINE, RATIS, MANAGEMENT</tag>
-    <description>The ipc port number of container.</description>
+    <description>The ipc port number of container for admin requests.</description>
+  </property>
+  <property>
+    <name>dfs.container.ratis.server.port</name>
+    <value>9856</value>
+    <tag>OZONE, CONTAINER, PIPELINE, RATIS, MANAGEMENT</tag>
+    <description>The ipc port number of container for server-server communication.</description>
   </property>
   <property>
     <name>dfs.container.ratis.ipc.random.port</name>
@@ -449,7 +469,7 @@
       with the configured address.
 
       If node ID is not deterministic from the configuration, then it is set
-      to the OmId from the OM version file.
+      to default node id - om1.
     </description>
   </property>
   <property>
@@ -780,6 +800,8 @@
   <value>2</value>
   <tag>OZONE, SCM, PIPELINE</tag>
   <description>Max number of pipelines per datanode can be engaged in.
+    Setting the value to 0 means the pipeline limit per dn will be determined
+    by the no of metadata volumes reported per dn.
   </description>
   </property>
   <property>
@@ -807,7 +829,7 @@
   <property>
     <name>ozone.scm.pipeline.leader-choose.policy</name>
     <value>
-      org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms.DefaultLeaderChoosePolicy
+      org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms.MinLeaderCountChoosePolicy
     </value>
     <tag>OZONE, SCM, PIPELINE</tag>
     <description>
@@ -955,7 +977,17 @@
     <tag>OZONE, MANAGEMENT</tag>
     <description>
       Retry count for the RPC from Datanode to SCM. The rpc-retry-interval
-      is 1s. Make sure rpc-retry-count * (rpc-timeout + rpc-retry-interval)
+      is 1s by default. Make sure rpc-retry-count * (rpc-timeout +
+      rpc-retry-interval) is less than hdds.heartbeat.interval.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.heartbeat.rpc-retry-interval</name>
+    <value>1s</value>
+    <tag>OZONE, MANAGEMENT</tag>
+    <description>
+      Retry interval for the RPC from Datanode to SCM.
+      Make sure rpc-retry-count * (rpc-timeout + rpc-retry-interval)
       is less than hdds.heartbeat.interval.
     </description>
   </property>
@@ -1404,7 +1436,7 @@
     <value/>
     <tag>OZONE, S3GATEWAY</tag>
     <description>List of Ozone S3Gateway domain names. If multiple
-      domain names to be provided, they should be a "," seperated.
+      domain names to be provided, they should be a "," separated.
       This parameter is only required when virtual host style pattern is
       followed.</description>
   </property>
@@ -1523,7 +1555,7 @@
 
   <property>
     <name>ozone.om.ratis.enable</name>
-    <value>false</value>
+    <value>true</value>
     <tag>OZONE, OM, RATIS, MANAGEMENT</tag>
     <description>Property to enable or disable Ratis server on OM.
     Please note - this is a temporary property to disable OM Ratis server.
@@ -1618,7 +1650,7 @@
 
   <property>
     <name>ozone.om.ratis.minimum.timeout</name>
-    <value>1s</value>
+    <value>5s</value>
     <tag>OZONE, OM, RATIS, MANAGEMENT</tag>
     <description>The minimum timeout duration for OM's Ratis server rpc.
     </description>
@@ -1626,10 +1658,10 @@
 
   <property>
     <name>ozone.om.leader.election.minimum.timeout.duration</name>
-    <value>1s</value>
-    <tag>OZONE, OM, RATIS, MANAGEMENT</tag>
-    <description>The minimum timeout duration for OM ratis leader election.
-      Default is 1s.
+    <value>5s</value>
+    <tag>OZONE, OM, RATIS, MANAGEMENT, DEPRECATED</tag>
+    <description>DEPRECATED. Leader election timeout uses ratis
+      rpc timeout which can be set via ozone.om.ratis.minimum.timeout.
     </description>
   </property>
 

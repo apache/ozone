@@ -155,7 +155,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       omKeyInfo.setDataSize(keyArgs.getDataSize());
       omKeyInfo.updateLocationInfoList(keyArgs.getKeyLocationsList().stream()
           .map(OmKeyLocationInfo::getFromProtobuf)
-          .collect(Collectors.toList()));
+          .collect(Collectors.toList()), true);
       // Set Modification time
       omKeyInfo.setModificationTime(keyArgs.getModificationTime());
       // Set the UpdateID to current transactionLogIndex
@@ -183,7 +183,8 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
           OzoneManagerProtocolProtos.PartKeyInfo.newBuilder();
       partKeyInfo.setPartName(partName);
       partKeyInfo.setPartNumber(partNumber);
-      partKeyInfo.setPartKeyInfo(omKeyInfo.getProtobuf());
+      partKeyInfo.setPartKeyInfo(omKeyInfo.getProtobuf(
+          getOmRequest().getVersion()));
 
       // Add this part information in to multipartKeyInfo.
       multipartKeyInfo.addPartKeyInfo(partNumber, partKeyInfo.build());

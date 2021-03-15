@@ -72,7 +72,7 @@ public class CsiServer extends GenericCli implements Callable<Void> {
             .channelType(EpollServerDomainSocketChannel.class)
             .workerEventLoopGroup(group)
             .bossEventLoopGroup(group)
-            .addService(new IdentitiyService())
+            .addService(new IdentityService())
             .addService(new ControllerService(rpcClient,
                 csiConfig.getDefaultVolumeSize()))
             .addService(new NodeService(csiConfig))

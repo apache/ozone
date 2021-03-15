@@ -24,7 +24,7 @@ services:
     env_file:
       - docker-config
     environment:
-      HADOOP_OPTS: ${HADOOP_OPTS}
+      OZONE_OPTS:
     ports:
       - 9864
       - 9882
@@ -37,7 +37,7 @@ services:
       - docker-config
     environment:
       ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
-      HADOOP_OPTS: ${HADOOP_OPTS}
+      OZONE_OPTS:
     ports:
       - 9874:9874
       - 9862:9862
@@ -53,7 +53,7 @@ services:
       - 9860:9860
     environment:
       ENSURE_SCM_INITIALIZED: /data/metadata/scm/current/VERSION
-      HADOOP_OPTS: ${HADOOP_OPTS}
+      OZONE_OPTS:
     command: ["ozone","scm"]
   csi:
     image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
@@ -62,5 +62,5 @@ services:
     env_file:
       - docker-config
     environment:
-      HADOOP_OPTS: ${HADOOP_OPTS}
+      OZONE_OPTS:
     command: ["ozone","csi"]

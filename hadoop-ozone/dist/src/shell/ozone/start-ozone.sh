@@ -15,13 +15,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Start hadoop hdfs and ozone daemons.
+# Start ozone daemons.
 # Run this on master node.
 ## @description  usage info
 ## @audience     private
 ## @stability    evolving
 ## @replaceable  no
-function hadoop_usage
+function ozone_usage
 {
   echo "Usage: start-ozone.sh"
 }
@@ -29,28 +29,23 @@ function hadoop_usage
 this="${BASH_SOURCE-$0}"
 bin=$(cd -P -- "$(dirname -- "${this}")" >/dev/null && pwd -P)
 
-# let's locate libexec...
-if [[ -n "${HADOOP_HOME}" ]]; then
-  HADOOP_DEFAULT_LIBEXEC_DIR="${HADOOP_HOME}/libexec"
-else
-  HADOOP_DEFAULT_LIBEXEC_DIR="${bin}/../libexec"
-fi
+# load functions
+for dir in "${OZONE_LIBEXEC_DIR}" "${OZONE_HOME}/libexec" "${HADOOP_LIBEXEC_DIR}" "${HADOOP_HOME}/libexec" "${bin}/../libexec"; do
+  if [[ -e "${dir}/ozone-functions.sh" ]]; then
+    . "${dir}/ozone-functions.sh"
+    if declare -F ozone_bootstrap >& /dev/null; then
+      break
+    fi
+  fi
+done
 
-HADOOP_LIBEXEC_DIR="${HADOOP_LIBEXEC_DIR:-$HADOOP_DEFAULT_LIBEXEC_DIR}"
-# shellcheck disable=SC2034
-HADOOP_NEW_CONFIG=true
-if [[ -f "${HADOOP_LIBEXEC_DIR}/ozone-config.sh" ]]; then
-  # shellcheck disable=SC1090
-  . "${HADOOP_LIBEXEC_DIR}/ozone-config.sh"
-elif [[ -f "${bin}/../libexec/ozone-config.sh" ]]; then
-  HADOOP_HOME="${bin}/../"
-  HADOOP_LIBEXEC_DIR="${HADOOP_HOME}/libexec"
-  HADOOP_DEFAULT_LIBEXEC_DIR="${HADOOP_HOME}/libexec"
-  . "${HADOOP_LIBEXEC_DIR}/ozone-config.sh"
-else
-  echo "ERROR: Cannot execute ${HADOOP_LIBEXEC_DIR}/ozone-config.sh." 2>&1
+if ! declare -F ozone_bootstrap >& /dev/null; then
+  echo "ERROR: Cannot find ozone-functions.sh." 2>&1
   exit 1
 fi
+
+ozone_bootstrap
+. "${OZONE_LIBEXEC_DIR}/ozone-config.sh"
 
 # get arguments
 if [[ $# -ge 1 ]]; then
@@ -64,7 +59,7 @@ if [[ $# -ge 1 ]]; then
       dataStartOpt="$startOpt"
     ;;
     *)
-      hadoop_exit_with_usage 1
+      ozone_exit_with_usage 1
     ;;
   esac
 fi
@@ -72,60 +67,45 @@ fi
 #Add other possible options
 nameStartOpt="$nameStartOpt $*"
 
-SECURITY_ENABLED=$("${HADOOP_HDFS_HOME}/bin/ozone" getconf -confKey hadoop.security.authentication | tr '[:upper:]' '[:lower:]' 2>&-)
-SECURITY_AUTHORIZATION_ENABLED=$("${HADOOP_HDFS_HOME}/bin/ozone" getconf -confKey hadoop.security.authorization | tr '[:upper:]' '[:lower:]' 2>&-)
-
-#if [[ ${SECURITY_ENABLED} == "kerberos" || ${SECURITY_AUTHORIZATION_ENABLED}
-# == "true" ]]; then
-#  echo "Ozone is not supported in a security enabled cluster."
-#  exit 1
-#fi
-
-#SECURITY_ENABLED=$("${HADOOP_HDFS_HOME}/bin/ozone" getozoneconf -confKey hadoop.security.authentication | tr '[:upper:]' '[:lower:]' 2>&-)
-#SECURITY_AUTHORIZATION_ENABLED=$("${HADOOP_HDFS_HOME}/bin/ozone" getozoneconf -confKey hadoop.security.authorization | tr '[:upper:]' '[:lower:]' 2>&-)
-#if [[ ${SECURITY_ENABLED} == "kerberos" || ${SECURITY_AUTHORIZATION_ENABLED} == "true" ]]; then
-#  echo "Ozone is not supported in a security enabled cluster."
-#  exit 1
-#fi
+SECURITY_ENABLED=$("${OZONE_HOME}/bin/ozone" getconf -confKey hadoop.security.authentication | tr '[:upper:]' '[:lower:]' 2>&-)
+SECURITY_AUTHORIZATION_ENABLED=$("${OZONE_HOME}/bin/ozone" getconf -confKey hadoop.security.authorization | tr '[:upper:]' '[:lower:]' 2>&-)
 
 # datanodes (using default workers file)
 
 echo "Starting datanodes"
-hadoop_uservar_su hdfs datanode "${HADOOP_HDFS_HOME}/bin/ozone" \
+ozone_uservar_su hdfs datanode "${OZONE_HOME}/bin/ozone" \
     --workers \
-    --config "${HADOOP_CONF_DIR}" \
+    --config "${OZONE_CONF_DIR}" \
     --daemon start \
     datanode ${dataStartOpt}
-(( HADOOP_JUMBO_RETCOUNTER=HADOOP_JUMBO_RETCOUNTER + $? ))
+OZONE_JUMBO_RETCOUNTER=$?
 
 #---------------------------------------------------------
 # Ozone ozonemanager nodes
-OM_NODES=$("${HADOOP_HDFS_HOME}/bin/ozone" getconf -ozonemanagers 2>/dev/null)
+OM_NODES=$("${OZONE_HOME}/bin/ozone" getconf -ozonemanagers 2>/dev/null)
 echo "Starting Ozone Manager nodes [${OM_NODES}]"
 if [[ "${OM_NODES}" == "0.0.0.0" ]]; then
   OM_NODES=$(hostname)
 fi
 
-hadoop_uservar_su hdfs om "${HADOOP_HDFS_HOME}/bin/ozone" \
+ozone_uservar_su hdfs om "${OZONE_HOME}/bin/ozone" \
   --workers \
-  --config "${HADOOP_CONF_DIR}" \
+  --config "${OZONE_CONF_DIR}" \
   --hostnames "${OM_NODES}" \
   --daemon start \
   om
-
-HADOOP_JUMBO_RETCOUNTER=$?
+(( OZONE_JUMBO_RETCOUNTER=OZONE_JUMBO_RETCOUNTER + $? ))
 
 #---------------------------------------------------------
 # Ozone storagecontainermanager nodes
-SCM_NODES=$("${HADOOP_HDFS_HOME}/bin/ozone" getconf -storagecontainermanagers 2>/dev/null)
+SCM_NODES=$("${OZONE_HOME}/bin/ozone" getconf -storagecontainermanagers 2>/dev/null)
 echo "Starting storage container manager nodes [${SCM_NODES}]"
-hadoop_uservar_su hdfs scm "${HADOOP_HDFS_HOME}/bin/ozone" \
+ozone_uservar_su hdfs scm "${OZONE_HOME}/bin/ozone" \
   --workers \
-  --config "${HADOOP_CONF_DIR}" \
+  --config "${OZONE_CONF_DIR}" \
   --hostnames "${SCM_NODES}" \
   --daemon start \
   scm
+(( OZONE_JUMBO_RETCOUNTER=OZONE_JUMBO_RETCOUNTER + $? ))
 
-(( HADOOP_JUMBO_RETCOUNTER=HADOOP_JUMBO_RETCOUNTER + $? ))
-
-exit ${HADOOP_JUMBO_RETCOUNTER}
+exit ${OZONE_JUMBO_RETCOUNTER}

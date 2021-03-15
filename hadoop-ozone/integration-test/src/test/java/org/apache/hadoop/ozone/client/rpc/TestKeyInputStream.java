@@ -58,7 +58,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.ozone.container.TestHelper.countReplicas;
-import static org.apache.hadoop.ozone.container.TestHelper.waitForReplicaCount;
 import static org.junit.Assert.fail;
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -87,20 +86,18 @@ public class TestKeyInputStream {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestKeyInputStream.class);
 
-  private static final int TIMEOUT = 300_000;
-
-  private static MiniOzoneCluster cluster;
-  private static OzoneConfiguration conf = new OzoneConfiguration();
-  private static OzoneClient client;
-  private static ObjectStore objectStore;
-  private static int chunkSize;
-  private static int flushSize;
-  private static int maxFlushSize;
-  private static int blockSize;
-  private static String volumeName;
-  private static String bucketName;
-  private static String keyString;
-  private static ChunkLayoutTestInfo chunkLayout;
+  private MiniOzoneCluster cluster;
+  private OzoneConfiguration conf = new OzoneConfiguration();
+  private OzoneClient client;
+  private ObjectStore objectStore;
+  private int chunkSize;
+  private int flushSize;
+  private int maxFlushSize;
+  private int blockSize;
+  private String volumeName;
+  private String bucketName;
+  private String keyString;
+  private ChunkLayoutTestInfo chunkLayout;
 
   @Parameterized.Parameters
   public static Collection<Object[]> layouts() {
@@ -135,6 +132,7 @@ public class TestKeyInputStream {
     conf.setTimeDuration(HDDS_SCM_WATCHER_TIMEOUT, 1000, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, TimeUnit.SECONDS);
     conf.setTimeDuration(OZONE_SCM_DEADNODE_INTERVAL, 6, TimeUnit.SECONDS);
+    conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 1);
     conf.setQuietMode(false);
     conf.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 64,
         StorageUnit.MB);
@@ -166,7 +164,7 @@ public class TestKeyInputStream {
   }
 
   @Rule
-  public Timeout timeout = new Timeout(TIMEOUT);
+  public Timeout timeout = Timeout.seconds(300);
 
   /**
    * Shutdown MiniDFSCluster.
@@ -464,28 +462,14 @@ public class TestKeyInputStream {
         keyInputStream.unbuffer();
       }
 
-      // stop one node, wait for container to be replicated to another one
       cluster.shutdownHddsDatanode(pipelineNodes.get(0));
-      waitForNodeToBecomeDead(pipelineNodes.get(0));
-      waitForReplicaCount(containerID, 2, cluster);
-      waitForReplicaCount(containerID, 3, cluster);
-
-      // avoid polluting the logs
-      cluster.getStorageContainerManager().getReplicationManager().stop();
-
-      // stop original pipeline's remaining nodes
-      cluster.shutdownHddsDatanode(pipelineNodes.get(1));
-      cluster.shutdownHddsDatanode(pipelineNodes.get(2));
-
-      // now only the new node has the container
-      waitForReplicaCount(containerID, 1, cluster);
 
       // check that we can still read it
       assertReadFully(data, keyInputStream, dataLength - 1, 1);
     }
   }
 
-  private static void waitForNodeToBecomeDead(
+  private void waitForNodeToBecomeDead(
       DatanodeDetails datanode) throws TimeoutException, InterruptedException {
     GenericTestUtils.waitFor(() ->
         HddsProtos.NodeState.DEAD == getNodeHealth(datanode),
@@ -494,7 +478,7 @@ public class TestKeyInputStream {
         getNodeHealth(datanode));
   }
 
-  private static HddsProtos.NodeState getNodeHealth(DatanodeDetails dn) {
+  private HddsProtos.NodeState getNodeHealth(DatanodeDetails dn) {
     HddsProtos.NodeState health = null;
     try {
       NodeManager nodeManager =

@@ -84,10 +84,10 @@ import static org.slf4j.event.Level.INFO;
  * Test cases to verify PipelineManager.
  */
 public class TestSCMPipelineManager {
-  private static MockNodeManager nodeManager;
-  private static File testDir;
-  private static OzoneConfiguration conf;
-  private static SCMMetadataStore scmMetadataStore;
+  private MockNodeManager nodeManager;
+  private File testDir;
+  private OzoneConfiguration conf;
+  private SCMMetadataStore scmMetadataStore;
 
   @Before
   public void setUp() throws Exception {
@@ -372,6 +372,10 @@ public class TestSCMPipelineManager {
         metrics);
     Assert.assertEquals(0, numPipelineAllocated);
 
+    // one node pipeline creation will not be accounted for
+    // pipeline limit determination
+    pipelineManager.createPipeline(HddsProtos.ReplicationType.RATIS,
+        HddsProtos.ReplicationFactor.ONE);
     // max limit on no of pipelines is 4
     for (int i = 0; i < pipelinePerDn; i++) {
       Pipeline pipeline = pipelineManager
@@ -383,7 +387,7 @@ public class TestSCMPipelineManager {
     metrics = getMetrics(
         SCMPipelineMetrics.class.getSimpleName());
     numPipelineAllocated = getLongCounter("NumPipelineAllocated", metrics);
-    Assert.assertEquals(4, numPipelineAllocated);
+    Assert.assertEquals(5, numPipelineAllocated);
 
     long numPipelineCreateFailed = getLongCounter(
         "NumPipelineCreationFailed", metrics);
@@ -402,7 +406,7 @@ public class TestSCMPipelineManager {
     metrics = getMetrics(
         SCMPipelineMetrics.class.getSimpleName());
     numPipelineAllocated = getLongCounter("NumPipelineAllocated", metrics);
-    Assert.assertEquals(4, numPipelineAllocated);
+    Assert.assertEquals(5, numPipelineAllocated);
 
     numPipelineCreateFailed = getLongCounter(
         "NumPipelineCreationFailed", metrics);
@@ -581,8 +585,7 @@ public class TestSCMPipelineManager {
         ratisProvider);
 
     try {
-      Pipeline pipeline = pipelineManager
-          .createPipeline(HddsProtos.ReplicationType.RATIS,
+      pipelineManager.createPipeline(HddsProtos.ReplicationType.RATIS,
               HddsProtos.ReplicationFactor.THREE);
       fail("Pipelines should not have been created");
     } catch (IOException e) {
@@ -591,8 +594,7 @@ public class TestSCMPipelineManager {
 
     // Ensure a pipeline of factor ONE can be created - no exceptions should be
     // raised.
-    Pipeline pipeline = pipelineManager
-        .createPipeline(HddsProtos.ReplicationType.RATIS,
+    pipelineManager.createPipeline(HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.ONE);
 
     // Simulate safemode check exiting.
@@ -749,7 +751,9 @@ public class TestSCMPipelineManager {
       oldPipelines.values().forEach(p ->
           pipelineManager.containsPipeline(p.getId()));
     } finally {
-      newScmMetadataStore.stop();
+      if (newScmMetadataStore != null) {
+        newScmMetadataStore.stop();
+      }
     }
 
     // Mimicking another restart.

@@ -32,9 +32,15 @@ import java.util.stream.Collectors;
 public class OmKeyLocationInfoGroup {
   private final long version;
   private final Map<Long, List<OmKeyLocationInfo>> locationVersionMap;
+  private  boolean isMultipartKey;
 
   public OmKeyLocationInfoGroup(long version,
                                 List<OmKeyLocationInfo> locations) {
+    this(version, locations, false);
+  }
+
+  public OmKeyLocationInfoGroup(long version,
+      List<OmKeyLocationInfo> locations, boolean isMultipartKey) {
     this.version = version;
     locationVersionMap = new HashMap<>();
     for (OmKeyLocationInfo info : locations) {
@@ -44,14 +50,30 @@ public class OmKeyLocationInfoGroup {
     }
     //prevent NPE
     this.locationVersionMap.putIfAbsent(version, new ArrayList<>());
+    this.isMultipartKey = isMultipartKey;
+
   }
 
   public OmKeyLocationInfoGroup(long version,
                                 Map<Long, List<OmKeyLocationInfo>> locations) {
+    this(version, locations, false);
+  }
+
+  public OmKeyLocationInfoGroup(long version,
+      Map<Long, List<OmKeyLocationInfo>> locations, boolean isMultipartKey) {
     this.version = version;
     this.locationVersionMap = locations;
     //prevent NPE
     this.locationVersionMap.putIfAbsent(version, new ArrayList<>());
+    this.isMultipartKey = isMultipartKey;
+  }
+
+  public void setMultipartKey(boolean isMpu) {
+    this.isMultipartKey = isMpu;
+  }
+
+  public boolean isMultipartKey() {
+    return isMultipartKey;
   }
 
   /**
@@ -80,15 +102,15 @@ public class OmKeyLocationInfoGroup {
     return new ArrayList<>(locationVersionMap.get(versionToFetch));
   }
 
-  public KeyLocationList getProtobuf(boolean ignorePipeline) {
+  public KeyLocationList getProtobuf(boolean ignorePipeline,
+      int clientVersion) {
     KeyLocationList.Builder builder = KeyLocationList.newBuilder()
-        .setVersion(version);
+        .setVersion(version).setIsMultipartKey(isMultipartKey);
     List<OzoneManagerProtocolProtos.KeyLocation> keyLocationList =
         new ArrayList<>();
     for (List<OmKeyLocationInfo> locationList : locationVersionMap.values()) {
       for (OmKeyLocationInfo keyInfo : locationList) {
-        keyLocationList.add(ignorePipeline ?
-            keyInfo.getCompactProtobuf() : keyInfo.getProtobuf());
+        keyLocationList.add(keyInfo.getProtobuf(ignorePipeline, clientVersion));
       }
     }
     return  builder.addAllKeyLocations(keyLocationList).build();
@@ -100,7 +122,9 @@ public class OmKeyLocationInfoGroup {
         keyLocationList.getVersion(),
         keyLocationList.getKeyLocationsList().stream()
             .map(OmKeyLocationInfo::getFromProtobuf)
-            .collect(Collectors.groupingBy(OmKeyLocationInfo::getCreateVersion))
+            .collect(Collectors.groupingBy(
+                OmKeyLocationInfo::getCreateVersion)),
+        keyLocationList.getIsMultipartKey()
     );
   }
 
@@ -141,6 +165,7 @@ public class OmKeyLocationInfoGroup {
   public String toString() {
     StringBuilder sb = new StringBuilder();
     sb.append("version:").append(version).append(" ");
+    sb.append("isMultipartKey:").append(isMultipartKey);
     for (List<OmKeyLocationInfo> kliList : locationVersionMap.values()) {
       for(OmKeyLocationInfo kli: kliList) {
         sb.append(kli.getLocalID()).append(" || ");

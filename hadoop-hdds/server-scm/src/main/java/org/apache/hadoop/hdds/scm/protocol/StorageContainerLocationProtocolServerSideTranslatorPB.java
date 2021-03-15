@@ -17,11 +17,10 @@
  */
 package org.apache.hadoop.hdds.scm.protocol;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-
+import com.google.common.base.Strings;
+import com.google.protobuf.ProtocolMessageEnum;
+import com.google.protobuf.RpcController;
+import com.google.protobuf.ServiceException;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -32,8 +31,11 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ClosePipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeUsageInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DeactivatePipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DeactivatePipelineResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionNodesRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionNodesResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ForceExitSafeModeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ForceExitSafeModeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerRequestProto;
@@ -44,12 +46,16 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerWithPipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetPipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetPipelineResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetSafeModeRuleStatusesRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetSafeModeRuleStatusesResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.InSafeModeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.InSafeModeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ListPipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ListPipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.NodeQueryResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.PipelineResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.RecommissionNodesRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.RecommissionNodesResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReplicationManagerStatusRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReplicationManagerStatusResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMCloseContainerRequestProto;
@@ -58,22 +64,16 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMDeleteContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMListContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMListContainerResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SafeModeRuleStatusProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ScmContainerLocationRequest;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ScmContainerLocationResponse;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ScmContainerLocationResponse.Status;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartMaintenanceNodesRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartMaintenanceNodesResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartReplicationManagerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartReplicationManagerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopReplicationManagerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopReplicationManagerResponseProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionNodesRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionNodesResponseProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.RecommissionNodesRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.RecommissionNodesResponseProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartMaintenanceNodesRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartMaintenanceNodesResponseProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetSafeModeRuleStatusesRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetSafeModeRuleStatusesResponseProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SafeModeRuleStatusProto;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
@@ -81,14 +81,16 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
-
-import com.google.protobuf.ProtocolMessageEnum;
-import com.google.protobuf.RpcController;
-import com.google.protobuf.ServiceException;
-import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.PipelineResponseProto.Error.errorPipelineAlreadyExists;
-import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.PipelineResponseProto.Error.success;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.PipelineResponseProto.Error.errorPipelineAlreadyExists;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.PipelineResponseProto.Error.success;
 
 /**
  * This class is the server-side translator that forwards requests received on
@@ -143,8 +145,8 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
         return ScmContainerLocationResponse.newBuilder()
             .setCmdType(request.getCmdType())
             .setStatus(Status.OK)
-            .setContainerResponse(
-                allocateContainer(request.getContainerRequest()))
+            .setContainerResponse(allocateContainer(
+                request.getContainerRequest(), request.getVersion()))
             .build();
       case GetContainer:
         return ScmContainerLocationResponse.newBuilder()
@@ -158,7 +160,8 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setCmdType(request.getCmdType())
             .setStatus(Status.OK)
             .setGetContainerWithPipelineResponse(getContainerWithPipeline(
-                request.getGetContainerWithPipelineRequest()))
+                request.getGetContainerWithPipelineRequest(),
+                request.getVersion()))
             .build();
       case GetContainerWithPipelineBatch:
         return ScmContainerLocationResponse.newBuilder()
@@ -166,7 +169,8 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setStatus(Status.OK)
             .setGetContainerWithPipelineBatchResponse(
                 getContainerWithPipelineBatch(
-                    request.getGetContainerWithPipelineBatchRequest()))
+                    request.getGetContainerWithPipelineBatchRequest(),
+                    request.getVersion()))
             .build();
       case ListContainer:
         return ScmContainerLocationResponse.newBuilder()
@@ -179,7 +183,8 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
         return ScmContainerLocationResponse.newBuilder()
             .setCmdType(request.getCmdType())
             .setStatus(Status.OK)
-            .setNodeQueryResponse(queryNode(request.getNodeQueryRequest()))
+            .setNodeQueryResponse(queryNode(request.getNodeQueryRequest(),
+                request.getVersion()))
             .build();
       case CloseContainer:
         return ScmContainerLocationResponse.newBuilder()
@@ -192,14 +197,15 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
         return ScmContainerLocationResponse.newBuilder()
             .setCmdType(request.getCmdType())
             .setStatus(Status.OK)
-            .setPipelineResponse(allocatePipeline(request.getPipelineRequest()))
+            .setPipelineResponse(allocatePipeline(
+                request.getPipelineRequest(), request.getVersion()))
             .build();
       case ListPipelines:
         return ScmContainerLocationResponse.newBuilder()
             .setCmdType(request.getCmdType())
             .setStatus(Status.OK)
             .setListPipelineResponse(listPipelines(
-                request.getListPipelineRequest()))
+                request.getListPipelineRequest(), request.getVersion()))
             .build();
       case ActivatePipeline:
         return ScmContainerLocationResponse.newBuilder()
@@ -269,7 +275,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setCmdType(request.getCmdType())
             .setStatus(Status.OK)
             .setGetPipelineResponse(getPipeline(
-                request.getGetPipelineRequest()))
+                request.getGetPipelineRequest(), request.getVersion()))
             .build();
       case GetSafeModeRuleStatuses:
         return ScmContainerLocationResponse.newBuilder()
@@ -297,7 +303,14 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setStatus(Status.OK)
             .setStartMaintenanceNodesResponse(startMaintenanceNodes(
                 request.getStartMaintenanceNodesRequest()))
-          .build();
+            .build();
+      case DatanodeUsageInfo:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setDatanodeUsageInfoResponse(getDatanodeUsageInfo(
+                request.getDatanodeUsageInfoRequest()))
+            .build();
       default:
         throw new IllegalArgumentException(
             "Unknown command type: " + request.getCmdType());
@@ -307,13 +320,13 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     }
   }
 
-  public ContainerResponseProto allocateContainer(ContainerRequestProto request)
-      throws IOException {
-    ContainerWithPipeline containerWithPipeline = impl
+  public ContainerResponseProto allocateContainer(ContainerRequestProto request,
+      int clientVersion) throws IOException {
+    ContainerWithPipeline cp = impl
         .allocateContainer(request.getReplicationType(),
             request.getReplicationFactor(), request.getOwner());
     return ContainerResponseProto.newBuilder()
-        .setContainerWithPipeline(containerWithPipeline.getProtobuf())
+        .setContainerWithPipeline(cp.getProtobuf(clientVersion))
         .setErrorCode(ContainerResponseProto.Error.success)
         .build();
 
@@ -328,24 +341,25 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   }
 
   public GetContainerWithPipelineResponseProto getContainerWithPipeline(
-      GetContainerWithPipelineRequestProto request)
-      throws IOException {
+      GetContainerWithPipelineRequestProto request,
+      int clientVersion) throws IOException {
     ContainerWithPipeline container = impl
         .getContainerWithPipeline(request.getContainerID());
     return GetContainerWithPipelineResponseProto.newBuilder()
-        .setContainerWithPipeline(container.getProtobuf())
+        .setContainerWithPipeline(container.getProtobuf(clientVersion))
         .build();
   }
 
   public GetContainerWithPipelineBatchResponseProto
       getContainerWithPipelineBatch(
-      GetContainerWithPipelineBatchRequestProto request) throws IOException {
+      GetContainerWithPipelineBatchRequestProto request,
+      int clientVersion) throws IOException {
     List<ContainerWithPipeline> containers = impl
         .getContainerWithPipelineBatch(request.getContainerIDsList());
     GetContainerWithPipelineBatchResponseProto.Builder builder =
         GetContainerWithPipelineBatchResponseProto.newBuilder();
     for (ContainerWithPipeline container : containers) {
-      builder.addContainerWithPipelines(container.getProtobuf());
+      builder.addContainerWithPipelines(container.getProtobuf(clientVersion));
     }
     return builder.build();
   }
@@ -362,8 +376,12 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       startContainerID = request.getStartContainerID();
     }
     count = request.getCount();
+    HddsProtos.LifeCycleState state = null;
+    if (request.hasState()) {
+      state = request.getState();
+    }
     List<ContainerInfo> containerList =
-        impl.listContainer(startContainerID, count);
+        impl.listContainer(startContainerID, count, state);
     SCMListContainerResponseProto.Builder builder =
         SCMListContainerResponseProto.newBuilder();
     for (ContainerInfo container : containerList) {
@@ -381,8 +399,8 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   }
 
   public NodeQueryResponseProto queryNode(
-      StorageContainerLocationProtocolProtos.NodeQueryRequestProto request)
-      throws IOException {
+      StorageContainerLocationProtocolProtos.NodeQueryRequestProto request,
+      int clientVersion) throws IOException {
 
     HddsProtos.NodeOperationalState opState = null;
     HddsProtos.NodeState nodeState = null;
@@ -393,7 +411,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       opState = request.getOpState();
     }
     List<HddsProtos.Node> datanodes = impl.queryNode(opState, nodeState,
-        request.getScope(), request.getPoolName());
+        request.getScope(), request.getPoolName(), clientVersion);
     return NodeQueryResponseProto.newBuilder()
         .addAllDatanodes(datanodes)
         .build();
@@ -407,8 +425,8 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   }
 
   public PipelineResponseProto allocatePipeline(
-      StorageContainerLocationProtocolProtos.PipelineRequestProto request)
-      throws IOException {
+      StorageContainerLocationProtocolProtos.PipelineRequestProto request,
+      int clientVersion) throws IOException {
     Pipeline pipeline = impl.createReplicationPipeline(
         request.getReplicationType(), request.getReplicationFactor(),
         HddsProtos.NodePool.getDefaultInstance());
@@ -416,31 +434,30 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       return PipelineResponseProto.newBuilder()
           .setErrorCode(errorPipelineAlreadyExists).build();
     }
-    PipelineResponseProto response = PipelineResponseProto.newBuilder()
+    return PipelineResponseProto.newBuilder()
         .setErrorCode(success)
-        .setPipeline(pipeline.getProtobufMessage()).build();
-    return response;
+        .setPipeline(pipeline.getProtobufMessage(clientVersion)).build();
   }
 
   public ListPipelineResponseProto listPipelines(
-      ListPipelineRequestProto request)
+      ListPipelineRequestProto request, int clientVersion)
       throws IOException {
     ListPipelineResponseProto.Builder builder = ListPipelineResponseProto
         .newBuilder();
     List<Pipeline> pipelines = impl.listPipelines();
     for (Pipeline pipeline : pipelines) {
-      HddsProtos.Pipeline protobufMessage = pipeline.getProtobufMessage();
-      builder.addPipelines(protobufMessage);
+      builder.addPipelines(pipeline.getProtobufMessage(clientVersion));
     }
     return builder.build();
   }
 
   public GetPipelineResponseProto getPipeline(
-      GetPipelineRequestProto request) throws IOException {
+      GetPipelineRequestProto request,
+      int clientVersion) throws IOException {
     GetPipelineResponseProto.Builder builder = GetPipelineResponseProto
         .newBuilder();
     Pipeline pipeline = impl.getPipeline(request.getPipelineID());
-    builder.setPipeline(pipeline.getProtobufMessage());
+    builder.setPipeline(pipeline.getProtobufMessage(clientVersion));
     return builder.build();
   }
 
@@ -549,6 +566,29 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     impl.startMaintenanceNodes(request.getHostsList(),
         (int)request.getEndInHours());
     return StartMaintenanceNodesResponseProto.newBuilder()
+        .build();
+  }
+
+  public DatanodeUsageInfoResponseProto getDatanodeUsageInfo(
+      StorageContainerLocationProtocolProtos.DatanodeUsageInfoRequestProto
+      request) throws IOException {
+    String ipaddress = null;
+    String uuid = null;
+    if (request.hasIpaddress()) {
+      ipaddress = request.getIpaddress();
+    }
+    if (request.hasUuid()) {
+      uuid = request.getUuid();
+    }
+    if (Strings.isNullOrEmpty(ipaddress) && Strings.isNullOrEmpty(uuid)) {
+      throw new IOException("No ip or uuid specified");
+    }
+
+    List<HddsProtos.DatanodeUsageInfo> infoList;
+    infoList = impl.getDatanodeUsageInfo(ipaddress,
+        uuid);
+    return DatanodeUsageInfoResponseProto.newBuilder()
+        .addAllInfo(infoList)
         .build();
   }
 

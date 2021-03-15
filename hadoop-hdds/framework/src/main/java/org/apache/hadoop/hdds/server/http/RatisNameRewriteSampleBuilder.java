@@ -26,7 +26,7 @@ import java.util.regex.Pattern;
 import io.prometheus.client.Collector.MetricFamilySamples.Sample;
 import io.prometheus.client.dropwizard.samplebuilder.DefaultSampleBuilder;
 import org.apache.logging.log4j.util.Strings;
-import static org.apache.ratis.server.metrics.RaftLogMetrics.RATIS_APPLICATION_NAME_METRICS;
+import static org.apache.ratis.metrics.RatisMetrics.RATIS_APPLICATION_NAME_METRICS;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

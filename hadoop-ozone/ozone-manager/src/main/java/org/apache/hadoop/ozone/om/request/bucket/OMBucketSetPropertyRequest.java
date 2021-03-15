@@ -70,6 +70,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
   }
 
   @Override
+  @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
       long transactionLogIndex,
       OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
@@ -180,6 +181,9 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
 
       // Set the updateID to current transaction log index
       bucketInfoBuilder.setUpdateID(transactionLogIndex);
+      // Quota used remains unchanged
+      bucketInfoBuilder.setUsedBytes(dbBucketInfo.getUsedBytes());
+      bucketInfoBuilder.setUsedNamespace(dbBucketInfo.getUsedNamespace());
 
       omBucketInfo = bucketInfoBuilder.build();
 
@@ -235,7 +239,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
           OMException.ResultCodes.QUOTA_ERROR);
     }
 
-    if (quotaInBytes == 0) {
+    if (quotaInBytes < OzoneConsts.QUOTA_RESET || quotaInBytes == 0) {
       return false;
     }
 
@@ -269,8 +273,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       OmBucketArgs omBucketArgs) {
     long quotaInNamespace = omBucketArgs.getQuotaInNamespace();
 
-    if ((quotaInNamespace <= 0
-         && quotaInNamespace != OzoneConsts.QUOTA_RESET)) {
+    if (quotaInNamespace < OzoneConsts.QUOTA_RESET || quotaInNamespace == 0) {
       return false;
     }
     return true;

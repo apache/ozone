@@ -71,18 +71,18 @@ import static org.junit.Assert.fail;
 @Ignore
 public class TestScmSafeMode {
 
-  private final static Logger LOG = LoggerFactory
+  private static final Logger LOG = LoggerFactory
       .getLogger(TestScmSafeMode.class);
-  private static MiniOzoneCluster cluster = null;
-  private static MiniOzoneCluster.Builder builder = null;
-  private static OzoneConfiguration conf;
-  private static OzoneManager om;
-  private static StorageContainerLocationProtocolClientSideTranslatorPB
+  private MiniOzoneCluster cluster = null;
+  private MiniOzoneCluster.Builder builder = null;
+  private OzoneConfiguration conf;
+  private OzoneManager om;
+  private StorageContainerLocationProtocolClientSideTranslatorPB
       storageContainerLocationClient;
 
 
   @Rule
-  public Timeout timeout = new Timeout(1000 * 200);
+  public Timeout timeout = Timeout.seconds(200);
 
   /**
    * Create a MiniDFSCluster for testing.

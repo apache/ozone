@@ -1425,7 +1425,7 @@ public final class HttpServer2 implements FilterContainer {
    * @param servletContext the servlet context.
    * @param request the servlet request.
    * @param response the servlet response.
-   * @return TRUE/FALSE based on the logic decribed above.
+   * @return TRUE/FALSE based on the logic described above.
    */
   public static boolean isInstrumentationAccessAllowed(
       ServletContext servletContext, HttpServletRequest request,

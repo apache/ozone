@@ -63,13 +63,13 @@ import org.mockito.Mockito;
  */
 public class TestSCMSafeModeManager {
 
-  private static EventQueue queue;
+  private EventQueue queue;
   private SCMSafeModeManager scmSafeModeManager;
-  private static OzoneConfiguration config;
+  private OzoneConfiguration config;
   private List<ContainerInfo> containers = Collections.emptyList();
 
   @Rule
-  public Timeout timeout = new Timeout(1000 * 300);
+  public Timeout timeout = Timeout.seconds(300);
 
   @Rule
   public final TemporaryFolder tempDir = new TemporaryFolder();

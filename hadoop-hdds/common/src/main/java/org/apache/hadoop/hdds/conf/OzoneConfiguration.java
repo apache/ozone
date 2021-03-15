@@ -127,7 +127,7 @@ public class OzoneConfiguration extends Configuration
     }
     // Adding core-site here because properties from core-site are
     // distributed to executors by spark driver. Ozone properties which are
-    // added to core-site, will be overriden by properties from adding Resource
+    // added to core-site, will be overridden by properties from adding Resource
     // ozone-default.xml. So, adding core-site again will help to resolve
     // this override issue.
     addResource("core-site.xml");

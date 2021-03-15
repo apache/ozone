@@ -18,18 +18,23 @@
 
 package org.apache.hadoop.hdds.scm.node.states;
 
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
-import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
-import org.apache.hadoop.hdds.scm.node.NodeStatus;
-
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
+
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 
 /**
  * Maintains the state of datanodes in SCM. This class should only be used by
@@ -334,7 +339,8 @@ public class NodeStateMap {
     lock.readLock().lock();
     try {
       checkIfNodeExist(uuid);
-      return Collections.unmodifiableSet(nodeToContainer.get(uuid));
+      return Collections
+          .unmodifiableSet(new HashSet<>(nodeToContainer.get(uuid)));
     } finally {
       lock.readLock().unlock();
     }

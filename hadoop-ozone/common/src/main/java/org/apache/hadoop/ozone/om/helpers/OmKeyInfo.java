@@ -145,9 +145,12 @@ public final class OmKeyInfo extends WithObjectID {
    *
    * @param locationInfoList list of locationInfo
    */
-  public void updateLocationInfoList(List<OmKeyLocationInfo> locationInfoList) {
+  public void updateLocationInfoList(List<OmKeyLocationInfo> locationInfoList,
+      boolean isMpu) {
     long latestVersion = getLatestVersionLocations().getVersion();
     OmKeyLocationInfoGroup keyLocationInfoGroup = getLatestVersionLocations();
+
+    keyLocationInfoGroup.setMultipartKey(isMpu);
     // Updates the latest locationList in the latest version only with
     // given locationInfoList here.
     // TODO : The original allocated list and the updated list here may vary
@@ -160,6 +163,8 @@ public final class OmKeyInfo extends WithObjectID {
         .setCreateVersion(latestVersion));
     keyLocationInfoGroup.addAll(latestVersion, locationInfoList);
   }
+
+
 
   /**
    * Append a set of blocks to the latest version. Note that these blocks are
@@ -381,8 +386,8 @@ public final class OmKeyInfo extends WithObjectID {
    * For network transmit.
    * @return
    */
-  public KeyInfo getProtobuf() {
-    return getProtobuf(false);
+  public KeyInfo getProtobuf(int clientVersion) {
+    return getProtobuf(false, clientVersion);
   }
 
   /**
@@ -390,13 +395,14 @@ public final class OmKeyInfo extends WithObjectID {
    * @param ignorePipeline true for persist to DB, false for network transmit.
    * @return
    */
-  public KeyInfo getProtobuf(boolean ignorePipeline) {
+  public KeyInfo getProtobuf(boolean ignorePipeline, int clientVersion) {
     long latestVersion = keyLocationVersions.size() == 0 ? -1 :
         keyLocationVersions.get(keyLocationVersions.size() - 1).getVersion();
 
     List<KeyLocationList> keyLocations = new ArrayList<>();
     for (OmKeyLocationInfoGroup locationInfoGroup : keyLocationVersions) {
-      keyLocations.add(locationInfoGroup.getProtobuf(ignorePipeline));
+      keyLocations.add(locationInfoGroup.getProtobuf(
+          ignorePipeline, clientVersion));
     }
 
     KeyInfo.Builder kb = KeyInfo.newBuilder()

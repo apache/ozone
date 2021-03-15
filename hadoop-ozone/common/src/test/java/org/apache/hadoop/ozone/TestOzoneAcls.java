@@ -26,7 +26,7 @@ import org.junit.Test;
 
 import java.util.HashMap;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.*;
 import static org.junit.Assert.assertEquals;
@@ -110,15 +110,15 @@ public class TestOzoneAcls {
     testMatrix.put(" anonymous::rw", Boolean.TRUE);
     testMatrix.put(" world:WORLD:rw", Boolean.TRUE);
 
-    Set<String> keys = testMatrix.keySet();
-    for (String key : keys) {
-      if (testMatrix.get(key)) {
-        OzoneAcl.parseAcl(key);
+    for (Map.Entry<String, Boolean> entry : testMatrix.entrySet()) {
+      if (entry.getValue()) {
+        OzoneAcl.parseAcl(entry.getKey());
       } else {
         try {
-          OzoneAcl.parseAcl(key);
+          OzoneAcl.parseAcl(entry.getKey());
           // should never get here since parseAcl will throw
-          fail("An exception was expected but did not happen. Key: " + key);
+          fail("An exception was expected but did not happen. Key: " +
+              entry.getKey());
         } catch (IllegalArgumentException e) {
           // nothing to do
         }

@@ -19,24 +19,32 @@
 # bats gc_opts.bats
 #
 
-load ../../shell/hdds/hadoop-functions.sh
-@test "Setting Hadoop GC parameters: add GC params for server" {
-  export HADOOP_SUBCMD_SUPPORTDAEMONIZATION=true
-  export HADOOP_OPTS="Test"
-  hadoop_add_default_gc_opts
-  [[ "$HADOOP_OPTS" =~ "UseConcMarkSweepGC" ]]
+load ozone-functions_test_helper
+
+@test "Setting GC parameters: add GC params for server" {
+  export OZONE_SUBCMD_SUPPORTDAEMONIZATION=true
+  export OZONE_OPTS="Test"
+
+  ozone_add_default_gc_opts
+
+  echo $OZONE_OPTS
+  [[ "$OZONE_OPTS" =~ "UseConcMarkSweepGC" ]]
 }
 
-@test "Setting Hadoop GC parameters: disabled for client" {
-  export HADOOP_SUBCMD_SUPPORTDAEMONIZATION=false
-  export HADOOP_OPTS="Test"
-  hadoop_add_default_gc_opts
-  [[ ! "$HADOOP_OPTS" =~ "UseConcMarkSweepGC" ]]
+@test "Setting GC parameters: disabled for client" {
+  export OZONE_SUBCMD_SUPPORTDAEMONIZATION=false
+  export OZONE_OPTS="Test"
+
+  ozone_add_default_gc_opts
+
+  [[ ! "$OZONE_OPTS" =~ "UseConcMarkSweepGC" ]]
 }
 
-@test "Setting Hadoop GC parameters: disabled if GC params are customized" {
-  export HADOOP_SUBCMD_SUPPORTDAEMONIZATION=true
-  export HADOOP_OPTS="-XX:++UseG1GC -Xmx512"
-  hadoop_add_default_gc_opts
-  [[ ! "$HADOOP_OPTS" =~ "UseConcMarkSweepGC" ]]
+@test "Setting GC parameters: disabled if GC params are customized" {
+  export OZONE_SUBCMD_SUPPORTDAEMONIZATION=true
+  export OZONE_OPTS="-XX:++UseG1GC -Xmx512"
+
+  ozone_add_default_gc_opts
+
+  [[ ! "$OZONE_OPTS" =~ "UseConcMarkSweepGC" ]]
 }

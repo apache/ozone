@@ -21,12 +21,12 @@ on:
 jobs:
   close-pending:
     name: close-pending
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     steps:
       - name: Checkout code
-        uses: actions/checkout@master
+        uses: actions/checkout@v2
       - name: Execute close-pending script
-        if: github.repository == 'apache/hadoop-ozone'
+        if: github.repository == 'apache/ozone'
         run: ./.github/close-pending.sh
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

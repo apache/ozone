@@ -26,16 +26,23 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.UUID;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.protocol.commands.ReregisterCommand;
+import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.hadoop.ozone.protocol.commands.SetNodeOperationalStateCommand;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -68,7 +75,7 @@ public class TestReconNodeManager {
   }
 
   @Test
-  public void testReconNodeDB() throws IOException {
+  public void testReconNodeDB() throws IOException, NodeNotFoundException {
     ReconStorageConfig scmStorageConfig = new ReconStorageConfig(conf);
     EventQueue eventQueue = new EventQueue();
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
@@ -90,6 +97,53 @@ public class TestReconNodeManager {
 
     assertEquals(1, reconNodeManager.getAllNodes().size());
     assertNotNull(reconNodeManager.getNodeByUuid(uuidString));
+
+    // If any commands are added to the eventQueue without using the onMessage
+    // interface, then they should be filtered out and not returned to the DN
+    // when it heartbeats.
+    // This command should never be returned by Recon
+    reconNodeManager.addDatanodeCommand(datanodeDetails.getUuid(),
+        new SetNodeOperationalStateCommand(1234,
+        HddsProtos.NodeOperationalState.DECOMMISSIONING, 0));
+
+    // This one should be returned
+    reconNodeManager.addDatanodeCommand(datanodeDetails.getUuid(),
+        new ReregisterCommand());
+
+    // OperationalState sanity check
+    final DatanodeDetails dnDetails =
+        reconNodeManager.getNodeByUuid(datanodeDetails.getUuidString());
+    assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
+        dnDetails.getPersistedOpState());
+    assertEquals(dnDetails.getPersistedOpState(),
+        reconNodeManager.getNodeStatus(dnDetails)
+            .getOperationalState());
+    assertEquals(dnDetails.getPersistedOpStateExpiryEpochSec(),
+        reconNodeManager.getNodeStatus(dnDetails)
+            .getOpStateExpiryEpochSeconds());
+
+    // Upon processing the heartbeat, the illegal command should be filtered out
+    List<SCMCommand> returnedCmds =
+        reconNodeManager.processHeartbeat(datanodeDetails);
+    assertEquals(1, returnedCmds.size());
+    assertEquals(SCMCommandProto.Type.reregisterCommand,
+        returnedCmds.get(0).getType());
+
+    // Now feed a DECOMMISSIONED heartbeat of the same DN
+    datanodeDetails.setPersistedOpState(
+        HddsProtos.NodeOperationalState.DECOMMISSIONED);
+    datanodeDetails.setPersistedOpStateExpiryEpochSec(12345L);
+    reconNodeManager.processHeartbeat(datanodeDetails);
+    // Check both persistedOpState and NodeStatus#operationalState
+    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONED,
+        dnDetails.getPersistedOpState());
+    assertEquals(dnDetails.getPersistedOpState(),
+        reconNodeManager.getNodeStatus(dnDetails)
+            .getOperationalState());
+    assertEquals(12345L, dnDetails.getPersistedOpStateExpiryEpochSec());
+    assertEquals(dnDetails.getPersistedOpStateExpiryEpochSec(),
+        reconNodeManager.getNodeStatus(dnDetails)
+            .getOpStateExpiryEpochSeconds());
 
     // Close the DB, and recreate the instance of Recon Node Manager.
     eventQueue.close();

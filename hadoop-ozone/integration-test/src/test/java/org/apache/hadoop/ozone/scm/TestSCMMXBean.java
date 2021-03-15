@@ -62,7 +62,7 @@ public class TestSCMMXBean {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = new Timeout(300000);
+  public Timeout timeout = Timeout.seconds(300);
 
   public static final Log LOG = LogFactory.getLog(TestSCMMXBean.class);
   private static int numOfDatanodes = 3;
@@ -179,9 +179,9 @@ public class TestSCMMXBean {
     containerStateCount = scm.getContainerStateCount();
 
     containerStateCount.forEach((k, v) -> {
-      if(k == HddsProtos.LifeCycleState.CLOSING.toString()) {
+      if(k.equals(HddsProtos.LifeCycleState.CLOSING.toString())) {
         assertEquals((int)v, 5);
-      } else if (k == HddsProtos.LifeCycleState.CLOSED.toString()) {
+      } else if (k.equals(HddsProtos.LifeCycleState.CLOSED.toString())) {
         assertEquals((int)v, 5);
       } else  {
         // Remaining all container state count should be zero.

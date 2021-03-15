@@ -389,6 +389,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
    * Intercept rename to trash calls from TrashPolicyDefault.
    */
   @Deprecated
+  @Override
   protected void rename(final Path src, final Path dst,
       final Options.Rename... options) throws IOException {
     boolean hasMoveToTrash = false;
@@ -409,7 +410,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   }
 
   private class DeleteIterator extends OzoneListingIterator {
-    final private boolean recursive;
+    private final boolean recursive;
     private final OzoneBucket bucket;
     private final BasicRootedOzoneClientAdapterImpl adapterImpl;
 
@@ -694,6 +695,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
    * @param allUsers return trashRoots of all users if true, used by emptier
    * @return trash roots
    */
+  @Override
   public Collection<FileStatus> getTrashRoots(boolean allUsers) {
     // Since get all trash roots for one or more users requires listing all
     // volumes and buckets, we will let adapter impl handle it.

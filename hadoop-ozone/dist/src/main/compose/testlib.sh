@@ -16,16 +16,16 @@
 # limitations under the License.
 set -e
 
+_testlib_this="${BASH_SOURCE[0]}"
+_testlib_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+
 COMPOSE_ENV_NAME=$(basename "$COMPOSE_DIR")
 RESULT_DIR=${RESULT_DIR:-"$COMPOSE_DIR/result"}
 RESULT_DIR_INSIDE="/tmp/smoketest/$(basename "$COMPOSE_ENV_NAME")/result"
-SMOKETEST_DIR_INSIDE="${OZONE_DIR:-/opt/hadoop}/smoketest"
 
 OM_HA_PARAM=""
 if [[ -n "${OM_SERVICE_ID}" ]] && [[ "${OM_SERVICE_ID}" != "om" ]]; then
   OM_HA_PARAM="--om-service-id=${OM_SERVICE_ID}"
-else
-  OM_SERVICE_ID=om
 fi
 
 ## @description create results directory, purging any prior data
@@ -96,6 +96,39 @@ wait_for_safemode_exit(){
    return 1
 }
 
+## @description wait until OM leader is elected (or 120 seconds)
+wait_for_om_leader() {
+  if [[ -z "${OM_SERVICE_ID:-}" ]]; then
+    echo "No OM HA service, no need to wait"
+    return
+  fi
+
+  #Reset the timer
+  SECONDS=0
+
+  #Don't give it up until 120 seconds
+  while [[ $SECONDS -lt 120 ]]; do
+    local command="ozone admin om roles --service-id '${OM_SERVICE_ID}'"
+    if [[ "${SECURITY_ENABLED}" == 'true' ]]; then
+      status=$(docker-compose exec -T scm bash -c "kinit -k scm/scm@EXAMPLE.COM -t /etc/security/keytabs/scm.keytab && $command" | grep LEADER)
+    else
+      status=$(docker-compose exec -T scm bash -c "$command" | grep LEADER)
+    fi
+    if [[ -n "${status}" ]]; then
+      echo "Found OM leader for service ${OM_SERVICE_ID}: $status"
+      return
+    else
+      echo "Waiting for OM leader for service ${OM_SERVICE_ID}"
+    fi
+
+    echo "SECONDS: $SECONDS"
+
+    sleep 2
+  done
+  echo "WARNING: OM leader still not found for service ${OM_SERVICE_ID}"
+  return 1
+}
+
 ## @description  Starts a docker-compose based test environment
 ## @param number of datanodes to start and wait for (default: 3)
 start_docker_env(){
@@ -105,7 +138,8 @@ start_docker_env(){
   export OZONE_SAFEMODE_MIN_DATANODES="${datanode_count}"
   docker-compose --no-ansi down
   if ! { docker-compose --no-ansi up -d --scale datanode="${datanode_count}" \
-      && wait_for_safemode_exit ; }; then
+      && wait_for_safemode_exit \
+      && wait_for_om_leader ; }; then
     OUTPUT_NAME="$COMPOSE_ENV_NAME"
     stop_docker_env
     return 1
@@ -135,10 +169,19 @@ execute_robot_test(){
     OUTPUT_FILE="robot-${OUTPUT_NAME}-${i}.xml"
   done
 
+  SMOKETEST_DIR_INSIDE="${OZONE_DIR:-/opt/hadoop}/smoketest"
+
   OUTPUT_PATH="$RESULT_DIR_INSIDE/${OUTPUT_FILE}"
   # shellcheck disable=SC2068
   docker-compose exec -T "$CONTAINER" mkdir -p "$RESULT_DIR_INSIDE" \
-    && docker-compose exec -T "$CONTAINER" robot -v OM_SERVICE_ID:"${OM_SERVICE_ID}" -v SECURITY_ENABLED:"${SECURITY_ENABLED}" -v OM_HA_PARAM:"${OM_HA_PARAM}" -v KEY_NAME:"${OZONE_BUCKET_KEY_NAME}" ${ARGUMENTS[@]} --log NONE --report NONE "${OZONE_ROBOT_OPTS[@]}" --output "$OUTPUT_PATH" "$SMOKETEST_DIR_INSIDE/$TEST"
+    && docker-compose exec -T "$CONTAINER" robot \
+      -v KEY_NAME:"${OZONE_BUCKET_KEY_NAME}" \
+      -v OM_HA_PARAM:"${OM_HA_PARAM}" \
+      -v OM_SERVICE_ID:"${OM_SERVICE_ID:-om}" \
+      -v OZONE_DIR:"${OZONE_DIR}" \
+      -v SECURITY_ENABLED:"${SECURITY_ENABLED}" \
+      ${ARGUMENTS[@]} --log NONE --report NONE "${OZONE_ROBOT_OPTS[@]}" --output "$OUTPUT_PATH" \
+      "$SMOKETEST_DIR_INSIDE/$TEST"
   local -i rc=$?
 
   FULL_CONTAINER_NAME=$(docker-compose ps | grep "_${CONTAINER}_" | head -n 1 | awk '{print $1}')
@@ -240,12 +283,14 @@ cleanup_docker_images() {
 
 ## @description  Generate robot framework reports based on the saved results.
 generate_report(){
+  local title="${1:-${COMPOSE_ENV_NAME}}"
+  local dir="${2:-${RESULT_DIR}}"
 
   if command -v rebot > /dev/null 2>&1; then
      #Generate the combined output and return with the right exit code (note: robot = execute test, rebot = generate output)
-     rebot -d "$RESULT_DIR" "$RESULT_DIR/robot-*.xml"
+     rebot --reporttitle "${title}" -N "${title}" -d "${dir}" "${dir}/*.xml"
   else
-     echo "Robot framework is not installed, the reports can be generated (sudo pip install robotframework)."
+     echo "Robot framework is not installed, the reports cannot be generated (sudo pip install robotframework)."
      exit 1
   fi
 }
@@ -258,7 +303,7 @@ copy_results() {
   local result_dir="${test_dir}/result"
   local test_dir_name=$(basename ${test_dir})
   if [[ -n "$(find "${result_dir}" -name "*.xml")" ]]; then
-    rebot --nostatusrc -N "${test_dir_name}" -o "${all_result_dir}/${test_dir_name}.xml" "${result_dir}/*.xml"
+    rebot --nostatusrc -N "${test_dir_name}" -l NONE -r NONE -o "${all_result_dir}/${test_dir_name}.xml" "${result_dir}/*.xml"
   fi
 
   cp "${result_dir}"/docker-*.log "${all_result_dir}"/
@@ -284,4 +329,64 @@ run_test_script() {
   cd - > /dev/null
 
   return ${ret}
+}
+
+## @description Make `OZONE_VOLUME_OWNER` the owner of the `OZONE_VOLUME`
+##   directory tree (required in Github Actions runner environment)
+fix_data_dir_permissions() {
+  if [[ -n "${OZONE_VOLUME}" ]] && [[ -n "${OZONE_VOLUME_OWNER}" ]]; then
+    current_user=$(whoami)
+    if [[ "${OZONE_VOLUME_OWNER}" != "${current_user}" ]]; then
+      chown -R "${OZONE_VOLUME_OWNER}" "${OZONE_VOLUME}" \
+        || sudo chown -R "${OZONE_VOLUME_OWNER}" "${OZONE_VOLUME}"
+    fi
+  fi
+}
+
+## @description Define variables required for using Ozone docker image which
+##   includes binaries for a specific release
+## @param `ozone` image version
+prepare_for_binary_image() {
+  local v=$1
+
+  export OZONE_DIR=/opt/ozone
+  export OZONE_IMAGE="apache/ozone:${v}"
+}
+
+## @description Define variables required for using `ozone-runner` docker image
+##   (no binaries included)
+## @param `ozone-runner` image version (optional)
+prepare_for_runner_image() {
+  local default_version=${docker.ozone-runner.version} # set at build-time from Maven property
+  local runner_version=${OZONE_RUNNER_VERSION:-${default_version}} # may be specified by user running the test
+  local v=${1:-${runner_version}} # prefer explicit argument
+
+  export OZONE_DIR=/opt/hadoop
+  export OZONE_IMAGE="apache/ozone-runner:${v}"
+}
+
+## @description Print the logical version for a specific release
+## @param the release for which logical version should be printed
+get_logical_version() {
+  local v="$1"
+
+  # shellcheck source=/dev/null
+  echo $(source "${_testlib_dir}/versions/${v}.sh" && ozone_logical_version)
+}
+
+## @description Activate the version-specific behavior for a given release
+## @param the release for which definitions should be loaded
+load_version_specifics() {
+  local v="$1"
+
+  # shellcheck source=/dev/null
+  source "${_testlib_dir}/versions/${v}.sh"
+
+  ozone_version_load
+}
+
+## @description Deactivate the previously version-specific behavior,
+##   reverting to the current version's definitions
+unload_version_specifics() {
+  ozone_version_unload
 }

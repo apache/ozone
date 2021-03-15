@@ -156,6 +156,14 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     private long quotaInBytes;
     private long quotaInNamespace;
 
+    /**
+     * Constructs a builder.
+     */
+    public Builder() {
+      quotaInBytes = OzoneConsts.QUOTA_RESET;
+      quotaInNamespace = OzoneConsts.QUOTA_RESET;
+    }
+
     public Builder setVolumeName(String volume) {
       this.volumeName = volume;
       return this;

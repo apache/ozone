@@ -199,6 +199,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
     lastUsed = Instant.ofEpochMilli(Time.now());
   }
 
+  @JsonIgnore
   public HddsProtos.ContainerInfoProto getProtobuf() {
     HddsProtos.ContainerInfoProto.Builder builder =
         HddsProtos.ContainerInfoProto.newBuilder();

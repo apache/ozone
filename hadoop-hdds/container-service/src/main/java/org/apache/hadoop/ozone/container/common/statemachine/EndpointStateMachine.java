@@ -102,7 +102,7 @@ public class EndpointStateMachine
   }
 
   /**
-   * Sets the Version reponse we recieved from the SCM.
+   * Sets the Version response we received from the SCM.
    *
    * @param version VersionResponse
    */
@@ -115,6 +115,7 @@ public class EndpointStateMachine
    *
    * @return - getState.
    */
+  @Override
   public EndPointStates getState() {
     return state;
   }
@@ -171,6 +172,7 @@ public class EndpointStateMachine
    *
    * @return int
    */
+  @Override
   public long getMissedCount() {
     return this.missedCount.get();
   }
@@ -208,6 +210,7 @@ public class EndpointStateMachine
    *
    * @return - String
    */
+  @Override
   public String toString() {
     return address.toString();
   }
@@ -327,6 +330,7 @@ public class EndpointStateMachine
     }
   }
 
+  @Override
   public long getLastSuccessfulHeartbeat() {
     return lastSuccessfulHeartbeat == null ?
         0 :

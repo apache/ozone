@@ -109,19 +109,26 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
     CompletableFuture<Path> tempTarFile = downloader
         .getContainerDataFromReplicas(containerID,
             sourceDatanodes);
-
-    try {
-      //wait for the download. This thread pool is limiting the paralell
-      //downloads, so it's ok to block here and wait for the full download.
-      Path path = tempTarFile.get();
-      LOG.info("Container {} is downloaded, starting to import.",
-          containerID);
-      importContainer(containerID, path);
-      LOG.info("Container {} is replicated successfully", containerID);
-      task.setStatus(Status.DONE);
-    } catch (Exception e) {
-      LOG.error("Container {} replication was unsuccessful.", containerID, e);
+    if (tempTarFile == null) {
       task.setStatus(Status.FAILED);
+    } else {
+      try {
+        // Wait for the download. This thread pool is limiting the parallel
+        // downloads, so it's ok to block here and wait for the full download.
+        Path path = tempTarFile.get();
+        long bytes = Files.size(path);
+
+        LOG.info("Container {} is downloaded with size {}, starting to import.",
+                containerID, bytes);
+        task.setTransferredBytes(bytes);
+
+        importContainer(containerID, path);
+        LOG.info("Container {} is replicated successfully", containerID);
+        task.setStatus(Status.DONE);
+      } catch (Exception e) {
+        LOG.error("Container {} replication was unsuccessful.", containerID, e);
+        task.setStatus(Status.FAILED);
+      }
     }
   }
 }

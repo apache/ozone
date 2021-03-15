@@ -33,6 +33,8 @@ import java.util.concurrent.TimeUnit;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ipc.ProtobufRpcEngine.Server;
@@ -52,8 +54,10 @@ import com.google.common.base.Strings;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.ServiceException;
 import org.apache.ratis.RaftConfigKeys;
+import org.apache.ratis.conf.Parameters;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.grpc.GrpcConfigKeys;
+import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.netty.NettyConfigKeys;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.exceptions.LeaderNotReadyException;
@@ -148,11 +152,17 @@ public final class OzoneManagerRatisServer {
   private RaftClientRequest createWriteRaftClientRequest(OMRequest omRequest) {
     Preconditions.checkArgument(Server.getClientId() != DUMMY_CLIENT_ID);
     Preconditions.checkArgument(Server.getCallId() != INVALID_CALL_ID);
-    return new RaftClientRequest(
-        ClientId.valueOf(UUID.nameUUIDFromBytes(Server.getClientId())),
-        server.getId(), raftGroupId, Server.getCallId(),
-        Message.valueOf(OMRatisHelper.convertRequestToByteString(omRequest)),
-        RaftClientRequest.writeRequestType(), null);
+    return RaftClientRequest.newBuilder()
+        .setClientId(
+            ClientId.valueOf(UUID.nameUUIDFromBytes(Server.getClientId())))
+        .setServerId(server.getId())
+        .setGroupId(raftGroupId)
+        .setCallId(Server.getCallId())
+        .setMessage(
+            Message.valueOf(
+                OMRatisHelper.convertRequestToByteString(omRequest)))
+        .setType(RaftClientRequest.writeRequestType())
+        .build();
   }
 
   /**
@@ -252,10 +262,12 @@ public final class OzoneManagerRatisServer {
    * @param raftPeers peer nodes in the raft ring
    * @throws IOException
    */
+  @SuppressWarnings({"parameternumber", "java:S107"})
   private OzoneManagerRatisServer(ConfigurationSource conf,
       OzoneManager om,
       String raftGroupIdStr, RaftPeerId localRaftPeerId,
-      InetSocketAddress addr, List<RaftPeer> raftPeers)
+      InetSocketAddress addr, List<RaftPeer> raftPeers,
+      SecurityConfig secConfig, CertificateClient certClient)
       throws IOException {
     this.ozoneManager = om;
     this.omRatisAddress = addr;
@@ -276,10 +288,12 @@ public final class OzoneManagerRatisServer {
 
     this.omStateMachine = getStateMachine(conf);
 
+    Parameters parameters = createServerTlsParameters(secConfig, certClient);
     this.server = RaftServer.newBuilder()
         .setServerId(this.raftPeerId)
         .setGroup(this.raftGroup)
         .setProperties(serverProperties)
+        .setParameters(parameters)
         .setStateMachine(omStateMachine)
         .build();
   }
@@ -289,7 +303,8 @@ public final class OzoneManagerRatisServer {
    */
   public static OzoneManagerRatisServer newOMRatisServer(
       ConfigurationSource ozoneConf, OzoneManager omProtocol,
-      OMNodeDetails omNodeDetails, List<OMNodeDetails> peerNodes)
+      OMNodeDetails omNodeDetails, List<OMNodeDetails> peerNodes,
+      SecurityConfig secConfig, CertificateClient certClient)
       throws IOException {
 
     // RaftGroupId is the omServiceId
@@ -333,7 +348,7 @@ public final class OzoneManagerRatisServer {
     }
 
     return new OzoneManagerRatisServer(ozoneConf, omProtocol, omServiceId,
-        localRaftPeerId, ratisAddr, raftPeers);
+        localRaftPeerId, ratisAddr, raftPeers, secConfig, certClient);
   }
 
   public RaftGroup getRaftGroup() {
@@ -405,6 +420,8 @@ public final class OzoneManagerRatisServer {
     String storageDir = OzoneManagerRatisServer.getOMRatisDirectory(conf);
     RaftServerConfigKeys.setStorageDir(properties,
         Collections.singletonList(new File(storageDir)));
+    // Disable the pre vote feature in Ratis
+    RaftServerConfigKeys.LeaderElection.setPreVote(properties, false);
 
     // Set RAFT segment size
     final int raftSegmentSize = (int) conf.getStorageSize(
@@ -481,7 +498,7 @@ public final class OzoneManagerRatisServer {
     long serverMaxTimeoutDuration =
         serverMinTimeout.toLong(TimeUnit.MILLISECONDS) + 200;
     final TimeDuration serverMaxTimeout = TimeDuration.valueOf(
-        serverMaxTimeoutDuration, serverMinTimeoutUnit);
+        serverMaxTimeoutDuration, TimeUnit.MILLISECONDS);
     RaftServerConfigKeys.Rpc.setTimeoutMin(properties,
         serverMinTimeout);
     RaftServerConfigKeys.Rpc.setTimeoutMax(properties,
@@ -491,23 +508,6 @@ public final class OzoneManagerRatisServer {
     RaftServerConfigKeys.Log.setSegmentCacheNumMax(properties, 2);
 
     // TODO: set max write buffer size
-
-    // Set the ratis leader election timeout
-    TimeUnit leaderElectionMinTimeoutUnit =
-        OMConfigKeys.OZONE_OM_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_DEFAULT
-            .getUnit();
-    long leaderElectionMinTimeoutduration = conf.getTimeDuration(
-        OMConfigKeys.OZONE_OM_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY,
-        OMConfigKeys.OZONE_OM_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_DEFAULT
-            .getDuration(), leaderElectionMinTimeoutUnit);
-    final TimeDuration leaderElectionMinTimeout = TimeDuration.valueOf(
-        leaderElectionMinTimeoutduration, leaderElectionMinTimeoutUnit);
-    RaftServerConfigKeys.Rpc.setTimeoutMin(properties,
-        leaderElectionMinTimeout);
-    long leaderElectionMaxTimeout = leaderElectionMinTimeout.toLong(
-        TimeUnit.MILLISECONDS) + 200;
-    RaftServerConfigKeys.Rpc.setTimeoutMax(properties,
-        TimeDuration.valueOf(leaderElectionMaxTimeout, TimeUnit.MILLISECONDS));
 
     TimeUnit nodeFailureTimeoutUnit =
         OMConfigKeys.OZONE_OM_RATIS_SERVER_FAILURE_TIMEOUT_DURATION_DEFAULT
@@ -645,4 +645,22 @@ public final class OzoneManagerRatisServer {
   public RaftGroupId getRaftGroupId() {
     return raftGroupId;
   }
+
+  private static Parameters createServerTlsParameters(SecurityConfig conf,
+      CertificateClient caClient) {
+    Parameters parameters = new Parameters();
+
+    if (conf.isSecurityEnabled() && conf.isGrpcTlsEnabled()) {
+      GrpcTlsConfig config = new GrpcTlsConfig(
+          caClient.getPrivateKey(), caClient.getCertificate(),
+          caClient.getCACertificate(), true);
+      GrpcConfigKeys.Server.setTlsConf(parameters, config);
+      GrpcConfigKeys.Admin.setTlsConf(parameters, config);
+      GrpcConfigKeys.Client.setTlsConf(parameters, config);
+      GrpcConfigKeys.TLS.setConf(parameters, config);
+    }
+
+    return parameters;
+  }
+
 }
