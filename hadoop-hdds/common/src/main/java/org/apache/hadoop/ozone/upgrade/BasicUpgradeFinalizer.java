@@ -164,6 +164,8 @@ public class BasicUpgradeFinalizer<T, V extends AbstractLayoutVersionManager>
     if (!success) {
       LOG.error("Unable to finalize after waiting for {} seconds",
           maxTimeToWaitInSeconds);
+    } else {
+      updateLayoutVersionInDB(versionManager, component);
     }
   }
 
@@ -343,5 +345,9 @@ public class BasicUpgradeFinalizer<T, V extends AbstractLayoutVersionManager>
       throws UpgradeException {
     LOG.error(msg, e);
     throw new UpgradeException(msg, e, resultCode);
+  }
+
+  protected void updateLayoutVersionInDB(V vm, T comp) throws IOException {
+    throw new UnsupportedOperationException();
   }
 }

@@ -43,7 +43,6 @@ import org.apache.hadoop.ozone.om.request.file.OMFileCreateRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyCreateRequest;
 import org.apache.hadoop.ozone.om.response.file.OMFileCreateResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyCreateResponse;
-import org.apache.hadoop.ozone.om.response.upgrade.OMFinalizeUpgradeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateFileRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
@@ -158,9 +157,7 @@ public class TestCleanupTableInfo {
             Arrays.stream(cleanupTables).allMatch(tables::contains)
         );
       } else {
-        if (aClass != OMFinalizeUpgradeResponse.class) {
-          assertTrue(cleanupAll);
-        }
+        assertTrue(cleanupAll);
       }
     });
   }

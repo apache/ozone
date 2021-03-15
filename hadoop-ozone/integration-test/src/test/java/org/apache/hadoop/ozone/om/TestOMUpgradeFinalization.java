@@ -146,11 +146,11 @@ public class TestOMUpgradeFinalization {
 
     waitForFinalization(omClient);
 
-    String lvString = ozoneManager.getMetadataManager().getMetaTable()
-        .get(LAYOUT_VERSION_KEY);
-    assertNotNull(lvString);
-    assertEquals(maxLayoutVersion(),
-        Integer.parseInt(lvString));
+    LambdaTestUtils.await(30000, 3000, () -> {
+      String lvString = ozoneManager.getMetadataManager().getMetaTable()
+          .get(LAYOUT_VERSION_KEY);
+      return maxLayoutVersion() == Integer.parseInt(lvString);
+    });
   }
 
   @Test
@@ -164,6 +164,8 @@ public class TestOMUpgradeFinalization {
     Assert.assertEquals(runningOms.remove(shutdownOMIndex), downedOM);
 
     OzoneManagerProtocol omClient = clientProtocol.getOzoneManagerClient();
+    // Have to do a "prepare" operation to get rid of the logs in the active
+    // OMs.
     long prepareIndex = omClient.prepareOzoneManager(120L, 5L);
     assertClusterPrepared(prepareIndex, runningOms);
 
@@ -206,8 +208,6 @@ public class TestOMUpgradeFinalization {
   private void assertClusterPrepared(
       long preparedIndex, List<OzoneManager> ozoneManagers) throws Exception {
     for (OzoneManager om : ozoneManagers) {
-      // Wait for each OM to be running and transaction info to match to know
-      // it is prepared.
       LambdaTestUtils.await(120000,
           1000, () -> {
             if (!om.isRunning()) {

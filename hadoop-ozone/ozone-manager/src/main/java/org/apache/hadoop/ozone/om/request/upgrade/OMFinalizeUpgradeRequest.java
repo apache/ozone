@@ -17,10 +17,14 @@
 
 package org.apache.hadoop.ozone.om.request.upgrade;
 
+import static org.apache.hadoop.ozone.OzoneConsts.LAYOUT_VERSION_KEY;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.FinalizeUpgrade;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos
     .UpgradeFinalizationStatus;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
@@ -36,6 +40,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+
+import com.google.common.base.Optional;
 
 /**
  * Handles finalizeUpgrade request.
@@ -74,18 +80,28 @@ public class OMFinalizeUpgradeRequest extends OMClientRequest {
               .setStatus(protoStatus)
               .build();
 
+      OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+      int lV = ozoneManager.getVersionManager().getMetadataLayoutVersion();
+      omMetadataManager.getMetaTable().addCacheEntry(
+          new CacheKey<>(LAYOUT_VERSION_KEY),
+          new CacheValue<>(Optional.of(String.valueOf(lV)),
+              transactionLogIndex));
+
       FinalizeUpgradeResponse omResponse =
           FinalizeUpgradeResponse.newBuilder()
               .setStatus(responseStatus)
               .build();
       responseBuilder.setFinalizeUpgradeResponse(omResponse);
-      response = new OMFinalizeUpgradeResponse(responseBuilder.build());
+      response = new OMFinalizeUpgradeResponse(responseBuilder.build(),
+          ozoneManager.getVersionManager().getMetadataLayoutVersion());
       LOG.trace("Returning response: {}", response);
     } catch (IOException e) {
       response = new OMFinalizeUpgradeResponse(
-          createErrorOMResponse(responseBuilder, e));
+          createErrorOMResponse(responseBuilder, e), -1);
+    } finally {
+      addResponseToDoubleBuffer(transactionLogIndex, response,
+          ozoneManagerDoubleBufferHelper);
     }
-
     return response;
   }
 

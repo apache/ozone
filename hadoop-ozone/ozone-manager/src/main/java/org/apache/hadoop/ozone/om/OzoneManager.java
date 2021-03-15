@@ -560,9 +560,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         LOG.info("New OM snapshot received with higher layout version {}. " +
             "Attempting to finalize current OM to that version.",
             layoutVersionInDB);
+        long timeout = configuration.getTimeDuration(
+            OMConfigKeys.OZONE_OM_RATIS_BASED_FINALIZATION_TIMEOUT,
+            OMConfigKeys.OZONE_OM_RATIS_BASED_FINALIZATION_TIMEOUT_DEFAULT
+                .getDuration(),
+            TimeUnit.SECONDS);
         upgradeFinalizer.finalizeAndWaitForCompletion(
             "om-ratis-snapshot", this,
-            TimeUnit.SECONDS.toSeconds(10));
+            TimeUnit.SECONDS.toSeconds(timeout));
         if (versionManager.getMetadataLayoutVersion() < layoutVersionInDB) {
           throw new IOException("Unable to finalize OM to the desired layout " +
               "version " + layoutVersionInDB + " present in the snapshot DB.");
