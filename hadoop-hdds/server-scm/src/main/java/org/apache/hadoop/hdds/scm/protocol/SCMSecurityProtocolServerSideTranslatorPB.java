@@ -111,6 +111,12 @@ public class SCMSecurityProtocolServerSideTranslatorPB
       case GetSCMCertificate:
         return scmSecurityResponse.setGetCertResponseProto(getSCMCertificate(
             request.getGetSCMCertificateRequest())).build();
+      case GetRootCACertificate:
+        return scmSecurityResponse.setGetCertResponseProto(
+            getRootCACertificate()).build();
+      case ListCACertificate:
+        return scmSecurityResponse.setListCertificateResponseProto(
+            listCACertificate()).build();
       default:
         throw new IllegalArgumentException(
             "Unknown request type: " + request.getCmdType());
@@ -257,4 +263,32 @@ public class SCMSecurityProtocolServerSideTranslatorPB
 
 
   }
+
+
+  public SCMGetCertResponseProto getRootCACertificate() throws IOException {
+    String rootCACertificate = impl.getRootCACertificate();
+    SCMGetCertResponseProto.Builder builder =
+        SCMGetCertResponseProto
+            .newBuilder()
+            .setResponseCode(ResponseCode.success)
+            .setX509RootCACertificate(rootCACertificate);
+    return builder.build();
+  }
+
+  public SCMListCertificateResponseProto listCACertificate()
+      throws IOException {
+
+    List<String> certs = impl.listCACertificate();
+
+    SCMListCertificateResponseProto.Builder builder =
+        SCMListCertificateResponseProto
+            .newBuilder()
+            .setResponseCode(SCMListCertificateResponseProto
+                .ResponseCode.success)
+            .addAllCertificates(certs);
+    return builder.build();
+
+  }
+
+
 }
