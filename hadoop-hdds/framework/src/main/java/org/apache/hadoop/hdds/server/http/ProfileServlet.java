@@ -187,10 +187,13 @@ public class ProfileServlet extends HttpServlet {
   @VisibleForTesting
   protected static String generateFileName(Integer pid, Output output,
       Event event) {
+    String outputFormat = output.name().toLowerCase();
+    if(output == Output.FLAMEGRAPH) {
+      outputFormat = "html";
+    }
     return FILE_PREFIX + pid + "-" +
         event.name().toLowerCase() + "-" + ID_GEN.incrementAndGet()
-        + "." +
-        output.name().toLowerCase();
+        + "." + outputFormat;
   }
 
   @VisibleForTesting
@@ -516,7 +519,7 @@ public class ProfileServlet extends HttpServlet {
     SVG,
     TREE,
     JFR,
-    HTML
+    FLAMEGRAPH
   }
 
 }
