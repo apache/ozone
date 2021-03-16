@@ -56,35 +56,41 @@ set_downgrade_om_args() {
 }
 
 echo "--- SETTING UP OLD VERSION $OZONE_UPGRADE_FROM ---"
+OUTPUT_NAME="$OZONE_UPGRADE_FROM"
 callback setup
-
 export OM_HA_ARGS='--'
 prepare_for_image "$OZONE_UPGRADE_FROM"
-start_docker_env
+
 echo "--- RUNNING WITH OLD VERSION $OZONE_UPGRADE_FROM ---"
+start_docker_env
 callback with_old_version
 prepare_oms
 
 prepare_for_image "$OZONE_UPGRADE_TO"
 export OM_HA_ARGS='--upgrade'
 restart_docker_env
+
 echo "--- RUNNING WITH NEW VERSION $OZONE_UPGRADE_TO PRE-FINALIZED ---"
+OUTPUT_NAME="$OZONE_UPGRADE_TO"-pre-finalized
 callback with_new_version_pre_finalized
 prepare_oms
 
 prepare_for_image "$OZONE_UPGRADE_FROM"
 set_downgrade_om_args
 restart_docker_env
+
 echo "--- RUNNING WITH OLD VERSION $OZONE_UPGRADE_FROM AFTER DOWNGRADE ---"
+OUTPUT_NAME="$OZONE_UPGRADE_FROM"-downgraded
 callback with_old_version_downgraded
 prepare_oms
 
 prepare_for_image "$OZONE_UPGRADE_TO"
 export OM_HA_ARGS='--upgrade'
 restart_docker_env
-execute_robot_test scm upgrade/finalize.robot
+
 echo "--- RUNNING WITH NEW VERSION $OZONE_UPGRADE_TO FINALIZED ---"
+OUTPUT_NAME="$OZONE_UPGRADE_TO"-finalized
+execute_robot_test scm upgrade/finalize.robot
 callback with_new_version_finalized
 
-stop_docker_env
 generate_report

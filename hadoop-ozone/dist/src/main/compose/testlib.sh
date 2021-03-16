@@ -140,15 +140,15 @@ start_docker_env(){
   if ! { docker-compose --no-ansi up -d --scale datanode="${datanode_count}" \
       && wait_for_safemode_exit \
       && wait_for_om_leader ; }; then
-    OUTPUT_NAME="$COMPOSE_ENV_NAME"
+    [[ -n "$OUTPUT_NAME" ]] || OUTPUT_NAME="$COMPOSE_ENV_NAME"
     stop_docker_env
     return 1
   fi
 }
 
 restart_docker_env() {
-  OZONE_KEEP_RESULTS=true stop_docker_env
-  start_docker_env
+  stop_docker_env
+  OZONE_KEEP_RESULTS=true start_docker_env
 }
 
 ## @description  Execute robot tests in a specific container.
@@ -164,7 +164,7 @@ execute_robot_test(){
   TEST_NAME=$(basename "$TEST")
   TEST_NAME="$(basename "$COMPOSE_DIR")-${TEST_NAME%.*}"
   set +e
-  OUTPUT_NAME="$COMPOSE_ENV_NAME-$TEST_NAME-$CONTAINER"
+  [[ -n "$OUTPUT_NAME" ]] || OUTPUT_NAME="$COMPOSE_ENV_NAME-$TEST_NAME-$CONTAINER"
 
   # find unique filename
   declare -i i=0
@@ -362,7 +362,7 @@ prepare_for_binary_image() {
 ##   (no binaries included)
 ## @param `ozone-runner` image version (optional)
 prepare_for_runner_image() {
-  local default_version=${docker.ozone-runner.version} # set at build-time from Maven property
+  local default_version=20210226-1 # set at build-time from Maven property
   local runner_version=${OZONE_RUNNER_VERSION:-${default_version}} # may be specified by user running the test
   local v=${1:-${runner_version}} # prefer explicit argument
 

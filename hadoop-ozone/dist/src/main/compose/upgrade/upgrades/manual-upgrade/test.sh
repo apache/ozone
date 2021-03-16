@@ -33,20 +33,23 @@ set +u
 source "$TEST_DIR"/testlib.sh
 source "$OZONE_UPGRADE_CALLBACK"
 
-prepare_for_image "$OZONE_UPGRADE_FROM"
 echo "--- SETTING UP OLD VERSION $OZONE_UPGRADE_FROM ---"
+OUTPUT_NAME="$OZONE_UPGRADE_FROM"
+prepare_for_image "$OZONE_UPGRADE_FROM"
 callback setup_old_version
-start_docker_env
-echo "--- RUNNING WITH OLD VERSION $OZONE_UPGRADE_FROM ---"
-callback with_old_version
 
+echo "--- RUNNING WITH OLD VERSION $OZONE_UPGRADE_FROM ---"
+start_docker_env
+callback with_old_version
 stop_docker_env
+
 echo "--- SETTING UP NEW VERSION $OZONE_UPGRADE_TO ---"
+OUTPUT_NAME="$OZONE_UPGRADE_TO"
+prepare_for_image "$OZONE_UPGRADE_TO"
 callback setup_new_version
 
-prepare_for_image "$OZONE_UPGRADE_TO"
-OZONE_KEEP_RESULTS=true start_docker_env
 echo "--- RUNNING WITH NEW VERSION $OZONE_UPGRADE_TO ---"
+OZONE_KEEP_RESULTS=true start_docker_env
 callback with_new_version
 
 stop_docker_env
