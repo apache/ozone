@@ -75,16 +75,16 @@ import org.slf4j.LoggerFactory;
  * //  --ttsp            time-to-safepoint profiling
  * Example:
  * - To collect 30 second CPU profile of current process (returns FlameGraph
- * html)
+ * svg)
  * curl "http://localhost:10002/prof"
  * - To collect 1 minute CPU profile of current process and output in tree
  * format (html)
  * curl "http://localhost:10002/prof?output=tree&duration=60"
  * - To collect 30 second heap allocation profile of current process (returns
- * FlameGraph html)
+ * FlameGraph svg)
  * curl "http://localhost:10002/prof?event=alloc"
  * - To collect lock contention profile of current process (returns
- * FlameGraph html)
+ * FlameGraph svg)
  * curl "http://localhost:10002/prof?event=lock"
  * Following event types are supported (default is 'cpu') (NOTE: not all
  * OS'es support all events)
@@ -379,7 +379,9 @@ public class ProfileServlet extends HttpServlet {
               + "ready..");
     } else {
       if (safeFileName.endsWith(".html")) {
-        resp.setContentType("image/html+xml");
+        resp.setContentType("text/html");
+      } else if (safeFileName.endsWith(".svg")) {
+        resp.setContentType("image/svg+xml");
       } else if (safeFileName.endsWith(".tree")) {
         resp.setContentType("text/html");
       }
@@ -442,10 +444,10 @@ public class ProfileServlet extends HttpServlet {
       try {
         return Output.valueOf(outputArg.trim().toUpperCase());
       } catch (IllegalArgumentException e) {
-        return Output.HTML;
+        return Output.SVG;
       }
     }
-    return Output.HTML;
+    return Output.SVG;
   }
 
   private void setResponseHeader(final HttpServletResponse response) {
@@ -511,6 +513,7 @@ public class ProfileServlet extends HttpServlet {
     TRACES,
     FLAT,
     COLLAPSED,
+    SVG,
     TREE,
     JFR,
     HTML

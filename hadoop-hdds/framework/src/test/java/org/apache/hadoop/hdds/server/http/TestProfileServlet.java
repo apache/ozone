@@ -33,7 +33,8 @@ public class TestProfileServlet {
   public void testNameValidation() throws IOException {
     ProfileServlet.validateFileName(
         ProfileServlet.generateFileName(1, Output.HTML, Event.ALLOC));
-
+    ProfileServlet.validateFileName(
+            ProfileServlet.generateFileName(1, Output.SVG, Event.ALLOC));
     ProfileServlet.validateFileName(
         ProfileServlet.generateFileName(23, Output.COLLAPSED,
             Event.L1_DCACHE_LOAD_MISSES));
@@ -44,12 +45,17 @@ public class TestProfileServlet {
     ProfileServlet.validateFileName(
         "test\n" + ProfileServlet.generateFileName(1, Output.HTML,
             Event.ALLOC));
+    ProfileServlet.validateFileName(
+            "test\n" + ProfileServlet.generateFileName(1, Output.SVG,
+            Event.ALLOC));
   }
 
   @Test(expected = IllegalArgumentException.class)
   public void testNameValidationWithSlash() throws IOException {
     ProfileServlet.validateFileName(
         "../" + ProfileServlet.generateFileName(1, Output.HTML, Event.ALLOC));
+    ProfileServlet.validateFileName(
+        "../" + ProfileServlet.generateFileName(1, Output.SVG, Event.ALLOC));
   }
 
 }
