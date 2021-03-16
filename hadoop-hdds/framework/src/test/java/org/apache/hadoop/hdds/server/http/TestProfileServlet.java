@@ -42,7 +42,8 @@ public class TestProfileServlet {
   @Test(expected = IllegalArgumentException.class)
   public void testNameValidationWithNewLine() throws IOException {
     ProfileServlet.validateFileName(
-        "test\n" + ProfileServlet.generateFileName(1, Output.HTML, Event.ALLOC));
+        "test\n" + ProfileServlet.generateFileName(1, Output.HTML,
+            Event.ALLOC));
   }
 
   @Test(expected = IllegalArgumentException.class)
