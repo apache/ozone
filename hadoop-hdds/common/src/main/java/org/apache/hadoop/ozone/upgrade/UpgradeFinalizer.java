@@ -175,5 +175,6 @@ public interface UpgradeFinalizer<T> {
    * feature).
    * @throws IOException
    */
-  void runPrefinalizeStateActions(Storage storage) throws IOException;
+  void runPrefinalizeStateActions(Storage storage, T service)
+      throws IOException;
 }

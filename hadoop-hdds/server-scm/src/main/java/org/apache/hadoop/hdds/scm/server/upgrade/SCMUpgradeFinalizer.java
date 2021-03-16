@@ -18,9 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.server.upgrade;
 
-import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON_FIRST_UPGRADE_START;
 import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON_FINALIZE;
-import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.UNFINALIZED_STATE_VALIDATION;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_DONE;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_IN_PROGRESS;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_REQUIRED;
@@ -107,25 +105,10 @@ public class SCMUpgradeFinalizer extends
   }
 
   @Override
-  public void runPrefinalizeStateActions(Storage storage)
+  public void runPrefinalizeStateActions(Storage storage,
+                                         StorageContainerManager scm)
       throws IOException {
-    LOG.info("Running pre-finalized state validations for unfinalized " +
-        "layout features.");
-    for (HDDSLayoutFeature f : versionManager.unfinalizedFeatures()) {
-      Optional<? extends UpgradeAction> action =
-          f.scmAction(UNFINALIZED_STATE_VALIDATION);
-      if (action.isPresent()) {
-        runValidationAction(f, action.get());
-      }
-    }
-
-    LOG.info("Running first upgrade commands for unfinalized layout features.");
-    for (HDDSLayoutFeature f : versionManager.unfinalizedFeatures()) {
-      Optional<? extends UpgradeAction> action =
-          f.scmAction(ON_FIRST_UPGRADE_START);
-      if (action.isPresent()) {
-        runFirstUpgradeAction(f, action.get(), storage);
-      }
-    }
+    super.runPrefinalizeStateActions(
+        lf -> ((HDDSLayoutFeature) lf)::scmAction, storage, scm);
   }
 }

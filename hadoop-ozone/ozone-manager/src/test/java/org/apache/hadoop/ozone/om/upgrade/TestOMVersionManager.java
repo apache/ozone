@@ -20,23 +20,31 @@ package org.apache.hadoop.ozone.om.upgrade;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.INITIAL_VERSION;
+import static org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager.OM_REQUEST_CLASS_PACKAGE;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager.getRequestClasses;
+import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.UNFINALIZED_STATE_VALIDATION;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.HashSet;
+import java.util.Optional;
 import java.util.Set;
 
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
+import org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -75,13 +83,26 @@ public class TestOMVersionManager {
   }
 
   @Test
-  public void testOMLayoutFeatureCatalog() {
+  public void testOMLayoutFeatureCatalog() throws Exception {
     OMLayoutFeature[] values = OMLayoutFeature.values();
     int currVersion = Integer.MIN_VALUE;
+    OMLayoutFeature lastFeature = null;
     for (OMLayoutFeature lf : values) {
-      assertTrue(currVersion <= lf.layoutVersion());
+      assertTrue(currVersion < lf.layoutVersion());
       currVersion = lf.layoutVersion();
+      lastFeature = lf;
     }
+    for (UpgradeActionType type : UpgradeActionType.values()) {
+      lastFeature.addAction(type, arg -> {
+        String v = arg.getVersion();
+      });
+    }
+
+    OzoneManager omMock = mock(OzoneManager.class);
+    for (UpgradeActionType type : UpgradeActionType.values()) {
+      lastFeature.action(type).get().execute(omMock);
+    }
+    verify(omMock, times(UpgradeActionType.values().length)).getVersion();
   }
 
   @Test
@@ -89,7 +110,7 @@ public class TestOMVersionManager {
       throws InvocationTargetException, IllegalAccessException {
 
     Set<Class<? extends OMClientRequest>> requestClasses =
-        getRequestClasses();
+        getRequestClasses(OM_REQUEST_CLASS_PACKAGE);
     Set<String> requestTypes = new HashSet<>();
 
     for (Class<? extends OMClientRequest> requestClass : requestClasses) {
@@ -113,5 +134,27 @@ public class TestOMVersionManager {
             nsmEx.getMessage());
       }
     }
+  }
+
+  @Test
+  public void testOmUpgradeActionsRegistered() throws Exception {
+    OMLayoutVersionManager lvm = new OMLayoutVersionManager(); // MLV >= 0
+    lvm.registerUpgradeActions("org.apache.hadoop.ozone.om.upgrade.test");
+
+    // INITIAL_VERSION is finalized, hence should not register.
+    Optional<OmUpgradeAction> action =
+        INITIAL_VERSION.action(UNFINALIZED_STATE_VALIDATION);
+    Assert.assertFalse(action.isPresent());
+
+    lvm = mock(OMLayoutVersionManager.class);
+    when(lvm.getMetadataLayoutVersion()).thenReturn(-1);
+    doCallRealMethod().when(lvm).registerUpgradeActions(anyString());
+    lvm.registerUpgradeActions("org.apache.hadoop.ozone.om.upgrade.test");
+
+    action = INITIAL_VERSION.action(UNFINALIZED_STATE_VALIDATION);
+    Assert.assertTrue(action.isPresent());
+    OzoneManager omMock = mock(OzoneManager.class);
+    action.get().execute(omMock);
+    verify(omMock, times(1)).getVersion();
   }
 }

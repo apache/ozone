@@ -34,6 +34,8 @@ import org.reflections.util.ConfigurationBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.annotations.VisibleForTesting;
+
 /**
  * Class to manage layout versions and features for Storage Container Manager
  * and DataNodes.
@@ -44,10 +46,11 @@ public class HDDSLayoutVersionManager extends
 
   private static final Logger LOG =
       LoggerFactory.getLogger(HDDSLayoutVersionManager.class);
+  public static final String HDDS_CLASS_PACKAGE = "org.apache.hadoop.hdds";
 
   public HDDSLayoutVersionManager(int layoutVersion) throws IOException {
     init(layoutVersion, HDDSLayoutFeature.values());
-    registerUpgradeActions();
+    registerUpgradeActions(HDDS_CLASS_PACKAGE);
   }
 
   public static int maxLayoutVersion() {
@@ -58,9 +61,10 @@ public class HDDSLayoutVersionManager extends
   /**
    * Scan classpath and register all actions to layout features.
    */
-  private void registerUpgradeActions() {
+  @VisibleForTesting
+  void registerUpgradeActions(String packageName) {
     Reflections reflections = new Reflections(new ConfigurationBuilder()
-        .setUrls(ClasspathHelper.forPackage("org.apache.hadoop.hdds"))
+        .setUrls(ClasspathHelper.forPackage(packageName))
         .setScanners(new TypeAnnotationsScanner(), new SubTypesScanner())
         .useParallelExecutor());
     Set<Class<?>> typesAnnotatedWith =
@@ -73,13 +77,16 @@ public class HDDSLayoutVersionManager extends
           UpgradeActionHdds annotation =
               actionClass.getAnnotation(UpgradeActionHdds.class);
           HDDSLayoutFeature feature = annotation.feature();
-          if (feature.layoutVersion() > metadataLayoutVersion) {
+          if (feature.layoutVersion() > getMetadataLayoutVersion()) {
             LOG.info("Registering Upgrade Action : {}", action.name());
             if (annotation.component() == SCM) {
               feature.addScmAction(annotation.type(), action);
             } else {
               feature.addDatanodeAction(annotation.type(), action);
             }
+          } else {
+            LOG.info("Skipping Upgrade Action {} since it has been finalized" +
+                ".", action.name());
           }
         } catch (Exception e) {
           LOG.error("Cannot instantiate Upgrade Action class {}",
