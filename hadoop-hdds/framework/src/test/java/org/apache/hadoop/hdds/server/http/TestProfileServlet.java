@@ -32,7 +32,7 @@ public class TestProfileServlet {
   @Test
   public void testNameValidation() throws IOException {
     ProfileServlet.validateFileName(
-        ProfileServlet.generateFileName(1, Output.SVG, Event.ALLOC));
+        ProfileServlet.generateFileName(1, Output.HTML, Event.ALLOC));
 
     ProfileServlet.validateFileName(
         ProfileServlet.generateFileName(23, Output.COLLAPSED,
@@ -42,13 +42,13 @@ public class TestProfileServlet {
   @Test(expected = IllegalArgumentException.class)
   public void testNameValidationWithNewLine() throws IOException {
     ProfileServlet.validateFileName(
-        "test\n" + ProfileServlet.generateFileName(1, Output.SVG, Event.ALLOC));
+        "test\n" + ProfileServlet.generateFileName(1, Output.HTML, Event.ALLOC));
   }
 
   @Test(expected = IllegalArgumentException.class)
   public void testNameValidationWithSlash() throws IOException {
     ProfileServlet.validateFileName(
-        "../" + ProfileServlet.generateFileName(1, Output.SVG, Event.ALLOC));
+        "../" + ProfileServlet.generateFileName(1, Output.HTML, Event.ALLOC));
   }
 
 }
