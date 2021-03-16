@@ -287,7 +287,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private BucketManager bucketManager;
   private KeyManager keyManager;
   private PrefixManagerImpl prefixManager;
-  private UpgradeFinalizer upgradeFinalizer;
+  private UpgradeFinalizer<OzoneManager> upgradeFinalizer;
 
   private final OMMetrics metrics;
   private final ProtocolMessageMetrics<ProtocolMessageEnum>
@@ -1182,7 +1182,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     metadataManager.start(configuration);
     startSecretManagerIfNecessary();
 
-    upgradeFinalizer.runPrefinalizeStateActions(omStorage);
+    upgradeFinalizer.runPrefinalizeStateActions(omStorage, this);
 
     if (certClient != null) {
       caCertPem = CertificateCodec.getPEMEncodedString(

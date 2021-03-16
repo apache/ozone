@@ -837,7 +837,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     ms = HddsServerUtil
         .initializeMetrics(configuration, "StorageContainerManager");
 
-    upgradeFinalizer.runPrefinalizeStateActions(scmStorageConfig);
+    upgradeFinalizer.runPrefinalizeStateActions(scmStorageConfig, this);
 
     commandWatcherLeaseManager.start();
     getClientProtocolServer().start();

@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON
 import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.UNFINALIZED_STATE_VALIDATION;
 import static org.apache.hadoop.ozone.upgrade.TestUpgradeFinalizer.MockLayoutFeature.VERSION_2;
 import static org.apache.hadoop.ozone.upgrade.TestUpgradeFinalizer.MockLayoutFeature.VERSION_3;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -64,8 +65,10 @@ public class TestUpgradeFinalizer {
     MockComponent mockObj = mock(MockComponent.class);
 
     File file = folder.newFolder();
-    file.mkdirs();
-    Paths.get(file.toString(), "scm", "current").toFile().mkdirs();
+    assertTrue(file.mkdirs());
+    File scmCurrent = Paths.get(file.toString(), "scm", "current")
+        .toFile();
+    assertTrue(scmCurrent.mkdirs());
     Storage storage = newStorage(file);
     uF.runPrefinalizeStateActions(storage, mockObj);
 
@@ -95,8 +98,10 @@ public class TestUpgradeFinalizer {
     MockComponent mockObj = mock(MockComponent.class);
 
     File file = folder.newFolder();
-    file.mkdirs();
-    Paths.get(file.toString(), "scm", "current").toFile().mkdirs();
+    assertTrue(file.mkdirs());
+    File scmCurrent = Paths.get(file.toString(), "scm", "current")
+        .toFile();
+    assertTrue(scmCurrent.mkdirs());
     Storage storage = newStorage(file);
 
     LambdaTestUtils.intercept(UpgradeException.class,

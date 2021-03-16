@@ -250,7 +250,7 @@ public class DatanodeStateMachine implements Closeable {
     reportManager.init();
     initCommandHandlerThread(conf);
 
-    upgradeFinalizer.runPrefinalizeStateActions(layoutStorage);
+    upgradeFinalizer.runPrefinalizeStateActions(layoutStorage, this);
 
     // Start jvm monitor
     jvmPauseMonitor = new JvmPauseMonitor();
