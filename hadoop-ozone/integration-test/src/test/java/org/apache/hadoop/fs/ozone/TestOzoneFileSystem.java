@@ -133,7 +133,8 @@ public class TestOzoneFileSystem {
 
   private void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setInt(FS_TRASH_INTERVAL_KEY, 1);
+    conf.setInt(FS_TRASH_INTERVAL_KEY, 2);
+    conf.setInt(OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY, 1);
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
@@ -801,7 +802,8 @@ public class TestOzoneFileSystem {
     Assert.assertTrue(trash.getConf().getClass(
         "fs.trash.classname", TrashPolicy.class).
         isAssignableFrom(TrashPolicyOzone.class));
-    Assert.assertEquals(trash.getConf().getInt(FS_TRASH_INTERVAL_KEY, 0), 1);
+    Assert.assertEquals(1, trash.getConf().
+        getInt(OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY, 0));
     // Call moveToTrash. We can't call protected fs.rename() directly
     trash.moveToTrash(path);
 
