@@ -31,8 +31,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 
-import static org.apache.hadoop.hdds.utils.HAUtils.checkSecurityAndSCMHAEnabled;
-
 /**
  * This class is used to start/stop S3 compatible rest server.
  */
@@ -56,7 +54,6 @@ public class Gateway extends GenericCli {
     TracingUtil.initTracing("S3gateway", ozoneConfiguration);
     OzoneConfigurationHolder.setConfiguration(ozoneConfiguration);
     UserGroupInformation.setConfiguration(ozoneConfiguration);
-    checkSecurityAndSCMHAEnabled(ozoneConfiguration);
     httpServer = new S3GatewayHttpServer(ozoneConfiguration, "s3gateway");
     start();
     return null;

@@ -20,6 +20,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import com.google.protobuf.ServiceException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
@@ -313,10 +314,13 @@ public final class HAUtils {
   }
 
   public static void checkSecurityAndSCMHAEnabled(OzoneConfiguration conf) {
-    if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
+    boolean enable =
+        conf.getBoolean(ScmConfigKeys.OZONE_SCM_HA_SECURITY_ENABLE,
+            ScmConfigKeys.OZONE_SCM_HA_SECURITY_ENABLE_DEFAULT);
+    if (OzoneSecurityUtil.isSecurityEnabled(conf) && !enable) {
       List<SCMNodeInfo> scmNodeInfo = SCMNodeInfo.buildNodeInfo(conf);
       if (scmNodeInfo.size() > 1) {
-        System.out.println("Ozone Services cannot be started on a secure SCM " +
+        System.err.println("Ozone Services cannot be started on a secure SCM " +
             "HA enabled cluster");
         System.exit(1);
       }

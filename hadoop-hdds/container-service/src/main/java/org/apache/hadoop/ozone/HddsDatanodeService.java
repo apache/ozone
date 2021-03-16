@@ -159,7 +159,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
 
   @Override
   public Void call() throws Exception {
-    checkSecurityAndSCMHAEnabled(conf);
     if (printBanner) {
       StringUtils.startupShutdownMessage(HddsVersionInfo.HDDS_VERSION_INFO,
           HddsDatanodeService.class, args, LOG);
@@ -189,6 +188,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
 
   public void start(OzoneConfiguration configuration) {
     setConfiguration(configuration);
+    checkSecurityAndSCMHAEnabled(conf);
     start();
   }
 
