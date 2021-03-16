@@ -46,32 +46,43 @@ import org.slf4j.LoggerFactory;
  * Source: https://github.com/apache/hive/blob/master/common/src/java/org
  * /apache/hive/http/ProfileServlet.java
  * <p>
- * Following options from async-profiler can be specified as query paramater.
+ * Following options from async-profiler can be specified as query parameter.
  * //  -e event          profiling event: cpu|alloc|lock|cache-misses etc.
- * //  -d duration       run profiling for <duration> seconds (integer)
- * //  -i interval       sampling interval in nanoseconds (long)
- * //  -j jstackdepth    maximum Java stack depth (integer)
- * //  -b bufsize        frame buffer size (long)
+ * //  -d duration       run profiling for <duration> seconds
+ * //  -f filename       dump output to <filename>
+ * //  -i interval       sampling interval in nanoseconds
+ * //  -j jstackdepth    maximum Java stack depth
  * //  -t                profile different threads separately
  * //  -s                simple class names instead of FQN
- * //  -o fmt[,fmt...]   output format:
- * summary|traces|flat|collapsed|svg|tree|jfr
- * //  --width px        SVG width pixels (integer)
- * //  --height px       SVG frame height pixels (integer)
- * //  --minwidth px     skip frames smaller than px (double)
+ * //  -g                print method signatures
+ * //  -a                annotate Java method names
+ * //  -o fmt            output format: flat|traces|collapsed|flamegraph|tree|jfr
+ * //  -I include        output only stack traces containing the specified pattern
+ * //  -X exclude        exclude stack traces with the specified pattern
+ * //  -v, --version     display version string
+ * //  --title string    FlameGraph title
+ * //  --minwidth pct    skip frames smaller than pct%
  * //  --reverse         generate stack-reversed FlameGraph / Call tree
+ * //  --alloc bytes     allocation profiling interval in bytes
+ * //  --lock duration   lock profiling threshold in nanoseconds
+ * //  --total           accumulate the total value (time, bytes, etc.)
+ * //  --all-user        only include user-mode events
+ * //  --cstack mode     how to traverse C stack: fp|lbr|no
+ * //  --begin function  begin profiling when function is executed
+ * //  --end function    end profiling when function is executed
+ * //  --ttsp            time-to-safepoint profiling
  * Example:
  * - To collect 30 second CPU profile of current process (returns FlameGraph
- * svg)
+ * html)
  * curl "http://localhost:10002/prof"
  * - To collect 1 minute CPU profile of current process and output in tree
  * format (html)
  * curl "http://localhost:10002/prof?output=tree&duration=60"
  * - To collect 30 second heap allocation profile of current process (returns
- * FlameGraph svg)
+ * FlameGraph html)
  * curl "http://localhost:10002/prof?event=alloc"
  * - To collect lock contention profile of current process (returns
- * FlameGraph svg)
+ * FlameGraph html)
  * curl "http://localhost:10002/prof?event=lock"
  * Following event types are supported (default is 'cpu') (NOTE: not all
  * OS'es support all events)
@@ -365,8 +376,8 @@ public class ProfileServlet extends HttpServlet {
           "This page will auto-refresh every 2 second until output file is "
               + "ready..");
     } else {
-      if (safeFileName.endsWith(".svg")) {
-        resp.setContentType("image/svg+xml");
+      if (safeFileName.endsWith(".html")) {
+        resp.setContentType("image/html+xml");
       } else if (safeFileName.endsWith(".tree")) {
         resp.setContentType("text/html");
       }
@@ -429,10 +440,10 @@ public class ProfileServlet extends HttpServlet {
       try {
         return Output.valueOf(outputArg.trim().toUpperCase());
       } catch (IllegalArgumentException e) {
-        return Output.SVG;
+        return Output.HTML;
       }
     }
-    return Output.SVG;
+    return Output.HTML;
   }
 
   private void setResponseHeader(final HttpServletResponse response) {
@@ -498,9 +509,9 @@ public class ProfileServlet extends HttpServlet {
     TRACES,
     FLAT,
     COLLAPSED,
-    SVG,
     TREE,
-    JFR
+    JFR,
+    HTML
   }
 
 }
