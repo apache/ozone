@@ -159,7 +159,7 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
         new ArrayList<>(containerStateManager.getContainerIDs());
     Collections.sort(containersIds);
     return containersIds.stream()
-        .filter(id -> id.getId() > start).limit(count)
+        .filter(id -> id.getId() >= start).limit(count)
         .map(ContainerID::getProtobuf)
         .map(containerStateManager::getContainer)
         .collect(Collectors.toList());

@@ -362,7 +362,12 @@ public class SCMClientProtocolServer implements
     }
     try {
       final ContainerID containerId = ContainerID.valueOf(startContainerID);
-      return scm.getContainerManager().getContainers(containerId, count);
+      if(null == state) {
+        return scm.getContainerManager().getContainers(containerId, count);
+      }
+      return scm.getContainerManager().getContainers(state).stream()
+          .filter(info -> info.containerID().getId() >= startContainerID)
+          .sorted().limit(count).collect(Collectors.toList());
     } catch (Exception ex) {
       auditSuccess = false;
       AUDIT.logReadFailure(
