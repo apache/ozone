@@ -373,6 +373,13 @@ public class ContainerOperationClient implements ScmClient {
         startContainerID, count);
   }
 
+  @Override
+  public List<ContainerInfo> listContainer(long startContainerID,
+      int count, HddsProtos.LifeCycleState state) throws IOException {
+    return storageContainerLocationClient.listContainer(
+        startContainerID, count, state);
+  }
+
   /**
    * Get meta data from an existing container.
    *

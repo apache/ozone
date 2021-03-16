@@ -25,10 +25,12 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageSize;
 import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.fs.SpaceUsagePersistence;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.container.common.helpers.DatanodeVersionFile;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 
@@ -51,6 +53,7 @@ public class TestHddsVolume {
   private static final String DATANODE_UUID = UUID.randomUUID().toString();
   private static final String CLUSTER_ID = UUID.randomUUID().toString();
   private static final OzoneConfiguration CONF = new OzoneConfiguration();
+  private static final String RESERVED_SPACE = "100B";
 
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();
@@ -61,6 +64,8 @@ public class TestHddsVolume {
   @Before
   public void setup() throws Exception {
     File rootDir = new File(folder.getRoot(), HddsVolume.HDDS_VOLUME_DIR);
+    CONF.set(ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED, folder.getRoot() +
+        ":" + RESERVED_SPACE);
     volumeBuilder = new HddsVolume.Builder(folder.getRoot().getPath())
         .datanodeUuid(DATANODE_UUID)
         .conf(CONF)
@@ -146,7 +151,13 @@ public class TestHddsVolume {
 
     // Volume.getAvailable() should succeed even when usage thread
     // is shutdown.
-    assertEquals(spaceUsage.getAvailable(), volume.getAvailable());
+    StorageSize size = StorageSize.parse(RESERVED_SPACE);
+    long reservedSpaceInBytes = (long) size.getUnit().toBytes(size.getValue());
+
+    assertEquals(spaceUsage.getCapacity(),
+        volume.getCapacity() + reservedSpaceInBytes);
+    assertEquals(spaceUsage.getAvailable(),
+        volume.getAvailable() + reservedSpaceInBytes);
   }
 
 }
