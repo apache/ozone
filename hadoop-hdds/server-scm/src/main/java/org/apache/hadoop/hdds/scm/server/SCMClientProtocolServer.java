@@ -325,17 +325,44 @@ public class SCMClientProtocolServer implements
     }
   }
 
+  /**
+   * Lists a range of containers and get their info.
+   *
+   * @param startContainerID start containerID.
+   * @param count count must be {@literal >} 0.
+   *
+   * @return a list of pipeline.
+   * @throws IOException
+   */
   @Override
   public List<ContainerInfo> listContainer(long startContainerID,
       int count) throws IOException {
+    return listContainer(startContainerID, count, null);
+  }
+
+  /**
+   * Lists a range of containers and get their info.
+   *
+   * @param startContainerID start containerID.
+   * @param count count must be {@literal >} 0.
+   * @param state Container with this state will be returned.
+   *
+   * @return a list of pipeline.
+   * @throws IOException
+   */
+  @Override
+  public List<ContainerInfo> listContainer(long startContainerID,
+      int count, HddsProtos.LifeCycleState state) throws IOException {
     boolean auditSuccess = true;
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("startContainerID", String.valueOf(startContainerID));
     auditMap.put("count", String.valueOf(count));
+    if (state != null) {
+      auditMap.put("state", state.name());
+    }
     try {
       final ContainerID containerId = ContainerID.valueOf(startContainerID);
-      return scm.getContainerManager().
-          getContainers(containerId, count);
+      return scm.getContainerManager().getContainers(containerId, count);
     } catch (Exception ex) {
       auditSuccess = false;
       AUDIT.logReadFailure(
@@ -347,7 +374,6 @@ public class SCMClientProtocolServer implements
             buildAuditMessageForSuccess(SCMAction.LIST_CONTAINER, auditMap));
       }
     }
-
   }
 
   @Override
