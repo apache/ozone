@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.upgrade;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.INITIAL_VERSION;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager.OM_REQUEST_CLASS_PACKAGE;
+import static org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager.OM_UPGRADE_CLASS_PACKAGE;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager.getRequestClasses;
 import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.UNFINALIZED_STATE_VALIDATION;
 import static org.junit.Assert.assertEquals;
@@ -139,7 +140,7 @@ public class TestOMVersionManager {
   @Test
   public void testOmUpgradeActionsRegistered() throws Exception {
     OMLayoutVersionManager lvm = new OMLayoutVersionManager(); // MLV >= 0
-    lvm.registerUpgradeActions("org.apache.hadoop.ozone.om.upgrade.test");
+    assertFalse(lvm.needsFinalization());
 
     // INITIAL_VERSION is finalized, hence should not register.
     Optional<OmUpgradeAction> action =
@@ -149,12 +150,23 @@ public class TestOMVersionManager {
     lvm = mock(OMLayoutVersionManager.class);
     when(lvm.getMetadataLayoutVersion()).thenReturn(-1);
     doCallRealMethod().when(lvm).registerUpgradeActions(anyString());
-    lvm.registerUpgradeActions("org.apache.hadoop.ozone.om.upgrade.test");
+    lvm.registerUpgradeActions(OM_UPGRADE_CLASS_PACKAGE);
 
     action = INITIAL_VERSION.action(UNFINALIZED_STATE_VALIDATION);
     Assert.assertTrue(action.isPresent());
+    Assert.assertEquals(MockOmUpgradeAction.class, action.get().getClass());
     OzoneManager omMock = mock(OzoneManager.class);
     action.get().execute(omMock);
     verify(omMock, times(1)).getVersion();
+  }
+
+  @UpgradeActionOm(type = UNFINALIZED_STATE_VALIDATION, feature =
+      INITIAL_VERSION)
+  public static class MockOmUpgradeAction implements OmUpgradeAction {
+
+    @Override
+    public void execute(OzoneManager arg) {
+      arg.getVersion();
+    }
   }
 }

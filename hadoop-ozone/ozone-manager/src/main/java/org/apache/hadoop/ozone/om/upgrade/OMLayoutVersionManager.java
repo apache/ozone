@@ -57,6 +57,8 @@ public final class OMLayoutVersionManager
       "org.apache.hadoop.ozone.om";
   public static final String OM_REQUEST_CLASS_PACKAGE =
       OM_CLASS_PACKAGE + ".request";
+  public static final String OM_UPGRADE_CLASS_PACKAGE =
+      OM_CLASS_PACKAGE + ".upgrade";
   private LayoutVersionInstanceFactory<Class<? extends OMClientRequest>>
       requestFactory;
 
@@ -87,7 +89,7 @@ public final class OMLayoutVersionManager
           e,
           NOT_SUPPORTED_OPERATION);
     }
-    registerUpgradeActions(OM_CLASS_PACKAGE);
+    registerUpgradeActions(OM_UPGRADE_CLASS_PACKAGE);
     registerOzoneManagerRequests(OM_REQUEST_CLASS_PACKAGE);
   }
 
@@ -97,8 +99,9 @@ public final class OMLayoutVersionManager
   @VisibleForTesting
   protected void registerUpgradeActions(String packageName) {
     Reflections reflections = new Reflections(new ConfigurationBuilder()
-        .setUrls(ClasspathHelper.forPackage(packageName))
+        .forPackages(packageName)
         .setScanners(new TypeAnnotationsScanner(), new SubTypesScanner())
+        .setExpandSuperTypes(false)
         .useParallelExecutor());
     Set<Class<?>> typesAnnotatedWith =
         reflections.getTypesAnnotatedWith(UpgradeActionOm.class);

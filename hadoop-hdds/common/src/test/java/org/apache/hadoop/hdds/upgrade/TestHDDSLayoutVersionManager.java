@@ -26,7 +26,7 @@ import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -46,12 +46,15 @@ import org.junit.Test;
  */
 public class TestHDDSLayoutVersionManager {
 
+  private static final String[] UPGRADE_ACTIONS_TEST_PACKAGES = new String[] {
+      "org.apache.hadoop.hdds.upgrade.test"};
+
   @Test
   public void testUpgradeActionsRegistered() throws Exception {
 
     HDDSLayoutVersionManager lvm =
         new HDDSLayoutVersionManager(maxLayoutVersion());
-    lvm.registerUpgradeActions("org.apache.hadoop.hdds.upgrade.test");
+    lvm.registerUpgradeActions(UPGRADE_ACTIONS_TEST_PACKAGES);
 
     //Cluster is finalized, hence should not register.
     Optional<HDDSUpgradeAction> action = INITIAL_VERSION.scmAction(ON_FINALIZE);
@@ -59,11 +62,12 @@ public class TestHDDSLayoutVersionManager {
     action = DATANODE_SCHEMA_V2.datanodeAction(ON_FIRST_UPGRADE_START);
     Assert.assertFalse(action.isPresent());
 
+    // Start from an unfinalized version manager.
     lvm = mock(HDDSLayoutVersionManager.class);
     when(lvm.getMetadataLayoutVersion()).thenReturn(-1);
 
-    doCallRealMethod().when(lvm).registerUpgradeActions(anyString());
-    lvm.registerUpgradeActions("org.apache.hadoop.hdds.upgrade.test");
+    doCallRealMethod().when(lvm).registerUpgradeActions(any());
+    lvm.registerUpgradeActions(UPGRADE_ACTIONS_TEST_PACKAGES);
 
     action = INITIAL_VERSION.scmAction(ON_FINALIZE);
     assertTrue(action.isPresent());

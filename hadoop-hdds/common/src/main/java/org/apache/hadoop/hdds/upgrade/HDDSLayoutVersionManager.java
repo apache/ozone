@@ -29,7 +29,6 @@ import org.apache.hadoop.ozone.upgrade.UpgradeActionHdds;
 import org.reflections.Reflections;
 import org.reflections.scanners.SubTypesScanner;
 import org.reflections.scanners.TypeAnnotationsScanner;
-import org.reflections.util.ClasspathHelper;
 import org.reflections.util.ConfigurationBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,11 +45,13 @@ public class HDDSLayoutVersionManager extends
 
   private static final Logger LOG =
       LoggerFactory.getLogger(HDDSLayoutVersionManager.class);
-  public static final String HDDS_CLASS_PACKAGE = "org.apache.hadoop.hdds";
+  private static final String[] HDDS_CLASS_UPGRADE_PACKAGES = new String[]{
+      "org.apache.hadoop.hdds.server.scm",
+      "org.apache.hadoop.ozone.container"};
 
   public HDDSLayoutVersionManager(int layoutVersion) throws IOException {
     init(layoutVersion, HDDSLayoutFeature.values());
-    registerUpgradeActions(HDDS_CLASS_PACKAGE);
+    registerUpgradeActions(HDDS_CLASS_UPGRADE_PACKAGES);
   }
 
   public static int maxLayoutVersion() {
@@ -62,9 +63,9 @@ public class HDDSLayoutVersionManager extends
    * Scan classpath and register all actions to layout features.
    */
   @VisibleForTesting
-  void registerUpgradeActions(String packageName) {
+  void registerUpgradeActions(String[] packageNames) {
     Reflections reflections = new Reflections(new ConfigurationBuilder()
-        .setUrls(ClasspathHelper.forPackage(packageName))
+        .forPackages(packageNames)
         .setScanners(new TypeAnnotationsScanner(), new SubTypesScanner())
         .useParallelExecutor());
     Set<Class<?>> typesAnnotatedWith =
@@ -85,7 +86,7 @@ public class HDDSLayoutVersionManager extends
               feature.addDatanodeAction(annotation.type(), action);
             }
           } else {
-            LOG.info("Skipping Upgrade Action {} since it has been finalized" +
+            LOG.debug("Skipping Upgrade Action {} since it has been finalized" +
                 ".", action.name());
           }
         } catch (Exception e) {

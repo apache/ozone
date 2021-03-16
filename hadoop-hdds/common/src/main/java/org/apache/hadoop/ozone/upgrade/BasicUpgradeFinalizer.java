@@ -174,6 +174,9 @@ public abstract class BasicUpgradeFinalizer
       Function<UpgradeActionType, Optional<? extends UpgradeAction>>> aFunction,
       Storage storage, T service) throws IOException {
 
+    if (!versionManager.needsFinalization()) {
+      return;
+    }
     this.component = service;
     LOG.info("Running pre-finalized state validations for unfinalized " +
         "layout features.");

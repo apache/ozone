@@ -65,7 +65,6 @@ public class TestUpgradeFinalizer {
     MockComponent mockObj = mock(MockComponent.class);
 
     File file = folder.newFolder();
-    assertTrue(file.mkdirs());
     File scmCurrent = Paths.get(file.toString(), "scm", "current")
         .toFile();
     assertTrue(scmCurrent.mkdirs());
@@ -98,7 +97,6 @@ public class TestUpgradeFinalizer {
     MockComponent mockObj = mock(MockComponent.class);
 
     File file = folder.newFolder();
-    assertTrue(file.mkdirs());
     File scmCurrent = Paths.get(file.toString(), "scm", "current")
         .toFile();
     assertTrue(scmCurrent.mkdirs());
