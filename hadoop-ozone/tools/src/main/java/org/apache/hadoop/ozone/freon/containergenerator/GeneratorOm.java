@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 import org.apache.hadoop.util.Time;
 
 import com.codahale.metrics.Timer;
@@ -144,8 +145,12 @@ public class GeneratorOm extends BaseGenerator implements
     String owner = getUserId();
 
     OmVolumeArgs omVolumeArgs = new OmVolumeArgs.Builder().setVolume(volumeName)
-        .setAdminName(admin).setCreationTime(Time.now()).setOwnerName(owner)
-        .setObjectID(1L).setUpdateID(1L).setQuotaInBytes(100L)
+        .setAdminName(admin)
+        .setCreationTime(Time.now())
+        .setOwnerName(owner)
+        .setObjectID(1L)
+        .setUpdateID(1L)
+        .setQuotaInBytes(100L)
         .addOzoneAcls(OzoneAcl.toProtobuf(
             new OzoneAcl(IAccessAuthorizer.ACLIdentityType.WORLD, "",
                 IAccessAuthorizer.ACLType.ALL, ACCESS)))
@@ -155,6 +160,29 @@ public class GeneratorOm extends BaseGenerator implements
         ).build();
 
     volTable.put("/" + volumeName, omVolumeArgs);
+
+    final Table<String, PersistedUserVolumeInfo> userTable =
+        omDb.getTable(OmMetadataManagerImpl.USER_TABLE, String.class,
+            PersistedUserVolumeInfo.class);
+
+    PersistedUserVolumeInfo currentUserVolumeInfo =
+        userTable.get(getUserId());
+
+    if (currentUserVolumeInfo == null) {
+      currentUserVolumeInfo = PersistedUserVolumeInfo.newBuilder()
+          .addVolumeNames(volumeName)
+          .build();
+
+    } else if (!currentUserVolumeInfo.getVolumeNamesList()
+        .contains(volumeName)) {
+
+      currentUserVolumeInfo = PersistedUserVolumeInfo.newBuilder()
+          .addAllVolumeNames(currentUserVolumeInfo.getVolumeNamesList())
+          .addVolumeNames(volumeName)
+          .build();
+    }
+
+    userTable.put(getUserId(), currentUserVolumeInfo);
 
     Table<String, OmBucketInfo> bucketTable =
         omDb.getTable(OmMetadataManagerImpl.BUCKET_TABLE, String.class,

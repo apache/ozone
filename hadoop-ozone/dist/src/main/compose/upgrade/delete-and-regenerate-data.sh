@@ -41,13 +41,13 @@ start_docker_env
 docker-compose stop
 
 #generate metadadata (-n1 means: only one container is generated)
-docker-compose run scm ozone freon cgscm -n 1
-docker-compose run om ozone freon cgom -n 1
+docker-compose run scm ozone freon cgscm -u hadoop -n 1
+docker-compose run om ozone freon cgom -u hadoop -n 1
 
 #generate real data (and metadata) on datanodes.
-docker-compose run dn1 ozone freon cgdn -n 1 --datanodes=3 --index=1
-docker-compose run dn2 ozone freon cgdn -n 1 --datanodes=3 --index=2
-docker-compose run dn3 ozone freon cgdn -n 1 --datanodes=3 --index=3
+docker-compose run dn1 ozone freon cgdn -u hadoop -n 1 --datanodes=3 --index=1
+docker-compose run dn2 ozone freon cgdn -u hadoop -n 1 --datanodes=3 --index=2
+docker-compose run dn3 ozone freon cgdn -u hadoop -n 1 --datanodes=3 --index=3
 
 #start docker env with the generated data
 start_docker_env
