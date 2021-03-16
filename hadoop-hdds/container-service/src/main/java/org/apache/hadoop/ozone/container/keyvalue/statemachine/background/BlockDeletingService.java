@@ -317,6 +317,12 @@ public class BlockDeletingService extends BackgroundService {
         for (Table.KeyValue<String, BlockData> entry: toDeleteBlocks) {
           String blockName = entry.getKey();
           LOG.debug("Deleting block {}", blockName);
+          if (entry.getValue() == null) {
+            LOG.warn("Missing delete block(Container = " +
+                container.getContainerData().getContainerID() + ", Block = " +
+                blockName);
+            continue;
+          }
           try {
             handler.deleteBlock(container, entry.getValue());
             succeedBlocks.add(blockName);
@@ -441,6 +447,12 @@ public class BlockDeletingService extends BackgroundService {
           String blk = blkLong.toString();
           BlockData blkInfo = blockDataTable.get(blk);
           LOG.debug("Deleting block {}", blk);
+          if (blkInfo == null) {
+            LOG.warn("Missing delete block(Container = " +
+                container.getContainerData().getContainerID() + ", Block = " +
+                blk);
+            continue;
+          }
           try {
             handler.deleteBlock(container, blkInfo);
           } catch (InvalidProtocolBufferException e) {
