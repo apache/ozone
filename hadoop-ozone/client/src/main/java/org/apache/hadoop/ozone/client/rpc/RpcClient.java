@@ -64,6 +64,7 @@ import org.apache.hadoop.ozone.client.OzoneMultipartUploadList;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
+import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.LengthInputStream;
@@ -696,7 +697,7 @@ public class RpcClient implements ClientProtocol {
         .setKeyName(keyName)
         .setDataSize(size)
         .setType(HddsProtos.ReplicationType.valueOf(type.toString()))
-        .setFactor(HddsProtos.ReplicationFactor.valueOf(factor.getValue()))
+        .setFactor(HddsProtos.ReplicationFactor.valueOf(1)) // hard coded to 1 to indicate replication factor ONE. Currently ONE assumed as EC 3:2
         .addAllMetadata(metadata)
         .setAcls(getAclList());
 
@@ -1261,17 +1262,20 @@ public class RpcClient implements ClientProtocol {
   private OzoneOutputStream createOutputStream(OpenKeySession openKey,
       String requestId, ReplicationType type, ReplicationFactor factor)
       throws IOException {
-    KeyOutputStream keyOutputStream =
-        new KeyOutputStream.Builder()
-            .setHandler(openKey)
-            .setXceiverClientManager(xceiverClientManager)
-            .setOmClient(ozoneManagerClient)
-            .setRequestID(requestId)
-            .setType(HddsProtos.ReplicationType.valueOf(type.toString()))
-            .setFactor(HddsProtos.ReplicationFactor.valueOf(factor.getValue()))
-            .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
-            .setConfig(clientConfig)
-            .build();
+    KeyOutputStream keyOutputStream = null;
+
+    if(true) { // check from opeKey, whether it's part of EC cluster/vol/bucket
+      keyOutputStream = new ECKeyOutputStream.Builder().setHandler(openKey).setXceiverClientManager(xceiverClientManager)
+          .setOmClient(ozoneManagerClient).setRequestID(requestId).setType(HddsProtos.ReplicationType.valueOf(type.toString()))
+          .setFactor(HddsProtos.ReplicationFactor.valueOf(1)).enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
+          .setConfig(clientConfig).build();
+    }else{
+      keyOutputStream = new KeyOutputStream.Builder().setHandler(openKey).setXceiverClientManager(xceiverClientManager)
+          .setOmClient(ozoneManagerClient).setRequestID(requestId).setType(HddsProtos.ReplicationType.valueOf(type.toString()))
+          .setFactor(HddsProtos.ReplicationFactor.valueOf(factor.getValue())).enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
+          .setConfig(clientConfig).build();
+    }
+
     keyOutputStream
         .addPreallocateBlocks(openKey.getKeyInfo().getLatestVersionLocations(),
             openKey.getOpenVersion());

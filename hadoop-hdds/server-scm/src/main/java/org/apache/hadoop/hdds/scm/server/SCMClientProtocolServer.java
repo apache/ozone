@@ -227,7 +227,9 @@ public class SCMClientProtocolServer implements
 
   private ContainerWithPipeline getContainerWithPipelineCommon(
       long containerID) throws IOException {
-    final ContainerID cid = ContainerID.valueof(containerID);
+     ContainerID cid = ContainerID.valueof(containerID);
+    //if(cid.getId() ==2)
+      //cid = new ContainerID(cid.getId()-1);
     final ContainerInfo container = scm.getContainerManager()
         .getContainer(cid);
 

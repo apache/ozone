@@ -74,8 +74,20 @@ public class AbstractContainerReportHandler {
   protected void processContainerReplica(final DatanodeDetails datanodeDetails,
       final ContainerReplicaProto replicaProto, final EventPublisher publisher)
       throws IOException {
-    final ContainerID containerId = ContainerID
+     ContainerID containerId = ContainerID
         .valueof(replicaProto.getContainerID());
+
+     //TODO: if we use bit masking we need to get groupID here.
+    // If we use separate index. container ID will be same, but make sure index
+    // id is carries in replica
+    if(containerId.getId() == 2)
+      containerId = new ContainerID(containerId.getId()-1);
+    if(containerId.getId() == 3)
+      containerId = new ContainerID(containerId.getId()-2);
+    if(containerId.getId() == 4)
+      containerId = new ContainerID(containerId.getId()-3);
+    if(containerId.getId() == 5)
+      containerId = new ContainerID(containerId.getId()-4);
 
     if (logger.isDebugEnabled()) {
       logger.debug("Processing replica of container {} from datanode {}",
@@ -274,7 +286,6 @@ public class AbstractContainerReportHandler {
                                       final ContainerID containerId,
                                       final ContainerReplicaProto replicaProto)
       throws ContainerNotFoundException, ContainerReplicaNotFoundException {
-
     final ContainerReplica replica = ContainerReplica.newBuilder()
         .setContainerID(containerId)
         .setContainerState(replicaProto.getState())

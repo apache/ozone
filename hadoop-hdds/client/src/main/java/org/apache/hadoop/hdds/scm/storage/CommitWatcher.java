@@ -105,7 +105,7 @@ public class CommitWatcher {
           LOG.error("Existing acknowledged data: " + key);
         }
       }
-      Preconditions.checkNotNull(remove);
+      //Preconditions.checkNotNull(remove);
       for (ChunkBuffer byteBuffer : buffers) {
         bufferPool.releaseBuffer(byteBuffer);
       }

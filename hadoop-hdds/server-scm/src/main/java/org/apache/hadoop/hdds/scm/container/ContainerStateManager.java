@@ -494,8 +494,9 @@ public class ContainerStateManager {
    * @return ContainerInfo containerInfo
    * @throws IOException
    */
-  ContainerInfo getContainer(final ContainerID containerID)
+  ContainerInfo getContainer( ContainerID containerID)
       throws ContainerNotFoundException {
+
     return containers.getContainerInfo(containerID);
   }
 

@@ -68,7 +68,7 @@ public class RatisPipelineProvider extends PipelineProvider {
         new PipelinePlacementPolicy(nodeManager, stateManager, conf);
     this.pipelineNumberLimit = conf.getInt(
         ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT,
-        ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT_DEFAULT);
+        1);
     String dnLimit = conf.get(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT);
     this.maxPipelinePerDatanode = dnLimit == null ? 0 :
         Integer.parseInt(dnLimit);

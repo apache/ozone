@@ -23,13 +23,16 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
 import org.apache.hadoop.fs.CanUnbuffer;
 import org.apache.hadoop.fs.Seekable;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetBlockResponseProto;
@@ -109,9 +112,18 @@ public class BlockInputStream extends InputStream
       Token<OzoneBlockTokenIdentifier> token, boolean verifyChecksum,
       XceiverClientFactory xceiverClientFactory,
       Function<BlockID, Pipeline> refreshPipelineFunction) {
-    this.blockID = blockId;
+
+    this.blockID = new BlockID(2L, blockId.getLocalID());
     this.length = blockLen;
-    this.pipeline = pipeline;
+    Map<DatanodeDetails, Long> nodeStatus = new LinkedHashMap<>();
+    nodeStatus.put(pipeline.getNodes().get(1), -1L);
+    Pipeline tmpPipeline = Pipeline.newBuilder(pipeline)
+        .setType(HddsProtos.ReplicationType.STAND_ALONE).build();
+    this.pipeline = new Pipeline(tmpPipeline.getId(),
+        tmpPipeline.getType(),
+        tmpPipeline.getFactor(),
+        tmpPipeline.getPipelineState(), nodeStatus,
+        null);
     this.token = token;
     this.verifyChecksum = verifyChecksum;
     this.xceiverClientFactory = xceiverClientFactory;
@@ -209,6 +221,7 @@ public class BlockInputStream extends InputStream
 
       DatanodeBlockID datanodeBlockID = blockID
           .getDatanodeBlockIDProtobuf();
+
       GetBlockResponseProto response = ContainerProtocolCalls
           .getBlock(xceiverClient, datanodeBlockID, token);
 

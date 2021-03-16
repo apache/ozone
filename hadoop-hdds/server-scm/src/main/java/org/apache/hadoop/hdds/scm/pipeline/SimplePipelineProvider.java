@@ -55,7 +55,7 @@ public class SimplePipelineProvider extends PipelineProvider {
         .setState(PipelineState.OPEN)
         .setType(ReplicationType.STAND_ALONE)
         .setFactor(factor)
-        .setNodes(dns.subList(0, factor.getNumber()))
+        .setNodes(dns.subList(0, 5))
         .build();
   }
 

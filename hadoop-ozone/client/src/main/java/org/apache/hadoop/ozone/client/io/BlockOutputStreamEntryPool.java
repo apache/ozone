@@ -20,15 +20,20 @@ package org.apache.hadoop.ozone.client.io;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.ListIterator;
+import java.util.Map;
 
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.BufferPool;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -148,17 +153,25 @@ public class BlockOutputStreamEntryPool {
 
   private void addKeyLocationInfo(OmKeyLocationInfo subKeyInfo) {
     Preconditions.checkNotNull(subKeyInfo.getPipeline());
-    BlockOutputStreamEntry.Builder builder =
-        new BlockOutputStreamEntry.Builder()
-            .setBlockID(subKeyInfo.getBlockID())
-            .setKey(keyArgs.getKeyName())
-            .setXceiverClientManager(xceiverClientFactory)
-            .setPipeline(subKeyInfo.getPipeline())
-            .setConfig(config)
-            .setLength(subKeyInfo.getLength())
-            .setBufferPool(bufferPool)
-            .setToken(subKeyInfo.getToken());
-    streamEntries.add(builder.build());
+    List<DatanodeDetails> nodes = subKeyInfo.getPipeline().getNodes();
+    long bid = subKeyInfo.getBlockID().getLocalID();
+    long cID = subKeyInfo.getBlockID().getContainerID();
+    for (int i = 0; i < nodes.size(); i++) {
+      Map<DatanodeDetails, Long> nodeStatus = new LinkedHashMap<>();
+      nodeStatus.put(nodes.get(i), -1L);
+      long currID = cID + i;
+      BlockOutputStreamEntry.Builder builder =
+          new BlockOutputStreamEntry.Builder()
+              .setBlockID(new BlockID(currID, bid)).setKey(keyArgs.getKeyName())
+              .setXceiverClientManager(xceiverClientFactory).setPipeline(
+              new Pipeline(subKeyInfo.getPipeline().getId(),
+                  subKeyInfo.getPipeline().getType(),
+                  subKeyInfo.getPipeline().getFactor(),
+                  subKeyInfo.getPipeline().getPipelineState(), nodeStatus,
+                  null)).setConfig(config).setLength(subKeyInfo.getLength())
+              .setBufferPool(bufferPool).setToken(subKeyInfo.getToken());
+      streamEntries.add(builder.build());
+    }
   }
 
   public List<OmKeyLocationInfo> getLocationInfoList()  {
@@ -168,8 +181,9 @@ public class BlockOutputStreamEntryPool {
 
       // Commit only those blocks to OzoneManager which are not empty
       if (length != 0) {
+        BlockID bid = streamEntry.getBlockID();
         OmKeyLocationInfo info =
-            new OmKeyLocationInfo.Builder().setBlockID(streamEntry.getBlockID())
+            new OmKeyLocationInfo.Builder().setBlockID(new BlockID(1L, bid.getLocalID()))
                 .setLength(streamEntry.getCurrentPosition()).setOffset(0)
                 .setToken(streamEntry.getToken())
                 .setPipeline(streamEntry.getPipeline()).build();
@@ -275,8 +289,17 @@ public class BlockOutputStreamEntryPool {
     }
   }
 
+  public int getCurrIdx(){
+    return currentStreamIndex;
+  }
+
+  public void updateToNextStream(int rotation){
+    currentStreamIndex = (currentStreamIndex+1) % rotation;
+  }
+
   BlockOutputStreamEntry allocateBlockIfNeeded() throws IOException {
     BlockOutputStreamEntry streamEntry = getCurrentStreamEntry();
+    //currentStreamIndex++;
     if (streamEntry != null && streamEntry.isClosed()) {
       // a stream entry gets closed either by :
       // a. If the stream gets full
@@ -287,8 +310,10 @@ public class BlockOutputStreamEntryPool {
       Preconditions.checkNotNull(omClient);
       // allocate a new block, if a exception happens, log an error and
       // throw exception to the caller directly, and the write fails.
-      allocateNewBlock();
+      //for(int i=0; i< 4; i++)
+        allocateNewBlock();
     }
+
     // in theory, this condition should never violate due the check above
     // still do a sanity check.
     Preconditions.checkArgument(currentStreamIndex < streamEntries.size());

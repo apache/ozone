@@ -253,14 +253,16 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
 
   private String getPipelineCacheKey(Pipeline pipeline, boolean forRead) {
     String key = pipeline.getId().getId().toString() + pipeline.getType();
-    if (topologyAwareRead && forRead) {
+    // TODO: this changes are not correct. Need
+    //if (topologyAwareRead && forRead) {
       try {
         key += pipeline.getClosestNode().getHostName();
+        key += pipeline.getClosestNode().getUuid();
       } catch (IOException e) {
         LOG.error("Failed to get closest node to create pipeline cache key:" +
             e.getMessage());
       }
-    }
+   // }
     return key;
   }
 

@@ -200,10 +200,12 @@ public class ContainerStateMap {
    * @return Set<DatanodeDetails>
    */
   public Set<ContainerReplica> getContainerReplicas(
-      final ContainerID containerID) throws ContainerNotFoundException {
+       ContainerID containerID) throws ContainerNotFoundException {
     Preconditions.checkNotNull(containerID);
     lock.readLock().lock();
     try {
+      if(containerID.getId() ==2)
+        containerID = new ContainerID(containerID.getId()-1);
       checkIfContainerExist(containerID);
       return Collections
           .unmodifiableSet(replicaMap.get(containerID));
@@ -543,6 +545,8 @@ public class ContainerStateMap {
 
   private void checkIfContainerExist(ContainerID containerID)
       throws ContainerNotFoundException {
+    if(containerID.getId() ==2)
+      containerID = new ContainerID(containerID.getId()-1);
     if (!containerMap.containsKey(containerID)) {
       throw new ContainerNotFoundException("Container with id " +
           containerID.getId() + " not found.");

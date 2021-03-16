@@ -341,7 +341,7 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_PIPELINE_CREATION_INTERVAL =
       "ozone.scm.pipeline.creation.interval";
   public static final String OZONE_SCM_PIPELINE_CREATION_INTERVAL_DEFAULT =
-      "120s";
+      "999999999s";
 
   // Allow SCM to auto create factor ONE ratis pipeline.
   public static final String OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE =

@@ -139,7 +139,8 @@ class BackgroundPipelineCreator {
         if (scheduler.isClosed()) {
           break;
         }
-        pipelineManager.createPipeline(type, factor);
+        if(pipelineManager.getPipelines().size() ==0)
+          pipelineManager.createPipeline(type, factor);
       } catch (IOException ioe) {
         it.remove();
       } catch (Throwable t) {

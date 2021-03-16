@@ -81,10 +81,9 @@ public abstract class PipelineProvider {
     List<DatanodeDetails> dns = nodeManager
         .getNodes(NodeStatus.inServiceHealthy())
         .parallelStream()
-        .filter(dn -> !dnsUsed.contains(dn))
-        .limit(factor.getNumber())
+        .limit(5)
         .collect(Collectors.toList());
-    if (dns.size() < factor.getNumber()) {
+    if (dns.size() < 5) {
       String e = String
           .format("Cannot create pipeline of factor %d using %d nodes." +
                   " Used %d nodes. Healthy nodes %d", factor.getNumber(),

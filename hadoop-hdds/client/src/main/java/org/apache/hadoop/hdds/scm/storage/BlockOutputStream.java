@@ -530,7 +530,7 @@ public class BlockOutputStream extends OutputStream {
       executePutBlock(true, true);
     }
     waitOnFlushFutures();
-    watchForCommit(false);
+    //watchForCommit(false);
     // just check again if the exception is hit while waiting for the
     // futures to ensure flush has indeed succeeded
 

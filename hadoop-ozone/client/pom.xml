@@ -43,6 +43,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>junit</artifactId>
       <scope>test</scope>
     </dependency>
+      <dependency>
+          <groupId>org.apache.hadoop</groupId>
+          <artifactId>hadoop-hdfs-client</artifactId>
+      </dependency>
   </dependencies>
 
   <build>
