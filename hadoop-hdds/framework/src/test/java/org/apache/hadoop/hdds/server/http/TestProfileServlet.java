@@ -34,7 +34,7 @@ public class TestProfileServlet {
     ProfileServlet.validateFileName(
         ProfileServlet.generateFileName(1, Output.FLAMEGRAPH, Event.ALLOC));
     ProfileServlet.validateFileName(
-            ProfileServlet.generateFileName(1, Output.SVG, Event.ALLOC));
+        ProfileServlet.generateFileName(1, Output.SVG, Event.ALLOC));
     ProfileServlet.validateFileName(
         ProfileServlet.generateFileName(23, Output.COLLAPSED,
             Event.L1_DCACHE_LOAD_MISSES));
@@ -46,14 +46,14 @@ public class TestProfileServlet {
         "test\n" + ProfileServlet.generateFileName(1, Output.FLAMEGRAPH,
             Event.ALLOC));
     ProfileServlet.validateFileName(
-            "test\n" + ProfileServlet.generateFileName(1, Output.SVG,
-            Event.ALLOC));
+        "test\n" + ProfileServlet.generateFileName(1, Output.SVG, Event.ALLOC));
   }
 
   @Test(expected = IllegalArgumentException.class)
   public void testNameValidationWithSlash() throws IOException {
     ProfileServlet.validateFileName(
-        "../" + ProfileServlet.generateFileName(1, Output.FLAMEGRAPH, Event.ALLOC));
+        "../" + ProfileServlet.generateFileName(1, Output.FLAMEGRAPH,
+            Event.ALLOC));
     ProfileServlet.validateFileName(
         "../" + ProfileServlet.generateFileName(1, Output.SVG, Event.ALLOC));
   }
