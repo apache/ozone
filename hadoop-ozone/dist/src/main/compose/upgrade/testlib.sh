@@ -110,3 +110,10 @@ validate() {
     execute_robot_test scm -v PREFIX:"$1" upgrade/validate.robot
 }
 
+## @description Checks that the metadata layout version of the provided node matches what is expected.
+## @param The name of the docker-compose service to run the check on.
+## @param The name of the path to the VERSION file in the container.
+## @param The metadata layout version expected for that service.
+check_mlv() {
+    execute_robot_test "$1" -v VERSION_FILE:"$2" -v VERSION:"$3" upgrade/check-mlv.robot
+}
