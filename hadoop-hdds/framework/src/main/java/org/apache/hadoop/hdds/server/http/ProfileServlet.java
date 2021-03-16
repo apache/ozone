@@ -56,8 +56,10 @@ import org.slf4j.LoggerFactory;
  * //  -s                simple class names instead of FQN
  * //  -g                print method signatures
  * //  -a                annotate Java method names
- * //  -o fmt            output format: flat|traces|collapsed|flamegraph|tree|jfr
- * //  -I include        output only stack traces containing the specified pattern
+ * //  -o fmt            output format:
+ * flat|traces|collapsed|flamegraph|tree|jfr
+ * //  -I include        output only stack traces
+ * containing the specified pattern
  * //  -X exclude        exclude stack traces with the specified pattern
  * //  -v, --version     display version string
  * //  --title string    FlameGraph title
