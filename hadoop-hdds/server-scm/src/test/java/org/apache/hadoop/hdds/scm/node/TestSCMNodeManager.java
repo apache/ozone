@@ -597,7 +597,7 @@ public class TestSCMNodeManager {
               .setSoftwareLayoutVersion(scmMlv + 2)
               .build());
       Assert.assertTrue(logCapturer.getOutput()
-          .contains("Rogue data node in the cluster"));
+          .contains("Invalid data node in the cluster"));
     }
   }
 
@@ -1083,9 +1083,6 @@ public class TestSCMNodeManager {
       eventQueue.processAll(8000L);
 
       assertEquals(nodeCount, nodeManager.getNodeCount(
-          NodeStatus.inServiceHealthyReadOnly()));
-      Thread.sleep(3 * 1000);
-      assertEquals(nodeCount, nodeManager.getNodeCount(
           NodeStatus.inServiceHealthy()));
       assertEquals(capacity * nodeCount, (long) nodeManager.getStats()
           .getCapacity().get());
@@ -1141,9 +1138,6 @@ public class TestSCMNodeManager {
       //TODO: wait for EventQueue to be processed
       eventQueue.processAll(8000L);
 
-      assertEquals(1, nodeManager.getNodeCount(
-          NodeStatus.inServiceHealthyReadOnly()));
-      Thread.sleep(3 * 1000);
       assertEquals(1, nodeManager
           .getNodeCount(NodeStatus.inServiceHealthy()));
       assertEquals(volumeCount / 2,
