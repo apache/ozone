@@ -23,13 +23,13 @@ summary: HA setup for Storage Container Manager to avoid any single point of fai
   limitations under the License.
 -->
 
-Ozone has two leader nodes (*Ozone Manager* for key space management and *Storage Container Management* for block space management) and storage nodes (Datanode). Data is replicated between Datanodes with the help of RAFT consensus algorithm.
+Ozone has two metadata-manager nodes (*Ozone Manager* for key space management and *Storage Container Management* for block space management) and multiple storage nodes (Datanode). Data is replicated between Datanodes with the help of RAFT consensus algorithm.
 
 <div class="alert alert-warning" role="alert">
 Please note that SCM-HA is not ready for production in secure environments. Security work is in progress and will be finished soon.
 </div>
 
-To avoid any single point of failure the leader nodes also should have a HA setup.
+To avoid any single point of failure the metadata-manager nodes also should have a HA setup.
 
 Both Ozone Manager and Storage Container Manager supports HA. In this mode the internal state is replicated via RAFT (with Apache Ratis) 
 
@@ -115,7 +115,7 @@ Based on the `ozone.scm.primordial.node.id`, the init process will be ignored on
 
 SCM HA uses Apache Ratis to replicate state between the members of the SCM HA quorum. Each node maintains the block management metadata in local RocksDB.
 
-This replication process is a simpler version of OM HA replication process as it doesn't use any double buffer (as the overall db thourghput of SCM requests )
+This replication process is a simpler version of OM HA replication process as it doesn't use any double buffer (as the overall db thourghput of SCM requests are lower)
 
 Datanodes are sending all the reports (Container reports, Pipeline reports...) to *all* the Datanodes parallel. Only the leader node can assign/create new containers, and only the leader node sends command back to the Datanodes.
 

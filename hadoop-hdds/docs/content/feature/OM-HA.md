@@ -1,5 +1,5 @@
 ---
-title: "OM High Availability "
+title: "OM High Availability"
 weight: 1
 menu:
    main:
@@ -23,9 +23,9 @@ summary: HA setup for Ozone Manager to avoid any single point of failure.
   limitations under the License.
 -->
 
-Ozone has two leader nodes (*Ozone Manager* for key space management and *Storage Container Management* for block space management) and storage nodes (Datanode). Data is replicated between datanodes with the help of RAFT consensus algorithm.
+Ozone has two metadata-manager nodes (*Ozone Manager* for key space management and *Storage Container Management* for block space management) and multiple storage nodes (Datanode). Data is replicated between Datanodes with the help of RAFT consensus algorithm.
 
-To avoid any single point of failure the leader nodes also should have a HA setup.
+To avoid any single point of failure the metadata-manager nodes also should have a HA setup.
 
 Both Ozone Manager and Storage Container Manager supports HA. In this mode the internal state is replicated via RAFT (with Apache Ratis) 
 
