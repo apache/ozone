@@ -333,7 +333,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
     }
   }
 
-  // OzoneManager specifc
+  // OzoneManager specific
   public static int getNumberOfOmToFail() {
     return 1;
   }
@@ -374,7 +374,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
     return RandomUtils.nextBoolean();
   }
 
-  // Datanode specifc
+  // Datanode specific
   private int getNumberOfDnToFail() {
     return RandomUtils.nextBoolean() ? 1 : 2;
   }
@@ -420,10 +420,10 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
       return Collections.emptySet();
     }
 
-    int numOms = getStorageContainerManagersList().size();
+    int numSCMs = getStorageContainerManagersList().size();
     Set<StorageContainerManager> scms = new HashSet<>();
     for (int i = 0; i < numNodesToFail; i++) {
-      int failedNodeIndex = FailureManager.getBoundedRandomIndex(numOms);
+      int failedNodeIndex = FailureManager.getBoundedRandomIndex(numSCMs);
       scms.add(getStorageContainerManager(failedNodeIndex));
     }
     return scms;

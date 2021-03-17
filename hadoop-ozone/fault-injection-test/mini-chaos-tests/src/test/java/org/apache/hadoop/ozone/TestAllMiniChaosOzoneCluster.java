@@ -40,7 +40,7 @@ public class TestAllMiniChaosOzoneCluster extends TestMiniChaosOzoneCluster
 
   @Override
   public Void call() throws Exception {
-    setNumManagers(3, 3, false);
+    setNumManagers(3, 3, true);
 
     LoadGenerator.getClassList().forEach(
         TestMiniChaosOzoneCluster::addLoadClasses);
