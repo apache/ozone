@@ -117,3 +117,24 @@ validate() {
 check_mlv() {
     execute_robot_test "$1" -v VERSION_FILE:"$2" -v VERSION:"$3" upgrade/check-mlv.robot
 }
+
+## @description Checks that the metadata layout version of a datanode matches what is expected.
+## @param The name of the docker-compose service to run the check on.
+## @param The metadata layout version expected for that service.
+check_dn_mlv() {
+  check_mlv "$1" /data/metadata/dnlayoutversion/VERSION "$2"
+}
+
+## @description Checks that the metadata layout version of an OM matches what is expected.
+## @param The name of the docker-compose service to run the check on.
+## @param The metadata layout version expected for that service.
+check_om_mlv() {
+  check_mlv "$1" /data/metadata/om/current/VERSION "$2"
+}
+
+## @description Checks that the metadata layout version of an SCM matches what is expected.
+## @param The name of the docker-compose service to run the check on.
+## @param The metadata layout version expected for that service.
+check_scm_mlv() {
+  check_mlv "$1" /data/metadata/scm/current/VERSION "$2"
+}

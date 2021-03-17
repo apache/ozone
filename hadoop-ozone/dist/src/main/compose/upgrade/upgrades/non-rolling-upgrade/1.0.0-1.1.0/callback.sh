@@ -17,6 +17,18 @@
 
 source "$TEST_DIR"/testlib.sh
 
+# Helper function, not a callback.
+_check_all_mlvs() {
+  mlv="$1"
+  check_om_mlv om1 "$mlv"
+  check_om_mlv om2 "$mlv"
+  check_om_mlv om3 "$mlv"
+  check_scm_mlv scm "$mlv"
+  check_dn_mlv dn1 "$mlv"
+  check_dn_mlv dn2 "$mlv"
+  check_dn_mlv dn3 "$mlv"
+}
+
 setup() {
   source "$TEST_DIR"/compose/ha/load.sh
   # OM preparation is not implemented until 1.2.0.
@@ -25,36 +37,32 @@ setup() {
 }
 
 with_old_version() {
-  #generate old1
-  #validate old1
-  true
+  generate old1
+  validate old1
 }
 
 with_new_version_pre_finalized() {
-  check_mlv om1 /data/metadata/om/current/VERSION 0
-  check_mlv scm /data/metadata/scm/current/VERSION 0
-  check_mlv dn1 /data/metadata/dnlayoutversion/VERSION 0
-  #validate old1
+  _check_all_mlvs 0
+  validate old1
 
-  #generate new1
-  #validate new1
+  generate new1
+  validate new1
 }
 
 with_old_version_downgraded() {
-  #validate old1
-  #validate new1
+  validate old1
+  validate new1
 
-  #generate old2
-  #validate old2
-  true
+  generate old2
+  validate old2
 }
 
 with_new_version_finalized() {
-  #validate old1
-  #validate new1
-  #validate old2
+  _check_all_mlvs 1
+  validate old1
+  validate new1
+  validate old2
 
-  #generate new2
-  #validate new2
-  true
+  generate new2
+  validate new2
 }

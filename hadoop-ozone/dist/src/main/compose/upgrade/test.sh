@@ -33,7 +33,7 @@ RESULT_DIR="$ALL_RESULT_DIR" create_results_dir
 # Run all upgrades even if one fails.
 # Any failure will save a failing return code to $RESULT.
 set +e
-#run_test manual-upgrade 0.5.0 1.1.0
+run_test manual-upgrade 0.5.0 1.1.0
 run_test non-rolling-upgrade 1.0.0 1.1.0
 set -e
 
