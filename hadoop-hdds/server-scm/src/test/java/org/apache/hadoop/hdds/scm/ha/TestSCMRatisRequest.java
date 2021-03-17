@@ -40,7 +40,8 @@ public class TestSCMRatisRequest {
     PipelineID pipelineID = PipelineID.randomId();
     Object[] args = new Object[] {pipelineID.getProtobuf()};
     String operation = "test";
-    SCMRatisRequest request = SCMRatisRequest.of(PIPELINE, operation, args);
+    SCMRatisRequest request = SCMRatisRequest.of(PIPELINE, operation,
+        new Class[]{pipelineID.getProtobuf().getClass()}, args);
     Assert.assertEquals(operation,
         SCMRatisRequest.decode(request.encode()).getOperation());
     Assert.assertEquals(args[0],
@@ -52,7 +53,8 @@ public class TestSCMRatisRequest {
     PipelineID pipelineID = PipelineID.randomId();
     // Non proto args
     Object[] args = new Object[] {pipelineID};
-    SCMRatisRequest request = SCMRatisRequest.of(PIPELINE, "test", args);
+    SCMRatisRequest request = SCMRatisRequest.of(PIPELINE, "test",
+        new Class[]{pipelineID.getClass()}, args);
     // Should throw exception there.
     request.encode();
   }
@@ -73,7 +75,8 @@ public class TestSCMRatisRequest {
     pids.add(PipelineID.randomId().getProtobuf());
     Object[] args = new Object[] {pids};
     String operation = "test";
-    SCMRatisRequest request = SCMRatisRequest.of(PIPELINE, operation, args);
+    SCMRatisRequest request = SCMRatisRequest.of(PIPELINE, operation,
+        new Class[]{pids.getClass()}, args);
     Assert.assertEquals(operation,
         SCMRatisRequest.decode(request.encode()).getOperation());
     Assert.assertEquals(args[0],
@@ -84,7 +87,8 @@ public class TestSCMRatisRequest {
   public void testEncodeAndDecodeOfLong() throws Exception {
     final Long value = 10L;
     String operation = "test";
-    SCMRatisRequest request = SCMRatisRequest.of(PIPELINE, operation, value);
+    SCMRatisRequest request = SCMRatisRequest.of(PIPELINE, operation,
+        new Class[]{value.getClass()}, value);
     Assert.assertEquals(operation,
         SCMRatisRequest.decode(request.encode()).getOperation());
     Assert.assertEquals(value,

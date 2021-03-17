@@ -19,9 +19,7 @@ package org.apache.hadoop.hdds.scm.ha;
 
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
-import java.util.ArrayList;
 import java.util.EnumMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
@@ -152,12 +150,8 @@ public class SCMStateMachine extends BaseStateMachine {
             request.getType());
       }
 
-      final List<Class<?>> argumentTypes = new ArrayList<>();
-      for(Object args : request.getArguments()) {
-        argumentTypes.add(args.getClass());
-      }
       final Object result = handler.getClass().getMethod(
-          request.getOperation(), argumentTypes.toArray(new Class<?>[0]))
+          request.getOperation(), request.getParameterTypes())
           .invoke(handler, request.getArguments());
       return SCMRatisResponse.encode(result);
     } catch (NoSuchMethodException | SecurityException ex) {

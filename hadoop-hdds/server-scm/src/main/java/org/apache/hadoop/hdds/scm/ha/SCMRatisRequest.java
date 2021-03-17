@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.ha;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.google.common.base.Preconditions;
 import com.google.protobuf.InvalidProtocolBufferException;
 
 import org.apache.hadoop.hdds.scm.ha.io.CodecFactory;
@@ -39,18 +40,22 @@ public final class SCMRatisRequest {
   private final RequestType type;
   private final String operation;
   private final Object[] arguments;
+  private final Class<?>[] parameterTypes;
 
   private SCMRatisRequest(final RequestType type, final String operation,
-                         final Object... arguments) {
+      final Class<?>[] parameterTypes, final Object... arguments) {
     this.type = type;
     this.operation = operation;
+    this.parameterTypes = parameterTypes;
     this.arguments = arguments;
   }
 
   public static SCMRatisRequest of(final RequestType type,
-                                   final String operation,
-                                   final Object... arguments) {
-    return new SCMRatisRequest(type, operation, arguments);
+      final String operation,
+      final Class<?>[] parameterTypes,
+      final Object... arguments) {
+    Preconditions.checkState(parameterTypes.length == arguments.length);
+    return new SCMRatisRequest(type, operation, parameterTypes, arguments);
   }
 
   /**
@@ -74,6 +79,9 @@ public final class SCMRatisRequest {
     return arguments.clone();
   }
 
+  public Class<?>[] getParameterTypes() {
+    return parameterTypes.clone();
+  }
   /**
    * Encodes the request into Ratis Message.
    */
@@ -86,9 +94,14 @@ public final class SCMRatisRequest {
     methodBuilder.setName(operation);
 
     final List<MethodArgument> args = new ArrayList<>();
+
+    int paramCounter = 0;
     for (Object argument : arguments) {
       final MethodArgument.Builder argBuilder = MethodArgument.newBuilder();
-      argBuilder.setType(argument.getClass().getName());
+      // Set actual method parameter type, not actual argument type.
+      // This is done to avoid MethodNotFoundException in case if argument is
+      // subclass type, where as method is defined with super class type.
+      argBuilder.setType(parameterTypes[paramCounter++].getName());
       argBuilder.setValue(CodecFactory.getCodec(argument.getClass())
           .serialize(argument));
       args.add(argBuilder.build());
@@ -109,9 +122,12 @@ public final class SCMRatisRequest {
         SCMRatisRequestProto.parseFrom(message.getContent().toByteArray());
     final Method method = requestProto.getMethod();
     List<Object> args = new ArrayList<>();
+    Class<?>[] parameterTypes = new Class[method.getArgsCount()];
+    int paramCounter = 0;
     for (MethodArgument argument : method.getArgsList()) {
       try {
         final Class<?> clazz = ReflectionUtil.getClass(argument.getType());
+        parameterTypes[paramCounter++] = clazz;
         args.add(CodecFactory.getCodec(clazz)
             .deserialize(clazz, argument.getValue()));
       } catch (ClassNotFoundException ex) {
@@ -120,7 +136,7 @@ public final class SCMRatisRequest {
       }
     }
     return new SCMRatisRequest(requestProto.getType(),
-        method.getName(), args.toArray());
+        method.getName(), parameterTypes, args.toArray());
   }
 
 }
