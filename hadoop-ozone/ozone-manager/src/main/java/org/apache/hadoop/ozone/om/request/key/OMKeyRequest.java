@@ -272,7 +272,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
         .build();
   }
 
-  private List< OzoneAcl > getAclsForKey(KeyArgs keyArgs,
+  protected List< OzoneAcl > getAclsForKey(KeyArgs keyArgs,
       OmBucketInfo bucketInfo, PrefixManager prefixManager) {
     List<OzoneAcl> acls = new ArrayList<>();
 

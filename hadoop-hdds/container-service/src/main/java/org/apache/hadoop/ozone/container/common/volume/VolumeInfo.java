@@ -20,15 +20,19 @@ package org.apache.hadoop.ozone.container.common.volume;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Collection;
 
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.StorageSize;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckParams;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED;
 
 /**
  * Stores information about a disk/volume.
@@ -47,6 +51,8 @@ public final class VolumeInfo {
   // limit the visible capacity for tests. If negative, then we just
   // query from the filesystem.
   private long configuredCapacity;
+
+  private long reservedInBytes;
 
   /**
    * Builder for VolumeInfo.
@@ -83,6 +89,31 @@ public final class VolumeInfo {
     }
   }
 
+  private long getReserved(ConfigurationSource conf) {
+    Collection<String> reserveList = conf.getTrimmedStringCollection(
+        HDDS_DATANODE_DIR_DU_RESERVED);
+    for (String reserve : reserveList) {
+      String[] words = reserve.split(":");
+      if (words.length < 2) {
+        LOG.error("Reserved space should config in pair, but current is {}",
+            reserve);
+        continue;
+      }
+
+      if (words[0].trim().equals(rootDir)) {
+        try {
+          StorageSize size = StorageSize.parse(words[1].trim());
+          return (long) size.getUnit().toBytes(size.getValue());
+        } catch (Exception e) {
+          LOG.error("Failed to parse StorageSize:{}", words[1].trim(), e);
+          return 0;
+        }
+      }
+    }
+
+    return 0;
+  }
+
   private VolumeInfo(Builder b) throws IOException {
 
     this.rootDir = b.rootDir;
@@ -108,18 +139,19 @@ public final class VolumeInfo {
     SpaceUsageCheckParams checkParams =
         usageCheckFactory.paramsFor(root);
 
+    this.reservedInBytes = getReserved(b.conf);
     this.usage = new VolumeUsage(checkParams);
   }
 
   public long getCapacity() {
     if (configuredCapacity < 0) {
-      return usage.getCapacity();
+      return Math.max(usage.getCapacity() - reservedInBytes, 0);
     }
     return configuredCapacity;
   }
 
   public long getAvailable() {
-    return usage.getAvailable();
+    return Math.max(usage.getAvailable() - reservedInBytes, 0);
   }
 
   public long getScmUsed() {

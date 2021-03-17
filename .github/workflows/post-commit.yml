@@ -56,6 +56,12 @@ jobs:
           name: ozone-bin
           path: hadoop-ozone/dist/target/hadoop-ozone*.tar.gz
           retention-days: 1
+      - name: Delete temporary build artifacts before caching
+        run: |
+          #Never cache local artifacts
+          rm -rf ~/.m2/repository/org/apache/hadoop/hadoop-hdds*
+          rm -rf ~/.m2/repository/org/apache/hadoop/hadoop-ozone*
+        if: always()
   bats:
     runs-on: ubuntu-18.04
     steps:
@@ -218,12 +224,6 @@ jobs:
           name: acceptance-${{ matrix.suite }}
           path: /mnt/ozone/target/acceptance
         continue-on-error: true
-      - name: Delete temporary build artifacts before caching
-        run: |
-          #Never cache local artifacts
-          rm -rf ~/.m2/repository/org/apache/hadoop/hdds
-          rm -rf ~/.m2/repository/org/apache/hadoop/ozone
-        if: always()
   integration:
     runs-on: ubuntu-18.04
     strategy:
@@ -264,14 +264,14 @@ jobs:
     steps:
       - name: Checkout project
         uses: actions/checkout@v2
-      - name: Run a full build
-        uses: ./.github/buildenv
-        with:
-          args: ./hadoop-ozone/dev-support/checks/build.sh
       - name: Download artifacts
         uses: actions/download-artifact@v2
         with:
           path: target/artifacts
+      - name: Untar binaries
+        run: |
+          mkdir -p hadoop-ozone/dist/target
+          tar xzvf target/artifacts/ozone-bin/hadoop-ozone*.tar.gz -C hadoop-ozone/dist/target
       - name: Calculate combined coverage
         run: ./hadoop-ozone/dev-support/checks/coverage.sh
       - name: Setup java 11
@@ -335,9 +335,3 @@ jobs:
           name: kubernetes
           path: /mnt/ozone/target/kubernetes
         continue-on-error: true
-      - name: Delete temporary build artifacts before caching
-        run: |
-          #Never cache local artifacts
-          rm -rf ~/.m2/repository/org/apache/hadoop/hdds
-          rm -rf ~/.m2/repository/org/apache/hadoop/ozone
-        if: always()

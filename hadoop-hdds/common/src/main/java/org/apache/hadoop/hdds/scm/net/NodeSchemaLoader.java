@@ -44,6 +44,8 @@ import java.util.Map;
 import  org.apache.hadoop.hdds.scm.net.NodeSchema.LayerType;
 import org.yaml.snakeyaml.Yaml;
 
+import static org.apache.commons.collections.EnumerationUtils.toList;
+
 /**
  * A Network topology layer schema loading tool that loads user defined network
  * layer schema data from a XML configuration file.
@@ -123,8 +125,10 @@ public final class NodeSchemaLoader {
           try (InputStream stream = classloader
               .getResourceAsStream(schemaFilePath)) {
             if (stream != null) {
-              LOG.info("Loading file from {}", classloader
-                  .getResources(schemaFilePath));
+              if (LOG.isInfoEnabled()) {
+                LOG.info("Loading schema from {}",
+                    toList(classloader.getResources(schemaFilePath)));
+              }
               return loadSchemaFromStream(schemaFilePath, stream);
             }
           }

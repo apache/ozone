@@ -232,14 +232,27 @@ public class SCMContainerManager implements ContainerManager {
   @Override
   public List<ContainerInfo> listContainer(ContainerID startContainerID,
       int count) {
+    return listContainer(startContainerID, count, null);
+  }
+
+  @Override
+  public List<ContainerInfo> listContainer(ContainerID startContainerID,
+      int count, HddsProtos.LifeCycleState state) {
     lock.lock();
     try {
       scmContainerManagerMetrics.incNumListContainersOps();
+      List<ContainerID> containersIds;
+      if (state == null) {
+        containersIds =
+            new ArrayList<>(containerStateManager.getAllContainerIDs());
+      } else {
+        containersIds = new ArrayList<>(
+            containerStateManager.getContainerIDsByState(state));
+      }
+      Collections.sort(containersIds);
+
       final long startId = startContainerID == null ?
           0 : startContainerID.getId();
-      final List<ContainerID> containersIds =
-          new ArrayList<>(containerStateManager.getAllContainerIDs());
-      Collections.sort(containersIds);
 
       return containersIds.stream()
           .filter(id -> id.getId() > startId)

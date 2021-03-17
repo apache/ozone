@@ -156,6 +156,24 @@ public class SCMHAConfiguration {
   )
   private long ratisLeaderElectionTimeout = 5 * 1000L;
 
+  @Config(key = "ratis.leader.ready.wait.timeout",
+      type = ConfigType.TIME,
+      defaultValue = "60s",
+      tags = {SCM, OZONE, HA, RATIS},
+      description = "The minimum timeout duration for waiting for" +
+                    "leader readiness"
+  )
+  private long ratisLeaderReadyWaitTimeout = 60 * 1000L;
+
+  @Config(key = "ratis.leader.ready.check.interval",
+      type = ConfigType.TIME,
+      defaultValue = "2s",
+      tags = {SCM, OZONE, HA, RATIS},
+      description = "The interval between ratis server performing" +
+                    "a leader readiness check"
+  )
+  private long ratisLeaderReadyCheckInterval = 2 * 1000L;
+
   @Config(key = "ratis.server.failure.timeout.duration",
       type = ConfigType.TIME,
       defaultValue = "120s",
@@ -278,6 +296,18 @@ public class SCMHAConfiguration {
 
   public long getLeaderElectionMaxTimeout() {
     return ratisLeaderElectionTimeout + 200L;
+  }
+
+  public long getLeaderReadyWaitTimeout() {
+    return ratisLeaderReadyWaitTimeout;
+  }
+
+  public void setLeaderReadyWaitTimeout(long mills) {
+    ratisLeaderReadyWaitTimeout = mills;
+  }
+
+  public long getLeaderReadyCheckInterval() {
+    return ratisLeaderReadyCheckInterval;
   }
 
   public long getRatisNodeFailureTimeout() {

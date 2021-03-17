@@ -66,7 +66,7 @@ import static org.junit.Assert.fail;
 public class TestOzoneFSWithObjectStoreCreate {
 
   @Rule
-  public Timeout timeout = new Timeout(300000);
+  public Timeout timeout = Timeout.seconds(300);
 
   private String rootPath;
 

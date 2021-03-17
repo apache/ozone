@@ -32,7 +32,7 @@ import io.grpc.stub.StreamObserver;
 /**
  * Implementation of the CSI identity service.
  */
-public class IdentitiyService extends IdentityImplBase {
+public class IdentityService extends IdentityImplBase {
 
   @Override
   public void getPluginInfo(csi.v1.Csi.GetPluginInfoRequest request,

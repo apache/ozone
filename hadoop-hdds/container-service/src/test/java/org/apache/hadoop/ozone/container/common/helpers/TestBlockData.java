@@ -40,7 +40,7 @@ import static org.junit.Assert.assertEquals;
 public class TestBlockData {
   static final Logger LOG = LoggerFactory.getLogger(TestBlockData.class);
   @Rule
-  public TestRule timeout = new Timeout(10000);
+  public TestRule timeout = Timeout.seconds(10);
 
   static ContainerProtos.ChunkInfo buildChunkInfo(String name, long offset,
       long len) {

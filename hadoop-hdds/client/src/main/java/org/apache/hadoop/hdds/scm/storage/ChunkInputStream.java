@@ -250,7 +250,7 @@ public class ChunkInputStream extends InputStream
   /**
    * Prepares to read by advancing through buffers or allocating new buffers,
    * as needed until it finds data to return, or encounters EOF.
-   * @param len desired lenght of data to read
+   * @param len desired length of data to read
    * @return length of data available to read, possibly less than desired length
    */
   private synchronized int prepareRead(int len) throws IOException {

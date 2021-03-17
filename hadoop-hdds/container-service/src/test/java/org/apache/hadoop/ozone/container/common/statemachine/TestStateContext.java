@@ -565,4 +565,40 @@ public class TestStateContext {
     assertEquals(1, awaited.get());
     assertEquals(1, executed.get());
   }
+
+  @Test
+  public void testGetReports() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    DatanodeStateMachine datanodeStateMachineMock =
+        mock(DatanodeStateMachine.class);
+
+    StateContext ctx = new StateContext(conf, DatanodeStates.getInitState(),
+        datanodeStateMachineMock);
+    InetSocketAddress scm1 = new InetSocketAddress("scm1", 9001);
+    ctx.addEndpoint(scm1);
+    InetSocketAddress scm2 = new InetSocketAddress("scm2", 9001);
+    ctx.addEndpoint(scm2);
+    // Check initial state
+    assertEquals(0, ctx.getAllAvailableReports(scm1).size());
+    assertEquals(0, ctx.getAllAvailableReports(scm2).size());
+
+    Map<String, Integer> expectedReportCount = new HashMap<>();
+
+    // Add a bunch of ContainerReports
+    batchAddReports(ctx, StateContext.CONTAINER_REPORTS_PROTO_NAME, 128);
+    batchAddReports(ctx, StateContext.NODE_REPORT_PROTO_NAME, 128);
+    batchAddReports(ctx, StateContext.PIPELINE_REPORTS_PROTO_NAME, 128);
+    batchAddReports(ctx,
+        StateContext.INCREMENTAL_CONTAINER_REPORT_PROTO_NAME, 128);
+
+    // Should only keep the latest one
+    expectedReportCount.put(StateContext.CONTAINER_REPORTS_PROTO_NAME, 1);
+    expectedReportCount.put(StateContext.NODE_REPORT_PROTO_NAME, 1);
+    expectedReportCount.put(StateContext.PIPELINE_REPORTS_PROTO_NAME, 1);
+    // Should keep less or equal than maxLimit depending on other reports' size.
+    expectedReportCount.put(
+        StateContext.INCREMENTAL_CONTAINER_REPORT_PROTO_NAME, 97);
+    checkReportCount(ctx.getReports(scm1, 100), expectedReportCount);
+    checkReportCount(ctx.getReports(scm2, 100), expectedReportCount);
+  }
 }

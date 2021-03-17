@@ -48,7 +48,7 @@ import org.mockito.Mockito;
  */
 public class TestHandler {
   @Rule
-  public TestRule timeout = new Timeout(300000);
+  public TestRule timeout = Timeout.seconds(300);
 
   private OzoneConfiguration conf;
   private HddsDispatcher dispatcher;
