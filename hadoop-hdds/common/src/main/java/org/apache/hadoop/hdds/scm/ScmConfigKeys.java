@@ -492,6 +492,14 @@ public final class ScmConfigKeys {
   public static final boolean HDDS_DATANODE_UPGRADE_LAYOUT_INLINE_DEFAULT =
       true;
 
+
+  // Temporary config which will be used only for test only purposes until
+  // SCM HA Security work is completed. This config should not be modified by
+  // users.
+  public static final String OZONE_SCM_HA_SECURITY_SUPPORTED =
+      "hdds.scm.ha.security.enable";
+  public static final boolean OZONE_SCM_HA_SECURITY_SUPPORTED_DEFAULT = false;
+
   /**
    * Never constructed.
    */
