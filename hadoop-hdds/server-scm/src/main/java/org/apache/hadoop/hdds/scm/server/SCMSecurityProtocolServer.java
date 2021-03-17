@@ -57,6 +57,7 @@ import org.slf4j.LoggerFactory;
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.CERTIFICATE_NOT_FOUND;
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_CA_CERT_FAILED;
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_CERTIFICATE_FAILED;
+import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_ROOT_CA_CERT_FAILED;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateApprover.ApprovalType.KERBEROS_TRUSTED;
 
 /**
@@ -281,6 +282,28 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
       }
     }
     return results;
+  }
+
+  @Override
+  public List<String> listCACertificate() throws IOException {
+    List<String> caCerts =
+        listCertificate(NodeType.SCM, 0, 10, false);
+    caCerts.add(getRootCACertificate());
+    return caCerts;
+  }
+
+  @Override
+  public String getRootCACertificate() throws IOException {
+    LOGGER.debug("Getting Root CA certificate.");
+    //TODO: This code will be modified after HDDS-4897 is merged and
+    // integrated. For now getting RootCA cert from certificateServer.
+    try {
+      return CertificateCodec.getPEMEncodedString(
+          certificateServer.getCACertificate());
+    } catch (CertificateException e) {
+      throw new SCMSecurityException("getRootCertificate operation failed. ",
+          e, GET_ROOT_CA_CERT_FAILED);
+    }
   }
 
   public RPC.Server getRpcServer() {
