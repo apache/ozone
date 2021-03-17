@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCAC
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertificateRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetDataNodeCertRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMListCACertificateRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMListCertificateRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityRequest;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityRequest.Builder;
@@ -293,6 +294,24 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
         .build();
     return submitRequest(Type.ListCertificate,
         builder -> builder.setListCertificateRequest(protoIns))
+        .getListCertificateResponseProto().getCertificatesList();
+  }
+
+  @Override
+  public String getRootCACertificate() throws IOException {
+    SCMGetCACertificateRequestProto protoIns = SCMGetCACertificateRequestProto
+        .getDefaultInstance();
+    return submitRequest(Type.GetCACertificate,
+        builder -> builder.setGetCACertificateRequest(protoIns))
+        .getGetCertResponseProto().getX509RootCACertificate();
+  }
+
+  @Override
+  public List<String> listCACertificate() throws IOException {
+    SCMListCACertificateRequestProto proto =
+        SCMListCACertificateRequestProto.getDefaultInstance();
+    return submitRequest(Type.ListCACertificate,
+        builder -> builder.setListCACertificateRequestProto(proto))
         .getListCertificateResponseProto().getCertificatesList();
   }
 

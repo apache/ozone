@@ -105,4 +105,31 @@ public interface SCMSecurityProtocol {
   List<String> listCertificate(HddsProtos.NodeType type, long startSerialId,
       int count, boolean isRevoked) throws IOException;
 
+  /**
+   * Get Root CA certificate.
+   * @return
+   * @throws IOException
+   */
+  String getRootCACertificate() throws IOException;
+
+  /**
+   * Returns all the individual SCM CA's along with Root CA.
+   *
+   * For example 3 nodes SCM HA cluster, the output will be
+   *
+   * SCM1 CA
+   * SCM2 CA
+   * SCM3 CA
+   * Root CA
+   * @return list of CA's
+   *
+   * For example on non-HA cluster the output will be SCM CA and Root CA.
+   *
+   * SCM CA
+   * Root CA
+   *
+   * @throws IOException
+   */
+  List<String> listCACertificate() throws IOException;
+
 }
