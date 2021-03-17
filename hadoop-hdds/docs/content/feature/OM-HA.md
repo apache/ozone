@@ -29,7 +29,7 @@ To avoid any single point of failure the leader nodes also should have a HA setu
 
 Both Ozone Manager and Storage Container Manager supports HA. In this mode the internal state is replicated via RAFT (with Apache Ratis) 
 
-This document explain the HA setup of Ozone Manager (OM) HA, please check [this page[({{< ref "SCM-HA" >}})].  While they can be setup for HA independently, a reliable, full HA setup requires enabling HA for both services.
+This document explain the HA setup of Ozone Manager (OM) HA, please check [this page]({{< ref "SCM-HA" >}}) for SCM HA.  While they can be setup for HA independently, a reliable, full HA setup requires enabling HA for both services.
 
 ## Ozone Manager HA
 
