@@ -537,12 +537,12 @@ public class ContainerOperationClient implements ScmClient {
    *
    * @param ipaddress datanode ipaddress String
    * @param uuid datanode uuid String
-   * @return List of DatanodeUsageInfo. Each element contains info such as
+   * @return List of DatanodeUsageInfoProto. Each element contains info such as
    * capacity, SCMused, and remaining space.
    * @throws IOException
    */
   @Override
-  public List<HddsProtos.DatanodeUsageInfo> getDatanodeUsageInfo(
+  public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
       String ipaddress, String uuid) throws IOException {
     return storageContainerLocationClient.getDatanodeUsageInfo(ipaddress,
         uuid);
@@ -553,12 +553,12 @@ public class ContainerOperationClient implements ScmClient {
    *
    * @param mostUsed true if most used, false if least used
    * @param count Integer number of nodes to get info for
-   * @return List of DatanodeUsageInfo. Each element contains info such as
+   * @return List of DatanodeUsageInfoProto. Each element contains info such as
    * capacity, SCMUsed, and remaining space.
    * @throws IOException
    */
   @Override
-  public List<HddsProtos.DatanodeUsageInfo> getDatanodeUsageInfo(
+  public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
       boolean mostUsed, int count) throws IOException {
     return storageContainerLocationClient.getDatanodeUsageInfo(mostUsed, count);
   }

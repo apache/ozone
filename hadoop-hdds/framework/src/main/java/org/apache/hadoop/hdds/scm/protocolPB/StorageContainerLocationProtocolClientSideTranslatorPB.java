@@ -616,12 +616,12 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
    *
    * @param ipaddress Address String
    * @param uuid UUID String
-   * @return List of DatanodeUsageInfo. Each element contains info such as
+   * @return List of DatanodeUsageInfoProto. Each element contains info such as
    * capacity, SCMUsed, and remaining space.
    * @throws IOException
    */
   @Override
-  public List<HddsProtos.DatanodeUsageInfo> getDatanodeUsageInfo(
+  public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
       String ipaddress, String uuid) throws IOException {
 
     DatanodeUsageInfoRequestProto request =
@@ -642,12 +642,12 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
    *
    * @param mostUsed true if most used, false if least used
    * @param count Integer number of nodes to get info for
-   * @return List of DatanodeUsageInfo. Each element contains info such as
+   * @return List of DatanodeUsageInfoProto. Each element contains info such as
    * capacity, SCMUsed, and remaining space.
    * @throws IOException
    */
   @Override
-  public List<HddsProtos.DatanodeUsageInfo> getDatanodeUsageInfo(
+  public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
       boolean mostUsed, int count) throws IOException {
     DatanodeUsageInfoRequestProto request =
         DatanodeUsageInfoRequestProto.newBuilder()

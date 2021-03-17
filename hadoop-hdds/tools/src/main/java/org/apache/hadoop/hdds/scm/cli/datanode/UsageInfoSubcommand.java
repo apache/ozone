@@ -41,46 +41,48 @@ import java.util.List;
     versionProvider = HddsVersionProvider.class)
 public class UsageInfoSubcommand extends ScmSubcommand {
 
-  @CommandLine.ArgGroup(exclusive = true, multiplicity = "1")
+  @CommandLine.ArgGroup(multiplicity = "1")
   private ExclusiveArguments exclusiveArguments;
 
-  static class ExclusiveArguments {
+  private static class ExclusiveArguments {
     @CommandLine.Option(names = {"--ip"}, paramLabel = "IP", description =
-        "show info by datanode ip address.", defaultValue = "")
+        "Show info by datanode ip address.", defaultValue = "")
     private String ipaddress;
 
     @CommandLine.Option(names = {"--uuid"}, paramLabel = "UUID", description =
-        "show info by datanode UUID.", defaultValue = "")
+        "Show info by datanode UUID.", defaultValue = "")
     private String uuid;
 
     @CommandLine.Option(names = {"-m", "--most-used"},
-        description = "include this option to show the most used datanodes",
+        description = "Show the most used datanodes.",
         defaultValue = "false")
     private boolean mostUsed;
 
     @CommandLine.Option(names = {"-l", "--least-used"},
-        description = "include this option to show the least used datanodes",
+        description = "Show the least used datanodes.",
         defaultValue = "false")
     private boolean leastUsed;
   }
 
-  @CommandLine.Option(names = {"-c", "--count"}, description = "number of " +
-      "datanodes to display (Default: ${DEFAULT-VALUE})",
+  @CommandLine.Option(names = {"-c", "--count"}, description = "Number of " +
+      "datanodes to display (Default: ${DEFAULT-VALUE}).",
       paramLabel = "NUMBER OF NODES", defaultValue = "3")
   private int count;
 
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
-    List<HddsProtos.DatanodeUsageInfo> infoList = null;
+    List<HddsProtos.DatanodeUsageInfoProto> infoList;
     if (count < 1) {
-      throw new IOException("count must be greater than 0");
+      throw new IOException("Count must be an integer greater than 0.");
     }
+
+    // fetch info by ip or uuid
     if (!Strings.isNullOrEmpty(exclusiveArguments.ipaddress) ||
         !Strings.isNullOrEmpty(exclusiveArguments.uuid)) {
       infoList = scmClient.getDatanodeUsageInfo(exclusiveArguments.ipaddress,
           exclusiveArguments.uuid);
-    } else {
+    } else { // get info of most used or least used nodes
       infoList = scmClient.getDatanodeUsageInfo(exclusiveArguments.mostUsed,
           count);
     }
@@ -93,14 +95,15 @@ public class UsageInfoSubcommand extends ScmSubcommand {
    *
    * @param info Information such as Capacity, SCMUsed etc.
    */
-  public void printInfo(HddsProtos.DatanodeUsageInfo info) {
-    Double capacity = (double)info.getCapacity();
-    Double usedRatio = info.getUsed() / capacity;
-    Double remainingRatio = info.getRemaining() / capacity;
+  public void printInfo(HddsProtos.DatanodeUsageInfoProto info) {
+    double capacity = (double) info.getCapacity();
+    double usedRatio = info.getUsed() / capacity;
+    double remainingRatio = info.getRemaining() / capacity;
     NumberFormat percentFormat = NumberFormat.getPercentInstance();
     percentFormat.setMinimumFractionDigits(5);
 
-    System.out.printf("Usage info for %s:%n", info.getNode().getUuid());
+    System.out.printf("Usage info for datanode with UUID %s:%n",
+        info.getNode().getUuid());
     System.out.printf("%-10s: %20sB %n", "Capacity", info.getCapacity());
     System.out.printf("%-10s: %20sB (%s) %n", "SCMUsed", info.getUsed(),
         percentFormat.format(usedRatio));

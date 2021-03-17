@@ -245,23 +245,22 @@ public interface StorageContainerLocationProtocol extends Closeable {
    *
    * @param ipaddress datanode IP address String
    * @param uuid datanode UUID String
-   * @return List of DatanodeUsageInfo. Each element contains info such as
+   * @return List of DatanodeUsageInfoProto. Each element contains info such as
    * capacity, SCMused, and remaining space.
    * @throws IOException
    */
-  List<HddsProtos.DatanodeUsageInfo> getDatanodeUsageInfo(String ipaddress,
-                                                          String uuid)
-      throws IOException;
+  List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
+      String ipaddress, String uuid) throws IOException;
 
   /**
    * Get usage information of most or least used datanodes.
    *
    * @param mostUsed true if most used, false if least used
    * @param count Integer number of nodes to get info for
-   * @return List of DatanodeUsageInfo. Each element contains info such as
+   * @return List of DatanodeUsageInfoProto. Each element contains info such as
    * capacity, SCMUsed, and remaining space.
    * @throws IOException
    */
-  List<HddsProtos.DatanodeUsageInfo> getDatanodeUsageInfo(
+  List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
       boolean mostUsed, int count) throws IOException;
 }

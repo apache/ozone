@@ -567,7 +567,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   public DatanodeUsageInfoResponseProto getDatanodeUsageInfo(
       StorageContainerLocationProtocolProtos.DatanodeUsageInfoRequestProto
       request) throws IOException {
-    List<HddsProtos.DatanodeUsageInfo> infoList;
+    List<HddsProtos.DatanodeUsageInfoProto> infoList;
 
     // get info by ip or uuid
     if (request.hasUuid() || request.hasIpaddress()) {
