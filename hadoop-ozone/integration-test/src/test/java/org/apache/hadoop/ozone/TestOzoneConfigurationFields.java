@@ -38,7 +38,7 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = new Timeout(300000);
+  public Timeout timeout = Timeout.seconds(300);
 
   @Override
   public void initializeMemberVariables() {
@@ -84,7 +84,8 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         ReconServerConfigKeys.RECON_OM_SNAPSHOT_TASK_INTERVAL_DELAY,
         ReconServerConfigKeys.RECON_OM_SNAPSHOT_TASK_FLUSH_PARAM,
         OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY,
-        OMConfigKeys.OZONE_OM_HA_PREFIX
+        OMConfigKeys.OZONE_OM_HA_PREFIX,
+        ScmConfigKeys.OZONE_SCM_HA_SECURITY_SUPPORTED
         // TODO HDDS-2856
     ));
   }

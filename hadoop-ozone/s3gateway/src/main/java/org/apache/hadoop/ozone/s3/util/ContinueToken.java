@@ -38,7 +38,7 @@ public class ContinueToken {
 
   private String lastDir;
 
-  private static final String CONTINUE_TOKEN_SEPERATOR = "-";
+  private static final String CONTINUE_TOKEN_SEPARATOR = "-";
 
   public ContinueToken(String lastKey, String lastDir) {
     Preconditions.checkNotNull(lastKey,
@@ -68,7 +68,7 @@ public class ContinueToken {
 
       String hex = Hex.encodeHexString(buffer.array());
       String digest = DigestUtils.sha256Hex(hex);
-      return hex + CONTINUE_TOKEN_SEPERATOR + digest;
+      return hex + CONTINUE_TOKEN_SEPARATOR + digest;
     } else {
       return null;
     }
@@ -83,7 +83,7 @@ public class ContinueToken {
    */
   public static ContinueToken decodeFromString(String key) throws OS3Exception {
     if (key != null) {
-      int indexSeparator = key.indexOf(CONTINUE_TOKEN_SEPERATOR);
+      int indexSeparator = key.indexOf(CONTINUE_TOKEN_SEPARATOR);
       if (indexSeparator == -1) {
         throw S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, key);
       }

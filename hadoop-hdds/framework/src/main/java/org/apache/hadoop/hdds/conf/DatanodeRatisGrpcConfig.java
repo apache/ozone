@@ -35,7 +35,7 @@ public class DatanodeRatisGrpcConfig {
       defaultValue = "32MB",
       type = ConfigType.INT,
       tags = {OZONE, CLIENT, PERFORMANCE},
-      description = "Maximum message size allowed to be recieved by Grpc " +
+      description = "Maximum message size allowed to be received by Grpc " +
           "Channel (Server)."
   )
   private int maximumMessageSize = 32 * 1024 * 1024;

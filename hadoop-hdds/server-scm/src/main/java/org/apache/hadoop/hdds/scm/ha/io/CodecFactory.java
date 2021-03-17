@@ -21,6 +21,8 @@ import com.google.protobuf.GeneratedMessage;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.ProtocolMessageEnum;
 
+import java.math.BigInteger;
+import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -38,6 +40,8 @@ public final class CodecFactory {
     codecs.put(Long.class, new LongCodec());
     codecs.put(String.class, new StringCodec());
     codecs.put(Boolean.class, new BooleanCodec());
+    codecs.put(BigInteger.class, new BigIntegerCodec());
+    codecs.put(X509Certificate.class, new X509CertificateCodec());
   }
 
   private CodecFactory() {}

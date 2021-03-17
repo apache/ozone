@@ -64,6 +64,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.ScmInfo;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.scm.ScmConfig;
@@ -135,6 +136,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.hdds.utils.HAUtils.checkSecurityAndSCMHAEnabled;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.OzoneConsts.CRL_SEQUENCE_ID_KEY;
 
@@ -257,6 +259,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     Objects.requireNonNull(configurator, "configurator cannot not be null");
     Objects.requireNonNull(conf, "configuration cannot not be null");
 
+    checkSecurityAndSCMHAEnabled(conf);
+
     scmHANodeDetails = SCMHANodeDetails.loadSCMHAConfig(conf);
 
     configuration = conf;
@@ -293,6 +297,17 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     // Creates the SCM DBs or opens them if it exists.
     // A valid pointer to the store is required by all the other services below.
     initalizeMetadataStore(conf, configurator);
+
+    eventQueue = new EventQueue();
+    serviceManager = new SCMServiceManager();
+
+    long watcherTimeout =
+        conf.getTimeDuration(ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT,
+            HDDS_SCM_WATCHER_TIMEOUT_DEFAULT, TimeUnit.MILLISECONDS);
+    commandWatcherLeaseManager = new LeaseManager<>("CommandWatcher",
+        watcherTimeout);
+    initializeSystemManagers(conf, configurator);
+
     // Authenticate SCM if security is enabled, this initialization can only
     // be done after the metadata store is initialized.
     if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
@@ -304,16 +319,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       certificateServer = null;
       securityProtocolServer = null;
     }
-
-    eventQueue = new EventQueue();
-    serviceManager = new SCMServiceManager();
-
-    long watcherTimeout =
-        conf.getTimeDuration(ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT,
-            HDDS_SCM_WATCHER_TIMEOUT_DEFAULT, TimeUnit.MILLISECONDS);
-    commandWatcherLeaseManager = new LeaseManager<>("CommandWatcher",
-        watcherTimeout);
-    initializeSystemManagers(conf, configurator);
 
     CloseContainerEventHandler closeContainerHandler =
         new CloseContainerEventHandler(
@@ -657,8 +662,12 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       throw new SCMException("Cannot initialize CA without a valid metadata " +
           "store", ResultCodes.SCM_NOT_INITIALIZED);
     }
-    SCMCertStore certStore = new SCMCertStore(this.scmMetadataStore,
-        getLastSequenceIdForCRL());
+
+    CertificateStore certStore =
+        new SCMCertStore.Builder().setMetadaStore(scmMetadataStore)
+            .setRatisServer(scmHAManager.getRatisServer())
+            .setCRLSequenceId(getLastSequenceIdForCRL()).build();
+
     return new DefaultCAServer(subject, clusterID, scmID, certStore);
   }
 
@@ -750,7 +759,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           "SCM bootstrap command can only be executed in non-Primordial SCM "
               + "{}, self id {} "
               + "Ignoring it.", primordialSCM, selfNodeId);
-      return false;
+      return true;
     }
     OzoneConfiguration config =
         SCMHAUtils.removeSelfId(conf,
@@ -797,6 +806,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    */
   public static boolean scmInit(OzoneConfiguration conf,
       String clusterId) throws IOException {
+    checkSecurityAndSCMHAEnabled(conf);
     SCMStorageConfig scmStorageConfig = new SCMStorageConfig(conf);
     StorageState state = scmStorageConfig.getState();
     final SCMHANodeDetails haDetails = SCMHANodeDetails.loadSCMHAConfig(conf);
@@ -808,7 +818,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           "SCM init command can only be executed in Primordial SCM {}, "
               + "self id {} "
               + "Ignoring it.", primordialSCM, selfNodeId);
-      return false;
+      return true;
     }
     if (state != StorageState.INITIALIZED) {
       try {

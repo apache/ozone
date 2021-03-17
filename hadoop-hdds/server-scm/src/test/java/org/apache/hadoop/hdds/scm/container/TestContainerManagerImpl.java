@@ -118,4 +118,35 @@ public class TestContainerManagerImpl {
         containerManager.getContainer(cid).getState());
   }
 
+  @Test
+  public void testGetContainers() throws Exception{
+    Assert.assertTrue(
+        containerManager.getContainers().isEmpty());
+
+    ContainerID[] cidArray = new ContainerID[10];
+    for(int i = 0; i < 10; i++){
+      ContainerInfo container = containerManager.allocateContainer(
+          HddsProtos.ReplicationType.RATIS,
+          HddsProtos.ReplicationFactor.THREE, "admin");
+      cidArray[i] = container.containerID();
+    }
+
+    Assert.assertEquals(10,
+        containerManager.getContainers(cidArray[0], 10).size());
+    Assert.assertEquals(10,
+        containerManager.getContainers(cidArray[0], 100).size());
+
+    containerManager.updateContainerState(cidArray[0],
+        HddsProtos.LifeCycleEvent.FINALIZE);
+    Assert.assertEquals(9,
+        containerManager.getContainers(HddsProtos.LifeCycleState.OPEN).size());
+    Assert.assertEquals(1, containerManager
+        .getContainers(HddsProtos.LifeCycleState.CLOSING).size());
+    containerManager.updateContainerState(cidArray[1],
+        HddsProtos.LifeCycleEvent.FINALIZE);
+    Assert.assertEquals(8,
+        containerManager.getContainers(HddsProtos.LifeCycleState.OPEN).size());
+    Assert.assertEquals(2, containerManager
+        .getContainers(HddsProtos.LifeCycleState.CLOSING).size());
+  }
 }

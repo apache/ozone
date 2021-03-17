@@ -140,7 +140,7 @@ public class TestDatanodeStateMachine {
         s.stop();
       }
     } catch (Exception e) {
-      //ignore all execption from the shutdown
+      //ignore all exception from the shutdown
     } finally {
       FileUtil.fullyDelete(testRoot);
     }

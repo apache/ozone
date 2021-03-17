@@ -166,7 +166,7 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   /**
-   * Creates a pipeline over the machines choosen by the SCM.
+   * Creates a pipeline over the machines chosen by the SCM.
    *
    * @param client   - Client
    * @param pipeline - pipeline to be createdon Datanodes.
@@ -371,6 +371,13 @@ public class ContainerOperationClient implements ScmClient {
       int count) throws IOException {
     return storageContainerLocationClient.listContainer(
         startContainerID, count);
+  }
+
+  @Override
+  public List<ContainerInfo> listContainer(long startContainerID,
+      int count, HddsProtos.LifeCycleState state) throws IOException {
+    return storageContainerLocationClient.listContainer(
+        startContainerID, count, state);
   }
 
   /**

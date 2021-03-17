@@ -34,7 +34,7 @@ public class TestSCMSecurityProtocolServer {
   private OzoneConfiguration config;
 
   @Rule
-  public Timeout timeout = new Timeout(1000 * 20);
+  public Timeout timeout = Timeout.seconds(20);
 
   @Before
   public void setUp() throws Exception {

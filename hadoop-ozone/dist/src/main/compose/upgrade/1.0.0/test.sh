@@ -15,9 +15,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+_mydir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
-: "${SCM_DIR:="${OZONE_VOLUME}/scm"}"
-: "${OZONE_RUNNER_VERSION:="20200625-1"}"
+export OZONE_UPGRADE_FROM="$(basename ${_mydir})"
+export RESULT_DIR="${_mydir}/result"
 
-docker run --rm -v "${SCM_DIR}":/scm -v "${SCRIPT_DIR}/1.0.0":/upgrade -w /scm/metadata apache/ozone-runner:"${OZONE_RUNNER_VERSION}" /upgrade/01-migrate-scm-db.sh
+cd "${_mydir}/.."
+source upgrade_to_current.sh

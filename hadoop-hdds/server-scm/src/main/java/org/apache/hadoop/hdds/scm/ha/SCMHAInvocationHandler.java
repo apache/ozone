@@ -90,7 +90,8 @@ public class SCMHAInvocationHandler implements InvocationHandler {
     long startTime = Time.monotonicNowNanos();
     Preconditions.checkNotNull(ratisHandler);
     final SCMRatisResponse response =  ratisHandler.submitRequest(
-        SCMRatisRequest.of(requestType, method.getName(), args));
+        SCMRatisRequest.of(requestType, method.getName(),
+            method.getParameterTypes(), args));
     LOG.info("Invoking method {} on target {}, cost {}us",
         method, ratisHandler, (Time.monotonicNowNanos() - startTime) / 1000.0);
     if (response.isSuccess()) {

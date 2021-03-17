@@ -25,6 +25,7 @@ enum RequestType {
     CONTAINER = 2;
     BLOCK = 3;
     SEQUENCE_ID = 4;
+    CERT_STORE = 5;
 }
 
 message Method {

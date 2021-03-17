@@ -88,7 +88,7 @@ public class TestConfigurationSubCommand {
   public static class CustomConfig extends ParentConfig {
 
     @Config(key = "address", defaultValue = "localhost", description = "Client "
-        + "addres (To test string injection).", tags = ConfigTag.MANAGEMENT)
+        + "address (To test string injection).", tags = ConfigTag.MANAGEMENT)
     private String clientAddress;
 
     public String getClientAddress() {

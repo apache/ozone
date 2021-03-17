@@ -61,7 +61,7 @@ public class TestXceiverClientMetrics {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = new Timeout(300000);
+  public Timeout timeout = Timeout.seconds(300);
   // only for testing
   private volatile boolean breakFlag;
   private CountDownLatch latch;

@@ -53,7 +53,7 @@ import org.junit.rules.Timeout;
  */
 public class TestReconWithOzoneManagerHA {
   @Rule
-  public Timeout timeout = new Timeout(300_000);
+  public Timeout timeout = Timeout.seconds(300);;
 
   private MiniOzoneOMHAClusterImpl cluster;
   private ObjectStore objectStore;

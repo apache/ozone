@@ -208,7 +208,7 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
     // Get the new OM Proxy NodeId
     String newProxyNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
 
-    // Verify that a failover occured. the new proxy nodeId should be
+    // Verify that a failover occurred. the new proxy nodeId should be
     // different from the old proxy nodeId.
     Assert.assertNotEquals("Failover did not occur as expected",
         firstProxyNodeId, newProxyNodeId);

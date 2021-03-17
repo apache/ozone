@@ -207,6 +207,8 @@ public final class ScmConfigKeys {
       "hdds.rest.http-address";
   public static final String HDDS_REST_HTTP_ADDRESS_DEFAULT = "0.0.0.0:9880";
   public static final String HDDS_DATANODE_DIR_KEY = "hdds.datanode.dir";
+  public static final String HDDS_DATANODE_DIR_DU_RESERVED =
+      "hdds.datanode.dir.du.reserved";
   public static final String HDDS_REST_CSRF_ENABLED_KEY =
       "hdds.rest.rest-csrf.enabled";
   public static final boolean HDDS_REST_CSRF_ENABLED_DEFAULT = false;
@@ -489,6 +491,14 @@ public final class ScmConfigKeys {
       "hdds.datanode.upgrade.layout.inline";
   public static final boolean HDDS_DATANODE_UPGRADE_LAYOUT_INLINE_DEFAULT =
       true;
+
+
+  // Temporary config which will be used only for test only purposes until
+  // SCM HA Security work is completed. This config should not be modified by
+  // users.
+  public static final String OZONE_SCM_HA_SECURITY_SUPPORTED =
+      "hdds.scm.ha.security.enable";
+  public static final boolean OZONE_SCM_HA_SECURITY_SUPPORTED_DEFAULT = false;
 
   /**
    * Never constructed.
