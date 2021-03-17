@@ -494,9 +494,9 @@ public final class ScmConfigKeys {
   // Temporary config which will be used only for test only purposes until
   // SCM HA Security work is completed. This config should not be modified by
   // users.
-  public static final String OZONE_SCM_HA_SECURITY_ENABLE =
+  public static final String OZONE_SCM_HA_SECURITY_SUPPORTED =
       "hdds.scm.ha.security.enable";
-  public static final boolean OZONE_SCM_HA_SECURITY_ENABLE_DEFAULT = false;
+  public static final boolean OZONE_SCM_HA_SECURITY_SUPPORTED_DEFAULT = false;
 
   /**
    * Never constructed.

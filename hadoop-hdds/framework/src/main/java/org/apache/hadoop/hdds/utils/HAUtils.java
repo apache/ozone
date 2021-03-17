@@ -315,8 +315,8 @@ public final class HAUtils {
 
   public static void checkSecurityAndSCMHAEnabled(OzoneConfiguration conf) {
     boolean enable =
-        conf.getBoolean(ScmConfigKeys.OZONE_SCM_HA_SECURITY_ENABLE,
-            ScmConfigKeys.OZONE_SCM_HA_SECURITY_ENABLE_DEFAULT);
+        conf.getBoolean(ScmConfigKeys.OZONE_SCM_HA_SECURITY_SUPPORTED,
+            ScmConfigKeys.OZONE_SCM_HA_SECURITY_SUPPORTED_DEFAULT);
     if (OzoneSecurityUtil.isSecurityEnabled(conf) && !enable) {
       List<SCMNodeInfo> scmNodeInfo = SCMNodeInfo.buildNodeInfo(conf);
       if (scmNodeInfo.size() > 1) {
