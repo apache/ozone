@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -465,9 +466,14 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     Parameters parameters = new Parameters();
 
     if (conf.isSecurityEnabled() && conf.isGrpcTlsEnabled()) {
+      ArrayList< X509Certificate > listCA = new ArrayList<>();
+      listCA.add(caClient.getCACertificate());
+      if (caClient.getRootCACertificate() != null) {
+        listCA.add(caClient.getRootCACertificate());
+      }
       GrpcTlsConfig serverConfig = new GrpcTlsConfig(
           caClient.getPrivateKey(), caClient.getCertificate(),
-          caClient.getCACertificate(), true);
+          listCA, true);
       GrpcConfigKeys.Server.setTlsConf(parameters, serverConfig);
       GrpcConfigKeys.Admin.setTlsConf(parameters, serverConfig);
 

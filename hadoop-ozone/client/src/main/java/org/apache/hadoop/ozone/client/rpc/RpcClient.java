@@ -27,6 +27,7 @@ import java.security.InvalidKeyException;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -173,12 +174,17 @@ public class RpcClient implements ClientProtocol {
     dtService = omTransport.getDelegationTokenService();
     ServiceInfoEx serviceInfoEx = ozoneManagerClient.getServiceInfo();
     String caCertPem = null;
+    List<String> caCertPems = null;
     if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
       caCertPem = serviceInfoEx.getCaCertificate();
     }
+    caCertPems = serviceInfoEx.getCaCertPemList();
+    if (caCertPems == null || caCertPems.isEmpty()) {
+      caCertPems = Collections.singletonList(caCertPem);
+    }
 
     this.xceiverClientManager = new XceiverClientManager(conf,
-        conf.getObject(XceiverClientManager.ScmClientConfig.class), caCertPem);
+        conf.getObject(XceiverClientManager.ScmClientConfig.class), caCertPems);
 
     int configuredChunkSize = (int) conf
         .getStorageSize(ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY,

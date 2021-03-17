@@ -23,7 +23,6 @@ import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -45,22 +44,14 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
-import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
-import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolPB;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
-import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolPB;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
-import org.apache.hadoop.ipc.Client;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
-import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
-import org.apache.hadoop.security.UserGroupInformation;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.io.FilenameUtils;
@@ -88,6 +79,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   private static final String CERT_FILE_NAME_FORMAT = "%s.crt";
   private static final String CA_CERT_PREFIX = "CA-";
   private static final int CA_CERT_PREFIX_LEN = 3;
+  private static final String ROOT_CA_CERT_PREFIX = "ROOTCA-";
+  private static final int ROOT_CA_PREFIX_LEN = 7;
   private final Logger logger;
   private final SecurityConfig securityConfig;
   private final KeyCodec keyCodec;
@@ -97,7 +90,9 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   private Map<String, X509Certificate> certificateMap;
   private String certSerialId;
   private String caCertId;
+  private String rootCaCertId;
   private String component;
+  private List<String> pemEncodedCACerts = null;
 
   DefaultCertificateClient(SecurityConfig securityConfig, Logger log,
       String certSerialId, String component) {
@@ -127,6 +122,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
         CertificateCodec certificateCodec =
             new CertificateCodec(securityConfig, component);
         long latestCaCertSerailId = -1L;
+        long latestRootCaCertSerialId = -1L;
         for (File file : certFiles) {
           if (file.isFile()) {
             try {
@@ -149,6 +145,16 @@ public abstract class DefaultCertificateClient implements CertificateClient {
                     latestCaCertSerailId = tmpCaCertSerailId;
                   }
                 }
+
+                if (file.getName().startsWith(ROOT_CA_CERT_PREFIX)) {
+                  String certFileName = FilenameUtils.getBaseName(
+                      file.getName());
+                  long tmpRootCaCertSerailId = NumberUtils.toLong(
+                      certFileName.substring(ROOT_CA_PREFIX_LEN));
+                  if (tmpRootCaCertSerailId > latestRootCaCertSerialId) {
+                    latestRootCaCertSerialId = tmpRootCaCertSerailId;
+                  }
+                }
                 getLogger().info("Added certificate from file:{}.",
                     file.getAbsolutePath());
               } else {
@@ -163,6 +169,9 @@ public abstract class DefaultCertificateClient implements CertificateClient {
         }
         if (latestCaCertSerailId != -1) {
           caCertId = Long.toString(latestCaCertSerailId);
+        }
+        if (latestRootCaCertSerialId != -1) {
+          rootCaCertId = Long.toString(latestRootCaCertSerialId);
         }
       }
     }
@@ -282,7 +291,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     getLogger().info("Getting certificate with certSerialId:{}.",
         certId);
     try {
-      SCMSecurityProtocol scmSecurityProtocolClient = getScmSecurityClient(
+      SCMSecurityProtocol scmSecurityProtocolClient =
+          HddsServerUtil.getScmSecurityClient(
           (OzoneConfiguration) securityConfig.getConfiguration());
       String pemEncodedCert =
           scmSecurityProtocolClient.getCertificate(certId);
@@ -471,6 +481,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
             builder.addIpAddress(ip.getHostAddress());
             if(validator.isValid(ip.getCanonicalHostName())) {
               builder.addDnsName(ip.getCanonicalHostName());
+            } else {
+              getLogger().error("InValid domain", ip.getCanonicalHostName());
             }
           });
     } catch (IOException e) {
@@ -818,29 +830,63 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     return logger;
   }
 
-  /**
-   * Create a scm security client, used to get SCM signed certificate.
-   *
-   * @return {@link SCMSecurityProtocol}
-   */
-  private static SCMSecurityProtocol getScmSecurityClient(
-      OzoneConfiguration conf) throws IOException {
-    RPC.setProtocolEngine(conf, SCMSecurityProtocolPB.class,
-        ProtobufRpcEngine.class);
-    long scmVersion =
-        RPC.getProtocolVersion(ScmBlockLocationProtocolPB.class);
-    InetSocketAddress scmSecurityProtoAdd =
-        HddsServerUtil.getScmAddressForSecurityProtocol(conf);
-    SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient =
-        new SCMSecurityProtocolClientSideTranslatorPB(
-            RPC.getProxy(SCMSecurityProtocolPB.class, scmVersion,
-                scmSecurityProtoAdd, UserGroupInformation.getCurrentUser(),
-                conf, NetUtils.getDefaultSocketFactory(conf),
-                Client.getRpcTimeout(conf)));
-    return scmSecurityClient;
-  }
-
   public String getComponentName() {
     return null;
+  }
+
+  @Override
+  public X509Certificate getRootCACertificate() {
+    if (rootCaCertId != null) {
+      return certificateMap.get(rootCaCertId);
+    }
+    return null;
+  }
+
+  @Override
+  public void storeRootCACertificate(String pemEncodedCert, boolean force)
+      throws CertificateException {
+    CertificateCodec certificateCodec = new CertificateCodec(securityConfig,
+        component);
+    try {
+      Path basePath = securityConfig.getCertificateLocation(component);
+
+      X509Certificate cert =
+          CertificateCodec.getX509Certificate(pemEncodedCert);
+      String certName = String.format(CERT_FILE_NAME_FORMAT,
+          cert.getSerialNumber().toString());
+
+      certName = ROOT_CA_CERT_PREFIX + certName;
+      rootCaCertId = cert.getSerialNumber().toString();
+
+      certificateCodec.writeCertificate(basePath, certName,
+          pemEncodedCert, force);
+      certificateMap.putIfAbsent(cert.getSerialNumber().toString(), cert);
+    } catch (IOException | java.security.cert.CertificateException e) {
+      throw new CertificateException("Error while storing Root CA " +
+          "certificate.", e, CERTIFICATE_ERROR);
+    }
+  }
+
+  @Override
+  public List<String> listCA() throws IOException {
+    if (pemEncodedCACerts == null) {
+      updateCAList();
+    }
+    return pemEncodedCACerts;
+  }
+
+  public List<String> updateCAList() throws IOException {
+    try {
+      SCMSecurityProtocol scmSecurityProtocolClient =
+          HddsServerUtil.getScmSecurityClient(
+              securityConfig.getConfiguration());
+      pemEncodedCACerts =
+          scmSecurityProtocolClient.listCACertificate();
+      return pemEncodedCACerts;
+    } catch (Exception e) {
+      getLogger().error("Error during updating CA list", e);
+      throw new CertificateException("Error during updating CA list", e,
+          CERTIFICATE_ERROR);
+    }
   }
 }

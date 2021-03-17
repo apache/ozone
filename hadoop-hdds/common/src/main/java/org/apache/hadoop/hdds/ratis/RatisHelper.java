@@ -294,7 +294,7 @@ public final class RatisHelper {
   // For External gRPC client to server with gRPC TLS.
   // No mTLS for external client as SCM CA does not issued certificates for them
   public static GrpcTlsConfig createTlsClientConfig(SecurityConfig conf,
-      X509Certificate caCert) {
+      List<X509Certificate> caCert) {
     GrpcTlsConfig tlsConfig = null;
     if (conf.isSecurityEnabled() && conf.isGrpcTlsEnabled()) {
       tlsConfig = new GrpcTlsConfig(null, null,

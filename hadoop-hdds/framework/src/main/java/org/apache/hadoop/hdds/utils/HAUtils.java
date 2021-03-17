@@ -18,7 +18,11 @@ package org.apache.hadoop.hdds.utils;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import com.google.protobuf.ServiceException;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
+import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmInfo;
@@ -27,6 +31,9 @@ import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.proxy.SCMBlockLocationFailoverProxyProvider;
+import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
+import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
@@ -35,6 +42,7 @@ import org.apache.hadoop.hdds.utils.db.RocksDBConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
+import org.apache.hadoop.util.Time;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.FileUtils;
 import org.slf4j.Logger;
@@ -47,7 +55,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 
 import static org.apache.hadoop.hdds.server.ServerUtils.getOzoneMetaDirPath;
@@ -326,4 +336,123 @@ public final class HAUtils {
       }
     }
   }
+
+  /**
+   * Build CA list which need to be passed to client.
+   *
+   * If certificate client is null, obtain the list of CA using SCM security
+   * client, else it uses certificate client.
+   * @param certClient
+   * @param configuration
+   * @return list of CA
+   * @throws IOException
+   */
+  public static List<String> buildCAList(CertificateClient certClient,
+      ConfigurationSource configuration) throws IOException {
+    //TODO: make it configurable.
+    long waitTime = 5 * 60 * 1000L;
+    long retryTime = 10 * 1000L;
+    long currentTime = Time.monotonicNow();
+    List<String> caCertPemList = null;
+    if (certClient != null) {
+      caCertPemList = new ArrayList<>();
+      if (!SCMHAUtils.isSCMHAEnabled(configuration)) {
+        if (certClient.getRootCACertificate() != null) {
+          caCertPemList.add(CertificateCodec.getPEMEncodedString(
+              certClient.getRootCACertificate()));
+        }
+        caCertPemList.add(CertificateCodec.getPEMEncodedString(
+            certClient.getCACertificate()));
+      } else {
+        // TODO: If SCMs are bootstrapped later, then listCA need to be
+        //  refetched if listCA size is less than scm ha config node list size.
+        // For now when Client of SCM's are started we compare their node list
+        // size and ca list size if it is as expected, we return the ca list.
+        boolean caListUpToDate;
+        Collection<String> scmNodes = SCMHAUtils.getSCMNodeIds(configuration);
+        // TODO: make them configurable.
+        if (scmNodes.size() > 1) {
+          do {
+            caCertPemList = certClient.updateCAList();
+            caListUpToDate =
+                caCertPemList.size() == scmNodes.size() + 1 ? true : false;
+            if (!caListUpToDate) {
+              try {
+                Thread.sleep(retryTime);
+              } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+              }
+            }
+          } while (!caListUpToDate &&
+              Time.monotonicNow() - currentTime < waitTime);
+          checkCertCount(caCertPemList.size(), scmNodes.size() + 1);
+        } else {
+          caCertPemList = certClient.updateCAList();
+        }
+      }
+    } else {
+      if (!SCMHAUtils.isSCMHAEnabled(configuration)) {
+        caCertPemList = new ArrayList<>();
+        SCMSecurityProtocolClientSideTranslatorPB scmSecurityProtocolClient =
+            HddsServerUtil.getScmSecurityClient(configuration);
+        SCMGetCertResponseProto scmGetCertResponseProto =
+            scmSecurityProtocolClient.getCACert();
+        if (scmGetCertResponseProto.hasX509Certificate()) {
+          caCertPemList.add(scmGetCertResponseProto.getX509Certificate());
+        }
+        if (scmGetCertResponseProto.hasX509RootCACertificate()) {
+          caCertPemList.add(scmGetCertResponseProto.getX509RootCACertificate());
+        }
+      } else {
+        Collection<String> scmNodes = SCMHAUtils.getSCMNodeIds(configuration);
+        SCMSecurityProtocol scmSecurityProtocolClient =
+            HddsServerUtil.getScmSecurityClient(configuration);
+        boolean caListUpToDate;
+        if (scmNodes.size() > 1) {
+          do {
+            caCertPemList =
+                scmSecurityProtocolClient.listCACertificate();
+            caListUpToDate =
+                caCertPemList.size() == scmNodes.size() + 1 ? true : false;
+            if (!caListUpToDate) {
+              try {
+                Thread.sleep(retryTime);
+              } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+              }
+            }
+          } while (!caListUpToDate &&
+              Time.monotonicNow() - currentTime < waitTime);
+          checkCertCount(caCertPemList.size(), scmNodes.size() + 1);
+        } else {
+          caCertPemList = scmSecurityProtocolClient.listCACertificate();
+        }
+      }
+    }
+    return caCertPemList;
+  }
+
+  /**
+   * Build CA list which need to be passed to client.
+   *
+   * @param configuration
+   * @return list of CA
+   * @throws IOException
+   */
+  public static List<String> buildCAList(ConfigurationSource configuration)
+      throws IOException {
+    return buildCAList(null, configuration);
+  }
+
+  private static void checkCertCount(int certCount, int expectedCount)
+      throws SCMSecurityException{
+    if (certCount != expectedCount) {
+      LOG.error("Unable to obtain CA list for SCM cluster, obtained CA list " +
+              "size is {}, where as expected list size is {}",
+          certCount, expectedCount);
+      throw new SCMSecurityException("Unable to obtain complete CA list");
+    }
+  }
+
+
 }

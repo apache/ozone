@@ -22,6 +22,8 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 
@@ -68,7 +70,7 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
   //TODO : change this to SCM configuration class
   private final ConfigurationSource conf;
   private final Cache<String, XceiverClientSpi> clientCache;
-  private X509Certificate caCert;
+  private List<X509Certificate> caCerts;
 
   private static XceiverClientMetrics metrics;
   private boolean isSecurityEnabled;
@@ -86,16 +88,19 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
 
   public XceiverClientManager(ConfigurationSource conf,
       ScmClientConfig clientConf,
-      String caCertPem) throws IOException {
+      List<String> caCertPems) throws IOException {
     Preconditions.checkNotNull(clientConf);
     Preconditions.checkNotNull(conf);
     long staleThresholdMs = clientConf.getStaleThreshold(MILLISECONDS);
     this.conf = conf;
     this.isSecurityEnabled = OzoneSecurityUtil.isSecurityEnabled(conf);
     if (isSecurityEnabled) {
-      Preconditions.checkNotNull(caCertPem);
+      Preconditions.checkNotNull(caCertPems);
       try {
-        this.caCert = CertificateCodec.getX509Cert(caCertPem);
+        this.caCerts = new ArrayList<>(caCertPems.size());
+        for (String cert : caCertPems) {
+          this.caCerts.add(CertificateCodec.getX509Cert(cert));
+        }
       } catch (CertificateException ex) {
         throw new SCMSecurityException("Error: Fail to get SCM CA certificate",
             ex);
@@ -232,10 +237,10 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
             switch (type) {
             case RATIS:
               client = XceiverClientRatis.newXceiverClientRatis(pipeline, conf,
-                  caCert);
+                  caCerts);
               break;
             case STAND_ALONE:
-              client = new XceiverClientGrpc(pipeline, conf, caCert);
+              client = new XceiverClientGrpc(pipeline, conf, caCerts);
               break;
             case CHAINED:
             default:

@@ -67,6 +67,7 @@ public class DefaultApprover extends BaseApprover {
 
   /**
    * Sign function signs a Certificate.
+   *
    * @param config - Security Config.
    * @param caPrivate - CAs private Key.
    * @param caCertificate - CA Certificate.
@@ -76,12 +77,12 @@ public class DefaultApprover extends BaseApprover {
    * @param scmId - SCM id.
    * @param clusterId - Cluster id.
    * @return Signed Certificate.
-   * @throws IOException - On Error
+   * @throws IOException               - On Error
    * @throws OperatorCreationException - on Error.
    */
   @SuppressWarnings("ParameterNumber")
   @Override
-  public  X509CertificateHolder sign(
+  public X509CertificateHolder sign(
       SecurityConfig config,
       PrivateKey caPrivate,
       X509CertificateHolder caCertificate,

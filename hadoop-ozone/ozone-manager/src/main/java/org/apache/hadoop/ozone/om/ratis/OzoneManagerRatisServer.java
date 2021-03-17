@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
+import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -651,9 +652,14 @@ public final class OzoneManagerRatisServer {
     Parameters parameters = new Parameters();
 
     if (conf.isSecurityEnabled() && conf.isGrpcTlsEnabled()) {
+      ArrayList< X509Certificate > listCA = new ArrayList<>();
+      listCA.add(caClient.getCACertificate());
+      if (caClient.getRootCACertificate() != null) {
+        listCA.add(caClient.getRootCACertificate());
+      }
       GrpcTlsConfig config = new GrpcTlsConfig(
           caClient.getPrivateKey(), caClient.getCertificate(),
-          caClient.getCACertificate(), true);
+          listCA, true);
       GrpcConfigKeys.Server.setTlsConf(parameters, config);
       GrpcConfigKeys.Admin.setTlsConf(parameters, config);
       GrpcConfigKeys.Client.setTlsConf(parameters, config);
