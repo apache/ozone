@@ -398,4 +398,21 @@ public final class OzoneConsts {
   // CRL Sequence Id
   public static final String CRL_SEQUENCE_ID_KEY = "CRL_SEQUENCE_ID";
 
+  public static final String OZONE_OM_RANGER_ADMIN_CREATE_USER_HTTP_ENDPOINT =
+      "/service/xusers/secure/users";
+
+  public static final String OZONE_OM_RANGER_ADMIN_DELETE_USER_HTTP_ENDPOINT =
+      "/service/xusers/secure/users/id/";
+
+  public static final String OZONE_OM_RANGER_ADMIN_CREATE_GROUP_HTTP_ENDPOINT =
+      "/service/xusers/secure/groups";
+
+  public static final String OZONE_OM_RANGER_ADMIN_DELETE_GROUP_HTTP_ENDPOINT =
+      "/service/xusers/secure/groups/id/";
+
+  public static final String OZONE_OM_RANGER_ADMIN_CREATE_POLICY_HTTP_ENDPOINT =
+      "/service/public/v2/api/policy";
+
+  public static final String OZONE_OM_RANGER_ADMIN_DELETE_POLICY_HTTP_ENDPOINT =
+      "/service/plugins/policies/";
 }

@@ -234,4 +234,27 @@ public final class OMConfigKeys {
       false;
 
   public static final String OZONE_OM_HA_PREFIX = "ozone.om.ha";
+
+  public static final String OZONE_RANGER_OM_IGNORE_SERVER_CERT =
+      "ozone.om.ranger.ignore.cert";
+  public static final boolean OZONE_RANGER_OM_IGNORE_SERVER_CERT_DEFAULT =
+      true;
+
+  public static final String OZONE_RANGER_OM_CONNECTION_TIMEOUT =
+      "ozone.om.ranger.connection.timeout";
+  public static final String OZONE_RANGER_OM_CONNECTION_TIMEOUT_DEFAULT = "5s";
+
+  public static final String OZONE_RANGER_OM_CONNECTION_REQUEST_TIMEOUT =
+      "ozone.om.ranger.connection.request.timeout";
+  public static final String
+      OZONE_RANGER_OM_CONNECTION_REQUEST_TIMEOUT_DEFAULT = "5s";
+
+  public static final String OZONE_RANGER_HTTPS_ADDRESS_KEY =
+      "ozone.om.ranger.https-address";
+
+  public static final String OZONE_OM_RANGER_HTTPS_ADMIN_API_USER =
+      "ozone.om.ranger.https.admin.api.user";
+
+  public static final String OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD =
+      "ozone.om.ranger.https.admin.api.passwd";
 }
