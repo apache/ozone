@@ -403,4 +403,7 @@ public final class OzoneConsts {
   // CRL Sequence Id
   public static final String CRL_SEQUENCE_ID_KEY = "CRL_SEQUENCE_ID";
 
+  // Layout Version written into Meta Table ONLY during finalization.
+  public static final String LAYOUT_VERSION_KEY = "#LAYOUTVERSION";
+
 }

@@ -299,6 +299,7 @@ public class TestOMUpgradeFinalizer {
         .thenAnswer((Answer<Integer>) ignore -> storedLayoutVersion);
 
     when(mock.getOmStorage()).thenReturn(st);
+
     return mock;
   }
 }

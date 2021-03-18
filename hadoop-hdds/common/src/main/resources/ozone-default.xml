@@ -2499,4 +2499,16 @@
       filesystem semantics.
     </description>
   </property>
+  <property>
+    <name>ozone.om.finalization.ratis.based.timeout</name>
+    <tag>OZONE, OM</tag>
+    <value></value>
+    <description>
+      Maximum time to wait for a slow follower to be finalized through a Ratis
+      snapshot. This is an advanced config, and needs to be changed only under
+      a special circumstance when the leader OM has purged the finalize request
+      from its logs, and a follower OM was down during upgrade finalization.
+      Default is 30s.
+    </description>
+  </property>
 </configuration>

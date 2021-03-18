@@ -19,8 +19,6 @@
 package org.apache.hadoop.ozone.om.upgrade;
 
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateKey;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
@@ -29,8 +27,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import org.apache.hadoop.ozone.om.OMStorage;
-import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyCreateRequest;
@@ -46,15 +42,10 @@ import org.reflections.Reflections;
 public class TestOmVersionManagerRequestFactory {
 
   private static OMLayoutVersionManager omVersionManager;
-  private static OzoneManager om;
 
   @BeforeClass
   public static void setup() throws OMException {
-    OMStorage omStorage = mock(OMStorage.class);
-    when(omStorage.getLayoutVersion()).thenReturn(0);
-    omVersionManager = new OMLayoutVersionManager(omStorage);
-    om = mock(OzoneManager.class);
-    when(om.getOmStorage()).thenReturn(omStorage);
+    omVersionManager = new OMLayoutVersionManager(0);
   }
 
   @Test
