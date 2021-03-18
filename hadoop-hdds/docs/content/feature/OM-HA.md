@@ -1,10 +1,10 @@
 ---
-title: "High Availability"
+title: "OM High Availability"
 weight: 1
 menu:
    main:
       parent: Features
-summary: HA setup for Ozone to avoid any single point of failure.
+summary: HA setup for Ozone Manager to avoid any single point of failure.
 ---
 <!---
   Licensed to the Apache Software Foundation (ASF) under one or more
@@ -23,19 +23,19 @@ summary: HA setup for Ozone to avoid any single point of failure.
   limitations under the License.
 -->
 
-Ozone has two leader nodes (*Ozone Manager* for key space management and *Storage Container Management* for block space management) and storage nodes (Datanode). Data is replicated between datanodes with the help of RAFT consensus algorithm.
+Ozone has two metadata-manager nodes (*Ozone Manager* for key space management and *Storage Container Management* for block space management) and multiple storage nodes (Datanode). Data is replicated between Datanodes with the help of RAFT consensus algorithm.
 
-To avoid any single point of failure the leader nodes also should have a HA setup.
+To avoid any single point of failure the metadata-manager nodes also should have a HA setup.
 
- 1. HA of Ozone Manager is implemented with the help of RAFT (Apache Ratis)
- 2. HA of Storage Container Manager is [under implementation]({{< ref "scmha.md">}})
+Both Ozone Manager and Storage Container Manager supports HA. In this mode the internal state is replicated via RAFT (with Apache Ratis) 
+
+This document explain the HA setup of Ozone Manager (OM) HA, please check [this page]({{< ref "SCM-HA" >}}) for SCM HA.  While they can be setup for HA independently, a reliable, full HA setup requires enabling HA for both services.
 
 ## Ozone Manager HA
 
-A single Ozone Manager uses [RocksDB](https://github.com/facebook/rocksdb/) to persiste metadata (volumes, buckets, keys) locally. HA version of Ozone Manager does exactly the same but all the data is replicated with the help of the RAFT consensus algorithm to follower Ozone Manager instances.
+A single Ozone Manager uses [RocksDB](https://github.com/facebook/rocksdb/) to persist metadata (volumes, buckets, keys) locally. HA version of Ozone Manager does exactly the same but all the data is replicated with the help of the RAFT consensus algorithm to follower Ozone Manager instances.
 
 ![OM HA](HA-OM.png)
-
 Client connects to the Leader Ozone Manager which process the request and schedule the replication with RAFT. When the request is replicated to all the followers the leader can return with the response.
 
 ## Configuration
