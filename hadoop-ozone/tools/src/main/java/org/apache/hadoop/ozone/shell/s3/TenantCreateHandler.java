@@ -15,7 +15,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-
 package org.apache.hadoop.ozone.shell.s3;
 
 import org.apache.hadoop.hdds.cli.GenericCli;
@@ -48,6 +47,9 @@ public class TenantCreateHandler extends S3Handler {
         final boolean res = client.getObjectStore().createTenant(tenantName);
         if (res) {
           out().println("Successfully created tenant " + tenantName);
+        } else {
+          // TODO: Can remove. Doesn't reach the statement on exception
+          out().println("Failed to create tenant " + tenantName);
         }
       }
     } else {

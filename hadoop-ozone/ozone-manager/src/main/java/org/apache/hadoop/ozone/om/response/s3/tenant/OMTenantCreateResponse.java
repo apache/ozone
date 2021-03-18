@@ -97,8 +97,6 @@ public class OMTenantCreateResponse extends OMClientResponse {
     String dbUserKey =
         omMetadataManager.getUserKey(omVolumeArgs.getOwnerName());
 
-    // TODO: Prepend / to volume name in request, may solve the issue
-
     omMetadataManager.getVolumeTable().putWithBatch(batchOperation,
         dbVolumeKey, omVolumeArgs);
     omMetadataManager.getUserTable().putWithBatch(batchOperation, dbUserKey,
@@ -110,6 +108,6 @@ public class OMTenantCreateResponse extends OMClientResponse {
 //          s3SecretValue.getKerberosID(), s3SecretValue);
 //    }
 
-    // TODO: Call OMMultiTenantManager.createTenant for Ranger policy sync
+    // TODO: Call OMMultiTenantManager.createTenant() for Ranger policy sync
   }
 }

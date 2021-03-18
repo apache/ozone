@@ -55,8 +55,9 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_L
 /**
  * Handles OMTenantCreate request.
  */
-// Ref: S3GetSecretRequest extends OMClientRequest
 /*
+  Ratis execution flow for OMTenantCreate
+
 - preExecute (perform checks and init)
   - Check tenant name validity (again)
     - If name is invalid, throw exception to client; else continue
@@ -77,8 +78,10 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_L
   - tenantPolicyTable: Generate default policies for the new tenant
     - K: finance-Users, V: finance-Users-default
     - K: finance-Buckets, V: finance-Buckets-default
+  - Grab USER_LOCK write lock
   - Create volume finance (See OMVolumeCreateRequest)
   - Release VOLUME_LOCK write lock
+  - Release USER_LOCK write lock
   - Queue Ranger policy sync that pushes default policies:
       OMMultiTenantManager#createTenant
  */
@@ -102,6 +105,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
           OMException.ResultCodes.INVALID_VOLUME_NAME);
     }
 
+    final long currentTime = System.currentTimeMillis();
     // .setModificationTime(0)  // TODO: Set to current time
 
     // TODO: Also check validity for volume name. e.g. length
@@ -146,12 +150,12 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
             tenantName, null, null);
       }
 
-      final String dbVolumeKey = tenantName;
+      final String dbVolumeKey = omMetadataManager.getVolumeKey(tenantName);
 
       acquiredVolumeLock = omMetadataManager.getLock().acquireWriteLock(
           VOLUME_LOCK, dbVolumeKey);
 
-      // TODO: check -. ozone debug ldb --db=
+      // TODO: check ozone debug ldb --db=
 
       // Check volume existence
       // In this case, volume name is tenant name.
@@ -204,7 +208,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
           owner);
 
       // TODO: Dedup with OMVolumeCreateRequest?
-      OzoneManagerStorageProtos.PersistedUserVolumeInfo volumeList = null;
+      OzoneManagerStorageProtos.PersistedUserVolumeInfo volumeList;
       OmVolumeArgs omVolumeArgs;
       // omVolumeArgs = OmVolumeArgs.getFromProtobuf(volumeInfo);
       // TODO: Double check omVolumeArgs necessary fields for volume creation.
@@ -218,6 +222,9 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
           ozoneManager.getObjectIdFromTxId(transactionLogIndex));
       omVolumeArgs.setUpdateID(transactionLogIndex,
           ozoneManager.isRatisEnabled());
+
+      // Audit volume creation
+      auditMap = omVolumeArgs.toAuditMap();
 
       String dbUserKey = omMetadataManager.getUserKey(owner);
       volumeList = omMetadataManager.getUserTable().get(dbUserKey);
@@ -268,16 +275,19 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       }
     }
 
-    // Audit
+    // Perform audit logging
     auditMap.put(OzoneConsts.TENANT, tenantName);
-    auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
-        OMAction.TENANT_CREATE, auditMap,
-        exception, getOmRequest().getUserInfo()));
+    // Note auditMap contains volume creation info
+    auditLog(ozoneManager.getAuditLogger(),
+        buildAuditMessage(OMAction.TENANT_CREATE, auditMap, exception,
+            getOmRequest().getUserInfo()));
 
     if (exception == null) {
       LOG.debug("Successfully created tenant {}", tenantName);
+      // TODO: Metrics? OMVolumeCreateRequest
     } else {
       LOG.error("Failed to create tenant {}", tenantName, exception);
+      // TODO: Metrics?
     }
     return omClientResponse;
   }
