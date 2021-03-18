@@ -23,7 +23,7 @@ set -e -o pipefail
 
 echo "--- RUNNING NON-ROLLING UPGRADE TEST FROM $OZONE_UPGRADE_FROM TO $OZONE_UPGRADE_TO ---"
 
-# Prepare OMs before upgrade unless this variable is false.
+# Prepare OMs before upgrade unless this variable is not 'true'.
 : "${OZONE_PREPARE_OMS:='true'}"
 
 # Fail if required vars are not set.
@@ -36,6 +36,7 @@ set +u
 
 # Tells main testlib.sh to wait for an OM leader.
 export OM_SERVICE_ID=omservice
+# Default compose cluster to use. May be overridden by callback.sh.
 export COMPOSE_FILE="${TEST_DIR}/compose/ha/docker-compose.yaml"
 
 source "$TEST_DIR"/testlib.sh
@@ -64,33 +65,38 @@ prepare_for_image "$OZONE_UPGRADE_FROM"
 echo "--- RUNNING WITH OLD VERSION $OZONE_UPGRADE_FROM ---"
 start_docker_env
 callback with_old_version
-prepare_oms
 
+prepare_oms
+stop_docker_env
 prepare_for_image "$OZONE_UPGRADE_TO"
 export OM_HA_ARGS='--upgrade'
-restart_docker_env
 
 echo "--- RUNNING WITH NEW VERSION $OZONE_UPGRADE_TO PRE-FINALIZED ---"
 OUTPUT_NAME="$OZONE_UPGRADE_TO"-pre-finalized
+OZONE_KEEP_RESULTS=true start_docker_env
 callback with_new_version_pre_finalized
-prepare_oms
 
+prepare_oms
+stop_docker_env
 prepare_for_image "$OZONE_UPGRADE_FROM"
 set_downgrade_om_args
-restart_docker_env
 
 echo "--- RUNNING WITH OLD VERSION $OZONE_UPGRADE_FROM AFTER DOWNGRADE ---"
 OUTPUT_NAME="$OZONE_UPGRADE_FROM"-downgraded
+OZONE_KEEP_RESULTS=true start_docker_env
 callback with_old_version_downgraded
-prepare_oms
 
+prepare_oms
+stop_docker_env
 prepare_for_image "$OZONE_UPGRADE_TO"
 export OM_HA_ARGS='--upgrade'
-restart_docker_env
 
 echo "--- RUNNING WITH NEW VERSION $OZONE_UPGRADE_TO FINALIZED ---"
 OUTPUT_NAME="$OZONE_UPGRADE_TO"-finalized
+OZONE_KEEP_RESULTS=true start_docker_env
+# Sends commands to finalize OM and SCM.
 execute_robot_test scm upgrade/finalize.robot
 callback with_new_version_finalized
 
+stop_docker_env
 generate_report
