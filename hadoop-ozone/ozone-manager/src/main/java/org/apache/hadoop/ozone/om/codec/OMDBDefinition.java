@@ -142,6 +142,14 @@ public class OMDBDefinition implements DBDefinition {
                     OMTransactionInfo.class,
                     new OMTransactionInfoCodec());
 
+  public static final DBColumnFamilyDefinition<String, String>
+      META_TABLE = new DBColumnFamilyDefinition<>(
+          OmMetadataManagerImpl.META_TABLE,
+          String.class,
+          new StringCodec(),
+          String.class,
+          new StringCodec());
+
   @Override
   public String getName() {
     return OzoneConsts.OM_DB_NAME;
@@ -157,7 +165,7 @@ public class OMDBDefinition implements DBDefinition {
     return new DBColumnFamilyDefinition[] {DELETED_TABLE, USER_TABLE,
         VOLUME_TABLE, OPEN_KEY_TABLE, KEY_TABLE,
         BUCKET_TABLE, MULTIPART_INFO_TABLE, PREFIX_TABLE, DTOKEN_TABLE,
-        S3_SECRET_TABLE, TRANSACTION_INFO_TABLE};
+        S3_SECRET_TABLE, TRANSACTION_INFO_TABLE, META_TABLE};
   }
 }
 

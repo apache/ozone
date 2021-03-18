@@ -41,7 +41,6 @@ import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
 
-import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
@@ -56,27 +55,22 @@ public class TestOMVersionManager {
 
   @Test
   public void testOMLayoutVersionManager() throws IOException {
-    OMStorage omStorage = mock(OMStorage.class);
-    when(omStorage.getLayoutVersion()).thenReturn(0);
     OMLayoutVersionManager omVersionManager =
-        new OMLayoutVersionManager(omStorage);
-    OzoneManager om = mock(OzoneManager.class);
-    when(om.getOmStorage()).thenReturn(omStorage);
+        new OMLayoutVersionManager();
 
+    // Initial Version is always allowed.
     assertTrue(omVersionManager.isAllowed(INITIAL_VERSION));
-    assertEquals(INITIAL_VERSION.layoutVersion(),
+    assertTrue(INITIAL_VERSION.layoutVersion() <=
         omVersionManager.getMetadataLayoutVersion());
-    assertFalse(omVersionManager.needsFinalization());
   }
 
   @Test
   public void testOMLayoutVersionManagerInitError() {
-    OMStorage omStorage = mock(OMStorage.class);
-    when(omStorage.getLayoutVersion()).thenReturn(
-        OMLayoutFeature.values()[OMLayoutFeature.values().length - 1]
-            .layoutVersion() + 1);
+    int lV = OMLayoutFeature.values()[OMLayoutFeature.values().length - 1]
+        .layoutVersion() + 1;
+
     try {
-      new OMLayoutVersionManager(omStorage);
+      new OMLayoutVersionManager(lV);
       Assert.fail();
     } catch (OMException ex) {
       assertEquals(NOT_SUPPORTED_OPERATION, ex.getResult());
@@ -145,7 +139,7 @@ public class TestOMVersionManager {
     // INITIAL_VERSION is finalized, hence should not register.
     Optional<OmUpgradeAction> action =
         INITIAL_VERSION.action(UNFINALIZED_STATE_VALIDATION);
-    Assert.assertFalse(action.isPresent());
+    assertFalse(action.isPresent());
 
     lvm = mock(OMLayoutVersionManager.class);
     when(lvm.getMetadataLayoutVersion()).thenReturn(-1);
