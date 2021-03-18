@@ -185,7 +185,7 @@ public class TestBlockDeletingService {
       int numOfChunksPerBlock) throws IOException {
     ChunkManager chunkManager;
     if (layout == FILE_PER_BLOCK) {
-      chunkManager = new FilePerBlockStrategy(true);
+      chunkManager = new FilePerBlockStrategy(true, null);
     } else {
       chunkManager = new FilePerChunkStrategy(true, null);
     }

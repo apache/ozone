@@ -81,7 +81,7 @@ public enum ChunkLayoutTestInfo {
   FILE_PER_BLOCK {
     @Override
     public ChunkManager createChunkManager(boolean sync, BlockManager manager) {
-      return new FilePerBlockStrategy(sync);
+      return new FilePerBlockStrategy(sync, null);
     }
 
     @Override
