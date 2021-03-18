@@ -145,6 +145,16 @@ public interface UpgradeFinalizer<T> {
       throws IOException;
 
   /**
+   * Finalize the component if needed, and wait until completion.
+   * @param upgradeClientID the initiating client's identifier.
+   * @param service the service on which we run finalization.
+   * @param timeoutInSeconds max time to wait for finalization in seconds.
+   * @throws IOException
+   */
+  void finalizeAndWaitForCompletion(String upgradeClientID, T service,
+                                    long timeoutInSeconds) throws IOException;
+
+  /**
    * Gets a status report about the finalization process.
    * This method has a meaning, when the client polls the server from time to
    * time for the status, and the server runs the finalization in the

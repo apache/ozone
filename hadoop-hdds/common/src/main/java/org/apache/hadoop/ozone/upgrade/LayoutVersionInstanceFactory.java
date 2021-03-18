@@ -205,6 +205,7 @@ public class LayoutVersionInstanceFactory<T> {
       if ((vInstances.isEmpty() ||
           vInstances.peek().version > feature.layoutVersion())
           && prevInstance != null) {
+        LOG.info("Re-registering {} with factory. ", prevInstance.instance);
         vInstances.offer(prevInstance);
       }
 

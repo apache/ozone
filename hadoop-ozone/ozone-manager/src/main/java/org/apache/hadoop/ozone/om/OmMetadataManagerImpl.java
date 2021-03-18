@@ -143,6 +143,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   public static final String PREFIX_TABLE = "prefixTable";
   public static final String TRANSACTION_INFO_TABLE =
       "transactionInfoTable";
+  public static final String META_TABLE = "metaTable";
 
   static final String[] ALL_TABLES = new String[] {
       USER_TABLE,
@@ -155,7 +156,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
       S3_SECRET_TABLE,
       DELEGATION_TOKEN_TABLE,
       PREFIX_TABLE,
-      TRANSACTION_INFO_TABLE
+      TRANSACTION_INFO_TABLE,
+      META_TABLE
   };
 
   private DBStore store;
@@ -174,6 +176,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   private Table dTokenTable;
   private Table prefixTable;
   private Table transactionInfoTable;
+  private Table metaTable;
   private boolean isRatisEnabled;
   private boolean ignorePipelineinKey;
 
@@ -350,6 +353,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         .addTable(S3_SECRET_TABLE)
         .addTable(PREFIX_TABLE)
         .addTable(TRANSACTION_INFO_TABLE)
+        .addTable(META_TABLE)
         .addCodec(OzoneTokenIdentifier.class, new TokenIdentifierCodec())
         .addCodec(OmKeyInfo.class, new OmKeyInfoCodec(true))
         .addCodec(RepeatedOmKeyInfo.class,
@@ -417,6 +421,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     transactionInfoTable = this.store.getTable(TRANSACTION_INFO_TABLE,
         String.class, OMTransactionInfo.class);
     checkTableStatus(transactionInfoTable, TRANSACTION_INFO_TABLE);
+
+    metaTable = this.store.getTable(META_TABLE, String.class, String.class);
+    checkTableStatus(metaTable, META_TABLE);
   }
 
   /**
@@ -1149,6 +1156,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   @Override
   public Table<String, OMTransactionInfo> getTransactionInfoTable() {
     return transactionInfoTable;
+  }
+
+  @Override
+  public Table<String, String> getMetaTable() {
+    return metaTable;
   }
 
   /**

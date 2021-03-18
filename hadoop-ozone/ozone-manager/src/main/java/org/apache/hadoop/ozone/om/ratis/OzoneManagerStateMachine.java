@@ -136,9 +136,11 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
 
   @Override
   public void reinitialize() throws IOException {
-    loadSnapshotInfoFromDB();
-    this.ozoneManagerDoubleBuffer = buildDoubleBufferForRatis();
-    handler.updateDoubleBuffer(ozoneManagerDoubleBuffer);
+    getLifeCycle().startAndTransition(() -> {
+      loadSnapshotInfoFromDB();
+      this.ozoneManagerDoubleBuffer = buildDoubleBufferForRatis();
+      handler.updateDoubleBuffer(ozoneManagerDoubleBuffer);
+    });
   }
 
   @Override
