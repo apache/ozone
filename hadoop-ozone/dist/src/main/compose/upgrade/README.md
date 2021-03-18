@@ -27,11 +27,11 @@ an older release of Ozone and a later release (which may be the local build).
         (1.0.0), and not the last commit (*c1*).
 ## Directory Layout
 
-## upgrades
+### upgrades
 
 Each type of upgrade has a subdirectory under the *upgrades* directory. Each upgrade's steps are controlled by a *test.sh* script in its *upgrades/\<upgrade-type>* directory. Callbacks to execute throughout the upgrade are called by this script and should be placed in a file called *callback.sh* in the *upgrades/\<upgrade-type>/\<upgrade-from>-\<upgrade-to>* directory. After the test is run, results and docker volume data for the upgrade for these versions will also be placed in this directory. The results of all upgrades run as part of the tests will be placed in a *results* folder in the top level upgrade directory.
 
-## compose
+### compose
 
 Docker compose cluster definitions to be used in upgrade testing are defined in the *compose* directory. A compose cluster can be selected by calling the *load.sh* script in the compose cluster's directory on the setup callback for the upgrade test.
 
