@@ -60,6 +60,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 
 import static org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest.getCertificationRequest;
@@ -129,6 +131,7 @@ public class DefaultCAServer implements CertificateServer {
   private CertificateApprover approver;
   private CRLApprover crlApprover;
   private CertificateStore store;
+  private Lock lock;
 
   /**
    * Create an Instance of DefaultCAServer.
@@ -143,6 +146,7 @@ public class DefaultCAServer implements CertificateServer {
     this.clusterID = clusterID;
     this.scmID = scmID;
     this.store = certificateStore;
+    lock = new ReentrantLock();
   }
 
   @Override
@@ -265,12 +269,19 @@ public class DefaultCAServer implements CertificateServer {
       LocalDate endDate, PKCS10CertificationRequest csr, NodeType role)
       throws IOException,
       OperatorCreationException, CertificateException {
-    X509CertificateHolder xcert = approver.sign(config,
-        getCAKeys().getPrivate(),
-        getCACertificate(), java.sql.Date.valueOf(beginDate),
-        java.sql.Date.valueOf(endDate), csr, scmID, clusterID);
-    store.storeValidCertificate(xcert.getSerialNumber(),
-        CertificateCodec.getX509Certificate(xcert), role);
+    lock.lock();
+    X509CertificateHolder xcert;
+    try {
+      xcert = approver.sign(config,
+          getCAKeys().getPrivate(),
+          getCACertificate(), java.sql.Date.valueOf(beginDate),
+          java.sql.Date.valueOf(endDate), csr, scmID, clusterID);
+      store.checkValidCertID(xcert.getSerialNumber());
+      store.storeValidCertificate(xcert.getSerialNumber(),
+          CertificateCodec.getX509Certificate(xcert), role);
+    } finally {
+      lock.unlock();
+    }
     return xcert;
   }
 
