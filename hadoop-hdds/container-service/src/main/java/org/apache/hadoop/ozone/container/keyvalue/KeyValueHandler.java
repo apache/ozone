@@ -666,14 +666,6 @@ public class KeyValueHandler extends Handler {
       return malformedRequest(request);
     }
 
-    // The container can become unhealthy after the lock is released.
-    // The operation will likely fail/timeout in that happens.
-    try {
-      checkContainerIsHealthy(kvContainer);
-    } catch (StorageContainerException sce) {
-      return ContainerUtils.logAndReturnError(LOG, sce, request);
-    }
-
     try {
       checkContainerOpen(kvContainer);
 
