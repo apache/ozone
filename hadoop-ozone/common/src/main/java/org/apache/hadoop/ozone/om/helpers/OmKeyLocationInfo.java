@@ -16,6 +16,8 @@
  */
 package org.apache.hadoop.ozone.om.helpers;
 
+import java.util.Objects;
+
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.UnknownPipelineStateException;
@@ -23,8 +25,6 @@ import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocation;
 import org.apache.hadoop.ozone.protocolPB.OzonePBHelper;
 import org.apache.hadoop.security.token.Token;
-
-import java.util.Objects;
 
 /**
  * One key can be too huge to fit in one container. In which case it gets split
@@ -252,4 +252,5 @@ public final class OmKeyLocationInfo {
     return Objects.hash(blockID, length, offset, token, createVersion,
         pipeline);
   }
+
 }

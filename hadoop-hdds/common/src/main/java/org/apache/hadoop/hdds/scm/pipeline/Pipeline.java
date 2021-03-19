@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -30,18 +31,18 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
-import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.builder.EqualsBuilder;
-import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.builder.EqualsBuilder;
+import org.apache.commons.lang3.builder.HashCodeBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Represents a group of datanodes which store a container.
@@ -55,6 +56,7 @@ public final class Pipeline {
 
   private PipelineState state;
   private Map<DatanodeDetails, Long> nodeStatus;
+  private Map<DatanodeDetails, Integer> replicaIndexes;
   // nodes with ordered distance to client
   private ThreadLocal<List<DatanodeDetails>> nodesInOrder = new ThreadLocal<>();
   // Current reported Leader for the pipeline
@@ -79,6 +81,7 @@ public final class Pipeline {
     this.nodeStatus = nodeStatus;
     this.creationTimestamp = Instant.now();
     this.suggestedLeaderId = suggestedLeaderId;
+    this.replicaIndexes = new HashMap<>();
   }
 
   /**
@@ -186,6 +189,10 @@ public final class Pipeline {
     return getNodeSet().equals(pipeline.getNodeSet());
   }
 
+  public int getReplicaIndex(DatanodeDetails dn) {
+    return replicaIndexes.getOrDefault(dn, 0);
+  }
+
   /**
    * Returns the leader if found else defaults to closest node.
    *
@@ -268,9 +275,13 @@ public final class Pipeline {
 
   public HddsProtos.Pipeline getProtobufMessage(int clientVersion)
       throws UnknownPipelineStateException {
+
     List<HddsProtos.DatanodeDetailsProto> members = new ArrayList<>();
+    List<Integer> memberReplicaIndexes = new ArrayList<>();
+
     for (DatanodeDetails dn : nodeStatus.keySet()) {
       members.add(dn.toProto(clientVersion));
+      memberReplicaIndexes.add(replicaIndexes.getOrDefault(dn, 0));
     }
 
     HddsProtos.Pipeline.Builder builder = HddsProtos.Pipeline.newBuilder()
@@ -280,7 +291,8 @@ public final class Pipeline {
         .setState(PipelineState.getProtobuf(state))
         .setLeaderID(leaderId != null ? leaderId.toString() : "")
         .setCreationTimeStamp(creationTimestamp.toEpochMilli())
-        .addAllMembers(members);
+        .addAllMembers(members)
+        .addAllMemberReplicaIndexes(memberReplicaIndexes);
 
     if (leaderId != null) {
       HddsProtos.UUID uuid128 = HddsProtos.UUID.newBuilder()
@@ -407,6 +419,10 @@ public final class Pipeline {
     return new Builder(pipeline);
   }
 
+  private void setReplicaIndexes(Map<DatanodeDetails, Integer> replicaIndexes) {
+    this.replicaIndexes = replicaIndexes;
+  }
+
   /**
    * Builder class for Pipeline.
    */
@@ -421,6 +437,7 @@ public final class Pipeline {
     private UUID leaderId = null;
     private Instant creationTimestamp = null;
     private UUID suggestedLeaderId = null;
+    private Map<DatanodeDetails, Integer> replicaIndexes = new HashMap<>();
 
     public Builder() {}
 
@@ -482,6 +499,11 @@ public final class Pipeline {
       return this;
     }
 
+    public Builder setReplicaIndexes(Map<DatanodeDetails, Integer> replicaIndexes) {
+      this.replicaIndexes = replicaIndexes;
+      return this;
+    }
+
     public Pipeline build() {
       Preconditions.checkNotNull(id);
       Preconditions.checkNotNull(type);
@@ -496,13 +518,15 @@ public final class Pipeline {
         pipeline.setCreationTimestamp(creationTimestamp);
       }
 
+      pipeline.setReplicaIndexes(replicaIndexes);
+
       if (nodeOrder != null && !nodeOrder.isEmpty()) {
         // This branch is for build from ProtoBuf
         List<DatanodeDetails> nodesWithOrder = new ArrayList<>();
-        for(int i = 0; i < nodeOrder.size(); i++) {
+        for (int i = 0; i < nodeOrder.size(); i++) {
           int nodeIndex = nodeOrder.get(i);
           Iterator<DatanodeDetails> it = nodeStatus.keySet().iterator();
-          while(it.hasNext() && nodeIndex >= 0) {
+          while (it.hasNext() && nodeIndex >= 0) {
             DatanodeDetails node = it.next();
             if (nodeIndex == 0) {
               nodesWithOrder.add(node);
@@ -516,13 +540,14 @@ public final class Pipeline {
               nodesWithOrder, id);
         }
         pipeline.setNodesInOrder(nodesWithOrder);
-      } else if (nodesInOrder != null){
+      } else if (nodesInOrder != null) {
         // This branch is for pipeline clone
         pipeline.setNodesInOrder(nodesInOrder);
       }
 
       return pipeline;
     }
+
   }
 
   /**

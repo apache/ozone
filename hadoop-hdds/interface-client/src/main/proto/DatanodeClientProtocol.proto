@@ -265,6 +265,7 @@ enum ContainerType {
 message  CreateContainerRequestProto {
   repeated KeyValue metadata = 2;
   optional ContainerType containerType = 3 [default = KeyValueContainer];
+  optional int32 replicaIndex = 4;
 }
 
 message  CreateContainerResponseProto {
@@ -393,6 +394,7 @@ message  WriteChunkRequestProto  {
   required DatanodeBlockID blockID = 1;
   required ChunkInfo chunkData = 2;
   optional bytes data = 3;
+  optional int32 containerinstanceIndex = 4;
 }
 
 message  WriteChunkResponseProto {
