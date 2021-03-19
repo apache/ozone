@@ -234,24 +234,16 @@ public class TestPipelinePlacementPolicy {
     List<DatanodeDetails> healthyNodes = overWriteLocationInNodes(
         nodeManager.getNodes(NodeStatus.inServiceHealthy()));
     DatanodeDetails node;
-    try {
-      node = placementPolicy.fallBackPickNodes(healthyNodes, null);
-      Assert.assertNotNull(node);
-    } catch (SCMException e) {
-      Assert.fail("Should not reach here.");
-    }
+
+    // test no nodes are excluded
+    node = placementPolicy.fallBackPickNodes(healthyNodes, null);
+    Assert.assertNotNull(node);
 
     // when input nodeSet are all excluded.
     List<DatanodeDetails> exclude = healthyNodes;
-    try {
-      node = placementPolicy.fallBackPickNodes(healthyNodes, exclude);
-      Assert.assertNull(node);
-    } catch (SCMException e) {
-      Assert.assertEquals(SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE,
-          e.getResult());
-    } catch (Exception ex) {
-      Assert.fail("Should not reach here.");
-    }
+    node = placementPolicy.fallBackPickNodes(healthyNodes, exclude);
+    Assert.assertNull(node);
+
   }
 
   @Test
