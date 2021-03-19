@@ -19,7 +19,6 @@
 
 package org.apache.hadoop.hdds.security.x509.certificate.authority;
 
-import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.PKIProfile;
@@ -158,6 +157,8 @@ public class DefaultApprover extends BaseApprover {
   }
 
   public long generateSerialId() {
+    // TODO: to make generation of serialId distributed.
+    // This issue will be fixed in HDDS-4999.
     return Time.monotonicNowNanos();
   }
 
