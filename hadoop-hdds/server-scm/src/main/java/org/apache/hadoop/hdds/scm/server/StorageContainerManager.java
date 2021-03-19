@@ -141,6 +141,7 @@ import static org.apache.hadoop.hdds.utils.HAUtils.checkSecurityAndSCMHAEnabled;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.OzoneConsts.CRL_SEQUENCE_ID_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_COMPONENT_NAME;
+import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_PREFIX;
 
 /**
  * StorageContainerManager is the main entry point for the service that
@@ -657,7 +658,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       String scmID) throws IOException {
     // TODO: Support Certificate Server loading via Class Name loader.
     // So it is easy to use different Certificate Servers if needed.
-    String subject = "scm@" + InetAddress.getLocalHost().getHostName();
+    String subject = SCM_ROOT_CA_PREFIX +
+        InetAddress.getLocalHost().getHostName();
     if(this.scmMetadataStore == null) {
       LOG.error("Cannot initialize Certificate Server without a valid meta " +
           "data layer.");

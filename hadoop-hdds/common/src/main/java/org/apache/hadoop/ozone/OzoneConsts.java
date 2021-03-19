@@ -425,4 +425,7 @@ public final class OzoneConsts {
 
   public static final String SCM_ROOT_CA_COMPONENT_NAME =
       Paths.get(SCM_CA_CERT_STORAGE_DIR, SCM_CA_PATH).toString();
+
+  public static final String SCM_SUB_CA_PREFIX = "scm-sub@";
+  public static final String SCM_ROOT_CA_PREFIX = "scm@";
 }

@@ -49,6 +49,8 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.SCM;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateApprover.ApprovalType.KERBEROS_TRUSTED;
 import static org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest.getEncodedString;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_COMPONENT_NAME;
+import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.SCM_SUB_CA_PREFIX;
 
 public final class HASecurityUtils {
 
@@ -217,7 +219,8 @@ public final class HASecurityUtils {
       OzoneConfiguration config, SCMCertStore scmCertStore,
       SCMStorageConfig scmStorageConfig)
       throws IOException {
-    String subject = "scm@" + InetAddress.getLocalHost().getHostName();
+    String subject = SCM_ROOT_CA_PREFIX +
+        InetAddress.getLocalHost().getHostName();
 
     DefaultCAServer rootCAServer = new DefaultCAServer(subject,
         scmStorageConfig.getClusterID(),
@@ -244,7 +247,7 @@ public final class HASecurityUtils {
     // Get host name.
     String hostname = scmAddress.getAddress().getHostName();
 
-    String subject = "scm-sub@"+ hostname;
+    String subject = SCM_SUB_CA_PREFIX + hostname;
 
     builder.setKey(keyPair)
         .setConfiguration(config)
