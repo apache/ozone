@@ -133,6 +133,11 @@ public final class ScmConfigKeys {
   // 4 MB by default
   public static final String OZONE_SCM_CHUNK_SIZE_DEFAULT = "4MB";
 
+  public static final String OZONE_CHUNK_READ_BUFFER_DEFAULT_SIZE_KEY =
+      "ozone.chunk.read.buffer.default.size";
+  public static final String OZONE_CHUNK_READ_BUFFER_DEFAULT_SIZE_DEFAULT =
+      "64KB";
+
   public static final String OZONE_SCM_CHUNK_LAYOUT_KEY =
       "ozone.scm.chunk.layout";
 

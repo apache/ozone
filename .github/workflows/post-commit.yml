@@ -18,13 +18,15 @@ on:
   push:
   schedule:
     - cron: 30 0,12 * * *
+env:
+  FAIL_FAST: ${{ github.event_name == 'pull_request' }}
 jobs:
   compile:
     runs-on: ubuntu-18.04
     strategy:
       matrix:
         java: [ 8, 11 ]
-      fail-fast: false
+      fail-fast: ${{ github.event_name == 'pull_request' }}
     steps:
       - name: Checkout project
         uses: actions/checkout@v2
@@ -187,7 +189,7 @@ jobs:
           - secure
           - unsecure
           - misc
-      fail-fast: false
+      fail-fast: ${{ github.event_name == 'pull_request' }}
     steps:
       - name: Checkout project
         uses: actions/checkout@v2
@@ -232,7 +234,7 @@ jobs:
           - client
           - filesystem-hdds
           - ozone
-      fail-fast: false
+      fail-fast: ${{ github.event_name == 'pull_request' }}
     steps:
       - name: Setup link to SSD
         run: sudo mkdir mnt && sudo mount --bind /mnt `pwd`/mnt && sudo chmod 777 mnt

@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.common;
 
 import com.google.common.base.Preconditions;
+import java.util.stream.Collectors;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
 import java.io.IOException;
@@ -271,6 +272,12 @@ final class IncrementalChunkBuffer implements ChunkBuffer {
   @Override
   public ByteString toByteStringImpl(Function<ByteBuffer, ByteString> f) {
     return buffers.stream().map(f).reduce(ByteString.EMPTY, ByteString::concat);
+  }
+
+  @Override
+  public List<ByteString> toByteStringListImpl(
+      Function<ByteBuffer, ByteString> f) {
+    return buffers.stream().map(f).collect(Collectors.toList());
   }
 
   @Override
