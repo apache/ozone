@@ -218,13 +218,21 @@ public class ChunkBufferImplWithByteBufferList implements ChunkBuffer {
 
   @Override
   public ByteString toByteStringImpl(Function<ByteBuffer, ByteString> f) {
-    return buffers.stream().map(f).reduce(ByteString.EMPTY, ByteString::concat);
+    ByteString result = ByteString.EMPTY;
+    for (ByteBuffer buffer : buffers) {
+      result = result.concat(f.apply(buffer));
+    }
+    return result;
   }
 
   @Override
   public List<ByteString> toByteStringListImpl(
       Function<ByteBuffer, ByteString> f) {
-    return buffers.stream().map(f).collect(Collectors.toList());
+    List<ByteString> byteStringList = new ArrayList<>();
+    for (ByteBuffer buffer : buffers) {
+      byteStringList.add(f.apply(buffer));
+    }
+    return byteStringList;
   }
 
   @Override

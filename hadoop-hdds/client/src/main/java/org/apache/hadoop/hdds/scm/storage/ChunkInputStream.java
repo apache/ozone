@@ -410,10 +410,7 @@ public class ChunkInputStream extends InputStream
     } else if (readChunkResponse.hasDataBuffers()) {
       List<ByteString> buffersList = readChunkResponse.getDataBuffers()
           .getBuffersList();
-      return buffersList.stream()
-          .map(ByteString::asReadOnlyByteBuffer)
-          .collect(Collectors.toList())
-          .toArray(new ByteBuffer[0]);
+      return BufferUtils.getReadOnlyByteBuffersArray(buffersList);
     } else {
       throw new IOException("Unexpected error while reading chunk data " +
           "from container. No data returned.");
