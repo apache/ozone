@@ -124,6 +124,7 @@ public class BlockOutputStream extends OutputStream {
   //current buffer allocated to write
   private ChunkBuffer currentBuffer;
   private final Token<? extends TokenIdentifier> token;
+  private int replicationIndex;
 
   /**
    * Creates a new BlockOutputStream.
@@ -152,6 +153,8 @@ public class BlockOutputStream extends OutputStream {
     this.xceiverClient = xceiverClientManager.acquireClient(pipeline);
     this.bufferPool = bufferPool;
     this.token = token;
+
+    replicationIndex = pipeline.getReplicaIndex(pipeline.getClosestNode());
 
     //number of buffers used before doing a flush
     refreshCurrentBuffer(bufferPool);
@@ -662,7 +665,7 @@ public class BlockOutputStream extends OutputStream {
 
     try {
       XceiverClientReply asyncReply = writeChunkAsync(xceiverClient, chunkInfo,
-          blockID.get(), data, token);
+          blockID.get(), data, token, replicationIndex);
       CompletableFuture<ContainerProtos.ContainerCommandResponseProto> future =
           asyncReply.getResponse();
       future.thenApplyAsync(e -> {
