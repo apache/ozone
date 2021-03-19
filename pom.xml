@@ -867,6 +867,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <artifactId>jersey-media-json-jackson</artifactId>
         <version>${jersey2.version}</version>
       </dependency>
+      <dependency>
+        <groupId>org.glassfish.jersey.media</groupId>
+        <artifactId>jersey-media-jaxb</artifactId>
+        <version>${jersey2.version}</version>
+      </dependency>
 
       <dependency>
         <groupId>org.codehaus.plexus</groupId>
