@@ -34,7 +34,8 @@ public class OzonePrefixPathImpl implements OzonePrefixPath {
   private String volumeName;
   private String bucketName;
   private KeyManager keyManager;
-  private int batchSize = 1000; // TODO: can be configurable.
+  // TODO: based on need can make batchSize configurable.
+  private int batchSize = 1000;
   private OzoneFileStatus pathStatus;
 
   public OzonePrefixPathImpl(String volumeName, String bucketName,
@@ -62,7 +63,7 @@ public class OzonePrefixPathImpl implements OzonePrefixPath {
   }
 
   @Override
-  public OzoneFileStatus getOzonePrefixPath() {
+  public OzoneFileStatus getOzoneFileStatus() {
     return pathStatus;
   }
 

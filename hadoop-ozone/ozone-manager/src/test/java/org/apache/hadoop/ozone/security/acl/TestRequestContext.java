@@ -16,15 +16,11 @@
  */
 package org.apache.hadoop.ozone.security.acl;
 
-import org.apache.hadoop.ozone.om.KeyManager;
-import org.apache.hadoop.ozone.om.OzonePrefixPathImpl;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.Assert;
 import org.junit.Test;
 
 import java.io.IOException;
-
-import static org.mockito.Mockito.mock;
 
 /**
  * Test request context.
@@ -70,32 +66,25 @@ public class TestRequestContext {
     context = new RequestContext("host", null,
             null, "serviceId",
             IAccessAuthorizer.ACLIdentityType.GROUP,
-            IAccessAuthorizer.ACLType.CREATE, "owner", false, null);
+            IAccessAuthorizer.ACLType.CREATE, "owner", false);
     Assert.assertFalse("Wrongly sets recursive flag value",
             context.isRecursiveAccessCheck());
 
-    KeyManager mockKeyManager = mock(KeyManager.class);
     context = new RequestContext("host", null,
             null, "serviceId",
             IAccessAuthorizer.ACLIdentityType.GROUP,
-            IAccessAuthorizer.ACLType.CREATE, "owner", true,
-            new OzonePrefixPathImpl("vol1", "buck1", "file", mockKeyManager));
+            IAccessAuthorizer.ACLType.CREATE, "owner", true);
     Assert.assertTrue("Wrongly sets recursive flag value",
             context.isRecursiveAccessCheck());
-    Assert.assertNotNull("unexpected path accessor",
-        context.getOzonePrefixPathViewer());
   }
 
   private RequestContext getUserRequestContext(String username,
       IAccessAuthorizer.ACLType type, boolean isOwner, String ownerName,
       boolean recursiveAccessCheck) throws IOException {
 
-    KeyManager mockKeyManager = mock(KeyManager.class);
     return RequestContext.getBuilder(
             UserGroupInformation.createRemoteUser(username), null, null,
-            type, ownerName, recursiveAccessCheck,
-            new OzonePrefixPathImpl("vol1", "buck1",
-                "file", mockKeyManager)).build();
+            type, ownerName, recursiveAccessCheck).build();
   }
 
   private RequestContext getUserRequestContext(String username,

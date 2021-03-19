@@ -94,7 +94,7 @@ public class TestOMKeyDeleteRequestV1 extends TestOMKeyDeleteRequest {
     // OzonePrefixPathImpl on a directory
     OzonePrefixPathImpl ozonePrefixPath = new OzonePrefixPathImpl(volumeName,
         bucketName, "c", keyManager);
-    OzoneFileStatus status = ozonePrefixPath.getOzonePrefixPath();
+    OzoneFileStatus status = ozonePrefixPath.getOzoneFileStatus();
     Assert.assertNotNull(status);
     Assert.assertEquals("c", status.getTrimmedName());
     Assert.assertTrue(status.isDirectory());
@@ -113,7 +113,7 @@ public class TestOMKeyDeleteRequestV1 extends TestOMKeyDeleteRequest {
     // OzonePrefixPathImpl on a file
     ozonePrefixPath = new OzonePrefixPathImpl(volumeName,
         bucketName, "c/d/e/file1", keyManager);
-    status = ozonePrefixPath.getOzonePrefixPath();
+    status = ozonePrefixPath.getOzoneFileStatus();
     Assert.assertNotNull(status);
     Assert.assertEquals("c/d/e/file1", status.getTrimmedName());
     Assert.assertEquals("c/d/e/file1", status.getKeyInfo().getKeyName());

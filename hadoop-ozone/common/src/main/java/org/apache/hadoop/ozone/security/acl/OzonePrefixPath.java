@@ -31,7 +31,7 @@ public interface OzonePrefixPath {
    *
    * @return OzoneFileStatus for the given path.
    */
-  OzoneFileStatus getOzonePrefixPath();
+  OzoneFileStatus getOzoneFileStatus();
 
   /**
    * Lists immediate children(files or a directories) of the given keyPrefix.

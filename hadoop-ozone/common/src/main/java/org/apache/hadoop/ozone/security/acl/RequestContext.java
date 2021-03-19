@@ -43,23 +43,20 @@ public class RequestContext {
    */
   private final boolean recursiveAccessCheck;
 
-  private final OzonePrefixPath ozonePrefixPath;
-
   @SuppressWarnings("parameternumber")
   public RequestContext(String host, InetAddress ip,
       UserGroupInformation clientUgi, String serviceId,
       ACLIdentityType aclType, ACLType aclRights,
       String ownerName) {
     this(host, ip, clientUgi, serviceId, aclType, aclRights, ownerName,
-            false, null);
+            false);
   }
 
   @SuppressWarnings("parameternumber")
   public RequestContext(String host, InetAddress ip,
       UserGroupInformation clientUgi, String serviceId,
       ACLIdentityType aclType, ACLType aclRights,
-      String ownerName, boolean recursiveAccessCheck,
-      OzonePrefixPath ozonePrefixPath) {
+      String ownerName, boolean recursiveAccessCheck) {
     this.host = host;
     this.ip = ip;
     this.clientUgi = clientUgi;
@@ -68,7 +65,6 @@ public class RequestContext {
     this.aclRights = aclRights;
     this.ownerName = ownerName;
     this.recursiveAccessCheck = recursiveAccessCheck;
-    this.ozonePrefixPath = ozonePrefixPath;
   }
 
   /**
@@ -89,8 +85,6 @@ public class RequestContext {
     private String ownerName;
 
     private boolean recursiveAccessCheck;
-
-    private OzonePrefixPath ozonePrefixPath;
 
     public Builder setHost(String bHost) {
       this.host = bHost;
@@ -136,14 +130,9 @@ public class RequestContext {
       return this;
     }
 
-    public Builder setOzonePrefixPath(OzonePrefixPath ozonePrefixPathViewer) {
-      this.ozonePrefixPath = ozonePrefixPathViewer;
-      return this;
-    }
-
     public RequestContext build() {
       return new RequestContext(host, ip, clientUgi, serviceId, aclType,
-          aclRights, ownerName, recursiveAccessCheck, ozonePrefixPath);
+          aclRights, ownerName, recursiveAccessCheck);
     }
   }
 
@@ -156,13 +145,12 @@ public class RequestContext {
       UserGroupInformation ugi, InetAddress remoteAddress, String hostName,
       ACLType aclType, String ownerName) {
     return getBuilder(ugi, remoteAddress, hostName, aclType, ownerName,
-            false, null);
+            false);
   }
 
   public static RequestContext.Builder getBuilder(
       UserGroupInformation ugi, InetAddress remoteAddress, String hostName,
-      ACLType aclType, String ownerName, boolean recursiveAccessCheck,
-      OzonePrefixPath ozonePrefixPathViewer) {
+      ACLType aclType, String ownerName, boolean recursiveAccessCheck) {
     RequestContext.Builder contextBuilder = RequestContext.newBuilder()
         .setClientUgi(ugi)
         .setIp(remoteAddress)
@@ -170,8 +158,7 @@ public class RequestContext {
         .setAclType(ACLIdentityType.USER)
         .setAclRights(aclType)
         .setOwnerName(ownerName)
-        .setRecursiveAccessCheck(recursiveAccessCheck)
-        .setOzonePrefixPath(ozonePrefixPathViewer);
+        .setRecursiveAccessCheck(recursiveAccessCheck);
     return contextBuilder;
   }
 
@@ -219,9 +206,5 @@ public class RequestContext {
    */
   public boolean isRecursiveAccessCheck() {
     return recursiveAccessCheck;
-  }
-
-  public OzonePrefixPath getOzonePrefixPathViewer() {
-    return ozonePrefixPath;
   }
 }

@@ -1295,7 +1295,7 @@ public class TestOzoneFileSystem {
         new OzonePrefixPathImpl(getVolumeName(), getBucketName(), keyName,
             cluster.getOzoneManager().getKeyManager());
 
-    OzoneFileStatus status = ozonePrefixPath.getOzonePrefixPath();
+    OzoneFileStatus status = ozonePrefixPath.getOzoneFileStatus();
     Assert.assertNotNull(status);
     Assert.assertEquals(keyName, status.getTrimmedName());
     Assert.assertTrue(status.isDirectory());

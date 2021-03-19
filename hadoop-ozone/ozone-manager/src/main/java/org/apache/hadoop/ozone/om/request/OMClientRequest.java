@@ -223,24 +223,25 @@ public abstract class OMClientRequest implements RequestAuditor {
   protected void checkACLs(OzoneManager ozoneManager, String volumeName,
       String bucketName, String keyName) throws IOException {
 
-    OzoneObj obj = OzoneObjInfo.Builder.newBuilder()
-        .setResType(OzoneObj.ResourceType.KEY)
-        .setStoreType(OzoneObj.StoreType.OZONE)
-        .setVolumeName(volumeName)
-        .setBucketName(bucketName)
-        .setKeyName(keyName).build();
-
     // TODO: Presently not populating sub-paths under a single bucket
     //  lock. Need to revisit this to handle any concurrent operations
     //  along with this.
     OzonePrefixPathImpl pathViewer = new OzonePrefixPathImpl(volumeName,
         bucketName, keyName, ozoneManager.getKeyManager());
-    boolean isDirectory = pathViewer.getOzonePrefixPath().isDirectory();
+
+    OzoneObj obj = OzoneObjInfo.Builder.newBuilder()
+        .setResType(OzoneObj.ResourceType.KEY)
+        .setStoreType(OzoneObj.StoreType.OZONE)
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setOzonePrefixPath(pathViewer).build();
+
+    boolean isDirectory = pathViewer.getOzoneFileStatus().isDirectory();
 
     RequestContext.Builder contextBuilder = RequestContext.newBuilder()
         .setAclRights(IAccessAuthorizer.ACLType.DELETE)
-        .setRecursiveAccessCheck(isDirectory) // recursive checks for a dir
-        .setOzonePrefixPath(pathViewer);
+        .setRecursiveAccessCheck(isDirectory); // recursive checks for a dir
 
     // check Acl
     checkKeyAcls(ozoneManager, obj, contextBuilder);
