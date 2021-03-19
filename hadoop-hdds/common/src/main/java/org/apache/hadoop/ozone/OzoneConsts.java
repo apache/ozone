@@ -25,6 +25,7 @@ import org.apache.ratis.thirdparty.io.grpc.Metadata;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Paths;
 import java.util.regex.Pattern;
 
 import static org.apache.ratis.thirdparty.io.grpc.Metadata.ASCII_STRING_MARSHALLER;
@@ -421,4 +422,7 @@ public final class OzoneConsts {
   public static final String SCM_CA_PATH = "ca";
   public static final String SCM_CA_CERT_STORAGE_DIR = "scm";
   public static final String SCM_SUB_CA_PATH = "sub-ca";
+
+  public static final String SCM_ROOT_CA_COMPONENT_NAME =
+      Paths.get(SCM_CA_CERT_STORAGE_DIR, SCM_CA_PATH).toString();
 }

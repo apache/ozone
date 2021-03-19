@@ -33,8 +33,9 @@ import static org.apache.hadoop.hdds.security.x509.certificate.client.Certificat
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.SUCCESS;
 
 /**
- * SCM Certificate Client which is used for generate public, private Key and
- * generate CSR.
+ * SCM Certificate Client which is used for generating public/private Key pair,
+ * generate CSR and finally obtain signed certificate. This Certificate
+ * client is used for setting up sub CA by SCM.
  */
 public class SCMCertificateClient extends DefaultCertificateClient {
 

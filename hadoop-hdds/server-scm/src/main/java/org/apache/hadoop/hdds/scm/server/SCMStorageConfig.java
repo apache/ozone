@@ -79,7 +79,7 @@ public class SCMStorageConfig extends Storage {
   }
 
   /**
-   * Sets the SCM CA certificate serial id.
+   * Sets the SCM Sub-CA certificate serial id.
    * @param certSerialId
    * @throws IOException
    */
@@ -88,8 +88,8 @@ public class SCMStorageConfig extends Storage {
   }
 
   /**
-   * Retrives the SCM CA certificate serial id from the version file.
-   * @return scm CA certificate serial id
+   * Retrives the SCM Sub-CA certificate serial id from the version file.
+   * @return scm sub-CA certificate serial id
    */
   public String getScmCertSerialId() {
     return getStorageInfo().getProperty(SCM_CERT_SERIAL_ID);

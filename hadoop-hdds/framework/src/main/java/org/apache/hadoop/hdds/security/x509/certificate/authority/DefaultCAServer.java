@@ -260,6 +260,7 @@ public class DefaultCAServer implements CertificateServer {
       LocalDate endDate, PKCS10CertificationRequest csr, NodeType role)
       throws IOException,
       OperatorCreationException, CertificateException {
+
     lock.lock();
     X509CertificateHolder xcert;
     try {
@@ -267,9 +268,11 @@ public class DefaultCAServer implements CertificateServer {
           getCAKeys().getPrivate(),
           getCACertificate(), java.sql.Date.valueOf(beginDate),
           java.sql.Date.valueOf(endDate), csr, scmID, clusterID);
-      store.checkValidCertID(xcert.getSerialNumber());
-      store.storeValidCertificate(xcert.getSerialNumber(),
-          CertificateCodec.getX509Certificate(xcert), role);
+      if (store != null) {
+        store.checkValidCertID(xcert.getSerialNumber());
+        store.storeValidCertificate(xcert.getSerialNumber(),
+            CertificateCodec.getX509Certificate(xcert), role);
+      }
     } finally {
       lock.unlock();
     }
@@ -459,11 +462,14 @@ public class DefaultCAServer implements CertificateServer {
           }
         };
       } else if (type == CAType.INTERMEDIARY_CA) {
-        // for this certificates are generated during bootstrap/start. If
-        // both certs are missing, something is wrong during bootstrap/start.
+        // For sub CA certificates are generated during bootstrap/init. If
+        // both keys/certs are missing, init/bootstrap is missed to be
+        // performed.
         consumer = (arg) -> {
+          LOG.error("Sub SCM CA Server is missing keys/certs. SCM is started " +
+              "with out init/bootstrap");
           throw new IllegalStateException("INTERMEDIARY_CA Should not be" +
-              " in Iniitialize State during startup.");
+              " in Initialize State during startup.");
         };
       }
       break;
