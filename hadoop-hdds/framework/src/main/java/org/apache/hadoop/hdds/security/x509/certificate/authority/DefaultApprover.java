@@ -19,7 +19,6 @@
 
 package org.apache.hadoop.hdds.security.x509.certificate.authority;
 
-import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
@@ -50,7 +49,6 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.security.PrivateKey;
 import java.util.Date;
-import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -159,9 +157,8 @@ public class DefaultApprover extends BaseApprover {
 
   }
 
-  public synchronized long generateSerialId() {
-   return Time.monotonicNowNanos() + RandomUtils.nextLong(0,
-       Time.monotonicNowNanos());
+  public long generateSerialId() {
+    return Time.monotonicNowNanos();
   }
 
   @Override

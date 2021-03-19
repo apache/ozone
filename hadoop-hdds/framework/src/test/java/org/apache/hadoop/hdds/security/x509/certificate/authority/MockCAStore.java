@@ -43,6 +43,11 @@ public class MockCAStore implements CertificateStore {
   }
 
   @Override
+  public void checkValidCertID(BigInteger serialID) throws IOException {
+
+  }
+
+  @Override
   public Optional<Long> revokeCertificates(
       List<BigInteger> serialIDs,
       X509CertificateHolder caCertificateHolder,
