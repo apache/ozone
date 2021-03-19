@@ -141,8 +141,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT_
 import static org.apache.hadoop.hdds.utils.HAUtils.checkSecurityAndSCMHAEnabled;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.OzoneConsts.CRL_SEQUENCE_ID_KEY;
-import static org.apache.hadoop.ozone.OzoneConsts.SCM_CA_CERT_STORAGE_DIR;
-import static org.apache.hadoop.ozone.OzoneConsts.SCM_CA_PATH;
+import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_COMPONENT_NAME;
 
 /**
  * StorageContainerManager is the main entry point for the service that
@@ -673,8 +672,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
             .setCRLSequenceId(getLastSequenceIdForCRL()).build();
 
     return new DefaultCAServer(subject, clusterID, scmID, certStore,
-        new DefaultProfile(),
-        Paths.get(SCM_CA_CERT_STORAGE_DIR, SCM_CA_PATH).toString());
+        new DefaultProfile(), SCM_ROOT_CA_COMPONENT_NAME);
   }
 
   long getLastSequenceIdForCRL() throws IOException {
