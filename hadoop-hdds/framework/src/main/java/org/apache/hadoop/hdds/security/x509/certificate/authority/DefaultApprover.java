@@ -19,6 +19,8 @@
 
 package org.apache.hadoop.hdds.security.x509.certificate.authority;
 
+import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.PKIProfile;
@@ -48,6 +50,7 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.security.PrivateKey;
 import java.util.Date;
+import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -89,7 +92,8 @@ public class DefaultApprover extends BaseApprover {
       Date validTill,
       PKCS10CertificationRequest certificationRequest,
       String scmId,
-      String clusterId) throws IOException, OperatorCreationException {
+      String clusterId) throws IOException,
+      OperatorCreationException {
 
     AlgorithmIdentifier sigAlgId = new
         DefaultSignatureAlgorithmIdentifierFinder().find(
@@ -135,7 +139,7 @@ public class DefaultApprover extends BaseApprover {
         new X509v3CertificateBuilder(
             caCertificate.getSubject(),
             // Serial is not sequential but it is monotonically increasing.
-            BigInteger.valueOf(Time.monotonicNowNanos()),
+            BigInteger.valueOf(generateSerialId()),
             validFrom,
             validTill,
             x500Name, keyInfo);
@@ -153,6 +157,11 @@ public class DefaultApprover extends BaseApprover {
 
     return certificateGenerator.build(sigGen);
 
+  }
+
+  public synchronized long generateSerialId() {
+   return Time.monotonicNowNanos() + RandomUtils.nextLong(0,
+       Time.monotonicNowNanos());
   }
 
   @Override
