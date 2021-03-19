@@ -242,21 +242,21 @@ public class StateContext {
     Preconditions.checkState(descriptor != null);
     final String reportType = descriptor.getFullName();
     Preconditions.checkState(reportType != null);
-    for (InetSocketAddress endpoint : endpoints) {
-      if (reportType.equals(CONTAINER_REPORTS_PROTO_NAME)) {
-        containerReports.set(report);
-      } else if (reportType.equals(NODE_REPORT_PROTO_NAME)) {
-        nodeReport.set(report);
-      } else if (reportType.equals(PIPELINE_REPORTS_PROTO_NAME)) {
-        pipelineReports.set(report);
-      } else if (ACCEPTED_INCREMENTAL_REPORT_TYPE_SET.contains(reportType)) {
-        synchronized (incrementalReportsQueue) {
+    if (reportType.equals(CONTAINER_REPORTS_PROTO_NAME)) {
+      containerReports.set(report);
+    } else if (reportType.equals(NODE_REPORT_PROTO_NAME)) {
+      nodeReport.set(report);
+    } else if (reportType.equals(PIPELINE_REPORTS_PROTO_NAME)) {
+      pipelineReports.set(report);
+    } else if (ACCEPTED_INCREMENTAL_REPORT_TYPE_SET.contains(reportType)) {
+      synchronized (incrementalReportsQueue) {
+        for (InetSocketAddress endpoint : endpoints) {
           incrementalReportsQueue.get(endpoint).add(report);
         }
-      } else {
-        throw new IllegalArgumentException(
-            "Unidentified report message type: " + reportType);
       }
+    } else {
+      throw new IllegalArgumentException(
+          "Unidentified report message type: " + reportType);
     }
   }
 
