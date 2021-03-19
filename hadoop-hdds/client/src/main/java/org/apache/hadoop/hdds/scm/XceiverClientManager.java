@@ -237,6 +237,9 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
             case STAND_ALONE:
               client = new XceiverClientGrpc(pipeline, conf, caCert);
               break;
+            case EC:
+              client = new XceiverClientGrpc(pipeline, conf, caCert);
+              break;
             case CHAINED:
             default:
               throw new IOException("not implemented" + pipeline.getType());
