@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.client.rpc.read;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.List;
 import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
 import org.apache.hadoop.hdds.scm.storage.ChunkInputStream;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
@@ -179,7 +178,7 @@ public class TestChunkInputStream extends TestInputStreamBase {
   }
 
   /**
-   * Verify number of buffers and their capacities
+   * Verify number of buffers and their capacities.
    * @param buffers chunk stream buffers
    * @param expectedNumBuffers expected number of buffers
    * @param numReleasedBuffers first numReleasedBuffers are expected to

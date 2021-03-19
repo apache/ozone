@@ -627,25 +627,6 @@ public class ChunkInputStream extends InputStream
   }
 
   /**
-   * Release a buffer.
-   * A buffer should be released after buffer EOF is reached i.e. the last
-   * byte in the buffer has been read.
-   * @param releaseUptoBufferIndex bufferIndex (inclusive) upto which the
-   *                               buffers must be released
-   */
-  private void releaseBuffers(int releaseUptoBufferIndex) {
-    if (releaseUptoBufferIndex == buffers.length - 1) {
-      // All the buffers need to be released
-      releaseBuffers();
-    } else {
-      for (int i = 0; i <= releaseUptoBufferIndex; i++) {
-        buffers[i] = null;
-      }
-      minBufferIndex = releaseUptoBufferIndex + 1;
-    }
-  }
-
-  /**
    * Check if end of chunkStream has been reached.
    */
   private boolean chunkStreamEOF() {
@@ -661,6 +642,33 @@ public class ChunkInputStream extends InputStream
           bufferOffsetWrtChunkData + buffersSize == length,
           "EOF detected but not at the last byte of the chunk");
       return true;
+    }
+  }
+
+
+  /**
+   * Release a buffer.
+   * A buffer should be released after buffer EOF is reached i.e. the last
+   * byte in the buffer has been read.
+   * @param releaseUptoBufferIndex bufferIndex (inclusive) upto which the
+   *                               buffers must be released
+   */
+  private void releaseBuffers(int releaseUptoBufferIndex) {
+    if (releaseUptoBufferIndex == buffers.length - 1) {
+      // Before releasing all the buffers, if chunk EOF is not reached, then
+      // chunkPosition should be set to point to the last position of the
+      // buffers. This should be done so that getPos() can return the current
+      // chunk position
+      chunkPosition = bufferOffsetWrtChunkData +
+          bufferOffsets[releaseUptoBufferIndex] +
+          buffers[releaseUptoBufferIndex].capacity();
+      // Release all the buffers
+      releaseBuffers();
+    } else {
+      for (int i = 0; i <= releaseUptoBufferIndex; i++) {
+        buffers[i] = null;
+      }
+      minBufferIndex = releaseUptoBufferIndex + 1;
     }
   }
 
@@ -709,6 +717,6 @@ public class ChunkInputStream extends InputStream
 
   @VisibleForTesting
   public ByteBuffer[] getCachedBuffers() {
-    return buffers;
+    return BufferUtils.getReadOnlyByteBuffers(buffers);
   }
 }

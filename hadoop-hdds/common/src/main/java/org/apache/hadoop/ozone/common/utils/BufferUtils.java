@@ -72,6 +72,18 @@ public final class BufferUtils {
   }
 
   /**
+   * Return a read only copy of ByteBuffer array.
+   */
+  public static ByteBuffer[] getReadOnlyByteBuffers(
+      ByteBuffer[] byteBuffers) {
+    ByteBuffer[] readOnlyBuffers = new ByteBuffer[byteBuffers.length];
+    for (int i = 0; i < byteBuffers.length; i++) {
+      readOnlyBuffers[i] = byteBuffers[i].asReadOnlyBuffer();
+    }
+    return readOnlyBuffers;
+  }
+
+  /**
    * Return a read only ByteBuffer array for the input ByteStrings list.
    */
   public static ByteBuffer[] getReadOnlyByteBuffersArray(
