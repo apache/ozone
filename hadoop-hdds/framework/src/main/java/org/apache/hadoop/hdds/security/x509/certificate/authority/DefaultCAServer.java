@@ -147,6 +147,7 @@ public class DefaultCAServer implements CertificateServer {
     this.scmID = scmID;
     this.store = certificateStore;
     this.profile = pkiProfile;
+    this.componentName = componentName;
     lock = new ReentrantLock();
   }
 
