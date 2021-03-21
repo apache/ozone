@@ -587,4 +587,15 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   public void setCertificateClient(CertificateClient client) {
     dnCertClient = client;
   }
+
+  @Override
+  public void printError(Throwable error) {
+    if (error.getMessage() == null || error.getMessage().length() == 0) {
+      //message could be null in case of NPE. This is unexpected so we can
+      //print out the stack trace.
+      LOG.error("Exception in HddsDatanodeService.", error);
+    } else {
+      LOG.error(error.getMessage().split("\n")[0]);
+    }
+  }
 }
