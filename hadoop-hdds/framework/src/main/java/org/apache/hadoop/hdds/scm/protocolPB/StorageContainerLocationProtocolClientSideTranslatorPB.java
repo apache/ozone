@@ -258,6 +258,12 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   @Override
   public List<ContainerInfo> listContainer(long startContainerID, int count)
       throws IOException {
+    return listContainer(startContainerID, count, null);
+  }
+
+  @Override
+  public List<ContainerInfo> listContainer(long startContainerID, int count,
+      HddsProtos.LifeCycleState state) throws IOException {
     Preconditions.checkState(startContainerID >= 0,
         "Container ID cannot be negative.");
     Preconditions.checkState(count > 0,
@@ -267,6 +273,10 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     builder.setStartContainerID(startContainerID);
     builder.setCount(count);
     builder.setTraceID(TracingUtil.exportCurrentSpan());
+    if (state != null) {
+      builder.setState(state);
+    }
+
     SCMListContainerRequestProto request = builder.build();
 
     SCMListContainerResponseProto response =
@@ -279,7 +289,6 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
       containerList.add(ContainerInfo.fromProtobuf(containerInfoProto));
     }
     return containerList;
-
   }
 
   /**

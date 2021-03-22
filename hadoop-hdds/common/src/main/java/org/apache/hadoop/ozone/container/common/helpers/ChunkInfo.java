@@ -38,6 +38,10 @@ public class ChunkInfo {
   private ChecksumData checksumData;
   private final Map<String, String> metadata;
 
+  // For older clients reading chunks in V0 version (all read data should
+  // reside in one buffer). This variable should be set to true for older
+  // clients to maintain backward wire compatibility.
+  private boolean readDataIntoSingleBuffer = false;
 
   /**
    * Constructs a ChunkInfo.
@@ -181,5 +185,13 @@ public class ChunkInfo {
         ", offset=" + offset +
         ", len=" + len +
         '}';
+  }
+
+  public void setReadDataIntoSingleBuffer(boolean readDataIntoSingleBuffer) {
+    this.readDataIntoSingleBuffer = readDataIntoSingleBuffer;
+  }
+
+  public boolean isReadDataIntoSingleBuffer() {
+    return readDataIntoSingleBuffer;
   }
 }

@@ -30,6 +30,8 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdds.cli.GenericCli;
+import org.apache.hadoop.hdds.cli.OzoneAdmin;
 import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.fs.ozone.OzoneFsShell;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -83,13 +85,14 @@ public class TestOzoneShellHA {
    * Set the timeout for every test.
    */
   @Rule
-  public Timeout testTimeout = new Timeout(300000);
+  public Timeout testTimeout = Timeout.seconds(300);
 
   private static File baseDir;
   private static File testFile;
   private static OzoneConfiguration conf = null;
   private static MiniOzoneCluster cluster = null;
   private static OzoneShell ozoneShell = null;
+  private static OzoneAdmin ozoneAdminShell = null;
 
   private final ByteArrayOutputStream out = new ByteArrayOutputStream();
   private final ByteArrayOutputStream err = new ByteArrayOutputStream();
@@ -121,6 +124,7 @@ public class TestOzoneShellHA {
     testFile.createNewFile();
 
     ozoneShell = new OzoneShell();
+    ozoneAdminShell = new OzoneAdmin();
 
     // Init HA cluster
     omServiceId = "om-service-test1";
@@ -168,7 +172,7 @@ public class TestOzoneShellHA {
     System.setErr(OLD_ERR);
   }
 
-  private void execute(Shell shell, String[] args) {
+  private void execute(GenericCli shell, String[] args) {
     LOG.info("Executing OzoneShell command with args {}", Arrays.asList(args));
     CommandLine cmd = shell.getCmd();
 
@@ -452,6 +456,28 @@ public class TestOzoneShellHA {
     execute(ozoneShell, args);
     Assert.assertEquals(0, out.size());
     Assert.assertEquals(0, getNumOfBuckets("bucket"));
+  }
+
+  /**
+   * Test ozone admin list command.
+   */
+  @Test
+  public void testOzoneAdminCmdList() throws UnsupportedEncodingException {
+    // Part of listing keys test.
+    generateKeys("/volume6", "/bucket");
+    // Test case 1: list OPEN container
+    String state = "--state=OPEN";
+    String[] args = new String[] {"container", "list", "--scm",
+        "localhost:" + cluster.getStorageContainerManager().getClientRpcPort(),
+        state};
+    execute(ozoneAdminShell, args);
+
+    // Test case 2: list CLOSED container
+    state = "--state=CLOSED";
+    args = new String[] {"container", "list", "--scm",
+        "localhost:" + cluster.getStorageContainerManager().getClientRpcPort(),
+        state};
+    execute(ozoneAdminShell, args);
   }
 
   /**

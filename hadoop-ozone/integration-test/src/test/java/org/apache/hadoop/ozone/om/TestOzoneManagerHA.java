@@ -86,7 +86,7 @@ public abstract class TestOzoneManagerHA {
   public ExpectedException exception = ExpectedException.none();
 
   @Rule
-  public Timeout timeout = new Timeout(300_000);
+  public Timeout timeout = Timeout.seconds(300);;
 
   public MiniOzoneHAClusterImpl getCluster() {
     return cluster;

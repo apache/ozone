@@ -460,7 +460,7 @@ int getReplicationCount(int expectedCount, int healthy, int maintenance) {
 
 Please note that we always assume that the the in-flight deletion are applied and the container is already deleted.
 
-There is a very rare case where the in-flight deletion is timed out (and as a result replication manager would assume the container is not deleted) BUT in the mean-time the container finally deleted. It can be survivied with including the creation timestamp in the ContainerDeleteCommand.
+There is a very rare case where the in-flight deletion is timed out (and as a result replication manager would assume the container is not deleted) BUT in the mean-time the container finally deleted. It can be survived with including the creation timestamp in the ContainerDeleteCommand.
 
 ### Over replication examples
 

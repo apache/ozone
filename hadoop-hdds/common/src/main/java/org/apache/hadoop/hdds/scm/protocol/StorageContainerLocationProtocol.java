@@ -106,8 +106,27 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * @return a list of container.
    * @throws IOException
    */
-  List<ContainerInfo> listContainer(long startContainerID, int count)
-      throws IOException;
+  List<ContainerInfo> listContainer(long startContainerID,
+      int count) throws IOException;
+
+  /**
+   * Ask SCM a list of containers with a range of container names
+   * and the limit of count.
+   * Search container names between start name(exclusive), and
+   * use prefix name to filter the result. the max size of the
+   * searching range cannot exceed the value of count.
+   *
+   * @param startContainerID start container ID.
+   * @param count count, if count {@literal <} 0, the max size is unlimited.(
+   *              Usually the count will be replace with a very big
+   *              value instead of being unlimited in case the db is very big)
+   * @param state Container with this state will be returned.
+   *
+   * @return a list of container.
+   * @throws IOException
+   */
+  List<ContainerInfo> listContainer(long startContainerID,
+      int count, HddsProtos.LifeCycleState state) throws IOException;
 
   /**
    * Deletes a container in SCM.

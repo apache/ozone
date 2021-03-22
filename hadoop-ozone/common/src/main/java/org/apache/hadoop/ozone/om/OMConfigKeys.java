@@ -235,10 +235,19 @@ public final class OMConfigKeys {
 
   public static final String OZONE_OM_HA_PREFIX = "ozone.om.ha";
 
+  public static final String OZONE_FS_TRASH_INTERVAL_KEY =
+      "ozone.fs.trash.interval";
+
+  public static final long  OZONE_FS_TRASH_INTERVAL_DEFAULT = 0;
+
+  public static final String OZONE_FS_TRASH_CHECKPOINT_INTERVAL_KEY =
+      "ozone.fs.trash.checkpoint.interval";
+
+  public static final long  OZONE_FS_TRASH_CHECKPOINT_INTERVAL_DEFAULT = 0;
+
   public static final String OZONE_OM_RATIS_BASED_FINALIZATION_TIMEOUT =
       "ozone.om.finalization.ratis.based.timeout";
   public static final TimeDuration
       OZONE_OM_RATIS_BASED_FINALIZATION_TIMEOUT_DEFAULT
-      = TimeDuration.valueOf(30, TimeUnit.SECONDS);;
-
+      = TimeDuration.valueOf(30, TimeUnit.SECONDS);
 }

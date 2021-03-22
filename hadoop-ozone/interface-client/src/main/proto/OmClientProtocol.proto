@@ -885,7 +885,7 @@ message LookupKeyResponse {
     // clients' followup request may carry this ID for stateful operations (similar
     // to a cookie).
     optional uint64 ID = 3;
-    // TODO : allow specifiying a particular version to read.
+    // TODO : allow specifying a particular version to read.
     optional uint64 openVersion = 4;
 }
 
