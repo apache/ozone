@@ -154,6 +154,8 @@ message DatanodeBlockID {
   required int64 containerID = 1;
   required int64 localID = 2;
   optional uint64 blockCommitSequenceId = 3 [default = 0];
+  optional int32 replicaIndex = 4;
+
 }
 
 message KeyValue {
@@ -394,7 +396,6 @@ message  WriteChunkRequestProto  {
   required DatanodeBlockID blockID = 1;
   required ChunkInfo chunkData = 2;
   optional bytes data = 3;
-  optional int32 containerinstanceIndex = 4;
 }
 
 message  WriteChunkResponseProto {

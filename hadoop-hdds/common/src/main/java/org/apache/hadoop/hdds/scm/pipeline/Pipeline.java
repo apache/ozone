@@ -18,6 +18,18 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
+import com.google.common.base.Preconditions;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.builder.EqualsBuilder;
+import org.apache.commons.lang3.builder.HashCodeBuilder;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -30,19 +42,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
-
-import com.google.common.base.Preconditions;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.builder.EqualsBuilder;
-import org.apache.commons.lang3.builder.HashCodeBuilder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Represents a group of datanodes which store a container.
@@ -499,8 +498,9 @@ public final class Pipeline {
       return this;
     }
 
-    public Builder setReplicaIndexes(Map<DatanodeDetails, Integer> replicaIndexes) {
-      this.replicaIndexes = replicaIndexes;
+
+    public Builder setReplicaIndexes(Map<DatanodeDetails, Integer> indexes) {
+      this.replicaIndexes = indexes;
       return this;
     }
 
@@ -523,10 +523,10 @@ public final class Pipeline {
       if (nodeOrder != null && !nodeOrder.isEmpty()) {
         // This branch is for build from ProtoBuf
         List<DatanodeDetails> nodesWithOrder = new ArrayList<>();
-        for (int i = 0; i < nodeOrder.size(); i++) {
+        for(int i = 0; i < nodeOrder.size(); i++) {
           int nodeIndex = nodeOrder.get(i);
           Iterator<DatanodeDetails> it = nodeStatus.keySet().iterator();
-          while (it.hasNext() && nodeIndex >= 0) {
+          while(it.hasNext() && nodeIndex >= 0) {
             DatanodeDetails node = it.next();
             if (nodeIndex == 0) {
               nodesWithOrder.add(node);
@@ -540,14 +540,13 @@ public final class Pipeline {
               nodesWithOrder, id);
         }
         pipeline.setNodesInOrder(nodesWithOrder);
-      } else if (nodesInOrder != null) {
+      } else if (nodesInOrder != null){
         // This branch is for pipeline clone
         pipeline.setNodesInOrder(nodesInOrder);
       }
 
       return pipeline;
     }
-
   }
 
   /**

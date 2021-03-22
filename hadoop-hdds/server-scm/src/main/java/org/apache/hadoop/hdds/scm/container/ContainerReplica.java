@@ -17,16 +17,15 @@
 
 package org.apache.hadoop.hdds.scm.container;
 
-import java.util.Optional;
-import java.util.UUID;
-
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
-
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.builder.CompareToBuilder;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
+
+import java.util.Optional;
+import java.util.UUID;
 
 /**
  * In-memory state of a container replica.
