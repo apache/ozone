@@ -125,12 +125,17 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
     subject.writeChunk(container, blockID, info, data, ctx);
 
     ChunkBuffer readData = subject.readChunk(container, blockID, info, ctx);
-    assertEquals(data.rewind(), readData.rewind());
+    // data will be ChunkBufferImplWithByteBuffer and readData will return
+    // ChunkBufferImplWithByteBufferList. Hence, convert both ByteStrings
+    // before comparing.
+    assertEquals(data.rewind().toByteString(),
+        readData.rewind().toByteString());
 
     ChunkInfo info2 = getChunk(blockID.getLocalID(), 0, start, length);
     ChunkBuffer readData2 = subject.readChunk(container, blockID, info2, ctx);
     assertEquals(length, info2.getLen());
-    assertEquals(data.duplicate(start, start + length), readData2.rewind());
+    assertEquals(data.rewind().toByteString().substring(start, start + length),
+        readData2.rewind().toByteString());
   }
 
   @Override

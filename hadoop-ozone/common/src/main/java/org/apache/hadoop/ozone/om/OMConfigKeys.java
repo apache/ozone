@@ -234,4 +234,14 @@ public final class OMConfigKeys {
       false;
 
   public static final String OZONE_OM_HA_PREFIX = "ozone.om.ha";
+
+  public static final String OZONE_FS_TRASH_INTERVAL_KEY =
+      "ozone.fs.trash.interval";
+
+  public static final long  OZONE_FS_TRASH_INTERVAL_DEFAULT = 0;
+
+  public static final String OZONE_FS_TRASH_CHECKPOINT_INTERVAL_KEY =
+      "ozone.fs.trash.checkpoint.interval";
+
+  public static final long  OZONE_FS_TRASH_CHECKPOINT_INTERVAL_DEFAULT = 0;
 }

@@ -502,4 +502,9 @@ public class BlockInputStream extends InputStream
 
     refreshPipeline(cause);
   }
+
+  @VisibleForTesting
+  public synchronized List<ChunkInputStream> getChunkStreams() {
+    return chunkStreams;
+  }
 }

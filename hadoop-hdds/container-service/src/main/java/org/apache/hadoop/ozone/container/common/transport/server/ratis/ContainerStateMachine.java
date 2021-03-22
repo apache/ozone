@@ -54,6 +54,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.hdds.utils.Cache;
 import org.apache.hadoop.hdds.utils.ResourceLimitCache;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.util.Time;
@@ -572,7 +573,8 @@ public class ContainerStateMachine extends BaseStateMachine {
     ReadChunkRequestProto.Builder readChunkRequestProto =
         ReadChunkRequestProto.newBuilder()
             .setBlockID(writeChunkRequestProto.getBlockID())
-            .setChunkData(chunkInfo);
+            .setChunkData(chunkInfo)
+            .setReadChunkVersion(ContainerProtos.ReadChunkVersion.V1);
     ContainerCommandRequestProto dataContainerCommandProto =
         ContainerCommandRequestProto.newBuilder(requestProto)
             .setCmdType(Type.ReadChunk).setReadChunk(readChunkRequestProto)
@@ -595,14 +597,22 @@ public class ContainerStateMachine extends BaseStateMachine {
     }
 
     ReadChunkResponseProto responseProto = response.getReadChunk();
+    ByteString data;
+    if (responseProto.hasData()) {
+      data = responseProto.getData();
+    } else {
+      data = BufferUtils.concatByteStrings(
+          responseProto.getDataBuffers().getBuffersList());
+    }
 
-    ByteString data = responseProto.getData();
     // assert that the response has data in it.
     Preconditions
-        .checkNotNull(data, "read chunk data is null for chunk: %s", chunkInfo);
+        .checkNotNull(data, "read chunk data is null for chunk: %s",
+            chunkInfo);
     Preconditions.checkState(data.size() == chunkInfo.getLen(),
         "read chunk len=%s does not match chunk expected len=%s for chunk:%s",
         data.size(), chunkInfo.getLen(), chunkInfo);
+
     return data;
   }
 

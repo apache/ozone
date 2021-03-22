@@ -19,6 +19,9 @@ package org.apache.hadoop.ozone.common;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+import java.util.Iterator;
+import java.util.NoSuchElementException;
+import java.util.stream.Collectors;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
 import java.io.IOException;
@@ -110,6 +113,11 @@ public class ChunkBufferImplWithByteBufferList implements ChunkBuffer {
   }
 
   @Override
+  public boolean hasRemaining() {
+    return position() < limit;
+  }
+
+  @Override
   public ChunkBuffer rewind() {
     buffers.forEach(ByteBuffer::rewind);
     rewindCurrent();
@@ -171,9 +179,29 @@ public class ChunkBufferImplWithByteBufferList implements ChunkBuffer {
   }
 
   @Override
+  /**
+   * Returns the next buffer in the list irrespective of the bufferSize.
+   */
   public Iterable<ByteBuffer> iterate(int bufferSize) {
-    // currently not necessary; implement if needed
-    throw new UnsupportedOperationException();
+    return () -> new Iterator<ByteBuffer>() {
+      @Override
+      public boolean hasNext() {
+        return hasRemaining();
+      }
+
+      @Override
+      public ByteBuffer next() {
+        if (!hasRemaining()) {
+          throw new NoSuchElementException();
+        }
+        findCurrent();
+        ByteBuffer current = buffers.get(currentIndex);
+        final ByteBuffer duplicated = current.duplicate();
+        duplicated.limit(current.limit());
+        current.position(current.limit());
+        return duplicated;
+      }
+    };
   }
 
   @Override
@@ -191,6 +219,12 @@ public class ChunkBufferImplWithByteBufferList implements ChunkBuffer {
   @Override
   public ByteString toByteStringImpl(Function<ByteBuffer, ByteString> f) {
     return buffers.stream().map(f).reduce(ByteString.EMPTY, ByteString::concat);
+  }
+
+  @Override
+  public List<ByteString> toByteStringListImpl(
+      Function<ByteBuffer, ByteString> f) {
+    return buffers.stream().map(f).collect(Collectors.toList());
   }
 
   @Override
