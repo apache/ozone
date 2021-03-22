@@ -35,7 +35,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -48,6 +47,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Multipa
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -129,7 +130,9 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       multipartKey = omMetadataManager.getMultipartKey(volumeName,
           bucketName, keyName, uploadID);
 
-      // TODO to support S3 ACL later.
+      // check Acl
+      checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
+          IAccessAuthorizer.ACLType.WRITE, OzoneObj.ResourceType.KEY);
 
       acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
           volumeName, bucketName);
@@ -271,7 +274,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
               .setFileEncryptionInfo(dbOpenKeyInfo.getFileEncryptionInfo())
               .setOmKeyLocationInfos(
                   Collections.singletonList(keyLocationInfoGroup))
-              .setAcls(OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()));
+              .setAcls(dbOpenKeyInfo.getAcls());
           // Check if db entry has ObjectID. This check is required because
           // it is possible that between multipart key uploads and complete,
           // we had an upgrade.

@@ -74,7 +74,7 @@ public class TestOMDbCheckpointServlet {
   private static String omId;
 
   @Rule
-  public Timeout timeout = new Timeout(240000);
+  public Timeout timeout = Timeout.seconds(240);
 
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();

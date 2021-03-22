@@ -145,6 +145,14 @@
     </description>
   </property>
   <property>
+    <name>hdds.datanode.dir.du.reserved</name>
+    <value/>
+    <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>
+    <description>Reserved space in bytes per volume. Always leave this much space free for non dfs use.
+       Such as /dir1:100B, /dir2:200MB, means dir1 reserves 100 bytes and dir2 reserves 200 MB.
+    </description>
+  </property>
+  <property>
     <name>hdds.datanode.volume.choosing.policy</name>
     <value/>
     <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>
@@ -690,6 +698,19 @@
       When tuning this parameter, flow control window parameter should be
       tuned accordingly. Refer to
       hdds.ratis.raft.grpc.flow.control.window for more information.
+    </description>
+  </property>
+  <property>
+    <name>ozone.chunk.read.buffer.default.size</name>
+    <value>64KB</value>
+    <tag>OZONE, SCM, CONTAINER, PERFORMANCE</tag>
+    <description>
+      The default read buffer size during read chunk operations when checksum
+      is disabled. Chunk data will be cached in buffers of this capacity.
+
+      For chunk data with checksum, the read buffer size will be the
+      same as the number of bytes per checksum
+      (ozone.client.bytes.per.checksum) corresponding to the chunk.
     </description>
   </property>
   <property>
@@ -1428,7 +1449,7 @@
     <value/>
     <tag>OZONE, S3GATEWAY</tag>
     <description>List of Ozone S3Gateway domain names. If multiple
-      domain names to be provided, they should be a "," seperated.
+      domain names to be provided, they should be a "," separated.
       This parameter is only required when virtual host style pattern is
       followed.</description>
   </property>

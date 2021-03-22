@@ -50,7 +50,7 @@ public class MiniOzoneLoadGenerator {
 
   MiniOzoneLoadGenerator(OzoneVolume volume, int numThreads,
       int numBuffers, OzoneConfiguration conf, String omServiceId,
-      Set<Class<? extends LoadGenerator>> loadGenratorClazzes)
+      Set<Class<? extends LoadGenerator>> loadGeneratorClazzes)
       throws Exception {
     DataBuffer buffer = new DataBuffer(numBuffers);
     loadGenerators = new ArrayList<>();
@@ -58,7 +58,7 @@ public class MiniOzoneLoadGenerator {
     this.conf = conf;
     this.omServiceID = omServiceId;
 
-    for(Class<? extends LoadGenerator> clazz : loadGenratorClazzes) {
+    for(Class<? extends LoadGenerator> clazz : loadGeneratorClazzes) {
       addLoads(clazz, buffer);
     }
 

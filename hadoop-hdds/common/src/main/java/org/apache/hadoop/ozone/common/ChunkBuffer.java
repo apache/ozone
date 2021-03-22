@@ -144,12 +144,26 @@ public interface ChunkBuffer {
     return toByteStringImpl(b -> applyAndAssertFunction(b, function, this));
   }
 
+  /**
+   * Convert this buffer(s) to a list of {@link ByteString}.
+   * The position and limit of this {@link ChunkBuffer} remains unchanged.
+   * The given function must preserve the position and limit
+   * of the input {@link ByteBuffer}.
+   */
+  default List<ByteString> toByteStringList(
+      Function<ByteBuffer, ByteString> function) {
+    return toByteStringListImpl(b -> applyAndAssertFunction(b, function, this));
+  }
+
   // for testing
   default ByteString toByteString() {
     return toByteString(ByteStringConversion::safeWrap);
   }
 
   ByteString toByteStringImpl(Function<ByteBuffer, ByteString> function);
+
+  List<ByteString> toByteStringListImpl(
+      Function<ByteBuffer, ByteString> function);
 
   static void assertInt(int expected, int computed, Supplier<String> prefix) {
     if (expected != computed) {
