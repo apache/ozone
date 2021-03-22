@@ -56,17 +56,6 @@ public final class SCMHAUtils {
         ScmConfigKeys.OZONE_SCM_HA_ENABLE_DEFAULT);
   }
 
-  public static boolean isHAWithMultiSCMNodes(ConfigurationSource conf) {
-    if (isSCMHAEnabled(conf)) {
-      String scmServiceId = SCMHAUtils.getScmServiceId(conf);
-      Collection<String> nodeIds = SCMHAUtils.getSCMNodeIds(conf, scmServiceId);
-      if (nodeIds.size() > 1) {
-        return true;
-      }
-    }
-    return false;
-  }
-
   public static String getPrimordialSCM(ConfigurationSource conf) {
     return conf.get(ScmConfigKeys.OZONE_SCM_PRIMORDIAL_NODE_ID_KEY);
   }
@@ -185,6 +174,11 @@ public final class SCMHAUtils {
     return conf;
   }
 
+  /**
+   * Get SCM Node Id list.
+   * @param configuration
+   * @return list of node ids.
+   */
   public static Collection<String> getSCMNodeIds(
       ConfigurationSource configuration) {
     String scmServiceId = SCMHAUtils.getScmServiceId(configuration);

@@ -234,8 +234,18 @@ public interface CertificateClient {
   void storeRootCACertificate(String pemEncodedCert, boolean force)
       throws CertificateException;
 
+  /**
+   * Return the pem encoded  CA certificate list.
+   * @return list of pem encoded  CA certificates.
+   * @throws IOException
+   */
   List<String> listCA() throws IOException;
 
+  /**
+   * Update and returns the pem encoded CA certificate list.
+   * @return list of pem encoded  CA certificates.
+   * @throws IOException
+   */
   List<String> updateCAList() throws IOException;
 
 }

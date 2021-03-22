@@ -883,7 +883,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
         if(OzoneSecurityUtil.isSecurityEnabled(conf)) {
           HASecurityUtils.initializeSecurity(scmStorageConfig,
-              scmInfo.getScmId(), conf, getScmAddress(scmhaNodeDetails, conf),
+              scmInfo.getScmId(), config, getScmAddress(scmhaNodeDetails, conf),
               false);
         }
         scmStorageConfig.setPrimaryScmNodeId(scmInfo.getScmId());

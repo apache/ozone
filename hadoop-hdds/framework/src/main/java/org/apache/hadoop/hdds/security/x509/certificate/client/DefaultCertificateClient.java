@@ -875,6 +875,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     return pemEncodedCACerts;
   }
 
+  @Override
   public List<String> updateCAList() throws IOException {
     try {
       SCMSecurityProtocol scmSecurityProtocolClient =
