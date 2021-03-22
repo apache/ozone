@@ -43,30 +43,23 @@ public class DatanodeUsageInfo {
   }
 
   /**
-   * Compares two DatanodeUsageInfo on the basis of used space.
+   * Compares two DatanodeUsageInfo on the basis of remaining space to capacity
+   * ratio.
    *
    * @param first DatanodeUsageInfo
    * @param second DatanodeUsageInfo
-   * @return a value greater than 0 if first is more used, a value
-   * lesser than 0 if second is more used, and 0 if both are equally used or
-   * first.equals(second) is true
+   * @return a value greater than 0 if second has higher remaining to
+   * capacity ratio, a value lesser than 0 if first has higher remaining to
+   * capacity ratio, and 0 if both have equal ratios or first.equals(second)
+   * is true
    */
-  private static int compare(DatanodeUsageInfo first,
+  private static int compareByRemainingRatio(DatanodeUsageInfo first,
                              DatanodeUsageInfo second) {
     if (first.equals(second)) {
       return 0;
     }
-    double remaining = first.scmNodeStat.getRemaining().get().doubleValue();
-    double capacity = first.scmNodeStat.getCapacity().get().doubleValue();
-    double ratioRemaining = remaining / capacity;
-
-    double secondRemaining = second.scmNodeStat
-        .getRemaining().get().doubleValue();
-    double secondCapacity = second.scmNodeStat
-        .getCapacity().get().doubleValue();
-    double secondRatioRemaining = secondRemaining / secondCapacity;
-
-    return Double.compare(secondRatioRemaining, ratioRemaining);
+    return first.getScmNodeStat()
+        .compareByRemainingRatio(second.getScmNodeStat());
   }
 
   /**
@@ -109,15 +102,16 @@ public class DatanodeUsageInfo {
 
   /**
    * Gets Comparator that compares two DatanodeUsageInfo on the basis of
-   * used space. The comparison function returns a value greater than 0 if
-   * first DatanodeUsageInfo is more used, a value lesser than 0 if second
-   * DatanodeUsageInfo is more used, and 0 if both are equally used or first
-   * .equals(second) is true
+   * remaining space to capacity ratio.
    *
-   * @return Comparator to compare two DatanodeUsageInfo.
+   * @return Comparator to compare two DatanodeUsageInfo. The comparison
+   * function returns a value greater than 0 if second DatanodeUsageInfo has
+   * greater remaining space to capacity ratio, a value lesser than 0 if
+   * first DatanodeUsageInfo has greater remaining space to capacity ratio,
+   * and 0 if both have equal ratios or first.equals(second) is true
    */
-  public static Comparator<DatanodeUsageInfo> getUsageComparator() {
-    return DatanodeUsageInfo::compare;
+  public static Comparator<DatanodeUsageInfo> getMostUsedByRemainingRatio() {
+    return DatanodeUsageInfo::compareByRemainingRatio;
   }
 
   /**

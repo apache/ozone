@@ -557,9 +557,10 @@ public class SCMNodeManager implements NodeManager {
     // sort the list according to appropriate comparator
     if (mostUsed) {
       datanodeUsageInfoList.sort(
-          DatanodeUsageInfo.getUsageComparator().reversed());
+          DatanodeUsageInfo.getMostUsedByRemainingRatio().reversed());
     } else {
-      datanodeUsageInfoList.sort(DatanodeUsageInfo.getUsageComparator());
+      datanodeUsageInfoList.sort(
+          DatanodeUsageInfo.getMostUsedByRemainingRatio());
     }
     return datanodeUsageInfoList;
   }
