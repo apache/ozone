@@ -34,10 +34,8 @@ set -u
 : "${OZONE_UPGRADE_CALLBACK}"
 set +u
 
-# Tells main testlib.sh to wait for an OM leader.
-export OM_SERVICE_ID=omservice
 # Default compose cluster to use. May be overridden by callback.sh.
-export COMPOSE_FILE="${TEST_DIR}/compose/ha/docker-compose.yaml"
+"$TEST_DIR"/compose/ha/load.sh
 
 source "$TEST_DIR"/testlib.sh
 source "$OZONE_UPGRADE_CALLBACK"
