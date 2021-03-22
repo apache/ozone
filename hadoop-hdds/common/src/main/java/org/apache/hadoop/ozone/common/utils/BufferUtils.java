@@ -76,9 +76,13 @@ public final class BufferUtils {
    */
   public static ByteBuffer[] getReadOnlyByteBuffers(
       ByteBuffer[] byteBuffers) {
+    if (byteBuffers == null) {
+      return null;
+    }
     ByteBuffer[] readOnlyBuffers = new ByteBuffer[byteBuffers.length];
     for (int i = 0; i < byteBuffers.length; i++) {
-      readOnlyBuffers[i] = byteBuffers[i].asReadOnlyBuffer();
+      readOnlyBuffers[i] = byteBuffers[i] == null ?
+          null : byteBuffers[i].asReadOnlyBuffer();
     }
     return readOnlyBuffers;
   }

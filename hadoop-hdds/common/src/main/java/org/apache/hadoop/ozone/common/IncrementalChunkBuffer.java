@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.common;
 
 import com.google.common.base.Preconditions;
-import java.util.stream.Collectors;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
 import java.io.IOException;
