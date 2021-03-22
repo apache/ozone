@@ -17,32 +17,17 @@
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR/../../.." || exit 1
 
-if [[ "$(uname -s)" = "Darwin" ]]; then
-  echo "k3s is not supported on Mac" >&2
-  exit 1
-fi
-
-export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
-
-_install_tool_callback() {
-  # Install k3s
-  curl -sfL https://get.k3s.io | sh -
-
-  sudo chmod a+r $KUBECONFIG
-
-  # Install flekszible
-  wget https://github.com/elek/flekszible/releases/download/v1.8.1/flekszible_1.8.1_Linux_x86_64.tar.gz -O - | tar -zx
-  chmod +x flekszible
-  mkdir -p ${TOOL_DIR}/bin
-  mv -iv flekszible ${TOOL_DIR}/bin/
-
-  # Install robotframework
-  sudo pip install robotframework
-}
+: ${KUBECONFIG:=/etc/rancher/k3s/k3s.yaml}
 
 source "${DIR}/_lib.sh"
-install_tool
-export PATH="${PATH}:${TOOL_DIR}/bin"
+
+install_flekszible
+install_robot
+if [[ "$(uname -s)" = "Darwin" ]]; then
+  echo "Skip installing k3s, not supported on Mac.  Make sure a working Kubernetes cluster is available." >&2
+else
+  install_k3s
+fi
 
 REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/kubernetes"}
 

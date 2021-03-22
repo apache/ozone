@@ -17,13 +17,9 @@
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "${DIR}/../../.." || exit 1
 
-_install_tool_callback() {
-  curl -LSs https://github.com/bats-core/bats-core/archive/v1.2.1.tar.gz | tar xzf -
-}
-
 source "${DIR}/_lib.sh"
-install_tool
-export PATH="${PATH}:${TOOL_DIR}/bats-core-1.2.1/bin"
+
+install_bats
 
 REPORT_DIR=${OUTPUT_DIR:-"${DIR}/../../../target/bats"}
 mkdir -p "${REPORT_DIR}"
