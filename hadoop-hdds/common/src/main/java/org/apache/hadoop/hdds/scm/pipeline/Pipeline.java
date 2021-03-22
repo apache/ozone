@@ -188,6 +188,17 @@ public final class Pipeline {
     return getNodeSet().equals(pipeline.getNodeSet());
   }
 
+  /**
+   * Return the replica index of the specific datanode in the datanode set.
+   * <p>
+   * For non-EC case all the replication should be exactly the same,
+   * therefore the replication index can always be zero. In case of EC
+   * different Datanodes can have different data for one specific block
+   * (parity and/or data parts) therefore the replicaIndex should be
+   * different for each of the pipeline members.
+   *
+   * @param dn datanode details
+   */
   public int getReplicaIndex(DatanodeDetails dn) {
     return replicaIndexes.getOrDefault(dn, 0);
   }
