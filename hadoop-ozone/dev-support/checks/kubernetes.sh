@@ -22,6 +22,7 @@ cd "$DIR/../../.." || exit 1
 source "${DIR}/_lib.sh"
 
 install_flekszible
+install_virtualenv
 install_robot
 if [[ "$(uname -s)" = "Darwin" ]]; then
   echo "Skip installing k3s, not supported on Mac.  Make sure a working Kubernetes cluster is available." >&2

@@ -87,6 +87,14 @@ _install_flekszible() {
   chmod +x bin/flekszible
 }
 
+install_virtualenv() {
+  _install_tool virtualenv
+}
+
+_install_virtualenv() {
+  sudo pip3 install virtualenv
+}
+
 install_robot() {
   _install_tool robot venv/bin
 }
