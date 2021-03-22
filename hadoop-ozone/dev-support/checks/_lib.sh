@@ -18,7 +18,7 @@ check_name="$(basename "${BASH_SOURCE[1]}")"
 check_name="${check_name%.sh}"
 
 : ${TOOLS_DIR:=$(pwd)/.dev-tools} # directory for tools
-: ${OZONE_PREFER_LOCAL_TOOL:-true} # skip install if tools are already available (eg. via package manager)
+: ${OZONE_PREFER_LOCAL_TOOL:=true} # skip install if tools are already available (eg. via package manager)
 
 ## @description  Install a dependency.  Only first argument is mandatory.
 ## @param name of the tool

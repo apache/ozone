@@ -19,6 +19,8 @@ cd "$DIR/../../.." || exit 1
 
 : ${KUBECONFIG:=/etc/rancher/k3s/k3s.yaml}
 
+export KUBECONFIG
+
 source "${DIR}/_lib.sh"
 
 install_flekszible
