@@ -19,11 +19,11 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>org.apache.ozone</groupId>
-    <artifactId>hadoop-main-ozone</artifactId>
+    <artifactId>ozone-main</artifactId>
     <version>1.1.0-SNAPSHOT</version>
   </parent>
 
-  <artifactId>hadoop-hdds</artifactId>
+  <artifactId>hdds</artifactId>
   <version>1.1.0-SNAPSHOT</version>
   <description>Apache Ozone Distributed Data Store Project</description>
   <name>Apache Ozone HDDS</name>
@@ -65,62 +65,62 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
 
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hadoop-hdds-common</artifactId>
+        <artifactId>hdds-common</artifactId>
         <version>${hdds.version}</version>
       </dependency>
 
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hadoop-hdds-hadoop-dependency-client</artifactId>
+        <artifactId>hdds-hadoop-dependency-client</artifactId>
         <version>${hdds.version}</version>
       </dependency>
 
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hadoop-hdds-hadoop-dependency-server</artifactId>
+        <artifactId>hdds-hadoop-dependency-server</artifactId>
         <version>${hdds.version}</version>
       </dependency>
 
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hadoop-hdds-hadoop-dependency-test</artifactId>
+        <artifactId>hdds-hadoop-dependency-test</artifactId>
         <version>${hdds.version}</version>
         <scope>test</scope>
       </dependency>
 
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hadoop-hdds-interface-server</artifactId>
+        <artifactId>hdds-interface-server</artifactId>
         <version>${hdds.version}</version>
       </dependency>
 
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hadoop-hdds-interface-client</artifactId>
+        <artifactId>hdds-interface-client</artifactId>
         <version>${hdds.version}</version>
       </dependency>
 
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hadoop-hdds-interface-admin</artifactId>
+        <artifactId>hdds-interface-admin</artifactId>
         <version>${hdds.version}</version>
       </dependency>
 
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hadoop-hdds-client</artifactId>
+        <artifactId>hdds-client</artifactId>
         <version>${hdds.version}</version>
       </dependency>
 
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hadoop-hdds-tools</artifactId>
+        <artifactId>hdds-tools</artifactId>
         <version>${hdds.version}</version>
       </dependency>
 
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hadoop-hdds-server-framework</artifactId>
+        <artifactId>hdds-server-framework</artifactId>
         <version>${hdds.version}</version>
       </dependency>
 
@@ -132,38 +132,38 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
 
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hadoop-hdds-server-scm</artifactId>
+        <artifactId>hdds-server-scm</artifactId>
         <version>${hdds.version}</version>
       </dependency>
 
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hadoop-hdds-container-service</artifactId>
+        <artifactId>hdds-container-service</artifactId>
         <version>${hdds.version}</version>
       </dependency>
 
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hadoop-hdds-docs</artifactId>
+        <artifactId>hdds-docs</artifactId>
         <version>${hdds.version}</version>
       </dependency>
 
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hadoop-hdds-config</artifactId>
+        <artifactId>hdds-config</artifactId>
         <version>${hdds.version}</version>
       </dependency>
 
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hadoop-hdds-test-utils</artifactId>
+        <artifactId>hdds-test-utils</artifactId>
         <version>${hdds.version}</version>
         <scope>test</scope>
       </dependency>
 
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hadoop-hdds-common</artifactId>
+        <artifactId>hdds-common</artifactId>
         <version>${hdds.version}</version>
         <type>test-jar</type>
         <scope>test</scope>
@@ -171,7 +171,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
 
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hadoop-hdds-container-service</artifactId>
+        <artifactId>hdds-container-service</artifactId>
         <version>${hdds.version}</version>
         <type>test-jar</type>
         <scope>test</scope>
@@ -179,7 +179,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
 
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hadoop-hdds-server-scm</artifactId>
+        <artifactId>hdds-server-scm</artifactId>
         <type>test-jar</type>
         <version>${hdds.version}</version>
         <scope>test</scope>

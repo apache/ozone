@@ -19,10 +19,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>org.apache.ozone</groupId>
-    <artifactId>hadoop-hdds</artifactId>
+    <artifactId>hdds</artifactId>
     <version>1.1.0-SNAPSHOT</version>
   </parent>
-  <artifactId>hadoop-hdds-common</artifactId>
+  <artifactId>hdds-common</artifactId>
   <version>1.1.0-SNAPSHOT</version>
   <description>Apache Ozone Distributed Data Store Common</description>
   <name>Apache Ozone HDDS Common</name>
@@ -31,7 +31,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <dependencies>
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hadoop-hdds-hadoop-dependency-client</artifactId>
+      <artifactId>hdds-hadoop-dependency-client</artifactId>
     </dependency>
     <dependency>
       <groupId>info.picocli</groupId>
@@ -68,11 +68,11 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hadoop-hdds-config</artifactId>
+      <artifactId>hdds-config</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hadoop-hdds-test-utils</artifactId>
+      <artifactId>hdds-test-utils</artifactId>
       <scope>test</scope>
     </dependency>
 
@@ -190,7 +190,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hadoop-hdds-interface-client</artifactId>
+      <artifactId>hdds-interface-client</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
