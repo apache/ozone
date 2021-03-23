@@ -151,16 +151,11 @@ public class SCMNodeStat implements NodeStat {
   public int compareByRemainingRatio(SCMNodeStat other) {
     Preconditions.checkNotNull(other, "Argument cannot be null");
 
-    double thisCapacity = this.getCapacity().get().doubleValue();
-    double otherCapacity = other.getCapacity().get().doubleValue();
-
     // if capacity is zero, replace with 1 for division to work
-    if (thisCapacity == 0) {
-      thisCapacity = 1;
-    }
-    if (otherCapacity == 0) {
-      otherCapacity = 1;
-    }
+    double thisCapacity = Math.max(this.getCapacity().get().doubleValue(), 1d);
+    double otherCapacity = Math.max(
+        other.getCapacity().get().doubleValue(), 1d);
+
     double thisRemainingRatio = this.getRemaining().get() / thisCapacity;
     double otherRemainingRatio = other.getRemaining().get() / otherCapacity;
 
