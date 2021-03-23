@@ -21,8 +21,9 @@ import static org.apache.hadoop.hdds.utils.RocksDBStoreMBean.ROCKSDB_CONTEXT_PRE
 
 import java.io.IOException;
 import java.io.Writer;
+import java.util.Collections;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.TreeMap;
 import java.util.regex.Pattern;
 
 import org.apache.commons.lang3.StringUtils;
@@ -44,7 +45,8 @@ public class PrometheusMetricsSink implements MetricsSink {
   /**
    * Cached output lines for each metrics.
    */
-  private final Map<String, String> metricLines = new ConcurrentHashMap<>();
+  private final Map<String, Map<String, String>> metricLines =
+      Collections.synchronizedSortedMap(new TreeMap<>());
 
   private static final Pattern SPLIT_PATTERN =
       Pattern.compile("(?<!(^|[A-Z_]))(?=[A-Z])|(?<!^)(?=[A-Z][a-z])");
@@ -64,43 +66,48 @@ public class PrometheusMetricsSink implements MetricsSink {
         String key = prometheusName(
             metricsRecord.name(), metrics.name());
 
-        StringBuilder builder = new StringBuilder();
-        builder.append("# TYPE ")
-            .append(key)
-            .append(" ")
-            .append(metrics.type().toString().toLowerCase())
-            .append("\n");
+        String prometheusMetricKeyAsString =
+            getPrometheusMetricKeyAsString(metricsRecord, key);
 
-        StringBuilder prometheusMetricKey = new StringBuilder();
-        prometheusMetricKey.append(key)
-            .append("{");
-        String sep = "";
+        String metricKey = "# TYPE "
+            + key
+            + " "
+            + metrics.type().toString().toLowerCase();
 
-        //add tags
-        for (MetricsTag tag : metricsRecord.tags()) {
-          String tagName = tag.name().toLowerCase();
-
-          //ignore specific tag which includes sub-hierarchy
-          if (!tagName.equals("numopenconnectionsperuser")) {
-            prometheusMetricKey.append(sep)
-                .append(tagName)
-                .append("=\"")
-                .append(tag.value())
-                .append("\"");
-            sep = ",";
-          }
+        if (!metricLines.containsKey(metricKey)){
+          metricLines.put(metricKey, new TreeMap<>());
         }
-        prometheusMetricKey.append("}");
 
-        String prometheusMetricKeyAsString = prometheusMetricKey.toString();
-        builder.append(prometheusMetricKeyAsString);
-        builder.append(" ");
-        builder.append(metrics.value());
-        builder.append("\n");
-        metricLines.put(prometheusMetricKeyAsString, builder.toString());
-
+        metricLines.get(metricKey).put(prometheusMetricKeyAsString,
+            String.valueOf(metrics.value()));
       }
     }
+  }
+
+  private String getPrometheusMetricKeyAsString(MetricsRecord metricsRecord,
+      String key) {
+    StringBuilder prometheusMetricKey = new StringBuilder();
+    prometheusMetricKey.append(key)
+        .append("{");
+    String sep = "";
+
+    //add tags
+    for (MetricsTag tag : metricsRecord.tags()) {
+      String tagName = tag.name().toLowerCase();
+
+      //ignore specific tag which includes sub-hierarchy
+      if (!tagName.equals("numopenconnectionsperuser")) {
+        prometheusMetricKey.append(sep)
+            .append(tagName)
+            .append("=\"")
+            .append(tag.value())
+            .append("\"");
+        sep = ",";
+      }
+    }
+    prometheusMetricKey.append("}");
+
+    return prometheusMetricKey.toString();
   }
 
   /**
@@ -139,8 +146,14 @@ public class PrometheusMetricsSink implements MetricsSink {
   }
 
   public void writeMetrics(Writer writer) throws IOException {
-    for (String line : metricLines.values()) {
-      writer.write(line);
+    for (Map.Entry<String, Map<String, String>> metricsEntry
+        : metricLines.entrySet()) {
+      writer.write(metricsEntry.getKey() + "\n");
+
+      for (Map.Entry<String, String> metrics
+          : metricsEntry.getValue().entrySet()) {
+        writer.write(metrics.getKey() + " " + metrics.getValue() + "\n");
+      }
     }
   }
 }
