@@ -70,9 +70,18 @@ public class SCMContainerLocationFailoverProxyProvider implements
   private final int maxRetryCount;
   private final long retryInterval;
 
+  private final UserGroupInformation ugi;
+
 
   public SCMContainerLocationFailoverProxyProvider(ConfigurationSource conf) {
     this.conf = conf;
+
+    try {
+      this.ugi = UserGroupInformation.getCurrentUser();
+    } catch (IOException ex) {
+      LOG.error("Unable to fetch user credentials from UGI", ex);
+      throw new RuntimeException(ex);
+    }
     this.scmVersion = RPC.getProtocolVersion(
         StorageContainerLocationProtocolPB.class);
 
@@ -237,7 +246,7 @@ public class SCMContainerLocationFailoverProxyProvider implements
         ProtobufRpcEngine.class);
     return RPC.getProxy(
         StorageContainerLocationProtocolPB.class,
-        scmVersion, scmAddress, UserGroupInformation.getCurrentUser(),
+        scmVersion, scmAddress, ugi,
         hadoopConf, NetUtils.getDefaultSocketFactory(hadoopConf),
         (int)scmClientConfig.getRpcTimeOut());
   }

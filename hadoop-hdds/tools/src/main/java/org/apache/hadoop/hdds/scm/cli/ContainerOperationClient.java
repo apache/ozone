@@ -45,6 +45,7 @@ import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 
+import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -112,14 +113,7 @@ public class ContainerOperationClient implements ScmClient {
 
   public static StorageContainerLocationProtocol newContainerRpcClient(
       ConfigurationSource configSource) {
-    SCMContainerLocationFailoverProxyProvider proxyProvider =
-        new SCMContainerLocationFailoverProxyProvider(configSource);
-
-    StorageContainerLocationProtocolClientSideTranslatorPB client =
-        new StorageContainerLocationProtocolClientSideTranslatorPB(
-            proxyProvider);
-    return TracingUtil.createProxy(
-        client, StorageContainerLocationProtocol.class, configSource);
+    return HAUtils.getScmContainerClient(configSource);
   }
 
   @Override

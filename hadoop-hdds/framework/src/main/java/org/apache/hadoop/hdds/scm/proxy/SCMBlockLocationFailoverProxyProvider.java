@@ -70,10 +70,19 @@ public class SCMBlockLocationFailoverProxyProvider implements
   private final int maxRetryCount;
   private final long retryInterval;
 
+  private final UserGroupInformation ugi;
+
 
   public SCMBlockLocationFailoverProxyProvider(ConfigurationSource conf) {
     this.conf = conf;
     this.scmVersion = RPC.getProtocolVersion(ScmBlockLocationProtocolPB.class);
+
+    try {
+      this.ugi = UserGroupInformation.getCurrentUser();
+    } catch (IOException ex) {
+      LOG.error("Unable to fetch user credentials from UGI", ex);
+      throw new RuntimeException(ex);
+    }
 
     // Set some constant for non-HA.
     if (scmServiceId == null) {
@@ -231,7 +240,7 @@ public class SCMBlockLocationFailoverProxyProvider implements
     RPC.setProtocolEngine(hadoopConf, ScmBlockLocationProtocolPB.class,
         ProtobufRpcEngine.class);
     return RPC.getProxy(ScmBlockLocationProtocolPB.class, scmVersion,
-        scmAddress, UserGroupInformation.getCurrentUser(), hadoopConf,
+        scmAddress, ugi, hadoopConf,
         NetUtils.getDefaultSocketFactory(hadoopConf),
         (int)conf.getObject(SCMClientConfig.class).getRpcTimeOut());
   }

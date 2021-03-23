@@ -66,6 +66,7 @@ import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.recon.ConfigurationProvider;
 import org.apache.hadoop.ozone.recon.ReconServer;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.test.GenericTestUtils;
 
@@ -329,7 +330,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
    */
   @Override
   public StorageContainerLocationProtocolClientSideTranslatorPB
-      getStorageContainerLocationClient() {
+      getStorageContainerLocationClient() throws IOException {
     InetSocketAddress address = scm.getClientRpcAddress();
     LOG.info(
         "Creating StorageContainerLocationProtocol RPC client with address {}",
