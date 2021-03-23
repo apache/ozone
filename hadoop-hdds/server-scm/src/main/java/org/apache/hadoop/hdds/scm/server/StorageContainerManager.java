@@ -65,6 +65,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.DefaultProfile;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.scm.ScmConfig;
@@ -139,6 +140,8 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT_
 import static org.apache.hadoop.hdds.utils.HAUtils.checkSecurityAndSCMHAEnabled;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.OzoneConsts.CRL_SEQUENCE_ID_KEY;
+import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_COMPONENT_NAME;
+import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_PREFIX;
 
 /**
  * StorageContainerManager is the main entry point for the service that
@@ -655,7 +658,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       String scmID) throws IOException {
     // TODO: Support Certificate Server loading via Class Name loader.
     // So it is easy to use different Certificate Servers if needed.
-    String subject = "scm@" + InetAddress.getLocalHost().getHostName();
+    String subject = SCM_ROOT_CA_PREFIX +
+        InetAddress.getLocalHost().getHostName();
     if(this.scmMetadataStore == null) {
       LOG.error("Cannot initialize Certificate Server without a valid meta " +
           "data layer.");
@@ -668,7 +672,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
             .setRatisServer(scmHAManager.getRatisServer())
             .setCRLSequenceId(getLastSequenceIdForCRL()).build();
 
-    return new DefaultCAServer(subject, clusterID, scmID, certStore);
+    return new DefaultCAServer(subject, clusterID, scmID, certStore,
+        new DefaultProfile(), SCM_ROOT_CA_COMPONENT_NAME);
   }
 
   long getLastSequenceIdForCRL() throws IOException {
