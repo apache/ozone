@@ -18,10 +18,10 @@
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>org.apache.ozone</groupId>
-    <artifactId>hadoop-ozone</artifactId>
+    <artifactId>ozone</artifactId>
     <version>1.1.0-SNAPSHOT</version>
   </parent>
-  <artifactId>hadoop-ozone-filesystem</artifactId>
+  <artifactId>ozone-filesystem</artifactId>
   <name>Apache Ozone FileSystem</name>
   <packaging>jar</packaging>
   <version>1.1.0-SNAPSHOT</version>
@@ -78,11 +78,11 @@
   <dependencies>
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hadoop-ozone-filesystem-common</artifactId>
+      <artifactId>ozone-filesystem-common</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hadoop-ozone-client</artifactId>
+      <artifactId>ozone-client</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>

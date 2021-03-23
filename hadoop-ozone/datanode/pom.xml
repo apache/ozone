@@ -18,10 +18,10 @@
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>org.apache.ozone</groupId>
-    <artifactId>hadoop-ozone</artifactId>
+    <artifactId>ozone</artifactId>
     <version>1.1.0-SNAPSHOT</version>
   </parent>
-  <artifactId>hadoop-ozone-datanode</artifactId>
+  <artifactId>ozone-datanode</artifactId>
   <name>Apache Ozone Datanode</name>
   <packaging>jar</packaging>
   <version>1.1.0-SNAPSHOT</version>
@@ -33,7 +33,7 @@
   <dependencies>
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hadoop-hdds-hadoop-dependency-server</artifactId>
+      <artifactId>hdds-hadoop-dependency-server</artifactId>
       <scope>compile</scope>
       <exclusions>
         <exclusion>
@@ -44,7 +44,7 @@
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hadoop-hdds-container-service</artifactId>
+      <artifactId>hdds-container-service</artifactId>
     </dependency>
     <dependency>
       <groupId>com.sun.xml.bind</groupId>

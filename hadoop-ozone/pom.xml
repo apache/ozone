@@ -15,10 +15,10 @@
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>org.apache.ozone</groupId>
-    <artifactId>hadoop-main-ozone</artifactId>
+    <artifactId>ozone-main</artifactId>
     <version>1.1.0-SNAPSHOT</version>
   </parent>
-  <artifactId>hadoop-ozone</artifactId>
+  <artifactId>ozone</artifactId>
   <version>1.1.0-SNAPSHOT</version>
   <description>Apache Ozone Project</description>
   <name>Apache Ozone</name>
@@ -59,179 +59,179 @@
     <dependencies>
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hadoop-ozone-common</artifactId>
+        <artifactId>ozone-common</artifactId>
         <version>${ozone.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hadoop-ozone-client</artifactId>
+        <artifactId>ozone-client</artifactId>
         <version>${ozone.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hadoop-ozone-interface-client</artifactId>
+        <artifactId>ozone-interface-client</artifactId>
         <version>${ozone.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hadoop-ozone-interface-storage</artifactId>
+        <artifactId>ozone-interface-storage</artifactId>
         <version>${ozone.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hadoop-ozone-ozone-manager</artifactId>
+        <artifactId>ozone-manager</artifactId>
         <version>${ozone.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hadoop-ozone-s3gateway</artifactId>
+        <artifactId>ozone-s3gateway</artifactId>
         <version>${ozone.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hadoop-ozone-csi</artifactId>
+        <artifactId>ozone-csi</artifactId>
         <version>${ozone.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hadoop-ozone-datanode</artifactId>
+        <artifactId>ozone-datanode</artifactId>
         <version>${ozone.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hadoop-ozone-tools</artifactId>
+        <artifactId>ozone-tools</artifactId>
         <version>${ozone.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hadoop-ozone-filesystem</artifactId>
+        <artifactId>ozone-filesystem</artifactId>
         <version>${ozone.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hadoop-ozone-filesystem-shaded</artifactId>
+        <artifactId>ozone-filesystem-shaded</artifactId>
         <version>${ozone.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hadoop-ozone-filesystem-common</artifactId>
+        <artifactId>ozone-filesystem-common</artifactId>
         <version>${ozone.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hadoop-ozone-filesystem-hadoop3</artifactId>
+        <artifactId>ozone-filesystem-hadoop3</artifactId>
         <version>${ozone.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hadoop-ozone-filesystem-hadoop2</artifactId>
+        <artifactId>ozone-filesystem-hadoop2</artifactId>
         <version>${ozone.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hadoop-hdds-config</artifactId>
+        <artifactId>hdds-config</artifactId>
         <version>${hdds.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hadoop-hdds-interface-client</artifactId>
+        <artifactId>hdds-interface-client</artifactId>
         <version>${hdds.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hadoop-hdds-test-utils</artifactId>
-        <version>${hdds.version}</version>
-        <scope>test</scope>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
-        <artifactId>hadoop-hdds-hadoop-dependency-client</artifactId>
-        <version>${hdds.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
-        <artifactId>hadoop-hdds-hadoop-dependency-server</artifactId>
-        <version>${hdds.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
-        <artifactId>hadoop-hdds-hadoop-dependency-test</artifactId>
+        <artifactId>hdds-test-utils</artifactId>
         <version>${hdds.version}</version>
         <scope>test</scope>
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hadoop-hdds-common</artifactId>
+        <artifactId>hdds-hadoop-dependency-client</artifactId>
+        <version>${hdds.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
+        <artifactId>hdds-hadoop-dependency-server</artifactId>
+        <version>${hdds.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
+        <artifactId>hdds-hadoop-dependency-test</artifactId>
+        <version>${hdds.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
+        <artifactId>hdds-common</artifactId>
         <version>${hdds.version}</version>
         <type>test-jar</type>
         <scope>test</scope>
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hadoop-ozone-integration-test</artifactId>
+        <artifactId>ozone-integration-test</artifactId>
         <version>${ozone.version}</version>
         <type>test-jar</type>
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hadoop-ozone-ozone-manager</artifactId>
+        <artifactId>ozone-manager</artifactId>
         <version>${ozone.version}</version>
         <type>test-jar</type>
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hadoop-hdds-common</artifactId>
+        <artifactId>hdds-common</artifactId>
         <version>${hdds.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hadoop-hdds-server-framework</artifactId>
+        <artifactId>hdds-server-framework</artifactId>
         <version>${hdds.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hadoop-hdds-server-scm</artifactId>
+        <artifactId>hdds-server-scm</artifactId>
         <version>${hdds.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hadoop-hdds-docs</artifactId>
+        <artifactId>hdds-docs</artifactId>
         <version>${hdds.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hadoop-hdds-container-service</artifactId>
+        <artifactId>hdds-container-service</artifactId>
         <version>${hdds.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hadoop-hdds-client</artifactId>
+        <artifactId>hdds-client</artifactId>
         <version>${hdds.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hadoop-hdds-tools</artifactId>
+        <artifactId>hdds-tools</artifactId>
         <version>${hdds.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hadoop-ozone-insight</artifactId>
+        <artifactId>ozone-insight</artifactId>
         <version>${hdds.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hadoop-ozone-recon</artifactId>
+        <artifactId>ozone-recon</artifactId>
         <version>${ozone.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hadoop-hdds-container-service</artifactId>
+        <artifactId>hdds-container-service</artifactId>
         <version>${hdds.version}</version>
         <type>test-jar</type>
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hadoop-hdds-server-scm</artifactId>
+        <artifactId>hdds-server-scm</artifactId>
         <type>test-jar</type>
         <version>${hdds.version}</version>
       </dependency>

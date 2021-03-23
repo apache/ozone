@@ -19,10 +19,10 @@
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>org.apache.ozone</groupId>
-    <artifactId>hadoop-ozone</artifactId>
+    <artifactId>ozone</artifactId>
     <version>1.1.0-SNAPSHOT</version>
   </parent>
-  <artifactId>hadoop-ozone-interface-storage</artifactId>
+  <artifactId>ozone-interface-storage</artifactId>
   <version>1.1.0-SNAPSHOT</version>
   <description>Apache Ozone Storage Interface</description>
   <name>Apache Ozone Storage Interface</name>
@@ -31,7 +31,7 @@
 
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hadoop-ozone-common</artifactId>
+      <artifactId>ozone-common</artifactId>
     </dependency>
 
     <dependency>
@@ -41,29 +41,29 @@
 
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hadoop-ozone-interface-client</artifactId>
+      <artifactId>ozone-interface-client</artifactId>
     </dependency>
 
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hadoop-hdds-server-framework</artifactId>
+      <artifactId>hdds-server-framework</artifactId>
     </dependency>
 
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hadoop-hdds-common</artifactId>
+      <artifactId>hdds-common</artifactId>
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hadoop-hdds-server-scm</artifactId>
+      <artifactId>hdds-server-scm</artifactId>
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hadoop-hdds-test-utils</artifactId>
+      <artifactId>hdds-test-utils</artifactId>
       <scope>test</scope>
     </dependency>
 

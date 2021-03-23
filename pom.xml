@@ -17,7 +17,7 @@ xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.apache.ozone</groupId>
-  <artifactId>hadoop-main-ozone</artifactId>
+  <artifactId>ozone-main</artifactId>
   <version>1.1.0-SNAPSHOT</version>
   <description>Apache Ozone Main</description>
   <name>Apache Ozone Main</name>
@@ -2002,7 +2002,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
           </dependencies>
           <configuration>
             <configLocation>hadoop-hdds/dev-support/checkstyle/checkstyle.xml</configLocation>
-            <suppressionsLocation>hadoop-hdds/dev-support/checkstyle/suppressions.xml</suppressionsLocation>
+            <suppressionsLocation>hdds/dev-support/checkstyle/suppressions.xml</suppressionsLocation>
             <includeTestSourceDirectory>true</includeTestSourceDirectory>
             <failOnViolation>false</failOnViolation>
             <format>xml</format>
