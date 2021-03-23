@@ -212,4 +212,10 @@ public interface CertificateClient {
    */
   String getSecurityProvider();
 
+  /**
+   * Return component name of this certificate client.
+   * @return component name
+   */
+  String getComponentName();
+
 }

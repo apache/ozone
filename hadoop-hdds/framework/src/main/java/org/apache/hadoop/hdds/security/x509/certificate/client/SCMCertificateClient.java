@@ -7,24 +7,25 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
 
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
+import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
+import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
+import java.nio.file.Paths;
 
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.FAILURE;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.GETCERT;
@@ -32,27 +33,32 @@ import static org.apache.hadoop.hdds.security.x509.certificate.client.Certificat
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.SUCCESS;
 
 /**
- * Certificate client for OzoneManager.
+ * SCM Certificate Client which is used for generating public/private Key pair,
+ * generate CSR and finally obtain signed certificate. This Certificate
+ * client is used for setting up sub CA by SCM.
  */
-public class OMCertificateClient extends DefaultCertificateClient {
+public class SCMCertificateClient extends DefaultCertificateClient {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(OMCertificateClient.class);
+      LoggerFactory.getLogger(SCMCertificateClient.class);
 
-  public static final String COMPONENT_NAME = "om";
+  public static final String COMPONENT_NAME =
+      Paths.get(OzoneConsts.SCM_CA_CERT_STORAGE_DIR,
+          OzoneConsts.SCM_SUB_CA_PATH).toString();
 
-  public OMCertificateClient(SecurityConfig securityConfig,
+  public SCMCertificateClient(SecurityConfig securityConfig,
       String certSerialId) {
     super(securityConfig, LOG, certSerialId, COMPONENT_NAME);
   }
 
-  public OMCertificateClient(SecurityConfig securityConfig) {
+  public SCMCertificateClient(SecurityConfig securityConfig) {
     super(securityConfig, LOG, null, COMPONENT_NAME);
   }
 
   @Override
-  protected InitResponse handleCase(InitCase init) throws
-      CertificateException {
+  protected InitResponse handleCase(InitCase init)
+      throws CertificateException {
+    // This is similar to OM.
     switch (init) {
     case NONE:
       LOG.info("Creating keypair for client as keypair and certificate not " +
@@ -116,7 +122,9 @@ public class OMCertificateClient extends DefaultCertificateClient {
       throws CertificateException {
     return super.getCSRBuilder()
         .setDigitalEncryption(true)
-        .setDigitalSignature(true);
+        .setDigitalSignature(true)
+        // Set CA to true, as this will be used to sign certs for OM/DN.
+        .setCA(true);
   }
 
 
