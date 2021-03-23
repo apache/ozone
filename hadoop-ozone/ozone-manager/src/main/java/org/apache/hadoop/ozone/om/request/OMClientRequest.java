@@ -192,29 +192,6 @@ public abstract class OMClientRequest implements RequestAuditor {
   /**
    * Check Acls for the ozone key.
    * @param ozoneManager
-   * @param obj
-   * @param ctxtBuilder
-   * @throws IOException
-   */
-  protected void checkKeyAcls(OzoneManager ozoneManager, OzoneObj obj,
-                              RequestContext.Builder ctxtBuilder)
-      throws IOException {
-
-    if (ozoneManager.getAclsEnabled()) {
-      String volumeOwner = ozoneManager.getVolumeOwner(obj.getVolumeName(),
-          ctxtBuilder.getAclRights(), obj.getResourceType());
-      ctxtBuilder.setClientUgi(createUGI());
-      ctxtBuilder.setIp(getRemoteAddress());
-      ctxtBuilder.setHost(getHostName());
-      ctxtBuilder.setAclType(IAccessAuthorizer.ACLIdentityType.USER);
-      ctxtBuilder.setOwnerName(volumeOwner);
-      ozoneManager.checkAcls(obj, ctxtBuilder.build(), true);
-    }
-  }
-
-  /**
-   * Check Acls for the ozone key.
-   * @param ozoneManager
    * @param volumeName
    * @param bucketName
    * @param keyName
@@ -245,7 +222,16 @@ public abstract class OMClientRequest implements RequestAuditor {
         .setRecursiveAccessCheck(isDirectory); // recursive checks for a dir
 
     // check Acl
-    checkKeyAcls(ozoneManager, obj, contextBuilder);
+    if (ozoneManager.getAclsEnabled()) {
+      String volumeOwner = ozoneManager.getVolumeOwner(obj.getVolumeName(),
+          contextBuilder.getAclRights(), obj.getResourceType());
+      contextBuilder.setClientUgi(createUGI());
+      contextBuilder.setIp(getRemoteAddress());
+      contextBuilder.setHost(getHostName());
+      contextBuilder.setAclType(IAccessAuthorizer.ACLIdentityType.USER);
+      contextBuilder.setOwnerName(volumeOwner);
+      ozoneManager.checkAcls(obj, contextBuilder.build(), true);
+    }
   }
 
   /**
