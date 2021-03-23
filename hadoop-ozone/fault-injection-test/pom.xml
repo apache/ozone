@@ -19,10 +19,10 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>org.apache.ozone</groupId>
-    <artifactId>hadoop-ozone</artifactId>
+    <artifactId>ozone</artifactId>
     <version>1.1.0-SNAPSHOT</version>
   </parent>
-  <artifactId>hadoop-ozone-fault-injection-test</artifactId>
+  <artifactId>ozone-fault-injection-test</artifactId>
   <version>1.1.0-SNAPSHOT</version>
   <description>Apache Ozone Fault Injection Tests</description>
   <name>Apache Ozone Fault Injection Tests</name>

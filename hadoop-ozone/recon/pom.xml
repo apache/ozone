@@ -17,12 +17,12 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <parent>
     <groupId>org.apache.ozone</groupId>
-    <artifactId>hadoop-ozone</artifactId>
+    <artifactId>ozone</artifactId>
     <version>1.1.0-SNAPSHOT</version>
   </parent>
   <name>Apache Ozone Recon</name>
   <modelVersion>4.0.0</modelVersion>
-  <artifactId>hadoop-ozone-recon</artifactId>
+  <artifactId>ozone-recon</artifactId>
   <build>
     <resources>
       <resource>
@@ -175,7 +175,7 @@
   <dependencies>
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hadoop-ozone-common</artifactId>
+      <artifactId>ozone-common</artifactId>
       <exclusions>
         <exclusion>
           <artifactId>jersey-server</artifactId>
@@ -193,12 +193,12 @@
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hadoop-ozone-reconcodegen</artifactId>
+      <artifactId>ozone-reconcodegen</artifactId>
       <version>${ozone.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hadoop-ozone-ozone-manager</artifactId>
+      <artifactId>ozone-manager</artifactId>
       <exclusions>
         <exclusion>
           <groupId>com.sun.jersey</groupId>
@@ -208,13 +208,13 @@
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hadoop-hdds-test-utils</artifactId>
+      <artifactId>hdds-test-utils</artifactId>
       <scope>test</scope>
     </dependency>
     <!-- visible only for ContainerOperationClient -->
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hadoop-hdds-tools</artifactId>
+      <artifactId>hdds-tools</artifactId>
       <exclusions>
         <exclusion>
           <groupId>*</groupId>
@@ -224,7 +224,7 @@
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hadoop-hdds-server-scm</artifactId>
+      <artifactId>hdds-server-scm</artifactId>
     </dependency>
     <dependency>
       <groupId>com.google.inject</groupId>
@@ -264,7 +264,7 @@
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hadoop-hdds-common</artifactId>
+      <artifactId>hdds-common</artifactId>
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>
@@ -280,7 +280,7 @@
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hadoop-hdds-hadoop-dependency-test</artifactId>
+      <artifactId>hdds-hadoop-dependency-test</artifactId>
       <scope>test</scope>
       <exclusions>
         <exclusion>

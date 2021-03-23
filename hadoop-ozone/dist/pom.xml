@@ -18,10 +18,10 @@
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>org.apache.ozone</groupId>
-    <artifactId>hadoop-ozone</artifactId>
+    <artifactId>ozone</artifactId>
     <version>1.1.0-SNAPSHOT</version>
   </parent>
-  <artifactId>hadoop-ozone-dist</artifactId>
+  <artifactId>ozone-dist</artifactId>
   <name>Apache Ozone Distribution</name>
   <packaging>jar</packaging>
   <version>1.1.0-SNAPSHOT</version>
@@ -73,8 +73,8 @@
               </outputDirectory>
               <includes>*.classpath</includes>
               <includeArtifactIds>
-                hadoop-hdds-server-scm,hadoop-ozone-common,hadoop-ozone-csi,hadoop-ozone-datanode,hadoop-ozone-insight,
-                hadoop-ozone-ozone-manager,hadoop-ozone-recon,hadoop-ozone-s3gateway,hadoop-ozone-tools
+                hdds-server-scm,ozone-common,ozone-csi,ozone-datanode,ozone-insight,
+                ozone-manager,ozone-recon,ozone-s3gateway,ozone-tools
               </includeArtifactIds>
             </configuration>
           </execution>
@@ -180,47 +180,47 @@
   <dependencies>
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hadoop-hdds-tools</artifactId>
+      <artifactId>hdds-tools</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hadoop-hdds-server-scm</artifactId>
+      <artifactId>hdds-server-scm</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hadoop-hdds-container-service</artifactId>
+      <artifactId>hdds-container-service</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hadoop-ozone-s3gateway</artifactId>
+      <artifactId>ozone-s3gateway</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hadoop-ozone-csi</artifactId>
+      <artifactId>ozone-csi</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hadoop-ozone-ozone-manager</artifactId>
+      <artifactId>ozone-manager</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hadoop-ozone-tools</artifactId>
+      <artifactId>ozone-tools</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hadoop-ozone-common</artifactId>
+      <artifactId>ozone-common</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hadoop-ozone-datanode</artifactId>
+      <artifactId>ozone-datanode</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hadoop-hdds-docs</artifactId>
+      <artifactId>hdds-docs</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hadoop-ozone-insight</artifactId>
+      <artifactId>ozone-insight</artifactId>
     </dependency>
   </dependencies>
   <profiles>
@@ -234,11 +234,11 @@
       <dependencies>
         <dependency>
           <groupId>org.apache.ozone</groupId>
-          <artifactId>hadoop-ozone-filesystem-hadoop2</artifactId>
+          <artifactId>ozone-filesystem-hadoop2</artifactId>
         </dependency>
         <dependency>
           <groupId>org.apache.ozone</groupId>
-          <artifactId>hadoop-ozone-filesystem-hadoop3</artifactId>
+          <artifactId>ozone-filesystem-hadoop3</artifactId>
         </dependency>
       </dependencies>
     </profile>
@@ -253,7 +253,7 @@
       <dependencies>
         <dependency>
           <groupId>org.apache.ozone</groupId>
-          <artifactId>hadoop-ozone-recon</artifactId>
+          <artifactId>ozone-recon</artifactId>
         </dependency>
       </dependencies>
     </profile>
@@ -301,7 +301,7 @@
                     </artifactItem>
                     <artifactItem>
                       <groupId>org.apache.ozone</groupId>
-                      <artifactId>hadoop-hdds-test-utils</artifactId>
+                      <artifactId>hdds-test-utils</artifactId>
                      </artifactItem>
                     </artifactItems>
                 </configuration>
@@ -334,7 +334,7 @@
                   <archiveBaseDirectory>../..</archiveBaseDirectory>
                   <appendAssemblyId>false</appendAssemblyId>
                   <attach>false</attach>
-                  <finalName>hadoop-ozone-${project.version}-src</finalName>
+                  <finalName>ozone-${project.version}-src</finalName>
                   <outputDirectory>target</outputDirectory>
                   <basedir>${project.basedir}/../..</basedir>
                   <!-- Not using descriptorRef and hadoop-assembly dependency -->
