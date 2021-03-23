@@ -616,13 +616,6 @@ public final class OMFileRequest {
     String bucketKey = omMetadataMgr.getBucketKey(volumeName, bucketName);
     OmBucketInfo omBucketInfo =
             omMetadataMgr.getBucketTable().get(bucketKey);
-    if (null == omBucketInfo) {
-      // if the volume exists but bucket does not exist, throw bucket not found
-      // exception
-      LOG.error("bucket not found: {}/{} ", volumeName, bucketName);
-      throw new OMException("Bucket not found",
-          BUCKET_NOT_FOUND);
-    }
 
     long lastKnownParentId = omBucketInfo.getObjectID();
     OmDirectoryInfo omDirInfo = null;

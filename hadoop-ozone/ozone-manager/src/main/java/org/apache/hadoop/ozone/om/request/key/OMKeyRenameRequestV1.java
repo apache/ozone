@@ -112,7 +112,8 @@ public class OMKeyRenameRequestV1 extends OMKeyRenameRequest {
       // old key and create operation on new key
 
       // check Acl fromKeyName
-      checkACLs(ozoneManager, volumeName, bucketName, fromKeyName);
+      checkACLs(ozoneManager, volumeName, bucketName, fromKeyName,
+          IAccessAuthorizer.ACLType.DELETE);
 
       // check Acl toKeyName
       checkKeyAcls(ozoneManager, volumeName, bucketName, toKeyName,

@@ -41,6 +41,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteK
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -97,7 +98,8 @@ public class OMKeyDeleteRequestV1 extends OMKeyDeleteRequest {
       volumeName = keyArgs.getVolumeName();
       bucketName = keyArgs.getBucketName();
 
-      checkACLs(ozoneManager, volumeName, bucketName, keyName);
+      checkACLs(ozoneManager, volumeName, bucketName, keyName,
+          IAccessAuthorizer.ACLType.DELETE);
 
       acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
           volumeName, bucketName);
