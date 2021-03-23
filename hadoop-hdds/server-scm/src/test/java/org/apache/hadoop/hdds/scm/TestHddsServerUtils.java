@@ -51,7 +51,7 @@ public class TestHddsServerUtils {
       TestHddsServerUtils.class);
 
   @Rule
-  public Timeout timeout = new Timeout(300_000);
+  public Timeout timeout = Timeout.seconds(300);;
 
   @Rule
   public ExpectedException thrown= ExpectedException.none();

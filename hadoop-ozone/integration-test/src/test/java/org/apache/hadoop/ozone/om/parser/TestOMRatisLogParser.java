@@ -50,7 +50,7 @@ public class TestOMRatisLogParser {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = new Timeout(300000);
+  public Timeout timeout = Timeout.seconds(300);
 
   private MiniOzoneHAClusterImpl cluster = null;
   private final ByteArrayOutputStream out = new ByteArrayOutputStream();

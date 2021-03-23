@@ -88,7 +88,7 @@ public class TestHddsVolumeChecker {
   public TestName testName = new TestName();
 
   @Rule
-  public Timeout globalTimeout = new Timeout(30_000);
+  public Timeout globalTimeout = Timeout.seconds(30);
 
   private OzoneConfiguration conf = new OzoneConfiguration();
 

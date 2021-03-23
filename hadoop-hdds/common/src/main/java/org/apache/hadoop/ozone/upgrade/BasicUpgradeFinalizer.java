@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.LAYOU
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.PERSIST_UPGRADE_TO_LAYOUT_VERSION_FAILED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.REMOVE_UPGRADE_TO_LAYOUT_VERSION_FAILED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.UPDATE_LAYOUT_VERSION_FAILED;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_DONE;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_REQUIRED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.STARTING_FINALIZATION;
 
@@ -32,6 +33,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeAction;
@@ -124,13 +126,54 @@ public class BasicUpgradeFinalizer<T, V extends AbstractLayoutVersionManager>
   }
 
   private void assertClientId(String id) throws UpgradeException {
-    if (!this.clientID.equals(id)) {
+    if (this.clientID == null || !this.clientID.equals(id)) {
       throw new UpgradeException("Unknown client tries to get finalization " +
           "status.\n The requestor is not the initiating client of the " +
           "finalization, if you want to take over, and get unsent status " +
           "messages, check -takeover option.", INVALID_REQUEST);
     }
   }
+
+  public void finalizeAndWaitForCompletion(String upgradeClientID, T service,
+                                           long maxTimeToWaitInSeconds)
+      throws IOException {
+
+    StatusAndMessages response = finalize(upgradeClientID, service);
+    LOG.info("Finalization Messages : {} ", response.msgs());
+    if (isFinalized(response.status())) {
+      return;
+    }
+
+    boolean success = false;
+    long endTime = System.currentTimeMillis() +
+        TimeUnit.SECONDS.toMillis(maxTimeToWaitInSeconds);
+    while (System.currentTimeMillis() < endTime) {
+      try {
+        response = reportStatus(upgradeClientID, false);
+        LOG.info("Finalization Messages : {} ", response.msgs());
+        if (isFinalized(response.status())) {
+          success = true;
+          break;
+        }
+        Thread.sleep(2000);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new IOException("Finalization Wait thread interrupted!");
+      }
+    }
+    if (!success) {
+      LOG.error("Unable to finalize after waiting for {} seconds",
+          maxTimeToWaitInSeconds);
+    } else {
+      updateLayoutVersionInDB(versionManager, component);
+    }
+  }
+
+  private static boolean isFinalized(UpgradeFinalizer.Status status) {
+    return status.equals(UpgradeFinalizer.Status.ALREADY_FINALIZED)
+        || status.equals(FINALIZATION_DONE);
+  }
+
 
   protected void finalizeFeature(LayoutFeature feature, Storage config,
                                  Optional<? extends UpgradeAction> action)
@@ -220,7 +263,7 @@ public class BasicUpgradeFinalizer<T, V extends AbstractLayoutVersionManager>
   }
 
   protected void emitNOOPMsg(String feature) {
-    String msg = "No finalization work defined for feature: " + feature + ".";
+    String msg = "No onFinalize work defined for feature: " + feature + ".";
 
     logAndEmit(msg);
   }
@@ -236,7 +279,7 @@ public class BasicUpgradeFinalizer<T, V extends AbstractLayoutVersionManager>
   }
 
   protected void emitStartingFinalizationActionMsg(String feature) {
-    String msg = "Executing finalization of feature: " + feature + ".";
+    String msg = "Executing onFinalize action of feature: " + feature + ".";
     logAndEmit(msg);
   }
 
@@ -302,5 +345,9 @@ public class BasicUpgradeFinalizer<T, V extends AbstractLayoutVersionManager>
       throws UpgradeException {
     LOG.error(msg, e);
     throw new UpgradeException(msg, e, resultCode);
+  }
+
+  protected void updateLayoutVersionInDB(V vm, T comp) throws IOException {
+    throw new UnsupportedOperationException();
   }
 }

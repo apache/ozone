@@ -167,3 +167,20 @@ Test key Acls
     ${result} =     Execute             ozone sh key getacl ${protocol}${server}/${volume}/bb1/key2
     Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"ACCESS\",\n.*\"aclList\" : . \"READ\", \"WRITE\", \"READ_ACL\", \"WRITE_ACL\"
     Should Match Regexp                 ${result}       \"type\" : \"GROUP\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"ACCESS\",\n.*\"aclList\" : . \"ALL\" .
+
+Test prefix Acls
+    [arguments]     ${protocol}         ${server}       ${volume}
+    Execute         ozone sh prefix addacl ${protocol}${server}/${volume}/bb1/prefix1/ -a user:superuser1:rwxy[DEFAULT]
+    ${result} =     Execute             ozone sh prefix getacl ${protocol}${server}/${volume}/bb1/prefix1/
+    Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"DEFAULT\",\n.*\"aclList\" : . \"READ\", \"WRITE\", \"READ_ACL\", \"WRITE_ACL\"
+    ${result} =     Execute             ozone sh prefix removeacl ${protocol}${server}/${volume}/bb1/prefix1/ -a user:superuser1:xy
+    ${result} =     Execute             ozone sh prefix getacl ${protocol}${server}/${volume}/bb1/prefix1/
+    Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"DEFAULT\",\n.*\"aclList\" : . \"READ\", \"WRITE\"
+    ${result} =     Execute             ozone sh prefix setacl ${protocol}${server}/${volume}/bb1/prefix1/ -al user:superuser1:rwxy[DEFAULT],group:superuser1:a[DEFAULT],user:testuser/scm@EXAMPLE.COM:rwxyc
+    ${result} =     Execute             ozone sh prefix getacl ${protocol}${server}/${volume}/bb1/prefix1/
+    Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"DEFAULT\",\n.*\"aclList\" : . \"READ\", \"WRITE\", \"READ_ACL\", \"WRITE_ACL\"
+    Should Match Regexp                 ${result}       \"type\" : \"GROUP\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"DEFAULT\",\n.*\"aclList\" : . \"ALL\" .
+    Execute         ozone sh key put ${protocol}${server}/${volume}/bb1/prefix1/key1 /opt/hadoop/NOTICE.txt
+    ${result} =     Execute             ozone sh key getacl ${protocol}${server}/${volume}/bb1/prefix1/key1
+    Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"ACCESS\",\n.*\"aclList\" : . \"READ\", \"WRITE\", \"READ_ACL\", \"WRITE_ACL\"
+    Should Match Regexp                 ${result}       \"type\" : \"GROUP\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"ACCESS\",\n.*\"aclList\" : . \"ALL\" .

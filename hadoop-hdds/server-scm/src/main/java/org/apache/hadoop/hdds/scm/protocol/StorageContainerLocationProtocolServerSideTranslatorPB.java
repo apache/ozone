@@ -398,8 +398,12 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       startContainerID = request.getStartContainerID();
     }
     count = request.getCount();
+    HddsProtos.LifeCycleState state = null;
+    if (request.hasState()) {
+      state = request.getState();
+    }
     List<ContainerInfo> containerList =
-        impl.listContainer(startContainerID, count);
+        impl.listContainer(startContainerID, count, state);
     SCMListContainerResponseProto.Builder builder =
         SCMListContainerResponseProto.newBuilder();
     for (ContainerInfo container : containerList) {

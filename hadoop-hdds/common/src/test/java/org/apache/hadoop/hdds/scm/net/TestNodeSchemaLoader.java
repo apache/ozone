@@ -48,7 +48,7 @@ public class TestNodeSchemaLoader {
     private final String errMsg;
 
     @Rule
-    public Timeout testTimeout = new Timeout(2000);
+    public Timeout testTimeout = Timeout.seconds(2);
 
     @Parameters
     public static Collection<Object[]> getSchemaFiles() {
@@ -98,7 +98,7 @@ public class TestNodeSchemaLoader {
     private static final String VALID_SCHEMA_FILE = "good.xml";
 
     @Rule
-    public Timeout testTimeout = new Timeout(2000);
+    public Timeout testTimeout = Timeout.seconds(2);
 
     @Test
     public void testGood() throws Exception {

@@ -54,7 +54,7 @@ public class TestOmUtils {
   public TemporaryFolder folder = new TemporaryFolder();
 
   @Rule
-  public Timeout timeout = new Timeout(60_000);
+  public Timeout timeout = Timeout.seconds(60);
 
 
   @Test

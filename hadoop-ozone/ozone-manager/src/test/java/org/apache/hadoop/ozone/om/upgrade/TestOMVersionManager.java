@@ -22,10 +22,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.INITIAL_VERSION;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager.getRequestClasses;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
@@ -33,8 +30,6 @@ import java.lang.reflect.Method;
 import java.util.HashSet;
 import java.util.Set;
 
-import org.apache.hadoop.ozone.om.OMStorage;
-import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.junit.Assert;
@@ -47,27 +42,22 @@ public class TestOMVersionManager {
 
   @Test
   public void testOMLayoutVersionManager() throws IOException {
-    OMStorage omStorage = mock(OMStorage.class);
-    when(omStorage.getLayoutVersion()).thenReturn(0);
     OMLayoutVersionManager omVersionManager =
-        new OMLayoutVersionManager(omStorage);
-    OzoneManager om = mock(OzoneManager.class);
-    when(om.getOmStorage()).thenReturn(omStorage);
+        new OMLayoutVersionManager();
 
+    // Initial Version is always allowed.
     assertTrue(omVersionManager.isAllowed(INITIAL_VERSION));
-    assertEquals(INITIAL_VERSION.layoutVersion(),
+    assertTrue(INITIAL_VERSION.layoutVersion() <=
         omVersionManager.getMetadataLayoutVersion());
-    assertFalse(omVersionManager.needsFinalization());
   }
 
   @Test
   public void testOMLayoutVersionManagerInitError() {
-    OMStorage omStorage = mock(OMStorage.class);
-    when(omStorage.getLayoutVersion()).thenReturn(
-        OMLayoutFeature.values()[OMLayoutFeature.values().length - 1]
-            .layoutVersion() + 1);
+    int lV = OMLayoutFeature.values()[OMLayoutFeature.values().length - 1]
+        .layoutVersion() + 1;
+
     try {
-      new OMLayoutVersionManager(omStorage);
+      new OMLayoutVersionManager(lV);
       Assert.fail();
     } catch (OMException ex) {
       assertEquals(NOT_SUPPORTED_OPERATION, ex.getResult());

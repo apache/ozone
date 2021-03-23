@@ -90,7 +90,7 @@ public class BlockInputStream extends InputStream
   // BlockInputStream i.e offset of the data to be read next from this block
   private int chunkIndex;
 
-  // Position of the BlockInputStream is maintainted by this variable till
+  // Position of the BlockInputStream is maintained by this variable till
   // the stream is initialized. This position is w.r.t to the block only and
   // not the key.
   // For the above example, if we seek to position 240 before the stream is
@@ -501,5 +501,10 @@ public class BlockInputStream extends InputStream
     }
 
     refreshPipeline(cause);
+  }
+
+  @VisibleForTesting
+  public synchronized List<ChunkInputStream> getChunkStreams() {
+    return chunkStreams;
   }
 }
