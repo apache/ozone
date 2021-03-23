@@ -30,7 +30,6 @@ _check_all_mlvs() {
 }
 
 setup() {
-  source "$TEST_DIR"/compose/ha/load.sh
   # OM preparation is not implemented until 1.2.0.
   export OZONE_OM_PREPARE='false'
   load_version_specifics "$OZONE_UPGRADE_FROM"

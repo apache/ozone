@@ -21,11 +21,6 @@
 
 set -e -o pipefail
 
-echo "--- RUNNING NON-ROLLING UPGRADE TEST FROM $OZONE_UPGRADE_FROM TO $OZONE_UPGRADE_TO ---"
-
-# Prepare OMs before upgrade unless this variable is not 'true'.
-: "${OZONE_PREPARE_OMS:='true'}"
-
 # Fail if required vars are not set.
 set -u
 : "${OZONE_UPGRADE_FROM}"
@@ -34,9 +29,13 @@ set -u
 : "${OZONE_UPGRADE_CALLBACK}"
 set +u
 
-# Default compose cluster to use. May be overridden by callback.sh.
-"$TEST_DIR"/compose/ha/load.sh
+echo "--- RUNNING NON-ROLLING UPGRADE TEST FROM $OZONE_UPGRADE_FROM TO $OZONE_UPGRADE_TO ---"
 
+# Prepare OMs before upgrade unless this variable is not 'true'.
+: "${OZONE_PREPARE_OMS:='true'}"
+
+# Default compose cluster to use. May be overridden by callback.sh.
+source "$TEST_DIR"/compose/ha/load.sh
 source "$TEST_DIR"/testlib.sh
 source "$OZONE_UPGRADE_CALLBACK"
 

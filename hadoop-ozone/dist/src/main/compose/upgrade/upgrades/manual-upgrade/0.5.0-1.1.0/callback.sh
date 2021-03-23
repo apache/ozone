@@ -18,7 +18,6 @@
 source "$TEST_DIR"/testlib.sh
 
 setup_old_version() {
-  source "$TEST_DIR"/compose/non-ha/load.sh
   load_version_specifics "$OZONE_UPGRADE_FROM"
 }
 

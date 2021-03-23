@@ -20,8 +20,6 @@
 
 set -e -o pipefail
 
-echo "--- RUNNING MANUAL UPGRADE TEST FROM $OZONE_UPGRADE_FROM TO $OZONE_UPGRADE_TO ---"
-
 # Fail if required vars are not set.
 set -u
 : "${OZONE_UPGRADE_FROM}"
@@ -30,8 +28,11 @@ set -u
 : "${OZONE_UPGRADE_CALLBACK}"
 set +u
 
+source "$TEST_DIR"/compose/non-ha/load.sh
 source "$TEST_DIR"/testlib.sh
 source "$OZONE_UPGRADE_CALLBACK"
+
+echo "--- RUNNING MANUAL UPGRADE TEST FROM $OZONE_UPGRADE_FROM TO $OZONE_UPGRADE_TO ---"
 
 echo "--- SETTING UP OLD VERSION $OZONE_UPGRADE_FROM ---"
 OUTPUT_NAME="$OZONE_UPGRADE_FROM"

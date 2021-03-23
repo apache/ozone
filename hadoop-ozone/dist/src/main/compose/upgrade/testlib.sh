@@ -29,10 +29,10 @@ _upgrade_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 : "${RESULT:=0}"
 : "${OZONE_REPLICATION_FACTOR:=3}"
 : "${OZONE_VOLUME_OWNER:=}"
+: "${OZONE_CURRENT_VERSION:=}"
 : "${ALL_RESULT_DIR:="$_upgrade_dir"/result}"
 
 # export for docker-compose
-export OZONE_VOLUME
 export OZONE_REPLICATION_FACTOR
 
 source "${_upgrade_dir}/../testlib.sh"
@@ -90,12 +90,12 @@ run_test() {
   export OZONE_VOLUME="$test_subdir"/data
   export RESULT_DIR="$test_subdir"/result
 
-  if ! run_test_script "${test_dir}"; then
+  if ! run_test_script "$test_dir"; then
     RESULT=1
   fi
 
   generate_report 'upgrade' "$RESULT_DIR"
-  copy_results "$test_subdir" "${ALL_RESULT_DIR}"
+  copy_results "$test_subdir" "$ALL_RESULT_DIR"
 }
 
 ## @description Generates data on the cluster.
