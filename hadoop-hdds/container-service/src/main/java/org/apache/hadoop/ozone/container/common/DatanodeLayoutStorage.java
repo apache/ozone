@@ -27,6 +27,7 @@ import java.util.Properties;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.server.ServerUtils;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.ozone.common.Storage;
 
 /**
@@ -42,7 +43,7 @@ public class DatanodeLayoutStorage extends Storage {
   public DatanodeLayoutStorage(OzoneConfiguration conf, String dataNodeId)
       throws IOException {
     super(NodeType.DATANODE, ServerUtils.getOzoneMetaDirPath(conf),
-        DATANODE_LAYOUT_VERSION_DIR, dataNodeId, maxLayoutVersion());
+        DATANODE_LAYOUT_VERSION_DIR, dataNodeId, getDefaultLayoutVersion());
   }
 
   public DatanodeLayoutStorage(OzoneConfiguration conf, String dataNodeId,
@@ -60,5 +61,17 @@ public class DatanodeLayoutStorage extends Storage {
   @Override
   protected Properties getNodeProperties() {
     return new Properties();
+  }
+
+  private static int getDefaultLayoutVersion() {
+    int softwareLayoutVersion = maxLayoutVersion();
+    int defaultLayoutVersion = softwareLayoutVersion;
+
+    if (softwareLayoutVersion ==
+        HDDSLayoutFeature.DATANODE_SCHEMA_V2.layoutVersion()) {
+      defaultLayoutVersion = HDDSLayoutFeature.INITIAL_VERSION.layoutVersion();
+    }
+
+    return defaultLayoutVersion;
   }
 }
