@@ -21,7 +21,7 @@ package org.apache.hadoop.hdds.security.exception;
 import java.io.IOException;
 
 /**
- * Root Security Exception call for all Certificate related Execptions.
+ * Root Security Exception call for all Certificate related Exceptions.
  */
 public class SCMSecurityException extends IOException {
   private final ErrorCode errorCode;

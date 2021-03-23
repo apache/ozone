@@ -106,6 +106,19 @@ public interface ScmClient extends Closeable {
       int count) throws IOException;
 
   /**
+   * Lists a range of containers and get their info.
+   *
+   * @param startContainerID start containerID.
+   * @param count count must be {@literal >} 0.
+   * @param state Container of this state will be returned.
+   *
+   * @return a list of pipeline.
+   * @throws IOException
+   */
+  List<ContainerInfo> listContainer(long startContainerID,
+      int count, HddsProtos.LifeCycleState state) throws IOException;
+
+  /**
    * Read meta data from an existing container.
    * @param containerID - ID of the container.
    * @param pipeline - Pipeline where the container is located.
@@ -283,5 +296,16 @@ public interface ScmClient extends Closeable {
    */
   boolean getReplicationManagerStatus() throws IOException;
 
-
+  /**
+   * Get usage information of datanode by ipaddress or uuid.
+   *
+   * @param ipaddress datanode ipaddress String
+   * @param uuid datanode uuid String
+   * @return List of DatanodeUsageInfo. Each element contains info such as
+   * capacity, SCMused, and remaining space.
+   * @throws IOException
+   */
+  List<HddsProtos.DatanodeUsageInfo> getDatanodeUsageInfo(String ipaddress,
+                                                  String uuid)
+      throws IOException;
 }

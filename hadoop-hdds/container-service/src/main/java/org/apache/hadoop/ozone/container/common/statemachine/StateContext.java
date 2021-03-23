@@ -242,21 +242,21 @@ public class StateContext {
     Preconditions.checkState(descriptor != null);
     final String reportType = descriptor.getFullName();
     Preconditions.checkState(reportType != null);
-    for (InetSocketAddress endpoint : endpoints) {
-      if (reportType.equals(CONTAINER_REPORTS_PROTO_NAME)) {
-        containerReports.set(report);
-      } else if (reportType.equals(NODE_REPORT_PROTO_NAME)) {
-        nodeReport.set(report);
-      } else if (reportType.equals(PIPELINE_REPORTS_PROTO_NAME)) {
-        pipelineReports.set(report);
-      } else if (ACCEPTED_INCREMENTAL_REPORT_TYPE_SET.contains(reportType)) {
-        synchronized (incrementalReportsQueue) {
+    if (reportType.equals(CONTAINER_REPORTS_PROTO_NAME)) {
+      containerReports.set(report);
+    } else if (reportType.equals(NODE_REPORT_PROTO_NAME)) {
+      nodeReport.set(report);
+    } else if (reportType.equals(PIPELINE_REPORTS_PROTO_NAME)) {
+      pipelineReports.set(report);
+    } else if (ACCEPTED_INCREMENTAL_REPORT_TYPE_SET.contains(reportType)) {
+      synchronized (incrementalReportsQueue) {
+        for (InetSocketAddress endpoint : endpoints) {
           incrementalReportsQueue.get(endpoint).add(report);
         }
-      } else {
-        throw new IllegalArgumentException(
-            "Unidentified report message type: " + reportType);
       }
+    } else {
+      throw new IllegalArgumentException(
+          "Unidentified report message type: " + reportType);
     }
   }
 
@@ -318,6 +318,23 @@ public class StateContext {
     return reportsToReturn;
   }
 
+  List<GeneratedMessage> getNonIncrementalReports() {
+    List<GeneratedMessage> nonIncrementalReports = new LinkedList<>();
+    GeneratedMessage report = containerReports.get();
+    if (report != null) {
+      nonIncrementalReports.add(report);
+    }
+    report = nodeReport.get();
+    if (report != null) {
+      nonIncrementalReports.add(report);
+    }
+    report = pipelineReports.get();
+    if (report != null) {
+      nonIncrementalReports.add(report);
+    }
+    return nonIncrementalReports;
+  }
+
   /**
    * Returns available reports from the report queue with a max limit on
    * list size, or empty list if the queue is empty.
@@ -326,21 +343,17 @@ public class StateContext {
    */
   public List<GeneratedMessage> getReports(InetSocketAddress endpoint,
                                            int maxLimit) {
-    List<GeneratedMessage> reportsToReturn =
-        getIncrementalReports(endpoint, maxLimit);
-    GeneratedMessage report = containerReports.get();
-    if (report != null) {
-      reportsToReturn.add(report);
+    if (maxLimit < 0) {
+      throw new IllegalArgumentException("Illegal maxLimit value: " + maxLimit);
     }
-    report = nodeReport.get();
-    if (report != null) {
-      reportsToReturn.add(report);
+    List<GeneratedMessage> reports = getNonIncrementalReports();
+    if (maxLimit <= reports.size()) {
+      return reports.subList(0, maxLimit);
+    } else {
+      reports.addAll(getIncrementalReports(endpoint,
+          maxLimit - reports.size()));
+      return reports;
     }
-    report = pipelineReports.get();
-    if (report != null) {
-      reportsToReturn.add(report);
-    }
-    return reportsToReturn;
   }
 
 

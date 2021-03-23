@@ -62,7 +62,7 @@ public class TestChecksumImplsComputeSameValues {
       impls.add(new ChecksumByteBufferImpl(new PureJavaCrc32C()));
       try {
         impls.add(new ChecksumByteBufferImpl(
-            ChecksumByteBufferImpl.Java9Crc32CFactory.createChecksum()));
+            ChecksumByteBufferFactory.Java9Crc32CFactory.createChecksum()));
       } catch (Throwable e) {
         // NOOP
       }

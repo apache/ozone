@@ -42,7 +42,7 @@ Status FailureInjectorSvcServiceImpl::GetStatus(
 {
 
     string prefix("GetStatus ");
-    cout << "Recived request " << request->name() << "\n";
+    cout << "Received request " << request->name() << "\n";
     reply->set_message(prefix + request->name());
     return Status::OK;
 }
@@ -52,7 +52,7 @@ Status FailureInjectorSvcServiceImpl::InjectFailure(
     const InjectFailureRequest* request,
     InjectFailureReply* reply)
 {
-  cout << "Recived request " << request->path() << ":" 
+  cout << "Received request " << request->path() << ":" 
             << request->op_name() << "\n";
   mFailureInjector->InjectFailure(request->path(), request->op_name(),
                                 InjectedAction((int)request->action_code(),
@@ -66,7 +66,7 @@ Status FailureInjectorSvcServiceImpl::ResetFailure(
     const ResetFailureRequest* request,
     ResetFailureReply* reply)
 {
-    cout << "Recived request ";
+    cout << "Received request ";
     if (request->has_path()) { 
             cout << request->path() << "\n";
         if (request->has_op_name()) {

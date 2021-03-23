@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.cli;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.util.NativeCodeLoader;
 
 import org.apache.log4j.ConsoleAppender;
@@ -26,6 +27,8 @@ import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import org.apache.log4j.PatternLayout;
 import picocli.CommandLine;
+
+import java.util.function.Supplier;
 
 /**
  * Ozone Admin Command line tool.
@@ -63,5 +66,15 @@ public class OzoneAdmin extends GenericCli {
     Logger.getLogger(NativeCodeLoader.class).setLevel(Level.ERROR);
 
     new OzoneAdmin().run(argv);
+  }
+
+  @Override
+  public void execute(String[] argv) {
+    TracingUtil.initTracing("shell", createOzoneConfiguration());
+    TracingUtil.executeInNewSpan("main",
+        (Supplier<Void>) () -> {
+          super.execute(argv);
+          return null;
+        });
   }
 }

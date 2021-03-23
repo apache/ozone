@@ -21,6 +21,7 @@ import java.nio.ByteBuffer;
 
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.ozone.common.ChecksumByteBuffer;
+import org.apache.hadoop.ozone.common.ChecksumByteBufferFactory;
 import org.apache.hadoop.ozone.common.ChecksumByteBufferImpl;
 import org.apache.hadoop.ozone.common.NativeCheckSumCRC32;
 import org.apache.hadoop.ozone.common.PureJavaCrc32ByteBuffer;
@@ -114,7 +115,7 @@ public class BenchMarkCRCStreaming {
       case "zipCRC32C":
         try {
           checksum = new ChecksumByteBufferImpl(
-              ChecksumByteBufferImpl.Java9Crc32CFactory.createChecksum());
+              ChecksumByteBufferFactory.Java9Crc32CFactory.createChecksum());
         } catch (Throwable e) {
           throw new RuntimeException("zipCRC32C is not available pre Java 9");
         }

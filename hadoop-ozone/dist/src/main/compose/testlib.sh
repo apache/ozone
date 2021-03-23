@@ -16,6 +16,9 @@
 # limitations under the License.
 set -e
 
+_testlib_this="${BASH_SOURCE[0]}"
+_testlib_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+
 COMPOSE_ENV_NAME=$(basename "$COMPOSE_DIR")
 RESULT_DIR=${RESULT_DIR:-"$COMPOSE_DIR/result"}
 RESULT_DIR_INSIDE="/tmp/smoketest/$(basename "$COMPOSE_ENV_NAME")/result"
@@ -37,11 +40,11 @@ create_results_dir() {
 ## @description find all the test.sh scripts in the immediate child dirs
 find_tests(){
   if [[ -n "${OZONE_ACCEPTANCE_SUITE}" ]]; then
-     tests=$(find . -mindepth 2 -maxdepth 2 -name test.sh | xargs grep -l "^#suite:${OZONE_ACCEPTANCE_SUITE}$" | sort)
+     tests=$(find . -mindepth 2 -maxdepth 2 -name test.sh | cut -c3- | xargs grep -l "^#suite:${OZONE_ACCEPTANCE_SUITE}$" | sort)
 
      # 'misc' is default suite, add untagged tests, too
     if [[ "misc" == "${OZONE_ACCEPTANCE_SUITE}" ]]; then
-       untagged="$(find . -mindepth 2 -maxdepth 2 -name test.sh | xargs grep -L "^#suite:")"
+       untagged="$(find . -mindepth 2 -maxdepth 2 -name test.sh | cut -c3- | xargs grep -L "^#suite:")"
        if [[ -n "${untagged}" ]]; then
          tests=$(echo ${tests} ${untagged} | xargs -n1 | sort)
        fi
@@ -52,7 +55,7 @@ find_tests(){
        exit 1
   fi
   else
-    tests=$(find . -mindepth 2 -maxdepth 2 -name test.sh | grep "${OZONE_TEST_SELECTOR:-""}" | sort)
+    tests=$(find . -mindepth 2 -maxdepth 2 -name test.sh | cut -c3- | grep "${OZONE_TEST_SELECTOR:-""}" | sort)
   fi
   echo $tests
 }
@@ -280,12 +283,14 @@ cleanup_docker_images() {
 
 ## @description  Generate robot framework reports based on the saved results.
 generate_report(){
+  local title="${1:-${COMPOSE_ENV_NAME}}"
+  local dir="${2:-${RESULT_DIR}}"
 
   if command -v rebot > /dev/null 2>&1; then
      #Generate the combined output and return with the right exit code (note: robot = execute test, rebot = generate output)
-     rebot --reporttitle "${COMPOSE_ENV_NAME}" -N "${COMPOSE_ENV_NAME}" -d "$RESULT_DIR" "$RESULT_DIR/robot-*.xml"
+     rebot --reporttitle "${title}" -N "${title}" -d "${dir}" "${dir}/*.xml"
   else
-     echo "Robot framework is not installed, the reports can be generated (sudo pip install robotframework)."
+     echo "Robot framework is not installed, the reports cannot be generated (sudo pip install robotframework)."
      exit 1
   fi
 }
@@ -298,7 +303,7 @@ copy_results() {
   local result_dir="${test_dir}/result"
   local test_dir_name=$(basename ${test_dir})
   if [[ -n "$(find "${result_dir}" -name "*.xml")" ]]; then
-    rebot --nostatusrc -N "${test_dir_name}" -o "${all_result_dir}/${test_dir_name}.xml" "${result_dir}/*.xml"
+    rebot --nostatusrc -N "${test_dir_name}" -l NONE -r NONE -o "${all_result_dir}/${test_dir_name}.xml" "${result_dir}/*.xml"
   fi
 
   cp "${result_dir}"/docker-*.log "${all_result_dir}"/
@@ -324,4 +329,84 @@ run_test_script() {
   cd - > /dev/null
 
   return ${ret}
+}
+
+run_test_scripts() {
+  ret=0
+
+  for t in "$@"; do
+    d="$(dirname "${t}")"
+
+    if ! run_test_script "${d}"; then
+      ret=1
+    fi
+
+    copy_results "${d}" "${ALL_RESULT_DIR}"
+
+    if [[ "${ret}" == "1" ]] && [[ "${FAIL_FAST:-}" == "true" ]]; then
+      break
+    fi
+  done
+
+  return ${ret}
+}
+
+## @description Make `OZONE_VOLUME_OWNER` the owner of the `OZONE_VOLUME`
+##   directory tree (required in Github Actions runner environment)
+fix_data_dir_permissions() {
+  if [[ -n "${OZONE_VOLUME}" ]] && [[ -n "${OZONE_VOLUME_OWNER}" ]]; then
+    current_user=$(whoami)
+    if [[ "${OZONE_VOLUME_OWNER}" != "${current_user}" ]]; then
+      chown -R "${OZONE_VOLUME_OWNER}" "${OZONE_VOLUME}" \
+        || sudo chown -R "${OZONE_VOLUME_OWNER}" "${OZONE_VOLUME}"
+    fi
+  fi
+}
+
+## @description Define variables required for using Ozone docker image which
+##   includes binaries for a specific release
+## @param `ozone` image version
+prepare_for_binary_image() {
+  local v=$1
+
+  export OZONE_DIR=/opt/ozone
+  export OZONE_IMAGE="apache/ozone:${v}"
+}
+
+## @description Define variables required for using `ozone-runner` docker image
+##   (no binaries included)
+## @param `ozone-runner` image version (optional)
+prepare_for_runner_image() {
+  local default_version=${docker.ozone-runner.version} # set at build-time from Maven property
+  local runner_version=${OZONE_RUNNER_VERSION:-${default_version}} # may be specified by user running the test
+  local v=${1:-${runner_version}} # prefer explicit argument
+
+  export OZONE_DIR=/opt/hadoop
+  export OZONE_IMAGE="apache/ozone-runner:${v}"
+}
+
+## @description Print the logical version for a specific release
+## @param the release for which logical version should be printed
+get_logical_version() {
+  local v="$1"
+
+  # shellcheck source=/dev/null
+  echo $(source "${_testlib_dir}/versions/${v}.sh" && ozone_logical_version)
+}
+
+## @description Activate the version-specific behavior for a given release
+## @param the release for which definitions should be loaded
+load_version_specifics() {
+  local v="$1"
+
+  # shellcheck source=/dev/null
+  source "${_testlib_dir}/versions/${v}.sh"
+
+  ozone_version_load
+}
+
+## @description Deactivate the previously version-specific behavior,
+##   reverting to the current version's definitions
+unload_version_specifics() {
+  ozone_version_unload
 }
