@@ -38,3 +38,4 @@ OZONE-SITE.XML_ozone.om.ratis.enable=true
 
 no_proxy=om1,om2,om3,scm,s3g,recon,kdc,localhost,127.0.0.1
 
+OM_SERVICE_ID=omservice

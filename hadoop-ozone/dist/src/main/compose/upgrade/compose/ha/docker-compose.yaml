@@ -21,9 +21,6 @@ x-common-config:
   &common-config
   env_file:
     - docker-config
-  environment:  
-    # Pass  value from current environment into containers.
-    - OM_SERVICE_ID
   image: ${OZONE_IMAGE}
 
 x-replication:
