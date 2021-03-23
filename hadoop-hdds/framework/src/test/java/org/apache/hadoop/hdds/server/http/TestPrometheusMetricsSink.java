@@ -125,7 +125,7 @@ public class TestPrometheusMetricsSink {
     metrics.register("Prometheus", "Prometheus", sink);
     metrics.register("SameName", "sameName",
         (MetricsSource) (collector, all) -> {
-          collector.addRecord("SameName").add(new MetricsTag(PORT_INFO, "1234"))git st
+          collector.addRecord("SameName").add(new MetricsTag(PORT_INFO, "1234"))
               .addGauge(COUNTER_INFO, 123).endRecord();
           collector.addRecord("SameName").add(new MetricsTag(PORT_INFO, "2345"))
               .addGauge(COUNTER_INFO, 234).endRecord();
