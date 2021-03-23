@@ -17,10 +17,12 @@
  */
 package org.apache.hadoop.hdds.server.http;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
-
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.MetricsSystem;
@@ -29,8 +31,6 @@ import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
-
-import static java.nio.charset.StandardCharsets.UTF_8;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -110,6 +110,41 @@ public class TestPrometheusMetricsSink {
             + "output",
         writtenMetrics.contains(
             "rpc_metrics_counter{port=\"1234\""));
+
+    metrics.stop();
+    metrics.shutdown();
+  }
+
+  @Test
+  public void testTypeWithSameNameButDifferentLabels() throws IOException {
+    //GIVEN
+    MetricsSystem metrics = DefaultMetricsSystem.instance();
+
+    metrics.init("test");
+    PrometheusMetricsSink sink = new PrometheusMetricsSink();
+    metrics.register("Prometheus", "Prometheus", sink);
+    metrics.register("SameName", "sameName",
+        (MetricsSource) (collector, all) -> {
+          collector.addRecord("SameName").add(new MetricsTag(PORT_INFO, "1234"))git st
+              .addGauge(COUNTER_INFO, 123).endRecord();
+          collector.addRecord("SameName").add(new MetricsTag(PORT_INFO, "2345"))
+              .addGauge(COUNTER_INFO, 234).endRecord();
+        });
+
+    metrics.start();
+    metrics.publishMetricsNow();
+
+    ByteArrayOutputStream stream = new ByteArrayOutputStream();
+    OutputStreamWriter writer = new OutputStreamWriter(stream, UTF_8);
+
+    //WHEN
+    sink.writeMetrics(writer);
+    writer.flush();
+
+    //THEN
+    String writtenMetrics = stream.toString(UTF_8.name());
+    Assert.assertEquals(1, StringUtils.countMatches(writtenMetrics,
+        "# TYPE same_name_counter"));
 
     metrics.stop();
     metrics.shutdown();
