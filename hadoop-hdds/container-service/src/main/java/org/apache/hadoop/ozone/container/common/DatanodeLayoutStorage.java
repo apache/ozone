@@ -63,6 +63,28 @@ public class DatanodeLayoutStorage extends Storage {
     return new Properties();
   }
 
+  /**
+   * Older versions of the code did not write a VERSION file to disk for the
+   * datanode. Therefore, When a datanode starts up and does not find a metadata
+   * layout version written to disk, it does not know whether
+   * it is being installed on a new system, or as part of an upgrade to an
+   * existing system.
+   *
+   * It should assume that it is being installed as part of
+   * an upgrade and use the lowest metadata layout version available. If it
+   * is being started as part of a new system, then SCM will tell it to
+   * finalize to match the SCM MLV, otherwise it will remain pre-finalized
+   * until SCM tells it to finalize.
+   *
+   * This is only an issue when upgrading from software layout versions
+   * {@link HDDSLayoutFeature#INITIAL_VERSION} to
+   * {@link HDDSLayoutFeature#DATANODE_SCHEMA_V2}. After this, the upgrade
+   * framework will write a VERSION file for the datanode and future software
+   * versions will always know the MLV to use.
+   *
+   * @return The layout version that should be used for the datanode if no
+   * layout version is found on disk.
+   */
   private static int getDefaultLayoutVersion() {
     int softwareLayoutVersion = maxLayoutVersion();
     int defaultLayoutVersion = softwareLayoutVersion;
