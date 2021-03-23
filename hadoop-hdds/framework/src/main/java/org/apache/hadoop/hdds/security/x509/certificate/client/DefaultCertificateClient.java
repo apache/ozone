@@ -482,7 +482,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
             if(validator.isValid(ip.getCanonicalHostName())) {
               builder.addDnsName(ip.getCanonicalHostName());
             } else {
-              getLogger().error("InValid domain", ip.getCanonicalHostName());
+              getLogger().error("Invalid domain {}", ip.getCanonicalHostName());
             }
           });
     } catch (IOException e) {
