@@ -587,4 +587,9 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   public void setCertificateClient(CertificateClient client) {
     dnCertClient = client;
   }
+
+  @Override
+  public void printError(Throwable error) {
+    LOG.error("Exception in HddsDatanodeService.", error);
+  }
 }
