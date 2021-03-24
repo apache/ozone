@@ -44,6 +44,8 @@ import com.google.protobuf.ServiceException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.Type.GetSCMCertificate;
+
 /**
  * This class is the server-side translator that forwards requests received on
  * {@link SCMSecurityProtocolPB} to the {@link
