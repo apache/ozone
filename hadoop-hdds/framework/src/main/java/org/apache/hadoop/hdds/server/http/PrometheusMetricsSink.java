@@ -25,15 +25,13 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.regex.Pattern;
-
+import org.apache.commons.configuration2.SubsetConfiguration;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.metrics2.AbstractMetric;
 import org.apache.hadoop.metrics2.MetricType;
 import org.apache.hadoop.metrics2.MetricsRecord;
 import org.apache.hadoop.metrics2.MetricsSink;
 import org.apache.hadoop.metrics2.MetricsTag;
-
-import org.apache.commons.configuration2.SubsetConfiguration;
 
 /**
  * Metrics sink for prometheus exporter.
@@ -74,12 +72,9 @@ public class PrometheusMetricsSink implements MetricsSink {
             + " "
             + metrics.type().toString().toLowerCase();
 
-        if (!metricLines.containsKey(metricKey)){
-          metricLines.put(metricKey, new TreeMap<>());
-        }
-
-        metricLines.get(metricKey).put(prometheusMetricKeyAsString,
-            String.valueOf(metrics.value()));
+        metricLines.computeIfAbsent(metricKey,
+            any -> Collections.synchronizedSortedMap(new TreeMap<>()))
+            .put(prometheusMetricKeyAsString, String.valueOf(metrics.value()));
       }
     }
   }
