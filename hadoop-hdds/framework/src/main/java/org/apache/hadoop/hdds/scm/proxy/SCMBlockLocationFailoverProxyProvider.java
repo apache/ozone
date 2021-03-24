@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolPB;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.io.retry.FailoverProxyProvider;
+import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.io.retry.RetryPolicy.RetryAction;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
@@ -239,10 +240,16 @@ public class SCMBlockLocationFailoverProxyProvider implements
         LegacyHadoopConfigurationSource.asHadoopConfiguration(conf);
     RPC.setProtocolEngine(hadoopConf, ScmBlockLocationProtocolPB.class,
         ProtobufRpcEngine.class);
-    return RPC.getProxy(ScmBlockLocationProtocolPB.class, scmVersion,
+    // FailoverOnNetworkException ensures that the IPC layer does not attempt
+    // retries on the same OM in case of connection exception. This retry
+    // policy essentially results in TRY_ONCE_THEN_FAIL.
+    RetryPolicy connectionRetryPolicy = RetryPolicies
+        .failoverOnNetworkException(0);
+    return RPC.getProtocolProxy(ScmBlockLocationProtocolPB.class, scmVersion,
         scmAddress, ugi, hadoopConf,
         NetUtils.getDefaultSocketFactory(hadoopConf),
-        (int)conf.getObject(SCMClientConfig.class).getRpcTimeOut());
+        (int)conf.getObject(SCMClientConfig.class).getRpcTimeOut(),
+        connectionRetryPolicy).getProxy();
   }
 
   public RetryPolicy getSCMBlockLocationRetryPolicy(String newLeader) {

@@ -231,7 +231,8 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
         certSerialId);
     try {
       X509Certificate certificate =
-          rootCertificateServer.getCertificate(certSerialId);
+          storageContainerManager.getScmCertificateServer()
+              .getCertificate(certSerialId);
       if (certificate != null) {
         return CertificateCodec.getPEMEncodedString(certificate);
       }
@@ -239,7 +240,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
       throw new SCMSecurityException("getCertificate operation failed. ", e,
           GET_CERTIFICATE_FAILED);
     }
-    LOGGER.debug("Certificate with serial id {} not found.", certSerialId);
+    LOGGER.info("Certificate with serial id {} not found.", certSerialId);
     throw new SCMSecurityException("Certificate not found",
         CERTIFICATE_NOT_FOUND);
   }
