@@ -255,15 +255,17 @@ message NodeQueryResponseProto {
 }
 
 /*
-  Usage info request message containing ip and uuid.
+  Datanode usage info request message.
 */
 message DatanodeUsageInfoRequestProto {
   optional string ipaddress = 1;
   optional string uuid = 2;
+  optional bool mostUsed = 3;
+  optional uint32 count = 4;
 }
 
 message DatanodeUsageInfoResponseProto {
-  repeated DatanodeUsageInfo info = 1;
+  repeated DatanodeUsageInfoProto info = 1;
 }
 
 /*
