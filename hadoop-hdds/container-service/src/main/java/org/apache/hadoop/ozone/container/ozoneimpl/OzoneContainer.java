@@ -172,7 +172,7 @@ public class OzoneContainer {
         new BlockDeletingService(this, svcInterval.toMillis(), serviceTimeout,
             TimeUnit.MILLISECONDS, config);
 
-    List< X509Certificate > x509Certificates;
+    List< X509Certificate > x509Certificates = null;
     if (certClient != null) {
       List<String> pemEncodedCerts = HAUtils.buildCAList(certClient, conf);
       x509Certificates = new ArrayList<>(pemEncodedCerts.size());
@@ -184,8 +184,6 @@ public class OzoneContainer {
           throw new IOException(ex);
         }
       }
-    } else {
-      x509Certificates = null;
     }
 
     tlsClientConfig = RatisHelper.createTlsClientConfig(secConf,

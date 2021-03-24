@@ -247,20 +247,4 @@ public class SCMNodeInfo {
   public String getScmDatanodeAddress() {
     return scmDatanodeAddress;
   }
-
-  public static SCMNodeInfo getScmNodeInfo(ConfigurationSource conf,
-      String nodeId) {
-    List<SCMNodeInfo> scmNodeInfoList = SCMNodeInfo.buildNodeInfo(conf);
-    Preconditions.checkState(scmNodeInfoList.size() >=1);
-    if (SCMHAUtils.getScmServiceId(conf) != null) {
-      for (SCMNodeInfo scmNodeInfo : scmNodeInfoList) {
-        if (scmNodeInfo.getNodeId().equals(nodeId)) {
-          return scmNodeInfo;
-        }
-      }
-    } else {
-      return scmNodeInfoList.get(0);
-    }
-    return null;
-  }
 }

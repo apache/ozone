@@ -181,7 +181,7 @@ public final class SCMHAUtils {
    */
   public static Collection<String> getSCMNodeIds(
       ConfigurationSource configuration) {
-    String scmServiceId = SCMHAUtils.getScmServiceId(configuration);
-    return SCMHAUtils.getSCMNodeIds(configuration, scmServiceId);
+    String scmServiceId = getScmServiceId(configuration);
+    return getSCMNodeIds(configuration, scmServiceId);
   }
 }

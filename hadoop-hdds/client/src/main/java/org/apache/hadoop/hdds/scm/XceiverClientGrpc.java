@@ -96,7 +96,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
    * @param caCert   - SCM ca certificate.
    */
   public XceiverClientGrpc(Pipeline pipeline, ConfigurationSource config,
-      List<X509Certificate> caCert) {
+      List<X509Certificate> caCerts) {
     super();
     Preconditions.checkNotNull(pipeline);
     Preconditions.checkNotNull(config);
@@ -114,7 +114,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     this.topologyAwareRead = config.getBoolean(
         OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_KEY,
         OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_DEFAULT);
-    this.caCerts = caCert;
+    this.caCerts = caCerts;
     this.getBlockDNcache = new ConcurrentHashMap<>();
   }
 

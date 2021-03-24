@@ -868,7 +868,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   }
 
   @Override
-  public List<String> listCA() throws IOException {
+  public synchronized List<String> listCA() throws IOException {
     if (pemEncodedCACerts == null) {
       updateCAList();
     }
