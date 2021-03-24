@@ -33,9 +33,11 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.lang.reflect.Proxy;
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -334,8 +336,19 @@ public class SequenceIdGenerator {
     Table<String, Long> sequenceIdTable = scmMetadataStore.getSequenceIdTable();
 
     // upgrade localId
+    // Short-term solution: when setup multi SCM from scratch, they need
+    // achieve an agreement upon the initial value of LOCAL_ID.
+    // Long-term solution: the bootstrapped SCM will explicitly download
+    // scm.db from leader SCM, and drop its own scm.db. Thus the upgrade
+    // operations can take effect exactly once in a SCM HA cluster.
     if (sequenceIdTable.get(LOCAL_ID) == null) {
-      sequenceIdTable.put(LOCAL_ID, UniqueId.next());
+      long millisSinceEpoch = TimeUnit.DAYS.toMillis(
+          LocalDate.of(LocalDate.now().getYear() + 1, 1, 1).toEpochDay());
+
+      long localId = millisSinceEpoch << Short.SIZE;
+      Preconditions.checkArgument(localId > UniqueId.next());
+
+      sequenceIdTable.put(LOCAL_ID, localId);
       LOG.info("upgrade {} to {}", LOCAL_ID, sequenceIdTable.get(LOCAL_ID));
     }
 
