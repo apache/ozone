@@ -18,15 +18,20 @@
 source "$TEST_DIR"/testlib.sh
 
 # Helper function, not a callback.
-_check_all_mlvs() {
+_check_hdds_mlvs() {
   mlv="$1"
-  check_om_mlv om1 "$mlv"
-  check_om_mlv om2 "$mlv"
-  check_om_mlv om3 "$mlv"
   check_scm_mlv scm "$mlv"
   check_dn_mlv dn1 "$mlv"
   check_dn_mlv dn2 "$mlv"
   check_dn_mlv dn3 "$mlv"
+}
+
+# Helper function, not a callback.
+_check_om_mlvs() {
+  mlv="$1"
+  check_om_mlv om1 "$mlv"
+  check_om_mlv om2 "$mlv"
+  check_om_mlv om3 "$mlv"
 }
 
 setup() {
@@ -41,7 +46,9 @@ with_old_version() {
 }
 
 with_new_version_pre_finalized() {
-  _check_all_mlvs 0
+  _check_hdds_mlvs 0
+  _check_om_mlvs 0
+
   validate old1
 
   generate new1
@@ -58,7 +65,10 @@ with_new_version_pre_finalized() {
 # }
 
 with_new_version_finalized() {
-  _check_all_mlvs 1
+  _check_hdds_mlvs 1
+  # OM currently only has one layout version.
+  _check_om_mlvs 0
+
   validate old1
   validate new1
   # TODO: Run when 1.1.0 is released.
