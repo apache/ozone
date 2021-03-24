@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
+import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -648,16 +649,17 @@ public class SCMClientProtocolServer implements
   }
 
   /**
-   * Get Datanode usage info (such as capacity, used) by ip or uuid.
+   * Get Datanode usage info such as capacity, SCMUsed, and remaining by ip
+   * or uuid.
    *
-   * @param ipaddress - Datanode Address String
-   * @param uuid - Datanode UUID String
-   * @return List of DatanodeUsageInfo. Each element contains usage info such
-   * as capacity, SCMUsed, and remaining space.
-   * @throws IOException
+   * @param ipaddress Datanode Address String
+   * @param uuid Datanode UUID String
+   * @return List of DatanodeUsageInfoProto. Each element contains usage info
+   * such as capacity, SCMUsed, and remaining space.
+   * @throws IOException if admin authentication fails
    */
   @Override
-  public List<HddsProtos.DatanodeUsageInfo> getDatanodeUsageInfo(
+  public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
       String ipaddress, String uuid) throws IOException {
 
     // check admin authorisation
@@ -682,7 +684,7 @@ public class SCMClientProtocolServer implements
     }
 
     // get datanode usage info
-    List<HddsProtos.DatanodeUsageInfo> infoList = new ArrayList<>();
+    List<HddsProtos.DatanodeUsageInfoProto> infoList = new ArrayList<>();
     for (DatanodeDetails node : nodes) {
       infoList.add(getUsageInfoFromDatanodeDetails(node));
     }
@@ -693,25 +695,69 @@ public class SCMClientProtocolServer implements
   /**
    * Get usage details for a specific DatanodeDetails node.
    *
-   * @param node - DatanodeDetails
+   * @param node DatanodeDetails
    * @return Usage info such as capacity, SCMUsed, and remaining space.
-   * @throws IOException
    */
-  private HddsProtos.DatanodeUsageInfo getUsageInfoFromDatanodeDetails(
-      DatanodeDetails node) throws IOException {
+  private HddsProtos.DatanodeUsageInfoProto getUsageInfoFromDatanodeDetails(
+      DatanodeDetails node) {
     SCMNodeStat stat = scm.getScmNodeManager().getNodeStat(node).get();
 
     long capacity = stat.getCapacity().get();
     long used = stat.getScmUsed().get();
     long remaining = stat.getRemaining().get();
 
-    HddsProtos.DatanodeUsageInfo info = HddsProtos.DatanodeUsageInfo
-        .newBuilder()
+    return HddsProtos.DatanodeUsageInfoProto.newBuilder()
         .setCapacity(capacity)
         .setUsed(used)
         .setRemaining(remaining)
+        .setNode(node.toProto(node.getCurrentVersion()))
         .build();
-    return info;
+  }
+
+  /**
+   * Get a sorted list of most or least used DatanodeUsageInfo containing
+   * healthy, in-service nodes.
+   *
+   * @param mostUsed true if most used, false if least used
+   * @param count number of nodes to get; must be an integer greater than zero
+   * @return List of DatanodeUsageInfoProto. Each element contains usage info
+   * such as capacity, SCMUsed, and remaining space.
+   * @throws IOException if admin authentication fails
+   * @throws IllegalArgumentException if count is not an integer greater than
+   * zero
+   */
+  @Override
+  public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
+      boolean mostUsed, int count) throws IOException, IllegalArgumentException{
+
+    // check admin authorisation
+    String remoteUser = getRpcRemoteUsername();
+    try {
+      getScm().checkAdminAccess(remoteUser);
+    } catch (IOException e) {
+      LOG.error("Authorisation failed", e);
+      throw e;
+    }
+
+    if (count < 1) {
+      throw new IllegalArgumentException("The specified parameter count must " +
+          "be an integer greater than zero.");
+    }
+
+    List<DatanodeUsageInfo> datanodeUsageInfoList =
+        scm.getScmNodeManager().getMostOrLeastUsedDatanodes(mostUsed);
+
+    // if count is greater than the size of list containing healthy,
+    // in-service nodes, just set count to that size
+    if (count > datanodeUsageInfoList.size()) {
+      count = datanodeUsageInfoList.size();
+    }
+
+    // return count number of DatanodeUsageInfoProto
+    return datanodeUsageInfoList.stream()
+        .map(DatanodeUsageInfo::toProto)
+        .limit(count)
+        .collect(Collectors.toList());
   }
 
   /**
