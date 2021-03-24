@@ -41,6 +41,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
@@ -93,6 +95,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   private String rootCaCertId;
   private String component;
   private List<String> pemEncodedCACerts = null;
+  private final Lock lock;
 
   DefaultCertificateClient(SecurityConfig securityConfig, Logger log,
       String certSerialId, String component) {
@@ -103,6 +106,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     this.certificateMap = new ConcurrentHashMap<>();
     this.certSerialId = certSerialId;
     this.component = component;
+    lock = new ReentrantLock();
 
     loadAllCertificates();
   }
@@ -868,15 +872,21 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   }
 
   @Override
-  public synchronized List<String> listCA() throws IOException {
-    if (pemEncodedCACerts == null) {
-      updateCAList();
+  public List<String> listCA() throws IOException {
+    lock.lock();
+    try {
+      if (pemEncodedCACerts == null) {
+        updateCAList();
+      }
+      return pemEncodedCACerts;
+    }finally {
+      lock.unlock();
     }
-    return pemEncodedCACerts;
   }
 
   @Override
   public List<String> updateCAList() throws IOException {
+    lock.lock();
     try {
       SCMSecurityProtocol scmSecurityProtocolClient =
           HddsServerUtil.getScmSecurityClient(
@@ -888,6 +898,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       getLogger().error("Error during updating CA list", e);
       throw new CertificateException("Error during updating CA list", e,
           CERTIFICATE_ERROR);
+    } finally {
+      lock.unlock();
     }
   }
 }
