@@ -84,17 +84,12 @@ public class DatanodeLayoutStorage extends Storage {
    * layout version is found on disk.
    */
   private static int getDefaultLayoutVersion(OzoneConfiguration conf) {
-    int softwareLayoutVersion = maxLayoutVersion();
-    int defaultLayoutVersion = softwareLayoutVersion;
+    int defaultLayoutVersion = maxLayoutVersion();
 
-    if (softwareLayoutVersion ==
-        HDDSLayoutFeature.DATANODE_SCHEMA_V2.layoutVersion()) {
-
-      File dnIdFile = new File(HddsServerUtil.getDatanodeIdFilePath(conf));
-      if (dnIdFile.exists()) {
-        defaultLayoutVersion =
-            HDDSLayoutFeature.INITIAL_VERSION.layoutVersion();
-      }
+    File dnIdFile = new File(HddsServerUtil.getDatanodeIdFilePath(conf));
+    if (dnIdFile.exists()) {
+      defaultLayoutVersion =
+          HDDSLayoutFeature.INITIAL_VERSION.layoutVersion();
     }
 
     return defaultLayoutVersion;
