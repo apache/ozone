@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdds.scm.protocol;
 
-import com.google.common.base.Strings;
 import com.google.protobuf.ProtocolMessageEnum;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
@@ -572,21 +571,17 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   public DatanodeUsageInfoResponseProto getDatanodeUsageInfo(
       StorageContainerLocationProtocolProtos.DatanodeUsageInfoRequestProto
       request) throws IOException {
-    String ipaddress = null;
-    String uuid = null;
-    if (request.hasIpaddress()) {
-      ipaddress = request.getIpaddress();
-    }
-    if (request.hasUuid()) {
-      uuid = request.getUuid();
-    }
-    if (Strings.isNullOrEmpty(ipaddress) && Strings.isNullOrEmpty(uuid)) {
-      throw new IOException("No ip or uuid specified");
+    List<HddsProtos.DatanodeUsageInfoProto> infoList;
+
+    // get info by ip or uuid
+    if (request.hasUuid() || request.hasIpaddress()) {
+      infoList = impl.getDatanodeUsageInfo(request.getIpaddress(),
+          request.getUuid());
+    } else {  // get most or least used nodes
+      infoList = impl.getDatanodeUsageInfo(request.getMostUsed(),
+          request.getCount());
     }
 
-    List<HddsProtos.DatanodeUsageInfo> infoList;
-    infoList = impl.getDatanodeUsageInfo(ipaddress,
-        uuid);
     return DatanodeUsageInfoResponseProto.newBuilder()
         .addAllInfo(infoList)
         .build();

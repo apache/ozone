@@ -17,26 +17,15 @@
  */
 package org.apache.hadoop.hdds.scm.node;
 
-import javax.management.ObjectName;
-import java.io.IOException;
-import java.net.InetAddress;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-import java.util.Collections;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ScheduledFuture;
-import java.util.stream.Collectors;
-
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
@@ -67,14 +56,24 @@ import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.ozone.protocol.commands.SetNodeOperationalStateCommand;
 import org.apache.hadoop.util.ReflectionUtils;
-
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
 import org.apache.hadoop.util.Time;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.management.ObjectName;
+import java.io.IOException;
+import java.net.InetAddress;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ScheduledFuture;
+import java.util.stream.Collectors;
 
 /**
  * Maintains information about the Datanodes on SCM side.
@@ -529,6 +528,41 @@ public class SCMNodeManager implements NodeManager {
       }
     }
     return nodeStats;
+  }
+
+  /**
+   * Gets a sorted list of most or least used DatanodeUsageInfo containing
+   * healthy, in-service nodes. If the specified mostUsed is true, the returned
+   * list is in descending order of usage. Otherwise, the returned list is in
+   * ascending order of usage.
+   *
+   * @param mostUsed true if most used, false if least used
+   * @return List of DatanodeUsageInfo
+   */
+  public List<DatanodeUsageInfo> getMostOrLeastUsedDatanodes(
+      boolean mostUsed) {
+    List<DatanodeDetails> healthyNodes =
+        getNodes(NodeOperationalState.IN_SERVICE, NodeState.HEALTHY);
+
+    List<DatanodeUsageInfo> datanodeUsageInfoList =
+        new ArrayList<>(healthyNodes.size());
+
+    // create a DatanodeUsageInfo from each DatanodeDetails and add it to the
+    // list
+    for (DatanodeDetails node : healthyNodes) {
+      SCMNodeStat stat = getNodeStatInternal(node);
+      datanodeUsageInfoList.add(new DatanodeUsageInfo(node, stat));
+    }
+
+    // sort the list according to appropriate comparator
+    if (mostUsed) {
+      datanodeUsageInfoList.sort(
+          DatanodeUsageInfo.getMostUsedByRemainingRatio().reversed());
+    } else {
+      datanodeUsageInfoList.sort(
+          DatanodeUsageInfo.getMostUsedByRemainingRatio());
+    }
+    return datanodeUsageInfoList;
   }
 
   /**
