@@ -58,3 +58,22 @@ execute_robot_test scm cli
 stop_docker_env
 
 generate_report
+
+#restart with new configs and run tests for layout version V1
+
+export OZONE_KEEP_RESULTS=true
+export LAYOUT_VERSION=V1
+export ENABLE_FS_PATHS=true
+export RESULT_DIR="$COMPOSE_DIR/resultV1"
+
+start_docker_env
+
+for scheme in ofs o3fs; do
+  for bucket in link bucket; do
+    execute_robot_test scm -v SCHEME:${scheme} -v BUCKET_TYPE:${bucket} -N ozonefs-${scheme}-${bucket} ozonefs/ozonefs.robot
+  done
+done
+
+stop_docker_env
+
+generate_report "Testing Layout version V1" ""
