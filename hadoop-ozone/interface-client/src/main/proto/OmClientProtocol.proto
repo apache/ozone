@@ -97,6 +97,7 @@ enum Type {
   RevokeS3Secret = 93;
 
   PurgePaths = 94;
+  TenantCreate = 93;
 }
 
 message OMRequest {
@@ -170,9 +171,13 @@ message OMRequest {
   optional ListTrashRequest                 listTrashRequest               = 91;
   optional RecoverTrashRequest              RecoverTrashRequest            = 92;
 
+<<<<<<< HEAD
   optional RevokeS3SecretRequest            RevokeS3SecretRequest          = 93;
 
   optional PurgePathsRequest                purgePathsRequest              = 94;
+=======
+  optional TenantCreateRequest              TenantCreateRequest            = 93;
+>>>>>>> 8503015f52 (HDDS-4945. Changes for "Create Tenant" API. (Changes done by Siyao Meng))
 }
 
 message OMResponse {
@@ -243,7 +248,12 @@ message OMResponse {
 
   optional ListTrashResponse                  listTrashResponse            = 91;
   optional RecoverTrashResponse               RecoverTrashResponse         = 92;
+<<<<<<< HEAD
   optional PurgePathsResponse                 purgePathsResponse           = 93;
+=======
+
+  optional TenantCreateResponse              TenantCreateResponse          = 93;
+>>>>>>> 8503015f52 (HDDS-4945. Changes for "Create Tenant" API. (Changes done by Siyao Meng))
 }
 
 enum Status {
@@ -1240,8 +1250,17 @@ message GetS3SecretResponse {
     required S3Secret s3Secret = 2;
 }
 
+<<<<<<< HEAD
 message RevokeS3SecretRequest {
     required string kerberosID = 1;
+=======
+message TenantCreateRequest {
+    required string tenantName = 1;
+}
+
+message TenantCreateResponse {
+    required bool success = 2;
+>>>>>>> 8503015f52 (HDDS-4945. Changes for "Create Tenant" API. (Changes done by Siyao Meng))
 }
 
 /**
@@ -1252,6 +1271,8 @@ message UpdateGetS3SecretRequest {
     required string kerberosID = 1;
     required string awsSecret = 2;
 }
+
+// MARK
 
 /**
  The OM service that takes care of Ozone namespace.

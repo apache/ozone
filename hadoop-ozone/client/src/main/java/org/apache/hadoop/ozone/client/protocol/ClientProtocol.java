@@ -551,6 +551,14 @@ public interface ClientProtocol {
   void revokeS3Secret(String kerberosID) throws IOException;
 
   /**
+   * Create tenant.
+   * @param tenantName
+   * @return
+   * @throws IOException
+   */
+  boolean createTenant(String tenantName) throws IOException;
+
+  /**
    * Get KMS client provider.
    * @return KMS client provider.
    * @throws IOException

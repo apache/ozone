@@ -73,6 +73,8 @@ public enum OMAction implements AuditAction {
   GET_S3_SECRET,
   REVOKE_S3_SECRET;
 
+  TENANT_CREATE;
+
   @Override
   public String getAction() {
     return this.toString();

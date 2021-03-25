@@ -17,41 +17,23 @@
  */
 package org.apache.hadoop.ozone.shell.s3;
 
-import java.util.function.Supplier;
-
-import org.apache.hadoop.hdds.tracing.TracingUtil;
-import org.apache.hadoop.ozone.shell.Shell;
-
-import picocli.CommandLine.Command;
+import org.apache.hadoop.ozone.shell.Handler;
+import org.apache.hadoop.ozone.shell.OzoneAddress;
+import org.apache.hadoop.ozone.shell.volume.VolumeUri;
+import picocli.CommandLine;
 
 /**
- * Shell for s3 related operations.
+ * Base class for tenant command handlers.
  */
-@Command(name = "ozone s3",
-    description = "Shell for S3 specific operations",
-    subcommands = {
-        GetS3SecretHandler.class,
-        RevokeS3SecretHandler.class,
-        TenantCommands.class
-    })
-public class S3Shell extends Shell {
+// TODO: VolumeHandler
+public abstract class TenantHandler extends Handler {
+
+  @CommandLine.Mixin
+  private VolumeUri address;
 
   @Override
-  public void execute(String[] argv) {
-    TracingUtil.initTracing("s3shell", createOzoneConfiguration());
-    TracingUtil.executeInNewSpan("s3shell",
-        (Supplier<Void>) () -> {
-          super.execute(argv);
-          return null;
-        });
+  protected OzoneAddress getAddress() {
+    return address.getValue();
   }
 
-  /**
-   * Main for the S3Shell Command handling.
-   *
-   * @param argv - System Args Strings[]
-   */
-  public static void main(String[] argv) {
-    new S3Shell().run(argv);
-  }
 }

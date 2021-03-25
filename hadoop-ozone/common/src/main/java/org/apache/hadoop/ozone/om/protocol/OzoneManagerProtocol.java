@@ -389,6 +389,14 @@ public interface OzoneManagerProtocol
   void revokeS3Secret(String kerberosID) throws IOException;
 
   /**
+   * Create tenant.
+   * @param tenantName
+   * @return
+   * @throws IOException
+   */
+  boolean createTenant(String tenantName) throws IOException;
+
+  /**
    * OzoneFS api to get file status for an entry.
    *
    * @param keyArgs Key args

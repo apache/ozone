@@ -130,6 +130,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameK
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameKeysRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenewDelegationTokenResponseProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RevokeS3SecretRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantCreateRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantCreateResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetAclRequest;
@@ -866,6 +868,21 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             .setRevokeS3SecretRequest(request)
             .build();
     handleError(submitRequest(omRequest));
+  }
+
+  // TODO: Use OmTenantArgs
+  @Override
+  public boolean createTenant(String tenantArgs) throws IOException {
+    TenantCreateRequest request = TenantCreateRequest.newBuilder()
+        .setTenantName(tenantArgs)
+        .build();
+    OMRequest omRequest = createOMRequest(Type.TenantCreate)
+        .setTenantCreateRequest(request)
+        .build();
+    final TenantCreateResponse resp = handleError(submitRequest(omRequest))
+        .getTenantCreateResponse();
+
+    return resp.getSuccess();
   }
 
   /**

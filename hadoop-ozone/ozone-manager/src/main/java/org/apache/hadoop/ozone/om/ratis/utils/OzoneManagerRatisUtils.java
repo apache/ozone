@@ -69,6 +69,7 @@ import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadComplete
 import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadCompleteRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.s3.security.S3GetSecretRequest;
 import org.apache.hadoop.ozone.om.request.s3.security.S3RevokeSecretRequest;
+import org.apache.hadoop.ozone.om.request.s3.usermgmt.OMTenantCreateRequest;
 import org.apache.hadoop.ozone.om.request.security.OMCancelDelegationTokenRequest;
 import org.apache.hadoop.ozone.om.request.security.OMGetDelegationTokenRequest;
 import org.apache.hadoop.ozone.om.request.security.OMRenewDelegationTokenRequest;
@@ -224,6 +225,8 @@ public final class OzoneManagerRatisUtils {
       return new OMTrashRecoverRequest(omRequest);
     case RevokeS3Secret:
       return new S3RevokeSecretRequest(omRequest);
+    case TenantCreate:
+      return new OMTenantCreateRequest(omRequest);
     default:
       throw new IllegalStateException("Unrecognized write command " +
           "type request" + cmdType);
