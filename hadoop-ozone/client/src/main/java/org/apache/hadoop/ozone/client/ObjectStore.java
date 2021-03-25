@@ -156,6 +156,10 @@ public class ObjectStore {
     return proxy.getS3Secret(kerberosID);
   }
 
+  public boolean createTenant(String tenantName) throws IOException {
+    return proxy.createTenant(tenantName);
+  }
+
   /**
    * Returns Iterator to iterate over all the volumes in object store.
    * The result can be restricted using volume prefix, will return all

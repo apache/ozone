@@ -50,6 +50,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 import com.google.common.base.Optional;
+import org.apache.commons.lang3.NotImplementedException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProvider;
@@ -2727,6 +2728,17 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           user.getUserName(), OMException.ResultCodes.USER_MISMATCH);
     }
     return s3SecretManager.getS3Secret(kerberosID);
+  }
+
+  /**
+   * Create tenant.
+   * @param tenantName
+   * @return
+   * @throws IOException
+   */
+  public boolean createTenant(String tenantName) throws IOException {
+    throw new NotImplementedException(
+        "Non-Ratis createTenant() is not implemented");
   }
 
   @Override

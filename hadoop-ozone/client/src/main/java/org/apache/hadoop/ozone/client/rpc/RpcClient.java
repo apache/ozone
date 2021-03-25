@@ -552,6 +552,20 @@ public class RpcClient implements ClientProtocol {
     return ozoneManagerClient.getS3Secret(kerberosID);
   }
 
+  /**
+   *
+   * @param tenantName
+   * @return
+   * @throws IOException
+   */
+  @Override
+  public boolean createTenant(String tenantName) throws IOException {
+    Preconditions.checkArgument(Strings.isNotBlank(tenantName),
+        "tenantName cannot be null or empty.");
+
+    return ozoneManagerClient.createTenant(tenantName);
+  }
+
   @Override
   public void setBucketVersioning(
       String volumeName, String bucketName, Boolean versioning)

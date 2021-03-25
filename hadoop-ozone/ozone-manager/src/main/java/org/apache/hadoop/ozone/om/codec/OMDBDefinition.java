@@ -27,6 +27,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBTenantInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
@@ -142,6 +143,55 @@ public class OMDBDefinition implements DBDefinition {
                     OMTransactionInfo.class,
                     new OMTransactionInfoCodec());
 
+  // Tables for S3 multi-tenancy
+
+  public static final DBColumnFamilyDefinition<String, String>
+            TENANT_USER_TABLE =
+            new DBColumnFamilyDefinition<>(
+                    OmMetadataManagerImpl.TENANT_USER_TABLE,
+                    String.class,
+                    new StringCodec(),
+                    String.class,
+                    new StringCodec());
+
+  public static final DBColumnFamilyDefinition<String, OmDBTenantInfo>
+            TENANT_STATE_TABLE =
+            new DBColumnFamilyDefinition<>(
+                    OmMetadataManagerImpl.TENANT_STATE_TABLE,
+                    String.class,
+                    new StringCodec(),
+                    OmDBTenantInfo.class,
+                    new OmTenantInfoCodec());
+
+  public static final DBColumnFamilyDefinition<String, String>
+            TENANT_GROUP_TABLE =
+            new DBColumnFamilyDefinition<>(
+                    OmMetadataManagerImpl.TENANT_GROUP_TABLE,
+                    String.class,
+                    new StringCodec(),
+                    String.class,
+                    new StringCodec());
+
+  public static final DBColumnFamilyDefinition<String, String>
+            TENANT_ROLE_TABLE =
+            new DBColumnFamilyDefinition<>(
+                    OmMetadataManagerImpl.TENANT_ROLE_TABLE,
+                    String.class,
+                    new StringCodec(),
+                    String.class,
+                    new StringCodec());
+
+  public static final DBColumnFamilyDefinition<String, String>
+            TENANT_POLICY_TABLE =
+            new DBColumnFamilyDefinition<>(
+                    OmMetadataManagerImpl.TENANT_POLICY_TABLE,
+                    String.class,
+                    new StringCodec(),
+                    String.class,
+                    new StringCodec());
+
+  // End tables for S3 multi-tenancy
+
   @Override
   public String getName() {
     return OzoneConsts.OM_DB_NAME;
@@ -157,7 +207,9 @@ public class OMDBDefinition implements DBDefinition {
     return new DBColumnFamilyDefinition[] {DELETED_TABLE, USER_TABLE,
         VOLUME_TABLE, OPEN_KEY_TABLE, KEY_TABLE,
         BUCKET_TABLE, MULTIPART_INFO_TABLE, PREFIX_TABLE, DTOKEN_TABLE,
-        S3_SECRET_TABLE, TRANSACTION_INFO_TABLE};
+        S3_SECRET_TABLE, TRANSACTION_INFO_TABLE,
+        TENANT_USER_TABLE, TENANT_STATE_TABLE, TENANT_GROUP_TABLE,
+        TENANT_ROLE_TABLE, TENANT_POLICY_TABLE };
   }
 }
 

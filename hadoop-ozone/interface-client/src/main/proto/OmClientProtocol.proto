@@ -93,6 +93,8 @@ enum Type {
 
   ListTrash = 91;
   RecoverTrash = 92;
+
+  TenantCreate = 93;
 }
 
 message OMRequest {
@@ -165,6 +167,8 @@ message OMRequest {
 
   optional ListTrashRequest                 listTrashRequest               = 91;
   optional RecoverTrashRequest              RecoverTrashRequest            = 92;
+
+  optional TenantCreateRequest              TenantCreateRequest            = 93;
 }
 
 message OMResponse {
@@ -235,6 +239,8 @@ message OMResponse {
 
   optional ListTrashResponse                  listTrashResponse            = 91;
   optional RecoverTrashResponse               RecoverTrashResponse         = 92;
+
+  optional TenantCreateResponse              TenantCreateResponse          = 93;
 }
 
 enum Status {
@@ -1200,6 +1206,14 @@ message GetS3SecretResponse {
     required S3Secret s3Secret = 2;
 }
 
+message TenantCreateRequest {
+    required string tenantName = 1;
+}
+
+message TenantCreateResponse {
+    required bool success = 2;
+}
+
 /**
   This will be used internally by OM to replicate S3 Secret across quorum of
   OM's.
@@ -1208,6 +1222,8 @@ message UpdateGetS3SecretRequest {
     required string kerberosID = 1;
     required string awsSecret = 2;
 }
+
+// MARK
 
 /**
  The OM service that takes care of Ozone namespace.
