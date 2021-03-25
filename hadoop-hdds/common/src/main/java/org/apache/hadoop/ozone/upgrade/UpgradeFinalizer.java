@@ -177,6 +177,11 @@ public interface UpgradeFinalizer<T> {
   StatusAndMessages reportStatus(String upgradeClientId, boolean takeover)
       throws IOException;
 
+  /**
+   * Get a readonly status of the finalization.
+   * @return the status of the finalization
+   */
+  Status getStatus();
 
   /**
    * Runs the set of pre finalized state validations and actions that need to

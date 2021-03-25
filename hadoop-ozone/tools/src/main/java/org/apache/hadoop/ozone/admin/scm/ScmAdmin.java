@@ -36,7 +36,8 @@ import picocli.CommandLine.Spec;
     versionProvider = HddsVersionProvider.class,
     subcommands = {
         GetScmRatisRolesSubcommand.class,
-        FinalizeScmUpgradeSubcommand.class
+        FinalizeScmUpgradeSubcommand.class,
+        FinalizationScmStatusSubcommand.class
     })
 @MetaInfServices(SubcommandWithParent.class)
 public class ScmAdmin extends GenericCli  implements SubcommandWithParent {
