@@ -30,7 +30,7 @@ public interface LayoutFeature {
 
   String description();
 
-  default Optional<? extends UpgradeAction> onFinalizeAction() {
+  default Optional<? extends UpgradeAction> action(UpgradeActionType p) {
     return Optional.empty();
   }
 
@@ -40,6 +40,31 @@ public interface LayoutFeature {
    * @param <T>
    */
   interface UpgradeAction<T> {
-    void executeAction(T arg) throws Exception;
+
+    default String name() {
+      return getClass().getSimpleName();
+    }
+
+    void execute(T arg) throws Exception;
+  }
+
+  /**
+   * Phase of execution for this action.
+   */
+  enum UpgradeActionType {
+
+    // Run every time an unfinalized component is started up.
+    UNFINALIZED_STATE_VALIDATION,
+
+    // Run exactly once when an upgraded cluster is detected with this new
+    // layout version.
+    // NOTE 1 : This will not be run in a NEW cluster!
+    // NOTE 2 : This needs to be a backward compatible action until a DOWNGRADE
+    // hook is provided!
+    // NOTE 3 : These actions are not submitted through RATIS (TODO)
+    ON_FIRST_UPGRADE_START,
+
+    // Run exactly once during finalization of layout feature.
+    ON_FINALIZE
   }
 }

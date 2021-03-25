@@ -18,8 +18,8 @@
 
 package org.apache.hadoop.hdds.upgrade;
 
+import java.util.EnumMap;
 import java.util.Optional;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 
@@ -30,28 +30,30 @@ public enum HDDSLayoutFeature implements LayoutFeature {
   //////////////////////////////  //////////////////////////////
   INITIAL_VERSION(0, "Initial Layout Version"),
   DATANODE_SCHEMA_V2(1, "Datanode RocksDB Schema Version 2 (with column " +
-      "families)");
+      "families)"),
+  SCM_HA(2, "Storage Container Manager HA");
 
   //////////////////////////////  //////////////////////////////
 
   private int layoutVersion;
   private String description;
-  private HDDSUpgradeAction scmUpgradeAction;
-  private HDDSUpgradeAction datanodeUpgradeAction;
+  private EnumMap<UpgradeActionType, HDDSUpgradeAction> scmActions =
+      new EnumMap<>(UpgradeActionType.class);
+  private EnumMap<UpgradeActionType, HDDSUpgradeAction> datanodeActions =
+      new EnumMap<>(UpgradeActionType.class);
 
   HDDSLayoutFeature(final int layoutVersion, String description) {
     this.layoutVersion = layoutVersion;
     this.description = description;
   }
 
-  @SuppressFBWarnings("ME_ENUM_FIELD_SETTER")
-  public void setSCMUpgradeAction(HDDSUpgradeAction scmAction) {
-    this.scmUpgradeAction = scmAction;
+  public void addScmAction(UpgradeActionType type, HDDSUpgradeAction action) {
+    this.scmActions.put(type, action);
   }
 
-  @SuppressFBWarnings("ME_ENUM_FIELD_SETTER")
-  public void setDataNodeUpgradeAction(HDDSUpgradeAction datanodeAction) {
-    this.datanodeUpgradeAction = datanodeAction;
+  public void addDatanodeAction(UpgradeActionType type,
+                                HDDSUpgradeAction action) {
+    this.datanodeActions.put(type, action);
   }
 
   @Override
@@ -64,11 +66,11 @@ public enum HDDSLayoutFeature implements LayoutFeature {
     return description;
   }
 
-  public Optional<? extends HDDSUpgradeAction> onFinalizeSCMAction() {
-    return Optional.ofNullable(scmUpgradeAction);
+  public Optional<HDDSUpgradeAction> scmAction(UpgradeActionType type) {
+    return Optional.ofNullable(scmActions.get(type));
   }
 
-  public Optional<? extends HDDSUpgradeAction> onFinalizeDataNodeAction() {
-    return Optional.ofNullable(datanodeUpgradeAction);
+  public Optional<HDDSUpgradeAction> datanodeAction(UpgradeActionType type) {
+    return Optional.ofNullable(datanodeActions.get(type));
   }
 }
