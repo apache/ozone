@@ -86,6 +86,8 @@ public class OzoneKeyLocation {
   /**
    * Returns the KeyOffset of this Key.
    */
-  public long getKeyOffset() { return keyOffset; }
+  public long getKeyOffset() {
+    return keyOffset;
+  }
 
 }
