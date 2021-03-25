@@ -221,7 +221,8 @@ public class TestKeyValueContainer {
         .getVolumesList(), 1);
     hddsVolumeDir = containerVolume.getHddsRootDir().toString();
     container.populatePathFields(scmId, containerVolume, hddsVolumeDir);
-    try (FileInputStream fis = new FileInputStream(folderToExport)) {
+    try {
+      FileInputStream fis = new FileInputStream(folderToExport);
       fis.close();
       container.importContainerData(fis, packer);
       fail("Container import should fail");
