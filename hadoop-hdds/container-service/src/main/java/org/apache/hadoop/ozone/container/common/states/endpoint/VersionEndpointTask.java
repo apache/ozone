@@ -109,11 +109,7 @@ public class VersionEndpointTask implements
           }
 
           // Start the container services after getting the version information
-          try {
-            ozoneContainer.start(scmId);
-          } catch (IOException ex) {
-            rpcEndPoint.logIfNeeded(ex);
-          }
+          ozoneContainer.start(scmId);
         }
         EndpointStateMachine.EndPointStates nextState =
             rpcEndPoint.getState().getNextState();
