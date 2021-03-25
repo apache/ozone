@@ -42,7 +42,7 @@ public class OzoneKeyLocation {
   /**
    * KeyOffset of this key.
    */
-  private final long KeyOffset;
+  private final long keyOffset;
   /**
    * Constructs OzoneKeyLocation.
    */
@@ -52,7 +52,7 @@ public class OzoneKeyLocation {
     this.localID = localID;
     this.length = length;
     this.offset = offset;
-    this.KeyOffset = length + offset;
+    this.keyOffset = length + offset;
   }
 
   /**
@@ -86,6 +86,6 @@ public class OzoneKeyLocation {
   /**
    * Returns the KeyOffset of this Key.
    */
-  public long getKeyOffset() { return KeyOffset; }
+  public long getKeyOffset() { return keyOffset; }
 
 }
