@@ -51,8 +51,6 @@ execute_robot_test scm cli
 
 stop_docker_env
 
-generate_report
-
 # running FS tests with different config requires restart of the cluster
 export OZONE_KEEP_RESULTS=true
 export OZONE_OM_LAYOUT_VERSION OZONE_OM_ENABLE_FILESYSTEM_PATHS
@@ -71,3 +69,5 @@ for OZONE_OM_LAYOUT_VERSION in V0 V1; do
   done
   stop_docker_env
 done
+
+generate_report
