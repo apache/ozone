@@ -139,6 +139,14 @@ public abstract class Storage {
     storageInfo.unsetUpgradingToLayoutVersion();
   }
 
+  public void setFirstUpgradeActionLayoutVersion(int version) {
+    storageInfo.setFirstUpgradeActionLayoutVersion(version);
+  }
+
+  public int getFirstUpgradeActionLayoutVersion() {
+    return storageInfo.getFirstUpgradeActionLayoutVersion();
+  }
+
   /**
    * Retrieves the storageInfo instance to read/write the common
    * version file properties.

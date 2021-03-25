@@ -250,6 +250,8 @@ public class DatanodeStateMachine implements Closeable {
     reportManager.init();
     initCommandHandlerThread(conf);
 
+    upgradeFinalizer.runPrefinalizeStateActions(layoutStorage, this);
+
     // Start jvm monitor
     jvmPauseMonitor = new JvmPauseMonitor();
     jvmPauseMonitor
@@ -640,7 +642,6 @@ public class DatanodeStateMachine implements Closeable {
 
   public StatusAndMessages queryUpgradeStatus()
       throws IOException{
-
     return upgradeFinalizer.reportStatus(datanodeDetails.getUuidString(),
         false);
   }

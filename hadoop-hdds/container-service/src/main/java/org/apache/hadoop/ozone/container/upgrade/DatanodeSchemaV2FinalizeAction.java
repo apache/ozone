@@ -18,21 +18,29 @@
 
 package org.apache.hadoop.ozone.container.upgrade;
 
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.DATANODE_SCHEMA_V2;
+import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON_FINALIZE;
+import static org.apache.hadoop.ozone.upgrade.UpgradeActionHdds.Component.DATANODE;
+
 import org.apache.hadoop.hdds.upgrade.HDDSUpgradeAction;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
+import org.apache.hadoop.ozone.upgrade.UpgradeActionHdds;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Upgrade Action for DataNode for the very first first Upgrade Version.
  */
+@UpgradeActionHdds(feature = DATANODE_SCHEMA_V2, component = DATANODE,
+    type = ON_FINALIZE)
 public class DatanodeSchemaV2FinalizeAction
     implements HDDSUpgradeAction<DatanodeStateMachine> {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(DatanodeSchemaV2FinalizeAction.class);
+
   @Override
-  public void executeAction(DatanodeStateMachine arg) throws Exception {
+  public void execute(DatanodeStateMachine arg) throws Exception {
     LOG.info("Executing datanode 'onFinalize' action for the first " +
         "version with upgrade support. New containers will be " +
         "created with Schema Version 2 henceforth.");

@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.upgrade;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.ozone.common.Storage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -177,4 +178,13 @@ public interface UpgradeFinalizer<T> {
   StatusAndMessages reportStatus(String upgradeClientId, boolean takeover)
       throws IOException;
 
+
+  /**
+   * Runs the set of pre finalized state validations and actions that need to
+   * be run exactly once during an upgrade (which introduces a new layout
+   * feature).
+   * @throws IOException
+   */
+  void runPrefinalizeStateActions(Storage storage, T service)
+      throws IOException;
 }

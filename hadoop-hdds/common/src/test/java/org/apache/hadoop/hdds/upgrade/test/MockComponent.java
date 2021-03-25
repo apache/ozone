@@ -16,31 +16,52 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.scm.server.upgrade;
+package org.apache.hadoop.hdds.upgrade.test;
 
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.DATANODE_SCHEMA_V2;
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.INITIAL_VERSION;
 import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON_FINALIZE;
+import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON_FIRST_UPGRADE_START;
+import static org.apache.hadoop.ozone.upgrade.UpgradeActionHdds.Component.DATANODE;
 import static org.apache.hadoop.ozone.upgrade.UpgradeActionHdds.Component.SCM;
 
-import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.upgrade.HDDSUpgradeAction;
 import org.apache.hadoop.ozone.upgrade.UpgradeActionHdds;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
- * SCM Upgrade Action for the very first Upgrade Version.
+ * Mock classes to test upgrade action registration.
  */
-@UpgradeActionHdds(feature = DATANODE_SCHEMA_V2, component = SCM, type =
-    ON_FINALIZE)
-public class ScmOnFinalizeActionForDatanodeSchemaV2 implements
-    HDDSUpgradeAction<StorageContainerManager> {
-  public static final Logger LOG =
-      LoggerFactory.getLogger(ScmOnFinalizeActionForDatanodeSchemaV2.class);
-
-  @Override
-  public void execute(StorageContainerManager arg) throws Exception {
-    LOG.info("Executing SCM On Finalize action for layout feature {}",
-        DATANODE_SCHEMA_V2);
+public class MockComponent {
+  public void mockMethodScm() {
   }
+
+  public void mockMethodDn() {
+  }
+
+  /**
+   * Mock SCM Upgrade Action.
+   */
+  @UpgradeActionHdds(type = ON_FINALIZE, feature = INITIAL_VERSION,
+      component = SCM)
+  public static class MockScmUpgradeAction implements
+      HDDSUpgradeAction<MockComponent> {
+    @Override
+    public void execute(MockComponent arg) {
+      arg.mockMethodScm();
+    }
+  }
+
+  /**
+   * Mock DN Upgrade Action.
+   */
+  @UpgradeActionHdds(type = ON_FIRST_UPGRADE_START,
+      feature = DATANODE_SCHEMA_V2, component = DATANODE)
+  public static class MockDnUpgradeAction implements
+      HDDSUpgradeAction<MockComponent> {
+    @Override
+    public void execute(MockComponent arg) {
+      arg.mockMethodDn();
+    }
+  }
+
 }
