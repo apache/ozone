@@ -1271,7 +1271,7 @@ public class TestOzoneFileSystem {
 
   @Test
   public void testListStatusOnLargeDirectoryForACLCheck() throws Exception {
-    String keyName = "testListStatusOnLargeDirectoryForACLCheck";
+    String keyName = "dir1/dir2/testListStatusOnLargeDirectoryForACLCheck";
     Path root = new Path(OZONE_URI_DELIMITER, keyName);
     Set<String> paths = new TreeSet<>();
     int numDirs = LISTING_PAGE_SIZE + LISTING_PAGE_SIZE / 2;

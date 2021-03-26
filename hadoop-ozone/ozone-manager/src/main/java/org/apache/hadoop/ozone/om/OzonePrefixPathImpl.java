@@ -21,6 +21,8 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.security.acl.OzonePrefixPath;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Iterator;
@@ -30,7 +32,8 @@ import java.util.NoSuchElementException;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 
 public class OzonePrefixPathImpl implements OzonePrefixPath {
-
+  private static final Logger LOG =
+      LoggerFactory.getLogger(OzonePrefixPathImpl.class);
   private String volumeName;
   private String bucketName;
   private KeyManager keyManager;
@@ -103,11 +106,16 @@ public class OzonePrefixPathImpl implements OzonePrefixPath {
     @Override
     public boolean hasNext() {
       if (!currentIterator.hasNext() && currentValue != null) {
+        String keyName = "";
         try {
+          keyName = currentValue.getTrimmedName();
           currentIterator =
-              getNextListOfKeys(currentValue.getTrimmedName()).iterator();
+              getNextListOfKeys(keyName).iterator();
         } catch (IOException e) {
-          throw new RuntimeException(e);
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Exception while listing keys, keyName:" + keyName, e);
+          }
+          return false;
         }
       }
       return currentIterator.hasNext();
