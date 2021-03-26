@@ -82,11 +82,22 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
   public void initialize(Configuration conf, FileSystem fs) {
     this.fs = fs;
     this.configuration = conf;
+    float hadoopTrashInterval = conf.getFloat(
+        FS_TRASH_INTERVAL_KEY, FS_TRASH_INTERVAL_DEFAULT);
+    // check whether user has configured ozone specific trash-interval
+    // if not fall back to hadoop configuration
     this.deletionInterval = (long)(conf.getFloat(
-        FS_TRASH_INTERVAL_KEY, FS_TRASH_INTERVAL_DEFAULT)
+        OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY, hadoopTrashInterval)
         * MSECS_PER_MINUTE);
+    float hadoopCheckpointInterval = conf.getFloat(
+        FS_TRASH_CHECKPOINT_INTERVAL_KEY,
+        FS_TRASH_CHECKPOINT_INTERVAL_DEFAULT);
+    // check whether user has configured ozone specific
+    // trash- checkpoint-interval
+    // if not fall back to hadoop configuration
     this.emptierInterval = (long)(conf.getFloat(
-        FS_TRASH_CHECKPOINT_INTERVAL_KEY, FS_TRASH_CHECKPOINT_INTERVAL_DEFAULT)
+        OMConfigKeys.OZONE_FS_TRASH_CHECKPOINT_INTERVAL_KEY,
+        hadoopCheckpointInterval)
         * MSECS_PER_MINUTE);
     if (deletionInterval < 0) {
       LOG.warn("Invalid value {} for deletion interval,"

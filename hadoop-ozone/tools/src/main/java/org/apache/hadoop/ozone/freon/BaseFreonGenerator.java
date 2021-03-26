@@ -468,6 +468,10 @@ public class BaseFreonGenerator {
     return threadNo;
   }
 
+  public void setThreadNo(int threadNo) {
+    this.threadNo = threadNo;
+  }
+
   protected OzoneClient createOzoneClient(String omServiceID,
       OzoneConfiguration conf) throws Exception {
     if (omServiceID != null) {
@@ -481,7 +485,7 @@ public class BaseFreonGenerator {
     this.testNo = testNo;
   }
 
-  public void setThreadNo(int threadNo) {
-    this.threadNo = threadNo;
+  public long getTestNo() {
+    return testNo;
   }
 }
