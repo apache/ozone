@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.om.request.volume;
 
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.Map;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -118,7 +117,7 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
     IOException exception = null;
     OMClientResponse omClientResponse = null;
     OmVolumeArgs omVolumeArgs = null;
-    Map<String, String> auditMap = new HashMap<>();
+    Map<String, String> auditMap = null;
     try {
       omVolumeArgs = OmVolumeArgs.getFromProtobuf(volumeInfo);
       // when you create a volume, we set both Object ID and update ID.
