@@ -19,23 +19,25 @@ package org.apache.hadoop.hdds.scm.ha;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
+import org.apache.hadoop.hdds.scm.metadata.SCMDBTransactionBufferImpl;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
 
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SEQUENCE_ID_BATCH_SIZE;
 
 public class TestSequenceIDGenerator {
   @Test
   public void testSequenceIDGenUponNonRatis() throws Exception {
     OzoneConfiguration conf = SCMTestUtils.getConf();
-    conf.setBoolean(OZONE_SCM_HA_ENABLE_KEY, false);
     SCMMetadataStore scmMetadataStore = new SCMMetadataStoreImpl(conf);
     scmMetadataStore.start(conf);
 
+    SCMHAManager scmHAManager = MockSCMHAManager
+        .getInstance(true, new SCMDBTransactionBufferImpl());
+
     SequenceIdGenerator sequenceIdGen = new SequenceIdGenerator(
-        conf, null, scmMetadataStore.getSequenceIdTable());
+        conf, scmHAManager, scmMetadataStore.getSequenceIdTable());
 
     // the first batch is [1, 1000]
     Assert.assertEquals(1L, sequenceIdGen.getNextId("someKey"));
@@ -70,9 +72,7 @@ public class TestSequenceIDGenerator {
   @Test
   public void testSequenceIDGenUponRatis() throws Exception {
     OzoneConfiguration conf = SCMTestUtils.getConf();
-    // enable ratis based SequenceIDGen
-    conf.setBoolean(OZONE_SCM_HA_ENABLE_KEY, true);
-
+    
     // change batchSize to 100
     conf.setInt(OZONE_SCM_SEQUENCE_ID_BATCH_SIZE, 100);
 
