@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.volume;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.Map;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -116,17 +117,21 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
     boolean acquiredUserLock = false;
     IOException exception = null;
     OMClientResponse omClientResponse = null;
-    OmVolumeArgs omVolumeArgs = OmVolumeArgs.getFromProtobuf(volumeInfo);
-    // when you create a volume, we set both Object ID and update ID.
-    // The Object ID will never change, but update
-    // ID will be set to transactionID each time we update the object.
-    omVolumeArgs.setObjectID(
-        ozoneManager.getObjectIdFromTxId(transactionLogIndex));
-    omVolumeArgs.setUpdateID(transactionLogIndex,
-        ozoneManager.isRatisEnabled());
-    Map<String, String> auditMap = omVolumeArgs.toAuditMap();
-
+    OmVolumeArgs omVolumeArgs = null;
+    Map<String, String> auditMap = new HashMap<>();
     try {
+      omVolumeArgs = OmVolumeArgs.getFromProtobuf(volumeInfo);
+      // when you create a volume, we set both Object ID and update ID.
+      // The Object ID will never change, but update
+      // ID will be set to transactionID each time we update the object.
+      omVolumeArgs.setObjectID(
+          ozoneManager.getObjectIdFromTxId(transactionLogIndex));
+      omVolumeArgs.setUpdateID(transactionLogIndex,
+          ozoneManager.isRatisEnabled());
+
+
+      auditMap = omVolumeArgs.toAuditMap();
+
       // check acl
       if (ozoneManager.getAclsEnabled()) {
         checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
