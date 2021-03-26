@@ -36,12 +36,6 @@ public interface AccountNameSpace {
   String getAccountNameSpaceID();
 
   /**
-   * Sets the AccountNameSpaceID.
-   * @param id
-   */
-  void setAccountNameSpaceID(String id);
-
-  /**
    * Get Space Usage Information for this AccountNameSpace. This can be
    * used for billing purpose. Such Aggregation can also be done lazily
    * by a Recon job. Implementations can decide.

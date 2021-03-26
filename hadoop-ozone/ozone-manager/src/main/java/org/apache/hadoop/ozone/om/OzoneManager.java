@@ -276,6 +276,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private String omId;
 
   private OMMetadataManager metadataManager;
+  private OMMultiTenantManager multiTenantManagr;
   private VolumeManager volumeManager;
   private BucketManager bucketManager;
   private KeyManager keyManager;
@@ -526,6 +527,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private void instantiateServices() throws IOException {
 
     metadataManager = new OmMetadataManagerImpl(configuration);
+    multiTenantManagr = new OMMultiTenantManagerImpl(metadataManager,
+        configuration);
     volumeManager = new VolumeManagerImpl(metadataManager, configuration);
     bucketManager = new BucketManagerImpl(metadataManager, getKmsProvider(),
         isRatisEnabled);
@@ -1132,6 +1135,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public OMMetadataManager getMetadataManager() {
     return metadataManager;
+  }
+
+  /**
+   * Get metadata manager.
+   *
+   * @return metadata manager.
+   */
+  public OMMultiTenantManager getMultiTenantManager() {
+    return multiTenantManagr;
   }
 
   public OzoneBlockTokenSecretManager getBlockTokenMgr() {

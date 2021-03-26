@@ -16,6 +16,8 @@
  */
 package org.apache.hadoop.ozone.om.multitenant;
 
+import java.util.List;
+
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 
@@ -36,21 +38,19 @@ public interface Tenant {
   AccountNameSpace getTenantAccountNameSpace();
 
   /**
-   * Set the Given AccountNamespace for the Tenant. This can be driven by
-   * Ozone Configuration.
-   * @param accountNameSpace
-   */
-  void setTenantAccountNameSpace(AccountNameSpace accountNameSpace);
-
-  /**
    * @return BucketNameSpace for the Tenant.
    */
   BucketNameSpace getTenantBucketNameSpace();
 
-  /**
-   * Set the Given bucketNameSpace for the Tenant. This can be driven by
-   * Ozone Configuration.
-   * @param bucketNameSpace
-   */
-  void setTenantBucketNameSpace(BucketNameSpace bucketNameSpace);
+  List<AccessPolicy> getTenantAccessPolicies();
+
+  void addTenantAccessPolicy(AccessPolicy policy);
+
+  void removeTenantAccessPolicy(AccessPolicy policy);
+
+  void addTenantAccessGroup(String groupID);
+
+  void removeTenantAccessGroup(String groupID);
+
+  List<String> getTenantGroups();
 }
