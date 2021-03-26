@@ -35,12 +35,6 @@ public interface BucketNameSpace {
   String getBucketNameSpaceID();
 
   /**
-   * Sets BucketNameSpaceID.
-   * @param id
-   */
-  void setBucketNameSpaceID(String id);
-
-  /**
    * Returns all the top level Ozone objects that belong to a BucketNameSpace.
    * Some implementation can choose to represent it by Single Volume. Nothing
    * prevents any future extension where a bucketNameSpace can be multiple
@@ -52,9 +46,9 @@ public interface BucketNameSpace {
 
   /**
    * Add one or more volumes to this BucketNameSpace.
-   * @param bucketNamespaceObjects
+   * @param bucketNamespaceObject
    */
-  void addBucketNameSpaceObjects(List<OzoneObj> bucketNamespaceObjects);
+  void addBucketNameSpaceObjects(OzoneObj bucketNamespaceObject);
 
   /**
    * Get Space Usage Information for this BucketNameSpace. This can be

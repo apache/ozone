@@ -100,6 +100,16 @@ public interface OMMultiTenantManager {
   void deactivateTenant(String tenantID) throws IOException;
 
   /**
+   * Given a TenantID, destroys all state associated with that tenant.
+   * This is different from deactivateTenant() above.
+   * @param tenantID
+   * @return
+   * @throws IOException
+   */
+  void destroyTenant(Tenant tenant) throws Exception;
+
+
+  /**
    * Creates a new user that exists for S3 API access to Ozone
    * @param tenantName
    * @param userName

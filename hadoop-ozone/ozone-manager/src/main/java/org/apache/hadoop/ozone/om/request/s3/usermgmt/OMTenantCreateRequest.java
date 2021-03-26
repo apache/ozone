@@ -28,6 +28,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.multitenant.Tenant;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.volume.OMVolumeRequest;
@@ -46,6 +47,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.USER_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
@@ -121,6 +123,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
 
     boolean acquiredVolumeLock = false;
     boolean acquiredUserLock = false;
+    Tenant tenant = null;
 
     // TODO: Double check volume owner existence
     final String owner = getOmRequest().getUserInfo().getUserName();
@@ -176,12 +179,17 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
           new CacheValue<>(Optional.of(omDBTenantInfo), transactionLogIndex)
       );
 
+      tenant =
+            ozoneManager.getMultiTenantManager().createTenant(tenantName);
+      final String tenantDefaultPolicies =
+          tenant.getTenantAccessPolicies().stream()
+          .map(e->e.getPolicyID()) .collect(Collectors.joining(","));
+
       // Add to tenantPolicyTable
-      final String userPolicyId =
-          userPolicyGroupName + OzoneConsts.DEFAULT_TENANT_POLICY_ID_SUFFIX;
       omMetadataManager.getTenantPolicyTable().addCacheEntry(
           new CacheKey<>(userPolicyGroupName),
-          new CacheValue<>(Optional.of(userPolicyId), transactionLogIndex)
+          new CacheValue<>(Optional.of(tenantDefaultPolicies),
+              transactionLogIndex)
       );
 
       final String bucketPolicyId =
@@ -226,7 +234,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       omClientResponse = new OMTenantCreateResponse(
           omResponse.build(),
           omVolumeArgs, volumeList,
-          omDBTenantInfo, userPolicyId, bucketPolicyId
+          omDBTenantInfo, tenantDefaultPolicies, bucketPolicyId
       );
     } catch (IOException ex) {
       exception = ex;
@@ -234,6 +242,16 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       omResponse.setTenantCreateResponse(
           TenantCreateResponse.newBuilder().setSuccess(false).build()
       );
+      // Cleanup any state maintained by OMMultiTenantManager.
+      if (tenant != null) {
+        try {
+          ozoneManager.getMultiTenantManager().destroyTenant(tenant);
+        } catch (Exception e) {
+          // Ignore for now. Multi-Tenant Manager is responsible for
+          // cleaning up stale state eventually.
+        }
+      }
+
       omClientResponse = new OMTenantCreateResponse(
           createErrorOMResponse(omResponse, ex));
     } finally {

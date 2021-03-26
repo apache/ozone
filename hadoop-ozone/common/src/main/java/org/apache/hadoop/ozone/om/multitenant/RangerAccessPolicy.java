@@ -26,7 +26,7 @@ public class RangerAccessPolicy implements AccessPolicy {
   String policyJsonString;
   String policyName;
 
-  RangerAccessPolicy(String Name) {
+  public RangerAccessPolicy(String Name) {
     policyMap = new ConcurrentHashMap<>();
     policyName = Name;
   }

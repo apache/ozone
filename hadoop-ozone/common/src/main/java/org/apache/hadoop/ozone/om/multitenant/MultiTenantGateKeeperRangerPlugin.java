@@ -308,7 +308,7 @@ public class MultiTenantGateKeeperRangerPlugin implements
         "DELETE", false);
     int respnseCode = conn.getResponseCode();
     if(respnseCode != 200 && respnseCode != 204) {
-      throw new IOException("Couldnt delete group " + policyId);
+      throw new IOException("Couldnt delete policy " + policyId);
     };
   }
 
