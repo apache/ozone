@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -48,9 +49,12 @@ import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.OzonePrefixPathImpl;
 import org.apache.hadoop.ozone.om.TrashPolicyOzone;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.test.GenericTestUtils;
@@ -63,6 +67,7 @@ import static org.apache.hadoop.fs.FileSystem.TRASH_PREFIX;
 import static org.apache.hadoop.fs.ozone.Constants.LISTING_PAGE_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -1264,5 +1269,62 @@ public class TestOzoneFileSystem {
         return false;
       }
     }, 1000, 120000);
+  }
+
+  @Test
+  public void testListStatusOnLargeDirectoryForACLCheck() throws Exception {
+    String keyName = "dir1/dir2/testListStatusOnLargeDirectoryForACLCheck";
+    Path root = new Path(OZONE_URI_DELIMITER, keyName);
+    Set<String> paths = new TreeSet<>();
+    int numDirs = LISTING_PAGE_SIZE + LISTING_PAGE_SIZE / 2;
+    for (int i = 0; i < numDirs; i++) {
+      Path p = new Path(root, String.valueOf(i));
+      getFs().mkdirs(p);
+      paths.add(keyName + OM_KEY_PREFIX + p.getName());
+    }
+
+    // unknown keyname
+    try {
+      new OzonePrefixPathImpl(getVolumeName(), getBucketName(), "invalidKey",
+          cluster.getOzoneManager().getKeyManager());
+      Assert.fail("Non-existent key name!");
+    } catch (OMException ome) {
+      Assert.assertEquals(OMException.ResultCodes.KEY_NOT_FOUND,
+          ome.getResult());
+    }
+
+    OzonePrefixPathImpl ozonePrefixPath =
+        new OzonePrefixPathImpl(getVolumeName(), getBucketName(), keyName,
+            cluster.getOzoneManager().getKeyManager());
+
+    OzoneFileStatus status = ozonePrefixPath.getOzoneFileStatus();
+    Assert.assertNotNull(status);
+    Assert.assertEquals(keyName, status.getTrimmedName());
+    Assert.assertTrue(status.isDirectory());
+
+    Iterator<? extends OzoneFileStatus> pathItr =
+        ozonePrefixPath.getChildren(keyName);
+    Assert.assertTrue("Failed to list keyPath:" + keyName, pathItr.hasNext());
+
+    Set<String> actualPaths = new TreeSet<>();
+    while (pathItr.hasNext()) {
+      String pathname = pathItr.next().getTrimmedName();
+      actualPaths.add(pathname);
+
+      // no subpaths, expected an empty list
+      Iterator<? extends OzoneFileStatus> subPathItr =
+          ozonePrefixPath.getChildren(pathname);
+      Assert.assertNotNull(subPathItr);
+      Assert.assertFalse("Failed to list keyPath: " + pathname,
+          subPathItr.hasNext());
+    }
+
+    Assert.assertEquals("ListStatus failed", paths.size(),
+        actualPaths.size());
+
+    for (String pathname : actualPaths) {
+      paths.remove(pathname);
+    }
+    Assert.assertTrue("ListStatus failed:" + paths, paths.isEmpty());
   }
 }

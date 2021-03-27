@@ -38,7 +38,14 @@ import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyRenameResponseV1;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.*;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
+    .KeyArgs;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
+    .RenameKeyRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
+    .RenameKeyResponse;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.slf4j.Logger;
@@ -102,8 +109,12 @@ public class OMKeyRenameRequestV1 extends OMKeyRenameRequest {
 
       // check Acls to see if user has access to perform delete operation on
       // old key and create operation on new key
-      checkKeyAcls(ozoneManager, volumeName, bucketName, fromKeyName,
-              IAccessAuthorizer.ACLType.DELETE, OzoneObj.ResourceType.KEY);
+
+      // check Acl fromKeyName
+      checkACLs(ozoneManager, volumeName, bucketName, fromKeyName,
+          IAccessAuthorizer.ACLType.DELETE);
+
+      // check Acl toKeyName
       checkKeyAcls(ozoneManager, volumeName, bucketName, toKeyName,
               IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
 

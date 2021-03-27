@@ -1771,6 +1771,21 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         .setAclRights(aclType)
         .setOwnerName(volumeOwner)
         .build();
+
+    return checkAcls(obj, context, throwIfPermissionDenied);
+  }
+
+  /**
+   * CheckAcls for the ozone object.
+   *
+   * @return true if permission granted, false if permission denied.
+   * @throws OMException ResultCodes.PERMISSION_DENIED if permission denied
+   *                     and throwOnPermissionDenied set to true.
+   */
+  public boolean checkAcls(OzoneObj obj, RequestContext context,
+                           boolean throwIfPermissionDenied)
+      throws OMException {
+
     if (!accessAuthorizer.checkAccess(obj, context)) {
       if (throwIfPermissionDenied) {
         LOG.warn("User {} doesn't have {} permission to access {} /{}/{}/{}",
@@ -1789,6 +1804,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       return true;
     }
   }
+
+
 
   /**
    * Return true if Ozone acl's are enabled, else false.
