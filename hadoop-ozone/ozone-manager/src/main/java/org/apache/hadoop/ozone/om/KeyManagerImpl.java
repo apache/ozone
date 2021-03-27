@@ -270,28 +270,6 @@ public class KeyManagerImpl implements KeyManager {
     return metadataManager.getBucketTable().get(bucketKey);
   }
 
-  private void validateBucket(String volumeName, String bucketName)
-      throws IOException {
-    String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
-    // Check if bucket exists
-    if (metadataManager.getBucketTable().get(bucketKey) == null) {
-      String volumeKey = metadataManager.getVolumeKey(volumeName);
-      // If the volume also does not exist, we should throw volume not found
-      // exception
-      if (metadataManager.getVolumeTable().get(volumeKey) == null) {
-        LOG.error("volume not found: {}", volumeName);
-        throw new OMException("Volume not found",
-            VOLUME_NOT_FOUND);
-      }
-
-      // if the volume exists but bucket does not exist, throw bucket not found
-      // exception
-      LOG.error("bucket not found: {}/{} ", volumeName, bucketName);
-      throw new OMException("Bucket not found",
-          BUCKET_NOT_FOUND);
-    }
-  }
-
   /**
    * Check S3 bucket exists or not.
    * @param volumeName
@@ -322,7 +300,7 @@ public class KeyManagerImpl implements KeyManager {
     String volumeName = args.getVolumeName();
     String bucketName = args.getBucketName();
     String keyName = args.getKeyName();
-    validateBucket(volumeName, bucketName);
+    OMFileRequest.validateBucket(metadataManager, volumeName, bucketName);
     String openKey = metadataManager.getOpenKey(
         volumeName, bucketName, keyName, clientID);
 
@@ -431,7 +409,7 @@ public class KeyManagerImpl implements KeyManager {
     String volumeName = args.getVolumeName();
     String bucketName = args.getBucketName();
     String keyName = args.getKeyName();
-    validateBucket(volumeName, bucketName);
+    OMFileRequest.validateBucket(metadataManager, volumeName, bucketName);
 
     long currentTime = UniqueId.next();
     OmKeyInfo keyInfo;
@@ -615,7 +593,7 @@ public class KeyManagerImpl implements KeyManager {
     try {
       metadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volumeName,
           bucketName);
-      validateBucket(volumeName, bucketName);
+      OMFileRequest.validateBucket(metadataManager, volumeName, bucketName);
       OmKeyInfo keyInfo = metadataManager.getOpenKeyTable().get(openKey);
       if (keyInfo == null) {
         throw new OMException("Failed to commit key, as " + openKey + "entry " +
@@ -1577,7 +1555,7 @@ public class KeyManagerImpl implements KeyManager {
 
     metadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volume, bucket);
     try {
-      validateBucket(volume, bucket);
+      OMFileRequest.validateBucket(metadataManager, volume, bucket);
       String objectKey = metadataManager.getOzoneKey(volume, bucket, keyName);
       OmKeyInfo keyInfo = metadataManager.getKeyTable().get(objectKey);
       if (keyInfo == null) {
@@ -1621,7 +1599,7 @@ public class KeyManagerImpl implements KeyManager {
 
     metadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volume, bucket);
     try {
-      validateBucket(volume, bucket);
+      OMFileRequest.validateBucket(metadataManager, volume, bucket);
       String objectKey = metadataManager.getOzoneKey(volume, bucket, keyName);
       OmKeyInfo keyInfo = metadataManager.getKeyTable().get(objectKey);
       if (keyInfo == null) {
@@ -1662,7 +1640,7 @@ public class KeyManagerImpl implements KeyManager {
 
     metadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volume, bucket);
     try {
-      validateBucket(volume, bucket);
+      OMFileRequest.validateBucket(metadataManager, volume, bucket);
       String objectKey = metadataManager.getOzoneKey(volume, bucket, keyName);
       OmKeyInfo keyInfo = metadataManager.getKeyTable().get(objectKey);
       if (keyInfo == null) {
@@ -1701,7 +1679,7 @@ public class KeyManagerImpl implements KeyManager {
     OmKeyInfo keyInfo;
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volume, bucket);
     try {
-      validateBucket(volume, bucket);
+      OMFileRequest.validateBucket(metadataManager, volume, bucket);
       String objectKey = metadataManager.getOzoneKey(volume, bucket, keyName);
       if (OzoneManagerRatisUtils.isBucketFSOptimized()) {
         keyInfo = getOmKeyInfoV1(volume, bucket, keyName);
@@ -1750,7 +1728,7 @@ public class KeyManagerImpl implements KeyManager {
 
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volume, bucket);
     try {
-      validateBucket(volume, bucket);
+      OMFileRequest.validateBucket(metadataManager, volume, bucket);
       OmKeyInfo keyInfo;
 
       // For Acl Type "WRITE", the key can only be found in
@@ -1885,7 +1863,7 @@ public class KeyManagerImpl implements KeyManager {
     try {
       // Check if this is the root of the filesystem.
       if (keyName.length() == 0) {
-        validateBucket(volumeName, bucketName);
+        OMFileRequest.validateBucket(metadataManager, volumeName, bucketName);
         return new OzoneFileStatus();
       }
 
@@ -1942,7 +1920,7 @@ public class KeyManagerImpl implements KeyManager {
     try {
       // Check if this is the root of the filesystem.
       if (keyName.length() == 0) {
-        validateBucket(volumeName, bucketName);
+        OMFileRequest.validateBucket(metadataManager, volumeName, bucketName);
         return new OzoneFileStatus();
       }
 
