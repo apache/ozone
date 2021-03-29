@@ -33,7 +33,7 @@ public class TestReplicationConfig {
   @Test
   public void deserializeRatis() {
     final ReplicationConfig replicationConfig = ReplicationConfig
-        .fromProto(ReplicationType.RATIS, ReplicationFactor.THREE);
+        .fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.THREE);
 
     Assert
         .assertEquals(RatisReplicationConfig.class,
@@ -50,7 +50,7 @@ public class TestReplicationConfig {
   @Test
   public void deserializeStandalone() {
     final ReplicationConfig replicationConfig = ReplicationConfig
-        .fromProto(ReplicationType.STAND_ALONE, ReplicationFactor.ONE);
+        .fromTypeAndFactor(ReplicationType.STAND_ALONE, ReplicationFactor.ONE);
 
     Assert
         .assertEquals(StandaloneReplicationConfig.class,

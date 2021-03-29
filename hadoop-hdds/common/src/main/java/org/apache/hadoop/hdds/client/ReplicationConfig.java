@@ -71,9 +71,28 @@ public interface ReplicationConfig {
     }
   }
 
+  static HddsProtos.ReplicationFactor getLegacyFactor(
+      ReplicationConfig replicationConfig) {
+    if (replicationConfig instanceof RatisReplicationConfig) {
+      return ((RatisReplicationConfig) replicationConfig)
+          .getReplicationFactor();
+    } else if (replicationConfig instanceof StandaloneReplicationConfig) {
+      return ((StandaloneReplicationConfig) replicationConfig)
+          .getReplicationFactor();
+    }
+    throw new UnsupportedOperationException(
+        "factor is not valid property of replication " + replicationConfig
+            .getReplicationType());
+  }
+
   /**
    * Replication type supported by the replication config.
    */
   HddsProtos.ReplicationType getReplicationType();
+
+  /**
+   * Number of required nodes for this replication.
+   */
+  int getRequiredNodes();
 
 }
