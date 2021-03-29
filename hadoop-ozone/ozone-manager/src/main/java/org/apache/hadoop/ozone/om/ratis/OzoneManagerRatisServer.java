@@ -38,6 +38,7 @@ import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.ipc.ProtobufRpcEngine.Server;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -648,11 +649,11 @@ public final class OzoneManagerRatisServer {
   }
 
   private static Parameters createServerTlsParameters(SecurityConfig conf,
-      CertificateClient caClient) {
+      CertificateClient caClient) throws IOException {
     Parameters parameters = new Parameters();
 
     if (conf.isSecurityEnabled() && conf.isGrpcTlsEnabled()) {
-      ArrayList< X509Certificate > listCA = new ArrayList<>();
+      List<X509Certificate> listCA = new ArrayList<>();
       listCA.add(caClient.getCACertificate());
       if (caClient.getRootCACertificate() != null) {
         listCA.add(caClient.getRootCACertificate());

@@ -183,8 +183,10 @@ public class RpcClient implements ClientProtocol {
       caCertPems = Collections.singletonList(caCertPem);
     }
 
+
     this.xceiverClientManager = new XceiverClientManager(conf,
-        conf.getObject(XceiverClientManager.ScmClientConfig.class), caCertPems);
+        conf.getObject(XceiverClientManager.ScmClientConfig.class),
+        OzoneSecurityUtil.convertToX509(caCertPems));
 
     int configuredChunkSize = (int) conf
         .getStorageSize(ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY,

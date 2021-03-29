@@ -57,7 +57,7 @@ import org.slf4j.LoggerFactory;
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.CERTIFICATE_NOT_FOUND;
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_CA_CERT_FAILED;
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_CERTIFICATE_FAILED;
-import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.PRIMARY_SCM_IS_NOT_LEADER;
+import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.NOT_A_PRIMARY_SCM;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateApprover.ApprovalType.KERBEROS_TRUSTED;
 
 /**
@@ -71,16 +71,19 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
   private static final Logger LOGGER = LoggerFactory
       .getLogger(SCMSecurityProtocolServer.class);
   private final CertificateServer rootCertificateServer;
+  private final CertificateServer scmCertificateServer;
   private final RPC.Server rpcServer;
   private final InetSocketAddress rpcAddress;
   private final ProtocolMessageMetrics metrics;
   private final StorageContainerManager storageContainerManager;
 
   SCMSecurityProtocolServer(OzoneConfiguration conf,
-      CertificateServer certificateServer, StorageContainerManager scm)
+      CertificateServer rootCertificateServer,
+      CertificateServer scmCertificateServer, StorageContainerManager scm)
       throws IOException {
     this.storageContainerManager = scm;
-    this.rootCertificateServer = certificateServer;
+    this.rootCertificateServer = rootCertificateServer;
+    this.scmCertificateServer = scmCertificateServer;
     final int handlerCount =
         conf.getInt(ScmConfigKeys.OZONE_SCM_SECURITY_HANDLER_COUNT_KEY,
             ScmConfigKeys.OZONE_SCM_SECURITY_HANDLER_COUNT_DEFAULT);
@@ -174,7 +177,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
       return getEncodedCertToString(certSignReq, NodeType.SCM);
     } else {
       throw new SCMSecurityException("Get SCM Certificate can be run only " +
-          "primary SCM", PRIMARY_SCM_IS_NOT_LEADER);
+          "primary SCM", NOT_A_PRIMARY_SCM);
     }
 
   }
@@ -194,8 +197,8 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
       future = rootCertificateServer.requestCertificate(certSignReq,
               KERBEROS_TRUSTED, nodeType);
     } else {
-      future = storageContainerManager.getScmCertificateServer()
-          .requestCertificate(certSignReq, KERBEROS_TRUSTED, nodeType);
+      future = scmCertificateServer.requestCertificate(certSignReq,
+          KERBEROS_TRUSTED, nodeType);
     }
     try {
       return CertificateCodec.getPEMEncodedString(future.get());
@@ -241,8 +244,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
         certSerialId);
     try {
       X509Certificate certificate =
-          storageContainerManager.getScmCertificateServer()
-              .getCertificate(certSerialId);
+          scmCertificateServer.getCertificate(certSerialId);
       if (certificate != null) {
         return CertificateCodec.getPEMEncodedString(certificate);
       }
@@ -265,7 +267,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
     LOGGER.debug("Getting CA certificate.");
     try {
       return CertificateCodec.getPEMEncodedString(
-          storageContainerManager.getScmCertificateServer().getCACertificate());
+          scmCertificateServer.getCACertificate());
     } catch (CertificateException e) {
       throw new SCMSecurityException("getRootCertificate operation failed. ",
           e, GET_CA_CERT_FAILED);
@@ -285,8 +287,8 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
   public List<String> listCertificate(NodeType role,
       long startSerialId, int count, boolean isRevoked) throws IOException {
     List<X509Certificate> certificates =
-        storageContainerManager.getScmCertificateServer()
-            .listCertificate(role, startSerialId, count, isRevoked);
+        scmCertificateServer.listCertificate(role, startSerialId, count,
+            isRevoked);
     List<String> results = new ArrayList<>(certificates.size());
     for (X509Certificate cert : certificates) {
       try {

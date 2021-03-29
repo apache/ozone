@@ -113,4 +113,8 @@ public class SCMStorageConfig extends Storage {
   public String getPrimaryScmNodeId() {
     return getStorageInfo().getProperty(PRIMARY_SCM_NODE_ID);
   }
+
+  public boolean checkPrimarySCMIdInitialized() {
+    return getPrimaryScmNodeId() != null ? true : false;
+  }
 }

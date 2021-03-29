@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.cli;
 
 import java.io.IOException;
+import java.security.cert.X509Certificate;
 import java.util.List;
 import java.util.Map;
 
@@ -97,7 +98,8 @@ public class ContainerOperationClient implements ScmClient {
       throws IOException {
     XceiverClientManager manager;
     if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
-      List<String> caCertificates = HAUtils.buildCAList(conf);
+      List<X509Certificate> caCertificates =
+          HAUtils.buildCAX509List(null, conf);
       manager = new XceiverClientManager(conf,
           conf.getObject(XceiverClientManager.ScmClientConfig.class),
           caCertificates);

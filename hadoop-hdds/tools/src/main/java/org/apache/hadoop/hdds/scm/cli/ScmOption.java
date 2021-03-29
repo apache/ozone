@@ -61,7 +61,6 @@ public class ScmOption {
 
       return new ContainerOperationClient(conf);
     } catch (IOException ex) {
-      ex.printStackTrace();
       throw new IllegalArgumentException("Can't create SCM client", ex);
     }
   }

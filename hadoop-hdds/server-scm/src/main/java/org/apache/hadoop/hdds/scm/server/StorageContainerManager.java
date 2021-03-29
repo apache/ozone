@@ -145,8 +145,6 @@ import static org.apache.hadoop.hdds.utils.HAUtils.checkSecurityAndSCMHAEnabled;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore.CertType.VALID_CERTS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.OzoneConsts.CRL_SEQUENCE_ID_KEY;
-import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_COMPONENT_NAME;
-import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_SUB_CA_PREFIX;
 
 /**
@@ -414,7 +412,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   }
 
   private void initializeCertificateClient() {
-    if (primaryScmNodeId != null) {
+    if (scmStorageConfig.checkPrimarySCMIdInitialized()) {
       scmCertificateClient = new SCMCertificateClient(
           new SecurityConfig(configuration),
           scmStorageConfig.getScmCertSerialId());
@@ -597,7 +595,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     // If primary SCM node Id is set it means this is a cluster which has
     // performed init with SCM HA version code.
-    if (primaryScmNodeId != null) {
+    if (scmStorageConfig.checkPrimarySCMIdInitialized()) {
       // Start specific instance SCM CA server.
       String subject = SCM_SUB_CA_PREFIX +
           InetAddress.getLocalHost().getHostName();
@@ -652,18 +650,14 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       // not be run again after upgrade. So for a upgraded cluster where init
       // has not happened again we will have setup like before where it has
       // one CA server which is issuing certificates to DN and OM.
-      String subject = SCM_ROOT_CA_PREFIX +
-          InetAddress.getLocalHost().getHostName();
-      rootCertificateServer = new DefaultCAServer(subject,
-          getScmStorageConfig().getClusterID(),
-          getScmStorageConfig().getScmId(), certificateStore,
-          new DefaultProfile(),
-          SCM_ROOT_CA_COMPONENT_NAME);
+      rootCertificateServer =
+          HASecurityUtils.initializeRootCertificateServer(conf,
+              certificateStore, scmStorageConfig);
       scmCertificateServer = rootCertificateServer;
     }
 
     securityProtocolServer = new SCMSecurityProtocolServer(conf,
-        rootCertificateServer, this);
+        rootCertificateServer, scmCertificateServer, this);
   }
 
   public CertificateServer getRootCertificateServer() {
@@ -728,36 +722,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       }
       LOG.info("SCM login successful.");
     }
-  }
-
-  /**
-   * This function creates/initializes a certificate server as needed.
-   * This function is idempotent, so calling this again and again after the
-   * server is initialized is not a problem.
-   *
-   * @param clusterID - Cluster ID
-   * @param scmID     - SCM ID
-   */
-  private CertificateServer initializeCertificateServer(String clusterID,
-      String scmID) throws IOException {
-    // TODO: Support Certificate Server loading via Class Name loader.
-    // So it is easy to use different Certificate Servers if needed.
-    String subject = SCM_ROOT_CA_PREFIX +
-        InetAddress.getLocalHost().getHostName();
-    if(this.scmMetadataStore == null) {
-      LOG.error("Cannot initialize Certificate Server without a valid meta " +
-          "data layer.");
-      throw new SCMException("Cannot initialize CA without a valid metadata " +
-          "store", ResultCodes.SCM_NOT_INITIALIZED);
-    }
-
-    CertificateStore certStore =
-        new SCMCertStore.Builder().setMetadaStore(scmMetadataStore)
-            .setRatisServer(scmHAManager.getRatisServer())
-            .setCRLSequenceId(getLastSequenceIdForCRL()).build();
-
-    return new DefaultCAServer(subject, clusterID, scmID, certStore,
-        new DefaultProfile(), SCM_ROOT_CA_COMPONENT_NAME);
   }
 
   long getLastSequenceIdForCRL() throws IOException {

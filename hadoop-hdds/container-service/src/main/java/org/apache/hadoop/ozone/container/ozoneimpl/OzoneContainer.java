@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
 import java.io.IOException;
-import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -42,7 +41,6 @@ import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.security.token.BlockTokenVerifier;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
-import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -174,16 +172,7 @@ public class OzoneContainer {
 
     List< X509Certificate > x509Certificates = null;
     if (certClient != null) {
-      List<String> pemEncodedCerts = HAUtils.buildCAList(certClient, conf);
-      x509Certificates = new ArrayList<>(pemEncodedCerts.size());
-      for (String cert : pemEncodedCerts) {
-        try {
-          x509Certificates.add(CertificateCodec.getX509Certificate(cert));
-        } catch (CertificateException ex) {
-          LOG.error("Error while fetching CA", ex);
-          throw new IOException(ex);
-        }
-      }
+      x509Certificates = HAUtils.buildCAX509List(certClient, conf);
     }
 
     tlsClientConfig = RatisHelper.createTlsClientConfig(secConf,

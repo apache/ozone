@@ -290,7 +290,7 @@ public final class HASecurityUtils {
    * @param caClient
    * @return
    */
-  public static Parameters createServerTlsParameters(SecurityConfig conf,
+  public static Parameters createSCMServerTlsParameters(SecurityConfig conf,
       CertificateClient caClient) {
     Parameters parameters = new Parameters();
 

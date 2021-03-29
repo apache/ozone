@@ -109,6 +109,6 @@ public class SCMSecurityException extends IOException {
     MISSING_BLOCK_TOKEN,
     BLOCK_TOKEN_VERIFICATION_FAILED,
     GET_ROOT_CA_CERT_FAILED,
-    PRIMARY_SCM_IS_NOT_LEADER
+    NOT_A_PRIMARY_SCM
   }
 }

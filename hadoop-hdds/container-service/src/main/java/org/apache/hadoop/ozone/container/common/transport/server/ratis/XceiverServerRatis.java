@@ -466,7 +466,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     Parameters parameters = new Parameters();
 
     if (conf.isSecurityEnabled() && conf.isGrpcTlsEnabled()) {
-      ArrayList< X509Certificate > listCA = new ArrayList<>();
+      List<X509Certificate> listCA = new ArrayList<>();
       listCA.add(caClient.getCACertificate());
       if (caClient.getRootCACertificate() != null) {
         listCA.add(caClient.getRootCACertificate());
@@ -479,7 +479,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
       GrpcTlsConfig clientConfig = new GrpcTlsConfig(
           caClient.getPrivateKey(), caClient.getCertificate(),
-          caClient.getCACertificate(), false);
+          listCA, false);
       GrpcConfigKeys.Client.setTlsConf(parameters, clientConfig);
     }
 

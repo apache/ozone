@@ -77,7 +77,7 @@ public class DefaultApprover extends BaseApprover {
    * @param scmId - SCM id.
    * @param clusterId - Cluster id.
    * @return Signed Certificate.
-   * @throws IOException               - On Error
+   * @throws IOException - On Error
    * @throws OperatorCreationException - on Error.
    */
   @SuppressWarnings("ParameterNumber")
