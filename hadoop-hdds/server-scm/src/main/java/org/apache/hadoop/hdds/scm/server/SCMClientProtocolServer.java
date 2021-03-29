@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ScmOps;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
+import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.ScmUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -441,11 +442,12 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
-  public void decommissionNodes(List<String> nodes) throws IOException {
+  public List<DatanodeAdminError> decommissionNodes(List<String> nodes)
+      throws IOException {
     String remoteUser = getRpcRemoteUsername();
     try {
       getScm().checkAdminAccess(remoteUser);
-      scm.getScmDecommissionManager().decommissionNodes(nodes);
+      return scm.getScmDecommissionManager().decommissionNodes(nodes);
     } catch (Exception ex) {
       LOG.error("Failed to decommission nodes", ex);
       throw ex;
@@ -453,11 +455,12 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
-  public void recommissionNodes(List<String> nodes) throws IOException {
+  public List<DatanodeAdminError> recommissionNodes(List<String> nodes)
+      throws IOException {
     String remoteUser = getRpcRemoteUsername();
     try {
       getScm().checkAdminAccess(remoteUser);
-      scm.getScmDecommissionManager().recommissionNodes(nodes);
+      return scm.getScmDecommissionManager().recommissionNodes(nodes);
     } catch (Exception ex) {
       LOG.error("Failed to recommission nodes", ex);
       throw ex;
@@ -465,12 +468,13 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
-  public void startMaintenanceNodes(List<String> nodes, int endInHours)
-      throws IOException {
+  public List<DatanodeAdminError> startMaintenanceNodes(List<String> nodes,
+      int endInHours) throws IOException {
     String remoteUser = getRpcRemoteUsername();
     try {
       getScm().checkAdminAccess(remoteUser);
-      scm.getScmDecommissionManager().startMaintenanceNodes(nodes, endInHours);
+      return scm.getScmDecommissionManager()
+          .startMaintenanceNodes(nodes, endInHours);
     } catch (Exception ex) {
       LOG.error("Failed to place nodes into maintenance mode", ex);
       throw ex;

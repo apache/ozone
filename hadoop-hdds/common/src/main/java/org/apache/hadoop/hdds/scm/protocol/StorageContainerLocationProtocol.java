@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.protocol;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -148,12 +149,14 @@ public interface StorageContainerLocationProtocol extends Closeable {
       HddsProtos.NodeState state, HddsProtos.QueryScope queryScope,
       String poolName, int clientVersion) throws IOException;
 
-  void decommissionNodes(List<String> nodes) throws IOException;
-
-  void recommissionNodes(List<String> nodes) throws IOException;
-
-  void startMaintenanceNodes(List<String> nodes, int endInHours)
+  List<DatanodeAdminError> decommissionNodes(List<String> nodes)
       throws IOException;
+
+  List<DatanodeAdminError> recommissionNodes(List<String> nodes)
+      throws IOException;
+
+  List<DatanodeAdminError> startMaintenanceNodes(List<String> nodes,
+      int endInHours) throws IOException;
 
   /**
    * Close a container.

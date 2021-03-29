@@ -275,8 +275,14 @@ message DecommissionNodesRequestProto {
   repeated string hosts = 1;
 }
 
+
+message DatanodeAdminErrorResponseProto {
+  required string host = 1;
+  required string error = 2;
+}
+
 message DecommissionNodesResponseProto {
-  // empty response
+  repeated DatanodeAdminErrorResponseProto failedHosts = 1;
 }
 
 /*
@@ -287,7 +293,7 @@ message RecommissionNodesRequestProto {
 }
 
 message RecommissionNodesResponseProto {
-  // empty response
+  repeated DatanodeAdminErrorResponseProto failedHosts = 1;
 }
 
 /*
@@ -299,7 +305,7 @@ message StartMaintenanceNodesRequestProto {
 }
 
 message StartMaintenanceNodesResponseProto {
-  // empty response
+  repeated DatanodeAdminErrorResponseProto failedHosts = 1;
 }
 
 /**
