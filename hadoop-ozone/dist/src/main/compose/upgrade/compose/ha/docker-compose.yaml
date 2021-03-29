@@ -48,10 +48,8 @@ x-om:
     - 9862
     - 9872
 
-# TODO: Make sure these rel paths are correct.
 x-volumes:
     - &ozone-dir ../../../..:${OZONE_DIR}
-    # TODO: Determine if this is needed.
     - &transformation ../../../../libexec/transformation.py:/opt/hadoop/libexec/transformation.py
 
 services:
