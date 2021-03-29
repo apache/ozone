@@ -76,8 +76,6 @@ public final class ConfigurationReflectionUtil {
           type = detectConfigType(field.getType(), fieldLocation);
         }
 
-        //Note: default value is handled by ozone-default.xml. Here we can
-        //use any default.
         try {
           switch (type) {
           case STRING:
