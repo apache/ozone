@@ -65,7 +65,7 @@ with_new_version_pre_finalized() {
 # }
 
 with_new_version_finalized() {
-  _check_hdds_mlvs 1
+  _check_hdds_mlvs 2
   # OM currently only has one layout version.
   _check_om_mlvs 0
 
