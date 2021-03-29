@@ -131,9 +131,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
    * | transactionInfoTable| #TRANSACTIONINFO -> OMTransactionInfo          |
    * |----------------------------------------------------------------------|
    * | tenantUserTable    |  tenant user name -> a tenant (organization)    |
-   * | tenantStateTable   |  tenant name -> OmTenantInfo                    |
+   * | tenantStateTable   |  tenant user name -> OmTenantInfo               |
    * | tenantGroupTable   |  tenant user name -> [tenant group A, B, ...]   |
-   * | tenantRoleTable    |  userA -> roles [admin, roleB, roleC, ...]      |
+   * | tenantRoleTable    |  tenant user name -> roles [admin, roleB, ...]  |
    * | tenantPolicyTable  |  policyGroup -> [policyId1, policyId2]          |
    * |----------------------------------------------------------------------|
    *
