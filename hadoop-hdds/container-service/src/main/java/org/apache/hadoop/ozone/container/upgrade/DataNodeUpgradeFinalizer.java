@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.container.upgrade;
 
+import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON_FINALIZE;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_DONE;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_IN_PROGRESS;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_REQUIRED;
@@ -28,9 +29,10 @@ import java.util.concurrent.Callable;
 
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
+import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
-import org.apache.hadoop.ozone.upgrade.LayoutFeature;
+import org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeAction;
 
 /**
  * UpgradeFinalizer for the DataNode.
@@ -42,7 +44,6 @@ public class DataNodeUpgradeFinalizer extends
                                   String optionalClientID) {
     super(versionManager);
     clientID = optionalClientID;
-    loadDataNodeUpgradeActions();
   }
 
   @Override
@@ -80,17 +81,10 @@ public class DataNodeUpgradeFinalizer extends
       try {
         emitStartingMsg();
         versionManager.setUpgradeState(FINALIZATION_IN_PROGRESS);
-        /*
-         * Before we can call finalize the feature, we need to make sure that
-         * all existing pipelines are closed and pipeline Manger would freeze
-         * all new pipeline creation.
-         */
-
         for (HDDSLayoutFeature f : versionManager.unfinalizedFeatures()) {
-          Optional<? extends LayoutFeature.UpgradeAction> action =
-              f.onFinalizeDataNodeAction();
-          finalizeFeature(f, datanodeStateMachine.getLayoutStorage(),
-              action);
+          Optional<? extends UpgradeAction> action =
+              f.datanodeAction(ON_FINALIZE);
+          finalizeFeature(f, datanodeStateMachine.getLayoutStorage(), action);
           updateLayoutVersionInVersionFile(f,
               datanodeStateMachine.getLayoutStorage());
           versionManager.finalized(f);
@@ -106,13 +100,11 @@ public class DataNodeUpgradeFinalizer extends
     }
   }
 
-  private void loadDataNodeUpgradeActions() {
-    // we just need to iterate through the enum list to load
-    // the actions.
-    for (DataNodeLayoutAction action : DataNodeLayoutAction.values()) {
-      LOG.debug("Loading datanode action for {}",
-          action.getHddsFeature().description());
-    }
+  @Override
+  public void runPrefinalizeStateActions(Storage storage,
+                                         DatanodeStateMachine dsm)
+      throws IOException {
+    super.runPrefinalizeStateActions(
+        lf -> ((HDDSLayoutFeature) lf)::datanodeAction, storage, dsm);
   }
-
 }

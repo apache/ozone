@@ -18,8 +18,10 @@
 
 package org.apache.hadoop.ozone.om.upgrade;
 
+import java.util.EnumMap;
 import java.util.Optional;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 
 /**
@@ -29,11 +31,20 @@ public enum OMLayoutFeature implements LayoutFeature {
   //////////////////////////////  //////////////////////////////
   INITIAL_VERSION(0, "Initial Layout Version");
 
+
+  ///////////////////////////////  /////////////////////////////
+  //    Example OM Layout Feature with Actions
+  //      CREATE_EC(1, "",
+  //          new ImmutablePair<>(ON_FINALIZE, new OnFinalizeECAction()),
+  //          new ImmutablePair<>(FIRST_RUN_ON_UPGRADE,
+  //          new OnFirstUpgradeStartECAction());
+  //
   //////////////////////////////  //////////////////////////////
 
   private int layoutVersion;
   private String description;
-  private Optional<OmUpgradeAction> omUpgradeAction = Optional.empty();
+  private EnumMap<UpgradeActionType, OmUpgradeAction> actions =
+      new EnumMap<>(UpgradeActionType.class);
 
   OMLayoutFeature(final int layoutVersion, String description) {
     this.layoutVersion = layoutVersion;
@@ -41,10 +52,12 @@ public enum OMLayoutFeature implements LayoutFeature {
   }
 
   OMLayoutFeature(final int layoutVersion, String description,
-                  OmUpgradeAction upgradeAction) {
+                  Pair<UpgradeActionType, OmUpgradeAction>... actions) {
     this.layoutVersion = layoutVersion;
     this.description = description;
-    omUpgradeAction = Optional.of(upgradeAction);
+    for (Pair<UpgradeActionType, OmUpgradeAction> action : actions) {
+      this.actions.put(action.getKey(), action.getValue());
+    }
   }
 
   @Override
@@ -57,8 +70,11 @@ public enum OMLayoutFeature implements LayoutFeature {
     return description;
   }
 
-  @Override
-  public Optional<OmUpgradeAction> onFinalizeAction() {
-    return omUpgradeAction;
+  public void addAction(UpgradeActionType type, OmUpgradeAction action) {
+    this.actions.put(type, action);
+  }
+
+  public Optional<OmUpgradeAction> action(UpgradeActionType phase) {
+    return Optional.ofNullable(actions.get(phase));
   }
 }

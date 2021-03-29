@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.upgrade.LayoutVersionInstanceFactory;
 import org.apache.hadoop.ozone.upgrade.VersionFactoryKey;
 import org.reflections.Reflections;
 import org.reflections.scanners.SubTypesScanner;
+import org.reflections.scanners.TypeAnnotationsScanner;
 import org.reflections.util.ClasspathHelper;
 import org.reflections.util.ConfigurationBuilder;
 import org.slf4j.Logger;
@@ -50,8 +51,12 @@ public final class OMLayoutVersionManager
   private static final Logger LOG =
       LoggerFactory.getLogger(OMLayoutVersionManager.class);
 
-  private static final String OM_REQUEST_CLASS_PACKAGE =
-      "org.apache.hadoop.ozone.om.request";
+  public static final String OM_CLASS_PACKAGE =
+      "org.apache.hadoop.ozone.om";
+  public static final String OM_REQUEST_CLASS_PACKAGE =
+      OM_CLASS_PACKAGE + ".request";
+  public static final String OM_UPGRADE_CLASS_PACKAGE =
+      OM_CLASS_PACKAGE + ".upgrade";
   private LayoutVersionInstanceFactory<Class<? extends OMClientRequest>>
       requestFactory;
 
@@ -82,12 +87,52 @@ public final class OMLayoutVersionManager
           e,
           NOT_SUPPORTED_OPERATION);
     }
-    registerOzoneManagerRequests();
+    registerUpgradeActions(OM_UPGRADE_CLASS_PACKAGE);
+    registerOzoneManagerRequests(OM_REQUEST_CLASS_PACKAGE);
   }
 
-  private void registerOzoneManagerRequests() {
+  /**
+   * Scan classpath and register all actions to layout features.
+   */
+  @VisibleForTesting
+  protected void registerUpgradeActions(String packageName) {
+    Reflections reflections = new Reflections(new ConfigurationBuilder()
+        .forPackages(packageName)
+        .setScanners(new TypeAnnotationsScanner(), new SubTypesScanner())
+        .setExpandSuperTypes(false)
+        .useParallelExecutor());
+    Set<Class<?>> typesAnnotatedWith =
+        reflections.getTypesAnnotatedWith(UpgradeActionOm.class);
+    typesAnnotatedWith.forEach(actionClass -> {
+      if (OmUpgradeAction.class.isAssignableFrom(actionClass)) {
+        try {
+          OmUpgradeAction action = (OmUpgradeAction) actionClass.newInstance();
+          UpgradeActionOm annotation =
+              actionClass.getAnnotation(UpgradeActionOm.class);
+          OMLayoutFeature feature = annotation.feature();
+          if (feature.layoutVersion() > getMetadataLayoutVersion()) {
+            LOG.info("Registering Upgrade Action : {}", action.name());
+            feature.addAction(annotation.type(), action);
+          }  else {
+            LOG.info("Skipping Upgrade Action {} since it has been finalized" +
+                ".", action.name());
+          }
+        } catch (Exception e) {
+          LOG.error("Cannot instantiate Upgrade Action class {}",
+              actionClass.getSimpleName(), e);
+        }
+      } else {
+        LOG.warn("Found upgrade action class not of type " +
+                "org.apache.hadoop.ozone.om.upgrade.OmUpgradeAction : {}",
+            actionClass.getName());
+      }
+    });
+  }
+
+  private void registerOzoneManagerRequests(String packageName) {
     try {
-      for (Class<? extends OMClientRequest> reqClass : getRequestClasses()) {
+      for (Class<? extends OMClientRequest> reqClass :
+          getRequestClasses(packageName)) {
         try {
           Method getRequestTypeMethod = reqClass.getMethod(
               "getRequestType");
@@ -114,11 +159,13 @@ public final class OMLayoutVersionManager
   }
 
   @VisibleForTesting
-  public static Set<Class<? extends OMClientRequest>> getRequestClasses() {
+  public static Set<Class<? extends OMClientRequest>> getRequestClasses(
+      String packageName) {
     Reflections reflections = new Reflections(new ConfigurationBuilder()
-        .setUrls(ClasspathHelper.forPackage(OM_REQUEST_CLASS_PACKAGE))
+        .setUrls(ClasspathHelper.forPackage(packageName))
         .setScanners(new SubTypesScanner())
-        .setExpandSuperTypes(false));
+        .setExpandSuperTypes(false)
+        .useParallelExecutor());
     Set<Class<? extends OMClientRequest>> validRequests = new HashSet<>();
 
     Set<Class<? extends OMClientRequest>> subTypes =

@@ -18,9 +18,13 @@
 
 package org.apache.hadoop.ozone.upgrade;
 
+import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON_FIRST_UPGRADE_START;
+import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.UNFINALIZED_STATE_VALIDATION;
+import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.FIRST_UPGRADE_START_ACTION_FAILED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.LAYOUT_FEATURE_FINALIZATION_FAILED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.PERSIST_UPGRADE_TO_LAYOUT_VERSION_FAILED;
+import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.PREFINALIZE_STATE_VALIDATION_FAILED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.REMOVE_UPGRADE_TO_LAYOUT_VERSION_FAILED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.UPDATE_LAYOUT_VERSION_FAILED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_DONE;
@@ -33,18 +37,22 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.function.Function;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeAction;
+import org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType;
 import org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes;
+
+import com.google.common.annotations.VisibleForTesting;
 
 /**
  * UpgradeFinalizer implementation for the Storage Container Manager service.
  */
 @SuppressWarnings("checkstyle:VisibilityModifier")
-public class BasicUpgradeFinalizer<T, V extends AbstractLayoutVersionManager>
-    implements UpgradeFinalizer<T> {
+public abstract class BasicUpgradeFinalizer
+    <T, V extends AbstractLayoutVersionManager> implements UpgradeFinalizer<T> {
 
   protected V versionManager;
   protected String clientID;
@@ -187,15 +195,93 @@ public class BasicUpgradeFinalizer<T, V extends AbstractLayoutVersionManager>
     putFinalizationMarkIntoVersionFile(feature, config);
 
     emitStartingFinalizationActionMsg(feature.name());
-    try {
-      UpgradeAction<T> newaction = action.get();
-      newaction.executeAction(component);
-    } catch (Exception e) {
-      logFinalizationFailureAndThrow(e, feature.name());
-    }
+
+    runOnFinalizeAction(feature, action.get());
+
     emitFinishFinalizationActionMsg(feature.name());
 
     removeFinalizationMarkFromVersionFile(feature, config);
+  }
+
+  private void runOnFinalizeAction(LayoutFeature feature, UpgradeAction action)
+      throws UpgradeException {
+    try {
+      action.execute(component);
+    } catch (Exception e) {
+      logFinalizationFailureAndThrow(e, feature.name());
+    }
+  }
+
+  @VisibleForTesting
+  protected void runPrefinalizeStateActions(Function<LayoutFeature,
+      Function<UpgradeActionType, Optional<? extends UpgradeAction>>> aFunction,
+      Storage storage, T service) throws IOException {
+
+    if (!versionManager.needsFinalization()) {
+      return;
+    }
+    this.component = service;
+    LOG.info("Running pre-finalized state validations for unfinalized " +
+        "layout features.");
+    for (Object obj : versionManager.unfinalizedFeatures()) {
+      LayoutFeature lf = (LayoutFeature) obj;
+      Function<UpgradeActionType, Optional<? extends UpgradeAction>> function =
+          aFunction.apply(lf);
+      Optional<? extends UpgradeAction> action =
+          function.apply(UNFINALIZED_STATE_VALIDATION);
+      if (action.isPresent()) {
+        runValidationAction(lf, action.get());
+      }
+    }
+
+    LOG.info("Running first upgrade commands for unfinalized layout features.");
+    for (Object obj : versionManager.unfinalizedFeatures()) {
+      LayoutFeature lf = (LayoutFeature) obj;
+      Function<UpgradeActionType, Optional<? extends UpgradeAction>> function =
+          aFunction.apply(lf);
+      Optional<? extends UpgradeAction> action =
+          function.apply(ON_FIRST_UPGRADE_START);
+      if (action.isPresent()) {
+        runFirstUpgradeAction(lf, action.get(), storage);
+      }
+    }
+  }
+
+  private void runValidationAction(LayoutFeature f, UpgradeAction action)
+      throws UpgradeException {
+    try {
+      LOG.info("Executing pre finalize state validation {}", action.name());
+      action.execute(component);
+    } catch (Exception ex) {
+      String msg = "Exception while running pre finalize state validation " +
+          "for feature %s";
+      LOG.error(String.format(msg, f.name()));
+      throw new UpgradeException(
+          String.format(msg, f.name()), ex,
+          PREFINALIZE_STATE_VALIDATION_FAILED);
+    }
+  }
+
+  private void runFirstUpgradeAction(LayoutFeature f, UpgradeAction action,
+                                     Storage storage) throws IOException {
+    try {
+      int versionOnDisk = storage.getFirstUpgradeActionLayoutVersion();
+      if (f.layoutVersion() > versionOnDisk) {
+        LOG.info("Executing first upgrade start action {}", action.name());
+        action.execute(component);
+      } else {
+        LOG.info("Skipping action {} since it has already been run.",
+            action.name());
+      }
+      storage.setFirstUpgradeActionLayoutVersion(f.layoutVersion());
+      persistStorage(storage);
+    } catch (Exception ex) {
+      String msg = "Exception while running first upgrade run actions " +
+          "for feature %s";
+      LOG.error(String.format(msg, f.name()));
+      throw new UpgradeException(
+          String.format(msg, f.name()), ex, FIRST_UPGRADE_START_ACTION_FAILED);
+    }
   }
 
   protected void updateLayoutVersionInVersionFile(LayoutFeature feature,

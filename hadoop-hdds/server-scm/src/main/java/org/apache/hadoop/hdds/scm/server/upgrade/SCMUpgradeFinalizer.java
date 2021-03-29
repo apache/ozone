@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.server.upgrade;
 
+import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON_FINALIZE;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_DONE;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_IN_PROGRESS;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_REQUIRED;
@@ -26,11 +27,13 @@ import java.io.IOException;
 import java.util.Optional;
 import java.util.concurrent.Callable;
 
+import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
+import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
-import org.apache.hadoop.ozone.upgrade.LayoutFeature;
+import org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeAction;
 
 /**
  * UpgradeFinalizer for the Storage Container Manager service.
@@ -40,7 +43,6 @@ public class SCMUpgradeFinalizer extends
 
   public SCMUpgradeFinalizer(HDDSLayoutVersionManager versionManager) {
     super(versionManager);
-    loadSCMUpgradeActions();
   }
 
   @Override
@@ -56,7 +58,7 @@ public class SCMUpgradeFinalizer extends
   }
 
   private class Worker implements Callable<Void> {
-    private StorageContainerManager storageContainerManager;
+    private StorageContainerManager scm;
 
     /**
      * Initiates the Worker, for the specified SCM instance.
@@ -64,7 +66,7 @@ public class SCMUpgradeFinalizer extends
      *           new LayoutFeatures.
      */
     Worker(StorageContainerManager scm) {
-      storageContainerManager = scm;
+      this.scm = scm;
     }
 
     @Override
@@ -77,24 +79,22 @@ public class SCMUpgradeFinalizer extends
          * all existing pipelines are closed and pipeline Manger would freeze
          * all new pipeline creation.
          */
-        String msg = "  Existing pipelines and containers will be closed " +
-            "during Upgrade.";
-        msg += "\n  New pipelines creation will remain frozen until Upgrade " +
+        String msg = "Existing pipelines and containers will be closed " +
+            "during upgrade.";
+        msg += "\nNew pipelines creation will remain frozen until upgrade " +
             "is finalized.";
-        storageContainerManager.preFinalizeUpgrade();
+        scm.preFinalizeUpgrade();
         logAndEmit(msg);
+        SCMStorageConfig storage = scm.getScmStorageConfig();
 
         for (HDDSLayoutFeature f : versionManager.unfinalizedFeatures()) {
-          Optional<? extends LayoutFeature.UpgradeAction> action =
-              f.onFinalizeSCMAction();
-          finalizeFeature(f, storageContainerManager.getScmStorageConfig(),
-              action);
-          updateLayoutVersionInVersionFile(f,
-              storageContainerManager.getScmStorageConfig());
+          Optional<? extends UpgradeAction> action = f.scmAction(ON_FINALIZE);
+          finalizeFeature(f, storage, action);
+          updateLayoutVersionInVersionFile(f, storage);
           versionManager.finalized(f);
         }
         versionManager.completeFinalization();
-        storageContainerManager.postFinalizeUpgrade();
+        scm.postFinalizeUpgrade();
         emitFinishedMsg();
         return null;
       } finally {
@@ -104,12 +104,11 @@ public class SCMUpgradeFinalizer extends
     }
   }
 
-  private void loadSCMUpgradeActions() {
-    // we just need to iterate through the enum list to load
-    // the actions.
-    for (SCMLayoutAction action : SCMLayoutAction.values()) {
-      LOG.debug("Loading datanode action for {}",
-          action.getHddsFeature().description());
-    }
+  @Override
+  public void runPrefinalizeStateActions(Storage storage,
+                                         StorageContainerManager scm)
+      throws IOException {
+    super.runPrefinalizeStateActions(
+        lf -> ((HDDSLayoutFeature) lf)::scmAction, storage, scm);
   }
 }

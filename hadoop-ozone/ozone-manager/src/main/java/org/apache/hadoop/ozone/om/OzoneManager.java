@@ -1205,6 +1205,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     metadataManager.start(configuration);
     startSecretManagerIfNecessary();
 
+    upgradeFinalizer.runPrefinalizeStateActions(omStorage, this);
     Integer layoutVersionInDB = getLayoutVersionInDB();
     if (layoutVersionInDB == null ||
         versionManager.getMetadataLayoutVersion() != layoutVersionInDB) {
