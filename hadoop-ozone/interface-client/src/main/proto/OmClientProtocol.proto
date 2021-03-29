@@ -239,9 +239,7 @@ message OMResponse {
 
   optional ListTrashResponse                  listTrashResponse            = 91;
   optional RecoverTrashResponse               RecoverTrashResponse         = 92;
-  optional PurgePathsResponse                 purgePathsResponse           =
-  93;
-
+  optional PurgePathsResponse                 purgePathsResponse           = 93;
 }
 
 enum Status {

@@ -40,7 +40,6 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-import com.google.common.collect.Lists;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension.EncryptedKeyVersion;
@@ -3003,49 +3002,5 @@ public class KeyManagerImpl implements KeyManager {
     }
 
     return files;
-  }
-
-  public List<OzoneFileStatus>  getPendingDeletion(String keyPrefix,
-       String startKey, long count) throws IOException {
-
-    List<OmKeyInfo> dirsList = Lists.newArrayList();
-    List<OmKeyInfo> filesList = Lists.newArrayList();
-    List<OmKeyInfo> filesWithBlocks = Lists.newArrayList();
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-             dirIter = metadataManager.getDeletedDirTable().iterator()) {
-      int currentCount = 0;
-      while (dirIter.hasNext() && currentCount < count) {
-        Table.KeyValue<String, OmKeyInfo> kv = dirIter.next();
-        if (kv != null) {
-          OmKeyInfo omKeyInfo = kv.getValue();
-          currentCount++;
-          OmKeyArgs keyArgs = new OmKeyArgs.Builder()
-              .setVolumeName(omKeyInfo.getVolumeName())
-              .setBucketName(omKeyInfo.getBucketName())
-              .setKeyName(omKeyInfo.getKeyName())
-              .setRefreshPipeline(true)
-              .build();
-          long numEntries = count - dirsList.size();
-          List<OzoneFileStatus> listStatus = listStatusV1(keyArgs, false,
-              startKey, numEntries, "");
-          for (OzoneFileStatus fileStatus : listStatus) {
-            if (fileStatus.isFile()) {
-              // If Key is not empty add this to delete table.
-              if (!isKeyEmpty(fileStatus.getKeyInfo())) {
-                filesList.add(fileStatus.getKeyInfo());
-              } else {
-                filesWithBlocks.add(fileStatus.getKeyInfo());
-              }
-            } else {
-              dirsList.add(fileStatus.getKeyInfo());
-            }
-          }
-
-        }
-      }
-    }
-
-
-    return null;
   }
 }

@@ -14,6 +14,7 @@ import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftClientRequest;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -154,8 +155,9 @@ public class DirectoryDeletingService extends BackgroundService {
                   Time.monotonicNow() - startTime);
             }
           }
-        } catch(Exception e){
-
+        } catch (IOException e) {
+          LOG.error("Error while running delete directories and files " +
+              "background task. Will retry at next run.", e);
         }
       }
 
