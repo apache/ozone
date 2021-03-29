@@ -39,6 +39,11 @@ public class StandaloneReplicationConfig implements ReplicationConfig {
   }
 
   @Override
+  public int getRequiredNodes() {
+    return replicationFactor.getNumber();
+  }
+
+  @Override
   public ReplicationType getReplicationType() {
     return ReplicationType.STAND_ALONE;
   }
@@ -53,6 +58,11 @@ public class StandaloneReplicationConfig implements ReplicationConfig {
     }
     StandaloneReplicationConfig that = (StandaloneReplicationConfig) o;
     return replicationFactor == that.replicationFactor;
+  }
+
+  @Override
+  public String toString() {
+    return "STANDALONE/" + replicationFactor;
   }
 
   @Override

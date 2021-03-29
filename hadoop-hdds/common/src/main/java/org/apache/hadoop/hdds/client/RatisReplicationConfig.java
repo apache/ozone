@@ -35,9 +35,23 @@ public class RatisReplicationConfig
     this.replicationFactor = replicationFactor;
   }
 
+  public static boolean hasFactor(ReplicationConfig replicationConfig,
+      ReplicationFactor factor) {
+    if (replicationConfig instanceof RatisReplicationConfig) {
+      return ((RatisReplicationConfig) replicationConfig).getReplicationFactor()
+          .equals(factor);
+    }
+    return false;
+  }
+
   @Override
   public ReplicationType getReplicationType() {
     return ReplicationType.RATIS;
+  }
+
+  @Override
+  public int getRequiredNodes() {
+    return replicationFactor.getNumber();
   }
 
   public ReplicationFactor getReplicationFactor() {
@@ -54,6 +68,11 @@ public class RatisReplicationConfig
     }
     RatisReplicationConfig that = (RatisReplicationConfig) o;
     return replicationFactor == that.replicationFactor;
+  }
+
+  @Override
+  public String toString() {
+    return "RATIS/" + replicationFactor;
   }
 
   @Override

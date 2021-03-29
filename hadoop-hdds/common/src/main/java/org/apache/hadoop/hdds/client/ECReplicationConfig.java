@@ -47,6 +47,11 @@ public class ECReplicationConfig implements ReplicationConfig {
     return HddsProtos.ReplicationType.EC;
   }
 
+  @Override
+  public int getRequiredNodes() {
+    return data + parity;
+  }
+
   public HddsProtos.ECReplicationConfig toProto() {
     return HddsProtos.ECReplicationConfig.newBuilder()
         .setData(data)
