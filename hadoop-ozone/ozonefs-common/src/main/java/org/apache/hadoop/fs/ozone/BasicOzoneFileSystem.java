@@ -770,9 +770,8 @@ public class BasicOzoneFileSystem extends FileSystem {
     String pathPatternString = p.toUri().getPath();
     if (pathPatternString.isEmpty()) {
       return new Path("/");
-    }
-    else {
-      return p.isUriPathAbsolute() ? p : new Path(this.getWorkingDirectory(), p);
+    } else {
+      return super.fixRelativePart(p);
     }
   }
    
