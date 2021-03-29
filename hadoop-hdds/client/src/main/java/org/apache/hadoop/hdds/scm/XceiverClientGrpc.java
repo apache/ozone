@@ -93,7 +93,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
    *
    * @param pipeline - Pipeline that defines the machines.
    * @param config   -- Ozone Config
-   * @param caCert   - SCM ca certificate.
+   * @param caCerts   - SCM ca certificate.
    */
   public XceiverClientGrpc(Pipeline pipeline, ConfigurationSource config,
       List<X509Certificate> caCerts) {

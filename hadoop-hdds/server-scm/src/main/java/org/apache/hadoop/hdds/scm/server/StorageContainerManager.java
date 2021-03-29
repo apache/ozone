@@ -618,8 +618,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           rootCertificateServer =
               HASecurityUtils.initializeRootCertificateServer(
               conf, certificateStore, scmStorageConfig);
-          rootCertificateServer.init(new SecurityConfig(configuration),
-              CertificateServer.CAType.SELF_SIGNED_CA);
         }
 
         BigInteger certSerial =

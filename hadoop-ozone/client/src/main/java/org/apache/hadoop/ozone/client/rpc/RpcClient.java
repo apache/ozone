@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.security.InvalidKeyException;
 import java.security.SecureRandom;
+import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -173,20 +174,21 @@ public class RpcClient implements ClientProtocol {
     );
     dtService = omTransport.getDelegationTokenService();
     ServiceInfoEx serviceInfoEx = ozoneManagerClient.getServiceInfo();
-    String caCertPem = null;
-    List<String> caCertPems = null;
+    List<X509Certificate> x509Certificates = null;
     if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
+      String caCertPem = null;
+      List<String> caCertPems = null;
       caCertPem = serviceInfoEx.getCaCertificate();
+      caCertPems = serviceInfoEx.getCaCertPemList();
+      if (caCertPems == null || caCertPems.isEmpty()) {
+        caCertPems = Collections.singletonList(caCertPem);
+      }
+      x509Certificates = OzoneSecurityUtil.convertToX509(caCertPems);
     }
-    caCertPems = serviceInfoEx.getCaCertPemList();
-    if (caCertPems == null || caCertPems.isEmpty()) {
-      caCertPems = Collections.singletonList(caCertPem);
-    }
-
 
     this.xceiverClientManager = new XceiverClientManager(conf,
         conf.getObject(XceiverClientManager.ScmClientConfig.class),
-        OzoneSecurityUtil.convertToX509(caCertPems));
+        x509Certificates);
 
     int configuredChunkSize = (int) conf
         .getStorageSize(ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY,
