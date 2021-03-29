@@ -40,12 +40,14 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
 public class OMKeyDeleteResponseV1 extends OMKeyDeleteResponse {
 
   private boolean isDeleteDirectory;
+  private String keyName;
 
   public OMKeyDeleteResponseV1(@Nonnull OMResponse omResponse,
-      @Nonnull OmKeyInfo omKeyInfo, boolean isRatisEnabled,
-      @Nonnull OmBucketInfo omBucketInfo,
+      @Nonnull String keyName, @Nonnull OmKeyInfo omKeyInfo,
+      boolean isRatisEnabled, @Nonnull OmBucketInfo omBucketInfo,
       @Nonnull boolean isDeleteDirectory) {
     super(omResponse, omKeyInfo, isRatisEnabled, omBucketInfo);
+    this.keyName = keyName;
     this.isDeleteDirectory = isDeleteDirectory;
   }
 
@@ -69,6 +71,12 @@ public class OMKeyDeleteResponseV1 extends OMKeyDeleteResponse {
     if (isDeleteDirectory) {
       omMetadataManager.getDirectoryTable().deleteWithBatch(batchOperation,
               ozoneDbKey);
+      OmKeyInfo omKeyInfo = getOmKeyInfo();
+      // Sets full absolute key name to OmKeyInfo, which is
+      // required for moving the sub-files to KeyDeletionService.
+      omKeyInfo.setKeyName(keyName);
+      omMetadataManager.getDeletedDirTable().putWithBatch(
+          batchOperation, ozoneDbKey, omKeyInfo);
     } else {
       Table<String, OmKeyInfo> keyTable = omMetadataManager.getKeyTable();
       addDeletionToBatch(omMetadataManager, batchOperation, keyTable,
