@@ -766,6 +766,17 @@ public class BasicOzoneFileSystem extends FileSystem {
   }
 
   @Override
+  protected Path fixRelativePart(Path p) {
+    String pathPatternString = p.toUri().getPath();
+    if (pathPatternString.isEmpty()) {
+      return new Path("/");
+    }
+    else {
+      return p.isUriPathAbsolute() ? p : new Path(this.getWorkingDirectory(), p);
+    }
+  }
+   
+  @Override
   public FileStatus[] globStatus(Path pathPattern) throws IOException {
     incrementCounter(Statistic.INVOCATION_GLOB_STATUS);
     return super.globStatus(pathPattern);
