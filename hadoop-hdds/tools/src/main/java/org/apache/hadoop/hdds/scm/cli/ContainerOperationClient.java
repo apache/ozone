@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
@@ -287,19 +288,22 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   @Override
-  public void decommissionNodes(List<String> hosts) throws IOException {
-    storageContainerLocationClient.decommissionNodes(hosts);
-  }
-
-  @Override
-  public void recommissionNodes(List<String> hosts) throws IOException {
-    storageContainerLocationClient.recommissionNodes(hosts);
-  }
-
-  @Override
-  public void startMaintenanceNodes(List<String> hosts, int endHours)
+  public List<DatanodeAdminError> decommissionNodes(List<String> hosts)
       throws IOException {
-    storageContainerLocationClient.startMaintenanceNodes(hosts, endHours);
+    return storageContainerLocationClient.decommissionNodes(hosts);
+  }
+
+  @Override
+  public List<DatanodeAdminError> recommissionNodes(List<String> hosts)
+      throws IOException {
+    return storageContainerLocationClient.recommissionNodes(hosts);
+  }
+
+  @Override
+  public List<DatanodeAdminError> startMaintenanceNodes(List<String> hosts,
+      int endHours) throws IOException {
+    return storageContainerLocationClient.startMaintenanceNodes(
+        hosts, endHours);
   }
 
   /**

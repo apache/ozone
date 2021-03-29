@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ClosePipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeAdminErrorResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeUsageInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DeactivatePipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DeactivatePipelineResponseProto;
@@ -73,6 +74,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartReplicationManagerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopReplicationManagerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopReplicationManagerResponseProto;
+import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
@@ -549,23 +551,51 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
 
   public DecommissionNodesResponseProto decommissionNodes(
       DecommissionNodesRequestProto request) throws IOException {
-    impl.decommissionNodes(request.getHostsList());
-    return DecommissionNodesResponseProto.newBuilder()
-        .build();
+    List<DatanodeAdminError> errors =
+        impl.decommissionNodes(request.getHostsList());
+    DecommissionNodesResponseProto.Builder response =
+        DecommissionNodesResponseProto.newBuilder();
+    for (DatanodeAdminError e : errors) {
+      DatanodeAdminErrorResponseProto.Builder error =
+          DatanodeAdminErrorResponseProto.newBuilder();
+      error.setHost(e.getHostname());
+      error.setError(e.getError());
+      response.addFailedHosts(error);
+    }
+    return response.build();
   }
 
   public RecommissionNodesResponseProto recommissionNodes(
       RecommissionNodesRequestProto request) throws IOException {
-    impl.recommissionNodes(request.getHostsList());
-    return RecommissionNodesResponseProto.newBuilder().build();
+    List<DatanodeAdminError> errors =
+        impl.recommissionNodes(request.getHostsList());
+    RecommissionNodesResponseProto.Builder response =
+        RecommissionNodesResponseProto.newBuilder();
+    for (DatanodeAdminError e : errors) {
+      DatanodeAdminErrorResponseProto.Builder error =
+          DatanodeAdminErrorResponseProto.newBuilder();
+      error.setHost(e.getHostname());
+      error.setError(e.getError());
+      response.addFailedHosts(error);
+    }
+    return response.build();
   }
 
   public StartMaintenanceNodesResponseProto startMaintenanceNodes(
       StartMaintenanceNodesRequestProto request) throws IOException {
-    impl.startMaintenanceNodes(request.getHostsList(),
+    List<DatanodeAdminError> errors =
+        impl.startMaintenanceNodes(request.getHostsList(),
         (int)request.getEndInHours());
-    return StartMaintenanceNodesResponseProto.newBuilder()
-        .build();
+    StartMaintenanceNodesResponseProto.Builder response =
+        StartMaintenanceNodesResponseProto.newBuilder();
+    for (DatanodeAdminError e : errors) {
+      DatanodeAdminErrorResponseProto.Builder error =
+          DatanodeAdminErrorResponseProto.newBuilder();
+      error.setHost(e.getHostname());
+      error.setError(e.getError());
+      response.addFailedHosts(error);
+    }
+    return response.build();
   }
 
   public DatanodeUsageInfoResponseProto getDatanodeUsageInfo(
