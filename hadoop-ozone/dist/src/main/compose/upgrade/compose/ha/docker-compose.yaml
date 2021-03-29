@@ -48,11 +48,8 @@ x-om:
     - 9862
     - 9872
 
-# TODO: Make sure these rel paths are correct.
 x-volumes:
     - &ozone-dir ../../../..:${OZONE_DIR}
-    # TODO: Determine if this is needed.
-    - &transformation ../../../../libexec/transformation.py:/opt/hadoop/libexec/transformation.py
 
 services:
   om1:
@@ -63,7 +60,6 @@ services:
     volumes:
       - ${OZONE_VOLUME}/om1:/data
       - *ozone-dir
-      - *transformation
   om2:
     <<: *om
     networks:
@@ -72,7 +68,6 @@ services:
     volumes:
       - ${OZONE_VOLUME}/om2:/data
       - *ozone-dir
-      - *transformation
   om3:
     <<: *om
     networks:
@@ -81,7 +76,6 @@ services:
     volumes:
       - ${OZONE_VOLUME}/om3:/data
       - *ozone-dir
-      - *transformation
 
   scm:
     command: ["ozone","scm"]
@@ -98,7 +92,6 @@ services:
     volumes:
       - ${OZONE_VOLUME}/scm:/data
       - *ozone-dir
-      - *transformation
   dn1:
     <<: *datanode
     networks:
@@ -107,7 +100,6 @@ services:
     volumes:
       - ${OZONE_VOLUME}/dn1:/data
       - *ozone-dir
-      - *transformation
   dn2:
     <<: *datanode
     networks:
@@ -116,7 +108,6 @@ services:
     volumes:
       - ${OZONE_VOLUME}/dn2:/data
       - *ozone-dir
-      - *transformation
   dn3:
     <<: *datanode
     networks:
@@ -125,7 +116,6 @@ services:
     volumes:
       - ${OZONE_VOLUME}/dn3:/data
       - *ozone-dir
-      - *transformation
   recon:
     command: ["ozone","recon"]
     <<: *common-config
@@ -139,7 +129,6 @@ services:
     volumes:
       - ${OZONE_VOLUME}/recon:/data
       - *ozone-dir
-      - *transformation
   s3g:
     command: ["ozone","s3g"]
     <<: *common-config
@@ -153,7 +142,6 @@ services:
     volumes:
       - ${OZONE_VOLUME}/s3g:/data
       - *ozone-dir
-      - *transformation
 networks:
   net:
     driver: bridge
