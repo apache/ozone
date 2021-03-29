@@ -60,6 +60,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -462,24 +463,21 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   // DN Ratis server act as both SSL client and server and we must pass TLS
   // configuration for both.
   private static Parameters createTlsParameters(SecurityConfig conf,
-      CertificateClient caClient) {
+      CertificateClient caClient) throws IOException {
     Parameters parameters = new Parameters();
 
     if (conf.isSecurityEnabled() && conf.isGrpcTlsEnabled()) {
-      List<X509Certificate> listCA = new ArrayList<>();
-      listCA.add(caClient.getCACertificate());
-      if (caClient.getRootCACertificate() != null) {
-        listCA.add(caClient.getRootCACertificate());
-      }
+      List<X509Certificate> caList = HAUtils.buildCAX509List(caClient,
+          conf.getConfiguration());
       GrpcTlsConfig serverConfig = new GrpcTlsConfig(
           caClient.getPrivateKey(), caClient.getCertificate(),
-          listCA, true);
+          caList, true);
       GrpcConfigKeys.Server.setTlsConf(parameters, serverConfig);
       GrpcConfigKeys.Admin.setTlsConf(parameters, serverConfig);
 
       GrpcTlsConfig clientConfig = new GrpcTlsConfig(
           caClient.getPrivateKey(), caClient.getCertificate(),
-          listCA, false);
+          caList, false);
       GrpcConfigKeys.Client.setTlsConf(parameters, clientConfig);
     }
 

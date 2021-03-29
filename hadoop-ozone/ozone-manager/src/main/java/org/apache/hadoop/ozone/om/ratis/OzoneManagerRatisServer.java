@@ -38,6 +38,7 @@ import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.ipc.ProtobufRpcEngine.Server;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -652,14 +653,11 @@ public final class OzoneManagerRatisServer {
     Parameters parameters = new Parameters();
 
     if (conf.isSecurityEnabled() && conf.isGrpcTlsEnabled()) {
-      List<X509Certificate> listCA = new ArrayList<>();
-      listCA.add(caClient.getCACertificate());
-      if (caClient.getRootCACertificate() != null) {
-        listCA.add(caClient.getRootCACertificate());
-      }
+      List<X509Certificate> caList = HAUtils.buildCAX509List(caClient,
+          conf.getConfiguration());
       GrpcTlsConfig config = new GrpcTlsConfig(
           caClient.getPrivateKey(), caClient.getCertificate(),
-          listCA, true);
+          caList, true);
       GrpcConfigKeys.Server.setTlsConf(parameters, config);
       GrpcConfigKeys.Admin.setTlsConf(parameters, config);
       GrpcConfigKeys.Client.setTlsConf(parameters, config);
