@@ -152,7 +152,7 @@ public class FilePerBlockStrategy implements ChunkManager {
 
     long len = info.getLen();
     long offset = info.getOffset();
-    long bufferCapacity = getBufferCapacityForChunkRead(info,
+    long bufferCapacity =  ChunkManager.getBufferCapacityForChunkRead(info,
         defaultReadBufferCapacity);
 
     ByteBuffer[] dataBuffers = BufferUtils.assignByteBuffers(len,

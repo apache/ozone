@@ -104,7 +104,7 @@ public interface ChunkManager {
     // no-op
   }
 
-  default long getBufferCapacityForChunkRead(ChunkInfo chunkInfo,
+  static long getBufferCapacityForChunkRead(ChunkInfo chunkInfo,
       long defaultReadBufferCapacity) {
     long bufferCapacity = 0;
     if (chunkInfo.isReadDataIntoSingleBuffer()) {

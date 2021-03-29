@@ -110,56 +110,58 @@ public class TestChunkInputStream extends TestInputStreamBase {
     int dataLength = CHUNK_SIZE;
     byte[] inputData = writeRandomBytes(keyName, dataLength);
 
-    KeyInputStream keyInputStream = getKeyInputStream(keyName);
+    try (KeyInputStream keyInputStream = getKeyInputStream(keyName)) {
 
-    BlockInputStream block0Stream = keyInputStream.getBlockStreams().get(0);
-    block0Stream.initialize();
+      BlockInputStream block0Stream = keyInputStream.getBlockStreams().get(0);
+      block0Stream.initialize();
 
-    ChunkInputStream chunk0Stream = block0Stream.getChunkStreams().get(0);
+      ChunkInputStream chunk0Stream = block0Stream.getChunkStreams().get(0);
 
-    // Read checksum boundary - 1 bytes of data
-    int readDataLen = BYTES_PER_CHECKSUM - 1;
-    byte[] readData = readDataFromChunk(chunk0Stream, 0, readDataLen);
-    validateData(inputData, 0, readData);
+      // Read checksum boundary - 1 bytes of data
+      int readDataLen = BYTES_PER_CHECKSUM - 1;
+      byte[] readData = readDataFromChunk(chunk0Stream, 0, readDataLen);
+      validateData(inputData, 0, readData);
 
-    // There should be 1 byte of data remaining in the buffer which is not
-    // yet read. Hence, the buffer should not be released.
-    checkBufferSizeAndCapacity(chunk0Stream.getCachedBuffers(),
-        1, 0, BYTES_PER_CHECKSUM);
-    Assert.assertEquals(1, chunk0Stream.getCachedBuffers()[0].remaining());
+      // There should be 1 byte of data remaining in the buffer which is not
+      // yet read. Hence, the buffer should not be released.
+      checkBufferSizeAndCapacity(chunk0Stream.getCachedBuffers(),
+          1, 0, BYTES_PER_CHECKSUM);
+      Assert.assertEquals(1, chunk0Stream.getCachedBuffers()[0].remaining());
 
-    // Reading the last byte in the buffer should result in all the buffers
-    // being released.
-    readData = readDataFromChunk(chunk0Stream, 1);
-    validateData(inputData, readDataLen, readData);
-    Assert.assertNull("Chunk stream buffers not released after last byte is " +
-        "read", chunk0Stream.getCachedBuffers());
+      // Reading the last byte in the buffer should result in all the buffers
+      // being released.
+      readData = readDataFromChunk(chunk0Stream, 1);
+      validateData(inputData, readDataLen, readData);
+      Assert
+          .assertNull("Chunk stream buffers not released after last byte is " +
+              "read", chunk0Stream.getCachedBuffers());
 
-    // Read more data to get the data till the next checksum boundary.
-    readDataLen = BYTES_PER_CHECKSUM / 2;
-    readData = readDataFromChunk(chunk0Stream, readDataLen);
-    // There should be one buffer and the buffer should not be released as
-    // there is data pending to be read from the buffer
-    checkBufferSizeAndCapacity(chunk0Stream.getCachedBuffers(), 1, 0,
-        BYTES_PER_CHECKSUM);
-    ByteBuffer lastCachedBuffer = chunk0Stream.getCachedBuffers()[0];
-    Assert.assertEquals(BYTES_PER_CHECKSUM - readDataLen,
-        lastCachedBuffer.remaining());
+      // Read more data to get the data till the next checksum boundary.
+      readDataLen = BYTES_PER_CHECKSUM / 2;
+      readData = readDataFromChunk(chunk0Stream, readDataLen);
+      // There should be one buffer and the buffer should not be released as
+      // there is data pending to be read from the buffer
+      checkBufferSizeAndCapacity(chunk0Stream.getCachedBuffers(), 1, 0,
+          BYTES_PER_CHECKSUM);
+      ByteBuffer lastCachedBuffer = chunk0Stream.getCachedBuffers()[0];
+      Assert.assertEquals(BYTES_PER_CHECKSUM - readDataLen,
+          lastCachedBuffer.remaining());
 
-    // Read more than the remaining data in buffer (but less than the next
-    // checksum boundary).
-    int position = (int) chunk0Stream.getPos();
-    readDataLen = lastCachedBuffer.remaining() + BYTES_PER_CHECKSUM / 2;
-    readData = readDataFromChunk(chunk0Stream, readDataLen);
-    validateData(inputData, position, readData);
-    // After reading the remaining data in the buffer, the buffer should be
-    // released and next checksum size of data must be read into the buffers
-    checkBufferSizeAndCapacity(chunk0Stream.getCachedBuffers(), 1, 0,
-        BYTES_PER_CHECKSUM);
-    // Verify that the previously cached buffer is released by comparing it
-    // with the current cached buffer
-    Assert.assertNotEquals(lastCachedBuffer,
-        chunk0Stream.getCachedBuffers()[0]);
+      // Read more than the remaining data in buffer (but less than the next
+      // checksum boundary).
+      int position = (int) chunk0Stream.getPos();
+      readDataLen = lastCachedBuffer.remaining() + BYTES_PER_CHECKSUM / 2;
+      readData = readDataFromChunk(chunk0Stream, readDataLen);
+      validateData(inputData, position, readData);
+      // After reading the remaining data in the buffer, the buffer should be
+      // released and next checksum size of data must be read into the buffers
+      checkBufferSizeAndCapacity(chunk0Stream.getCachedBuffers(), 1, 0,
+          BYTES_PER_CHECKSUM);
+      // Verify that the previously cached buffer is released by comparing it
+      // with the current cached buffer
+      Assert.assertNotEquals(lastCachedBuffer,
+          chunk0Stream.getCachedBuffers()[0]);
+    }
   }
 
   private byte[] readDataFromChunk(ChunkInputStream chunkInputStream,

@@ -89,7 +89,7 @@ public class ChunkInputStream extends InputStream
   private long bufferOffsetWrtChunkData;
 
   // Index of the first buffer which has not been released
-  private int minBufferIndex = 0;
+  private int firstUnreleasedBufferIndex = 0;
 
   // The number of bytes of chunk data residing in the buffers currently
   private long buffersSize;
@@ -376,7 +376,7 @@ public class ChunkInputStream extends InputStream
     }
 
     bufferIndex = 0;
-    minBufferIndex = 0;
+    firstUnreleasedBufferIndex = 0;
     allocated = true;
   }
 
@@ -589,7 +589,8 @@ public class ChunkInputStream extends InputStream
       // Check if the current buffers cover the input position
       // Released buffers should not be considered when checking if position
       // is available
-      return pos >= bufferOffsetWrtChunkData + bufferOffsets[minBufferIndex] &&
+      return pos >= bufferOffsetWrtChunkData +
+          bufferOffsets[firstUnreleasedBufferIndex] &&
           pos < bufferOffsetWrtChunkData + buffersSize;
     }
     return false;
@@ -646,9 +647,7 @@ public class ChunkInputStream extends InputStream
 
 
   /**
-   * Release a buffer.
-   * A buffer should be released after buffer EOF is reached i.e. the last
-   * byte in the buffer has been read.
+   * Release a buffers upto the given index.
    * @param releaseUptoBufferIndex bufferIndex (inclusive) upto which the
    *                               buffers must be released
    */
@@ -667,7 +666,7 @@ public class ChunkInputStream extends InputStream
       for (int i = 0; i <= releaseUptoBufferIndex; i++) {
         buffers[i] = null;
       }
-      minBufferIndex = releaseUptoBufferIndex + 1;
+      firstUnreleasedBufferIndex = releaseUptoBufferIndex + 1;
     }
   }
 
@@ -677,7 +676,7 @@ public class ChunkInputStream extends InputStream
   private void releaseBuffers() {
     buffers = null;
     bufferIndex = 0;
-    minBufferIndex = 0;
+    firstUnreleasedBufferIndex = 0;
     // We should not reset bufferOffsetWrtChunkData and buffersSize here
     // because when getPos() is called in chunkStreamEOF() we use these
     // values and determine whether chunk is read completely or not.
