@@ -23,6 +23,12 @@ Test Timeout        5 minutes
 *** Variables ***
 ${version_prefix}    layoutVersion=
 
+*** Keywords ***
+Check version
+    ${version_file_contents} =    Get file    ${VERSION_FILE}
+    ${version_line} =    Catenate    SEPARATOR=   ${version_prefix}    ${VERSION}
+    Should contain    ${version_file_contents}    ${version_line}
+
 *** Test Cases ***
 Check MLV
     # Fail if required variables are not set.
@@ -32,6 +38,4 @@ Check MLV
     File should exist    ${VERSION_FILE}
     File should not be empty    ${VERSION_FILE}
 
-    ${version_file_contents} =    Get File    ${VERSION_FILE}
-    ${version_line} =    Catenate    SEPARATOR=   ${version_prefix}    ${VERSION}
-    Should contain    ${version_file_contents}    ${version_line}
+    Wait until keyword succeeds    3min    10sec    Check version
