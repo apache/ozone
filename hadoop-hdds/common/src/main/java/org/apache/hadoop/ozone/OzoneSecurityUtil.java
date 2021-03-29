@@ -125,6 +125,12 @@ public final class OzoneSecurityUtil {
     return hostIps;
   }
 
+  /**
+   * Convert list of string encoded certificates to list of X509Certificate.
+   * @param pemEncodedCerts
+   * @return list of X509Certificate.
+   * @throws IOException
+   */
   public static List<X509Certificate> convertToX509(
       List<String> pemEncodedCerts) throws IOException {
     List<X509Certificate> x509Certificates =
