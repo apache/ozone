@@ -23,6 +23,7 @@ import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.apache.ratis.server.RaftServer;
 
 import java.io.IOException;
+import java.net.UnknownHostException;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
@@ -45,7 +46,7 @@ public interface SCMRatisServer {
   /**
    * Returns roles of ratis peers.
    */
-  List<String> getRatisRoles();
+  List<String> getRatisRoles() throws UnknownHostException;
 
   /**
    * Returns NotLeaderException with useful info.
