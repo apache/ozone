@@ -65,7 +65,7 @@ public class PutKeyHandler extends KeyHandler {
 
   @Option(names = {"-t", "--type"},
       description = "Replication type of the new key. (use RATIS or " +
-          "STAND_ALONE) Default is specified in the cluster-wide config.")
+          "STAND_ALONE or EC) Default is specified in the cluster-wide config.")
   private ReplicationType replicationType;
 
   @Override
