@@ -250,6 +250,7 @@ enum ReplicationType {
     RATIS = 1;
     STAND_ALONE = 2;
     CHAINED = 3;
+    EC = 4;
 }
 
 enum ReplicationFactor {
