@@ -107,6 +107,10 @@ import org.slf4j.LoggerFactory;
  * // Java events:
  * //    alloc
  * //    lock
+ * Note for version usage:
+ * The default output format of the newest async profiler is HTML.
+ * If the user is using an older version such as 1.5, HTML is not supported.
+ * Please specify the corresponding output format.
  */
 public class ProfileServlet extends HttpServlet {
   private static final long serialVersionUID = 1L;
@@ -447,10 +451,10 @@ public class ProfileServlet extends HttpServlet {
       try {
         return Output.valueOf(outputArg.trim().toUpperCase());
       } catch (IllegalArgumentException e) {
-        return Output.SVG;
+        return Output.FLAMEGRAPH;
       }
     }
-    return Output.SVG;
+    return Output.FLAMEGRAPH;
   }
 
   private void setResponseHeader(final HttpServletResponse response) {
@@ -516,9 +520,11 @@ public class ProfileServlet extends HttpServlet {
     TRACES,
     FLAT,
     COLLAPSED,
+    // No SVG in 2.x asyncprofiler.
     SVG,
     TREE,
     JFR,
+    // In 2.x asyncprofiler, this is how you get flamegraphs.
     FLAMEGRAPH
   }
 
