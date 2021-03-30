@@ -441,14 +441,6 @@ public final class OzoneConfigKeys {
       false;
 
   /**
-   * Configuration properties for Dir Deleting Service.
-   */
-  public static final String OZONE_DIR_DELETING_SERVICE_INTERVAL =
-      "ozone.dir.deleting.service.interval";
-  public static final String OZONE_DIR_DELETING_SERVICE_INTERVAL_DEFAULT
-      = "30s";
-
-  /**
    * There is no need to instantiate this class.
    */
   private OzoneConfigKeys() {

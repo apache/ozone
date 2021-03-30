@@ -1,3 +1,19 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with this
+ * work for additional information regarding copyright ownership.  The ASF
+ * licenses this file to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations under
+ * the License.
+ */
 package org.apache.hadoop.ozone.om;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -21,6 +37,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK_DEFAULT;
 
 /**
  * This is a background service to delete orphan directories and its
@@ -46,17 +64,29 @@ public class DirectoryDeletingService extends BackgroundService {
   private AtomicLong deletedDirsCount;
   private AtomicLong deletedFilesCount;
   private final AtomicLong runCount;
-  private final long numEntries = 1000;
+
   private static ClientId clientId = ClientId.randomId();
+
+  // Use only a single thread for DirDeletion. Multiple threads would read
+  // or write to same tables and can send deletion requests for same key
+  // multiple times.
+  private static final int DIR_DELETING_CORE_POOL_SIZE = 1;
+
+  // Number of items(dirs/files) to be batched in an iteration.
+  private final long pathLimitPerTask;
 
   public DirectoryDeletingService(long interval, TimeUnit unit,
       long serviceTimeout, OzoneManager ozoneManager) {
-    super("DirectoryDeletingService", interval, unit, 1, serviceTimeout);
+    super("DirectoryDeletingService", interval, unit,
+        DIR_DELETING_CORE_POOL_SIZE, serviceTimeout);
     this.keyManager = ozoneManager.getKeyManager();
     this.ozoneManager = ozoneManager;
     this.deletedDirsCount = new AtomicLong(0);
     this.deletedFilesCount = new AtomicLong(0);
     this.runCount = new AtomicLong(0);
+    this.pathLimitPerTask = ozoneManager.getConfiguration()
+        .getInt(OZONE_PATH_DELETING_LIMIT_PER_TASK,
+            OZONE_PATH_DELETING_LIMIT_PER_TASK_DEFAULT);
   }
 
   private boolean shouldRun() {
@@ -92,7 +122,7 @@ public class DirectoryDeletingService extends BackgroundService {
     public BackgroundTaskResult call() throws Exception {
       if (shouldRun()) {
         runCount.incrementAndGet();
-        long count = numEntries;
+        long count = pathLimitPerTask;
         try {
           long startTime = Time.monotonicNow();
           // step-1) Get one pending deleted directory

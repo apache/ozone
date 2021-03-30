@@ -27,7 +27,6 @@ import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -80,7 +79,7 @@ public class TestDirectoryDeletingServiceV1 {
   @BeforeClass
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setInt(OzoneConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL, 5);
+    conf.setInt(OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL, 5);
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     if (isBucketFSOptimized) {
