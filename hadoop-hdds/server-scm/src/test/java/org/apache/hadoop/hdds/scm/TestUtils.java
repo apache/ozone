@@ -317,12 +317,12 @@ public final class TestUtils {
   public static void openAllRatisPipelines(PipelineManager pipelineManager)
       throws IOException {
     // Pipeline is created by background thread
-    List<Pipeline> pipelines =
-        pipelineManager.getPipelines(new RatisReplicationConfig(
-            ReplicationFactor.THREE));
-    // Trigger the processed pipeline report event
-    for (Pipeline pipeline : pipelines) {
-      pipelineManager.openPipeline(pipeline.getId());
+    for (ReplicationFactor factor : ReplicationFactor.values()) {
+      // Trigger the processed pipeline report event
+      for (Pipeline pipeline : pipelineManager
+          .getPipelines(new RatisReplicationConfig(factor))) {
+        pipelineManager.openPipeline(pipeline.getId());
+      }
     }
   }
 
