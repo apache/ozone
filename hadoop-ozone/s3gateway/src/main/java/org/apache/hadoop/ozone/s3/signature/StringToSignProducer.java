@@ -127,7 +127,6 @@ public final class StringToSignProducer {
         headers,
         queryParams,
         !signatureInfo.isSignPayload());
-    System.out.println(canonicalRequest);
     strToSign.append(hash(canonicalRequest));
     if (LOG.isDebugEnabled()) {
       LOG.debug("canonicalRequest:[{}]", canonicalRequest);

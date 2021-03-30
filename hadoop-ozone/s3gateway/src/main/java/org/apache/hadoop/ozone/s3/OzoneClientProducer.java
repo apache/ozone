@@ -158,9 +158,6 @@ public class OzoneClientProducer {
     }
   }
 
-  private void getSignatureInfo() {
-  }
-
   // ONLY validate aws access id when needed.
   private void validateAccessId(String awsAccessId) throws Exception {
     if (awsAccessId == null || awsAccessId.equals("")) {
