@@ -45,6 +45,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE_ROCKSDB;
 import static org.apache.hadoop.ozone.OzoneConsts.CHUNKS_PATH;
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE;
 import static org.apache.hadoop.ozone.OzoneConsts.METADATA_PATH;
+import static org.apache.hadoop.ozone.OzoneConsts.REPLICA_INDEX;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_VERSION;
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_BYTES_USED;
 import static org.apache.hadoop.ozone.OzoneConsts.BLOCK_COUNT;
@@ -82,6 +83,8 @@ public class KeyValueContainerData extends ContainerData {
 
   private long blockCommitSequenceId;
 
+  private int replicaIndex;
+
   static {
     // Initialize YAML fields
     KV_YAML_FIELDS = Lists.newArrayList();
@@ -90,6 +93,7 @@ public class KeyValueContainerData extends ContainerData {
     KV_YAML_FIELDS.add(CHUNKS_PATH);
     KV_YAML_FIELDS.add(CONTAINER_DB_TYPE);
     KV_YAML_FIELDS.add(SCHEMA_VERSION);
+    KV_YAML_FIELDS.add(REPLICA_INDEX);
   }
 
   /**
@@ -300,5 +304,13 @@ public class KeyValueContainerData extends ContainerData {
             (long)(getNumPendingDeletionBlocks() - deletedBlockCount));
 
     db.getStore().getBatchHandler().commitBatchOperation(batchOperation);
+  }
+
+  public int getReplicaIndex() {
+    return replicaIndex;
+  }
+
+  public void setReplicaIndex(int replicaIndex) {
+    this.replicaIndex = replicaIndex;
   }
 }

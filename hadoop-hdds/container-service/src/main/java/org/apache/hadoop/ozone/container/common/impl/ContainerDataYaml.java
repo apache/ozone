@@ -281,6 +281,8 @@ public final class ContainerDataYaml {
             .setState(ContainerProtos.ContainerDataProto.State.valueOf(state));
         String schemaVersion = (String) nodes.get(OzoneConsts.SCHEMA_VERSION);
         kvData.setSchemaVersion(schemaVersion);
+        kvData.setReplicaIndex(
+            ((Long) nodes.get(OzoneConsts.REPLICA_INDEX)).intValue());
 
         return kvData;
       }
