@@ -181,44 +181,7 @@ public class TestContainerDataYaml {
       GenericTestUtils.assertExceptionContains("No enum constant", ex);
     }
   }
-
-
-  @Test
-  public void testCheckBackWardCompatibilityOfContainerFile() throws
-      IOException {
-    // This test is for if we upgrade, and then .container files added by new
-    // server will have new fields added to .container file, after a while we
-    // decided to rollback. Then older ozone can read .container files
-    // created or not.
-
-    try {
-      String containerFile = "additionalfields.container";
-      //Get file from resources folder
-      ClassLoader classLoader = getClass().getClassLoader();
-      File file = new File(classLoader.getResource(containerFile).getFile());
-      KeyValueContainerData kvData = (KeyValueContainerData) ContainerDataYaml
-          .readContainerFile(file);
-      ContainerUtils.verifyChecksum(kvData);
-
-      //Checking the Container file data is consistent or not
-      assertEquals(ContainerProtos.ContainerDataProto.State.CLOSED, kvData
-          .getState());
-      assertEquals(CONTAINER_DB_TYPE, kvData.getContainerDBType());
-      assertEquals(ContainerProtos.ContainerType.KeyValueContainer, kvData
-          .getContainerType());
-      assertEquals(9223372036854775807L, kvData.getContainerID());
-      assertEquals("/hdds/current/aed-fg4-hji-jkl/containerDir0/1", kvData
-          .getChunksPath());
-      assertEquals("/hdds/current/aed-fg4-hji-jkl/containerDir0/1", kvData
-          .getMetadataPath());
-      assertEquals(FILE_PER_CHUNK, kvData.getLayOutVersion());
-      assertEquals(2, kvData.getMetadata().size());
-
-    } catch (Exception ex) {
-      ex.printStackTrace();
-      fail("testCheckBackWardCompatibilityOfContainerFile failed");
-    }
-  }
+  
 
   /**
    * Test to verify {@link ContainerUtils#verifyChecksum(ContainerData)}.
