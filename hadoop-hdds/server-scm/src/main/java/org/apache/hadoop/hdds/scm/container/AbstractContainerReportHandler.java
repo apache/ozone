@@ -290,6 +290,7 @@ public class AbstractContainerReportHandler {
         .setOriginNodeId(UUID.fromString(replicaProto.getOriginNodeId()))
         .setSequenceId(replicaProto.getBlockCommitSequenceId())
         .setKeyCount(replicaProto.getKeyCount())
+        .setReplicaIndex(replicaProto.getReplicaIndex())
         .setBytesUsed(replicaProto.getUsed())
         .build();
 
