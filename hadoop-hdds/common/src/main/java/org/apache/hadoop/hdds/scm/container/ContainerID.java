@@ -40,7 +40,7 @@ public final class ContainerID implements Comparable<ContainerID> {
    *
    * @param id int
    */
-  private ContainerID(long id) {
+  public ContainerID(long id) {
     Preconditions.checkState(id >= 0,
         "Container ID should be positive. %s.", id);
     this.id = id;

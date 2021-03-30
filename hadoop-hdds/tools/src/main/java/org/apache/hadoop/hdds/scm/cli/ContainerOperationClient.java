@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
@@ -48,6 +49,8 @@ import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
+import com.google.common.annotations.VisibleForTesting;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClient;
@@ -87,6 +90,12 @@ public class ContainerOperationClient implements ScmClient {
       replicationFactor = HddsProtos.ReplicationFactor.ONE;
       replicationType = HddsProtos.ReplicationType.STAND_ALONE;
     }
+  }
+
+  @VisibleForTesting
+  public StorageContainerLocationProtocol
+      getStorageContainerLocationProtocol() {
+    return storageContainerLocationClient;
   }
 
   private XceiverClientManager newXCeiverClientManager(ConfigurationSource conf)
@@ -259,19 +268,22 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   @Override
-  public void decommissionNodes(List<String> hosts) throws IOException {
-    storageContainerLocationClient.decommissionNodes(hosts);
-  }
-
-  @Override
-  public void recommissionNodes(List<String> hosts) throws IOException {
-    storageContainerLocationClient.recommissionNodes(hosts);
-  }
-
-  @Override
-  public void startMaintenanceNodes(List<String> hosts, int endHours)
+  public List<DatanodeAdminError> decommissionNodes(List<String> hosts)
       throws IOException {
-    storageContainerLocationClient.startMaintenanceNodes(hosts, endHours);
+    return storageContainerLocationClient.decommissionNodes(hosts);
+  }
+
+  @Override
+  public List<DatanodeAdminError> recommissionNodes(List<String> hosts)
+      throws IOException {
+    return storageContainerLocationClient.recommissionNodes(hosts);
+  }
+
+  @Override
+  public List<DatanodeAdminError> startMaintenanceNodes(List<String> hosts,
+      int endHours) throws IOException {
+    return storageContainerLocationClient.startMaintenanceNodes(
+        hosts, endHours);
   }
 
   /**
@@ -526,16 +538,31 @@ public class ContainerOperationClient implements ScmClient {
   /**
    * Get Datanode Usage information by ipaddress or uuid.
    *
-   * @param ipaddress - datanode ipaddress String
-   * @param uuid - datanode uuid String
-   * @return List of DatanodeUsageInfo. Each element contains info such as
+   * @param ipaddress datanode ipaddress String
+   * @param uuid datanode uuid String
+   * @return List of DatanodeUsageInfoProto. Each element contains info such as
    * capacity, SCMused, and remaining space.
    * @throws IOException
    */
   @Override
-  public List<HddsProtos.DatanodeUsageInfo> getDatanodeUsageInfo(
+  public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
       String ipaddress, String uuid) throws IOException {
     return storageContainerLocationClient.getDatanodeUsageInfo(ipaddress,
         uuid);
+  }
+
+  /**
+   * Get usage information of most or least used datanodes.
+   *
+   * @param mostUsed true if most used, false if least used
+   * @param count Integer number of nodes to get info for
+   * @return List of DatanodeUsageInfoProto. Each element contains info such as
+   * capacity, SCMUsed, and remaining space.
+   * @throws IOException
+   */
+  @Override
+  public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
+      boolean mostUsed, int count) throws IOException {
+    return storageContainerLocationClient.getDatanodeUsageInfo(mostUsed, count);
   }
 }

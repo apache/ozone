@@ -257,15 +257,17 @@ message NodeQueryResponseProto {
 }
 
 /*
-  Usage info request message containing ip and uuid.
+  Datanode usage info request message.
 */
 message DatanodeUsageInfoRequestProto {
   optional string ipaddress = 1;
   optional string uuid = 2;
+  optional bool mostUsed = 3;
+  optional uint32 count = 4;
 }
 
 message DatanodeUsageInfoResponseProto {
-  repeated DatanodeUsageInfo info = 1;
+  repeated DatanodeUsageInfoProto info = 1;
 }
 
 /*
@@ -275,8 +277,14 @@ message DecommissionNodesRequestProto {
   repeated string hosts = 1;
 }
 
+
+message DatanodeAdminErrorResponseProto {
+  required string host = 1;
+  required string error = 2;
+}
+
 message DecommissionNodesResponseProto {
-  // empty response
+  repeated DatanodeAdminErrorResponseProto failedHosts = 1;
 }
 
 /*
@@ -287,7 +295,7 @@ message RecommissionNodesRequestProto {
 }
 
 message RecommissionNodesResponseProto {
-  // empty response
+  repeated DatanodeAdminErrorResponseProto failedHosts = 1;
 }
 
 /*
@@ -299,7 +307,7 @@ message StartMaintenanceNodesRequestProto {
 }
 
 message StartMaintenanceNodesResponseProto {
-  // empty response
+  repeated DatanodeAdminErrorResponseProto failedHosts = 1;
 }
 
 /**

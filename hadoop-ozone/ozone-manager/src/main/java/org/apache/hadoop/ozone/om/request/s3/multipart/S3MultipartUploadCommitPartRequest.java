@@ -45,6 +45,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -122,7 +124,10 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       volumeName = keyArgs.getVolumeName();
       bucketName = keyArgs.getBucketName();
 
-      // TODO to support S3 ACL later.
+      // check acl
+      checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
+          IAccessAuthorizer.ACLType.WRITE, OzoneObj.ResourceType.KEY);
+
       acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
           volumeName, bucketName);
 
