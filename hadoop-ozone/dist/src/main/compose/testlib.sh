@@ -42,11 +42,11 @@ create_results_dir() {
 ## @description find all the test.sh scripts in the immediate child dirs
 find_tests(){
   if [[ -n "${OZONE_ACCEPTANCE_SUITE}" ]]; then
-     tests=$(find . -mindepth 2 -maxdepth 2 -name test.sh | xargs grep -l "^#suite:${OZONE_ACCEPTANCE_SUITE}$" | sort)
+     tests=$(find . -mindepth 2 -maxdepth 2 -name test.sh | cut -c3- | xargs grep -l "^#suite:${OZONE_ACCEPTANCE_SUITE}$" | sort)
 
      # 'misc' is default suite, add untagged tests, too
     if [[ "misc" == "${OZONE_ACCEPTANCE_SUITE}" ]]; then
-       untagged="$(find . -mindepth 2 -maxdepth 2 -name test.sh | xargs grep -L "^#suite:")"
+       untagged="$(find . -mindepth 2 -maxdepth 2 -name test.sh | cut -c3- | xargs grep -L "^#suite:")"
        if [[ -n "${untagged}" ]]; then
          tests=$(echo ${tests} ${untagged} | xargs -n1 | sort)
        fi
@@ -57,7 +57,7 @@ find_tests(){
        exit 1
   fi
   else
-    tests=$(find . -mindepth 2 -maxdepth 2 -name test.sh | grep "${OZONE_TEST_SELECTOR:-""}" | sort)
+    tests=$(find . -mindepth 2 -maxdepth 2 -name test.sh | cut -c3- | grep "${OZONE_TEST_SELECTOR:-""}" | sort)
   fi
   echo $tests
 }
@@ -332,6 +332,26 @@ run_test_script() {
   fi
 
   cd - > /dev/null
+
+  return ${ret}
+}
+
+run_test_scripts() {
+  ret=0
+
+  for t in "$@"; do
+    d="$(dirname "${t}")"
+
+    if ! run_test_script "${d}"; then
+      ret=1
+    fi
+
+    copy_results "${d}" "${ALL_RESULT_DIR}"
+
+    if [[ "${ret}" == "1" ]] && [[ "${FAIL_FAST:-}" == "true" ]]; then
+      break
+    fi
+  done
 
   return ${ret}
 }

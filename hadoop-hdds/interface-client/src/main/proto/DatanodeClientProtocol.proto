@@ -154,6 +154,8 @@ message DatanodeBlockID {
   required int64 containerID = 1;
   required int64 localID = 2;
   optional uint64 blockCommitSequenceId = 3 [default = 0];
+  optional int32 replicaIndex = 4;
+
 }
 
 message KeyValue {
@@ -265,6 +267,7 @@ enum ContainerType {
 message  CreateContainerRequestProto {
   repeated KeyValue metadata = 2;
   optional ContainerType containerType = 3 [default = KeyValueContainer];
+  optional int32 replicaIndex = 4;
 }
 
 message  CreateContainerResponseProto {
@@ -398,15 +401,29 @@ message  WriteChunkRequestProto  {
 message  WriteChunkResponseProto {
 }
 
+enum ReadChunkVersion {
+  V0 = 0; // Response data is sent in a single ByteBuffer
+  V1 = 1; // Response data is split into multiple buffers
+}
+
 message  ReadChunkRequestProto  {
   required DatanodeBlockID blockID = 1;
   required ChunkInfo chunkData = 2;
+  optional ReadChunkVersion readChunkVersion = 3;
 }
 
 message  ReadChunkResponseProto {
   required DatanodeBlockID blockID = 1;
   required ChunkInfo chunkData = 2;
-  required bytes data = 3;
+  // Chunk data should be returned in one of the two for
+  oneof responseData {
+    bytes data = 3; // Chunk data is returned as single buffer for V0
+    DataBuffers dataBuffers = 4; // Chunk data is returned as a list of buffers
+  }
+}
+
+message DataBuffers {
+  repeated bytes buffers = 1;
 }
 
 message  DeleteChunkRequestProto {
@@ -443,6 +460,7 @@ message PutSmallFileResponseProto {
 
 message GetSmallFileRequestProto {
   required GetBlockRequestProto block = 1;
+  optional ReadChunkVersion readChunkVersion = 2;
 }
 
 message GetSmallFileResponseProto {

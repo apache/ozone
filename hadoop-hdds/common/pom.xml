@@ -172,6 +172,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>jaeger-client</artifactId>
     </dependency>
     <dependency>
+      <groupId>org.jetbrains.kotlin</groupId>
+      <artifactId>kotlin-stdlib</artifactId>
+    </dependency>
+    <dependency>
       <groupId>io.opentracing</groupId>
       <artifactId>opentracing-util</artifactId>
     </dependency>

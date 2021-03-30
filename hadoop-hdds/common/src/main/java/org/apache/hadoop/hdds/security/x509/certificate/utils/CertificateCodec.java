@@ -293,7 +293,8 @@ public class CertificateCodec {
    * @throws CertificateEncodingException - on Error.
    * @throws IOException                  - on Error.
    */
-  public X509CertificateHolder getCertificateHolder(X509Certificate x509cert)
+  public static X509CertificateHolder getCertificateHolder(
+      X509Certificate x509cert)
       throws CertificateEncodingException, IOException {
     return new X509CertificateHolder(x509cert.getEncoded());
   }
