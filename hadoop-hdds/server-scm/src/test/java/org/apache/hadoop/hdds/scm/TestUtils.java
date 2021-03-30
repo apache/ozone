@@ -18,8 +18,10 @@ package org.apache.hadoop.hdds.scm;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.RandomUtils;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.PipelineAction;
 import org.apache.hadoop.hdds.protocol.proto
@@ -316,7 +318,8 @@ public final class TestUtils {
       throws IOException {
     // Pipeline is created by background thread
     List<Pipeline> pipelines =
-        pipelineManager.getPipelines(HddsProtos.ReplicationType.RATIS);
+        pipelineManager.getPipelines(new RatisReplicationConfig(
+            ReplicationFactor.THREE));
     // Trigger the processed pipeline report event
     for (Pipeline pipeline : pipelines) {
       pipelineManager.openPipeline(pipeline.getId());
@@ -435,8 +438,7 @@ public final class TestUtils {
       allocateContainer(ContainerManagerV2 containerManager)
       throws IOException {
     return containerManager
-        .allocateContainer(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, "root");
+        .allocateContainer(new RatisReplicationConfig(ReplicationFactor.THREE), "root");
 
   }
 
@@ -584,11 +586,10 @@ public final class TestUtils {
     nodes.add(MockDatanodeDetails.randomDatanodeDetails());
     nodes.add(MockDatanodeDetails.randomDatanodeDetails());
     return Pipeline.newBuilder()
-        .setFactor(HddsProtos.ReplicationFactor.THREE)
+        .setReplicationConfig(new RatisReplicationConfig(ReplicationFactor.THREE))
         .setId(PipelineID.randomId())
         .setNodes(nodes)
         .setState(Pipeline.PipelineState.OPEN)
-        .setType(HddsProtos.ReplicationType.RATIS)
         .build();
   }
 }

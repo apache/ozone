@@ -100,7 +100,7 @@ public class ListInfoSubcommand extends ScmSubcommand {
         relatedPipelineNum = relatedPipelines.size();
         relatedPipelines.forEach(
             p -> pipelineListInfo.append(p.getId().getId().toString())
-                .append("/").append(p.getFactor().toString()).append("/")
+                .append("/").append(p.getReplicationConfig().toString()).append("/")
                 .append(p.getType().toString()).append("/")
                 .append(p.getPipelineState().toString()).append("/")
                 .append(datanode.getUuid().equals(p.getLeaderId()) ?
