@@ -83,7 +83,7 @@ public class SequenceIdGenerator {
 
   /**
    * @param conf            : conf
-   * @param scmhaManager    : null if non-Ratis based
+   * @param scmhaManager    : scmhaManager
    * @param sequenceIdTable : sequenceIdTable
    */
   public SequenceIdGenerator(ConfigurationSource conf,
@@ -93,15 +93,11 @@ public class SequenceIdGenerator {
     this.batchSize = conf.getInt(OZONE_SCM_SEQUENCE_ID_BATCH_SIZE,
         OZONE_SCM_SEQUENCE_ID_BATCH_SIZE_DEFAULT);
 
-    if (SCMHAUtils.isSCMHAEnabled(conf)) {
-      this.stateManager = new StateManagerHAImpl.Builder()
-          .setRatisServer(scmhaManager.getRatisServer())
-          .setDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
-          .setSequenceIdTable(sequenceIdTable)
-          .build();
-    } else {
-      this.stateManager = new StateManagerImpl(sequenceIdTable);
-    }
+    Preconditions.checkNotNull(scmhaManager);
+    this.stateManager = new StateManagerImpl.Builder()
+        .setRatisServer(scmhaManager.getRatisServer())
+        .setDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
+        .setSequenceIdTable(sequenceIdTable).build();
   }
 
   /**
@@ -187,12 +183,12 @@ public class SequenceIdGenerator {
    * Ratis based StateManager, db operations are queued in
    * DBTransactionBuffer until a snapshot is taken.
    */
-  static final class StateManagerHAImpl implements StateManager {
+  static final class StateManagerImpl implements StateManager {
     private final Table<String, Long> sequenceIdTable;
     private final DBTransactionBuffer transactionBuffer;
     private final Map<String, Long> sequenceIdToLastIdMap;
 
-    private StateManagerHAImpl(Table<String, Long> sequenceIdTable,
+    private StateManagerImpl(Table<String, Long> sequenceIdTable,
                                DBTransactionBuffer trxBuffer) {
       this.sequenceIdTable = sequenceIdTable;
       this.transactionBuffer = trxBuffer;
@@ -262,9 +258,9 @@ public class SequenceIdGenerator {
       public StateManager build() {
         Preconditions.checkNotNull(table);
         Preconditions.checkNotNull(buffer);
-        Preconditions.checkNotNull(ratisServer);
 
-        final StateManager impl = new StateManagerHAImpl(table, buffer);
+        final StateManager impl = new StateManagerImpl(table, buffer);
+
         final SCMHAInvocationHandler invocationHandler
             = new SCMHAInvocationHandler(SEQUENCE_ID, impl, ratisServer);
 
@@ -272,54 +268,6 @@ public class SequenceIdGenerator {
             SCMHAInvocationHandler.class.getClassLoader(),
             new Class<?>[]{StateManager.class},
             invocationHandler);
-      }
-    }
-  }
-
-  /**
-   * Default StateManager, writes directly go to RocksDB.
-   */
-  static final class StateManagerImpl implements StateManager {
-    private final Table<String, Long> sequenceIdTable;
-
-    StateManagerImpl(Table<String, Long> sequenceIdTable) {
-      this.sequenceIdTable = sequenceIdTable;
-      LOG.info("Init default SequenceIdGenerator.");
-    }
-
-    @Override
-    public Boolean allocateBatch(String sequenceIdName,
-                                 Long expectedLastId, Long newLastId) {
-      Long lastId;
-      try {
-        lastId = sequenceIdTable.get(sequenceIdName);
-      } catch (IOException ioe) {
-        throw new RuntimeException("Failed to get lastId from db", ioe);
-      }
-      if (lastId == null) {
-        lastId = INVALID_SEQUENCE_ID;
-      }
-
-      if (!lastId.equals(expectedLastId)) {
-        LOG.warn("Failed to allocate a batch for {}, expected lastId is {}," +
-            " actual lastId is {}.", sequenceIdName, expectedLastId, lastId);
-        return false;
-      }
-
-      try {
-        sequenceIdTable.put(sequenceIdName, newLastId);
-      } catch (IOException ioe) {
-        throw new RuntimeException("Failed to put lastId to db", ioe);
-      }
-      return true;
-    }
-
-    @Override
-    public Long getLastId(String sequenceIdName) {
-      try {
-        return sequenceIdTable.get(sequenceIdName);
-      } catch (IOException ioe) {
-        throw new RuntimeException("Failed to get lastId from db", ioe);
       }
     }
   }
