@@ -54,13 +54,13 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
   }
 
   @Override
-  public void addToBuffer(Table table, Object key, Object value)
-      throws IOException {
+  public <KEY, VALUE> void addToBuffer(
+      Table<KEY, VALUE> table, KEY key, VALUE value) throws IOException {
     table.putWithBatch(getCurrentBatchOperation(), key, value);
   }
 
   @Override
-  public void removeFromBuffer(Table table, Object key)
+  public <KEY, VALUE> void removeFromBuffer(Table<KEY, VALUE> table, KEY key)
       throws IOException {
     table.deleteWithBatch(getCurrentBatchOperation(), key);
   }
