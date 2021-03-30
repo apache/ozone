@@ -24,6 +24,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -196,13 +197,13 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     Assert.assertEquals(bucketCount + deleteCount + 1, lastAppliedIndex);
 
 
-    OMTransactionInfo omTransactionInfo =
+    TransactionInfo transactionInfo =
         omMetadataManager.getTransactionInfoTable().get(TRANSACTION_INFO_KEY);
-    assertNotNull(omTransactionInfo);
+    assertNotNull(transactionInfo);
 
     Assert.assertEquals(lastAppliedIndex,
-        omTransactionInfo.getTransactionIndex());
-    Assert.assertEquals(term, omTransactionInfo.getTerm());
+        transactionInfo.getTransactionIndex());
+    Assert.assertEquals(term, transactionInfo.getTerm());
   }
 
   /**

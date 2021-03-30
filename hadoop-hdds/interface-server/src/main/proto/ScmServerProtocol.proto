@@ -38,6 +38,7 @@ enum Type {
   DeleteScmKeyBlocks = 12;
   GetScmInfo         = 13;
   SortDatanodes      = 14;
+  AddScm             = 15;
 }
 
 message SCMBlockLocationRequest {
@@ -54,6 +55,7 @@ message SCMBlockLocationRequest {
   optional DeleteScmKeyBlocksRequestProto     deleteScmKeyBlocksRequest = 12;
   optional hadoop.hdds.GetScmInfoRequestProto getScmInfoRequest         = 13;
   optional SortDatanodesRequestProto          sortDatanodesRequest      = 14;
+  optional hadoop.hdds.AddScmRequestProto     addScmRequestProto       = 15;
 }
 
 message SCMBlockLocationResponse {
@@ -71,10 +73,13 @@ message SCMBlockLocationResponse {
 
   optional string leaderOMNodeId = 6;
 
+  optional string leaderSCMNodeId = 7;
+
   optional AllocateScmBlockResponseProto       allocateScmBlockResponse   = 11;
   optional DeleteScmKeyBlocksResponseProto     deleteScmKeyBlocksResponse = 12;
   optional hadoop.hdds.GetScmInfoResponseProto getScmInfoResponse         = 13;
   optional SortDatanodesResponseProto          sortDatanodesResponse      = 14;
+  optional hadoop.hdds.AddScmResponseProto     addScmResponse        = 15;
 }
 
 /**
@@ -117,6 +122,7 @@ enum Status {
   INTERNAL_ERROR = 29;
   FAILED_TO_INIT_PIPELINE_CHOOSE_POLICY = 30;
   FAILED_TO_INIT_LEADER_CHOOSE_POLICY = 31;
+  SCM_NOT_LEADER = 32;
 }
 
 /**

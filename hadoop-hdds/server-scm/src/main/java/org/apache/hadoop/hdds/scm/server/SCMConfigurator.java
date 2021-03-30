@@ -21,9 +21,11 @@ package org.apache.hadoop.hdds.scm.server;
 
 
 import org.apache.hadoop.hdds.scm.block.BlockManager;
+import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
-import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -51,7 +53,9 @@ import org.apache.hadoop.hdds.security.x509.certificate.authority
  * ReplicationManager replicationManager;
  * SCMSafeModeManager scmSafeModeManager;
  * CertificateServer certificateServer;
- * SCMMetadata scmMetadataStore.
+ * SCMMetadata scmMetadataStore;
+ * SCMHAManager scmHAManager;
+ * SCMContext scmContext.
  *
  * If any of these are *not* specified then the default version of these
  * managers are used by SCM.
@@ -60,13 +64,15 @@ import org.apache.hadoop.hdds.security.x509.certificate.authority
 public final class SCMConfigurator {
   private NodeManager scmNodeManager;
   private PipelineManager pipelineManager;
-  private ContainerManager containerManager;
+  private ContainerManagerV2 containerManager;
   private BlockManager scmBlockManager;
   private ReplicationManager replicationManager;
   private SCMSafeModeManager scmSafeModeManager;
   private CertificateServer certificateServer;
   private SCMMetadataStore metadataStore;
   private NetworkTopology networkTopology;
+  private SCMHAManager scmHAManager;
+  private SCMContext scmContext;
 
   /**
    * Allows user to specify a version of Node manager to use with this SCM.
@@ -90,7 +96,7 @@ public final class SCMConfigurator {
    *  this SCM.
    * @param containerManager - Container Manager.
    */
-  public void setContainerManager(ContainerManager containerManager) {
+  public void setContainerManager(ContainerManagerV2 containerManager) {
     this.containerManager = containerManager;
   }
 
@@ -149,6 +155,24 @@ public final class SCMConfigurator {
   }
 
   /**
+   * Allows user to specify a custom version of SCMHAManager to be
+   * used with this SCM.
+   * @param scmHaMgr - SCMHAManager.
+   */
+  public void setSCMHAManager(SCMHAManager scmHaMgr) {
+    this.scmHAManager = scmHaMgr;
+  }
+
+  /**
+   * Allows user to specify a custom version of SCMContext to be
+   * used with this SCM.
+   * @param scmContext - SCMContext.
+   */
+  public void setScmContext(SCMContext scmContext) {
+    this.scmContext = scmContext;
+  }
+
+  /**
    * Gets SCM Node Manager.
    * @return Node Manager.
    */
@@ -168,7 +192,7 @@ public final class SCMConfigurator {
    * Get Container Manager.
    * @return container Manger.
    */
-  public ContainerManager getContainerManager() {
+  public ContainerManagerV2 getContainerManager() {
     return containerManager;
   }
 
@@ -218,5 +242,21 @@ public final class SCMConfigurator {
    */
   public NetworkTopology getNetworkTopology() {
     return networkTopology;
+  }
+
+  /**
+   * Get SCMHAManager.
+   * @return SCMHAManager.
+   */
+  public SCMHAManager getSCMHAManager() {
+    return scmHAManager;
+  }
+
+  /**
+   * Get SCMContext.
+   * @return SCMContext.
+   */
+  public SCMContext getScmContext() {
+    return scmContext;
   }
 }

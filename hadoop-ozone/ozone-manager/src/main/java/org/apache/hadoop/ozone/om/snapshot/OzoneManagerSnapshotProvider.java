@@ -79,7 +79,7 @@ public class OzoneManagerSnapshotProvider {
 
     this.peerNodesMap = new HashMap<>();
     for (OMNodeDetails peerNode : peerNodes) {
-      this.peerNodesMap.put(peerNode.getOMNodeId(), peerNode);
+      this.peerNodesMap.put(peerNode.getNodeId(), peerNode);
     }
 
     this.httpPolicy = HttpConfig.getHttpPolicy(conf);

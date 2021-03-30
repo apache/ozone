@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.client;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -177,17 +178,23 @@ public interface ScmClient extends Closeable {
    * by their hostname and optionally port in the format foo.com:port.
    * @param hosts A list of hostnames, optionally with port
    * @throws IOException
+   * @return A list of DatanodeAdminError for any hosts which failed to
+   *         decommission
    */
-  void decommissionNodes(List<String> hosts) throws IOException;
+  List<DatanodeAdminError> decommissionNodes(List<String> hosts)
+      throws IOException;
 
   /**
    * Allows a list of hosts in maintenance or decommission states to be placed
    * back in service. The hosts are identified by their hostname and optionally
    * port in the format foo.com:port.
    * @param hosts A list of hostnames, optionally with port
+   * @return A list of DatanodeAdminError for any hosts which failed to
+   *         recommission
    * @throws IOException
    */
-  void recommissionNodes(List<String> hosts) throws IOException;
+  List<DatanodeAdminError> recommissionNodes(List<String> hosts)
+      throws IOException;
 
   /**
    * Place the list of datanodes into maintenance mode. If a non-zero endDtm
@@ -199,10 +206,12 @@ public interface ScmClient extends Closeable {
    * @param hosts A list of hostnames, optionally with port
    * @param endHours The number of hours from now which maintenance will end or
    *                 zero if maintenance must be manually ended.
+   * @return A list of DatanodeAdminError for any hosts which failed to
+   *         end maintenance.
    * @throws IOException
    */
-  void startMaintenanceNodes(List<String> hosts, int endHours)
-      throws IOException;
+  List<DatanodeAdminError> startMaintenanceNodes(List<String> hosts,
+      int endHours) throws IOException;
 
   /**
    * Creates a specified replication pipeline.
@@ -295,6 +304,11 @@ public interface ScmClient extends Closeable {
    * @return True if ReplicationManager is running, false otherwise.
    */
   boolean getReplicationManagerStatus() throws IOException;
+
+  /**
+   * returns the list of ratis peer roles. Currently only include peer address.
+   */
+  List<String> getScmRatisRoles() throws IOException;
 
   /**
    * Get usage information of datanode by ipaddress or uuid.

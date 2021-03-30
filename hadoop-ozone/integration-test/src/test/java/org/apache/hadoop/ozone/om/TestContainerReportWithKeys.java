@@ -130,7 +130,7 @@ public class TestContainerReportWithKeys {
     ContainerInfo cinfo = scm.getContainerInfo(keyInfo.getContainerID());
     Set<ContainerReplica> replicas =
         scm.getContainerManager().getContainerReplicas(
-            new ContainerID(keyInfo.getContainerID()));
+            ContainerID.valueOf(keyInfo.getContainerID()));
     Assert.assertTrue(replicas.size() == 1);
     replicas.stream().forEach(rp ->
         Assert.assertTrue(rp.getDatanodeDetails().getParent() != null));

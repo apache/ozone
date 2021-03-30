@@ -164,6 +164,8 @@ public abstract class TestOzoneRpcClientAbstract {
       remoteGroupName, READ, ACCESS);
 
   private static String scmId = UUID.randomUUID().toString();
+  private static String clusterId = UUID.randomUUID().toString();
+
 
   /**
    * Create a MiniOzoneCluster for testing.
@@ -175,6 +177,7 @@ public abstract class TestOzoneRpcClientAbstract {
         .setNumDatanodes(3)
         .setTotalPipelineNumLimit(10)
         .setScmId(scmId)
+        .setClusterId(clusterId)
         .build();
     cluster.waitForClusterToBeReady();
     ozClient = OzoneClientFactory.getRpcClient(conf);
@@ -228,8 +231,8 @@ public abstract class TestOzoneRpcClientAbstract {
     return TestOzoneRpcClientAbstract.store;
   }
 
-  public static void setScmId(String scmId) {
-    TestOzoneRpcClientAbstract.scmId = scmId;
+  public static void setClusterId(String clusterId) {
+    TestOzoneRpcClientAbstract.clusterId = clusterId;
   }
 
   /**
@@ -1395,7 +1398,7 @@ public abstract class TestOzoneRpcClientAbstract {
     // Second, sum the data size from chunks in Container via containerID
     // and localID, make sure the size equals to the size from keyDetails.
     ContainerInfo container = cluster.getStorageContainerManager()
-        .getContainerManager().getContainer(ContainerID.valueof(containerID));
+        .getContainerManager().getContainer(ContainerID.valueOf(containerID));
     Pipeline pipeline = cluster.getStorageContainerManager()
         .getPipelineManager().getPipeline(container.getPipelineID());
     List<DatanodeDetails> datanodes = pipeline.getNodes();
@@ -1596,7 +1599,7 @@ public abstract class TestOzoneRpcClientAbstract {
       String containreBaseDir =
           container.getContainerData().getVolume().getHddsRootDir().getPath();
       File chunksLocationPath = KeyValueContainerLocationUtil
-          .getChunksLocationPath(containreBaseDir, scmId, containerID);
+          .getChunksLocationPath(containreBaseDir, clusterId, containerID);
       byte[] corruptData = "corrupted data".getBytes(UTF_8);
       // Corrupt the contents of chunk files
       for (File file : FileUtils.listFiles(chunksLocationPath, null, false)) {
