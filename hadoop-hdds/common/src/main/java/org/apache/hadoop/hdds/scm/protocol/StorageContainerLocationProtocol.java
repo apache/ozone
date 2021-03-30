@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.protocol;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -160,12 +161,14 @@ public interface StorageContainerLocationProtocol extends Closeable {
       HddsProtos.NodeState state, HddsProtos.QueryScope queryScope,
       String poolName, int clientVersion) throws IOException;
 
-  void decommissionNodes(List<String> nodes) throws IOException;
-
-  void recommissionNodes(List<String> nodes) throws IOException;
-
-  void startMaintenanceNodes(List<String> nodes, int endInHours)
+  List<DatanodeAdminError> decommissionNodes(List<String> nodes)
       throws IOException;
+
+  List<DatanodeAdminError> recommissionNodes(List<String> nodes)
+      throws IOException;
+
+  List<DatanodeAdminError> startMaintenanceNodes(List<String> nodes,
+      int endInHours) throws IOException;
 
   /**
    * Close a container.
@@ -274,13 +277,24 @@ public interface StorageContainerLocationProtocol extends Closeable {
   /**
    * Get Datanode usage information by ip or uuid.
    *
-   * @param ipaddress - datanode IP address String
-   * @param uuid - datanode UUID String
-   * @return List of DatanodeUsageInfo. Each element contains info such as
+   * @param ipaddress datanode IP address String
+   * @param uuid datanode UUID String
+   * @return List of DatanodeUsageInfoProto. Each element contains info such as
    * capacity, SCMused, and remaining space.
    * @throws IOException
    */
-  List<HddsProtos.DatanodeUsageInfo> getDatanodeUsageInfo(String ipaddress,
-                                                          String uuid)
-      throws IOException;
+  List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
+      String ipaddress, String uuid) throws IOException;
+
+  /**
+   * Get usage information of most or least used datanodes.
+   *
+   * @param mostUsed true if most used, false if least used
+   * @param count Integer number of nodes to get info for
+   * @return List of DatanodeUsageInfoProto. Each element contains info such as
+   * capacity, SCMUsed, and remaining space.
+   * @throws IOException
+   */
+  List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
+      boolean mostUsed, int count) throws IOException;
 }

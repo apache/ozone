@@ -34,6 +34,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
+import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.volume.VolumeIOStats;
 import org.apache.hadoop.test.GenericTestUtils;
@@ -83,8 +84,13 @@ public class TestChunkUtils {
         final int threadNumber = i;
         executor.execute(() -> {
           try {
-            ByteBuffer readBuffer = ByteBuffer.allocate((int) len);
-            ChunkUtils.readData(file, readBuffer, offset, len, stats);
+            ByteBuffer[] readBuffers = BufferUtils.assignByteBuffers(len, len);
+            ChunkUtils.readData(file, readBuffers, offset, len, stats);
+
+            // There should be only one element in readBuffers
+            Assert.assertEquals(1, readBuffers.length);
+            ByteBuffer readBuffer = readBuffers[0];
+
             LOG.info("Read data ({}): {}", threadNumber,
                 new String(readBuffer.array(), UTF_8));
             if (!Arrays.equals(array, readBuffer.array())) {
@@ -161,8 +167,14 @@ public class TestChunkUtils {
       long len = data.limit();
       long offset = 0;
       ChunkUtils.writeData(file, data, offset, len, stats, true);
-      ByteBuffer readBuffer = ByteBuffer.allocate((int) len);
-      ChunkUtils.readData(file, readBuffer, offset, len, stats);
+
+      ByteBuffer[] readBuffers = BufferUtils.assignByteBuffers(len, len);
+      ChunkUtils.readData(file, readBuffers, offset, len, stats);
+
+      // There should be only one element in readBuffers
+      Assert.assertEquals(1, readBuffers.length);
+      ByteBuffer readBuffer = readBuffers[0];
+
       assertArrayEquals(array, readBuffer.array());
       assertEquals(len, readBuffer.remaining());
     } catch (Exception e) {
@@ -193,13 +205,13 @@ public class TestChunkUtils {
     int len = 123;
     int offset = 0;
     File nonExistentFile = new File("nosuchfile");
-    ByteBuffer buf = ByteBuffer.allocate(len);
+    ByteBuffer[] bufs = BufferUtils.assignByteBuffers(len, len);
     VolumeIOStats stats = new VolumeIOStats();
 
     // when
     StorageContainerException e = LambdaTestUtils.intercept(
         StorageContainerException.class,
-        () -> ChunkUtils.readData(nonExistentFile, buf, offset, len, stats));
+        () -> ChunkUtils.readData(nonExistentFile, bufs, offset, len, stats));
 
     // then
     Assert.assertEquals(UNABLE_TO_FIND_CHUNK, e.getResult());

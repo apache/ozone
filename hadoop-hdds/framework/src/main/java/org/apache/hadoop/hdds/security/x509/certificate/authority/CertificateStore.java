@@ -55,6 +55,14 @@ public interface CertificateStore {
       X509Certificate certificate, NodeType role) throws IOException;
 
   /**
+   * Check certificate serialID exists or not. If exists throws an exception.
+   * @param serialID
+   * @throws IOException
+   */
+  void checkValidCertID(BigInteger serialID) throws IOException;
+
+
+  /**
    * Adds the certificates to be revoked to a new CRL and moves all the
    * certificates in a transactional manner from valid certificate to
    * revoked certificate state. Returns an empty {@code Optional} instance if
