@@ -113,7 +113,7 @@ public class OzoneClientConfig {
       type = ConfigType.SIZE,
       description = "Checksum will be computed for every bytes per checksum "
           + "number of bytes and stored sequentially. The minimum value for "
-          + "this config is 256KB.",
+          + "this config is 16KB.",
       tags = ConfigTag.CLIENT)
   private int bytesPerChecksum = 1024 * 1024;
 

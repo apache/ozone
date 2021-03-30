@@ -719,6 +719,19 @@
     </description>
   </property>
   <property>
+    <name>ozone.chunk.read.buffer.default.size</name>
+    <value>64KB</value>
+    <tag>OZONE, SCM, CONTAINER, PERFORMANCE</tag>
+    <description>
+      The default read buffer size during read chunk operations when checksum
+      is disabled. Chunk data will be cached in buffers of this capacity.
+
+      For chunk data with checksum, the read buffer size will be the
+      same as the number of bytes per checksum
+      (ozone.client.bytes.per.checksum) corresponding to the chunk.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.chunk.layout</name>
     <value>FILE_PER_BLOCK</value>
     <tag>OZONE, SCM, CONTAINER, PERFORMANCE</tag>

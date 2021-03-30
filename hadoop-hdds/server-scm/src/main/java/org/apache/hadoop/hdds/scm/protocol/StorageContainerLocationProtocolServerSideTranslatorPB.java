@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdds.scm.protocol;
 
-import com.google.common.base.Strings;
 import com.google.protobuf.ProtocolMessageEnum;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
@@ -31,6 +30,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ClosePipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeAdminErrorResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeUsageInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DeactivatePipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DeactivatePipelineResponseProto;
@@ -74,6 +74,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartReplicationManagerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopReplicationManagerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopReplicationManagerResponseProto;
+import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
@@ -562,43 +563,67 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
 
   public DecommissionNodesResponseProto decommissionNodes(
       DecommissionNodesRequestProto request) throws IOException {
-    impl.decommissionNodes(request.getHostsList());
-    return DecommissionNodesResponseProto.newBuilder()
-        .build();
+    List<DatanodeAdminError> errors =
+        impl.decommissionNodes(request.getHostsList());
+    DecommissionNodesResponseProto.Builder response =
+        DecommissionNodesResponseProto.newBuilder();
+    for (DatanodeAdminError e : errors) {
+      DatanodeAdminErrorResponseProto.Builder error =
+          DatanodeAdminErrorResponseProto.newBuilder();
+      error.setHost(e.getHostname());
+      error.setError(e.getError());
+      response.addFailedHosts(error);
+    }
+    return response.build();
   }
 
   public RecommissionNodesResponseProto recommissionNodes(
       RecommissionNodesRequestProto request) throws IOException {
-    impl.recommissionNodes(request.getHostsList());
-    return RecommissionNodesResponseProto.newBuilder().build();
+    List<DatanodeAdminError> errors =
+        impl.recommissionNodes(request.getHostsList());
+    RecommissionNodesResponseProto.Builder response =
+        RecommissionNodesResponseProto.newBuilder();
+    for (DatanodeAdminError e : errors) {
+      DatanodeAdminErrorResponseProto.Builder error =
+          DatanodeAdminErrorResponseProto.newBuilder();
+      error.setHost(e.getHostname());
+      error.setError(e.getError());
+      response.addFailedHosts(error);
+    }
+    return response.build();
   }
 
   public StartMaintenanceNodesResponseProto startMaintenanceNodes(
       StartMaintenanceNodesRequestProto request) throws IOException {
-    impl.startMaintenanceNodes(request.getHostsList(),
+    List<DatanodeAdminError> errors =
+        impl.startMaintenanceNodes(request.getHostsList(),
         (int)request.getEndInHours());
-    return StartMaintenanceNodesResponseProto.newBuilder()
-        .build();
+    StartMaintenanceNodesResponseProto.Builder response =
+        StartMaintenanceNodesResponseProto.newBuilder();
+    for (DatanodeAdminError e : errors) {
+      DatanodeAdminErrorResponseProto.Builder error =
+          DatanodeAdminErrorResponseProto.newBuilder();
+      error.setHost(e.getHostname());
+      error.setError(e.getError());
+      response.addFailedHosts(error);
+    }
+    return response.build();
   }
 
   public DatanodeUsageInfoResponseProto getDatanodeUsageInfo(
       StorageContainerLocationProtocolProtos.DatanodeUsageInfoRequestProto
       request) throws IOException {
-    String ipaddress = null;
-    String uuid = null;
-    if (request.hasIpaddress()) {
-      ipaddress = request.getIpaddress();
-    }
-    if (request.hasUuid()) {
-      uuid = request.getUuid();
-    }
-    if (Strings.isNullOrEmpty(ipaddress) && Strings.isNullOrEmpty(uuid)) {
-      throw new IOException("No ip or uuid specified");
+    List<HddsProtos.DatanodeUsageInfoProto> infoList;
+
+    // get info by ip or uuid
+    if (request.hasUuid() || request.hasIpaddress()) {
+      infoList = impl.getDatanodeUsageInfo(request.getIpaddress(),
+          request.getUuid());
+    } else {  // get most or least used nodes
+      infoList = impl.getDatanodeUsageInfo(request.getMostUsed(),
+          request.getCount());
     }
 
-    List<HddsProtos.DatanodeUsageInfo> infoList;
-    infoList = impl.getDatanodeUsageInfo(ipaddress,
-        uuid);
     return DatanodeUsageInfoResponseProto.newBuilder()
         .addAllInfo(infoList)
         .build();

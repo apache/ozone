@@ -202,7 +202,8 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
       break;
     case ReadChunk:
       builder.setReadChunk(ContainerProtos.ReadChunkRequestProto.newBuilder()
-          .setBlockID(fakeBlockId).setChunkData(fakeChunkInfo).build());
+          .setBlockID(fakeBlockId).setChunkData(fakeChunkInfo)
+          .setReadChunkVersion(ContainerProtos.ReadChunkVersion.V1).build());
       break;
     case DeleteChunk:
       builder
