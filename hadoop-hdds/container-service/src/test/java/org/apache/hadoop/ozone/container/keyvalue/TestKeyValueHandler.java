@@ -372,7 +372,7 @@ public class TestKeyValueHandler {
       final KeyValueHandler kvHandler = new KeyValueHandler(conf,
           UUID.randomUUID().toString(), containerSet, volumeSet, metrics,
           c -> icrReceived.incrementAndGet());
-      kvHandler.setScmID(UUID.randomUUID().toString());
+      kvHandler.setClusterID(UUID.randomUUID().toString());
 
       final ContainerCommandRequestProto createContainer =
           ContainerCommandRequestProto.newBuilder()

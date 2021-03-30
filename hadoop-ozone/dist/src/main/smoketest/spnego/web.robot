@@ -27,12 +27,13 @@ ${OM_URL}           http://om:9874
 ${OM_DB_CHECKPOINT_URL}      ${OM_URL}/dbCheckpoint
 ${OM_SERVICE_LIST_URL}       ${OM_URL}/serviceList
 
-${SCM_URL}          http://scm:9876
+${SCM}              scm
+${SCM_URL}          http://${SCM}:9876
 ${RECON_URL}        http://recon:9888
 
-${SCM_CONF_URL}     http://scm:9876/conf
-${SCM_JMX_URL}      http://scm:9876/jmx
-${SCM_STACKS_URL}   http://scm:9876/stacks
+${SCM_CONF_URL}     http://${SCM}:9876/conf
+${SCM_JMX_URL}      http://${SCM}:9876/jmx
+${SCM_STACKS_URL}   http://${SCM}:9876/stacks
 
 
 *** Keywords ***

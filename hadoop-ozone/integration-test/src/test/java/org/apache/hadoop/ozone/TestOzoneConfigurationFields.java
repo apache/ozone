@@ -54,6 +54,8 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
     errorIfMissingXmlProps = true;
     xmlPropsToSkipCompare.add("hadoop.tags.custom");
     xmlPropsToSkipCompare.add("ozone.om.nodes.EXAMPLEOMSERVICEID");
+    xmlPropsToSkipCompare.add("ozone.scm.nodes.EXAMPLESCMSERVICEID");
+    xmlPrefixToSkipCompare.add("ipc.client.rpc-timeout.ms");
     xmlPropsToSkipCompare.add("ozone.om.leader.election.minimum.timeout" +
         ".duration"); // Deprecated config
     addPropertiesNotInXml();
@@ -69,6 +71,8 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         OMConfigKeys.OZONE_OM_NODES_KEY,
         OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY,
         OMConfigKeys.OZONE_FS_TRASH_CHECKPOINT_INTERVAL_KEY,
+        ScmConfigKeys.OZONE_SCM_NODES_KEY,
+        ScmConfigKeys.OZONE_SCM_ADDRESS_KEY,
         OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE,
         OzoneConfigKeys.OZONE_S3_AUTHINFO_MAX_LIFETIME_KEY,
         ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR,
@@ -82,7 +86,8 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         ReconServerConfigKeys.RECON_OM_SNAPSHOT_TASK_INTERVAL_DELAY,
         ReconServerConfigKeys.RECON_OM_SNAPSHOT_TASK_FLUSH_PARAM,
         OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY,
-        OMConfigKeys.OZONE_OM_HA_PREFIX
+        OMConfigKeys.OZONE_OM_HA_PREFIX,
+        ScmConfigKeys.OZONE_SCM_HA_SECURITY_SUPPORTED
         // TODO HDDS-2856
     ));
   }

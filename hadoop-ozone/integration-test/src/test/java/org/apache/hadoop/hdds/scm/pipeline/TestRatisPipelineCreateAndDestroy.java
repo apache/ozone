@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.ha.SCMService.Event;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.HddsDatanodeService;
@@ -87,7 +88,7 @@ public class TestRatisPipelineCreateAndDestroy {
         .getPipelines(HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.THREE, Pipeline.PipelineState.OPEN);
     for (Pipeline pipeline : pipelines) {
-      pipelineManager.finalizeAndDestroyPipeline(pipeline, false);
+      pipelineManager.closePipeline(pipeline, false);
     }
     // make sure two pipelines are created
     waitForPipelines(2);
@@ -109,7 +110,7 @@ public class TestRatisPipelineCreateAndDestroy {
         .getPipelines(HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.THREE, Pipeline.PipelineState.OPEN);
     for (Pipeline pipeline : pipelines) {
-      pipelineManager.finalizeAndDestroyPipeline(pipeline, false);
+      pipelineManager.closePipeline(pipeline, false);
     }
 
     // make sure two pipelines are created
@@ -153,14 +154,16 @@ public class TestRatisPipelineCreateAndDestroy {
 
     // destroy the existing pipelines
     for (Pipeline pipeline : pipelines) {
-      pipelineManager.finalizeAndDestroyPipeline(pipeline, false);
+      pipelineManager.closePipeline(pipeline, false);
     }
 
     if (cluster.getStorageContainerManager()
         .getScmNodeManager().getNodeCount(NodeStatus.inServiceHealthy()) >=
         HddsProtos.ReplicationFactor.THREE.getNumber()) {
       // make sure pipelines is created after node start
-      pipelineManager.triggerPipelineCreation();
+      cluster.getStorageContainerManager()
+          .getSCMServiceManager()
+          .notifyEventTriggered(Event.PRE_CHECK_COMPLETED);
       waitForPipelines(1);
     }
   }

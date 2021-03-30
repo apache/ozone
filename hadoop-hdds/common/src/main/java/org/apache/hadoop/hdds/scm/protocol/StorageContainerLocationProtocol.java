@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.protocol;
 
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmConfig;
@@ -29,8 +30,11 @@ import org.apache.hadoop.security.KerberosInfo;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.EnumSet;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * ContainerLocationProtocol is used by an HDFS node to find the set of nodes
@@ -45,6 +49,14 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * Version 1: Initial version.
    */
   long versionID = 1L;
+
+  /**
+   * Admin command should take effect on all SCM instance.
+   */
+  Set<Type> ADMIN_COMMAND_TYPE = Collections.unmodifiableSet(EnumSet.of(
+      Type.StartReplicationManager,
+      Type.StopReplicationManager,
+      Type.ForceExitSafeMode));
 
   /**
    * Asks SCM where a container should be allocated. SCM responds with the

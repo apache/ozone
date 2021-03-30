@@ -305,6 +305,10 @@ message SCMCommandProto {
   optional CreatePipelineCommandProto createPipelineCommandProto = 7;
   optional ClosePipelineCommandProto closePipelineCommandProto = 8;
   optional SetNodeOperationalStateCommandProto setNodeOperationalStateCommandProto = 9;
+
+  // If running upon Ratis, holds term of underlying RaftServer iff current
+  // SCM is a leader. If running without Ratis, holds SCMContext.INVALID_TERM.
+  optional int64 term = 15;
 }
 
 /**

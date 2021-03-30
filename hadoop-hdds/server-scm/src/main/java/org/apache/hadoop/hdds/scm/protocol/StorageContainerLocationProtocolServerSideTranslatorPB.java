@@ -80,6 +80,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.slf4j.Logger;
@@ -92,6 +93,7 @@ import java.util.Map;
 
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.PipelineResponseProto.Error.errorPipelineAlreadyExists;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.PipelineResponseProto.Error.success;
+import static org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol.ADMIN_COMMAND_TYPE;
 
 /**
  * This class is the server-side translator that forwards requests received on
@@ -107,6 +109,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
           StorageContainerLocationProtocolServerSideTranslatorPB.class);
 
   private final StorageContainerLocationProtocol impl;
+  private final StorageContainerManager scm;
 
   private OzoneProtocolMessageDispatcher<ScmContainerLocationRequest,
       ScmContainerLocationResponse, ProtocolMessageEnum>
@@ -121,9 +124,11 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
    */
   public StorageContainerLocationProtocolServerSideTranslatorPB(
       StorageContainerLocationProtocol impl,
+      StorageContainerManager scm,
       ProtocolMessageMetrics<ProtocolMessageEnum> protocolMetrics)
       throws IOException {
     this.impl = impl;
+    this.scm = scm;
     this.dispatcher =
         new OzoneProtocolMessageDispatcher<>("ScmContainerLocation",
             protocolMetrics, LOG);
@@ -132,6 +137,13 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   @Override
   public ScmContainerLocationResponse submitRequest(RpcController controller,
       ScmContainerLocationRequest request) throws ServiceException {
+    // not leader or not belong to admin command.
+    if (!scm.getScmContext().isLeader()
+        && !ADMIN_COMMAND_TYPE.contains(request.getCmdType())) {
+      throw new ServiceException(scm.getScmHAManager()
+                                    .getRatisServer()
+                                    .triggerNotLeaderException());
+    }
     return dispatcher
         .processRequest(request, this::processRequest, request.getCmdType(),
             request.getTraceID());
@@ -492,8 +504,8 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     return HddsProtos.GetScmInfoResponseProto.newBuilder()
         .setClusterId(scmInfo.getClusterId())
         .setScmId(scmInfo.getScmId())
+        .addAllPeerRoles(scmInfo.getRatisPeerRoles())
         .build();
-
   }
 
   public InSafeModeResponseProto inSafeMode(

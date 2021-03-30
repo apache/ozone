@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanode
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSING;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.OPEN;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -40,7 +41,8 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -49,7 +51,6 @@ import org.junit.Test;
  */
 public class TestReconContainerManager
     extends AbstractReconContainerManagerTest {
-
   @Test
   public void testAddNewOpenContainer() throws IOException {
     ContainerWithPipeline containerWithPipeline =
@@ -59,13 +60,13 @@ public class TestReconContainerManager
     ContainerInfo containerInfo = containerWithPipeline.getContainerInfo();
 
     ReconContainerManager containerManager = getContainerManager();
-    assertFalse(containerManager.exists(containerID));
+    assertFalse(containerManager.containerExist(containerID));
     assertFalse(getContainerTable().isExist(containerID));
 
     containerManager.addNewContainer(
         containerID.getId(), containerWithPipeline);
 
-    assertTrue(containerManager.exists(containerID));
+    assertTrue(containerManager.containerExist(containerID));
 
     List<ContainerInfo> containers =
         containerManager.getContainers(LifeCycleState.OPEN);
@@ -78,6 +79,8 @@ public class TestReconContainerManager
     assertEquals(containerID, containersInPipeline.first());
 
     // Verify container DB.
+    SCMHAManager scmhaManager = containerManager.getSCMHAManager();
+    scmhaManager.getDBTransactionBuffer().close();
     assertTrue(getContainerTable().isExist(containerID));
   }
 
@@ -89,35 +92,37 @@ public class TestReconContainerManager
     ContainerInfo containerInfo = containerWithPipeline.getContainerInfo();
 
     ReconContainerManager containerManager = getContainerManager();
-    assertFalse(containerManager.exists(containerID));
+    assertFalse(containerManager.containerExist(containerID));
     assertFalse(getContainerTable().isExist(containerID));
 
     containerManager.addNewContainer(
         containerID.getId(), containerWithPipeline);
 
-    assertTrue(containerManager.exists(containerID));
+    assertTrue(containerManager.containerExist(containerID));
 
     List<ContainerInfo> containers = containerManager.getContainers(CLOSED);
     assertEquals(1, containers.size());
     assertEquals(containerInfo, containers.get(0));
     // Verify container DB.
+    SCMHAManager scmhaManager = containerManager.getSCMHAManager();
+    scmhaManager.getDBTransactionBuffer().close();
     assertTrue(getContainerTable().isExist(containerID));
   }
 
   @Test
   public void testCheckAndAddNewContainer() throws IOException {
-    ContainerID containerID = new ContainerID(100L);
+    ContainerID containerID = ContainerID.valueOf(100L);
     ReconContainerManager containerManager = getContainerManager();
-    assertFalse(containerManager.exists(containerID));
+    assertFalse(containerManager.containerExist(containerID));
     DatanodeDetails datanodeDetails = randomDatanodeDetails();
     containerManager.checkAndAddNewContainer(containerID,
         OPEN, datanodeDetails);
-    assertTrue(containerManager.exists(containerID));
+    assertTrue(containerManager.containerExist(containerID));
 
     // Doing it one more time should not change any state.
     containerManager.checkAndAddNewContainer(containerID, OPEN,
         datanodeDetails);
-    assertTrue(containerManager.exists(containerID));
+    assertTrue(containerManager.containerExist(containerID));
     assertEquals(LifeCycleState.OPEN,
         getContainerManager().getContainer(containerID).getState());
   }
@@ -146,7 +151,7 @@ public class TestReconContainerManager
         getContainerManager().getContainer(containerID).getState());
   }
 
-  ContainerInfo newContainerInfo(long containerId) {
+  ContainerInfo newContainerInfo(long containerId, Pipeline pipeline) {
     return new ContainerInfo.Builder()
         .setContainerID(containerId)
         .setReplicationType(HddsProtos.ReplicationType.RATIS)
@@ -154,18 +159,8 @@ public class TestReconContainerManager
         .setOwner("owner2")
         .setNumberOfKeys(99L)
         .setReplicationFactor(HddsProtos.ReplicationFactor.THREE)
-        .setPipelineID(PipelineID.randomId())
+        .setPipelineID(pipeline.getId())
         .build();
-  }
-
-  void putContainerInfos(ReconContainerManager containerManager, int num)
-      throws IOException {
-    for (int i = 1; i <= num; i++) {
-      final ContainerInfo info = newContainerInfo(i);
-      containerManager.getContainerStore().put(new ContainerID(i), info);
-      containerManager.getContainerStateManager()
-          .addContainerInfo(i, info, null, null);
-    }
   }
 
   @Test
@@ -174,7 +169,7 @@ public class TestReconContainerManager
 
     // Init Container 1
     final long cIDlong1 = 1L;
-    final ContainerID containerID1 = new ContainerID(cIDlong1);
+    final ContainerID containerID1 = ContainerID.valueOf(cIDlong1);
 
     // Init DN01
     final UUID uuid1 = UUID.randomUUID();
@@ -191,7 +186,14 @@ public class TestReconContainerManager
     Assert.assertEquals(0, repHistMap.size());
 
     // Put a replica info and call updateContainerReplica
-    putContainerInfos(containerManager, 10);
+    Pipeline pipeline = getRandomPipeline();
+    getPipelineManager().addPipeline(pipeline);
+    for (int i = 1; i <= 10; i++) {
+      final ContainerInfo info = newContainerInfo(i, pipeline);
+      containerManager.addNewContainer(i,
+          new ContainerWithPipeline(info, pipeline));
+    }
+
     containerManager.updateContainerReplica(containerID1, containerReplica1);
     // Should have 1 container entry in the replica history map
     Assert.assertEquals(1, repHistMap.size());

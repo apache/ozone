@@ -182,7 +182,7 @@ public class TestLeaderChoosePolicy {
 
       int destroyNum = r.nextInt(pipelines.size());
       for (int k = 0; k <= destroyNum; k++) {
-        pipelineManager.finalizeAndDestroyPipeline(pipelines.get(k), false);
+        pipelineManager.closePipeline(pipelines.get(k), false);
       }
 
       waitForPipelines(pipelineNum);

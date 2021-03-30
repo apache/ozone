@@ -73,7 +73,9 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.proxy.SCMContainerLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.io.retry.RetryProxy;
 import org.apache.hadoop.ipc.ProtobufHelper;
 import org.apache.hadoop.ipc.ProtocolTranslator;
 import org.apache.hadoop.ipc.RPC;
@@ -103,15 +105,21 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   private static final RpcController NULL_RPC_CONTROLLER = null;
 
   private final StorageContainerLocationProtocolPB rpcProxy;
+  private final SCMContainerLocationFailoverProxyProvider fpp;
 
   /**
    * Creates a new StorageContainerLocationProtocolClientSideTranslatorPB.
    *
-   * @param rpcProxy {@link StorageContainerLocationProtocolPB} RPC proxy
+   * @param proxyProvider {@link SCMContainerLocationFailoverProxyProvider}
    */
   public StorageContainerLocationProtocolClientSideTranslatorPB(
-      StorageContainerLocationProtocolPB rpcProxy) {
-    this.rpcProxy = rpcProxy;
+      SCMContainerLocationFailoverProxyProvider proxyProvider) {
+    Preconditions.checkNotNull(proxyProvider);
+    this.fpp = proxyProvider;
+    this.rpcProxy = (StorageContainerLocationProtocolPB) RetryProxy.create(
+        StorageContainerLocationProtocolPB.class,
+        fpp,
+        fpp.getRetryPolicy());
   }
 
   /**
@@ -122,7 +130,6 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
       Consumer<Builder> builderConsumer) throws IOException {
     final ScmContainerLocationResponse response;
     try {
-
       Builder builder = ScmContainerLocationRequest.newBuilder()
           .setCmdType(type)
           .setVersion(CURRENT_VERSION)
@@ -139,7 +146,16 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
   private ScmContainerLocationResponse submitRpcRequest(
       ScmContainerLocationRequest wrapper) throws ServiceException {
-    return rpcProxy.submitRequest(NULL_RPC_CONTROLLER, wrapper);
+    if (!ADMIN_COMMAND_TYPE.contains(wrapper.getCmdType())) {
+      return rpcProxy.submitRequest(NULL_RPC_CONTROLLER, wrapper);
+    }
+
+    // TODO: Modify ScmContainerLocationResponse to hold results from multi SCM
+    ScmContainerLocationResponse response = null;
+    for (StorageContainerLocationProtocolPB proxy : fpp.getProxies()) {
+      response = proxy.submitRequest(NULL_RPC_CONTROLLER, wrapper);
+    }
+    return response;
   }
 
   /**
@@ -558,7 +574,9 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
         .getGetScmInfoResponse();
     ScmInfo.Builder builder = new ScmInfo.Builder()
         .setClusterId(resp.getClusterId())
-        .setScmId(resp.getScmId());
+        .setScmId(resp.getScmId())
+        .setRatisPeerRoles(resp.getPeerRolesList());
+
     return builder.build();
 
   }

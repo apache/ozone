@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.NodeReportFromDatanode;
@@ -58,8 +59,8 @@ public class TestNodeReportHandler implements EventPublisher {
     SCMStorageConfig storageConfig = Mockito.mock(SCMStorageConfig.class);
     Mockito.when(storageConfig.getClusterID()).thenReturn("cluster1");
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
-    nodeManager =
-        new SCMNodeManager(conf, storageConfig, new EventQueue(), clusterMap);
+    nodeManager = new SCMNodeManager(conf, storageConfig,
+        new EventQueue(), clusterMap, SCMContext.emptyContext());
     nodeReportHandler = new NodeReportHandler(nodeManager);
   }
 

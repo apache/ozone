@@ -68,12 +68,32 @@ services:
       - 9862
     hostname: om3
     command: ["ozone","om"]
-  scm:
+  scm1:
     <<: *common-config
     ports:
-      - 9876:9876
+      - 9876
     environment:
       ENSURE_SCM_INITIALIZED: /data/metadata/scm/current/VERSION
+      OZONE-SITE.XML_hdds.scm.safemode.min.datanode: ${OZONE_SAFEMODE_MIN_DATANODES:-1}
+      <<: *replication
+    command: ["ozone","scm"]
+  scm2:
+    <<: *common-config
+    ports:
+      - 9876
+    environment:
+      WAITFOR: scm1:9865
+      ENSURE_SCM_BOOTSTRAPPED: /data/metadata/scm/current/VERSION
+      OZONE-SITE.XML_hdds.scm.safemode.min.datanode: ${OZONE_SAFEMODE_MIN_DATANODES:-1}
+      <<: *replication
+    command: ["ozone","scm"]
+  scm3:
+    <<: *common-config
+    ports:
+      - 9876
+    environment:
+      WAITFOR: scm2:9865
+      ENSURE_SCM_BOOTSTRAPPED: /data/metadata/scm/current/VERSION
       OZONE-SITE.XML_hdds.scm.safemode.min.datanode: ${OZONE_SAFEMODE_MIN_DATANODES:-1}
       <<: *replication
     command: ["ozone","scm"]

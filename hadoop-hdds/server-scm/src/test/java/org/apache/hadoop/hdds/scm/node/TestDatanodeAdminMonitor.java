@@ -425,7 +425,7 @@ public class TestDatanodeAdminMonitor {
   private Set<ContainerID> generateContainers(int count) {
     Set<ContainerID> containers = new HashSet<>();
     for (int i=0; i<count; i++) {
-      containers.add(new ContainerID(i));
+      containers.add(ContainerID.valueOf(i));
     }
     return containers;
   }
