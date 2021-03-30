@@ -27,7 +27,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.DefaultProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.PKIProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.SelfSignedCertificate;
@@ -60,6 +59,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 
 import static org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest.getCertificationRequest;
@@ -118,7 +119,7 @@ public class DefaultCAServer implements CertificateServer {
   private final String subject;
   private final String clusterID;
   private final String scmID;
-  private String componentName = Paths.get("scm", "ca").toString();
+  private String componentName;
   private Path caKeysPath;
   private Path caRootX509Path;
   private SecurityConfig config;
@@ -129,6 +130,7 @@ public class DefaultCAServer implements CertificateServer {
   private CertificateApprover approver;
   private CRLApprover crlApprover;
   private CertificateStore store;
+  private Lock lock;
 
   /**
    * Create an Instance of DefaultCAServer.
@@ -138,11 +140,15 @@ public class DefaultCAServer implements CertificateServer {
    * @param certificateStore - A store used to persist Certificates.
    */
   public DefaultCAServer(String subject, String clusterID, String scmID,
-                         CertificateStore certificateStore) {
+                         CertificateStore certificateStore,
+      PKIProfile pkiProfile, String componentName) {
     this.subject = subject;
     this.clusterID = clusterID;
     this.scmID = scmID;
     this.store = certificateStore;
+    this.profile = pkiProfile;
+    this.componentName = componentName;
+    lock = new ReentrantLock();
   }
 
   @Override
@@ -151,28 +157,18 @@ public class DefaultCAServer implements CertificateServer {
     caKeysPath = securityConfig.getKeyLocation(componentName);
     caRootX509Path = securityConfig.getCertificateLocation(componentName);
     this.config = securityConfig;
-
-    // TODO: Make these configurable and load different profiles based on
-    // config.
-    profile = new DefaultProfile();
     this.approver = new DefaultApprover(profile, this.config);
 
     /* In future we will split this code to have different kind of CAs.
      * Right now, we have only self-signed CertificateServer.
      */
 
-    if (type == CAType.SELF_SIGNED_CA) {
-      VerificationStatus status = verifySelfSignedCA(securityConfig);
-      Consumer<SecurityConfig> caInitializer =
-          processVerificationStatus(status);
-      caInitializer.accept(securityConfig);
-      crlApprover = new DefaultCRLApprover(securityConfig,
-          getCAKeys().getPrivate());
-      return;
-    }
-
-    LOG.error("We support only Self-Signed CAs for now.");
-    throw new IllegalStateException("Not implemented functionality requested.");
+    VerificationStatus status = verifySelfSignedCA(securityConfig);
+    Consumer<SecurityConfig> caInitializer =
+        processVerificationStatus(status, type);
+    caInitializer.accept(securityConfig);
+    crlApprover = new DefaultCRLApprover(securityConfig,
+        getCAKeys().getPrivate());
   }
 
   @Override
@@ -265,12 +261,22 @@ public class DefaultCAServer implements CertificateServer {
       LocalDate endDate, PKCS10CertificationRequest csr, NodeType role)
       throws IOException,
       OperatorCreationException, CertificateException {
-    X509CertificateHolder xcert = approver.sign(config,
-        getCAKeys().getPrivate(),
-        getCACertificate(), java.sql.Date.valueOf(beginDate),
-        java.sql.Date.valueOf(endDate), csr, scmID, clusterID);
-    store.storeValidCertificate(xcert.getSerialNumber(),
-        CertificateCodec.getX509Certificate(xcert), role);
+
+    lock.lock();
+    X509CertificateHolder xcert;
+    try {
+      xcert = approver.sign(config,
+          getCAKeys().getPrivate(),
+          getCACertificate(), java.sql.Date.valueOf(beginDate),
+          java.sql.Date.valueOf(endDate), csr, scmID, clusterID);
+      if (store != null) {
+        store.checkValidCertID(xcert.getSerialNumber());
+        store.storeValidCertificate(xcert.getSerialNumber(),
+            CertificateCodec.getX509Certificate(xcert), role);
+      }
+    } finally {
+      lock.unlock();
+    }
     return xcert;
   }
 
@@ -414,7 +420,7 @@ public class DefaultCAServer implements CertificateServer {
    */
   @VisibleForTesting
   Consumer<SecurityConfig> processVerificationStatus(
-      VerificationStatus status) {
+      VerificationStatus status,  CAType type) {
     Consumer<SecurityConfig> consumer = null;
     switch (status) {
     case SUCCESS:
@@ -442,19 +448,31 @@ public class DefaultCAServer implements CertificateServer {
       };
       break;
     case INITIALIZE:
-      consumer = (arg) -> {
-        try {
-          generateSelfSignedCA(arg);
-        } catch (NoSuchProviderException | NoSuchAlgorithmException
-            | IOException e) {
-          LOG.error("Unable to initialize CertificateServer.", e);
-        }
-        VerificationStatus newStatus = verifySelfSignedCA(arg);
-        if (newStatus != VerificationStatus.SUCCESS) {
-          LOG.error("Unable to initialize CertificateServer, failed in " +
-              "verification.");
-        }
-      };
+      if (type == CAType.SELF_SIGNED_CA) {
+        consumer = (arg) -> {
+          try {
+            generateSelfSignedCA(arg);
+          } catch (NoSuchProviderException | NoSuchAlgorithmException
+              | IOException e) {
+            LOG.error("Unable to initialize CertificateServer.", e);
+          }
+          VerificationStatus newStatus = verifySelfSignedCA(arg);
+          if (newStatus != VerificationStatus.SUCCESS) {
+            LOG.error("Unable to initialize CertificateServer, failed in " +
+                "verification.");
+          }
+        };
+      } else if (type == CAType.INTERMEDIARY_CA) {
+        // For sub CA certificates are generated during bootstrap/init. If
+        // both keys/certs are missing, init/bootstrap is missed to be
+        // performed.
+        consumer = (arg) -> {
+          LOG.error("Sub SCM CA Server is missing keys/certs. SCM is started " +
+              "with out init/bootstrap");
+          throw new IllegalStateException("INTERMEDIARY_CA Should not be" +
+              " in Initialize State during startup.");
+        };
+      }
       break;
     default:
       /* Make CheckStyle happy */

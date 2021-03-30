@@ -50,6 +50,7 @@ message SCMSecurityRequest {
     optional SCMGetCACertificateRequestProto getCACertificateRequest = 6;
     optional SCMListCertificateRequestProto listCertificateRequest = 7;
     optional SCMGetSCMCertRequestProto getSCMCertificateRequest = 8;
+    optional SCMListCACertificateRequestProto listCACertificateRequestProto = 9;
 
 }
 
@@ -79,6 +80,8 @@ enum Type {
     GetCACertificate = 4;
     ListCertificate = 5;
     GetSCMCertificate = 6;
+    GetRootCACertificate = 7;
+    ListCACertificate = 8;
 }
 
 enum Status {
@@ -96,6 +99,7 @@ enum Status {
     DEFAULT = 12;
     MISSING_BLOCK_TOKEN = 13;
     BLOCK_TOKEN_VERIFICATION_FAILED = 14;
+    GET_ROOT_CA_CERTIFICATE_FAILED = 15;
 }
 /**
 * This message is send by data node to prove its identity and get an SCM
@@ -155,6 +159,8 @@ message SCMGetCertResponseProto {
     required ResponseCode responseCode = 1;
     required string x509Certificate = 2; // Base64 encoded X509 certificate.
     optional string x509CACertificate = 3; // Base64 encoded CA X509 certificate.
+    // Base64 encoded Root CA X509 certificate.
+    optional string x509RootCACertificate = 4;
 }
 
 /**
@@ -169,6 +175,11 @@ message SCMListCertificateResponseProto {
     repeated string certificates = 2;
 }
 
+message SCMGetRootCACertificateRequestProto {
+}
+
+message SCMListCACertificateRequestProto {
+}
 
 service SCMSecurityProtocolService {
     rpc submitRequest (SCMSecurityRequest) returns (SCMSecurityResponse);

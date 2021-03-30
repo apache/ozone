@@ -1230,8 +1230,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * @throws IOException
    */
   private void startTrashEmptier(Configuration conf) throws IOException {
+    long hadoopTrashInterval =
+        conf.getLong(FS_TRASH_INTERVAL_KEY, FS_TRASH_INTERVAL_DEFAULT);
+    // check whether user has configured ozone specific trash-interval
+    // if not fall back to hadoop configuration
     long trashInterval =
-            conf.getLong(FS_TRASH_INTERVAL_KEY, FS_TRASH_INTERVAL_DEFAULT);
+            conf.getLong(OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY,
+                hadoopTrashInterval);
     if (trashInterval == 0) {
       LOG.info("Trash Interval set to 0. Files deleted will not move to trash");
       return;

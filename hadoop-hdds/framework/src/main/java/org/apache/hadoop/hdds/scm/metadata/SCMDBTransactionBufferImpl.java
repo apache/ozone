@@ -31,13 +31,13 @@ public class SCMDBTransactionBufferImpl implements DBTransactionBuffer {
   }
 
   @Override
-  public void addToBuffer(Table table, Object key, Object value)
-      throws IOException {
+  public <KEY, VALUE> void addToBuffer(
+      Table<KEY, VALUE> table, KEY key, VALUE value) throws IOException {
     table.put(key, value);
   }
 
   @Override
-  public void removeFromBuffer(Table table, Object key)
+  public <KEY, VALUE>void removeFromBuffer(Table<KEY, VALUE> table, KEY key)
       throws IOException {
     table.delete(key);
   }

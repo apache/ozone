@@ -103,7 +103,8 @@ public class TestContainerSmallFile {
         "data123".getBytes(UTF_8), null);
     ContainerProtos.GetSmallFileResponseProto response =
         ContainerProtocolCalls.readSmallFile(client, blockID, null);
-    String readData = response.getData().getData().toStringUtf8();
+    String readData = response.getData().getDataBuffers().getBuffersList()
+        .get(0).toStringUtf8();
     Assert.assertEquals("data123", readData);
     xceiverClientManager.releaseClient(client, false);
   }
@@ -204,7 +205,8 @@ public class TestContainerSmallFile {
     blockID1.setBlockCommitSequenceId(bcsId);
     ContainerProtos.GetSmallFileResponseProto response =
         ContainerProtocolCalls.readSmallFile(client, blockID1, null);
-    String readData = response.getData().getData().toStringUtf8();
+    String readData = response.getData().getDataBuffers().getBuffersList()
+        .get(0).toStringUtf8();
     Assert.assertEquals("data123", readData);
     xceiverClientManager.releaseClient(client, false);
   }

@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
 
+import static org.apache.hadoop.ozone.OzoneConsts.SCM_CERT_SERIAL_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.STORAGE_DIR;
 
@@ -77,4 +78,20 @@ public class SCMStorageConfig extends Storage {
     return scmProperties;
   }
 
+  /**
+   * Sets the SCM Sub-CA certificate serial id.
+   * @param certSerialId
+   * @throws IOException
+   */
+  public void setScmCertSerialId(String certSerialId) throws IOException {
+    getStorageInfo().setProperty(SCM_CERT_SERIAL_ID, certSerialId);
+  }
+
+  /**
+   * Retrives the SCM Sub-CA certificate serial id from the version file.
+   * @return scm sub-CA certificate serial id
+   */
+  public String getScmCertSerialId() {
+    return getStorageInfo().getProperty(SCM_CERT_SERIAL_ID);
+  }
 }
