@@ -25,11 +25,11 @@ import java.io.IOException;
 /**
  * DB transaction that abstracts the updates to the underlying datastore.
  */
-public interface DBTransactionBuffer<KEY, VALUE> extends Closeable {
+public interface DBTransactionBuffer extends Closeable {
 
-  void addToBuffer(Table<KEY, VALUE> table, KEY key, VALUE value) throws
-      IOException;
+  <KEY, VALUE> void addToBuffer(Table<KEY, VALUE> table, KEY key, VALUE value)
+      throws IOException;
 
-  void removeFromBuffer(Table<KEY, VALUE> table, KEY key) throws
-      IOException;
+  <KEY, VALUE> void removeFromBuffer(Table<KEY, VALUE> table, KEY key)
+      throws IOException;
 }
