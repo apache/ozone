@@ -238,9 +238,7 @@ public class OMException extends IOException {
     DIRECTORY_NOT_EMPTY,
 
     TENANT_ALREADY_EXISTS,
-
     TENANT_USER_ALREADY_EXISTS,
-
     INVALID_TENANT_USER_NAME
 
   }
