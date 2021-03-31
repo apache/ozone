@@ -62,6 +62,7 @@ import org.apache.hadoop.test.LambdaTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
@@ -251,6 +252,7 @@ public class TestHDDSUpgrade {
     });
   }
 
+  @Ignore("Needs PipelineManager logic refactor after SCM HA merge.")
   @Test
   public void testFinalizationFromInitialVersionToLatestVersion()
       throws Exception {
