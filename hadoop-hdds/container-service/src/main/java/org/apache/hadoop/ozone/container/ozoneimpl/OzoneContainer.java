@@ -92,11 +92,6 @@ public class OzoneContainer {
   private final ReplicationServer replicationServer;
   private DatanodeDetails datanodeDetails;
 
-  /**
-   * If SCM HA is enabled, OzoneContainer#start() will be called multi-times
-   * from VersionEndpointTask. The first call should do the initializing job,
-   * the successive calls should wait until OzoneContainer is initialized.
-   */
   enum InitializingStatus {
     UNINITIALIZED, INITIALIZING, INITIALIZED
   }
@@ -268,6 +263,9 @@ public class OzoneContainer {
    * @throws IOException
    */
   public void start(String clusterId) throws IOException {
+    // If SCM HA is enabled, OzoneContainer#start() will be called multi-times
+    // from VersionEndpointTask. The first call should do the initializing job,
+    // the successive calls should wait until OzoneContainer is initialized.
     if (!initializingStatus.compareAndSet(
         InitializingStatus.UNINITIALIZED, InitializingStatus.INITIALIZING)) {
 
