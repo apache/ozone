@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
@@ -602,7 +603,6 @@ public class DatanodeStateMachine implements Closeable {
     return layoutStorage;
   }
 
-  @VisibleForTesting
   private boolean canFinalizeDataNode() {
     // Lets be sure that we do not have any open container before we return
     // from here. This function should be called in its own finalizer thread
@@ -611,12 +611,13 @@ public class DatanodeStateMachine implements Closeable {
         getContainer().getController().getContainers();
     while (containerIt.hasNext()) {
       Container ctr = containerIt.next();
-      switch (ctr.getContainerState()) {
+      State state = ctr.getContainerState();
+      switch (state) {
       case OPEN:
       case CLOSING:
       case UNHEALTHY:
         LOG.warn("FinalizeUpgrade : Waiting for container to close, current " +
-            "state is: {}", ctr.getContainerState());
+            "state is: {}", state);
         return false;
       default:
         continue;
@@ -646,6 +647,6 @@ public class DatanodeStateMachine implements Closeable {
         false);
   }
   public UpgradeFinalizer<DatanodeStateMachine> getUpgradeFinalizer() {
-    return  upgradeFinalizer;
+    return upgradeFinalizer;
   }
 }

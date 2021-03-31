@@ -1780,6 +1780,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   }
 
   public UpgradeFinalizer<StorageContainerManager> getUpgradeFinalizer() {
-    return  upgradeFinalizer;
+    return upgradeFinalizer;
   }
 }

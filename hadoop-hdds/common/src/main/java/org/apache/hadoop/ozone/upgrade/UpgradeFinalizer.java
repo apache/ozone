@@ -28,7 +28,6 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.concurrent.Callable;
 
 /**
  * Interface to define the upgrade finalizer implementations.
@@ -44,28 +43,6 @@ import java.util.concurrent.Callable;
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public interface UpgradeFinalizer<T> {
-
-  enum UpgradeTestInjectionPoints {
-    BeforePreFinalizeUpgrade(1),
-    AfterPreFinalizeUpgrade(2),
-    BeforeCompleteFinalization(3),
-    AfterCompleteFinalization(4),
-    AfterPostFinalizeUpgrade(5);
-
-    private int val;
-    UpgradeTestInjectionPoints(int value) {
-      val = value;
-    }
-
-    public int getValue() {
-      return val;
-    }
-  }
-
-  class UpgradeTestInjectionAbort extends Exception {
-    public UpgradeTestInjectionAbort() {
-    }
-  }
 
   Logger LOG = LoggerFactory.getLogger(UpgradeFinalizer.class);
 
@@ -95,7 +72,6 @@ public interface UpgradeFinalizer<T> {
    * ongoing, the messages that should be passed to the initiating client of
    * finalization.
    * This translates to a counterpart in the RPC layer.
-   * @see UpgradeFinalizationStatus in OMClientProtocol.proto
    */
   class StatusAndMessages {
     private Status status;
@@ -212,21 +188,8 @@ public interface UpgradeFinalizer<T> {
       throws IOException;
 
   /**
-   * Interface to inject arbitrary failures for stress testing.
-   * @param InjectTestFunction function that will be called
-   *        code execution reached injectTestFunctionAtThisPoint() location.
-   * @param pointIndex code execution point for a given thread.
+   * Sets the Finalization Executor driver.
+   * @param executor FinalizationExecutor.
    */
-  void configureTestInjectionFunction(UpgradeTestInjectionPoints pointIndex,
-                                      Callable<Boolean> injectTestFunction);
-
-  /**
-   * Interface to inject error at a given point in an upgrade thread.
-   * @param pointIndex TestFunction Injection point in an upgrade thread.
-   * @return "true" if the calling thread should not continue with further
-   *          upgrade processing, "false" otherwise.
-   */
-  Boolean injectTestFunctionAtThisPoint(UpgradeTestInjectionPoints pointIndex)
-      throws Exception;
-
+  void setFinalizationExecutor(UpgradeFinalizationExecutor executor);
 }

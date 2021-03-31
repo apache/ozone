@@ -36,7 +36,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Queue;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Function;
 import java.util.concurrent.TimeUnit;
@@ -58,18 +57,32 @@ public abstract class BasicUpgradeFinalizer
   protected V versionManager;
   protected String clientID;
   protected T component;
+  protected UpgradeFinalizationExecutor finalizationExecutor;
 
   private Queue<String> msgs = new ConcurrentLinkedQueue<>();
   protected boolean isDone = false;
-  private Callable<Boolean> injectTestFunction;
-  private UpgradeTestInjectionPoints testInjectionPoint;
 
   public BasicUpgradeFinalizer(V versionManager) {
     this.versionManager = versionManager;
+    this.finalizationExecutor =
+        new UpgradeFinalizationExecutor();
+  }
+
+  @Override
+  public void setFinalizationExecutor(UpgradeFinalizationExecutor executor) {
+    finalizationExecutor = executor;
   }
 
   public boolean isFinalizationDone() {
     return isDone;
+  }
+
+  public void markFinalizationDone() {
+    isDone = true;
+  }
+
+  public V getVersionManager() {
+    return versionManager;
   }
 
   public synchronized StatusAndMessages preFinalize(String upgradeClientID,
@@ -184,7 +197,6 @@ public abstract class BasicUpgradeFinalizer
     return status.equals(UpgradeFinalizer.Status.ALREADY_FINALIZED)
         || status.equals(FINALIZATION_DONE);
   }
-
 
   protected void finalizeFeature(LayoutFeature feature, Storage config,
                                  Optional<? extends UpgradeAction> action)
@@ -440,25 +452,14 @@ public abstract class BasicUpgradeFinalizer
     throw new UnsupportedOperationException();
   }
 
-  @Override
-  public void configureTestInjectionFunction(
-      UpgradeTestInjectionPoints pointIndex,
-      Callable<Boolean> injectedTestFunction) {
-    injectTestFunction = injectedTestFunction;
-    testInjectionPoint = pointIndex;
+  protected void postFinalizeUpgrade() throws IOException {
   }
 
-  @Override
-  public Boolean injectTestFunctionAtThisPoint(
-      UpgradeTestInjectionPoints pointIndex) throws Exception {
-    if ((testInjectionPoint != null) &&
-        (pointIndex.getValue() == testInjectionPoint.getValue())) {
-      if (injectTestFunction != null) {
-        if (injectTestFunction.call()) {
-          throw new UpgradeTestInjectionAbort();
-        }
-      }
-    }
-    return false;
+  protected void finalizeVersionManager(Storage storageConfig)
+      throws UpgradeException {
+  }
+
+  protected boolean preFinalizeUpgrade() throws IOException {
+    return true;
   }
 }
