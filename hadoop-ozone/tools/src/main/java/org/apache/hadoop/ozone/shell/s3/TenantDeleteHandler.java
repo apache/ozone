@@ -17,6 +17,19 @@
  */
 package org.apache.hadoop.ozone.shell.s3;
 
-// TODO: See VolumeCommands
-public class UserCommands {
+import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.shell.OzoneAddress;
+import picocli.CommandLine;
+
+/**
+ * ozone s3 tenant delete
+ */
+@CommandLine.Command(name = "delete",
+    description = "Delete a tenant")
+public class TenantDeleteHandler extends S3Handler {
+
+  @Override
+  protected void execute(OzoneClient client, OzoneAddress address) {
+    out().println("Not Implemented.");
+  }
 }

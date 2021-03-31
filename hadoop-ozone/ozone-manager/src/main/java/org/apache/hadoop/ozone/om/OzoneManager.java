@@ -2767,7 +2767,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   /**
    * Create tenant user.
    */
-  public void createTenantUser(String tenantUsername, String tenantName)
+  public S3SecretValue createTenantUser(String tenantUsername, String tenantName)
       throws IOException {
     throw new NotImplementedException(
         "non-Ratis createTenantUser() is not implemented");

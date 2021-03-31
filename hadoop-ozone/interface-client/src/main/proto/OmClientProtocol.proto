@@ -1308,6 +1308,7 @@ message DeleteTenantResponse {
 
 message CreateTenantUserResponse {
     optional bool success = 1;
+    optional S3Secret s3Secret = 2;
 }
 
 message ModifyTenantUserResponse {

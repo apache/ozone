@@ -403,7 +403,7 @@ public interface OzoneManagerProtocol
    * @param tenantName tenant name.
    * @throws IOException
    */
-  void createTenantUser(String tenantUsername, String tenantName)
+  S3SecretValue createTenantUser(String tenantUsername, String tenantName)
       throws IOException;
 
   // TODO: modify, delete

@@ -47,7 +47,6 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
 import org.apache.hadoop.ozone.om.helpers.OmRenameKeys;
-import org.apache.hadoop.ozone.om.helpers.OmTenantUserArgs;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
@@ -72,6 +71,9 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateF
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateFileResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateTenantRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateTenantUserRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateTenantUserResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateVolumeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesResponse;
@@ -131,8 +133,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameK
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameKeysRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenewDelegationTokenResponseProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RevokeS3SecretRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateTenantRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateTenantUserRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetAclRequest;
@@ -871,6 +871,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     handleError(submitRequest(omRequest));
   }
 
+  /**
+   * {@inheritDoc}
+   */
   @Override
   public void createTenant(String tenantArgs)
       throws IOException {
@@ -886,8 +889,11 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   // TODO: Add a variant that uses OmTenantArgs
   // TODO: modify, delete
 
+  /**
+   * {@inheritDoc}
+   */
   @Override
-  public void createTenantUser(String tenantUsername, String tenantName)
+  public S3SecretValue createTenantUser(String tenantUsername, String tenantName)
       throws IOException {
     final CreateTenantUserRequest request = CreateTenantUserRequest.newBuilder()
         .setTenantUsername(tenantUsername)
@@ -897,7 +903,10 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setCreateTenantUserRequest(request)
         .build();
     final OMResponse omResponse = submitRequest(omRequest);
-    handleError(omResponse);
+    final CreateTenantUserResponse resp = handleError(omResponse)
+        .getCreateTenantUserResponse();
+
+    return S3SecretValue.fromProtobuf(resp.getS3Secret());
   }
   // TODO: Add a variant that uses OmTenantUserArgs
   // TODO: modify, delete

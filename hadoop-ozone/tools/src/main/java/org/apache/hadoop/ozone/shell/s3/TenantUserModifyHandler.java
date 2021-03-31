@@ -17,42 +17,19 @@
  */
 package org.apache.hadoop.ozone.shell.s3;
 
-import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import picocli.CommandLine;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-
 /**
- * ozone s3 tenant create
+ * ozone s3 user modify
  */
-@CommandLine.Command(name = "create",
-    description = "Create one or more tenants")
-public class TenantCreateHandler extends S3Handler {
-
-  @CommandLine.Spec
-  private CommandLine.Model.CommandSpec spec;
-
-  @CommandLine.Parameters(description = "List of tenant names")
-  private List<String> tenants = new ArrayList<>();
+@CommandLine.Command(name = "modify",
+    description = "Modify a tenant user")
+public class TenantUserModifyHandler extends S3Handler {
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address) {
-    if (tenants.size() > 0) {
-      for (String tenantName : tenants) {
-        try {
-          client.getObjectStore().createTenant(tenantName);
-          out().println("Successfully created tenant " + tenantName);
-        } catch (IOException e) {
-          out().println("Failed to create tenant " + tenantName + ": " +
-              e.getMessage());
-        }
-      }
-    } else {
-      GenericCli.missingSubcommand(spec);
-    }
+    out().println("Not Implemented.");
   }
 }

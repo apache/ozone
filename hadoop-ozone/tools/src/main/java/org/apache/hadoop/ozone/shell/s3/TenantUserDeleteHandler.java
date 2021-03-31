@@ -15,49 +15,21 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-
 package org.apache.hadoop.ozone.shell.s3;
 
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import picocli.CommandLine;
 
-import java.io.IOException;
-
 /**
- * Ozone s3 user create
+ * ozone s3 user delete
  */
-@CommandLine.Command(name = "create",
-    description = "Create a new S3 user")
-public class UserCreateHandler extends S3Handler {
-  /*
-  @CommandLine.Option(names = "-e",
-      description = "Print out variables together with 'export' prefix, to "
-          + "use it from 'eval $(ozone s3 getsecret)'")
-  private boolean export;
-  */
-
-  // TODO: Limit to security enabled only later?
-/*
-  @Override
-  protected boolean isApplicable() {
-    return securityEnabled();
-  }
-*/
+@CommandLine.Command(name = "delete",
+    description = "Delete a tenant user")
+public class TenantUserDeleteHandler extends S3Handler {
 
   @Override
-  protected void execute(OzoneClient client, OzoneAddress address)
-      throws IOException {
-    /*
-    String userName = UserGroupInformation.getCurrentUser().getUserName();
-
-    final S3SecretValue secret = client.getObjectStore().getS3Secret(userName);
-    if (export) {
-      out().println("export AWS_ACCESS_KEY_ID=" + secret.getAwsAccessKey());
-      out().println("export AWS_SECRET_ACCESS_KEY=" + secret.getAwsSecret());
-    } else {
-      out().println(secret);
-    }
-    */
+  protected void execute(OzoneClient client, OzoneAddress address) {
+    out().println("Not Implemented.");
   }
 }
