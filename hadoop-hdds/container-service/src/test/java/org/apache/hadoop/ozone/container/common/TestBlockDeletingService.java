@@ -696,19 +696,19 @@ public class TestBlockDeletingService {
       // blockLimitPerInterval = 10
       // each interval will at most runDeletingTasks = 10 blocks
       // but as per of deletion policy (random/topNorder), it will fetch all 3
-      // blocks of last container instead of 1.
-      // C1 - 3 BLOCKS, C2 - 3 BLOCKS, C3 - 3 BLOCKS, C4 - 3 BLOCKS(NOT 1)
+      // blocks from first 3 containers and 1 block from last container.
+      // C1 - 3 BLOCKS, C2 - 3 BLOCKS, C3 - 3 BLOCKS, C4 - 1 BLOCK
 
-      // Deleted space of 12 blocks should be equal to (initial total space
+      // Deleted space of 10 blocks should be equal to (initial total space
       // of container - current total space of container).
       deleteAndWait(service, 1);
-      Assert.assertEquals((blockLimitPerInterval + 2) * blockSpace,
+      Assert.assertEquals(blockLimitPerInterval * blockSpace,
           (totalContainerSpace - currentBlockSpace(containerData,
               containerCount)));
 
       // There is only 5 blocks left to runDeletingTasks
 
-      // (Deleted space of previous 12 blocks + these left 3 blocks) should
+      // (Deleted space of previous 10 blocks + these left 5 blocks) should
       // be equal to (initial total space of container
       // - current total space of container(it will be zero as all blocks
       // in all the containers are deleted)).

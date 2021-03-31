@@ -62,17 +62,17 @@ public class RandomContainerDeletionChoosingPolicy
 
     for (ContainerData entry : shuffled) {
       if (((KeyValueContainerData) entry).getNumPendingDeletionBlocks() > 0) {
-        blockCount -=
-            ((KeyValueContainerData) entry).getNumPendingDeletionBlocks();
-        result.add(new ContainerBlockInfo(entry,
-            ((KeyValueContainerData) entry).getNumPendingDeletionBlocks()));
-        if (blockCount <= 0) {
-          break;
-        }
+        long numBlocksToDelete = Math.min(blockCount,
+            ((KeyValueContainerData) entry).getNumPendingDeletionBlocks());
+        blockCount -= numBlocksToDelete;
+        result.add(new ContainerBlockInfo(entry, numBlocksToDelete));
         if (LOG.isDebugEnabled()) {
           LOG.debug("Select container {} for block deletion, "
                   + "pending deletion blocks num: {}.", entry.getContainerID(),
               ((KeyValueContainerData) entry).getNumPendingDeletionBlocks());
+        }
+        if (blockCount == 0) {
+          break;
         }
       }
     }

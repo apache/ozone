@@ -58,7 +58,6 @@ public class DatanodeConfiguration {
   private int replicationMaxStreams = REPLICATION_MAX_STREAMS_DEFAULT;
 
   static final int CONTAINER_DELETE_THREADS_DEFAULT = 2;
-  static final int OZONE_BLOCK_DELETING_LIMIT_PER_INTERVAL = 1000;
 
   /**
    * The maximum number of threads used to delete containers on a datanode
@@ -95,13 +94,13 @@ public class DatanodeConfiguration {
   }
 
   @Config(key = "block.deleting.limit.per.interval",
-      defaultValue = "1000",
+      defaultValue = "5000",
       type = ConfigType.INT,
       tags = { ConfigTag.SCM, ConfigTag.DELETION },
       description =
           "Number of blocks to be deleted in an interval."
   )
-  private int blockLimitPerInterval = OZONE_BLOCK_DELETING_LIMIT_PER_INTERVAL;
+  private int blockLimitPerInterval = 5000;
 
   public int getBlockDeletionLimit() {
     return blockLimitPerInterval;

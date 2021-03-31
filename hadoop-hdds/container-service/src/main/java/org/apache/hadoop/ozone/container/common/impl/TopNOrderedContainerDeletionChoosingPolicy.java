@@ -75,16 +75,17 @@ public class TopNOrderedContainerDeletionChoosingPolicy
 
     for (KeyValueContainerData entry : orderedList) {
       if (entry.getNumPendingDeletionBlocks() > 0) {
-        totalBlocks -= entry.getNumPendingDeletionBlocks();
-        result.add(
-            new ContainerBlockInfo(entry, entry.getNumPendingDeletionBlocks()));
-        if (totalBlocks <= 0) {
-          break;
-        }
+        long numBlocksToDelete =
+            Math.min(totalBlocks, entry.getNumPendingDeletionBlocks());
+        totalBlocks -= numBlocksToDelete;
+        result.add(new ContainerBlockInfo(entry, numBlocksToDelete));
         if (LOG.isDebugEnabled()) {
           LOG.debug("Select container {} for block deletion, "
                   + "pending deletion blocks num: {}.", entry.getContainerID(),
               entry.getNumPendingDeletionBlocks());
+        }
+        if (totalBlocks == 0) {
+          break;
         }
       } else {
         LOG.debug("Stop looking for next container, there is no"

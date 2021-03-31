@@ -105,8 +105,8 @@ public class BlockDeletingService extends BackgroundService {
       throw new RuntimeException(e);
     }
     this.conf = conf;
-    DatanodeConfiguration subject = conf.getObject(DatanodeConfiguration.class);
-    this.blockLimitPerInterval = subject.getBlockDeletionLimit();
+    DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
+    this.blockLimitPerInterval = dnConf.getBlockDeletionLimit();
   }
 
   public static class ContainerBlockInfo {
@@ -325,13 +325,11 @@ public class BlockDeletingService extends BackgroundService {
         Handler handler = Objects.requireNonNull(ozoneContainer.getDispatcher()
             .getHandler(container.getContainerType()));
 
-        int blocksDeleted = 0;
         for (Table.KeyValue<String, BlockData> entry: toDeleteBlocks) {
           String blockName = entry.getKey();
           LOG.debug("Deleting block {}", blockName);
           try {
             handler.deleteBlock(container, entry.getValue());
-            blocksDeleted++;
             succeedBlocks.add(blockName);
           } catch (InvalidProtocolBufferException e) {
             LOG.error("Failed to parse block info for block {}", blockName, e);
