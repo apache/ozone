@@ -36,7 +36,6 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.UUID;
 
-import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.FILE_PER_CHUNK;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
