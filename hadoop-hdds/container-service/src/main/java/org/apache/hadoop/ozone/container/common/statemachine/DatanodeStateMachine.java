@@ -60,6 +60,7 @@ import org.apache.hadoop.ozone.container.replication.SimpleContainerDownloader;
 import org.apache.hadoop.ozone.container.upgrade.DataNodeUpgradeFinalizer;
 import org.apache.hadoop.ozone.container.upgrade.DatanodeMetadataFeatures;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.util.JvmPauseMonitor;
 import org.apache.hadoop.util.Time;
@@ -602,7 +603,7 @@ public class DatanodeStateMachine implements Closeable {
   }
 
   @VisibleForTesting
-  public boolean canFinalizeDataNode() {
+  private boolean canFinalizeDataNode() {
     // Lets be sure that we do not have any open container before we return
     // from here. This function should be called in its own finalizer thread
     // context.
@@ -614,6 +615,8 @@ public class DatanodeStateMachine implements Closeable {
       case OPEN:
       case CLOSING:
       case UNHEALTHY:
+        LOG.warn("FinalizeUpgrade : Waiting for container to close, current " +
+            "state is: {}", ctr.getContainerState());
         return false;
       default:
         continue;
@@ -641,5 +644,8 @@ public class DatanodeStateMachine implements Closeable {
       throws IOException{
     return upgradeFinalizer.reportStatus(datanodeDetails.getUuidString(),
         false);
+  }
+  public UpgradeFinalizer<DatanodeStateMachine> getUpgradeFinalizer() {
+    return  upgradeFinalizer;
   }
 }

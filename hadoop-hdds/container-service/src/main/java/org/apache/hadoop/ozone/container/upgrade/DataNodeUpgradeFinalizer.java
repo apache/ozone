@@ -22,6 +22,11 @@ import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_DONE;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_IN_PROGRESS;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_REQUIRED;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.UpgradeTestInjectionPoints.AfterCompleteFinalization;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.UpgradeTestInjectionPoints.AfterPostFinalizeUpgrade;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.UpgradeTestInjectionPoints.AfterPreFinalizeUpgrade;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.UpgradeTestInjectionPoints.BeforeCompleteFinalization;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.UpgradeTestInjectionPoints.BeforePreFinalizeUpgrade;
 
 import java.io.IOException;
 import java.util.Optional;
@@ -33,12 +38,17 @@ import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeAction;
+import org.apache.hadoop.ozone.upgrade.LayoutFeature;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * UpgradeFinalizer for the DataNode.
  */
 public class DataNodeUpgradeFinalizer extends
     BasicUpgradeFinalizer<DatanodeStateMachine, HDDSLayoutVersionManager> {
+  static final Logger LOG =
+      LoggerFactory.getLogger(DataNodeUpgradeFinalizer.class);
 
   public DataNodeUpgradeFinalizer(HDDSLayoutVersionManager versionManager,
                                   String optionalClientID) {
@@ -54,7 +64,12 @@ public class DataNodeUpgradeFinalizer extends
     if (response.status() != FINALIZATION_REQUIRED) {
       return response;
     }
-    new Worker(dsm).call();
+    try {
+      new Worker(dsm).call();
+    } catch (Exception e) {
+      e.printStackTrace();
+      throw new IOException(e.getMessage());
+    }
     return STARTING_MSG;
   }
 
@@ -71,13 +86,15 @@ public class DataNodeUpgradeFinalizer extends
     }
 
     @Override
-    public Void call() throws IOException {
+    public Void call() throws Exception {
+      injectTestFunctionAtThisPoint(BeforePreFinalizeUpgrade);
       if(!datanodeStateMachine.preFinalizeUpgrade()) {
-      // datanode is not yet ready to finalize.
+      // DataNode is not yet ready to finalize.
       // Reset the Finalization state.
         versionManager.setUpgradeState(FINALIZATION_REQUIRED);
         return null;
       }
+      injectTestFunctionAtThisPoint(AfterPreFinalizeUpgrade);
       try {
         emitStartingMsg();
         versionManager.setUpgradeState(FINALIZATION_IN_PROGRESS);
@@ -89,14 +106,22 @@ public class DataNodeUpgradeFinalizer extends
               datanodeStateMachine.getLayoutStorage());
           versionManager.finalized(f);
         }
+        injectTestFunctionAtThisPoint(BeforeCompleteFinalization);
         versionManager.completeFinalization();
+        injectTestFunctionAtThisPoint(AfterCompleteFinalization);
         datanodeStateMachine.postFinalizeUpgrade();
+        injectTestFunctionAtThisPoint(AfterPostFinalizeUpgrade);
         emitFinishedMsg();
         return null;
+      } catch (Exception e) {
+        e.printStackTrace();
+        if (versionManager.needsFinalization()) {
+          versionManager.setUpgradeState(FINALIZATION_REQUIRED);
+        }
       } finally {
-        versionManager.setUpgradeState(FINALIZATION_DONE);
         isDone = true;
       }
+      return null;
     }
   }
 

@@ -22,6 +22,11 @@ import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_DONE;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_IN_PROGRESS;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_REQUIRED;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.UpgradeTestInjectionPoints.AfterCompleteFinalization;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.UpgradeTestInjectionPoints.AfterPostFinalizeUpgrade;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.UpgradeTestInjectionPoints.AfterPreFinalizeUpgrade;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.UpgradeTestInjectionPoints.BeforeCompleteFinalization;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.UpgradeTestInjectionPoints.BeforePreFinalizeUpgrade;
 
 import java.io.IOException;
 import java.util.Optional;
@@ -53,7 +58,12 @@ public class SCMUpgradeFinalizer extends
     if (response.status() != FINALIZATION_REQUIRED) {
       return response;
     }
-    new Worker(scm).call();
+    try {
+      new Worker(scm).call();
+    } catch (InterruptedException e) {
+      e.printStackTrace();
+      throw new IOException(e.getMessage());
+    }
     return STARTING_MSG;
   }
 
@@ -70,7 +80,7 @@ public class SCMUpgradeFinalizer extends
     }
 
     @Override
-    public Void call() throws IOException {
+    public Void call() throws IOException, InterruptedException {
       try {
         emitStartingMsg();
         versionManager.setUpgradeState(FINALIZATION_IN_PROGRESS);
@@ -83,7 +93,10 @@ public class SCMUpgradeFinalizer extends
             "during upgrade.";
         msg += "\nNew pipelines creation will remain frozen until upgrade " +
             "is finalized.";
+
+        injectTestFunctionAtThisPoint(BeforePreFinalizeUpgrade);
         scm.preFinalizeUpgrade();
+        injectTestFunctionAtThisPoint(AfterPreFinalizeUpgrade);
         logAndEmit(msg);
         SCMStorageConfig storage = scm.getScmStorageConfig();
 
@@ -93,14 +106,22 @@ public class SCMUpgradeFinalizer extends
           updateLayoutVersionInVersionFile(f, storage);
           versionManager.finalized(f);
         }
+        injectTestFunctionAtThisPoint(BeforeCompleteFinalization);
         versionManager.completeFinalization();
+        injectTestFunctionAtThisPoint(AfterCompleteFinalization);
         scm.postFinalizeUpgrade();
+        injectTestFunctionAtThisPoint(AfterPostFinalizeUpgrade);
         emitFinishedMsg();
         return null;
+      } catch (Exception e) {
+        e.printStackTrace();
+        if (versionManager.needsFinalization()) {
+          versionManager.setUpgradeState(FINALIZATION_REQUIRED);
+        }
       } finally {
-        versionManager.setUpgradeState(FINALIZATION_DONE);
         isDone = true;
       }
+      return null;
     }
   }
 

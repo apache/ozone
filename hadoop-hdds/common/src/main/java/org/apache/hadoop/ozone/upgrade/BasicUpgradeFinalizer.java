@@ -36,6 +36,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Queue;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Function;
 import java.util.concurrent.TimeUnit;
@@ -60,6 +61,8 @@ public abstract class BasicUpgradeFinalizer
 
   private Queue<String> msgs = new ConcurrentLinkedQueue<>();
   protected boolean isDone = false;
+  private Callable<Boolean> injectTestFunction;
+  private UpgradeTestInjectionPoints testInjectionPoint;
 
   public BasicUpgradeFinalizer(V versionManager) {
     this.versionManager = versionManager;
@@ -435,5 +438,27 @@ public abstract class BasicUpgradeFinalizer
 
   protected void updateLayoutVersionInDB(V vm, T comp) throws IOException {
     throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public void configureTestInjectionFunction(
+      UpgradeTestInjectionPoints pointIndex,
+      Callable<Boolean> injectedTestFunction) {
+    injectTestFunction = injectedTestFunction;
+    testInjectionPoint = pointIndex;
+  }
+
+  @Override
+  public Boolean injectTestFunctionAtThisPoint(
+      UpgradeTestInjectionPoints pointIndex) throws Exception {
+    if ((testInjectionPoint != null) &&
+        (pointIndex.getValue() == testInjectionPoint.getValue())) {
+      if (injectTestFunction != null) {
+        if (injectTestFunction.call()) {
+          throw new UpgradeTestInjectionAbort();
+        }
+      }
+    }
+    return false;
   }
 }
