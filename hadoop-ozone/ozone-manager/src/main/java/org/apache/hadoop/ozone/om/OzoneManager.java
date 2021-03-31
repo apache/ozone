@@ -2756,8 +2756,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   /**
    * Create tenant.
-   * @param tenantName tenant name.
-   * @throws IOException
    */
   public void createTenant(String tenantName) throws IOException {
     throw new NotImplementedException(
@@ -2768,10 +2766,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   /**
    * Create tenant user.
-   * @param tenantUsername tenant user name.
-   * @throws IOException
    */
-  public void createTenantUser(String tenantUsername) throws IOException {
+  public void createTenantUser(String tenantUsername, String tenantName)
+      throws IOException {
     throw new NotImplementedException(
         "non-Ratis createTenantUser() is not implemented");
   }

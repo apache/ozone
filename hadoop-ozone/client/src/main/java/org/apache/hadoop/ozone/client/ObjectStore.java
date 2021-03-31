@@ -186,10 +186,12 @@ public class ObjectStore {
   /**
    * Create tenant user.
    * @param tenantUsername tenant user name.
+   * @param tenantName tenant name.
    * @throws IOException
    */
-  public void createTenantUser(String tenantUsername) throws IOException {
-    proxy.createTenantUser(tenantUsername);
+  public void createTenantUser(String tenantUsername, String tenantName)
+      throws IOException {
+    proxy.createTenantUser(tenantUsername, tenantName);
   }
 
   // TODO: modify, delete

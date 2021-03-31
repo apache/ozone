@@ -20,12 +20,18 @@ package org.apache.hadoop.ozone.om.helpers;
 
 public class OmTenantUserArgs {
   private final String tenantUsername;
+  private final String tenantName;
 
-  public OmTenantUserArgs(String tenantUsername) {
+  public OmTenantUserArgs(String tenantUsername, String tenantName) {
     this.tenantUsername = tenantUsername;
+    this.tenantName = tenantName;
   }
 
   public String getTenantUsername() {
     return tenantUsername;
+  }
+
+  public String getTenantName() {
+    return tenantName;
   }
 }

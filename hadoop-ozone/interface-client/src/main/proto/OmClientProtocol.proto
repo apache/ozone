@@ -1283,6 +1283,7 @@ message DeleteTenantRequest {
 
 message CreateTenantUserRequest {
     optional string tenantUsername = 1;
+    optional string tenantName = 2;
 }
 
 message ModifyTenantUserRequest {

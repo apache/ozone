@@ -575,9 +575,11 @@ public interface ClientProtocol {
   /**
    * Create tenant user.
    * @param tenantUsername tenant user name.
+   * @param tenantName tenant name.
    * @throws IOException
    */
-  void createTenantUser(String tenantUsername) throws IOException;
+  void createTenantUser(String tenantUsername, String tenantName)
+      throws IOException;
 
   // TODO: modify, delete
 

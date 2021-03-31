@@ -348,7 +348,7 @@ public interface OMMetadataManager extends DBStoreHAManager {
 
   Table<String, TransactionInfo> getTransactionInfoTable();
 
-  Table<String, OmDBTenantInfo> getTenantUserTable();
+  Table<String, String> getTenantUserTable();
 
   Table<String, OmDBTenantInfo> getTenantStateTable();
 
