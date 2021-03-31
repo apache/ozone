@@ -156,24 +156,17 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     OMClientResponse omClientResponse = null;
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
-
     boolean acquiredVolumeLock = false;
     boolean acquiredUserLock = false;
     Tenant tenant = null;
-
-    // TODO: Double check volume owner existence
     // TODO: owner should be access_key_id
     final String owner = getOmRequest().getUserInfo().getUserName();
-    LOG.debug("hasUserInfo: {}, owner: {}",
-        getOmRequest().hasUserInfo(), owner);
-
+    LOG.info("owner: {}", owner);
     Map<String, String> auditMap = new HashMap<>();
-
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     CreateTenantRequest request = getOmRequest().getCreateTenantRequest();
     String tenantName = request.getTenantName();
     final String dbVolumeKey = omMetadataManager.getVolumeKey(tenantName);
-
     IOException exception = null;
     try {
       // Check ACL
@@ -214,12 +207,10 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
           userPolicyGroupName, bucketPolicyGroupName);
       omMetadataManager.getTenantStateTable().addCacheEntry(
           new CacheKey<>(tenantName),
-          new CacheValue<>(Optional.of(omDBTenantInfo), transactionLogIndex)
-      );
+          new CacheValue<>(Optional.of(omDBTenantInfo), transactionLogIndex));
 
       // Call OMMultiTenantManager
       tenant = ozoneManager.getMultiTenantManager().createTenant(tenantName);
-
       final String tenantDefaultPolicies =
           tenant.getTenantAccessPolicies().stream()
           .map(e->e.getPolicyID()) .collect(Collectors.joining(","));
@@ -228,29 +219,25 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       omMetadataManager.getTenantPolicyTable().addCacheEntry(
           new CacheKey<>(userPolicyGroupName),
           new CacheValue<>(Optional.of(tenantDefaultPolicies),
-              transactionLogIndex)
-      );
-
+              transactionLogIndex));
       final String bucketPolicyId =
           bucketPolicyGroupName + OzoneConsts.DEFAULT_TENANT_POLICY_ID_SUFFIX;
       omMetadataManager.getTenantPolicyTable().addCacheEntry(
           new CacheKey<>(bucketPolicyGroupName),
-          new CacheValue<>(Optional.of(bucketPolicyId), transactionLogIndex)
-      );
+          new CacheValue<>(Optional.of(bucketPolicyId), transactionLogIndex));
 
       // Create volume
       acquiredUserLock = omMetadataManager.getLock().acquireWriteLock(USER_LOCK,
           owner);
 
-      // TODO: Dedup with OMVolumeCreateRequest?
+      // TODO: Dedup with OMVolumeCreateRequest
       OzoneManagerStorageProtos.PersistedUserVolumeInfo volumeList;
-      OmVolumeArgs omVolumeArgs;
       // omVolumeArgs = OmVolumeArgs.getFromProtobuf(volumeInfo);
       // TODO: Refactor this with volumeInfo from preExecute
       final VolumeInfo volumeInfo =
           getOmRequest().getCreateVolumeRequest().getVolumeInfo();
       LOG.info("Vol mod time: {}", volumeInfo.getModificationTime()); // TODO
-      omVolumeArgs = OmVolumeArgs.newBuilder()
+      OmVolumeArgs omVolumeArgs = OmVolumeArgs.newBuilder()
           .setAdminName(owner)
           .setOwnerName(owner)
           .setVolume(dbVolumeKey)
@@ -324,10 +311,10 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
 
     if (exception == null) {
       LOG.debug("Successfully created tenant {}", tenantName);
-      // TODO: Metrics? see OMVolumeCreateRequest
+      // TODO: metrics, see OMVolumeCreateRequest
     } else {
       LOG.error("Failed to create tenant {}", tenantName, exception);
-      // TODO: Metrics?
+      // TODO: metrics
     }
     return omClientResponse;
   }
