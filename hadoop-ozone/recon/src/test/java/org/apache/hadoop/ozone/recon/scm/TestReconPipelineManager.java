@@ -26,6 +26,10 @@ import java.util.List;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
+import org.apache.hadoop.hdds.scm.ha.MockSCMHADBTransactionBuffer;
+import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -70,6 +74,8 @@ public class TestReconPipelineManager {
   private SCMStorageConfig scmStorageConfig;
   private DBStore store;
   private HDDSLayoutVersionManager versionManager;
+  private SCMHAManager scmhaManager;
+  private SCMContext scmContext;
 
   @Before
   public void setup() throws IOException {
@@ -79,6 +85,9 @@ public class TestReconPipelineManager {
     conf.set(OZONE_SCM_NAMES, "localhost");
     scmStorageConfig = new ReconStorageConfig(conf);
     store = DBStoreBuilder.createDBStore(conf, new ReconSCMDBDefinition());
+    scmhaManager = MockSCMHAManager.getInstance(
+        true, new MockSCMHADBTransactionBuffer(store));
+    scmContext = SCMContext.emptyContext();
   }
 
   @After
@@ -114,20 +123,23 @@ public class TestReconPipelineManager {
 
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     EventQueue eventQueue = new EventQueue();
-
     this.versionManager =
         Mockito.mock(HDDSLayoutVersionManager.class);
     Mockito.when(versionManager.getMetadataLayoutVersion())
         .thenReturn(maxLayoutVersion());
     Mockito.when(versionManager.getSoftwareLayoutVersion())
         .thenReturn(maxLayoutVersion());
-    NodeManager nodeManager =
-        new SCMNodeManager(conf, scmStorageConfig, eventQueue, clusterMap,
-            versionManager);
+    NodeManager nodeManager = new SCMNodeManager(conf, scmStorageConfig,
+        eventQueue, clusterMap, SCMContext.emptyContext(), versionManager);
 
     try (ReconPipelineManager reconPipelineManager =
-        new ReconPipelineManager(conf, nodeManager,
-            ReconSCMDBDefinition.PIPELINES.getTable(store), eventQueue)) {
+             ReconPipelineManager.newReconPipelineManager(
+                 conf,
+                 nodeManager,
+                 ReconSCMDBDefinition.PIPELINES.getTable(store),
+                 eventQueue,
+                 scmhaManager,
+                 scmContext)) {
       reconPipelineManager.addPipeline(validPipeline);
       reconPipelineManager.addPipeline(invalidPipeline);
 
@@ -164,13 +176,18 @@ public class TestReconPipelineManager {
         .thenReturn(maxLayoutVersion());
     Mockito.when(versionManager.getSoftwareLayoutVersion())
         .thenReturn(maxLayoutVersion());
-    NodeManager nodeManager =
-        new SCMNodeManager(conf, scmStorageConfig, eventQueue, clusterMap,
-            versionManager);
+    NodeManager nodeManager = new SCMNodeManager(conf, scmStorageConfig,
+        eventQueue, clusterMap, SCMContext.emptyContext(), versionManager);
 
     ReconPipelineManager reconPipelineManager =
-        new ReconPipelineManager(conf, nodeManager,
-            ReconSCMDBDefinition.PIPELINES.getTable(store), eventQueue);
+        ReconPipelineManager.newReconPipelineManager(
+            conf,
+            nodeManager,
+            ReconSCMDBDefinition.PIPELINES.getTable(store),
+            eventQueue,
+            scmhaManager,
+            scmContext);
+
     assertFalse(reconPipelineManager.containsPipeline(pipeline.getId()));
     reconPipelineManager.addPipeline(pipeline);
     assertTrue(reconPipelineManager.containsPipeline(pipeline.getId()));
@@ -181,9 +198,15 @@ public class TestReconPipelineManager {
 
     NodeManager nodeManagerMock = mock(NodeManager.class);
 
-    ReconPipelineManager reconPipelineManager = new ReconPipelineManager(
-        conf, nodeManagerMock, ReconSCMDBDefinition.PIPELINES.getTable(store),
-        new EventQueue());
+    ReconPipelineManager reconPipelineManager =
+        ReconPipelineManager.newReconPipelineManager(
+            conf,
+            nodeManagerMock,
+            ReconSCMDBDefinition.PIPELINES.getTable(store),
+            new EventQueue(),
+            scmhaManager,
+            scmContext);
+
     PipelineFactory pipelineFactory = reconPipelineManager.getPipelineFactory();
     assertTrue(pipelineFactory instanceof ReconPipelineFactory);
     ReconPipelineFactory reconPipelineFactory =

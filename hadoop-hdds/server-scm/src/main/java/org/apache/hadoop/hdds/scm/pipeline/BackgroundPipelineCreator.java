@@ -113,7 +113,7 @@ class BackgroundPipelineCreator {
     }
   }
 
-  private void createPipelines() {
+  private void createPipelines() throws RuntimeException {
     // TODO: #CLUTIL Different replication factor may need to be supported
 
     if(pausePipelineCreation.get()) {

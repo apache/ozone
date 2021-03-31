@@ -18,30 +18,41 @@
 package org.apache.hadoop.hdds.utils;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import com.google.protobuf.BlockingService;
+import org.apache.commons.compress.archivers.ArchiveEntry;
+import org.apache.commons.compress.archivers.ArchiveOutputStream;
+import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
+import org.apache.commons.compress.compressors.CompressorException;
+import org.apache.commons.compress.compressors.CompressorOutputStream;
+import org.apache.commons.compress.compressors.CompressorStreamFactory;
+import org.apache.commons.compress.utils.IOUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
-import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolPB;
 import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
-import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolPB;
+import org.apache.hadoop.hdds.scm.proxy.SCMSecurityProtocolFailoverProxyProvider;
 import org.apache.hadoop.hdds.server.ServerUtils;
-import org.apache.hadoop.io.retry.RetryPolicies;
-import org.apache.hadoop.io.retry.RetryPolicy;
-import org.apache.hadoop.ipc.Client;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.metrics2.MetricsException;
@@ -147,7 +158,8 @@ public final class HddsServerUtil {
 
     final int port = getPortNumberFromConfigKeys(conf,
         ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY)
-        .orElse(ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT);
+        .orElse(conf.getInt(ScmConfigKeys.OZONE_SCM_CLIENT_PORT_KEY,
+            ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT));
 
     return NetUtils.createSocketAddr(host + ":" + port);
   }
@@ -167,7 +179,8 @@ public final class HddsServerUtil {
 
     final int port = getPortNumberFromConfigKeys(conf,
         ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY)
-        .orElse(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT);
+        .orElse(conf.getInt(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_KEY,
+            ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT));
 
     return NetUtils.createSocketAddr(host + ":" + port);
   }
@@ -419,20 +432,9 @@ public final class HddsServerUtil {
    */
   public static SCMSecurityProtocolClientSideTranslatorPB getScmSecurityClient(
       OzoneConfiguration conf) throws IOException {
-    RPC.setProtocolEngine(conf, SCMSecurityProtocolPB.class,
-        ProtobufRpcEngine.class);
-    long scmVersion =
-        RPC.getProtocolVersion(ScmBlockLocationProtocolPB.class);
-    InetSocketAddress address =
-        getScmAddressForSecurityProtocol(conf);
-    RetryPolicy retryPolicy =
-        RetryPolicies.retryForeverWithFixedSleep(
-            1000, TimeUnit.MILLISECONDS);
     return new SCMSecurityProtocolClientSideTranslatorPB(
-        RPC.getProtocolProxy(SCMSecurityProtocolPB.class, scmVersion,
-            address, UserGroupInformation.getCurrentUser(),
-            conf, NetUtils.getDefaultSocketFactory(conf),
-            Client.getRpcTimeout(conf), retryPolicy).getProxy());
+        new SCMSecurityProtocolFailoverProxyProvider(conf,
+            UserGroupInformation.getCurrentUser()));
   }
 
 
@@ -473,17 +475,11 @@ public final class HddsServerUtil {
    */
   public static SCMSecurityProtocol getScmSecurityClient(
       OzoneConfiguration conf, UserGroupInformation ugi) throws IOException {
-    RPC.setProtocolEngine(conf, SCMSecurityProtocolPB.class,
-        ProtobufRpcEngine.class);
-    long scmVersion =
-        RPC.getProtocolVersion(ScmBlockLocationProtocolPB.class);
-    InetSocketAddress scmSecurityProtoAdd =
-        getScmAddressForSecurityProtocol(conf);
-    return new SCMSecurityProtocolClientSideTranslatorPB(
-        RPC.getProxy(SCMSecurityProtocolPB.class, scmVersion,
-            scmSecurityProtoAdd, ugi, conf,
-            NetUtils.getDefaultSocketFactory(conf),
-            Client.getRpcTimeout(conf)));
+    SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient =
+        new SCMSecurityProtocolClientSideTranslatorPB(
+            new SCMSecurityProtocolFailoverProxyProvider(conf, ugi));
+    return TracingUtil.createProxy(scmSecurityClient,
+        SCMSecurityProtocol.class, conf);
   }
 
   /**
@@ -505,6 +501,51 @@ public final class HddsServerUtil {
   }
 
   /**
+   * Write DB Checkpoint to an output stream as a compressed file (tgz).
+   *
+   * @param checkpoint  checkpoint file
+   * @param destination destination output stream.
+   * @throws IOException
+   */
+  public static void writeDBCheckpointToStream(DBCheckpoint checkpoint,
+      OutputStream destination)
+      throws IOException {
+    try (CompressorOutputStream gzippedOut = new CompressorStreamFactory()
+        .createCompressorOutputStream(CompressorStreamFactory.GZIP,
+            destination);
+        ArchiveOutputStream archiveOutputStream =
+            new TarArchiveOutputStream(gzippedOut);
+        Stream<Path> files =
+            Files.list(checkpoint.getCheckpointLocation())) {
+      for (Path path : files.collect(Collectors.toList())) {
+        if (path != null) {
+          Path fileName = path.getFileName();
+          if (fileName != null) {
+            includeFile(path.toFile(), fileName.toString(),
+                archiveOutputStream);
+          }
+        }
+      }
+    } catch (CompressorException e) {
+      throw new IOException(
+          "Can't compress the checkpoint: " +
+              checkpoint.getCheckpointLocation(), e);
+    }
+  }
+
+  private static void includeFile(File file, String entryName,
+      ArchiveOutputStream archiveOutputStream)
+      throws IOException {
+    ArchiveEntry archiveEntry =
+        archiveOutputStream.createArchiveEntry(file, entryName);
+    archiveOutputStream.putArchiveEntry(archiveEntry);
+    try (FileInputStream fis = new FileInputStream(file)) {
+      IOUtils.copy(fis, archiveOutputStream);
+    }
+    archiveOutputStream.closeArchiveEntry();
+  }
+
+  /**
    * Converts RocksDB exception to IOE.
    * @param msg  - Message to add to exception.
    * @param e - Original Exception.
@@ -519,5 +560,4 @@ public final class HddsServerUtil {
         + "; message : " + errMessage;
     return new IOException(output, e);
   }
-
 }

@@ -25,6 +25,7 @@ import org.apache.ratis.thirdparty.io.grpc.Metadata;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Paths;
 import java.util.regex.Pattern;
 
 import static org.apache.ratis.thirdparty.io.grpc.Metadata.ASCII_STRING_MARSHALLER;
@@ -38,6 +39,8 @@ public final class OzoneConsts {
 
   public static final String STORAGE_DIR = "scm";
   public static final String SCM_ID = "scmUuid";
+  public static final String CLUSTER_ID_PREFIX = "CID-";
+  public static final String SCM_CERT_SERIAL_ID = "scmCertSerialId";
 
   public static final String OZONE_SIMPLE_ROOT_USER = "root";
   public static final String OZONE_SIMPLE_HDFS_USER = "hdfs";
@@ -124,7 +127,9 @@ public final class OzoneConsts {
   public static final String PIPELINE_DB_SUFFIX = "pipeline.db";
   public static final String DN_CONTAINER_DB = "-dn-"+ CONTAINER_DB_SUFFIX;
   public static final String OM_DB_NAME = "om.db";
+  public static final String SCM_DB_NAME = "scm.db";
   public static final String OM_DB_BACKUP_PREFIX = "om.db.backup.";
+  public static final String SCM_DB_BACKUP_PREFIX = "scm.db.backup.";
 
   public static final String STORAGE_DIR_CHUNKS = "chunks";
   public static final String OZONE_DB_CHECKPOINT_REQUEST_FLUSH =
@@ -390,6 +395,13 @@ public final class OzoneConsts {
   public static final String CONTAINER_DB_TYPE_ROCKSDB = "RocksDB";
   public static final String CONTAINER_DB_TYPE_LEVELDB = "LevelDB";
 
+  // SCM HA
+  public static final String SCM_SERVICE_ID_DEFAULT = "scmServiceIdDefault";
+
+  // SCM Ratis snapshot file to store the last applied index
+  public static final String SCM_RATIS_SNAPSHOT_INDEX = "scmRatisSnapshotIndex";
+
+  public static final String SCM_RATIS_SNAPSHOT_TERM = "scmRatisSnapshotTerm";
   // An on-disk transient marker file used when replacing DB with checkpoint
   public static final String DB_TRANSIENT_MARKER = "dbInconsistentMarker";
 
@@ -397,13 +409,31 @@ public final class OzoneConsts {
   // should remain prepared even after a restart.
   public static final String PREPARE_MARKER = "prepareMarker";
 
+  // TODO : rename this to OZONE_RATIS_SNAPSHOT_DIR and use it in both
+  // SCM and OM
   public static final String OM_RATIS_SNAPSHOT_DIR = "snapshot";
+  public static final String SCM_RATIS_SNAPSHOT_DIR = "snapshot";
 
   public static final long DEFAULT_OM_UPDATE_ID = -1L;
+
+  // SCM default service Id and node Id in non-HA where config is not defined
+  // in non-HA style.
+  public static final String SCM_DUMMY_NODEID = "scmNodeId";
+  public static final String SCM_DUMMY_SERVICE_ID = "scmServiceId";
+
   // CRL Sequence Id
   public static final String CRL_SEQUENCE_ID_KEY = "CRL_SEQUENCE_ID";
 
+  public static final String SCM_CA_PATH = "ca";
+  public static final String SCM_CA_CERT_STORAGE_DIR = "scm";
+  public static final String SCM_SUB_CA_PATH = "sub-ca";
+
+  public static final String SCM_ROOT_CA_COMPONENT_NAME =
+      Paths.get(SCM_CA_CERT_STORAGE_DIR, SCM_CA_PATH).toString();
+
+  public static final String SCM_SUB_CA_PREFIX = "scm-sub@";
+  public static final String SCM_ROOT_CA_PREFIX = "scm@";
+
   // Layout Version written into Meta Table ONLY during finalization.
   public static final String LAYOUT_VERSION_KEY = "#LAYOUTVERSION";
-
 }

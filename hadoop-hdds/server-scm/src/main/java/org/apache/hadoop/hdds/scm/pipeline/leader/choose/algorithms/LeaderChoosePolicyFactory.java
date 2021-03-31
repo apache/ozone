@@ -21,7 +21,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineStateManager;
+import org.apache.hadoop.hdds.scm.pipeline.StateManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,7 +45,7 @@ public final class LeaderChoosePolicyFactory {
 
   public static LeaderChoosePolicy getPolicy(
       ConfigurationSource conf, final NodeManager nodeManager,
-      final PipelineStateManager pipelineStateManager) throws SCMException {
+      final StateManager pipelineStateManager) throws SCMException {
     final Class<? extends LeaderChoosePolicy> policyClass = conf
         .getClass(ScmConfigKeys.OZONE_SCM_PIPELINE_LEADER_CHOOSING_POLICY,
             OZONE_SCM_PIPELINE_LEADER_CHOOSING_POLICY_DEFAULT,
@@ -53,7 +53,7 @@ public final class LeaderChoosePolicyFactory {
     Constructor<? extends LeaderChoosePolicy> constructor;
     try {
       constructor = policyClass.getDeclaredConstructor(NodeManager.class,
-          PipelineStateManager.class);
+          StateManager.class);
       LOG.info("Create leader choose policy of type {}",
           policyClass.getCanonicalName());
     } catch (NoSuchMethodException e) {

@@ -37,11 +37,11 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.NodeReportFromDatanode;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
-import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
@@ -161,7 +161,7 @@ public class TestSCMNodeManager {
 
   SCMNodeManager createNodeManager(OzoneConfiguration config)
       throws IOException, AuthenticationException {
-    scm = HddsTestUtils.getScm(config);
+    scm = TestUtils.getScm(config);
     return (SCMNodeManager) scm.getScmNodeManager();
   }
 
@@ -610,7 +610,8 @@ public class TestSCMNodeManager {
     HDDSLayoutVersionManager lvm  =
         new HDDSLayoutVersionManager(scmStorageConfig.getLayoutVersion());
     SCMNodeManager nodeManager  = new SCMNodeManager(conf,
-        scmStorageConfig, eventPublisher, new NetworkTopologyImpl(conf), lvm);
+        scmStorageConfig, eventPublisher, new NetworkTopologyImpl(conf),
+        SCMContext.emptyContext(), lvm);
     DatanodeDetails node1 =
         TestUtils.createRandomDatanodeAndRegister(nodeManager);
     verify(eventPublisher,

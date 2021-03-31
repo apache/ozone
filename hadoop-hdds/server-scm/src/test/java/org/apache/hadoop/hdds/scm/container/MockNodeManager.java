@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.scm.net.NetConstants;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.net.Node;
+import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -267,6 +268,21 @@ public class MockNodeManager implements NodeManager {
   @Override
   public Map<DatanodeDetails, SCMNodeStat> getNodeStats() {
     return nodeMetricMap;
+  }
+
+  /**
+   * Gets a sorted list of most or least used DatanodeUsageInfo containing
+   * healthy, in-service nodes. If the specified mostUsed is true, the returned
+   * list is in descending order of usage. Otherwise, the returned list is in
+   * ascending order of usage.
+   *
+   * @param mostUsed true if most used, false if least used
+   * @return List of DatanodeUsageInfo
+   */
+  @Override
+  public List<DatanodeUsageInfo> getMostOrLeastUsedDatanodes(
+      boolean mostUsed) {
+    return null;
   }
 
   /**

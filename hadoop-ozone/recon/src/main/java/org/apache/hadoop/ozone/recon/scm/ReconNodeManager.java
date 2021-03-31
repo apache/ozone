@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionRequestProto;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -77,7 +78,7 @@ public class ReconNodeManager extends SCMNodeManager {
                           Table<UUID, DatanodeDetails> nodeDB,
                           HDDSLayoutVersionManager scmLayoutVersionManager) {
     super(conf, scmStorageConfig, eventPublisher, networkTopology,
-        scmLayoutVersionManager);
+        SCMContext.emptyContext(), scmLayoutVersionManager);
     this.nodeDB = nodeDB;
     loadExistingNodes();
   }

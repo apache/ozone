@@ -189,8 +189,8 @@ public class TestEndPoint {
 
       // Now change server scmId, so datanode scmId  will be
       // different from SCM server response scmId
-      String newScmId = UUID.randomUUID().toString();
-      scmServerImpl.setScmId(newScmId);
+      String newClusterId = UUID.randomUUID().toString();
+      scmServerImpl.setClusterId(newClusterId);
       rpcEndPoint.setState(EndpointStateMachine.EndPointStates.GETVERSION);
       newState = versionTask.call();
       Assert.assertEquals(EndpointStateMachine.EndPointStates.SHUTDOWN,
@@ -198,11 +198,9 @@ public class TestEndPoint {
       List<HddsVolume> volumesList = ozoneContainer.getVolumeSet()
           .getFailedVolumesList();
       Assert.assertTrue(volumesList.size() == 1);
-      File expectedScmDir = new File(volumesList.get(0).getHddsRootDir(),
-          scmServerImpl.getScmId());
-      Assert.assertTrue(logCapturer.getOutput().contains("expected scm " +
-          "directory " + expectedScmDir.getAbsolutePath() + " does not " +
-          "exist"));
+      Assert.assertTrue(logCapturer.getOutput()
+          .contains("org.apache.hadoop.ozone.common" +
+              ".InconsistentStorageStateException: Mismatched ClusterIDs"));
       Assert.assertTrue(ozoneContainer.getVolumeSet().getVolumesList().size()
           == 0);
       Assert.assertTrue(ozoneContainer.getVolumeSet().getFailedVolumesList()

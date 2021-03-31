@@ -53,9 +53,9 @@ import org.slf4j.LoggerFactory;
  * <p>
  * The disk layout per volume is as follows:
  * <p>../hdds/VERSION
- * <p>{@literal ../hdds/<<scmUuid>>/current/<<containerDir>>/<<containerID
+ * <p>{@literal ../hdds/<<clusterUuid>>/current/<<containerDir>>/<<containerID
  * >>/metadata}
- * <p>{@literal ../hdds/<<scmUuid>>/current/<<containerDir>>/<<containerID
+ * <p>{@literal ../hdds/<<clusterUuid>>/current/<<containerDir>>/<<containerID
  * >>/<<dataDir>>}
  * <p>
  * Each hdds volume has its own VERSION file. The hdds volume will have one

@@ -19,9 +19,11 @@
 
 package org.apache.hadoop.hdds.security.x509.certificate.authority;
 
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.cert.X509CertificateHolder;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
+import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 
 import java.io.IOException;
 import java.math.BigInteger;
@@ -45,10 +47,20 @@ public interface CertificateStore {
    * Writes a new certificate that was issued to the persistent store.
    * @param serialID - Certificate Serial Number.
    * @param certificate - Certificate to persist.
+   * @param role - OM/DN/SCM.
    * @throws IOException - on Failure.
    */
+  @Replicate
   void storeValidCertificate(BigInteger serialID,
-                             X509Certificate certificate) throws IOException;
+      X509Certificate certificate, NodeType role) throws IOException;
+
+  /**
+   * Check certificate serialID exists or not. If exists throws an exception.
+   * @param serialID
+   * @throws IOException
+   */
+  void checkValidCertID(BigInteger serialID) throws IOException;
+
 
   /**
    * Adds the certificates to be revoked to a new CRL and moves all the
@@ -99,9 +111,15 @@ public interface CertificateStore {
    * @return list of X509 certificates.
    * @throws IOException - on failure.
    */
-  List<X509Certificate> listCertificate(HddsProtos.NodeType role,
+  List<X509Certificate> listCertificate(NodeType role,
       BigInteger startSerialID, int count, CertType certType)
       throws IOException;
+
+  /**
+   * Reinitialize the certificate server.
+   * @param metadataStore SCMMetaStore.
+   */
+  void reinitialize(SCMMetadataStore metadataStore);
 
   /**
    * Different kind of Certificate stores.
@@ -110,5 +128,4 @@ public interface CertificateStore {
     VALID_CERTS,
     REVOKED_CERTS
   }
-
 }

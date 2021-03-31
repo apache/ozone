@@ -30,7 +30,11 @@ import org.apache.hadoop.hdds.server.events.IdentifiableEventPayload;
  */
 public abstract class SCMCommand<T extends GeneratedMessage> implements
     IdentifiableEventPayload {
-  private long id;
+  private final long id;
+
+  // If running upon Ratis, holds term of underlying RaftServer iff current
+  // SCM is a leader. If running without Ratis, holds SCMContext.INVALID_TERM.
+  private long term;
 
   SCMCommand() {
     this.id = HddsIdFactory.getLongId();
@@ -60,4 +64,18 @@ public abstract class SCMCommand<T extends GeneratedMessage> implements
     return id;
   }
 
+  /**
+   * Get term of this command.
+   * @return term
+   */
+  public long getTerm() {
+    return term;
+  }
+
+  /**
+   * Set term of this command.
+   */
+  public void setTerm(long term) {
+    this.term = term;
+  }
 }

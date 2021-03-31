@@ -45,7 +45,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -85,7 +85,7 @@ public class TestHDDSUpgrade {
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf;
   private StorageContainerManager scm;
-  private ContainerManager scmContainerManager;
+  private ContainerManagerV2 scmContainerManager;
   private PipelineManager scmPipelineManager;
   private Pipeline ratisPipeline1;
   private final int numContainersCreated = 1;

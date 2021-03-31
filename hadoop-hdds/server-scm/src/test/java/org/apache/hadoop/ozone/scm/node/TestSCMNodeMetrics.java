@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.TestUtils;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.node.SCMNodeMetrics;
@@ -77,7 +78,8 @@ public class TestSCMNodeMetrics {
     Mockito.when(versionManager.getSoftwareLayoutVersion())
         .thenReturn(maxLayoutVersion());
     nodeManager = new SCMNodeManager(source, config, publisher,
-        new NetworkTopologyImpl(source), versionManager);
+        new NetworkTopologyImpl(source), SCMContext.emptyContext(),
+            versionManager);
 
     registeredDatanode = DatanodeDetails.newBuilder()
         .setHostName("localhost")

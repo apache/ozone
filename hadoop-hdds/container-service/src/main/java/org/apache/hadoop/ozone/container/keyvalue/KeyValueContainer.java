@@ -98,11 +98,11 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
   @Override
   public void create(VolumeSet volumeSet, VolumeChoosingPolicy
-      volumeChoosingPolicy, String scmId) throws StorageContainerException {
+      volumeChoosingPolicy, String clusterId) throws StorageContainerException {
     Preconditions.checkNotNull(volumeChoosingPolicy, "VolumeChoosingPolicy " +
         "cannot be null");
     Preconditions.checkNotNull(volumeSet, "VolumeSet cannot be null");
-    Preconditions.checkNotNull(scmId, "scmId cannot be null");
+    Preconditions.checkNotNull(clusterId, "clusterId cannot be null");
 
     File containerMetaDataPath = null;
     //acquiring volumeset read lock
@@ -116,11 +116,11 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       long containerID = containerData.getContainerID();
 
       containerMetaDataPath = KeyValueContainerLocationUtil
-          .getContainerMetaDataPath(hddsVolumeDir, scmId, containerID);
+          .getContainerMetaDataPath(hddsVolumeDir, clusterId, containerID);
       containerData.setMetadataPath(containerMetaDataPath.getPath());
 
       File chunksPath = KeyValueContainerLocationUtil.getChunksLocationPath(
-          hddsVolumeDir, scmId, containerID);
+          hddsVolumeDir, clusterId, containerID);
 
       // Check if it is new Container.
       ContainerUtils.verifyIsNewContainer(containerMetaDataPath);
@@ -175,20 +175,20 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
    * Set all of the path realted container data fields based on the name
    * conventions.
    *
-   * @param scmId
+   * @param clusterId
    * @param containerVolume
    * @param hddsVolumeDir
    */
-  public void populatePathFields(String scmId,
+  public void populatePathFields(String clusterId,
       HddsVolume containerVolume, String hddsVolumeDir) {
 
     long containerId = containerData.getContainerID();
 
     File containerMetaDataPath = KeyValueContainerLocationUtil
-        .getContainerMetaDataPath(hddsVolumeDir, scmId, containerId);
+        .getContainerMetaDataPath(hddsVolumeDir, clusterId, containerId);
 
     File chunksPath = KeyValueContainerLocationUtil.getChunksLocationPath(
-        hddsVolumeDir, scmId, containerId);
+        hddsVolumeDir, clusterId, containerId);
     File dbFile = KeyValueContainerLocationUtil.getContainerDBFile(
         containerMetaDataPath, containerId);
 

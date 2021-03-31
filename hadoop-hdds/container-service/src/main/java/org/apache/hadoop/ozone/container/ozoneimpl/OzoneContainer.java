@@ -25,6 +25,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -86,6 +87,7 @@ public class OzoneContainer {
   private List<ContainerDataScanner> dataScanners;
   private final BlockDeletingService blockDeletingService;
   private final GrpcTlsConfig tlsClientConfig;
+  private final AtomicBoolean isStarted;
   private final ReplicationServer replicationServer;
   private DatanodeDetails datanodeDetails;
 
@@ -110,7 +112,7 @@ public class OzoneContainer {
     containerSet = new ContainerSet();
     metadataScanner = null;
 
-    buildContainerSet();
+    buildContainerSet(volumeSet, containerSet, config);
     final ContainerMetrics metrics = ContainerMetrics.create(conf);
     handlers = Maps.newHashMap();
 
@@ -167,6 +169,8 @@ public class OzoneContainer {
             TimeUnit.MILLISECONDS, config);
     tlsClientConfig = RatisHelper.createTlsClientConfig(
         secConf, certClient != null ? certClient.getCACertificate() : null);
+
+    isStarted = new AtomicBoolean(false);
   }
 
   public GrpcTlsConfig getTlsClientConfig() {
@@ -178,7 +182,8 @@ public class OzoneContainer {
   /**
    * Build's container map.
    */
-  private void buildContainerSet() {
+  public static void buildContainerSet(MutableVolumeSet volumeSet,
+        ContainerSet containerSet, ConfigurationSource config) {
     Iterator<HddsVolume> volumeSetIterator = volumeSet.getVolumesList()
         .iterator();
     ArrayList<Thread> volumeThreads = new ArrayList<>();
@@ -251,7 +256,11 @@ public class OzoneContainer {
    *
    * @throws IOException
    */
-  public void start(String scmId) throws IOException {
+  public void start(String clusterId) throws IOException {
+    if (!isStarted.compareAndSet(false, true)) {
+      LOG.info("Ignore. OzoneContainer already started.");
+      return;
+    }
     LOG.info("Attempting to start container services.");
     startContainerScrub();
 
@@ -261,7 +270,7 @@ public class OzoneContainer {
     writeChannel.start();
     readChannel.start();
     hddsDispatcher.init();
-    hddsDispatcher.setScmId(scmId);
+    hddsDispatcher.setClusterId(clusterId);
     blockDeletingService.start();
   }
 
