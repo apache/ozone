@@ -145,25 +145,17 @@ public class OMTenantUserCreateRequest extends OMVolumeRequest {
     OMClientResponse omClientResponse = null;
     final OMResponse.Builder omResponse =
         OmResponseUtil.getOMResponseBuilder(getOmRequest());
-
     final UpdateGetS3SecretRequest updateGetS3SecretRequest =
         getOmRequest().getUpdateGetS3SecretRequest();
     final String kerberosID = updateGetS3SecretRequest.getKerberosID();
     final String awsSecret = updateGetS3SecretRequest.getAwsSecret();
-
     boolean acquiredVolumeLock = false;
     boolean acquiredS3SecretLock = false;
     OzoneMultiTenantPrincipal tenantPrincipal = null;
-
-    // TODO: owner should be access_key_id
-    final String owner = getOmRequest().getUserInfo().getUserName();
-
     Map<String, String> auditMap = new HashMap<>();
-
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     final CreateTenantUserRequest request =
         getOmRequest().getCreateTenantUserRequest();
-
     final String tenantName = request.getTenantName();
     final String tenantUsername = request.getTenantUsername();
     final String fullUsername = tenantName +
@@ -171,24 +163,20 @@ public class OMTenantUserCreateRequest extends OMVolumeRequest {
 
     IOException exception = null;
     try {
-      // Check ACL: caller should be tenant admin. TODO: Use access_key_id
+      // Check ACL: access_key_id should be tenant admin
       if (ozoneManager.getAclsEnabled()) {
-        // TODO: Impl. Use OMMultiTenantManager?
-//        checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
-//            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.CREATE,
-//            tenantName, null, null);
+        // TODO: Use OMMultiTenantManager?
       }
 
       // Sanity check full user name with kerberosID in UpdateGetS3SecretRequest
       if (!fullUsername.equals(kerberosID)) {
-        LOG.error("fullUsername mismatches kerberosID. "
-            + "fullUsername: {}, kerberosID: {}", fullUsername, kerberosID);
+        LOG.error("fullUsername {} mismatches kerberosID {}.",
+            fullUsername, kerberosID);
         throw new OMException("fullUsername mismatches kerberosID",
             OMException.ResultCodes.INVALID_TENANT_USER_NAME);
       }
 
       final String dbVolumeKey = omMetadataManager.getVolumeKey(tenantName);
-
       acquiredVolumeLock = omMetadataManager.getLock().acquireWriteLock(
           VOLUME_LOCK, dbVolumeKey);
 
@@ -219,11 +207,9 @@ public class OMTenantUserCreateRequest extends OMVolumeRequest {
 
       final S3SecretValue s3SecretValue =
           new S3SecretValue(kerberosID, awsSecret);
-
       omMetadataManager.getS3SecretTable().addCacheEntry(
           new CacheKey<>(kerberosID),
-          new CacheValue<>(Optional.of(s3SecretValue), transactionLogIndex)
-      );
+          new CacheValue<>(Optional.of(s3SecretValue), transactionLogIndex));
 
       omMetadataManager.getLock().releaseWriteLock(S3_SECRET_LOCK, kerberosID);
       acquiredS3SecretLock = false;
@@ -231,23 +217,18 @@ public class OMTenantUserCreateRequest extends OMVolumeRequest {
       // Add to tenantUserTable
       omMetadataManager.getTenantUserTable().addCacheEntry(
           new CacheKey<>(fullUsername),
-          new CacheValue<>(Optional.of(tenantName), transactionLogIndex)
-      );
-
+          new CacheValue<>(Optional.of(tenantName), transactionLogIndex));
       // Add to tenantGroupTable
       final String defaultGroupName =
           tenantName + OzoneConsts.DEFAULT_TENANT_USER_GROUP_SUFFIX;
       omMetadataManager.getTenantGroupTable().addCacheEntry(
           new CacheKey<>(fullUsername),
-          new CacheValue<>(Optional.of(defaultGroupName), transactionLogIndex)
-      );
-
+          new CacheValue<>(Optional.of(defaultGroupName), transactionLogIndex));
       // Add to tenantRoleTable
       final String roleName = "dummy-role";
       omMetadataManager.getTenantRoleTable().addCacheEntry(
           new CacheKey<>(fullUsername),
-          new CacheValue<>(Optional.of(roleName), transactionLogIndex)
-      );
+          new CacheValue<>(Optional.of(roleName), transactionLogIndex));
 
       // Call OMMultiTenantManager
       //  TODO: Check usage with Prashant
@@ -255,43 +236,32 @@ public class OMTenantUserCreateRequest extends OMVolumeRequest {
           .createUser(tenantName, fullUsername /* TODO: full or short name? */);
 
       omResponse.setCreateTenantUserResponse(
-          CreateTenantUserResponse.newBuilder()
-              .setSuccess(true)
+          CreateTenantUserResponse.newBuilder().setSuccess(true)
               .setS3Secret(S3Secret.newBuilder()
                   .setAwsSecret(awsSecret).setKerberosID(kerberosID))
-              .build()
-      );
-
+              .build());
       omClientResponse = new OMTenantUserCreateResponse(
           omResponse.build(), s3SecretValue,
-          fullUsername, tenantName, defaultGroupName, roleName
-      );
+          fullUsername, tenantName, defaultGroupName, roleName);
     } catch (IOException ex) {
       exception = ex;
       // Set response success flag to false
       omResponse.setCreateTenantUserResponse(
-          CreateTenantUserResponse.newBuilder()
-              .setSuccess(false).build()
-      );
-
+          CreateTenantUserResponse.newBuilder().setSuccess(false).build());
       // Cleanup any state maintained by OMMultiTenantManager
       if (tenantPrincipal != null) {
-        try {
-          // TODO: Check usage with Prashant
+        try {  // TODO: Check usage with Prashant
           ozoneManager.getMultiTenantManager().deactivateUser(tenantPrincipal);
         } catch (Exception e) {
-          // Ignore for now. Multi-Tenant Manager is responsible for
-          // cleaning up stale state eventually.
+          // Ignore for now
         }
       }
-
       omClientResponse = new OMTenantCreateResponse(
           createErrorOMResponse(omResponse, ex));
     } finally {
       if (omClientResponse != null) {
-        omClientResponse.setFlushFuture(
-            ozoneManagerDoubleBufferHelper.add(omClientResponse,
-                transactionLogIndex));
+        omClientResponse.setFlushFuture(ozoneManagerDoubleBufferHelper
+            .add(omClientResponse, transactionLogIndex));
       }
       if (acquiredS3SecretLock) {
         omMetadataManager.getLock().releaseWriteLock(
@@ -302,9 +272,8 @@ public class OMTenantUserCreateRequest extends OMVolumeRequest {
       }
     }
 
-    // Perform audit logging
+    // Audit
     auditMap.put(OzoneConsts.TENANT, tenantName);
-    // Note auditMap contains volume creation info
     auditLog(ozoneManager.getAuditLogger(),
         buildAuditMessage(OMAction.CREATE_TENANT_USER, auditMap, exception,
             getOmRequest().getUserInfo()));

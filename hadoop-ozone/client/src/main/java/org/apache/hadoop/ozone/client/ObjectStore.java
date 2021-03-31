@@ -193,8 +193,8 @@ public class ObjectStore {
    * @param tenantName tenant name.
    * @throws IOException
    */
-  public S3SecretValue createTenantUser(String tenantUsername, String tenantName)
-      throws IOException {
+  public S3SecretValue createTenantUser(
+      String tenantUsername, String tenantName) throws IOException {
     return proxy.createTenantUser(tenantUsername, tenantName);
   }
 

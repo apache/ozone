@@ -640,8 +640,8 @@ public class RpcClient implements ClientProtocol {
    * @throws IOException
    */
   @Override
-  public S3SecretValue createTenantUser(String tenantUsername, String tenantName)
-      throws IOException {
+  public S3SecretValue createTenantUser(
+      String tenantUsername, String tenantName) throws IOException {
     Preconditions.checkArgument(Strings.isNotBlank(tenantUsername),
         "tenantUsername cannot be null or empty.");
     Preconditions.checkArgument(Strings.isNotBlank(tenantName),
