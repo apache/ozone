@@ -1189,7 +1189,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   }
 
   @Override
-  public Table<String, OmDBTenantInfo> getTenantUserTable() {
+  public Table<String, String> getTenantUserTable() {
     return tenantUserTable;
   }
 

@@ -325,10 +325,11 @@ public final class OzoneConsts {
   public static final String TENANT = "tenant";
 
   // For multi-tenancy
-  public static final String TENANT_NAME_USER_NAME_DELIMITER = ":";
+  public static final String TENANT_NAME_USER_NAME_DELIMITER = "$";
   public static final String DEFAULT_TENANT_USER_POLICY_SUFFIX = "-users";
   public static final String DEFAULT_TENANT_BUCKET_POLICY_SUFFIX = "-buckets";
   public static final String DEFAULT_TENANT_POLICY_ID_SUFFIX = "-default";
+  public static final String DEFAULT_TENANT_USER_GROUP_SUFFIX = "-users";
 
   // For OM metrics saving to a file
   public static final String OM_METRICS_FILE = "omMetrics";

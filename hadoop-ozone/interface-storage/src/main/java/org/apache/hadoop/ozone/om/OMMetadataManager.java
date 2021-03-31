@@ -346,7 +346,7 @@ public interface OMMetadataManager {
 
   Table<String, OMTransactionInfo> getTransactionInfoTable();
 
-  Table<String, OmDBTenantInfo> getTenantUserTable();
+  Table<String, String> getTenantUserTable();
 
   Table<String, OmDBTenantInfo> getTenantStateTable();
 

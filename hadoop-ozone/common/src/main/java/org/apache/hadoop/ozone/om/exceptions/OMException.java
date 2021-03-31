@@ -233,7 +233,13 @@ public class OMException extends IOException {
 
     QUOTA_EXCEEDED,
 
-    QUOTA_ERROR
+    QUOTA_ERROR,
+
+    TENANT_ALREADY_EXISTS,
+
+    TENANT_USER_ALREADY_EXISTS,
+
+    INVALID_TENANT_USER_NAME
 
   }
 }

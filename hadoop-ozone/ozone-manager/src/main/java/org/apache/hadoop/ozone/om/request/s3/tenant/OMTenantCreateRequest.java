@@ -1,26 +1,27 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
  * regarding copyright ownership.  The ASF licenses this file
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ *  with the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
  */
-
 package org.apache.hadoop.ozone.om.request.s3.tenant;
 
 import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -36,11 +37,14 @@ import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.s3.tenant.OMTenantCreateResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateTenantRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateTenantResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateVolumeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeInfo;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,9 +56,6 @@ import java.util.stream.Collectors;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.USER_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 
-/**
- * Handles OMTenantCreate request.
- */
 /*
   Ratis execution flow for OMTenantCreate
 
@@ -85,6 +86,10 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_L
   - Queue Ranger policy sync that pushes default policies:
       OMMultiTenantManager#createTenant
  */
+
+/**
+ * Handles OMTenantCreate request.
+ */
 public class OMTenantCreateRequest extends OMVolumeRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMTenantCreateRequest.class);
@@ -95,8 +100,8 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    CreateTenantRequest request = getOmRequest().getCreateTenantRequest();
-    String tenantName = request.getTenantName();
+    final CreateTenantRequest request = getOmRequest().getCreateTenantRequest();
+    final String tenantName = request.getTenantName();
 
     // Check tenantName validity
     if (tenantName.contains(OzoneConsts.TENANT_NAME_USER_NAME_DELIMITER)) {
@@ -105,15 +110,38 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
           OMException.ResultCodes.INVALID_VOLUME_NAME);
     }
 
-    final long currentTime = System.currentTimeMillis();
-    // .setModificationTime(0)  // TODO: Set to current time
+    // Generate VolumeInfo
+    final VolumeInfo volumeInfo = VolumeInfo.newBuilder()
+        .setVolume(tenantName)  // TODO: volume=tenant for now. configurable
+//        .setOwnerName("owner")  // TODO: Fill in access_key_id
+        .build();
 
-    // TODO: Also check validity for volume name. e.g. length
-    //  depending on ozone-site.xml
+    // Verify volume name
+    OmUtils.validateVolumeName(volumeInfo.getVolume());
 
-    // TODO: Check
-    return getOmRequest().toBuilder()
-        .setUserInfo(getUserInfo()).build();  // TODO: pass mod time
+    // Generate volume modification time
+    long initialTime = Time.now();
+    final VolumeInfo updatedVolumeInfo = volumeInfo.toBuilder()
+            .setCreationTime(initialTime)
+            .setModificationTime(initialTime)
+            .build();
+
+    final OMRequest.Builder omRequestBuilder = getOmRequest().toBuilder()
+        .setCreateTenantRequest(
+            CreateTenantRequest.newBuilder().setTenantName(tenantName)
+        )
+        .setCreateVolumeRequest(
+            CreateVolumeRequest.newBuilder().setVolumeInfo(updatedVolumeInfo)
+        )
+        .setUserInfo(getUserInfo())
+        .setCmdType(getOmRequest().getCmdType())
+        .setClientId(getOmRequest().getClientId());
+
+    if (getOmRequest().hasTraceID()) {
+      omRequestBuilder.setTraceID(getOmRequest().getTraceID());
+    }
+
+    return omRequestBuilder.build();
   }
 
   @Override
@@ -130,18 +158,18 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     Tenant tenant = null;
 
     // TODO: Double check volume owner existence
+    // TODO: owner should be access_key_id
     final String owner = getOmRequest().getUserInfo().getUserName();
     LOG.debug("hasUserInfo: {}, owner: {}",
         getOmRequest().hasUserInfo(), owner);
 
     Map<String, String> auditMap = new HashMap<>();
 
-    // TODO: Audit volume creation, if any
-
-    IOException exception = null;
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     CreateTenantRequest request = getOmRequest().getCreateTenantRequest();
     String tenantName = request.getTenantName();
+
+    IOException exception = null;
     try {
       // Check ACL
       if (ozoneManager.getAclsEnabled()) {
@@ -155,20 +183,23 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       acquiredVolumeLock = omMetadataManager.getLock().acquireWriteLock(
           VOLUME_LOCK, dbVolumeKey);
 
-      // TODO: check ozone debug ldb --db=
-
       // Check volume existence
-      // In this case, volume name is tenant name.
+      // In this case, volume name *is* tenant name
       if (omMetadataManager.getVolumeTable().isExist(dbVolumeKey)) {
-        LOG.debug("volume:{} already exists", dbVolumeKey);
+        LOG.debug("volume: {} already exists", dbVolumeKey);
         throw new OMException("Volume already exists",
             OMException.ResultCodes.VOLUME_ALREADY_EXISTS);
       }
 
       // Check tenant existence in tenantStateTable
+      if (omMetadataManager.getTenantStateTable().isExist(tenantName)) {
+        LOG.debug("tenant: {} already exists", tenantName);
+        throw new OMException("Tenant already exists",
+            OMException.ResultCodes.TENANT_ALREADY_EXISTS);
+      }
 
       // Add to tenantStateTable
-      // Intentional redundant assignment for clarity. TODO: Clean up later
+      // Note: intentional redundant assignment here for clarity
       final String bucketNamespaceName = tenantName;
       final String accountNamespaceName = tenantName;
       final String userPolicyGroupName =
@@ -183,8 +214,9 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
           new CacheValue<>(Optional.of(omDBTenantInfo), transactionLogIndex)
       );
 
-      tenant =
-            ozoneManager.getMultiTenantManager().createTenant(tenantName);
+      // Call OMMultiTenantManager
+      tenant = ozoneManager.getMultiTenantManager().createTenant(tenantName);
+
       final String tenantDefaultPolicies =
           tenant.getTenantAccessPolicies().stream()
           .map(e->e.getPolicyID()) .collect(Collectors.joining(","));
@@ -211,12 +243,16 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       OzoneManagerStorageProtos.PersistedUserVolumeInfo volumeList;
       OmVolumeArgs omVolumeArgs;
       // omVolumeArgs = OmVolumeArgs.getFromProtobuf(volumeInfo);
-      // TODO: Double check omVolumeArgs necessary fields for volume creation.
+      // TODO: Refactor this with volumeInfo from preExecute
+      final VolumeInfo volumeInfo =
+          getOmRequest().getCreateVolumeRequest().getVolumeInfo();
+      LOG.info("Vol mod time: {}", volumeInfo.getModificationTime()); // TODO
       omVolumeArgs = OmVolumeArgs.newBuilder()
           .setAdminName(owner)
           .setOwnerName(owner)
           .setVolume(dbVolumeKey)
-//          .setModificationTime(0)  // TODO: Set to current time
+          .setCreationTime(volumeInfo.getCreationTime())
+          .setModificationTime(volumeInfo.getModificationTime())
           .build();
       omVolumeArgs.setObjectID(
           ozoneManager.getObjectIdFromTxId(transactionLogIndex));
@@ -249,7 +285,8 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       omResponse.setCreateTenantResponse(
           CreateTenantResponse.newBuilder().setSuccess(false).build()
       );
-      // Cleanup any state maintained by OMMultiTenantManager.
+
+      // Cleanup any state maintained by OMMultiTenantManager
       if (tenant != null) {
         try {
           ozoneManager.getMultiTenantManager().destroyTenant(tenant);
@@ -279,12 +316,12 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     auditMap.put(OzoneConsts.TENANT, tenantName);
     // Note auditMap contains volume creation info
     auditLog(ozoneManager.getAuditLogger(),
-        buildAuditMessage(OMAction.TENANT_CREATE, auditMap, exception,
+        buildAuditMessage(OMAction.CREATE_TENANT, auditMap, exception,
             getOmRequest().getUserInfo()));
 
     if (exception == null) {
       LOG.debug("Successfully created tenant {}", tenantName);
-      // TODO: Metrics? OMVolumeCreateRequest
+      // TODO: Metrics? see OMVolumeCreateRequest
     } else {
       LOG.error("Failed to create tenant {}", tenantName, exception);
       // TODO: Metrics?

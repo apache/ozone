@@ -870,10 +870,11 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   // TODO: modify, delete
 
   @Override
-  public void createTenantUser(String tenantUsername)
+  public void createTenantUser(String tenantUsername, String tenantName)
       throws IOException {
     final CreateTenantUserRequest request = CreateTenantUserRequest.newBuilder()
         .setTenantUsername(tenantUsername)
+        .setTenantName(tenantName)
         .build();
     final OMRequest omRequest = createOMRequest(Type.CreateTenantUser)
         .setCreateTenantUserRequest(request)

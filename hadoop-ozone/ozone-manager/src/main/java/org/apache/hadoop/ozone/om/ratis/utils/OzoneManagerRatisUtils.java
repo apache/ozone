@@ -55,6 +55,11 @@ import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadCommitPa
 import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadCompleteRequest;
 import org.apache.hadoop.ozone.om.request.s3.security.S3GetSecretRequest;
 import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantCreateRequest;
+import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantDeleteRequest;
+import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantModifyRequest;
+import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantUserCreateRequest;
+import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantUserDeleteRequest;
+import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantUserModifyRequest;
 import org.apache.hadoop.ozone.om.request.security.OMCancelDelegationTokenRequest;
 import org.apache.hadoop.ozone.om.request.security.OMGetDelegationTokenRequest;
 import org.apache.hadoop.ozone.om.request.security.OMRenewDelegationTokenRequest;
@@ -163,6 +168,16 @@ public final class OzoneManagerRatisUtils {
       return new OMTrashRecoverRequest(omRequest);
     case CreateTenant:
       return new OMTenantCreateRequest(omRequest);
+    case ModifyTenant:
+      return new OMTenantModifyRequest(omRequest);
+    case DeleteTenant:
+      return new OMTenantDeleteRequest(omRequest);
+    case CreateTenantUser:
+      return new OMTenantUserCreateRequest(omRequest);
+    case ModifyTenantUser:
+      return new OMTenantUserModifyRequest(omRequest);
+    case DeleteTenantUser:
+      return new OMTenantUserDeleteRequest(omRequest);
     default:
       throw new IllegalStateException("Unrecognized write command " +
           "type request" + cmdType);
