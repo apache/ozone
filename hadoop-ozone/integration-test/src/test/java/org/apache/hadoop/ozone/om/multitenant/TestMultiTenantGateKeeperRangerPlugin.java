@@ -22,7 +22,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_HTTPS_ADDRESS
 import static org.apache.hadoop.ozone.om.multitenant.AccessPolicy.AccessGrantType.ALLOW;
 import static org.apache.hadoop.ozone.om.multitenant.OzoneMultiTenantPrincipal.OzonePrincipalType.GROUP_PRINCIPAL;
 import static org.apache.hadoop.ozone.om.multitenant.OzoneMultiTenantPrincipal.OzonePrincipalType.USER_PRINCIPAL;
-import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.CREATE;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.LIST;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.NONE;
@@ -39,12 +38,9 @@ import java.util.List;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.multitenantImpl.OzoneMultiTenantPrincipalImpl;
-import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.http.auth.BasicUserPrincipal;
-import org.apache.zookeeper.data.ACL;
-import org.checkerframework.checker.units.qual.K;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -54,7 +50,6 @@ import org.junit.Test;
 import org.junit.rules.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 
 /**
  * Tests TestMultiTenantGateKeeperImplWithRanger.
@@ -117,19 +112,19 @@ public class TestMultiTenantGateKeeperRangerPlugin {
           getTestPrincipal("tenant1", "user1Test", USER_PRINCIPAL);
       usersIdsCreated.add(omm.createUser(userPrincipal, groupIdsCreated));
 
-      AccessPolicy tenant1VolumeAccessPolicy = CreateVolumeAccessPolicy(
+      AccessPolicy tenant1VolumeAccessPolicy = createVolumeAccessPolicy(
           "vol1", "tenant1", "Users");
       policyIdsCreated.add(omm.createAccessPolicy(tenant1VolumeAccessPolicy));
 
-      AccessPolicy tenant1BucketCreatePolicy = AllowCreateBucketPolicy(
+      AccessPolicy tenant1BucketCreatePolicy = allowCreateBucketPolicy(
           "vol1", "tenant1", "Users");
       policyIdsCreated.add(omm.createAccessPolicy(tenant1BucketCreatePolicy));
 
-      AccessPolicy tenant1BucketAccessPolicy = AllowAccessBucketPolicy(
+      AccessPolicy tenant1BucketAccessPolicy = allowAccessBucketPolicy(
           "vol1", "tenant1", "Users", "bucket1");
       policyIdsCreated.add(omm.createAccessPolicy(tenant1BucketAccessPolicy));
 
-      AccessPolicy tenant1KeyAccessPolicy = AllowAccessKeyPolicy(
+      AccessPolicy tenant1KeyAccessPolicy = allowAccessKeyPolicy(
           "vol1", "tenant1", "Users", "bucket1");
       policyIdsCreated.add(omm.createAccessPolicy(tenant1KeyAccessPolicy));
 
@@ -148,8 +143,7 @@ public class TestMultiTenantGateKeeperRangerPlugin {
     }
   }
 
-  OzoneMultiTenantPrincipal getTestPrincipal(
-      String tenant, String id,
+  OzoneMultiTenantPrincipal getTestPrincipal(String tenant, String id,
       OzoneMultiTenantPrincipal.OzonePrincipalType type) {
     OzoneMultiTenantPrincipal principal = new OzoneMultiTenantPrincipalImpl(
         new BasicUserPrincipal(tenant),
@@ -157,7 +151,7 @@ public class TestMultiTenantGateKeeperRangerPlugin {
     return principal;
   }
 
-  AccessPolicy CreateVolumeAccessPolicy(String vol, String tenant,
+  AccessPolicy createVolumeAccessPolicy(String vol, String tenant,
                                         String group) throws IOException {
     AccessPolicy tenantVolumeAccessPolicy = new RangerAccessPolicy(
         tenant + group + "VolumeAccess" + vol + "Policy");
@@ -172,8 +166,8 @@ public class TestMultiTenantGateKeeperRangerPlugin {
     return tenantVolumeAccessPolicy;
   }
 
-  AccessPolicy AllowCreateBucketPolicy(String vol, String tenant,
-                                        String group) throws IOException {
+  AccessPolicy allowCreateBucketPolicy(String vol, String tenant,
+                                       String group) throws IOException {
     AccessPolicy tenantVolumeAccessPolicy = new RangerAccessPolicy(
         tenant + group + "AllowBucketCreate" + vol + "Policy");
     OzoneObjInfo obj = OzoneObjInfo.Builder.newBuilder()
@@ -185,8 +179,9 @@ public class TestMultiTenantGateKeeperRangerPlugin {
     return tenantVolumeAccessPolicy;
   }
 
-  AccessPolicy AllowAccessBucketPolicy(String vol, String tenant,
-                                       String group, String bucketName) throws IOException {
+  AccessPolicy allowAccessBucketPolicy(String vol, String tenant,
+                                       String group, String bucketName)
+      throws IOException {
     AccessPolicy tenantVolumeAccessPolicy = new RangerAccessPolicy(
         tenant + group + "AllowBucketAccess" + vol + bucketName + "Policy");
     OzoneObjInfo obj = OzoneObjInfo.Builder.newBuilder()
@@ -203,8 +198,9 @@ public class TestMultiTenantGateKeeperRangerPlugin {
     return tenantVolumeAccessPolicy;
   }
 
-  AccessPolicy AllowAccessKeyPolicy(String vol, String tenant,
-                                       String group, String bucketName) throws IOException {
+  AccessPolicy allowAccessKeyPolicy(String vol, String tenant,
+                                    String group, String bucketName)
+      throws IOException {
     AccessPolicy tenantVolumeAccessPolicy = new RangerAccessPolicy(
         tenant + group + "AllowBucketKeyAccess" + vol + bucketName + "Policy");
     OzoneObjInfo obj = OzoneObjInfo.Builder.newBuilder()

@@ -22,7 +22,7 @@ import org.apache.hadoop.ozone.shell.OzoneAddress;
 import picocli.CommandLine;
 
 /**
- * ozone s3 user modify
+ * ozone s3 user modify.
  */
 @CommandLine.Command(name = "modify",
     description = "Modify a tenant user")

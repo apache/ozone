@@ -876,8 +876,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    * {@inheritDoc}
    */
   @Override
-  public S3SecretValue createTenantUser(String tenantUsername, String tenantName)
-      throws IOException {
+  public S3SecretValue createTenantUser(
+      String tenantUsername, String tenantName) throws IOException {
+
     final CreateTenantUserRequest request = CreateTenantUserRequest.newBuilder()
         .setTenantUsername(tenantUsername)
         .setTenantName(tenantName)

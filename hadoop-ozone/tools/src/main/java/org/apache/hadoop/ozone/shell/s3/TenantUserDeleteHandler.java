@@ -22,7 +22,7 @@ import org.apache.hadoop.ozone.shell.OzoneAddress;
 import picocli.CommandLine;
 
 /**
- * ozone s3 user delete
+ * ozone s3 user delete.
  */
 @CommandLine.Command(name = "delete",
     description = "Delete a tenant user")

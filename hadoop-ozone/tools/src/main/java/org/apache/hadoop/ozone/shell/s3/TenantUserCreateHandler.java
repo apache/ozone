@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.shell.s3;
 
 import org.apache.hadoop.hdds.cli.GenericCli;
-import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
@@ -30,7 +29,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * ozone s3 user create
+ * ozone s3 user create.
  */
 @CommandLine.Command(name = "create",
     description = "Create one or more tenant users")

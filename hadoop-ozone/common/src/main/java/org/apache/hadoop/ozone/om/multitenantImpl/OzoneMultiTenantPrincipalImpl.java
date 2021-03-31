@@ -24,16 +24,18 @@ import java.security.Principal;
 import org.apache.hadoop.ozone.om.multitenant.OzoneMultiTenantPrincipal;
 import org.apache.http.auth.BasicUserPrincipal;
 
-public class OzoneMultiTenantPrincipalImpl implements OzoneMultiTenantPrincipal {
-  // TODO: This separator should come from Ozone Config.
-  final String tenantIDSeparator = "$";
-  OzonePrincipalType  principalType = USER_PRINCIPAL;
-  Principal principalUserIDPart;
-  Principal principalTenantIDPart;
+public class OzoneMultiTenantPrincipalImpl
+    implements OzoneMultiTenantPrincipal {
 
-  public OzoneMultiTenantPrincipalImpl(Principal Tenant, Principal user,
-                                OzonePrincipalType type) {
-    principalTenantIDPart = Tenant;
+  // TODO: This separator should come from Ozone Config.
+  private final String tenantIDSeparator = "$";
+  private OzonePrincipalType  principalType = USER_PRINCIPAL;
+  private Principal principalUserIDPart;
+  private Principal principalTenantIDPart;
+
+  public OzoneMultiTenantPrincipalImpl(Principal tenant, Principal user,
+      OzonePrincipalType type) {
+    principalTenantIDPart = tenant;
     principalUserIDPart = user;
     principalType = type;
   }

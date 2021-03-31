@@ -52,10 +52,10 @@ import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.http.auth.BasicUserPrincipal;
 
 public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
-  MultiTenantGateKeeper gateKeeper;
-  OMMetadataManager omMetadataManager;
-  OzoneConfiguration conf;
-  Map<String, Tenant> allTenants;
+  private MultiTenantGateKeeper gateKeeper;
+  private OMMetadataManager omMetadataManager;
+  private OzoneConfiguration conf;
+  private Map<String, Tenant> allTenants;
 
   OMMultiTenantManagerImpl(OMMetadataManager mgr, OzoneConfiguration conf)
       throws IOException {
@@ -90,9 +90,10 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       //TBD : for now just create state in the Ranger.
       // OM state is already created in ValidateAndUpdateCache for
       // the ratis transaction.
-      OzoneMultiTenantPrincipal groupTenantAllUsers = getOzonePrincipal(tenantID,
-          "GroupTenantAllUsers", GROUP_PRINCIPAL);
-      String groupTenantAllUsersID = gateKeeper.createGroup(groupTenantAllUsers);
+      OzoneMultiTenantPrincipal groupTenantAllUsers = getOzonePrincipal(
+          tenantID, "GroupTenantAllUsers", GROUP_PRINCIPAL);
+      String groupTenantAllUsersID =
+          gateKeeper.createGroup(groupTenantAllUsers);
       tenant.addTenantAccessGroup(groupTenantAllUsersID);
 
       BucketNameSpace bucketNameSpace = tenant.getTenantBucketNameSpace();
@@ -106,7 +107,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
         tenant.addTenantAccessPolicy(tenantVolumeAccessPolicy);
 
         // Allow Bucket Create within Volume
-        AccessPolicy tenantBucketCreatePolicy = AllowCreateBucketPolicy(
+        AccessPolicy tenantBucketCreatePolicy = allowCreateBucketPolicy(
             volumeName, tenantID, groupTenantAllUsers.getUserID());
         tenantBucketCreatePolicy.setPolicyID(
             gateKeeper.createAccessPolicy(tenantBucketCreatePolicy));
@@ -139,12 +140,14 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   }
 
   @Override
-  public OzoneMultiTenantPrincipal createUser(String tenantName, String userName) throws IOException {
+  public OzoneMultiTenantPrincipal createUser(
+      String tenantName, String userName) throws IOException {
     return null;
   }
 
   @Override
-  public String getUserSecret(OzoneMultiTenantPrincipal user) throws IOException {
+  public String getUserSecret(OzoneMultiTenantPrincipal user)
+      throws IOException {
     return "";
   }
 
@@ -154,77 +157,90 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   }
 
   @Override
-  public void deactivateUser(OzoneMultiTenantPrincipal user) throws IOException {
+  public void deactivateUser(OzoneMultiTenantPrincipal user)
+      throws IOException {
 
   }
 
   @Override
-  public List<OzoneMultiTenantPrincipal> listAllUsers(String tenantID) throws IOException {
+  public List<OzoneMultiTenantPrincipal> listAllUsers(String tenantID)
+      throws IOException {
     return null;
   }
 
   @Override
-  public Tenant getUserTenantInfo(OzoneMultiTenantPrincipal user) throws IOException {
+  public Tenant getUserTenantInfo(OzoneMultiTenantPrincipal user)
+      throws IOException {
     return null;
   }
 
   @Override
-  public void assignTenantAdminRole(OzoneMultiTenantPrincipal user) throws IOException {
+  public void assignTenantAdminRole(OzoneMultiTenantPrincipal user)
+      throws IOException {
 
   }
 
   @Override
-  public void revokeTenantAdmin(OzoneMultiTenantPrincipal user) throws IOException {
+  public void revokeTenantAdmin(OzoneMultiTenantPrincipal user)
+      throws IOException {
 
   }
 
   @Override
-  public List<OzoneMultiTenantPrincipal> listAllTenantAdmin(String tenantID) throws IOException {
+  public List<OzoneMultiTenantPrincipal> listAllTenantAdmin(String tenantID)
+      throws IOException {
     return null;
   }
 
   @Override
-  public void grantAccess(OzoneMultiTenantPrincipal user, BucketNameSpace bucketNameSpace) throws IOException {
+  public void grantAccess(OzoneMultiTenantPrincipal user,
+      BucketNameSpace bucketNameSpace) throws IOException {
 
   }
 
   @Override
-  public void revokeAccess(OzoneMultiTenantPrincipal user, BucketNameSpace bucketNameSpace) throws IOException {
+  public void revokeAccess(OzoneMultiTenantPrincipal user,
+      BucketNameSpace bucketNameSpace) throws IOException {
 
   }
 
   @Override
-  public void grantAccess(OzoneMultiTenantPrincipal user, AccountNameSpace accountNameSpace) throws IOException {
+  public void grantAccess(OzoneMultiTenantPrincipal user,
+      AccountNameSpace accountNameSpace) throws IOException {
 
   }
 
   @Override
-  public void revokeAccess(OzoneMultiTenantPrincipal user, AccountNameSpace accountNameSpace) throws IOException {
+  public void revokeAccess(OzoneMultiTenantPrincipal user,
+      AccountNameSpace accountNameSpace) throws IOException {
 
   }
 
   @Override
-  public String createTenantDefaultPolicy(Tenant tenant, AccessPolicy policy) throws IOException {
+  public String createTenantDefaultPolicy(Tenant tenant,
+      AccessPolicy policy) throws IOException {
     return null;
   }
 
   @Override
-  public List<Pair<String, AccessPolicy>> TenantDefaultPolicies(Tenant tenant) throws IOException {
+  public List<Pair<String, AccessPolicy>> listDefaultTenantPolicies(
+      Tenant tenant) throws IOException {
     return null;
   }
 
   @Override
-  public List<Pair<String, AccessPolicy>> listAllTenantPolicies(Tenant tenant) throws IOException {
+  public List<Pair<String, AccessPolicy>> listAllTenantPolicies(
+      Tenant tenant) throws IOException {
     return null;
   }
 
   @Override
-  public void updateTenantPolicy(Tenant tenant, String policyID, AccessPolicy policy) throws IOException {
+  public void updateTenantPolicy(Tenant tenant, String policyID,
+      AccessPolicy policy) throws IOException {
 
   }
 
-  private OzoneMultiTenantPrincipal getOzonePrincipal(
-      String tenant, String id,
+  private OzoneMultiTenantPrincipal getOzonePrincipal(String tenant, String id,
       OzoneMultiTenantPrincipal.OzonePrincipalType type) {
     OzoneMultiTenantPrincipal principal = new OzoneMultiTenantPrincipalImpl(
         new BasicUserPrincipal(tenant),
@@ -233,7 +249,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   }
 
   private AccessPolicy CreateVolumeAccessPolicy(String vol, String tenant,
-                                        String group) throws IOException {
+      String group) throws IOException {
     AccessPolicy tenantVolumeAccessPolicy = new RangerAccessPolicy(
         tenant + group + "VolumeAccess" + vol + "Policy");
     OzoneObjInfo obj = OzoneObjInfo.Builder.newBuilder()
@@ -243,12 +259,13 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
         GROUP_PRINCIPAL);
     tenantVolumeAccessPolicy.addAccessPolicyElem(obj, principal, READ, ALLOW);
     tenantVolumeAccessPolicy.addAccessPolicyElem(obj, principal, LIST, ALLOW);
-    tenantVolumeAccessPolicy.addAccessPolicyElem(obj, principal, READ_ACL, ALLOW);
+    tenantVolumeAccessPolicy.addAccessPolicyElem(obj, principal,
+        READ_ACL, ALLOW);
     return tenantVolumeAccessPolicy;
   }
 
-  private AccessPolicy AllowCreateBucketPolicy(String vol, String tenant,
-                                       String group) throws IOException {
+  private AccessPolicy allowCreateBucketPolicy(String vol, String tenant,
+      String group) throws IOException {
     AccessPolicy tenantVolumeAccessPolicy = new RangerAccessPolicy(
         tenant + group + "AllowBucketCreate" + vol + "Policy");
     OzoneObjInfo obj = OzoneObjInfo.Builder.newBuilder()
@@ -260,8 +277,8 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     return tenantVolumeAccessPolicy;
   }
 
-  private AccessPolicy AllowAccessBucketPolicy(String vol, String tenant,
-                                       String group, String bucketName) throws IOException {
+  private AccessPolicy allowAccessBucketPolicy(String vol, String tenant,
+      String group, String bucketName) throws IOException {
     AccessPolicy tenantVolumeAccessPolicy = new RangerAccessPolicy(
         tenant + group + "AllowBucketAccess" + vol + bucketName + "Policy");
     OzoneObjInfo obj = OzoneObjInfo.Builder.newBuilder()
@@ -278,8 +295,8 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     return tenantVolumeAccessPolicy;
   }
 
-  private AccessPolicy AllowAccessKeyPolicy(String vol, String tenant,
-                                    String group, String bucketName) throws IOException {
+  private AccessPolicy allowAccessKeyPolicy(String vol, String tenant,
+      String group, String bucketName) throws IOException {
     AccessPolicy tenantVolumeAccessPolicy = new RangerAccessPolicy(
         tenant + group + "AllowBucketKeyAccess" + vol + bucketName + "Policy");
     OzoneObjInfo obj = OzoneObjInfo.Builder.newBuilder()

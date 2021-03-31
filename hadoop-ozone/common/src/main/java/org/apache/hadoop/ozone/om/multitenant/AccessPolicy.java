@@ -43,10 +43,10 @@ public interface AccessPolicy {
   enum AccessGrantType {ALLOW, DENY};
 
   class AccessPolicyElem {
-    OzoneObj object;
-    OzoneMultiTenantPrincipal principal;
-    ACLType aclType;
-    AccessGrantType grantType;
+    private OzoneObj object;
+    private OzoneMultiTenantPrincipal principal;
+    private ACLType aclType;
+    private AccessGrantType grantType;
 
     public AccessPolicyElem(OzoneObj obj, OzoneMultiTenantPrincipal id,
                      ACLType acl, AccessGrantType grant) {
@@ -64,22 +64,22 @@ public interface AccessPolicy {
       return principal;
     }
 
-    public ACLType getAclType () {
+    public ACLType getAclType() {
       return aclType;
     }
 
-    public AccessGrantType getAccessGrantType () {
+    public AccessGrantType getAccessGrantType() {
       return grantType;
     }
   }
 
   /**
-   * @param id : This would be policy-ID that an external/native authorizer
+   * @param id This would be policy-ID that an external/native authorizer
    *           could return.
    */
-  public void setPolicyID(String id);
+  void setPolicyID(String id);
 
-  public String getPolicyID();
+  String getPolicyID();
 
   /**
    *
@@ -103,7 +103,8 @@ public interface AccessPolicy {
 
   void removeAccessPolicyElem(OzoneObj object,
                               OzoneMultiTenantPrincipal principal,
-                              ACLType acl, AccessGrantType grant) throws IOException;
+                              ACLType acl, AccessGrantType grant)
+      throws IOException;
 
   List<AccessPolicyElem> getAccessPolicyElem();
 }

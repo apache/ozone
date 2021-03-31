@@ -172,7 +172,7 @@ public class MultiTenantGateKeeperRangerPlugin implements
   }
 
   public List<Pair<BucketNameSpace, ACLType>>
-  getAllBucketNameSpaceAccesses(OzoneMultiTenantPrincipal user) {
+      getAllBucketNameSpaceAccesses(OzoneMultiTenantPrincipal user) {
     // TBD
     return null;
   }
@@ -201,7 +201,7 @@ public class MultiTenantGateKeeperRangerPlugin implements
                                          List<String> groupIDs)
       throws Exception {
     String groupIdList = groupIDs.stream().collect(Collectors.joining("\",\"",
-        "",""));
+        "", ""));
     String jsonCreateUserString = "{ \"name\":\"" + userName  + "\"," +
         "\"firstName\":\"" + userName + "\"," +
         "  \"loginId\": \"" + userName + "\"," +
@@ -222,7 +222,7 @@ public class MultiTenantGateKeeperRangerPlugin implements
         principal.getFullMultiTenantPrincipalID(), groupIDs);
 
     HttpsURLConnection conn = makeHttpsPostCall(rangerAdminUrl,
-        jsonCreateUserString,"POST", false);
+        jsonCreateUserString, "POST", false);
     String userInfo = getReponseData(conn);
     String userIDCreated;
     try {
@@ -296,9 +296,9 @@ public class MultiTenantGateKeeperRangerPlugin implements
     HttpsURLConnection conn = makeHttpsPostCall(rangerAdminUrl, null,
         "DELETE", false);
     int respnseCode = conn.getResponseCode();
-    if(respnseCode != 200 && respnseCode != 204) {
+    if (respnseCode != 200 && respnseCode != 204) {
       throw new IOException("Couldnt delete user " + userId);
-    };
+    }
   }
 
   public void deleteGroup(String groupId) throws Exception {
@@ -310,9 +310,9 @@ public class MultiTenantGateKeeperRangerPlugin implements
     HttpsURLConnection conn = makeHttpsPostCall(rangerAdminUrl, null,
         "DELETE", false);
     int respnseCode = conn.getResponseCode();
-    if(respnseCode != 200 && respnseCode != 204) {
+    if (respnseCode != 200 && respnseCode != 204) {
       throw new IOException("Couldnt delete group " + groupId);
-    };
+    }
   }
 
   public void deletePolicy(String policyId) throws Exception {
@@ -324,9 +324,9 @@ public class MultiTenantGateKeeperRangerPlugin implements
     HttpsURLConnection conn = makeHttpsPostCall(rangerAdminUrl, null,
         "DELETE", false);
     int respnseCode = conn.getResponseCode();
-    if(respnseCode != 200 && respnseCode != 204) {
+    if (respnseCode != 200 && respnseCode != 204) {
       throw new IOException("Couldnt delete policy " + policyId);
-    };
+    }
   }
 
   private String getReponseData(HttpsURLConnection urlConnection) throws IOException {
