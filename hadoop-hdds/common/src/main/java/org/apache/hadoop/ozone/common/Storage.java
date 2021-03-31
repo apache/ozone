@@ -17,8 +17,11 @@
  */
 package org.apache.hadoop.ozone.common;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_INIT_DEFAULT_LAYOUT_VERSION_DEFAULT;
+
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
@@ -30,6 +33,7 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Properties;
+import java.util.function.Supplier;
 
 /**
  * Storage information file. This Class defines the methods to check
@@ -288,5 +292,14 @@ public abstract class Storage {
     storageInfo.writeTo(getVersionFile());
   }
 
+  protected static int getInitLayoutVersion(OzoneConfiguration conf,
+      String configKey,
+      Supplier<Integer> defaultLvSupplier) {
+    int lV = conf.getInt(configKey, OZONE_INIT_DEFAULT_LAYOUT_VERSION_DEFAULT);
+    if (lV == OZONE_INIT_DEFAULT_LAYOUT_VERSION_DEFAULT) {
+      lV = defaultLvSupplier.get();
+    }
+    return lV;
+  }
 }
 
