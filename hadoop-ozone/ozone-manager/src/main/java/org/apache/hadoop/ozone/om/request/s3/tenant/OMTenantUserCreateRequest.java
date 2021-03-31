@@ -114,8 +114,8 @@ public class OMTenantUserCreateRequest extends OMVolumeRequest {
 
     // Generate S3 secret
     // TODO: Equivalent, but not a real kerberosID: tenant$username
-    final String kerberosID = tenantUsername +
-        OzoneConsts.TENANT_NAME_USER_NAME_DELIMITER + tenantName;
+    final String kerberosID = tenantName +
+        OzoneConsts.TENANT_NAME_USER_NAME_DELIMITER + tenantUsername;
     final String s3Secret = DigestUtils.sha256Hex(OmUtils.getSHADigest());
 
     final UpdateGetS3SecretRequest updateGetS3SecretRequest =

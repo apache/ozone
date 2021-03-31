@@ -32,7 +32,8 @@ import picocli.CommandLine.Command;
     subcommands = {
         GetS3SecretHandler.class,
         RevokeS3SecretHandler.class,
-        TenantCommands.class
+        TenantCommands.class,
+        TenantUserCommands.class
     })
 public class S3Shell extends Shell {
 

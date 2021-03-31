@@ -110,10 +110,14 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
           OMException.ResultCodes.INVALID_VOLUME_NAME);
     }
 
+    // TODO: Use access_key_id
+    final String owner = getOmRequest().getUserInfo().getUserName();
+
     // Generate VolumeInfo
     final VolumeInfo volumeInfo = VolumeInfo.newBuilder()
         .setVolume(tenantName)  // TODO: volume=tenant for now. configurable
-//        .setOwnerName("owner")  // TODO: Fill in access_key_id
+        .setAdminName(owner)
+        .setOwnerName(owner)
         .build();
 
     // Verify volume name
@@ -168,6 +172,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     CreateTenantRequest request = getOmRequest().getCreateTenantRequest();
     String tenantName = request.getTenantName();
+    final String dbVolumeKey = omMetadataManager.getVolumeKey(tenantName);
 
     IOException exception = null;
     try {
@@ -177,8 +182,6 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
             OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.CREATE,
             tenantName, null, null);
       }
-
-      final String dbVolumeKey = omMetadataManager.getVolumeKey(tenantName);
 
       acquiredVolumeLock = omMetadataManager.getLock().acquireWriteLock(
           VOLUME_LOCK, dbVolumeKey);
@@ -308,7 +311,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
         omMetadataManager.getLock().releaseWriteLock(USER_LOCK, owner);
       }
       if (acquiredVolumeLock) {
-        omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, tenantName);
+        omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, dbVolumeKey);
       }
     }
 
