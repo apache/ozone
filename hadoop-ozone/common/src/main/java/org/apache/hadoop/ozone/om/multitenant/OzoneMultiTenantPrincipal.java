@@ -43,7 +43,6 @@ public interface OzoneMultiTenantPrincipal {
    */
   String getUserID();
 
-
   /**
    *
    * @return Whether this principal represents a User or a group.
@@ -51,5 +50,5 @@ public interface OzoneMultiTenantPrincipal {
   OzonePrincipalType getUserPrincipalType();
 
   @Override
-  public String toString();
+  String toString();
 }

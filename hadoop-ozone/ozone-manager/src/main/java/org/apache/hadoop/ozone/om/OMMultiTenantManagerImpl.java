@@ -100,7 +100,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       for (OzoneObj volume : bucketNameSpace.getBucketNameSpaceObjects()) {
         String volumeName = volume.getVolumeName();
         // Allow Volume List access
-        AccessPolicy tenantVolumeAccessPolicy = CreateVolumeAccessPolicy(
+        AccessPolicy tenantVolumeAccessPolicy = createVolumeAccessPolicy(
             volumeName, tenantID, groupTenantAllUsers.getUserID());
         tenantVolumeAccessPolicy.setPolicyID(
             gateKeeper.createAccessPolicy(tenantVolumeAccessPolicy));
@@ -248,7 +248,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     return principal;
   }
 
-  private AccessPolicy CreateVolumeAccessPolicy(String vol, String tenant,
+  private AccessPolicy createVolumeAccessPolicy(String vol, String tenant,
       String group) throws IOException {
     AccessPolicy tenantVolumeAccessPolicy = new RangerAccessPolicy(
         tenant + group + "VolumeAccess" + vol + "Policy");
