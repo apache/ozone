@@ -30,20 +30,20 @@ import picocli.CommandLine;
 import java.util.concurrent.Callable;
 
 /**
- * Subcommand to group tenant related operations. TODO: see VolumeCommands
+ * Subcommand to group tenant user related operations.
  */
-@CommandLine.Command(name = "tenant",
-    description = "Tenant management",
+@CommandLine.Command(name = "user",
+    description = "Tenant user management",
     subcommands = {
-        TenantCreateHandler.class,
-        TenantModifyHandler.class,
-        TenantDeleteHandler.class
+        TenantUserCreateHandler.class,
+        TenantUserModifyHandler.class,
+        TenantUserDeleteHandler.class
     },
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
 @MetaInfServices(SubcommandWithParent.class)
-public class TenantCommands implements GenericParentCommand, Callable<Void>,
-    SubcommandWithParent {
+public class TenantUserCommands implements GenericParentCommand, Callable<Void>,
+    SubcommandWithParent{
 
   @CommandLine.ParentCommand
   private Shell shell;
@@ -51,7 +51,7 @@ public class TenantCommands implements GenericParentCommand, Callable<Void>,
   @Override
   public Void call() throws Exception {
     throw new MissingSubcommandException(
-        this.shell.getCmd().getSubcommands().get("tenant"));
+        this.shell.getCmd().getSubcommands().get("user"));
   }
 
   @Override

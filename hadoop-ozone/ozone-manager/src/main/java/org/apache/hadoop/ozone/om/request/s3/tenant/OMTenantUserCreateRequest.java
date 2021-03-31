@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateT
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateTenantUserResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Secret;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UpdateGetS3SecretRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -254,7 +255,11 @@ public class OMTenantUserCreateRequest extends OMVolumeRequest {
           .createUser(tenantName, fullUsername /* TODO: full or short name? */);
 
       omResponse.setCreateTenantUserResponse(
-          CreateTenantUserResponse.newBuilder().setSuccess(true).build()
+          CreateTenantUserResponse.newBuilder()
+              .setSuccess(true)
+              .setS3Secret(S3Secret.newBuilder()
+                  .setAwsSecret(awsSecret).setKerberosID(kerberosID))
+              .build()
       );
 
       omClientResponse = new OMTenantUserCreateResponse(
@@ -265,7 +270,8 @@ public class OMTenantUserCreateRequest extends OMVolumeRequest {
       exception = ex;
       // Set response success flag to false
       omResponse.setCreateTenantUserResponse(
-          CreateTenantUserResponse.newBuilder().setSuccess(false).build()
+          CreateTenantUserResponse.newBuilder()
+              .setSuccess(false).build()
       );
 
       // Cleanup any state maintained by OMMultiTenantManager

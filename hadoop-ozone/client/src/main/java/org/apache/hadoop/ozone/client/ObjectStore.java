@@ -86,6 +86,10 @@ public class ObjectStore {
     return proxy;
   }
 
+  public String getS3VolumeName() {
+    return s3VolumeName;
+  }
+
   /**
    * Creates the volume with default values.
    * @param volumeName Name of the volume to be created.
@@ -165,7 +169,7 @@ public class ObjectStore {
     proxy.createTenant(tenantName);
   }
 
-  // TODO
+  // TODO: createTenant with tenantArgs
 //  /**
 //   * Create tenant.
 //   * @param tenantName tenant name.
@@ -185,9 +189,9 @@ public class ObjectStore {
    * @param tenantName tenant name.
    * @throws IOException
    */
-  public void createTenantUser(String tenantUsername, String tenantName)
+  public S3SecretValue createTenantUser(String tenantUsername, String tenantName)
       throws IOException {
-    proxy.createTenantUser(tenantUsername, tenantName);
+    return proxy.createTenantUser(tenantUsername, tenantName);
   }
 
   // TODO: modify, delete

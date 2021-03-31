@@ -18,7 +18,10 @@
 package org.apache.hadoop.ozone.shell.s3;
 
 import org.apache.hadoop.hdds.cli.GenericCli;
+import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
+import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import picocli.CommandLine;
 
@@ -27,27 +30,37 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * ozone s3 tenant create
+ * ozone s3 user create
  */
 @CommandLine.Command(name = "create",
-    description = "Create one or more tenants")
-public class TenantCreateHandler extends S3Handler {
+    description = "Create one or more tenant users")
+public class TenantUserCreateHandler extends S3Handler {
 
   @CommandLine.Spec
   private CommandLine.Model.CommandSpec spec;
 
-  @CommandLine.Parameters(description = "List of tenant names")
-  private List<String> tenants = new ArrayList<>();
+  @CommandLine.Parameters(description = "List of tenant user short names")
+  private List<String> usernames = new ArrayList<>();
+
+  @CommandLine.Option(names = "-t",
+      description = "Tenant name")
+  private String tenantName;
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address) {
-    if (tenants.size() > 0) {
-      for (String tenantName : tenants) {
+    final ObjectStore objStore = client.getObjectStore();
+    if (tenantName == null || tenantName.length() == 0) {
+      tenantName = objStore.getS3VolumeName();
+    }
+    if (usernames.size() > 0) {
+      for (String username : usernames) {
         try {
-          client.getObjectStore().createTenant(tenantName);
-          out().println("Successfully created tenant " + tenantName);
+          S3SecretValue res = objStore.createTenantUser(username, tenantName);
+          out().println("Successfully created tenant " + username + ":");
+          out().println("export AWS_ACCESS_KEY_ID=" + res.getAwsAccessKey());
+          out().println("export AWS_SECRET_ACCESS_KEY=" + res.getAwsSecret());
         } catch (IOException e) {
-          out().println("Failed to create tenant " + tenantName + ": " +
+          out().println("Failed to create tenant " + username + ": " +
               e.getMessage());
         }
       }
