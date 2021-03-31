@@ -92,14 +92,14 @@ public interface MultiTenantGateKeeper extends IAccessAuthorizer {
    * @return unique and opaque policy ID that is maintained by the plugin.
    * @throws Exception
    */
-  public String createAccessPolicy(AccessPolicy policy) throws Exception;
+  String createAccessPolicy(AccessPolicy policy) throws Exception;
 
   /**
    *
    * @param policyId that was returned earlier by the createAccessPolicy().
    * @throws Exception
    */
-  public void deletePolicy(String policyId) throws Exception;
+  void deletePolicy(String policyId) throws Exception;
 
   /**
    * Grant user aclType access to bucketNameSpace.

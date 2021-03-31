@@ -110,7 +110,7 @@ public interface OMMultiTenantManager {
 
 
   /**
-   * Creates a new user that exists for S3 API access to Ozone
+   * Creates a new user that exists for S3 API access to Ozone.
    * @param tenantName
    * @param userName
    * @return OzoneMultiTenantPrincipal
@@ -120,7 +120,7 @@ public interface OMMultiTenantManager {
                                        String userName)throws IOException;
 
   /**
-   * Given a user, return their S3-Secret Key
+   * Given a user, return their S3-Secret Key.
    * @param user
    * @return S3 secret Key
    */
@@ -187,8 +187,8 @@ public interface OMMultiTenantManager {
    * @param user
    * @param bucketNameSpace
    */
- void revokeAccess(OzoneMultiTenantPrincipal user,
-                   BucketNameSpace bucketNameSpace) throws IOException;
+  void revokeAccess(OzoneMultiTenantPrincipal user,
+                    BucketNameSpace bucketNameSpace) throws IOException;
 
   /**
    * grant given user access to the given AccountNameSpace.
@@ -221,7 +221,7 @@ public interface OMMultiTenantManager {
    * @param tenant
    * @return list of Default Access policies for a Tenant
    */
-  List<Pair<String, AccessPolicy>> TenantDefaultPolicies(Tenant tenant)
+  List<Pair<String, AccessPolicy>> listDefaultTenantPolicies(Tenant tenant)
       throws IOException;
 
   /**

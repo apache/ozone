@@ -27,7 +27,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * ozone s3 tenant create
+ * ozone s3 tenant create.
  */
 @CommandLine.Command(name = "create",
     description = "Create one or more tenants")
