@@ -242,11 +242,15 @@ public class SCMRatisServerImpl implements SCMRatisServer {
     Collection<RaftPeer> peers = division.getGroup().getPeers();
     List<String> ratisRoles = new ArrayList<>();
     for (RaftPeer peer : peers) {
-      InetAddress peerInetAddress = InetAddress.getByName(HddsUtils.getHostName(peer.getAddress()).get());
+      InetAddress peerInetAddress = InetAddress.getByName(
+              HddsUtils.getHostName(peer.getAddress()).get());
       boolean isLocal = NetUtils.isLocalAddress(peerInetAddress);
-      ratisRoles.add((peer.getAddress() == null ? "" : peer.getAddress()
-              .concat(isLocal ? ":".concat(RaftProtos.RaftPeerRole.LEADER.toString()) :
-                      ":".concat(RaftProtos.RaftPeerRole.FOLLOWER.toString()))));
+      ratisRoles.add((peer.getAddress() == null ? "" :
+              peer.getAddress().concat(isLocal ?
+                      ":".concat(RaftProtos.RaftPeerRole.LEADER
+                              .toString()) :
+                      ":".concat(RaftProtos.RaftPeerRole.FOLLOWER
+                              .toString()))));
     }
     return ratisRoles;
   }
