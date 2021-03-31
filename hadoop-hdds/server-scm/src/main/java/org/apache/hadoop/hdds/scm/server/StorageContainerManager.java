@@ -220,8 +220,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private final LeaseManager<Long> commandWatcherLeaseManager;
 
   private SCMSafeModeManager scmSafeModeManager;
-  private CertificateServer rootCertificateServer;
-  private CertificateServer scmCertificateServer;
   private SCMCertificateClient scmCertificateClient;
 
   private JvmPauseMonitor jvmPauseMonitor;
@@ -329,8 +327,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       // if no Security, we do not create a Certificate Server at all.
       // This allows user to boot SCM without security temporarily
       // and then come back and enable it without any impact.
-      rootCertificateServer = null;
-      scmCertificateServer = null;
       securityProtocolServer = null;
     }
 
@@ -578,6 +574,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private void initializeCAnSecurityProtocol(OzoneConfiguration conf,
       SCMConfigurator configurator) throws IOException {
 
+
     // TODO: Support Certificate Server loading via Class Name loader.
     // So it is easy to use different Certificate Servers if needed.
     if(this.scmMetadataStore == null) {
@@ -593,6 +590,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
             .setCRLSequenceId(getLastSequenceIdForCRL()).build();
 
 
+    final CertificateServer scmCertificateServer;
+    final CertificateServer rootCertificateServer;
     // If primary SCM node Id is set it means this is a cluster which has
     // performed init with SCM HA version code.
     if (scmStorageConfig.checkPrimarySCMIdInitialized()) {
@@ -600,7 +599,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       String subject = SCM_SUB_CA_PREFIX +
           InetAddress.getLocalHost().getHostName();
       if (configurator.getCertificateServer() != null) {
-        this.scmCertificateServer = configurator.getCertificateServer();
+        scmCertificateServer = configurator.getCertificateServer();
       } else {
         scmCertificateServer = new DefaultCAServer(subject,
             scmStorageConfig.getClusterID(), scmStorageConfig.getScmId(),
@@ -613,33 +612,13 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
       if (primaryScmNodeId.equals(scmStorageConfig.getScmId())) {
         if (configurator.getCertificateServer() != null) {
-          this.rootCertificateServer = configurator.getCertificateServer();
+          rootCertificateServer = configurator.getCertificateServer();
         } else {
           rootCertificateServer =
               HASecurityUtils.initializeRootCertificateServer(
               conf, certificateStore, scmStorageConfig);
         }
-
-        BigInteger certSerial =
-            scmCertificateClient.getCertificate().getSerialNumber();
-        // Store the certificate in DB. On primary SCM when init happens, the
-        // certificate is not persisted to DB. As we don't have Metadatstore
-        // and ratis server initialized with statemachine. We need to do only
-        // for primary scm, for other bootstrapped scm's certificates will be
-        // persisted via ratis.
-        if (certificateStore.getCertificateByID(certSerial,
-            VALID_CERTS) == null) {
-          LOG.info("Storing certSerial {}", certSerial);
-          certificateStore.storeValidScmCertificate(
-              certSerial, scmCertificateClient.getCertificate());
-        }
-        X509Certificate rootCACert = scmCertificateClient.getCACertificate();
-        if (certificateStore.getCertificateByID(rootCACert.getSerialNumber(),
-            VALID_CERTS) == null) {
-          LOG.info("Storing root certSerial {}", rootCACert.getSerialNumber());
-          certificateStore.storeValidScmCertificate(
-              rootCACert.getSerialNumber(), rootCACert);
-        }
+        persistPrimarySCMCerts();
       } else {
         rootCertificateServer = null;
       }
@@ -654,16 +633,48 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       scmCertificateServer = rootCertificateServer;
     }
 
+    // We need to pass getCACertificate as rootCA certificate,
+    // as for SCM CA is root-CA.
     securityProtocolServer = new SCMSecurityProtocolServer(conf,
-        rootCertificateServer, scmCertificateServer, this);
+        rootCertificateServer, scmCertificateServer,
+        scmCertificateClient.getCACertificate(), this);
+  }
+
+  /** Persist primary SCM root ca cert and sub-ca certs to DB.
+   *
+   * @throws IOException
+   */
+  private void persistPrimarySCMCerts() throws IOException {
+    BigInteger certSerial =
+        scmCertificateClient.getCertificate().getSerialNumber();
+    // Store the certificate in DB. On primary SCM when init happens, the
+    // certificate is not persisted to DB. As we don't have Metadatstore
+    // and ratis server initialized with statemachine. We need to do only
+    // for primary scm, for other bootstrapped scm's certificates will be
+    // persisted via ratis.
+    if (certificateStore.getCertificateByID(certSerial,
+        VALID_CERTS) == null) {
+      LOG.info("Storing sub-ca certificate serialId {} on primary SCM",
+          certSerial);
+      certificateStore.storeValidScmCertificate(
+          certSerial, scmCertificateClient.getCertificate());
+    }
+    X509Certificate rootCACert = scmCertificateClient.getCACertificate();
+    if (certificateStore.getCertificateByID(rootCACert.getSerialNumber(),
+        VALID_CERTS) == null) {
+      LOG.info("Storing root certificate serialId {}",
+          rootCACert.getSerialNumber());
+      certificateStore.storeValidScmCertificate(
+          rootCACert.getSerialNumber(), rootCACert);
+    }
   }
 
   public CertificateServer getRootCertificateServer() {
-    return rootCertificateServer;
+    return getSecurityProtocolServer().getRootCertificateServer();
   }
 
   public CertificateServer getScmCertificateServer() {
-    return scmCertificateServer;
+    return getSecurityProtocolServer().getScmCertificateServer();
   }
 
   public SCMCertificateClient getScmCertificateClient() {
@@ -1142,6 +1153,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     setStartTime();
   }
 
+  /** Persist SCM certs to DB on bootstrap scm nodes.
+   *
+   * @throws IOException
+   */
   private void persistSCMCertificates() throws IOException {
     // Fetch all CA's and persist during startup on bootstrap nodes. This
     // is primarily being done to persist primary SCM Cert and Root CA.
@@ -1149,7 +1164,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (primaryScmNodeId != null && !primaryScmNodeId.equals(
         scmStorageConfig.getScmId())) {
       List<String> pemEncodedCerts =
-          scmCertificateClient.updateCAList();
+          scmCertificateClient.listCA();
 
       // Write the primary SCM CA and Root CA during startup.
       for (String cert : pemEncodedCerts) {
@@ -1158,8 +1173,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
               CertificateCodec.getX509Certificate(cert);
           if (certificateStore.getCertificateByID(
               x509Certificate.getSerialNumber(), VALID_CERTS) == null) {
-            LOG.info("Persist certserial {} on Scm Bootstrap Node {}",
-                x509Certificate.getSerialNumber(), scmStorageConfig.getScmId());
+            LOG.info("Persist certificate serialId {} on Scm Bootstrap Node " +
+                    "{}", x509Certificate.getSerialNumber(),
+                scmStorageConfig.getScmId());
             certificateStore.storeValidScmCertificate(
                 x509Certificate.getSerialNumber(), x509Certificate);
           }

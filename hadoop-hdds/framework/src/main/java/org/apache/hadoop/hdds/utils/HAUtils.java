@@ -20,7 +20,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import com.google.protobuf.ServiceException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
+import org.apache.hadoop.hdds.function.SupplierWithIOException;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
@@ -365,10 +365,7 @@ public final class HAUtils {
   public static List<String> buildCAList(CertificateClient certClient,
       ConfigurationSource configuration) throws IOException {
     //TODO: make it configurable.
-    long waitTime = 5 * 60 * 1000L;
-    long retryTime = 10 * 1000L;
-    long currentTime = Time.monotonicNow();
-    List<String> caCertPemList = null;
+    List<String> caCertPemList;
     if (certClient != null) {
       caCertPemList = new ArrayList<>();
       if (!SCMHAUtils.isSCMHAEnabled(configuration)) {
@@ -379,37 +376,28 @@ public final class HAUtils {
         caCertPemList.add(CertificateCodec.getPEMEncodedString(
             certClient.getCACertificate()));
       } else {
-        // TODO: If SCMs are bootstrapped later, then listCA need to be
-        //  refetched if listCA size is less than scm ha config node list size.
-        // For now when Client of SCM's are started we compare their node list
-        // size and ca list size if it is as expected, we return the ca list.
-        boolean caListUpToDate;
         Collection<String> scmNodes = SCMHAUtils.getSCMNodeIds(configuration);
-        // TODO: make them configurable.
+        int expectedCount = scmNodes.size() + 1;
         if (scmNodes.size() > 1) {
-          do {
-            caCertPemList = certClient.updateCAList();
-            caListUpToDate =
-                caCertPemList.size() == scmNodes.size() + 1 ? true : false;
-            if (!caListUpToDate) {
-              try {
-                Thread.sleep(retryTime);
-              } catch (InterruptedException ex) {
-                Thread.currentThread().interrupt();
-              }
-            }
-          } while (!caListUpToDate &&
-              Time.monotonicNow() - currentTime < waitTime);
-          checkCertCount(caCertPemList.size(), scmNodes.size() + 1);
+          // First check if cert client has ca list initialized.
+          // This is being done, when this method is called multiple times we
+          // don't make call to SCM, we return from in-memory.
+          caCertPemList = certClient.getCAList();
+          if (caCertPemList != null && caCertPemList.size() == expectedCount) {
+            return caCertPemList;
+          }
+          caCertPemList = waitForCACerts(() -> certClient.updateCAList(),
+              expectedCount);
+          checkCertCount(caCertPemList.size(), expectedCount);
         } else {
-          caCertPemList = certClient.updateCAList();
+          caCertPemList = certClient.listCA();
         }
       }
     } else {
+      SCMSecurityProtocolClientSideTranslatorPB scmSecurityProtocolClient =
+          HddsServerUtil.getScmSecurityClient(configuration);
       if (!SCMHAUtils.isSCMHAEnabled(configuration)) {
         caCertPemList = new ArrayList<>();
-        SCMSecurityProtocolClientSideTranslatorPB scmSecurityProtocolClient =
-            HddsServerUtil.getScmSecurityClient(configuration);
         SCMGetCertResponseProto scmGetCertResponseProto =
             scmSecurityProtocolClient.getCACert();
         if (scmGetCertResponseProto.hasX509Certificate()) {
@@ -420,30 +408,49 @@ public final class HAUtils {
         }
       } else {
         Collection<String> scmNodes = SCMHAUtils.getSCMNodeIds(configuration);
-        SCMSecurityProtocol scmSecurityProtocolClient =
-            HddsServerUtil.getScmSecurityClient(configuration);
-        boolean caListUpToDate;
+        int expectedCount = scmNodes.size() + 1;
         if (scmNodes.size() > 1) {
-          do {
-            caCertPemList =
-                scmSecurityProtocolClient.listCACertificate();
-            caListUpToDate =
-                caCertPemList.size() == scmNodes.size() + 1 ? true : false;
-            if (!caListUpToDate) {
-              try {
-                Thread.sleep(retryTime);
-              } catch (InterruptedException ex) {
-                Thread.currentThread().interrupt();
-              }
-            }
-          } while (!caListUpToDate &&
-              Time.monotonicNow() - currentTime < waitTime);
-          checkCertCount(caCertPemList.size(), scmNodes.size() + 1);
-        } else {
+          caCertPemList = waitForCACerts(
+              () -> scmSecurityProtocolClient.listCACertificate(),
+              expectedCount);
+          checkCertCount(caCertPemList.size(), expectedCount);
+        } else{
           caCertPemList = scmSecurityProtocolClient.listCACertificate();
         }
       }
     }
+    return caCertPemList;
+  }
+
+  private static List<String> waitForCACerts(
+      final SupplierWithIOException<List<String>> applyFunction,
+      int expectedCount) throws IOException {
+    //TODO: make wait time and sleep time configurable if needed.
+    // TODO: If SCMs are bootstrapped later, then listCA need to be
+    //  refetched if listCA size is less than scm ha config node list size.
+    // For now when Client of SCM's are started we compare their node list
+    // size and ca list size if it is as expected, we return the ca list.
+    boolean caListUpToDate;
+    long waitTime = 5 * 60 * 1000L;
+    long retryTime = 10 * 1000L;
+    long currentTime = Time.monotonicNow();
+    List<String> caCertPemList;
+    do {
+      caCertPemList = applyFunction.get();
+      caListUpToDate =
+          caCertPemList.size() == expectedCount ? true : false;
+      if (!caListUpToDate) {
+        LOG.info("Expected CA list size {}, where as received CA List size " +
+            "{}. Retry to fetch CA List after {} seconds", expectedCount,
+            caCertPemList.size(), waitTime/1000);
+        try {
+          Thread.sleep(retryTime);
+        } catch (InterruptedException ex) {
+          Thread.currentThread().interrupt();
+        }
+      }
+    } while (!caListUpToDate &&
+        Time.monotonicNow() - currentTime < waitTime);
     return caCertPemList;
   }
 

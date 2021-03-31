@@ -72,6 +72,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
       .getLogger(SCMSecurityProtocolServer.class);
   private final CertificateServer rootCertificateServer;
   private final CertificateServer scmCertificateServer;
+  private final X509Certificate rootCACertificate;
   private final RPC.Server rpcServer;
   private final InetSocketAddress rpcAddress;
   private final ProtocolMessageMetrics metrics;
@@ -79,11 +80,13 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
 
   SCMSecurityProtocolServer(OzoneConfiguration conf,
       CertificateServer rootCertificateServer,
-      CertificateServer scmCertificateServer, StorageContainerManager scm)
+      CertificateServer scmCertificateServer,
+      X509Certificate rootCACert, StorageContainerManager scm)
       throws IOException {
     this.storageContainerManager = scm;
     this.rootCertificateServer = rootCertificateServer;
     this.scmCertificateServer = scmCertificateServer;
+    this.rootCACertificate = rootCACert;
     final int handlerCount =
         conf.getInt(ScmConfigKeys.OZONE_SCM_SECURITY_HANDLER_COUNT_KEY,
             ScmConfigKeys.OZONE_SCM_SECURITY_HANDLER_COUNT_DEFAULT);
@@ -314,8 +317,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
     LOGGER.debug("Getting Root CA certificate.");
     if (storageContainerManager.getScmStorageConfig()
         .getPrimaryScmNodeId() != null) {
-      return CertificateCodec.getPEMEncodedString(
-          storageContainerManager.getScmCertificateClient().getCACertificate());
+      return CertificateCodec.getPEMEncodedString(rootCACertificate);
     }
     return null;
   }
@@ -351,4 +353,12 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
     getRpcServer().join();
   }
 
+  public CertificateServer getRootCertificateServer() {
+    return rootCertificateServer;
+  }
+
+
+  public CertificateServer getScmCertificateServer() {
+    return scmCertificateServer;
+  }
 }

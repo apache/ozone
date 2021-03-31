@@ -235,7 +235,20 @@ public interface CertificateClient {
       throws CertificateException;
 
   /**
+   * Return the pem encoded CA certificate list.
+   *
+   * If initialized return list of pem encoded CA certificates, else return
+   * null.
+   * @return list of pem encoded CA certificates.
+   */
+  List<String> getCAList();
+
+  /**
    * Return the pem encoded  CA certificate list.
+   *
+   * If list is null, fetch the list from SCM and returns the list.
+   * If list is not null, return the pem encoded  CA certificate list.
+   *
    * @return list of pem encoded  CA certificates.
    * @throws IOException
    */

@@ -872,6 +872,16 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   }
 
   @Override
+  public List<String> getCAList() {
+    lock.lock();
+    try {
+      return pemEncodedCACerts;
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  @Override
   public List<String> listCA() throws IOException {
     lock.lock();
     try {

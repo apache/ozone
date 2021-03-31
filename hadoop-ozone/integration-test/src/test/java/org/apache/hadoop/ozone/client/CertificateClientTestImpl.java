@@ -200,6 +200,10 @@ public class CertificateClientTestImpl implements CertificateClient {
   }
 
   @Override
+  public List<String> getCAList() {
+    return null;
+  }
+  @Override
   public List<String> listCA() throws IOException  {
     return null;
   }
