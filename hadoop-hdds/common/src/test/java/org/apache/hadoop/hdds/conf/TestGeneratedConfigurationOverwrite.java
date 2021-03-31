@@ -42,9 +42,6 @@ public class TestGeneratedConfigurationOverwrite {
 
   private OzoneConfiguration conf;
 
-  @Rule
-  public TemporaryFolder tempConfigs = new TemporaryFolder();
-
   @Before
   public void overwriteConfigFile() throws Exception {
     Files.move(generatedConfigurationPath, generatedConfigurationPathBak);
