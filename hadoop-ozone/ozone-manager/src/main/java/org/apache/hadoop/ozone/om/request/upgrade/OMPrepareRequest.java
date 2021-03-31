@@ -17,10 +17,10 @@
 
 package org.apache.hadoop.ozone.om.request.upgrade;
 
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
@@ -166,7 +166,7 @@ public class OMPrepareRequest extends OMClientRequest {
       // ozoneManager#getRatisSnaphotIndex.
       // Get the transaction directly instead to handle the case when it is
       // null.
-      OMTransactionInfo dbTxnInfo = metadataManager
+      TransactionInfo dbTxnInfo = metadataManager
           .getTransactionInfoTable().get(TRANSACTION_INFO_KEY);
       long ratisTxnIndex =
           division.getStateMachine().getLastAppliedTermIndex().getIndex();

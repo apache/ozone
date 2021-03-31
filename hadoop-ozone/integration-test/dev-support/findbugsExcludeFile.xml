@@ -128,4 +128,12 @@
     <Class name="org.apache.hadoop.ozone.client.rpc.TestDeleteWithSlowFollower"/>
     <Bug pattern="ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD" />
   </Match>
+  <Match>
+    <Class name="org.apache.hadoop.hdds.scm.TestSCMInstallSnapshot"/>
+    <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.ozone.scm.TestSCMInstallSnapshotWithHA"/>
+    <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE" />
+  </Match>
 </FindBugsFilter>

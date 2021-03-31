@@ -200,6 +200,10 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_HTTPS_ADDRESS_KEY =
       "ozone.scm.https-address";
 
+  public static final String OZONE_SCM_ADDRESS_KEY =
+      "ozone.scm.address";
+  public static final String OZONE_SCM_BIND_HOST_DEFAULT =
+      "0.0.0.0";
   public static final String OZONE_SCM_HTTP_BIND_HOST_DEFAULT = "0.0.0.0";
   public static final int OZONE_SCM_HTTP_BIND_PORT_DEFAULT = 9876;
   public static final int OZONE_SCM_HTTPS_BIND_PORT_DEFAULT = 9877;
@@ -285,8 +289,30 @@ public final class ScmConfigKeys {
   // able to send back a new list to the datanodes.
   public static final String OZONE_SCM_NAMES = "ozone.scm.names";
 
-  public static final int OZONE_SCM_DEFAULT_PORT =
-      OZONE_SCM_DATANODE_PORT_DEFAULT;
+  public static final String OZONE_SCM_DEFAULT_SERVICE_ID =
+      "ozone.scm.default.service.id";
+
+  public static final String OZONE_SCM_SERVICE_IDS_KEY =
+      "ozone.scm.service.ids";
+  public static final String OZONE_SCM_NODES_KEY =
+      "ozone.scm.nodes";
+  public static final String OZONE_SCM_NODE_ID_KEY =
+      "ozone.scm.node.id";
+
+  /**
+   * Optional config, if being set will cause scm --init to only take effect on
+   * the specific node and ignore scm --bootstrap cmd.
+   * Similarly, scm --init will be ignored on the non-primordial scm nodes.
+   * With the config set, applications/admins can safely execute init and
+   * bootstrap commands safely on all scm instances, for example kubernetes
+   * deployments.
+   *
+   * If a cluster is upgraded from non-ratis to ratis based SCM, scm --init
+   * needs to re-run for switching from
+   * non-ratis based SCM to ratis-based SCM on the primary node.
+   */
+  public static final String OZONE_SCM_PRIMORDIAL_NODE_ID_KEY =
+      "ozone.scm.primordial.node.id";
   // The path where datanode ID is to be written to.
   // if this value is not set then container startup will fail.
   public static final String OZONE_SCM_DATANODE_ID_DIR =
@@ -364,6 +390,10 @@ public final class ScmConfigKeys {
   public static final String HDDS_SCM_WATCHER_TIMEOUT =
       "hdds.scm.watcher.timeout";
 
+  public static final String OZONE_SCM_SEQUENCE_ID_BATCH_SIZE =
+      "ozone.scm.sequence.id.batch.size";
+  public static final int OZONE_SCM_SEQUENCE_ID_BATCH_SIZE_DEFAULT = 1000;
+
   public static final String HDDS_SCM_WATCHER_TIMEOUT_DEFAULT =
       "10m";
 
@@ -376,10 +406,104 @@ public final class ScmConfigKeys {
   public static final String HDDS_TRACING_ENABLED = "hdds.tracing.enabled";
   public static final boolean HDDS_TRACING_ENABLED_DEFAULT = false;
 
+  // SCM Ratis related
+  public static final String OZONE_SCM_HA_ENABLE_KEY
+      = "ozone.scm.ratis.enable";
+  public static final boolean OZONE_SCM_HA_ENABLE_DEFAULT
+      = false;
+  public static final String OZONE_SCM_RATIS_PORT_KEY
+      = "ozone.scm.ratis.port";
+  public static final int OZONE_SCM_RATIS_PORT_DEFAULT
+      = 9865;
+  public static final String OZONE_SCM_GRPC_PORT_KEY
+      = "ozone.scm.grpc.port";
+  public static final int OZONE_SCM_GRPC_PORT_DEFAULT
+      = 9866;
+  public static final String OZONE_SCM_RATIS_RPC_TYPE_KEY
+      = "ozone.scm.ratis.rpc.type";
+  public static final String OZONE_SCM_RATIS_RPC_TYPE_DEFAULT
+      = "GRPC";
+
+  // SCM Ratis Log configurations
+  public static final String OZONE_SCM_RATIS_STORAGE_DIR
+      = "ozone.scm.ratis.storage.dir";
+  public static final String OZONE_SCM_RATIS_SEGMENT_SIZE_KEY
+      = "ozone.scm.ratis.segment.size";
+  public static final String OZONE_SCM_RATIS_SEGMENT_SIZE_DEFAULT
+      = "16KB";
+  public static final String OZONE_SCM_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY
+      = "ozone.scm.ratis.segment.preallocated.size";
+  public static final String OZONE_SCM_RATIS_SEGMENT_PREALLOCATED_SIZE_DEFAULT
+      = "16KB";
+
+  // SCM Ratis Log Appender configurations
+  public static final String
+      OZONE_SCM_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS =
+      "ozone.scm.ratis.log.appender.queue.num-elements";
+  public static final int
+      OZONE_SCM_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS_DEFAULT = 1024;
+  public static final String OZONE_SCM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT =
+      "ozone.scm.ratis.log.appender.queue.byte-limit";
+  public static final String
+      OZONE_SCM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT = "32MB";
+  public static final String OZONE_SCM_RATIS_LOG_PURGE_GAP =
+      "ozone.scm.ratis.log.purge.gap";
+  public static final int OZONE_SCM_RATIS_LOG_PURGE_GAP_DEFAULT = 1000000;
+
+  // SCM Ratis server configurations
+  public static final String OZONE_SCM_RATIS_SERVER_REQUEST_TIMEOUT_KEY
+      = "ozone.scm.ratis.server.request.timeout";
+  public static final TimeDuration
+      OZONE_SCM_RATIS_SERVER_REQUEST_TIMEOUT_DEFAULT
+      = TimeDuration.valueOf(3000, TimeUnit.MILLISECONDS);
+  public static final String
+      OZONE_SCM_RATIS_SERVER_RETRY_CACHE_TIMEOUT_KEY
+      = "ozone.scm.ratis.server.retry.cache.timeout";
+  public static final TimeDuration
+      OZONE_SCM_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DEFAULT
+      = TimeDuration.valueOf(600000, TimeUnit.MILLISECONDS);
+  public static final String OZONE_SCM_RATIS_MINIMUM_TIMEOUT_KEY
+      = "ozone.scm.ratis.minimum.timeout";
+  public static final TimeDuration OZONE_SCM_RATIS_MINIMUM_TIMEOUT_DEFAULT
+      = TimeDuration.valueOf(1, TimeUnit.SECONDS);
+
+  // SCM Ratis Leader Election configurations
+  public static final String
+      OZONE_SCM_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY =
+      "ozone.scm.ratis.leader.election.minimum.timeout.duration";
+  public static final TimeDuration
+      OZONE_SCM_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_DEFAULT =
+      TimeDuration.valueOf(1, TimeUnit.SECONDS);
+  public static final String OZONE_SCM_RATIS_SERVER_FAILURE_TIMEOUT_DURATION_KEY
+      = "ozone.scm.ratis.server.failure.timeout.duration";
+  public static final TimeDuration
+      OZONE_SCM_RATIS_SERVER_FAILURE_TIMEOUT_DURATION_DEFAULT
+      = TimeDuration.valueOf(120, TimeUnit.SECONDS);
+
+  // SCM Leader server role check interval
+  public static final String OZONE_SCM_RATIS_SERVER_ROLE_CHECK_INTERVAL_KEY
+      = "ozone.scm.ratis.server.role.check.interval";
+  public static final TimeDuration
+      OZONE_SCM_RATIS_SERVER_ROLE_CHECK_INTERVAL_DEFAULT
+      = TimeDuration.valueOf(15, TimeUnit.SECONDS);
+
   public static final String OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL =
       "ozone.scm.datanode.admin.monitor.interval";
   public static final String OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL_DEFAULT =
       "30s";
+
+  public static final String HDDS_DATANODE_UPGRADE_LAYOUT_INLINE =
+      "hdds.datanode.upgrade.layout.inline";
+  public static final boolean HDDS_DATANODE_UPGRADE_LAYOUT_INLINE_DEFAULT =
+      true;
+
+
+  // Temporary config which will be used only for test only purposes until
+  // SCM HA Security work is completed. This config should not be modified by
+  // users.
+  public static final String OZONE_SCM_HA_SECURITY_SUPPORTED =
+      "hdds.scm.ha.security.enable";
+  public static final boolean OZONE_SCM_HA_SECURITY_SUPPORTED_DEFAULT = false;
 
   /**
    * Never constructed.

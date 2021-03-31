@@ -70,7 +70,7 @@ public class TestContainerReader {
 
   private RoundRobinVolumeChoosingPolicy volumeChoosingPolicy;
   private UUID datanodeId;
-  private String scmId = UUID.randomUUID().toString();
+  private String clusterId = UUID.randomUUID().toString();
   private int blockCount = 10;
   private long blockLen = 1024;
 
@@ -85,7 +85,7 @@ public class TestContainerReader {
     datanodeId = UUID.randomUUID();
     hddsVolume = new HddsVolume.Builder(volumeDir
         .getAbsolutePath()).conf(conf).datanodeUuid(datanodeId
-        .toString()).build();
+        .toString()).clusterID(clusterId).build();
 
     volumeSet = mock(MutableVolumeSet.class);
     volumeChoosingPolicy = mock(RoundRobinVolumeChoosingPolicy.class);
@@ -101,7 +101,7 @@ public class TestContainerReader {
       KeyValueContainer keyValueContainer =
           new KeyValueContainer(keyValueContainerData,
               conf);
-      keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+      keyValueContainer.create(volumeSet, volumeChoosingPolicy, clusterId);
 
 
       List<Long> blkNames;
@@ -225,7 +225,7 @@ public class TestContainerReader {
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY,
         datanodeDirs.toString());
     MutableVolumeSet volumeSets =
-        new MutableVolumeSet(datanodeId.toString(), conf);
+        new MutableVolumeSet(datanodeId.toString(), clusterId, conf);
     ContainerCache cache = ContainerCache.getInstance(conf);
     cache.clear();
 
@@ -243,7 +243,7 @@ public class TestContainerReader {
       KeyValueContainer keyValueContainer =
           new KeyValueContainer(keyValueContainerData,
               conf);
-      keyValueContainer.create(volumeSets, policy, scmId);
+      keyValueContainer.create(volumeSets, policy, clusterId);
 
       List<Long> blkNames;
       if (i % 2 == 0) {

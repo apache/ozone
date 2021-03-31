@@ -28,7 +28,6 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.NodeReportProto;
-import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
@@ -71,7 +70,7 @@ public class TestStatisticsUpdate {
     conf.set(ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL, "1s");
     conf.set(ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL, "2s");
     final EventQueue eventQueue = new EventQueue();
-    final StorageContainerManager scm = HddsTestUtils.getScm(conf);
+    final StorageContainerManager scm = TestUtils.getScm(conf);
     nodeManager = scm.getScmNodeManager();
     final DeadNodeHandler deadNodeHandler = new DeadNodeHandler(
         nodeManager, Mockito.mock(PipelineManager.class),

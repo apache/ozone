@@ -40,6 +40,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeUsageInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DeactivatePipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionNodesRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionNodesResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeAdminErrorResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ForceExitSafeModeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ForceExitSafeModeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerRequestProto;
@@ -55,6 +57,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.PipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.PipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.RecommissionNodesRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.RecommissionNodesResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReplicationManagerStatusRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReplicationManagerStatusResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMCloseContainerRequestProto;
@@ -65,15 +68,19 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ScmContainerLocationRequest.Builder;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ScmContainerLocationResponse;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartMaintenanceNodesRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartMaintenanceNodesResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartReplicationManagerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopReplicationManagerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type;
+import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.proxy.SCMContainerLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.io.retry.RetryProxy;
 import org.apache.hadoop.ipc.ProtobufHelper;
 import org.apache.hadoop.ipc.ProtocolTranslator;
 import org.apache.hadoop.ipc.RPC;
@@ -105,15 +112,21 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   private static final RpcController NULL_RPC_CONTROLLER = null;
 
   private final StorageContainerLocationProtocolPB rpcProxy;
+  private final SCMContainerLocationFailoverProxyProvider fpp;
 
   /**
    * Creates a new StorageContainerLocationProtocolClientSideTranslatorPB.
    *
-   * @param rpcProxy {@link StorageContainerLocationProtocolPB} RPC proxy
+   * @param proxyProvider {@link SCMContainerLocationFailoverProxyProvider}
    */
   public StorageContainerLocationProtocolClientSideTranslatorPB(
-      StorageContainerLocationProtocolPB rpcProxy) {
-    this.rpcProxy = rpcProxy;
+      SCMContainerLocationFailoverProxyProvider proxyProvider) {
+    Preconditions.checkNotNull(proxyProvider);
+    this.fpp = proxyProvider;
+    this.rpcProxy = (StorageContainerLocationProtocolPB) RetryProxy.create(
+        StorageContainerLocationProtocolPB.class,
+        fpp,
+        fpp.getRetryPolicy());
   }
 
   /**
@@ -124,7 +137,6 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
       Consumer<Builder> builderConsumer) throws IOException {
     final ScmContainerLocationResponse response;
     try {
-
       Builder builder = ScmContainerLocationRequest.newBuilder()
           .setCmdType(type)
           .setVersion(CURRENT_VERSION)
@@ -141,7 +153,16 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
   private ScmContainerLocationResponse submitRpcRequest(
       ScmContainerLocationRequest wrapper) throws ServiceException {
-    return rpcProxy.submitRequest(NULL_RPC_CONTROLLER, wrapper);
+    if (!ADMIN_COMMAND_TYPE.contains(wrapper.getCmdType())) {
+      return rpcProxy.submitRequest(NULL_RPC_CONTROLLER, wrapper);
+    }
+
+    // TODO: Modify ScmContainerLocationResponse to hold results from multi SCM
+    ScmContainerLocationResponse response = null;
+    for (StorageContainerLocationProtocolPB proxy : fpp.getProxies()) {
+      response = proxy.submitRequest(NULL_RPC_CONTROLLER, wrapper);
+    }
+    return response;
   }
 
   /**
@@ -348,14 +369,22 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
    * @throws IOException
    */
   @Override
-  public void decommissionNodes(List<String> nodes) throws IOException {
+  public List<DatanodeAdminError> decommissionNodes(List<String> nodes)
+      throws IOException {
     Preconditions.checkNotNull(nodes);
     DecommissionNodesRequestProto request =
         DecommissionNodesRequestProto.newBuilder()
         .addAllHosts(nodes)
         .build();
-    submitRequest(Type.DecommissionNodes,
-        builder -> builder.setDecommissionNodesRequest(request));
+    DecommissionNodesResponseProto response =
+        submitRequest(Type.DecommissionNodes,
+            builder -> builder.setDecommissionNodesRequest(request))
+            .getDecommissionNodesResponse();
+    List<DatanodeAdminError> errors = new ArrayList<>();
+    for (DatanodeAdminErrorResponseProto e : response.getFailedHostsList()) {
+      errors.add(new DatanodeAdminError(e.getHost(), e.getError()));
+    }
+    return errors;
   }
 
   /**
@@ -364,14 +393,22 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
    * @throws IOException
    */
   @Override
-  public void recommissionNodes(List<String> nodes) throws IOException {
+  public List<DatanodeAdminError> recommissionNodes(List<String> nodes)
+      throws IOException {
     Preconditions.checkNotNull(nodes);
     RecommissionNodesRequestProto request =
         RecommissionNodesRequestProto.newBuilder()
             .addAllHosts(nodes)
             .build();
-    submitRequest(Type.RecommissionNodes,
-        builder -> builder.setRecommissionNodesRequest(request));
+    RecommissionNodesResponseProto response =
+        submitRequest(Type.RecommissionNodes,
+            builder -> builder.setRecommissionNodesRequest(request))
+                .getRecommissionNodesResponse();
+    List<DatanodeAdminError> errors = new ArrayList<>();
+    for (DatanodeAdminErrorResponseProto e : response.getFailedHostsList()) {
+      errors.add(new DatanodeAdminError(e.getHost(), e.getError()));
+    }
+    return errors;
   }
 
   /**
@@ -385,16 +422,23 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
    * @throws IOException
    */
   @Override
-  public void startMaintenanceNodes(List<String> nodes, int endInHours)
-      throws IOException {
+  public List<DatanodeAdminError> startMaintenanceNodes(
+      List<String> nodes, int endInHours) throws IOException {
     Preconditions.checkNotNull(nodes);
     StartMaintenanceNodesRequestProto request =
         StartMaintenanceNodesRequestProto.newBuilder()
             .addAllHosts(nodes)
             .setEndInHours(endInHours)
             .build();
-    submitRequest(Type.StartMaintenanceNodes,
-        builder -> builder.setStartMaintenanceNodesRequest(request));
+    StartMaintenanceNodesResponseProto response =
+        submitRequest(Type.StartMaintenanceNodes,
+            builder -> builder.setStartMaintenanceNodesRequest(request))
+                .getStartMaintenanceNodesResponse();
+    List<DatanodeAdminError> errors = new ArrayList<>();
+    for (DatanodeAdminErrorResponseProto e : response.getFailedHostsList()) {
+      errors.add(new DatanodeAdminError(e.getHost(), e.getError()));
+    }
+    return errors;
   }
 
   /**
@@ -537,7 +581,9 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
         .getGetScmInfoResponse();
     ScmInfo.Builder builder = new ScmInfo.Builder()
         .setClusterId(resp.getClusterId())
-        .setScmId(resp.getScmId());
+        .setScmId(resp.getScmId())
+        .setRatisPeerRoles(resp.getPeerRolesList());
+
     return builder.build();
 
   }
@@ -630,14 +676,14 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   /**
    * Builds request for datanode usage information and receives response.
    *
-   * @param ipaddress - Address String
-   * @param uuid - UUID String
-   * @return List of DatanodeUsageInfo. Each element contains info such as
+   * @param ipaddress Address String
+   * @param uuid UUID String
+   * @return List of DatanodeUsageInfoProto. Each element contains info such as
    * capacity, SCMUsed, and remaining space.
    * @throws IOException
    */
   @Override
-  public List<HddsProtos.DatanodeUsageInfo> getDatanodeUsageInfo(
+  public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
       String ipaddress, String uuid) throws IOException {
 
     DatanodeUsageInfoRequestProto request =
@@ -650,6 +696,32 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
         submitRequest(Type.DatanodeUsageInfo,
             builder -> builder.setDatanodeUsageInfoRequest(request))
             .getDatanodeUsageInfoResponse();
+    return response.getInfoList();
+  }
+
+  /**
+   * Get usage information of most or least used datanodes.
+   *
+   * @param mostUsed true if most used, false if least used
+   * @param count Integer number of nodes to get info for
+   * @return List of DatanodeUsageInfoProto. Each element contains info such as
+   * capacity, SCMUsed, and remaining space.
+   * @throws IOException
+   */
+  @Override
+  public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
+      boolean mostUsed, int count) throws IOException {
+    DatanodeUsageInfoRequestProto request =
+        DatanodeUsageInfoRequestProto.newBuilder()
+            .setMostUsed(mostUsed)
+            .setCount(count)
+            .build();
+
+    DatanodeUsageInfoResponseProto response =
+        submitRequest(Type.DatanodeUsageInfo,
+            builder -> builder.setDatanodeUsageInfoRequest(request))
+        .getDatanodeUsageInfoResponse();
+
     return response.getInfoList();
   }
 

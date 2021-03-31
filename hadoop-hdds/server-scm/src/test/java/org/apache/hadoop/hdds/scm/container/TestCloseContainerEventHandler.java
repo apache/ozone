@@ -28,11 +28,17 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.TestUtils;
+import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.ha.SCMService.Event;
+import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
 import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerV2Impl;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
-import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
@@ -55,12 +61,15 @@ public class TestCloseContainerEventHandler {
 
   private static OzoneConfiguration configuration;
   private static MockNodeManager nodeManager;
-  private static SCMPipelineManager pipelineManager;
-  private static SCMContainerManager containerManager;
+  private static PipelineManagerV2Impl pipelineManager;
+  private static ContainerManagerV2 containerManager;
   private static long size;
   private static File testDir;
   private static EventQueue eventQueue;
+  private static SCMContext scmContext;
   private static SCMMetadataStore scmMetadataStore;
+  private static SCMHAManager scmhaManager;
+  private static SequenceIdGenerator sequenceIdGen;
 
   @BeforeClass
   public static void setUp() throws Exception {
@@ -74,27 +83,41 @@ public class TestCloseContainerEventHandler {
     configuration.setInt(ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT, 16);
     nodeManager = new MockNodeManager(true, 10);
     eventQueue = new EventQueue();
+    scmContext = SCMContext.emptyContext();
     scmMetadataStore = new SCMMetadataStoreImpl(configuration);
+    scmhaManager = MockSCMHAManager.getInstance(true);
+    sequenceIdGen = new SequenceIdGenerator(
+        configuration, scmhaManager, scmMetadataStore.getSequenceIdTable());
+
+    SCMServiceManager serviceManager = new SCMServiceManager();
 
     pipelineManager =
-        new SCMPipelineManager(configuration, nodeManager,
-            scmMetadataStore.getPipelineTable(), eventQueue);
-    pipelineManager.allowPipelineCreation();
+        PipelineManagerV2Impl.newPipelineManager(
+            configuration,
+            scmhaManager,
+            nodeManager,
+            scmMetadataStore.getPipelineTable(),
+            eventQueue,
+            scmContext,
+            serviceManager);
+
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
             pipelineManager.getStateManager(), configuration, eventQueue);
     pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
         mockRatisProvider);
-    containerManager = new SCMContainerManager(
-            configuration,
-            scmMetadataStore.getContainerTable(),
-            scmMetadataStore.getStore(),
-            pipelineManager);
-    pipelineManager.triggerPipelineCreation();
+    containerManager = new ContainerManagerImpl(configuration,
+        scmhaManager,
+        sequenceIdGen,
+        pipelineManager,
+        scmMetadataStore.getContainerTable());
+
+    // trigger BackgroundPipelineCreator to take effect.
+    serviceManager.notifyEventTriggered(Event.PRE_CHECK_COMPLETED);
+
     eventQueue.addHandler(CLOSE_CONTAINER,
         new CloseContainerEventHandler(
-                pipelineManager,
-                containerManager));
+            pipelineManager, containerManager, scmContext));
     eventQueue.addHandler(DATANODE_COMMAND, nodeManager);
     // Move all pipelines created by background from ALLOCATED to OPEN state
     Thread.sleep(2000);
@@ -120,7 +143,7 @@ public class TestCloseContainerEventHandler {
     GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
         .captureLogs(CloseContainerEventHandler.LOG);
     eventQueue.fireEvent(CLOSE_CONTAINER,
-        new ContainerID(Math.abs(RandomUtils.nextInt())));
+        ContainerID.valueOf(Math.abs(RandomUtils.nextInt())));
     eventQueue.processAll(1000);
     Assert.assertTrue(logCapturer.getOutput()
         .contains("Close container Event triggered for container"));
@@ -132,7 +155,7 @@ public class TestCloseContainerEventHandler {
     GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
         .captureLogs(CloseContainerEventHandler.LOG);
     eventQueue.fireEvent(CLOSE_CONTAINER,
-        new ContainerID(id));
+        ContainerID.valueOf(id));
     eventQueue.processAll(1000);
     Assert.assertTrue(logCapturer.getOutput()
         .contains("Failed to close the container"));

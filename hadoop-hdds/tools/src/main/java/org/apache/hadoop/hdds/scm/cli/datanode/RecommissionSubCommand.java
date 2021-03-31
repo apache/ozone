@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.cli.datanode;
 
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import picocli.CommandLine;
@@ -47,9 +48,19 @@ public class RecommissionSubCommand extends ScmSubcommand {
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     if (hosts.size() > 0) {
-      scmClient.recommissionNodes(hosts);
+      List<DatanodeAdminError> errors = scmClient.recommissionNodes(hosts);
       System.out.println("Started recommissioning datanode(s):\n" +
           String.join("\n", hosts));
+      if (errors.size() > 0) {
+        for (DatanodeAdminError error : errors) {
+          System.err.println("Error: " + error.getHostname() +": "
+              + error.getError());
+        }
+        // Throwing the exception will cause a non-zero exit status for the
+        // command.
+        throw new IOException(
+            "Some nodes could be recommissioned");
+      }
     } else {
       GenericCli.missingSubcommand(spec);
     }

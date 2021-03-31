@@ -18,31 +18,27 @@
 
 package org.apache.hadoop.hdds.scm.container.states;
 
-import com.google.common.base.Preconditions;
-
-import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
-import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerReplicaNotFoundException;
-import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.Set;
 import java.util.Collections;
 import java.util.Map;
 import java.util.NavigableSet;
 import java.util.TreeSet;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes
-    .CONTAINER_EXISTS;
+import com.google.common.base.Preconditions;
+
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+
 import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes
     .FAILED_TO_CHANGE_CONTAINER_STATE;
 
@@ -76,6 +72,8 @@ import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes
  * select a container that belongs to user1, with Ratis replication which can
  * make 3 copies of data. The fact that we will look for open containers by
  * default and if we cannot find them we will add new containers.
+ *
+ * All the calls are idempotent.
  */
 public class ContainerStateMap {
   private static final Logger LOG =
@@ -92,11 +90,6 @@ public class ContainerStateMap {
   private final Map<ContainerID, Set<ContainerReplica>> replicaMap;
   private final Map<ContainerQueryKey, NavigableSet<ContainerID>> resultCache;
 
-  // Container State Map lock should be held before calling into
-  // Update ContainerAttributes. The consistency of ContainerAttributes is
-  // protected by this lock.
-  private final ReadWriteLock lock;
-
   /**
    * Create a ContainerStateMap.
    */
@@ -106,7 +99,6 @@ public class ContainerStateMap {
     this.factorMap = new ContainerAttribute<>();
     this.typeMap = new ContainerAttribute<>();
     this.containerMap = new ConcurrentHashMap<>();
-    this.lock = new ReentrantReadWriteLock();
     this.replicaMap = new ConcurrentHashMap<>();
     this.resultCache = new ConcurrentHashMap<>();
   }
@@ -120,19 +112,9 @@ public class ContainerStateMap {
   public void addContainer(final ContainerInfo info)
       throws SCMException {
     Preconditions.checkNotNull(info, "Container Info cannot be null");
-    Preconditions.checkArgument(info.getReplicationFactor().getNumber() > 0,
-        "ExpectedReplicaCount should be greater than 0");
-
-    lock.writeLock().lock();
-    try {
-      final ContainerID id = info.containerID();
-      if (containerMap.putIfAbsent(id, info) != null) {
-        LOG.debug("Duplicate container ID detected. {}", id);
-        throw new
-            SCMException("Duplicate container ID detected.",
-            CONTAINER_EXISTS);
-      }
-
+    final ContainerID id = info.containerID();
+    if (!contains(id)) {
+      containerMap.put(id, info);
       lifeCycleStateMap.insert(info.getState(), id);
       ownerMap.insert(info.getOwner(), id);
       factorMap.insert(info.getReplicationFactor(), id);
@@ -142,36 +124,32 @@ public class ContainerStateMap {
       // Flush the cache of this container type, will be added later when
       // get container queries are executed.
       flushCache(info);
-      LOG.trace("Created container with {} successfully.", id);
-    } finally {
-      lock.writeLock().unlock();
+      LOG.trace("Container {} added to ContainerStateMap.", id);
     }
+  }
+
+  public boolean contains(final ContainerID id) {
+    return containerMap.containsKey(id);
   }
 
   /**
    * Removes a Container Entry from ContainerStateMap.
    *
-   * @param containerID - ContainerID
-   * @throws SCMException - throws if create failed.
+   * @param id - ContainerID
    */
-  public void removeContainer(final ContainerID containerID)
-      throws ContainerNotFoundException {
-    Preconditions.checkNotNull(containerID, "ContainerID cannot be null");
-    lock.writeLock().lock();
-    try {
-      checkIfContainerExist(containerID);
+  public void removeContainer(final ContainerID id) {
+    Preconditions.checkNotNull(id, "ContainerID cannot be null");
+    if (contains(id)) {
       // Should we revert back to the original state if any of the below
       // remove operation fails?
-      final ContainerInfo info = containerMap.remove(containerID);
-      lifeCycleStateMap.remove(info.getState(), containerID);
-      ownerMap.remove(info.getOwner(), containerID);
-      factorMap.remove(info.getReplicationFactor(), containerID);
-      typeMap.remove(info.getReplicationType(), containerID);
+      final ContainerInfo info = containerMap.remove(id);
+      lifeCycleStateMap.remove(info.getState(), id);
+      ownerMap.remove(info.getOwner(), id);
+      factorMap.remove(info.getReplicationFactor(), id);
+      typeMap.remove(info.getReplicationType(), id);
       // Flush the cache of this container type.
       flushCache(info);
-      LOG.trace("Removed container with {} successfully.", containerID);
-    } finally {
-      lock.writeLock().unlock();
+      LOG.trace("Container {} removed from ContainerStateMap.", id);
     }
   }
 
@@ -179,37 +157,24 @@ public class ContainerStateMap {
    * Returns the latest state of Container from SCM's Container State Map.
    *
    * @param containerID - ContainerID
-   * @return container info, if found.
+   * @return container info, if found else null.
    */
-  public ContainerInfo getContainerInfo(final ContainerID containerID)
-      throws ContainerNotFoundException {
-    lock.readLock().lock();
-    try {
-      checkIfContainerExist(containerID);
-      return containerMap.get(containerID);
-    } finally {
-      lock.readLock().unlock();
-    }
+  public ContainerInfo getContainerInfo(final ContainerID containerID) {
+    return containerMap.get(containerID);
   }
 
   /**
    * Returns the latest list of DataNodes where replica for given containerId
-   * exist. Throws an SCMException if no entry is found for given containerId.
+   * exist.
    *
    * @param containerID
    * @return Set<DatanodeDetails>
    */
   public Set<ContainerReplica> getContainerReplicas(
-      final ContainerID containerID) throws ContainerNotFoundException {
+      final ContainerID containerID) {
     Preconditions.checkNotNull(containerID);
-    lock.readLock().lock();
-    try {
-      checkIfContainerExist(containerID);
-      return Collections
-          .unmodifiableSet(replicaMap.get(containerID));
-    } finally {
-      lock.readLock().unlock();
-    }
+    final Set<ContainerReplica> replicas = replicaMap.get(containerID);
+    return replicas == null ? null : Collections.unmodifiableSet(replicas);
   }
 
   /**
@@ -221,16 +186,12 @@ public class ContainerStateMap {
    * @param replica
    */
   public void updateContainerReplica(final ContainerID containerID,
-      final ContainerReplica replica) throws ContainerNotFoundException {
+      final ContainerReplica replica) {
     Preconditions.checkNotNull(containerID);
-    lock.writeLock().lock();
-    try {
-      checkIfContainerExist(containerID);
-      Set<ContainerReplica> replicas = replicaMap.get(containerID);
+    if (contains(containerID)) {
+      final Set<ContainerReplica> replicas = replicaMap.get(containerID);
       replicas.remove(replica);
       replicas.add(replica);
-    } finally {
-      lock.writeLock().unlock();
     }
   }
 
@@ -242,21 +203,11 @@ public class ContainerStateMap {
    * @return True of dataNode is removed successfully else false.
    */
   public void removeContainerReplica(final ContainerID containerID,
-      final ContainerReplica replica)
-      throws ContainerNotFoundException, ContainerReplicaNotFoundException {
+      final ContainerReplica replica) {
     Preconditions.checkNotNull(containerID);
     Preconditions.checkNotNull(replica);
-
-    lock.writeLock().lock();
-    try {
-      checkIfContainerExist(containerID);
-      if(!replicaMap.get(containerID).remove(replica)) {
-        throw new ContainerReplicaNotFoundException(
-            "Container #"
-                + containerID.getId() + ", replica: " + replica);
-      }
-    } finally {
-      lock.writeLock().unlock();
+    if (contains(containerID)) {
+      replicaMap.get(containerID).remove(replica);
     }
   }
 
@@ -264,17 +215,13 @@ public class ContainerStateMap {
    * Just update the container State.
    * @param info ContainerInfo.
    */
-  public void updateContainerInfo(final ContainerInfo info)
-      throws ContainerNotFoundException {
-    lock.writeLock().lock();
-    try {
-      Preconditions.checkNotNull(info);
-      checkIfContainerExist(info.containerID());
-      final ContainerInfo currentInfo = containerMap.get(info.containerID());
+  public void updateContainerInfo(final ContainerInfo info) {
+    Preconditions.checkNotNull(info);
+    final ContainerID id = info.containerID();
+    if (contains(id)) {
+      final ContainerInfo currentInfo = containerMap.get(id);
       flushCache(info, currentInfo);
-      containerMap.put(info.containerID(), info);
-    } finally {
-      lock.writeLock().unlock();
+      containerMap.put(id, info);
     }
   }
 
@@ -287,61 +234,59 @@ public class ContainerStateMap {
    * @throws SCMException - in case of failure.
    */
   public void updateState(ContainerID containerID, LifeCycleState currentState,
-      LifeCycleState newState) throws SCMException, ContainerNotFoundException {
+      LifeCycleState newState) throws SCMException {
     Preconditions.checkNotNull(currentState);
     Preconditions.checkNotNull(newState);
-    lock.writeLock().lock();
+    if (!contains(containerID)) {
+      return;
+    }
+    // Return if updating state not changed
+    if (currentState == newState) {
+      LOG.debug("CurrentState and NewState are the same, return from " +
+          "updateState directly.");
+      return;
+    }
+    // TODO: Simplify this logic.
+    final ContainerInfo currentInfo = containerMap.get(containerID);
     try {
-      checkIfContainerExist(containerID);
-      // Return if updating state not changed
-      if (currentState == newState) {
-        LOG.debug("CurrentState and NewState are the same, return from " +
-            "updateState directly.");
-        return;
+      currentInfo.setState(newState);
+
+      // We are updating two places before this update is done, these can
+      // fail independently, since the code needs to handle it.
+
+      // We update the attribute map, if that fails it will throw an
+      // exception, so no issues, if we are successful, we keep track of the
+      // fact that we have updated the lifecycle state in the map, and update
+      // the container state. If this second update fails, we will attempt to
+      // roll back the earlier change we did. If the rollback fails, we can
+      // be in an inconsistent state,
+
+      lifeCycleStateMap.update(currentState, newState, containerID);
+      if (LOG.isTraceEnabled()) {
+        LOG.trace("Updated the container {} to new state. Old = {}, new = " +
+            "{}", containerID, currentState, newState);
       }
-      final ContainerInfo currentInfo = containerMap.get(containerID);
-      try {
-        currentInfo.setState(newState);
 
-        // We are updating two places before this update is done, these can
-        // fail independently, since the code needs to handle it.
+      // Just flush both old and new data sets from the result cache.
+      flushCache(currentInfo);
+    } catch (SCMException ex) {
+      LOG.error("Unable to update the container state.", ex);
+      // we need to revert the change in this attribute since we are not
+      // able to update the hash table.
+      LOG.info("Reverting the update to lifecycle state. Moving back to " +
+              "old state. Old = {}, Attempted state = {}", currentState,
+          newState);
 
-        // We update the attribute map, if that fails it will throw an
-        // exception, so no issues, if we are successful, we keep track of the
-        // fact that we have updated the lifecycle state in the map, and update
-        // the container state. If this second update fails, we will attempt to
-        // roll back the earlier change we did. If the rollback fails, we can
-        // be in an inconsistent state,
+      currentInfo.setState(currentState);
 
-        lifeCycleStateMap.update(currentState, newState, containerID);
-        if (LOG.isTraceEnabled()) {
-          LOG.trace("Updated the container {} to new state. Old = {}, new = " +
-              "{}", containerID, currentState, newState);
-        }
+      // if this line throws, the state map can be in an inconsistent
+      // state, since we will have modified the attribute by the
+      // container state will not in sync since we were not able to put
+      // that into the hash table.
+      lifeCycleStateMap.update(newState, currentState, containerID);
 
-        // Just flush both old and new data sets from the result cache.
-        flushCache(currentInfo);
-      } catch (SCMException ex) {
-        LOG.error("Unable to update the container state.", ex);
-        // we need to revert the change in this attribute since we are not
-        // able to update the hash table.
-        LOG.info("Reverting the update to lifecycle state. Moving back to " +
-                "old state. Old = {}, Attempted state = {}", currentState,
-            newState);
-
-        currentInfo.setState(currentState);
-
-        // if this line throws, the state map can be in an inconsistent
-        // state, since we will have modified the attribute by the
-        // container state will not in sync since we were not able to put
-        // that into the hash table.
-        lifeCycleStateMap.update(newState, currentState, containerID);
-
-        throw new SCMException("Updating the container map failed.", ex,
-            FAILED_TO_CHANGE_CONTAINER_STATE);
-      }
-    } finally {
-      lock.writeLock().unlock();
+      throw new SCMException("Updating the container map failed.", ex,
+          FAILED_TO_CHANGE_CONTAINER_STATE);
     }
   }
 
@@ -357,12 +302,7 @@ public class ContainerStateMap {
    */
   NavigableSet<ContainerID> getContainerIDsByOwner(final String ownerName) {
     Preconditions.checkNotNull(ownerName);
-    lock.readLock().lock();
-    try {
-      return ownerMap.getCollection(ownerName);
-    } finally {
-      lock.readLock().unlock();
-    }
+    return ownerMap.getCollection(ownerName);
   }
 
   /**
@@ -373,12 +313,7 @@ public class ContainerStateMap {
    */
   NavigableSet<ContainerID> getContainerIDsByType(final ReplicationType type) {
     Preconditions.checkNotNull(type);
-    lock.readLock().lock();
-    try {
-      return typeMap.getCollection(type);
-    } finally {
-      lock.readLock().unlock();
-    }
+    return typeMap.getCollection(type);
   }
 
   /**
@@ -390,12 +325,7 @@ public class ContainerStateMap {
   NavigableSet<ContainerID> getContainerIDsByFactor(
       final ReplicationFactor factor) {
     Preconditions.checkNotNull(factor);
-    lock.readLock().lock();
-    try {
-      return factorMap.getCollection(factor);
-    } finally {
-      lock.readLock().unlock();
-    }
+    return factorMap.getCollection(factor);
   }
 
   /**
@@ -407,12 +337,7 @@ public class ContainerStateMap {
   public NavigableSet<ContainerID> getContainerIDsByState(
       final LifeCycleState state) {
     Preconditions.checkNotNull(state);
-    lock.readLock().lock();
-    try {
-      return lifeCycleStateMap.getCollection(state);
-    } finally {
-      lock.readLock().unlock();
-    }
+    return lifeCycleStateMap.getCollection(state);
   }
 
   /**
@@ -433,57 +358,52 @@ public class ContainerStateMap {
     Preconditions.checkNotNull(factor, "Factor cannot be null");
     Preconditions.checkNotNull(type, "Type cannot be null");
 
-    lock.readLock().lock();
-    try {
-      final ContainerQueryKey queryKey =
-          new ContainerQueryKey(state, owner, factor, type);
-      if(resultCache.containsKey(queryKey)){
-        return resultCache.get(queryKey);
-      }
-
-      // If we cannot meet any one condition we return EMPTY_SET immediately.
-      // Since when we intersect these sets, the result will be empty if any
-      // one is empty.
-      final NavigableSet<ContainerID> stateSet =
-          lifeCycleStateMap.getCollection(state);
-      if (stateSet.size() == 0) {
-        return EMPTY_SET;
-      }
-
-      final NavigableSet<ContainerID> ownerSet =
-          ownerMap.getCollection(owner);
-      if (ownerSet.size() == 0) {
-        return EMPTY_SET;
-      }
-
-      final NavigableSet<ContainerID> factorSet =
-          factorMap.getCollection(factor);
-      if (factorSet.size() == 0) {
-        return EMPTY_SET;
-      }
-
-      final NavigableSet<ContainerID> typeSet =
-          typeMap.getCollection(type);
-      if (typeSet.size() == 0) {
-        return EMPTY_SET;
-      }
-
-
-      // if we add more constraints we will just add those sets here..
-      final NavigableSet<ContainerID>[] sets = sortBySize(stateSet,
-          ownerSet, factorSet, typeSet);
-
-      NavigableSet<ContainerID> currentSet = sets[0];
-      // We take the smallest set and intersect against the larger sets. This
-      // allows us to reduce the lookups to the least possible number.
-      for (int x = 1; x < sets.length; x++) {
-        currentSet = intersectSets(currentSet, sets[x]);
-      }
-      resultCache.put(queryKey, currentSet);
-      return currentSet;
-    } finally {
-      lock.readLock().unlock();
+    final ContainerQueryKey queryKey =
+        new ContainerQueryKey(state, owner, factor, type);
+    if(resultCache.containsKey(queryKey)){
+      return resultCache.get(queryKey);
     }
+
+    // If we cannot meet any one condition we return EMPTY_SET immediately.
+    // Since when we intersect these sets, the result will be empty if any
+    // one is empty.
+    final NavigableSet<ContainerID> stateSet =
+        lifeCycleStateMap.getCollection(state);
+    if (stateSet.size() == 0) {
+      return EMPTY_SET;
+    }
+
+    final NavigableSet<ContainerID> ownerSet =
+        ownerMap.getCollection(owner);
+    if (ownerSet.size() == 0) {
+      return EMPTY_SET;
+    }
+
+    final NavigableSet<ContainerID> factorSet =
+        factorMap.getCollection(factor);
+    if (factorSet.size() == 0) {
+      return EMPTY_SET;
+    }
+
+    final NavigableSet<ContainerID> typeSet =
+        typeMap.getCollection(type);
+    if (typeSet.size() == 0) {
+      return EMPTY_SET;
+    }
+
+
+    // if we add more constraints we will just add those sets here..
+    final NavigableSet<ContainerID>[] sets = sortBySize(stateSet,
+        ownerSet, factorSet, typeSet);
+
+    NavigableSet<ContainerID> currentSet = sets[0];
+    // We take the smallest set and intersect against the larger sets. This
+    // allows us to reduce the lookups to the least possible number.
+    for (int x = 1; x < sets.length; x++) {
+      currentSet = intersectSets(currentSet, sets[x]);
+    }
+    resultCache.put(queryKey, currentSet);
+    return currentSet;
   }
 
   /**
@@ -538,14 +458,6 @@ public class ContainerStateMap {
           containerInfo.getReplicationFactor(),
           containerInfo.getReplicationType());
       resultCache.remove(key);
-    }
-  }
-
-  private void checkIfContainerExist(ContainerID containerID)
-      throws ContainerNotFoundException {
-    if (!containerMap.containsKey(containerID)) {
-      throw new ContainerNotFoundException("Container with id " +
-          containerID.getId() + " not found.");
     }
   }
 

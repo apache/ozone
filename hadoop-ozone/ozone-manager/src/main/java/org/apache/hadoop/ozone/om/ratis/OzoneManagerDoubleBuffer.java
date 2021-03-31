@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.function.SupplierWithIOException;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.util.Time;
@@ -218,7 +219,7 @@ public final class OzoneManagerDoubleBuffer {
   }
 
   /**
-   * Add to writeBatch {@link OMTransactionInfo}.
+   * Add to writeBatch {@link TransactionInfo}.
    */
   private Void addToBatchTransactionInfoWithTrace(String parentName,
       long transactionIndex, SupplierWithIOException<Void> supplier)
@@ -280,7 +281,7 @@ public final class OzoneManagerDoubleBuffer {
                 (SupplierWithIOException<Void>) () -> {
                   omMetadataManager.getTransactionInfoTable().putWithBatch(
                       batchOperation, TRANSACTION_INFO_KEY,
-                      new OMTransactionInfo.Builder()
+                      new TransactionInfo.Builder()
                           .setTransactionIndex(lastRatisTransactionIndex)
                           .setCurrentTerm(term).build());
                   return null;

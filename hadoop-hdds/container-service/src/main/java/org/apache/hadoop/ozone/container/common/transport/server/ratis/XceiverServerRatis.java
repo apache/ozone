@@ -793,12 +793,15 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         clientId, server.getId(), nextCallId(), group);
 
     RaftClientReply reply;
+    LOG.debug("Received addGroup request for pipeline {}", pipelineID);
+
     try {
       reply = server.groupManagement(request);
     } catch (Exception e) {
       throw new IOException(e.getMessage(), e);
     }
     processReply(reply);
+    LOG.info("Created group {}", pipelineID);
   }
 
   @Override

@@ -182,7 +182,7 @@ public class TestFailureHandlingByClient {
     long containerId = locationInfoList.get(0).getContainerID();
     ContainerInfo container = cluster.getStorageContainerManager()
         .getContainerManager()
-        .getContainer(ContainerID.valueof(containerId));
+        .getContainer(ContainerID.valueOf(containerId));
     Pipeline pipeline =
         cluster.getStorageContainerManager().getPipelineManager()
             .getPipeline(container.getPipelineID());
@@ -222,7 +222,7 @@ public class TestFailureHandlingByClient {
     BlockID blockId = locationInfoList.get(0).getBlockID();
     ContainerInfo container =
         cluster.getStorageContainerManager().getContainerManager()
-            .getContainer(ContainerID.valueof(containerId));
+            .getContainer(ContainerID.valueOf(containerId));
     Pipeline pipeline =
         cluster.getStorageContainerManager().getPipelineManager()
             .getPipeline(container.getPipelineID());
@@ -286,7 +286,7 @@ public class TestFailureHandlingByClient {
     key.flush();
 
     Assert.assertTrue(keyOutputStream.getExcludeList().getContainerIds()
-        .contains(ContainerID.valueof(containerId)));
+        .contains(ContainerID.valueOf(containerId)));
     Assert.assertTrue(
         keyOutputStream.getExcludeList().getDatanodes().isEmpty());
     Assert.assertTrue(
@@ -335,7 +335,7 @@ public class TestFailureHandlingByClient {
     BlockID blockId = streamEntryList.get(0).getBlockID();
     ContainerInfo container =
         cluster.getStorageContainerManager().getContainerManager()
-            .getContainer(ContainerID.valueof(containerId));
+            .getContainer(ContainerID.valueOf(containerId));
     Pipeline pipeline =
         cluster.getStorageContainerManager().getPipelineManager()
             .getPipeline(container.getPipelineID());
@@ -398,7 +398,7 @@ public class TestFailureHandlingByClient {
     BlockID blockId = streamEntryList.get(0).getBlockID();
     ContainerInfo container =
         cluster.getStorageContainerManager().getContainerManager()
-            .getContainer(ContainerID.valueof(containerId));
+            .getContainer(ContainerID.valueOf(containerId));
     Pipeline pipeline =
         cluster.getStorageContainerManager().getPipelineManager()
             .getPipeline(container.getPipelineID());
