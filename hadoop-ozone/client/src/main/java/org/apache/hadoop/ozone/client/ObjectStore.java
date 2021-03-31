@@ -160,9 +160,39 @@ public class ObjectStore {
     proxy.revokeS3Secret(kerberosID);
   }
 
-  public boolean createTenant(String tenantName) throws IOException {
-    return proxy.createTenant(tenantName);
+  /**
+   * Create tenant.
+   * @param tenantName tenant name.
+   * @throws IOException
+   */
+  public void createTenant(String tenantName) throws IOException {
+    proxy.createTenant(tenantName);
   }
+
+  // TODO
+//  /**
+//   * Create tenant.
+//   * @param tenantName tenant name.
+//   * @param tenantArgs tenant arguments.
+//   * @throws IOException
+//   */
+//  public void createTenant(String tenantName, OmTenantArgs tenantArgs)
+//      throws IOException {
+//    proxy.createTenant(tenantName, tenantArgs);
+//  }
+
+  // TODO: modify, delete
+
+  /**
+   * Create tenant user.
+   * @param tenantUsername tenant user name.
+   * @throws IOException
+   */
+  public void createTenantUser(String tenantUsername) throws IOException {
+    proxy.createTenantUser(tenantUsername);
+  }
+
+  // TODO: modify, delete
 
   /**
    * Returns Iterator to iterate over all the volumes in object store.

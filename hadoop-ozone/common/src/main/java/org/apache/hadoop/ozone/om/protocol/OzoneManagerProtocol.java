@@ -390,11 +390,21 @@ public interface OzoneManagerProtocol
 
   /**
    * Create tenant.
-   * @param tenantName
-   * @return
+   * @param tenantName tenant name.
    * @throws IOException
    */
-  boolean createTenant(String tenantName) throws IOException;
+  void createTenant(String tenantName) throws IOException;
+
+  // TODO: modify, delete
+
+  /**
+   * Create tenant user.
+   * @param tenantUsername tenant user name.
+   * @throws IOException
+   */
+  void createTenantUser(String tenantUsername) throws IOException;
+
+  // TODO: modify, delete
 
   /**
    * OzoneFS api to get file status for an entry.

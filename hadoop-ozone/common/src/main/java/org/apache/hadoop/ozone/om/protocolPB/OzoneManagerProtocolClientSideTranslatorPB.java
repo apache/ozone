@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
 import org.apache.hadoop.ozone.om.helpers.OmRenameKeys;
+import org.apache.hadoop.ozone.om.helpers.OmTenantUserArgs;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
@@ -130,8 +131,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameK
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameKeysRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenewDelegationTokenResponseProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RevokeS3SecretRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantCreateRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantCreateResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateTenantRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateTenantUserRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetAclRequest;
@@ -870,20 +871,35 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     handleError(submitRequest(omRequest));
   }
 
-  // TODO: Use OmTenantArgs
   @Override
-  public boolean createTenant(String tenantArgs) throws IOException {
-    TenantCreateRequest request = TenantCreateRequest.newBuilder()
+  public void createTenant(String tenantArgs)
+      throws IOException {
+    final CreateTenantRequest request = CreateTenantRequest.newBuilder()
         .setTenantName(tenantArgs)
         .build();
-    OMRequest omRequest = createOMRequest(Type.TenantCreate)
-        .setTenantCreateRequest(request)
+    final OMRequest omRequest = createOMRequest(Type.CreateTenant)
+        .setCreateTenantRequest(request)
         .build();
-    final TenantCreateResponse resp = handleError(submitRequest(omRequest))
-        .getTenantCreateResponse();
-
-    return resp.getSuccess();
+    final OMResponse omResponse = submitRequest(omRequest);
+    handleError(omResponse);
   }
+  // TODO: Add a variant that uses OmTenantArgs
+  // TODO: modify, delete
+
+  @Override
+  public void createTenantUser(String tenantUsername)
+      throws IOException {
+    final CreateTenantUserRequest request = CreateTenantUserRequest.newBuilder()
+        .setTenantUsername(tenantUsername)
+        .build();
+    final OMRequest omRequest = createOMRequest(Type.CreateTenantUser)
+        .setCreateTenantUserRequest(request)
+        .build();
+    final OMResponse omResponse = submitRequest(omRequest);
+    handleError(omResponse);
+  }
+  // TODO: Add a variant that uses OmTenantUserArgs
+  // TODO: modify, delete
 
   /**
    * Return the proxy object underlying this protocol translator.
