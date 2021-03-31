@@ -79,12 +79,14 @@ import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.STANDALO
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_IPC_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_ADMIN_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_SERVER_PORT;
+import static org.apache.hadoop.ozone.om.OmGenericConfig.ConfigStrings.OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_HTTP_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
@@ -692,11 +694,13 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         throws IOException, AuthenticationException {
       configureSCM();
       SCMStorageConfig scmStore;
-      if (scmLayoutVersion.isPresent()) {
-        scmStore = new SCMStorageConfig(conf, scmLayoutVersion.get());
-      } else {
-        scmStore = new SCMStorageConfig(conf);
-      }
+
+      // Set non standard layout version if needed.
+      scmLayoutVersion.ifPresent(integer ->
+          conf.set(HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION,
+              String.valueOf(integer)));
+
+      scmStore = new SCMStorageConfig(conf);
       initializeScmStorage(scmStore);
       StorageContainerManager scm = TestUtils.getScmSimple(conf);
       HealthyPipelineSafeModeRule rule =
@@ -751,7 +755,10 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     protected OzoneManager createOM()
         throws IOException, AuthenticationException {
       configureOM();
-      OMStorage omStore = newOMStorage(conf);
+      omLayoutVersion.ifPresent(integer ->
+          conf.set(OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION,
+              String.valueOf(integer)));
+      OMStorage omStore = new OMStorage(conf);
       initializeOmStorage(omStore);
       return OzoneManager.createOm(conf);
     }
@@ -770,22 +777,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
       }
       return stringBuilder.toString();
-    }
-    /**
-     * Create new OM storage based on layout version.
-     * @param conf configuration object.
-     * @return OMStorage instance.
-     * @throws IOException on error.
-     */
-    protected OMStorage newOMStorage(OzoneConfiguration conf)
-        throws IOException {
-      OMStorage omStore;
-      if (omLayoutVersion.isPresent()) {
-        omStore = new OMStorage(conf, omLayoutVersion.get());
-      } else {
-        omStore = new OMStorage(conf);
-      }
-      return omStore;
     }
 
     /**
