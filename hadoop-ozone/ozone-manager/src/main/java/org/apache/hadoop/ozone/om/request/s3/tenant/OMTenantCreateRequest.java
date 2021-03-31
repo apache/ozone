@@ -34,8 +34,8 @@ import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.volume.OMVolumeRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.s3.tenant.OMTenantCreateResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantCreateRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantCreateResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateTenantRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateTenantResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -69,15 +69,15 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_L
     - If tenant already exists, throw exception to client; else continue
   - tenantStateTable: New entry
     - Key: tenant name. e.g. finance
-    - Value: new OmTenantInfo for the tenant
+    - Value: new OmDBTenantInfo for the tenant
       - tenantName: finance
       - bucketNamespaceName: finance
       - accountNamespaceName: finance
-      - userPolicyGroupName: finance-Users
-      - bucketPolicyGroupName: finance-Buckets
+      - userPolicyGroupName: finance-users
+      - bucketPolicyGroupName: finance-buckets
   - tenantPolicyTable: Generate default policies for the new tenant
-    - K: finance-Users, V: finance-Users-default
-    - K: finance-Buckets, V: finance-Buckets-default
+    - K: finance-Users, V: finance-users-default
+    - K: finance-Buckets, V: finance-buckets-default
   - Grab USER_LOCK write lock
   - Create volume finance (See OMVolumeCreateRequest)
   - Release VOLUME_LOCK write lock
@@ -95,7 +95,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    TenantCreateRequest request = getOmRequest().getTenantCreateRequest();
+    CreateTenantRequest request = getOmRequest().getCreateTenantRequest();
     String tenantName = request.getTenantName();
 
     // Check tenantName validity
@@ -140,7 +140,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
 
     IOException exception = null;
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-    TenantCreateRequest request = getOmRequest().getTenantCreateRequest();
+    CreateTenantRequest request = getOmRequest().getCreateTenantRequest();
     String tenantName = request.getTenantName();
     try {
       // Check ACL
@@ -234,8 +234,8 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
           dbUserKey, transactionLogIndex);
       LOG.debug("volume:{} successfully created", dbVolumeKey);
 
-      omResponse.setTenantCreateResponse(
-          TenantCreateResponse.newBuilder().setSuccess(true).build()
+      omResponse.setCreateTenantResponse(
+          CreateTenantResponse.newBuilder().setSuccess(true).build()
       );
 
       omClientResponse = new OMTenantCreateResponse(
@@ -246,8 +246,8 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     } catch (IOException ex) {
       exception = ex;
       // Set response success flag to false
-      omResponse.setTenantCreateResponse(
-          TenantCreateResponse.newBuilder().setSuccess(false).build()
+      omResponse.setCreateTenantResponse(
+          CreateTenantResponse.newBuilder().setSuccess(false).build()
       );
       // Cleanup any state maintained by OMMultiTenantManager.
       if (tenant != null) {

@@ -553,18 +553,32 @@ public class RpcClient implements ClientProtocol {
   }
 
   /**
-   *
-   * @param tenantName
-   * @return
+   * Create tenant.
+   * @param tenantName tenant name.
    * @throws IOException
    */
   @Override
-  public boolean createTenant(String tenantName) throws IOException {
+  public void createTenant(String tenantName) throws IOException {
     Preconditions.checkArgument(Strings.isNotBlank(tenantName),
         "tenantName cannot be null or empty.");
-
-    return ozoneManagerClient.createTenant(tenantName);
+    ozoneManagerClient.createTenant(tenantName);
   }
+
+  // TODO: modify, delete
+
+  /**
+   * Create tenant user.
+   * @param tenantUsername tenant user name.
+   * @throws IOException
+   */
+  @Override
+  public void createTenantUser(String tenantUsername) throws IOException {
+    Preconditions.checkArgument(Strings.isNotBlank(tenantUsername),
+        "tenantUsername cannot be null or empty.");
+    ozoneManagerClient.createTenantUser(tenantUsername);
+  }
+
+  // TODO: modify, delete
 
   @Override
   public void setBucketVersioning(

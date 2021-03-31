@@ -161,7 +161,7 @@ public final class OzoneManagerRatisUtils {
       return new S3GetSecretRequest(omRequest);
     case RecoverTrash:
       return new OMTrashRecoverRequest(omRequest);
-    case TenantCreate:
+    case CreateTenant:
       return new OMTenantCreateRequest(omRequest);
     default:
       throw new IllegalStateException("Unrecognized write command " +

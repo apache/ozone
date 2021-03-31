@@ -52,7 +52,7 @@ import org.apache.hadoop.ozone.om.codec.OmBucketInfoCodec;
 import org.apache.hadoop.ozone.om.codec.OmKeyInfoCodec;
 import org.apache.hadoop.ozone.om.codec.OmMultipartKeyInfoCodec;
 import org.apache.hadoop.ozone.om.codec.OmPrefixInfoCodec;
-import org.apache.hadoop.ozone.om.codec.OmTenantInfoCodec;
+import org.apache.hadoop.ozone.om.codec.OmDBTenantInfoCodec;
 import org.apache.hadoop.ozone.om.codec.OmVolumeArgsCodec;
 import org.apache.hadoop.ozone.om.codec.RepeatedOmKeyInfoCodec;
 import org.apache.hadoop.ozone.om.codec.S3SecretValueCodec;
@@ -131,7 +131,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
    * |  transactionInfoTable | #TRANSACTIONINFO -> OMTransactionInfo        |
    * |----------------------------------------------------------------------|
    * | tenantUserTable    |  tenant user name -> a tenant (organization)    |
-   * | tenantStateTable   |  tenant user name -> OmTenantInfo               |
+   * | tenantStateTable   |  tenant user name -> OmDBTenantInfo             |
    * | tenantGroupTable   |  tenant user name -> [tenant group A, B, ...]   |
    * | tenantRoleTable    |  tenant user name -> roles [admin, roleB, ...]  |
    * | tenantPolicyTable  |  policyGroup -> [policyId1, policyId2]          |
@@ -371,7 +371,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         .addCodec(S3SecretValue.class, new S3SecretValueCodec())
         .addCodec(OmPrefixInfo.class, new OmPrefixInfoCodec())
         .addCodec(OMTransactionInfo.class, new OMTransactionInfoCodec())
-        .addCodec(OmDBTenantInfo.class, new OmTenantInfoCodec());
+        .addCodec(OmDBTenantInfo.class, new OmDBTenantInfoCodec());
   }
 
   /**

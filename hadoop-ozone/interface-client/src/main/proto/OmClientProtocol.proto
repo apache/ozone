@@ -94,7 +94,13 @@ enum Type {
   ListTrash = 91;
   RecoverTrash = 92;
 
-  TenantCreate = 93;
+  CreateTenant = 93;
+  ModifyTenant = 94;
+  DeleteTenant = 95;
+
+  CreateTenantUser = 96;
+  ModifyTenantUser = 97;
+  DeleteTenantUser = 98;
 }
 
 message OMRequest {
@@ -168,7 +174,13 @@ message OMRequest {
   optional ListTrashRequest                 listTrashRequest               = 91;
   optional RecoverTrashRequest              RecoverTrashRequest            = 92;
 
-  optional TenantCreateRequest              TenantCreateRequest            = 93;
+  optional CreateTenantRequest              CreateTenantRequest            = 93;
+  optional ModifyTenantRequest              ModifyTenantRequest            = 94;
+  optional DeleteTenantRequest              DeleteTenantRequest            = 95;
+
+  optional CreateTenantUserRequest          CreateTenantUserRequest        = 96;
+  optional ModifyTenantUserRequest          ModifyTenantUserRequest        = 97;
+  optional DeleteTenantUserRequest          DeleteTenantUserRequest        = 98;
 }
 
 message OMResponse {
@@ -240,7 +252,13 @@ message OMResponse {
   optional ListTrashResponse                  listTrashResponse            = 91;
   optional RecoverTrashResponse               RecoverTrashResponse         = 92;
 
-  optional TenantCreateResponse              TenantCreateResponse          = 93;
+  optional CreateTenantResponse              CreateTenantResponse          = 93;
+  optional ModifyTenantResponse              ModifyTenantResponse          = 94;
+  optional DeleteTenantResponse              DeleteTenantResponse          = 95;
+
+  optional CreateTenantUserResponse          CreateTenantUserResponse      = 96;
+  optional ModifyTenantUserResponse          ModifyTenantUserResponse      = 97;
+  optional DeleteTenantUserResponse          DeleteTenantUserResponse      = 98;
 }
 
 enum Status {
@@ -1206,12 +1224,52 @@ message GetS3SecretResponse {
     required S3Secret s3Secret = 2;
 }
 
-message TenantCreateRequest {
-    required string tenantName = 1;
+message CreateTenantRequest {
+    optional string tenantName = 1;
 }
 
-message TenantCreateResponse {
-    required bool success = 2;
+message ModifyTenantRequest {
+    optional string tenantName = 1;
+}
+
+message DeleteTenantRequest {
+    optional string tenantName = 1;
+}
+
+message CreateTenantUserRequest {
+    optional string tenantUsername = 1;
+}
+
+message ModifyTenantUserRequest {
+    optional string tenantUsername = 1;
+}
+
+message DeleteTenantUserRequest {
+    optional string tenantUsername = 1;
+}
+
+message CreateTenantResponse {
+    optional bool success = 1;
+}
+
+message ModifyTenantResponse {
+    optional bool success = 1;
+}
+
+message DeleteTenantResponse {
+    optional bool success = 1;
+}
+
+message CreateTenantUserResponse {
+    optional bool success = 1;
+}
+
+message ModifyTenantUserResponse {
+    optional bool success = 1;
+}
+
+message DeleteTenantUserResponse {
+    optional bool success = 1;
 }
 
 /**

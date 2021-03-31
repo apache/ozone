@@ -161,7 +161,7 @@ public class OMDBDefinition implements DBDefinition {
                     String.class,
                     new StringCodec(),
                     OmDBTenantInfo.class,
-                    new OmTenantInfoCodec());
+                    new OmDBTenantInfoCodec());
 
   public static final DBColumnFamilyDefinition<String, String>
             TENANT_GROUP_TABLE =

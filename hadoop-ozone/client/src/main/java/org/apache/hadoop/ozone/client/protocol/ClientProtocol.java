@@ -507,12 +507,35 @@ public interface ClientProtocol {
   S3SecretValue getS3Secret(String kerberosID) throws IOException;
 
   /**
-   *
-   * @param tenantName
-   * @return
+   * Create tenant. TODO: return void
+   * @param tenantName tenant name.
    * @throws IOException
    */
-  boolean createTenant(String tenantName) throws IOException;
+  void createTenant(String tenantName) throws IOException;
+
+  // TODO
+//  /**
+//   * Modify tenant.
+//   * @param tenantName tenant name.
+//   * @throws IOException
+//   */
+//  void modifyTenant(String tenantName) throws IOException;
+//
+//  /**
+//   * Delete tenant.
+//   * @param tenantName tenant name.
+//   * @throws IOException
+//   */
+//  void deleteTenant(String tenantName) throws IOException;
+
+  /**
+   * Create tenant user.
+   * @param tenantUsername tenant user name.
+   * @throws IOException
+   */
+  void createTenantUser(String tenantUsername) throws IOException;
+
+  // TODO: modify, delete
 
   /**
    * Get KMS client provider.

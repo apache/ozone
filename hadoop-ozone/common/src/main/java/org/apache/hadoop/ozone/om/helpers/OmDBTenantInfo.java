@@ -85,7 +85,7 @@ public final class OmDBTenantInfo {
   }
 
   /**
-   * Convert OmTenantInfo to byteArray to be persisted to DB.
+   * Convert OmDBTenantInfo to byteArray to be persisted to DB.
    * @return byte[]
    */
   public byte[] convertToByteArray() {
@@ -93,9 +93,9 @@ public final class OmDBTenantInfo {
   }
 
   /**
-   * Convert byte array to OmTenantInfo.
+   * Convert byte array to OmDBTenantInfo.
    * @param bytes
-   * @return OmTenantInfo
+   * @return OmDBTenantInfo
    */
   public static OmDBTenantInfo getFromByteArray(byte[] bytes) {
     String tInfo = StringUtils.bytes2String(bytes);

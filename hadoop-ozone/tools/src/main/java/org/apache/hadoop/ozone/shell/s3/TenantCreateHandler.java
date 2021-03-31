@@ -40,16 +40,15 @@ public class TenantCreateHandler extends S3Handler {
   private List<String> tenants = new ArrayList<>();
 
   @Override
-  protected void execute(OzoneClient client, OzoneAddress address)
-      throws IOException {
+  protected void execute(OzoneClient client, OzoneAddress address) {
     if (tenants.size() > 0) {
       for (String tenantName : tenants) {
-        final boolean res = client.getObjectStore().createTenant(tenantName);
-        if (res) {
+        try {
+          client.getObjectStore().createTenant(tenantName);
           out().println("Successfully created tenant " + tenantName);
-        } else {
-          // TODO: Can remove. Doesn't reach the statement on exception
-          out().println("Failed to create tenant " + tenantName);
+        } catch (IOException e) {
+          out().println("Failed to create tenant " + tenantName + ": " +
+              e.getMessage());
         }
       }
     } else {

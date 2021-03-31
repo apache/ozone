@@ -382,12 +382,22 @@ public interface OzoneManagerProtocol
   S3SecretValue getS3Secret(String kerberosID) throws IOException;
 
   /**
-   *
-   * @param tenantName
-   * @return
+   * Create tenant.
+   * @param tenantName tenant name.
    * @throws IOException
    */
-  boolean createTenant(String tenantName) throws IOException;
+  void createTenant(String tenantName) throws IOException;
+
+  // TODO: modify, delete
+
+  /**
+   * Create tenant user.
+   * @param tenantUsername tenant user name.
+   * @throws IOException
+   */
+  void createTenantUser(String tenantUsername) throws IOException;
+
+  // TODO: modify, delete
 
   /**
    * OzoneFS api to get file status for an entry.

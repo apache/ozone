@@ -27,11 +27,11 @@ import java.io.IOException;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
- * Codec to encode OmTenantInfo as byte array.
+ * Codec to encode OmDBTenantInfo as byte array.
  */
-public class OmTenantInfoCodec implements Codec<OmDBTenantInfo> {
+public class OmDBTenantInfoCodec implements Codec<OmDBTenantInfo> {
   private static final Logger LOG =
-      LoggerFactory.getLogger(OmTenantInfoCodec.class);
+      LoggerFactory.getLogger(OmDBTenantInfoCodec.class);
 
   @Override
   public byte[] toPersistedFormat(OmDBTenantInfo object) throws IOException {
