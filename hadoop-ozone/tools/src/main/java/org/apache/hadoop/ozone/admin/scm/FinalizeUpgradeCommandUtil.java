@@ -15,7 +15,7 @@
  * the License.
  */
 
-package org.apache.hadoop.hdds.scm.cli.upgrade;
+package org.apache.hadoop.ozone.admin.scm;
 
 import static org.apache.hadoop.ozone.upgrade.UpgradeException
     .ResultCodes.INVALID_REQUEST;

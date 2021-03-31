@@ -16,17 +16,17 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.scm.cli.upgrade;
+package org.apache.hadoop.ozone.admin.scm;
 
-import static org.apache.hadoop.hdds.scm.cli.upgrade.FinalizeUpgradeCommandUtil.emitCancellationMsg;
-import static org.apache.hadoop.hdds.scm.cli.upgrade.FinalizeUpgradeCommandUtil.emitExitMsg;
-import static org.apache.hadoop.hdds.scm.cli.upgrade.FinalizeUpgradeCommandUtil.emitFinishedMsg;
-import static org.apache.hadoop.hdds.scm.cli.upgrade.FinalizeUpgradeCommandUtil.emitGeneralErrorMsg;
-import static org.apache.hadoop.hdds.scm.cli.upgrade.FinalizeUpgradeCommandUtil.handleInvalidRequestAfterInitiatingFinalization;
-import static org.apache.hadoop.hdds.scm.cli.upgrade.FinalizeUpgradeCommandUtil.isDone;
-import static org.apache.hadoop.hdds.scm.cli.upgrade.FinalizeUpgradeCommandUtil.isFinalized;
-import static org.apache.hadoop.hdds.scm.cli.upgrade.FinalizeUpgradeCommandUtil.isInprogress;
-import static org.apache.hadoop.hdds.scm.cli.upgrade.FinalizeUpgradeCommandUtil.isStarting;
+import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.emitCancellationMsg;
+import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.emitExitMsg;
+import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.emitFinishedMsg;
+import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.emitGeneralErrorMsg;
+import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.handleInvalidRequestAfterInitiatingFinalization;
+import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.isDone;
+import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.isFinalized;
+import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.isInprogress;
+import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.isStarting;
 
 import java.io.IOException;
 import java.util.UUID;
@@ -54,8 +54,11 @@ import picocli.CommandLine;
     description = "Finalize SCM Upgrade",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
-
 public class FinalizeScmUpgradeSubcommand extends ScmSubcommand {
+
+  @CommandLine.ParentCommand
+  private ScmAdmin parent;
+
   @CommandLine.Option(
       names = {"--takeover"},
       description = "Forces takeover of monitoring from another client, if "
