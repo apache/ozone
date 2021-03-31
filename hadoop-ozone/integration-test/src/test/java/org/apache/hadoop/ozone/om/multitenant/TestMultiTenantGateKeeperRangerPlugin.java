@@ -162,7 +162,8 @@ public class TestMultiTenantGateKeeperRangerPlugin {
         GROUP_PRINCIPAL);
     tenantVolumeAccessPolicy.addAccessPolicyElem(obj, principal, READ, ALLOW);
     tenantVolumeAccessPolicy.addAccessPolicyElem(obj, principal, LIST, ALLOW);
-    tenantVolumeAccessPolicy.addAccessPolicyElem(obj, principal, READ_ACL, ALLOW);
+    tenantVolumeAccessPolicy.addAccessPolicyElem(obj, principal,
+        READ_ACL, ALLOW);
     return tenantVolumeAccessPolicy;
   }
 

@@ -329,7 +329,8 @@ public class MultiTenantGateKeeperRangerPlugin implements
     }
   }
 
-  private String getReponseData(HttpsURLConnection urlConnection) throws IOException {
+  private String getReponseData(HttpsURLConnection urlConnection)
+      throws IOException {
     StringBuilder response = new StringBuilder();
     try (BufferedReader br = new BufferedReader(
         new InputStreamReader(urlConnection.getInputStream(), "utf-8"))) {

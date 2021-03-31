@@ -156,6 +156,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     OMClientResponse omClientResponse = null;
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
+    OmVolumeArgs omVolumeArgs = null;
     boolean acquiredVolumeLock = false;
     boolean acquiredUserLock = false;
     Tenant tenant = null;
@@ -237,7 +238,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       final VolumeInfo volumeInfo =
           getOmRequest().getCreateVolumeRequest().getVolumeInfo();
       LOG.info("Vol mod time: {}", volumeInfo.getModificationTime()); // TODO
-      OmVolumeArgs omVolumeArgs = OmVolumeArgs.newBuilder()
+      omVolumeArgs = OmVolumeArgs.newBuilder()
           .setAdminName(owner)
           .setOwnerName(owner)
           .setVolume(dbVolumeKey)

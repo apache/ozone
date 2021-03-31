@@ -164,9 +164,8 @@ public class OMTenantUserCreateRequest extends OMVolumeRequest {
     IOException exception = null;
     try {
       // Check ACL: access_key_id should be tenant admin
-      if (ozoneManager.getAclsEnabled()) {
-        // TODO: Use OMMultiTenantManager?
-      }
+//      if (ozoneManager.getAclsEnabled()) {  // TODO: Use OMMultiTenantManager?
+//      }
 
       // Sanity check full user name with kerberosID in UpdateGetS3SecretRequest
       if (!fullUsername.equals(kerberosID)) {
