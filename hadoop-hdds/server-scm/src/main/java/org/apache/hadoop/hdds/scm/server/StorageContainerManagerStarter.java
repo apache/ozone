@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
 import org.apache.hadoop.ozone.common.StorageInfo;
+import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -174,7 +175,7 @@ public class StorageContainerManagerStarter extends GenericCli {
 
     @Override
     public boolean bootStrap(OzoneConfiguration conf)
-        throws IOException{
+        throws AuthenticationException, IOException {
       return StorageContainerManager.scmBootstrap(conf);
     }
 

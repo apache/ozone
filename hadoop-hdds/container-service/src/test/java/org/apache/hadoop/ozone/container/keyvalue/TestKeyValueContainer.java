@@ -206,8 +206,33 @@ public class TestKeyValueContainer {
       fail("Container is imported twice. Previous files are overwritten");
     } catch (IOException ex) {
       //all good
+      assertTrue(container.getContainerFile().exists());
     }
 
+    //Import failure should cleanup the container directory
+    containerData =
+        new KeyValueContainerData(containerId + 1,
+            keyValueContainerData.getLayOutVersion(),
+            keyValueContainerData.getMaxSize(), UUID.randomUUID().toString(),
+            datanodeId.toString());
+    container = new KeyValueContainer(containerData, CONF);
+
+    containerVolume = volumeChoosingPolicy.chooseVolume(volumeSet
+        .getVolumesList(), 1);
+    hddsVolumeDir = containerVolume.getHddsRootDir().toString();
+    container.populatePathFields(scmId, containerVolume, hddsVolumeDir);
+    try {
+      FileInputStream fis = new FileInputStream(folderToExport);
+      fis.close();
+      container.importContainerData(fis, packer);
+      fail("Container import should fail");
+    } catch (Exception ex) {
+      assertTrue(ex instanceof IOException);
+    } finally {
+      File directory =
+          new File(container.getContainerData().getContainerPath());
+      assertFalse(directory.exists());
+    }
   }
 
   /**

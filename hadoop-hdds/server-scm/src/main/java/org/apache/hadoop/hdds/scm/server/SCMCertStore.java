@@ -101,7 +101,7 @@ public final class SCMCertStore implements CertificateStore {
    * @param certificate - Certificate to persist.
    * @throws IOException - on Failure.
    */
-  private void storeValidScmCertificate(BigInteger serialID,
+  public void storeValidScmCertificate(BigInteger serialID,
       X509Certificate certificate) throws IOException {
     lock.lock();
     try {

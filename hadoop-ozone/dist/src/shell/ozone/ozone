@@ -39,6 +39,7 @@ function ozone_usage
   ozone_add_subcommand "classpath" client "prints the class path needed for running ozone commands"
   ozone_add_subcommand "datanode" daemon "run a HDDS datanode"
   ozone_add_subcommand "envvars" client "display computed Hadoop environment variables"
+  ozone_add_subcommand "daemonlog" admin "get/set the log level for each daemon"
   ozone_add_subcommand "freon" client "runs an ozone data generator"
   ozone_add_subcommand "fs" client "run a filesystem command on Ozone file system. Equivalent to 'hadoop fs'"
   ozone_add_subcommand "genconf" client "generate minimally required ozone configs and output to ozone-site.xml in specified path"
@@ -200,6 +201,10 @@ function ozonecmd_case
     ;;
     fs)
       OZONE_CLASSNAME=org.apache.hadoop.fs.ozone.OzoneFsShell
+      OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-tools"
+    ;;
+    daemonlog)
+      OZONE_CLASSNAME=org.apache.hadoop.log.LogLevel
       OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-tools"
     ;;
     insight)
