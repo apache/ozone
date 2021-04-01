@@ -193,8 +193,8 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>hdds-interface-client</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-hdds-interface-admin</artifactId>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-interface-admin</artifactId>
     </dependency>
     <dependency>
       <groupId>org.hamcrest</groupId>
