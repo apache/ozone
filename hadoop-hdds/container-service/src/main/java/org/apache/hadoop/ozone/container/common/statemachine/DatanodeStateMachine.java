@@ -127,11 +127,10 @@ public class DatanodeStateMachine implements Closeable {
     this.conf = conf;
     this.datanodeDetails = datanodeDetails;
 
+    // Expected to be initialized already.
     layoutStorage = new DatanodeLayoutStorage(conf,
         datanodeDetails.getUuidString());
-    if (layoutStorage.getState() != INITIALIZED) {
-      layoutStorage.initialize();
-    }
+
     layoutVersionManager = new HDDSLayoutVersionManager(
         layoutStorage.getLayoutVersion());
     upgradeFinalizer = new DataNodeUpgradeFinalizer(layoutVersionManager,
