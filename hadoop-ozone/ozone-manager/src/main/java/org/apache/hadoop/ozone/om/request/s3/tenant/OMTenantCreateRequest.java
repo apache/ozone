@@ -211,10 +211,10 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
           new CacheValue<>(Optional.of(omDBTenantInfo), transactionLogIndex));
 
       // Call OMMultiTenantManager
-      tenant = ozoneManager.getMultiTenantManager().createTenant(tenantName);
-      final String tenantDefaultPolicies =
-          tenant.getTenantAccessPolicies().stream()
-          .map(e->e.getPolicyID()) .collect(Collectors.joining(","));
+//      tenant = ozoneManager.getMultiTenantManager().createTenant(tenantName);
+      final String tenantDefaultPolicies = "tenantDefaultPolicies";
+//          tenant.getTenantAccessPolicies().stream()
+//          .map(e->e.getPolicyID()).collect(Collectors.joining(","));
 
       // Add to tenantPolicyTable
       omMetadataManager.getTenantPolicyTable().addCacheEntry(

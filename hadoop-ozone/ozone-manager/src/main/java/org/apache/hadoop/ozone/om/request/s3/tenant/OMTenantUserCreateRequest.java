@@ -230,8 +230,8 @@ public class OMTenantUserCreateRequest extends OMVolumeRequest {
 
       // Call OMMultiTenantManager
       //  TODO: Check usage with Prashant
-      tenantPrincipal = ozoneManager.getMultiTenantManager()
-          .createUser(tenantName, fullUsername /* TODO: full or short name? */);
+//      tenantPrincipal = ozoneManager.getMultiTenantManager()
+//          .createUser(tenantName, fullUsername /* TODO: full/short name? */);
 
       omResponse.setCreateTenantUserResponse(
           CreateTenantUserResponse.newBuilder().setSuccess(true)
