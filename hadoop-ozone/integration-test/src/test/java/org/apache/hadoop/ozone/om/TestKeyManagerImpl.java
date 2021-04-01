@@ -609,7 +609,7 @@ public class TestKeyManagerImpl {
         .setStoreType(OzoneObj.StoreType.OZONE)
         .build();
 
-
+    prefixManager.addAcl(ozPrefix1, ozAcl1);
     List<OzoneAcl> ozAclGet = prefixManager.getAcl(ozPrefix1);
     Assert.assertEquals(1, ozAclGet.size());
     Assert.assertEquals(ozAcl1, ozAclGet.get(0));
@@ -617,7 +617,7 @@ public class TestKeyManagerImpl {
     // get acl with invalid prefix name
     exception.expect(OMException.class);
     exception.expectMessage("Invalid prefix name");
-    Assert.assertEquals(null, ozAcl1);
+    prefixManager.getAcl(ozInvalidPrefix);
 
     // set acl with invalid prefix name
     List<OzoneAcl> ozoneAcls = new ArrayList<OzoneAcl>();
