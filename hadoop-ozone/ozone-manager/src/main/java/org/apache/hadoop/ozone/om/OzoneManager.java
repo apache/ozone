@@ -69,8 +69,6 @@ import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
-import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
-import org.apache.hadoop.hdds.scm.proxy.SCMContainerLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.OMCertificateClient;
@@ -78,7 +76,6 @@ import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.server.ServiceRuntimeInfoImpl;
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
-import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
@@ -261,6 +258,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private OzoneBlockTokenSecretManager blockTokenMgr;
   private CertificateClient certClient;
   private String caCertPem = null;
+  private List<String> caCertPemList = new ArrayList<>();
   private static boolean testSecureOmFlag = false;
   private final Text omRpcAddressTxt;
   private final OzoneConfiguration configuration;
@@ -845,17 +843,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * Returns a scm container client.
    *
    * @return {@link StorageContainerLocationProtocol}
-   * @throws IOException
    */
   private static StorageContainerLocationProtocol getScmContainerClient(
       OzoneConfiguration conf) {
-    SCMContainerLocationFailoverProxyProvider proxyProvider =
-        new SCMContainerLocationFailoverProxyProvider(conf);
-    StorageContainerLocationProtocol scmContainerClient =
-        TracingUtil.createProxy(
-            new StorageContainerLocationProtocolClientSideTranslatorPB(
-                proxyProvider), StorageContainerLocationProtocol.class, conf);
-    return scmContainerClient;
+    return HAUtils.getScmContainerClient(conf);
   }
 
   /**
@@ -1123,10 +1114,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     metadataManager.start(configuration);
     startSecretManagerIfNecessary();
 
+
+    // Perform this to make it work with old clients.
     if (certClient != null) {
-      caCertPem = CertificateCodec.getPEMEncodedString(
-          certClient.getCACertificate());
+      caCertPem =
+          CertificateCodec.getPEMEncodedString(certClient.getCACertificate());
+      caCertPemList = HAUtils.buildCAList(certClient, configuration);
     }
+
     // Set metrics and start metrics back ground thread
     metrics.setNumVolumes(metadataManager.countRowsInTable(metadataManager
         .getVolumeTable()));
@@ -1478,6 +1473,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         String pemEncodedRootCert = response.getX509CACertificate();
         client.storeCertificate(pemEncodedRootCert, true, true);
         client.storeCertificate(pemEncodedCert, true);
+
+        // Store Root CA certificate if available.
+        if (response.hasX509RootCACertificate()) {
+          client.storeRootCACertificate(response.getX509RootCACertificate(),
+              true);
+        }
+
         // Persist om cert serial id.
         omStore.setOmCertSerialId(CertificateCodec.
             getX509Certificate(pemEncodedCert).getSerialNumber().toString());
@@ -2675,7 +2677,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   @Override
   public ServiceInfoEx getServiceInfo() throws IOException {
-    return new ServiceInfoEx(getServiceList(), caCertPem);
+    return new ServiceInfoEx(getServiceList(), caCertPem, caCertPemList);
   }
 
   @Override

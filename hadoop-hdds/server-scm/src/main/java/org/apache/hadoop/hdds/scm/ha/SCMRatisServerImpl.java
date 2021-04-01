@@ -39,8 +39,10 @@ import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.util.Time;
+import org.apache.ratis.conf.Parameters;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.protocol.ClientId;
@@ -88,9 +90,14 @@ public class SCMRatisServerImpl implements SCMRatisServer {
     // persisted in the raft log post leader election. Now, when the primary
     // scm boots up, it has peer info embedded in the raft log and will
     // trigger leader election.
-    this.server =
-        newRaftServer(scm.getScmId(), conf).setStateMachine(stateMachine)
-            .setGroup(RaftGroup.valueOf(groupId)).build();
+
+    Parameters parameters =
+        HASecurityUtils.createSCMServerTlsParameters(new SecurityConfig(conf),
+           scm.getScmCertificateClient());
+    this.server = newRaftServer(scm.getScmId(), conf)
+        .setStateMachine(stateMachine)
+        .setGroup(RaftGroup.valueOf(groupId))
+        .setParameters(parameters).build();
     this.division = server.getDivision(groupId);
   }
 
