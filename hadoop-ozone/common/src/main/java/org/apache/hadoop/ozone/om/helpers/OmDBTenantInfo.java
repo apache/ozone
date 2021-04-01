@@ -66,10 +66,6 @@ public final class OmDBTenantInfo {
     bucketPolicyGroupName = tInfo[4];
   }
 
-  public static class Builder {
-    // TODO: Finish this if necessary later. ref: OmMultipartKeyInfo
-  }
-
   public String getTenantName() {
     return tenantName;
   }
@@ -116,5 +112,46 @@ public final class OmDBTenantInfo {
 
   public String getBucketPolicyGroupName() {
     return bucketPolicyGroupName;
+  }
+
+  public static class Builder {
+    private String tenantName;
+    private String bucketNamespaceName;
+    private String accountNamespaceName;
+    private String userPolicyGroupName;
+    private String bucketPolicyGroupName;
+
+    private Builder() {
+    }
+
+    public Builder setTenantName(String tenantName) {
+      this.tenantName = tenantName;
+      return this;
+    }
+
+    public Builder setBucketNamespaceName(String bucketNamespaceName) {
+      this.bucketNamespaceName = bucketNamespaceName;
+      return this;
+    }
+
+    public Builder setAccountNamespaceName(String accountNamespaceName) {
+      this.accountNamespaceName = accountNamespaceName;
+      return this;
+    }
+
+    public Builder setUserPolicyGroupName(String userPolicyGroupName) {
+      this.userPolicyGroupName = userPolicyGroupName;
+      return this;
+    }
+
+    public Builder setBucketPolicyGroupName(String bucketPolicyGroupName) {
+      this.bucketPolicyGroupName = bucketPolicyGroupName;
+      return this;
+    }
+
+    public OmDBTenantInfo build() {
+      return new OmDBTenantInfo(tenantName, bucketNamespaceName,
+          accountNamespaceName, userPolicyGroupName, bucketPolicyGroupName);
+    }
   }
 }
