@@ -68,7 +68,7 @@ public class OMUpgradeFinalizer extends BasicUpgradeFinalizer<OzoneManager,
           this);
     } catch (Exception e) {
       e.printStackTrace();
-      throw new IOException(e.getMessage());
+      throw (IOException) e;
     }
     return STARTING_MSG;
   }

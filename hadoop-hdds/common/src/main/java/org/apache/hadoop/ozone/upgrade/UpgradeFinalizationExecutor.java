@@ -70,6 +70,7 @@ public class UpgradeFinalizationExecutor {
       if (basicUpgradeFinalizer.getVersionManager().needsFinalization()) {
         basicUpgradeFinalizer.getVersionManager()
             .setUpgradeState(FINALIZATION_REQUIRED);
+        throw (e);
       }
     } finally {
       basicUpgradeFinalizer.markFinalizationDone();
