@@ -45,7 +45,7 @@ public class BucketNameSpaceImpl implements BucketNameSpace {
   }
 
   @Override
-  public void addBucketNameSpaceObjects(OzoneObj e) {
+  public void addBucketNameSpaceObject(OzoneObj e) {
     bucketNameSpaceObjects.add(e);
   }
 

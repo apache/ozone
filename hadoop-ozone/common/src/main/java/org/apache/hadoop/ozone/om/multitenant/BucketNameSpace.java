@@ -65,7 +65,7 @@ public interface BucketNameSpace {
    * Add one or more volumes to this BucketNameSpace.
    * @param bucketNamespaceObject
    */
-  void addBucketNameSpaceObjects(OzoneObj bucketNamespaceObject);
+  void addBucketNameSpaceObject(OzoneObj bucketNamespaceObject);
 
   /**
    * Get Space Usage Information for this BucketNameSpace. This can be
