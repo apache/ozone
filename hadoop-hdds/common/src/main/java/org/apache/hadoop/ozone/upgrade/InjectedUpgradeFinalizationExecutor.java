@@ -62,7 +62,7 @@ public class InjectedUpgradeFinalizationExecutor extends
     }
   }
 
-  class UpgradeTestInjectionAbort extends Exception {
+  static class UpgradeTestInjectionAbort extends Exception {
     UpgradeTestInjectionAbort() {
     }
   }

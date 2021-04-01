@@ -54,7 +54,7 @@ public class SCMUpgradeFinalizer extends
       return response;
     }
     try {
-      finalizationExecutor.execute(scm.getScmStorageConfig(), this);
+      getFinalizationExecutor().execute(scm.getScmStorageConfig(), this);
     } catch (Exception e) {
       e.printStackTrace();
       throw new IOException(e.getMessage());

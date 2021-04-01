@@ -64,7 +64,7 @@ public class OMUpgradeFinalizer extends BasicUpgradeFinalizer<OzoneManager,
     //        Executors.newSingleThreadExecutor(r -> new Thread(threadName));
     //    executor.submit(new Worker(om));
     try {
-      finalizationExecutor.execute(ozoneManager.getOmStorage(),
+      getFinalizationExecutor().execute(ozoneManager.getOmStorage(),
           this);
     } catch (Exception e) {
       e.printStackTrace();

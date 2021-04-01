@@ -59,7 +59,7 @@ public class DataNodeUpgradeFinalizer extends
       return response;
     }
     try {
-      finalizationExecutor.execute(dsm.getLayoutStorage(),
+      getFinalizationExecutor().execute(dsm.getLayoutStorage(),
           this);
     } catch (Exception e) {
       e.printStackTrace();

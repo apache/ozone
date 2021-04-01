@@ -73,6 +73,11 @@ public abstract class BasicUpgradeFinalizer
     finalizationExecutor = executor;
   }
 
+  @Override
+  public UpgradeFinalizationExecutor getFinalizationExecutor() {
+    return finalizationExecutor;
+  }
+
   public boolean isFinalizationDone() {
     return isDone;
   }
