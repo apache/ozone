@@ -42,7 +42,7 @@ public class CephCompatibleTenantImpl implements Tenant {
     tenantGroupsIDs = new ArrayList<>();
     accountNameSpace = new AccountNameSpaceImpl(id);
     bucketNameSpace = new BucketNameSpaceImpl(id);
-    OzoneObj volume = new OzoneObjInfo.Builder().newBuilder()
+    OzoneObj volume = new OzoneObjInfo.Builder()
         .setResType(VOLUME)
         .setStoreType(OZONE)
         .setVolumeName(bucketNameSpace.getBucketNameSpaceID()).build();

@@ -59,6 +59,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
 
   OMMultiTenantManagerImpl(OMMetadataManager mgr, OzoneConfiguration conf)
       throws IOException {
+    this.conf = conf;
     allTenants = new ConcurrentHashMap<>();
     omMetadataManager = mgr;
     start(conf);
