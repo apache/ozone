@@ -44,6 +44,8 @@ import com.google.protobuf.ServiceException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.Type.GetSCMCertificate;
+
 /**
  * This class is the server-side translator that forwards requests received on
  * {@link SCMSecurityProtocolPB} to the {@link
@@ -170,7 +172,8 @@ public class SCMSecurityProtocolServerSideTranslatorPB
             .newBuilder()
             .setResponseCode(ResponseCode.success)
             .setX509Certificate(certificate)
-            .setX509CACertificate(impl.getCACertificate());
+            .setX509CACertificate(impl.getCACertificate())
+            .setX509RootCACertificate(impl.getRootCACertificate());
 
     return builder.build();
 
@@ -194,7 +197,8 @@ public class SCMSecurityProtocolServerSideTranslatorPB
             .newBuilder()
             .setResponseCode(ResponseCode.success)
             .setX509Certificate(certificate)
-            .setX509CACertificate(impl.getCACertificate());
+            .setX509CACertificate(impl.getRootCACertificate())
+            .setX509RootCACertificate(impl.getRootCACertificate());
 
     return builder.build();
 
@@ -216,7 +220,8 @@ public class SCMSecurityProtocolServerSideTranslatorPB
             .newBuilder()
             .setResponseCode(ResponseCode.success)
             .setX509Certificate(certificate)
-            .setX509CACertificate(impl.getCACertificate());
+            .setX509CACertificate(impl.getCACertificate())
+            .setX509RootCACertificate(impl.getRootCACertificate());
     return builder.build();
 
   }
@@ -243,7 +248,9 @@ public class SCMSecurityProtocolServerSideTranslatorPB
         SCMGetCertResponseProto
             .newBuilder()
             .setResponseCode(ResponseCode.success)
-            .setX509Certificate(certificate);
+            .setX509Certificate(certificate)
+            .setX509CACertificate(certificate)
+            .setX509RootCACertificate(impl.getRootCACertificate());
     return builder.build();
 
   }
@@ -271,6 +278,7 @@ public class SCMSecurityProtocolServerSideTranslatorPB
         SCMGetCertResponseProto
             .newBuilder()
             .setResponseCode(ResponseCode.success)
+            .setX509Certificate(rootCACertificate)
             .setX509RootCACertificate(rootCACertificate);
     return builder.build();
   }

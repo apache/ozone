@@ -487,6 +487,11 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     if (serviceInfoEx.getCaCertificate() != null) {
       resp.setCaCertificate(serviceInfoEx.getCaCertificate());
     }
+
+    for (String ca : serviceInfoEx.getCaCertPemList()) {
+      resp.addCaCerts(ca);
+    }
+
     return resp.build();
   }
 

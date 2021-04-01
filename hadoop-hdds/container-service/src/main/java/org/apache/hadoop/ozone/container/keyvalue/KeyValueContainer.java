@@ -468,7 +468,8 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
                 + " as the container descriptor (%s) has already been exist.",
             getContainerData().getContainerID(),
             getContainerFile().getAbsolutePath());
-        throw new IOException(errorMessage);
+        throw new StorageContainerException(errorMessage,
+            CONTAINER_ALREADY_EXISTS);
       }
       //copy the values from the input stream to the final destination
       // directory.
@@ -498,11 +499,17 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       KeyValueContainerUtil.parseKVContainerData(containerData, config);
 
     } catch (Exception ex) {
+      if (ex instanceof StorageContainerException &&
+          ((StorageContainerException) ex).getResult() ==
+              CONTAINER_ALREADY_EXISTS) {
+        throw ex;
+      }
       //delete all the temporary data in case of any exception.
       try {
         FileUtils.deleteDirectory(new File(containerData.getMetadataPath()));
         FileUtils.deleteDirectory(new File(containerData.getChunksPath()));
-        FileUtils.deleteDirectory(getContainerFile());
+        FileUtils.deleteDirectory(
+            new File(getContainerData().getContainerPath()));
       } catch (Exception deleteex) {
         LOG.error(
             "Can not cleanup destination directories after a container import"

@@ -32,9 +32,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
-import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
-import org.apache.hadoop.hdds.scm.proxy.SCMContainerLocationFailoverProxyProvider;
-import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -342,15 +340,8 @@ public class BaseFreonGenerator {
   }
 
   public StorageContainerLocationProtocol createStorageContainerLocationClient(
-      OzoneConfiguration ozoneConf) {
-    SCMContainerLocationFailoverProxyProvider proxyProvider =
-        new SCMContainerLocationFailoverProxyProvider(ozoneConf);
-    StorageContainerLocationProtocol client =
-        TracingUtil.createProxy(
-            new StorageContainerLocationProtocolClientSideTranslatorPB(
-                proxyProvider),
-            StorageContainerLocationProtocol.class, ozoneConf);
-    return client;
+      OzoneConfiguration ozoneConf) throws IOException {
+    return HAUtils.getScmContainerClient(ozoneConf);
   }
 
   public static Pipeline findPipelineForTest(String pipelineId,

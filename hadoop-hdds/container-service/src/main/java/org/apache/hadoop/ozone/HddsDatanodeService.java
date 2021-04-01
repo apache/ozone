@@ -363,6 +363,12 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
         dnCertClient.storeCertificate(pemEncodedCert, true);
         dnCertClient.storeCertificate(response.getX509CACertificate(), true,
             true);
+
+        // Store Root CA certificate.
+        if (response.hasX509RootCACertificate()) {
+          dnCertClient.storeRootCACertificate(
+              response.getX509RootCACertificate(), true);
+        }
         String dnCertSerialId = getX509Certificate(pemEncodedCert).
             getSerialNumber().toString();
         datanodeDetails.setCertSerialId(dnCertSerialId);

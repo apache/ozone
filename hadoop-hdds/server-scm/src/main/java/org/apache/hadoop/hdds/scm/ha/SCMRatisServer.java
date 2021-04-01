@@ -25,6 +25,7 @@ import org.apache.ratis.server.RaftServer;
 import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
 
 /**
  * TODO.
@@ -36,7 +37,8 @@ public interface SCMRatisServer {
   void registerStateMachineHandler(RequestType handlerType, Object handler);
 
   SCMRatisResponse submitRequest(SCMRatisRequest request)
-      throws IOException, ExecutionException, InterruptedException;
+      throws IOException, ExecutionException, InterruptedException,
+      TimeoutException;
 
   void stop() throws IOException;
 
@@ -45,7 +47,7 @@ public interface SCMRatisServer {
   /**
    * Returns roles of ratis peers.
    */
-  List<String> getRatisRoles();
+  List<String> getRatisRoles() throws IOException;
 
   /**
    * Returns NotLeaderException with useful info.
