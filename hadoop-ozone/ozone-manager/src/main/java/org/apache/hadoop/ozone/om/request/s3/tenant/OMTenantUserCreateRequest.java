@@ -245,14 +245,13 @@ public class OMTenantUserCreateRequest extends OMVolumeRequest {
       // Set response success flag to false
       omResponse.setCreateTenantUserResponse(
           CreateTenantUserResponse.newBuilder().setSuccess(false).build());
-      // Cleanup any state maintained by OMMultiTenantManager
-      if (tenantPrincipal != null) {
-        try {  // TODO: Check usage with Prashant
-          ozoneManager.getMultiTenantManager().deactivateUser(tenantPrincipal);
-        } catch (Exception e) {
-          // Ignore for now
-        }
-      }
+//      if (tenantPrincipal != null) {
+//        try {
+//          ozoneManager.getMultiTenantManager()
+//              .deactivateUser(tenantPrincipal);
+//        } catch (Exception ignored) {
+//        }
+//      }
       omClientResponse = new OMTenantCreateResponse(
           createErrorOMResponse(omResponse, ex));
     } finally {
