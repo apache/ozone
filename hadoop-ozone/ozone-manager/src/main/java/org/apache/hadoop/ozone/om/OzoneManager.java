@@ -191,6 +191,7 @@ import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForClients;
 import static org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest.getEncodedString;
 import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
+import static org.apache.hadoop.hdds.utils.HAUtils.getScmInfo;
 import static org.apache.hadoop.ozone.OmUtils.MAX_TRXN_ID;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_ENABLED_DEFAULT;
@@ -495,13 +496,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   private void logVersionMismatch(OzoneConfiguration conf, ScmInfo scmInfo) {
     List<SCMNodeInfo> scmNodeInfoList = SCMNodeInfo.buildNodeInfo(conf);
-    String scmBlockAddress = "";
+    StringBuilder scmBlockAddressBuilder = new StringBuilder("");
     for (SCMNodeInfo scmNodeInfo : scmNodeInfoList) {
-      scmBlockAddress += scmNodeInfo.getBlockClientAddress() + ",";
+      scmBlockAddressBuilder.append(scmNodeInfo.getBlockClientAddress())
+          .append(",");
     }
-    if (scmBlockAddress != "") {
-      scmBlockAddress = scmBlockAddress.substring(0,
-          scmBlockAddress.lastIndexOf(",") - 1);
+    String scmBlockAddress = scmBlockAddressBuilder.toString();
+    if (!StringUtils.isBlank(scmBlockAddress)) {
+      scmBlockAddress.substring(0, scmBlockAddress.lastIndexOf(","));
     }
     if (!scmInfo.getClusterId().equals(omStorage.getClusterID())) {
       LOG.error("clusterId from {} is {}, but is {} in {}",
@@ -931,7 +933,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     StorageState state = omStorage.getState();
     if (state != StorageState.INITIALIZED) {
       try {
-        ScmInfo scmInfo = HAUtils.getScmInfo(conf);
+        ScmInfo scmInfo = getScmInfo(conf);
         String clusterId = scmInfo.getClusterId();
         String scmId = scmInfo.getScmId();
         if (clusterId == null || clusterId.isEmpty()) {

@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateSer
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.DefaultCAServer;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.DefaultCAProfile;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.PKIProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse;
 import org.apache.hadoop.hdds.security.x509.certificate.client.SCMCertificateClient;
@@ -184,7 +185,8 @@ public final class HASecurityUtils {
     try {
 
       CertificateServer rootCAServer =
-          initializeRootCertificateServer(config, null, scmStorageConfig);
+          initializeRootCertificateServer(config, null, scmStorageConfig,
+              new DefaultCAProfile());
 
       PKCS10CertificationRequest csr = generateCSR(client, scmStorageConfig,
           config, scmAddress);
@@ -230,14 +232,14 @@ public final class HASecurityUtils {
    */
   public static CertificateServer initializeRootCertificateServer(
       OzoneConfiguration config, CertificateStore scmCertStore,
-      SCMStorageConfig scmStorageConfig)
+      SCMStorageConfig scmStorageConfig, PKIProfile pkiProfile)
       throws IOException {
     String subject = SCM_ROOT_CA_PREFIX +
         InetAddress.getLocalHost().getHostName();
 
     DefaultCAServer rootCAServer = new DefaultCAServer(subject,
         scmStorageConfig.getClusterID(),
-        scmStorageConfig.getScmId(), scmCertStore, new DefaultCAProfile(),
+        scmStorageConfig.getScmId(), scmCertStore, pkiProfile,
         SCM_ROOT_CA_COMPONENT_NAME);
 
     rootCAServer.init(new SecurityConfig(config),
