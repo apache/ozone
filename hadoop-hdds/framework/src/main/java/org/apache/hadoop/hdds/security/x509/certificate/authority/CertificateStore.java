@@ -54,6 +54,9 @@ public interface CertificateStore {
   void storeValidCertificate(BigInteger serialID,
       X509Certificate certificate, NodeType role) throws IOException;
 
+  void storeValidScmCertificate(BigInteger serialID,
+      X509Certificate certificate) throws IOException;
+
   /**
    * Check certificate serialID exists or not. If exists throws an exception.
    * @param serialID

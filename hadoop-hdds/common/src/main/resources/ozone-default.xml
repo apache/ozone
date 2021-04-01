@@ -2068,6 +2068,14 @@
   </property>
 
   <property>
+    <name>ozone.scm.ratis.minimum.timeout</name>
+    <value>30s</value>
+    <tag>OZONE, SCM, HA, RATIS</tag>
+    <description>The request timeout duration for SCM's Ratis server request.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.scm.ratis.leader.election.minimum.timeout.duration</name>
     <value>1s</value>
     <tag>OZONE, SCM, HA, RATIS</tag>

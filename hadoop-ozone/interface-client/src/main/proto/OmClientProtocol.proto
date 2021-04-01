@@ -1055,6 +1055,8 @@ message ServiceListResponse {
     // When security is enabled, return SCM CA certificate to Ozone client
     // to set up gRPC TLS for client to authenticate server(DN).
     optional string caCertificate = 3;
+
+    repeated string caCerts = 4;
 }
 
 message DBUpdatesResponse {

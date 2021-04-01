@@ -332,7 +332,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
    */
   @Override
   public StorageContainerLocationProtocolClientSideTranslatorPB
-      getStorageContainerLocationClient() {
+      getStorageContainerLocationClient() throws IOException {
     InetSocketAddress address = scm.getClientRpcAddress();
     LOG.info(
         "Creating StorageContainerLocationProtocol RPC client with address {}",
