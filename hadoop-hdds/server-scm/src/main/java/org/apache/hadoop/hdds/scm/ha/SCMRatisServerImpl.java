@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.scm.ha;
 
 import java.io.IOException;
 import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -238,7 +237,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   }
 
   @Override
-  public List<String> getRatisRoles() throws UnknownHostException {
+  public List<String> getRatisRoles() throws IOException {
     Collection<RaftPeer> peers = division.getGroup().getPeers();
     List<String> ratisRoles = new ArrayList<>();
     for (RaftPeer peer : peers) {
