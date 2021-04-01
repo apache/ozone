@@ -47,18 +47,18 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TENANT_USER_TABLE
 public class OMTenantUserCreateResponse extends OMClientResponse {
 
   private S3SecretValue s3SecretValue;
-  private String fullUsername, tenantName, groupName, roleName;
+  private String principal, tenantName, groupName, roleName;
 
   public OMTenantUserCreateResponse(@Nonnull OMResponse omResponse,
       @Nullable S3SecretValue s3SecretValue,
-      @Nullable String fullUsername,
+      @Nullable String principal,
       @Nullable String tenantName,
       @Nullable String groupName,
       @Nullable String roleName
   ) {
     super(omResponse);
     this.s3SecretValue = s3SecretValue;
-    this.fullUsername = fullUsername;
+    this.principal = principal;
     this.tenantName = tenantName;
     this.groupName = groupName;
     this.roleName = roleName;
@@ -84,10 +84,10 @@ public class OMTenantUserCreateResponse extends OMClientResponse {
     }
 
     omMetadataManager.getTenantUserTable().putWithBatch(
-        batchOperation, fullUsername, tenantName);
+        batchOperation, principal, tenantName);
     omMetadataManager.getTenantGroupTable().putWithBatch(
-        batchOperation, fullUsername, groupName);
+        batchOperation, principal, groupName);
     omMetadataManager.getTenantRoleTable().putWithBatch(
-        batchOperation, fullUsername, roleName);
+        batchOperation, principal, roleName);
   }
 }
