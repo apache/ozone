@@ -67,6 +67,7 @@ public class DefaultApprover extends BaseApprover {
 
   /**
    * Sign function signs a Certificate.
+   *
    * @param config - Security Config.
    * @param caPrivate - CAs private Key.
    * @param caCertificate - CA Certificate.
@@ -81,7 +82,7 @@ public class DefaultApprover extends BaseApprover {
    */
   @SuppressWarnings("ParameterNumber")
   @Override
-  public  X509CertificateHolder sign(
+  public X509CertificateHolder sign(
       SecurityConfig config,
       PrivateKey caPrivate,
       X509CertificateHolder caCertificate,

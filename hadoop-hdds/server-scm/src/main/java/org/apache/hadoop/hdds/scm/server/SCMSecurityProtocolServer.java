@@ -57,7 +57,7 @@ import org.slf4j.LoggerFactory;
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.CERTIFICATE_NOT_FOUND;
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_CA_CERT_FAILED;
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_CERTIFICATE_FAILED;
-import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_ROOT_CA_CERT_FAILED;
+import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.NOT_A_PRIMARY_SCM;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateApprover.ApprovalType.KERBEROS_TRUSTED;
 
 /**
@@ -70,17 +70,23 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
 
   private static final Logger LOGGER = LoggerFactory
       .getLogger(SCMSecurityProtocolServer.class);
-  private final CertificateServer certificateServer;
+  private final CertificateServer rootCertificateServer;
+  private final CertificateServer scmCertificateServer;
+  private final X509Certificate rootCACertificate;
   private final RPC.Server rpcServer;
   private final InetSocketAddress rpcAddress;
   private final ProtocolMessageMetrics metrics;
   private final StorageContainerManager storageContainerManager;
 
   SCMSecurityProtocolServer(OzoneConfiguration conf,
-      CertificateServer certificateServer, StorageContainerManager scm)
+      CertificateServer rootCertificateServer,
+      CertificateServer scmCertificateServer,
+      X509Certificate rootCACert, StorageContainerManager scm)
       throws IOException {
     this.storageContainerManager = scm;
-    this.certificateServer = certificateServer;
+    this.rootCertificateServer = rootCertificateServer;
+    this.scmCertificateServer = scmCertificateServer;
+    this.rootCACertificate = rootCACert;
     final int handlerCount =
         conf.getInt(ScmConfigKeys.OZONE_SCM_SECURITY_HANDLER_COUNT_KEY,
             ScmConfigKeys.OZONE_SCM_SECURITY_HANDLER_COUNT_DEFAULT);
@@ -155,18 +161,27 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
   public String getSCMCertificate(ScmNodeDetailsProto scmNodeDetails,
       String certSignReq) throws IOException {
     Objects.requireNonNull(scmNodeDetails);
-    LOGGER.info("Processing CSR for scm {}, nodeId: {}",
-        scmNodeDetails.getHostName(), scmNodeDetails.getScmNodeId());
+    String primaryScmId =
+        storageContainerManager.getScmStorageConfig().getPrimaryScmNodeId();
 
-    // Check clusterID
-    if (storageContainerManager.getClusterId().equals(
-        scmNodeDetails.getClusterId())) {
-      throw new IOException("SCM ClusterId mismatch. Peer SCM ClusterId " +
-          scmNodeDetails.getClusterId() + ", primary SCM ClusterId "
-          + storageContainerManager.getClusterId());
+    if (primaryScmId != null &&
+        primaryScmId.equals(storageContainerManager.getScmId())) {
+      LOGGER.info("Processing CSR for scm {}, nodeId: {}",
+          scmNodeDetails.getHostName(), scmNodeDetails.getScmNodeId());
+
+      // Check clusterID
+      if (!storageContainerManager.getClusterId().equals(
+          scmNodeDetails.getClusterId())) {
+        throw new IOException("SCM ClusterId mismatch. Peer SCM ClusterId " +
+            scmNodeDetails.getClusterId() + ", primary SCM ClusterId "
+            + storageContainerManager.getClusterId());
+      }
+
+      return getEncodedCertToString(certSignReq, NodeType.SCM);
+    } else {
+      throw new SCMSecurityException("Get SCM Certificate can be run only " +
+          "primary SCM", NOT_A_PRIMARY_SCM);
     }
-
-    return getEncodedCertToString(certSignReq, NodeType.SCM);
 
   }
 
@@ -179,9 +194,15 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
    */
   private String getEncodedCertToString(String certSignReq, NodeType nodeType)
       throws IOException {
-    Future<X509CertificateHolder> future =
-        certificateServer.requestCertificate(certSignReq,
-            KERBEROS_TRUSTED, nodeType);
+
+    Future<X509CertificateHolder> future;
+    if (nodeType == NodeType.SCM) {
+      future = rootCertificateServer.requestCertificate(certSignReq,
+              KERBEROS_TRUSTED, nodeType);
+    } else {
+      future = scmCertificateServer.requestCertificate(certSignReq,
+          KERBEROS_TRUSTED, nodeType);
+    }
     try {
       return CertificateCodec.getPEMEncodedString(future.get());
     } catch (InterruptedException e) {
@@ -226,7 +247,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
         certSerialId);
     try {
       X509Certificate certificate =
-          certificateServer.getCertificate(certSerialId);
+          scmCertificateServer.getCertificate(certSerialId);
       if (certificate != null) {
         return CertificateCodec.getPEMEncodedString(certificate);
       }
@@ -234,7 +255,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
       throw new SCMSecurityException("getCertificate operation failed. ", e,
           GET_CERTIFICATE_FAILED);
     }
-    LOGGER.debug("Certificate with serial id {} not found.", certSerialId);
+    LOGGER.info("Certificate with serial id {} not found.", certSerialId);
     throw new SCMSecurityException("Certificate not found",
         CERTIFICATE_NOT_FOUND);
   }
@@ -249,7 +270,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
     LOGGER.debug("Getting CA certificate.");
     try {
       return CertificateCodec.getPEMEncodedString(
-          certificateServer.getCACertificate());
+          scmCertificateServer.getCACertificate());
     } catch (CertificateException e) {
       throw new SCMSecurityException("getRootCertificate operation failed. ",
           e, GET_CA_CERT_FAILED);
@@ -269,7 +290,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
   public List<String> listCertificate(NodeType role,
       long startSerialId, int count, boolean isRevoked) throws IOException {
     List<X509Certificate> certificates =
-        certificateServer.listCertificate(role, startSerialId, count,
+        scmCertificateServer.listCertificate(role, startSerialId, count,
             isRevoked);
     List<String> results = new ArrayList<>(certificates.size());
     for (X509Certificate cert : certificates) {
@@ -288,22 +309,17 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
   public List<String> listCACertificate() throws IOException {
     List<String> caCerts =
         listCertificate(NodeType.SCM, 0, 10, false);
-    caCerts.add(getRootCACertificate());
     return caCerts;
   }
 
   @Override
   public String getRootCACertificate() throws IOException {
     LOGGER.debug("Getting Root CA certificate.");
-    //TODO: This code will be modified after HDDS-4897 is merged and
-    // integrated. For now getting RootCA cert from certificateServer.
-    try {
-      return CertificateCodec.getPEMEncodedString(
-          certificateServer.getCACertificate());
-    } catch (CertificateException e) {
-      throw new SCMSecurityException("getRootCertificate operation failed. ",
-          e, GET_ROOT_CA_CERT_FAILED);
+    if (storageContainerManager.getScmStorageConfig()
+        .getPrimaryScmNodeId() != null) {
+      return CertificateCodec.getPEMEncodedString(rootCACertificate);
     }
+    return null;
   }
 
   public RPC.Server getRpcServer() {
@@ -337,4 +353,12 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
     getRpcServer().join();
   }
 
+  public CertificateServer getRootCertificateServer() {
+    return rootCertificateServer;
+  }
+
+
+  public CertificateServer getScmCertificateServer() {
+    return scmCertificateServer;
+  }
 }

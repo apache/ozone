@@ -23,6 +23,8 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.nio.file.Path;
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Enumeration;
@@ -39,6 +41,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_HTTP_SECURITY_ENABLE
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_HTTP_SECURITY_ENABLED_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
+
+import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -119,5 +123,26 @@ public final class OzoneSecurityUtil {
     }
 
     return hostIps;
+  }
+
+  /**
+   * Convert list of string encoded certificates to list of X509Certificate.
+   * @param pemEncodedCerts
+   * @return list of X509Certificate.
+   * @throws IOException
+   */
+  public static List<X509Certificate> convertToX509(
+      List<String> pemEncodedCerts) throws IOException {
+    List<X509Certificate> x509Certificates =
+        new ArrayList<>(pemEncodedCerts.size());
+    for (String cert : pemEncodedCerts) {
+      try {
+        x509Certificates.add(CertificateCodec.getX509Certificate(cert));
+      } catch (CertificateException ex) {
+        LOG.error("Error while converting to X509 format", ex);
+        throw new IOException(ex);
+      }
+    }
+    return x509Certificates;
   }
 }
