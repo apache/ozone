@@ -90,7 +90,7 @@ public final class HAUtils {
       SCMClientConfig scmClientConfig =
           configuration.getObject(SCMClientConfig.class);
       int retryCount =
-         (int) (duration / (scmClientConfig.getRetryInterval()/1000));
+          (int) (duration / (scmClientConfig.getRetryInterval()/1000));
 
       // If duration is set to lesser value, fall back to actual default
       // retry count.
