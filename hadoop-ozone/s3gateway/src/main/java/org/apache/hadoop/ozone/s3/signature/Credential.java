@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.s3.header;
+package org.apache.hadoop.ozone.s3.signature;
 
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
@@ -106,5 +106,11 @@ public class Credential {
 
   public String getCredential() {
     return credential;
+  }
+
+  public String createScope() {
+    return String.format("%s/%s/%s/%s", getDate(),
+        getAwsRegion(), getAwsService(),
+        getAwsRequest());
   }
 }

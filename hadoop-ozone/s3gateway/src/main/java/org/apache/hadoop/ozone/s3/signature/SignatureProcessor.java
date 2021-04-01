@@ -15,50 +15,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.s3;
+package org.apache.hadoop.ozone.s3.signature;
 
-import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+
+import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 
 /**
  * Parser to request auth parser for http request.
  */
 public interface SignatureProcessor {
 
-  String UNSIGNED_PAYLOAD = "UNSIGNED-PAYLOAD";
-  String NEWLINE = "\n";
   String CONTENT_TYPE = "content-type";
-  String X_AMAZ_DATE = "X-Amz-Date";
+
   String CONTENT_MD5 = "content-md5";
-  String AUTHORIZATION_HEADER = "Authorization";
-  String X_AMZ_CONTENT_SHA256 = "X-Amz-Content-SHA256";
-  String HOST = "host";
 
   String AWS4_SIGNING_ALGORITHM = "AWS4-HMAC-SHA256";
-
-  /**
-   * Seconds in a week, which is the max expiration time Sig-v4 accepts.
-   */
-  long PRESIGN_URL_MAX_EXPIRATION_SECONDS =
-      60 * 60 * 24 * 7;
 
   String HOST_HEADER = "Host";
 
   DateTimeFormatter DATE_FORMATTER =
       DateTimeFormatter.ofPattern("yyyyMMdd");
 
-  DateTimeFormatter TIME_FORMATTER =
-      DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'")
-          .withZone(ZoneOffset.UTC);
-
   /**
    * API to return string to sign.
    */
-  String getStringToSign() throws Exception;
-
-  String getSignature();
-
-  String getAwsAccessId();
-
-  Exception getException();
+  SignatureInfo parseSignature() throws OS3Exception;
 }
