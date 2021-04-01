@@ -26,7 +26,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -64,6 +64,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT;
+
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -89,9 +90,13 @@ public class OzoneContainer {
   private List<ContainerDataScanner> dataScanners;
   private final BlockDeletingService blockDeletingService;
   private final GrpcTlsConfig tlsClientConfig;
-  private final AtomicBoolean isStarted;
+  private final AtomicReference<InitializingStatus> initializingStatus;
   private final ReplicationServer replicationServer;
   private DatanodeDetails datanodeDetails;
+
+  enum InitializingStatus {
+    UNINITIALIZED, INITIALIZING, INITIALIZED
+  }
 
   /**
    * Construct OzoneContainer object.
@@ -178,7 +183,8 @@ public class OzoneContainer {
     tlsClientConfig = RatisHelper.createTlsClientConfig(secConf,
         x509Certificates);
 
-    isStarted = new AtomicBoolean(false);
+    initializingStatus =
+        new AtomicReference<>(InitializingStatus.UNINITIALIZED);
   }
 
   public GrpcTlsConfig getTlsClientConfig() {
@@ -265,10 +271,24 @@ public class OzoneContainer {
    * @throws IOException
    */
   public void start(String clusterId) throws IOException {
-    if (!isStarted.compareAndSet(false, true)) {
+    // If SCM HA is enabled, OzoneContainer#start() will be called multi-times
+    // from VersionEndpointTask. The first call should do the initializing job,
+    // the successive calls should wait until OzoneContainer is initialized.
+    if (!initializingStatus.compareAndSet(
+        InitializingStatus.UNINITIALIZED, InitializingStatus.INITIALIZING)) {
+
+      // wait OzoneContainer to finish its initializing.
+      while (initializingStatus.get() != InitializingStatus.INITIALIZED) {
+        try {
+          Thread.sleep(1);
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+        }
+      }
       LOG.info("Ignore. OzoneContainer already started.");
       return;
     }
+
     LOG.info("Attempting to start container services.");
     startContainerScrub();
 
@@ -280,6 +300,9 @@ public class OzoneContainer {
     hddsDispatcher.init();
     hddsDispatcher.setClusterId(clusterId);
     blockDeletingService.start();
+
+    // mark OzoneContainer as INITIALIZED.
+    initializingStatus.set(InitializingStatus.INITIALIZED);
   }
 
   /**
