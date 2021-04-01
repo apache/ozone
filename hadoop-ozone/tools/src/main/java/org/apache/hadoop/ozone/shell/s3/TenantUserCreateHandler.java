@@ -55,11 +55,11 @@ public class TenantUserCreateHandler extends S3Handler {
       for (String username : usernames) {
         try {
           S3SecretValue res = objStore.createTenantUser(username, tenantName);
-          out().println("Successfully created tenant " + username + ":");
+          out().println("Successfully created user " + username + ":");
           out().println("export AWS_ACCESS_KEY_ID=" + res.getAwsAccessKey());
           out().println("export AWS_SECRET_ACCESS_KEY=" + res.getAwsSecret());
         } catch (IOException e) {
-          out().println("Failed to create tenant " + username + ": " +
+          out().println("Failed to create user " + username + ": " +
               e.getMessage());
         }
       }

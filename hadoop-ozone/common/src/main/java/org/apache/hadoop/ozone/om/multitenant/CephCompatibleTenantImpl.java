@@ -46,7 +46,7 @@ public class CephCompatibleTenantImpl implements Tenant {
         .setResType(VOLUME)
         .setStoreType(OZONE)
         .setVolumeName(bucketNameSpace.getBucketNameSpaceID()).build();
-    bucketNameSpace.addBucketNameSpaceObjects(volume);
+    bucketNameSpace.addBucketNameSpaceObject(volume);
   }
 
   @Override
