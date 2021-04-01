@@ -140,18 +140,21 @@ public class BlockDeletingService extends BackgroundService {
       // The chosen result depends on what container deletion policy is
       // configured.
       containers = chooseContainerForBlockDeletion(blockLimitPerInterval,
-              containerDeletionPolicy);
+          containerDeletionPolicy);
 
-      BlockDeletingTask containerTask = null;
-      for (ContainerBlockInfo container : containers) {
-        containerTask = new BlockDeletingTask(container.containerData,
-            TASK_PRIORITY_DEFAULT, container.numBlocksToDelete);
-        queue.add(containerTask);
+      BlockDeletingTask containerBlockInfos = null;
+      long totalBlocks = 0;
+      for (ContainerBlockInfo containerBlockInfo : containers) {
+        containerBlockInfos =
+            new BlockDeletingTask(containerBlockInfo.containerData,
+                TASK_PRIORITY_DEFAULT, containerBlockInfo.numBlocksToDelete);
+        queue.add(containerBlockInfos);
+        totalBlocks += containerBlockInfo.numBlocksToDelete;
       }
       if (containers.size() > 0) {
         LOG.info("Plan to choose {} blocks for block deletion, "
                 + "actually deleting {} blocks.", blockLimitPerInterval,
-            containerTask.blocksToDelete);
+            totalBlocks);
       }
     } catch (StorageContainerException e) {
       LOG.warn("Failed to initiate block deleting tasks, "

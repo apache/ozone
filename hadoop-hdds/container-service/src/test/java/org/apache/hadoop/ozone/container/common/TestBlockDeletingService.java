@@ -397,10 +397,10 @@ public class TestBlockDeletingService {
 
   @Test
   public void testBlockDeletion() throws Exception {
-    DatanodeConfiguration subject = conf.getObject(DatanodeConfiguration.class);
-    subject.setBlockDeletionLimit(3);
-    this.blockLimitPerInterval = subject.getBlockDeletionLimit();
-    conf.setFromObject(subject);
+    DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
+    dnConf.setBlockDeletionLimit(3);
+    this.blockLimitPerInterval = dnConf.getBlockDeletionLimit();
+    conf.setFromObject(dnConf);
     ContainerSet containerSet = new ContainerSet();
     createToDeleteBlocks(containerSet, 1, 3, 1);
     ContainerMetrics metrics = ContainerMetrics.create(conf);
@@ -502,10 +502,10 @@ public class TestBlockDeletingService {
 
   @Test
   public void testBlockDeletionTimeout() throws Exception {
-    DatanodeConfiguration subject = conf.getObject(DatanodeConfiguration.class);
-    subject.setBlockDeletionLimit(3);
-    blockLimitPerInterval = subject.getBlockDeletionLimit();
-    conf.setFromObject(subject);
+    DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
+    dnConf.setBlockDeletionLimit(3);
+    blockLimitPerInterval = dnConf.getBlockDeletionLimit();
+    conf.setFromObject(dnConf);
     ContainerSet containerSet = new ContainerSet();
     createToDeleteBlocks(containerSet, 1, 3, 1);
     ContainerMetrics metrics = ContainerMetrics.create(conf);
@@ -601,10 +601,10 @@ public class TestBlockDeletingService {
     conf.set(
         ScmConfigKeys.OZONE_SCM_KEY_VALUE_CONTAINER_DELETION_CHOOSING_POLICY,
         TopNOrderedContainerDeletionChoosingPolicy.class.getName());
-    DatanodeConfiguration subject = conf.getObject(DatanodeConfiguration.class);
-    subject.setBlockDeletionLimit(1);
-    this.blockLimitPerInterval = subject.getBlockDeletionLimit();
-    conf.setFromObject(subject);
+    DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
+    dnConf.setBlockDeletionLimit(1);
+    this.blockLimitPerInterval = dnConf.getBlockDeletionLimit();
+    conf.setFromObject(dnConf);
     ContainerSet containerSet = new ContainerSet();
 
     int containerCount = 2;
@@ -667,10 +667,10 @@ public class TestBlockDeletingService {
     // Each time containers can be all scanned, but only 10 blocks
     // can be actually deleted. So it requires 2 waves
     // to cleanup all the 15 blocks.
-    DatanodeConfiguration subject = conf.getObject(DatanodeConfiguration.class);
-    subject.setBlockDeletionLimit(10);
-    this.blockLimitPerInterval = subject.getBlockDeletionLimit();
-    conf.setFromObject(subject);
+    DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
+    dnConf.setBlockDeletionLimit(10);
+    this.blockLimitPerInterval = dnConf.getBlockDeletionLimit();
+    conf.setFromObject(dnConf);
     ContainerSet containerSet = new ContainerSet();
     ContainerMetrics metrics = ContainerMetrics.create(conf);
     KeyValueHandler keyValueHandler =
