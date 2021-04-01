@@ -58,7 +58,6 @@ public class ContainerBalancer {
     this.ozoneConfiguration = ozoneConfiguration;
     this.balancerRunning = false;
     this.config = new ContainerBalancerConfiguration();
-    start(new ContainerBalancerConfiguration());
   }
 
   /**
