@@ -179,16 +179,15 @@ public class OMTenantUserCreateRequest extends OMVolumeRequest {
           VOLUME_LOCK, volumeName);
 
       // Check tenant existence in tenantStateTable
-      if (omMetadataManager.getTenantStateTable().isExist(tenantName)) {
-        LOG.debug("tenant: {} already exists", tenantName);
-        throw new OMException("Tenant already exists",
-            OMException.ResultCodes.TENANT_ALREADY_EXISTS);
+      if (!omMetadataManager.getTenantStateTable().isExist(tenantName)) {
+        LOG.debug("tenant: {} does not exist", tenantName);
+        throw new OMException("Tenant does not exist",
+            OMException.ResultCodes.TENANT_NOT_FOUND);
       }
-
       // Check user existence in tenantUserTable
       if (omMetadataManager.getTenantUserTable().isExist(fullUsername)) {
         LOG.debug("tenant full user name: {} already exists", fullUsername);
-        throw new OMException("Tenant user already exists",
+        throw new OMException("User already exists in tenant",
             OMException.ResultCodes.TENANT_USER_ALREADY_EXISTS);
       }
 
@@ -277,11 +276,12 @@ public class OMTenantUserCreateRequest extends OMVolumeRequest {
             getOmRequest().getUserInfo()));
 
     if (exception == null) {
-      LOG.debug("Successfully created tenant user {}", tenantName);
-      // TODO: add metrics, see OMVolumeCreateRequest
+      LOG.info("Created user: {}, in tenant: {}. User principal: {}",
+          tenantUsername, tenantName, fullUsername);
+      // TODO: omMetrics.incNumTenantUsers()
     } else {
       LOG.error("Failed to create tenant user {}", tenantName, exception);
-      // TODO: same, add metrics
+      // TODO: omMetrics.incNumTenantUserCreateFails()
     }
     return omClientResponse;
   }
