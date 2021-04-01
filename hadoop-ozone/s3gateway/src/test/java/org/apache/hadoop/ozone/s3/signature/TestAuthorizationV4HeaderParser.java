@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -16,25 +16,29 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.s3.header;
-
-import org.apache.hadoop.ozone.s3.exception.OS3Exception;
-import org.apache.hadoop.test.LambdaTestUtils;
-import org.junit.Before;
-import org.junit.Test;
+package org.apache.hadoop.ozone.s3.signature;
 
 import java.time.LocalDate;
 
+import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.test.LambdaTestUtils;
+
 import static java.time.temporal.ChronoUnit.DAYS;
-import static org.apache.hadoop.ozone.s3.AWSSignatureProcessor.DATE_FORMATTER;
+import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.DATE_FORMATTER;
+import org.junit.Assert;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
+import org.junit.Before;
+import org.junit.Test;
 
 /**
  * This class tests Authorization header format v2.
  */
 
-public class TestAuthorizationHeaderV4 {
+public class TestAuthorizationV4HeaderParser {
+
+  private static final String SAMPLE_DATE = "20210202T144559Z";
+
   private String curDate;
 
   @Before
@@ -49,14 +53,14 @@ public class TestAuthorizationHeaderV4 {
         "Credential=ozone/" + curDate + "/us-east-1/s3/aws4_request, " +
         "SignedHeaders=host;range;x-amz-date, " +
         "Signature=fe5f80f77d5fa3beca038a248ff027";
-    AuthorizationHeaderV4 v4 = new AuthorizationHeaderV4(auth);
-    assertEquals("AWS4-HMAC-SHA256", v4.getAlgorithm());
-    assertEquals("ozone", v4.getAccessKeyID());
-    assertEquals(curDate, v4.getDate());
-    assertEquals("us-east-1", v4.getAwsRegion());
-    assertEquals("aws4_request", v4.getAwsRequest());
-    assertEquals("host;range;x-amz-date", v4.getSignedHeaderString());
-    assertEquals("fe5f80f77d5fa3beca038a248ff027", v4.getSignature());
+    AuthorizationV4HeaderParser v4 =
+        new AuthorizationV4HeaderParser(auth, SAMPLE_DATE);
+    final SignatureInfo signatureInfo = v4.parseSignature();
+    assertEquals("ozone", signatureInfo.getAwsAccessId());
+    assertEquals(curDate, signatureInfo.getDate());
+    assertEquals("host;range;x-amz-date", signatureInfo.getSignedHeaders());
+    assertEquals("fe5f80f77d5fa3beca038a248ff027",
+        signatureInfo.getSignature());
   }
 
   @Test
@@ -65,7 +69,9 @@ public class TestAuthorizationHeaderV4 {
       String auth = "AWS4-HMAC-SHA256 " +
           "Credential=ozone/" + curDate + "/us-east-1/s3/aws4_request, " +
           "SignedHeaders=host;range;x-amz-date,";
-      new AuthorizationHeaderV4(auth);
+      AuthorizationV4HeaderParser v4 =
+          new AuthorizationV4HeaderParser(auth, SAMPLE_DATE);
+      v4.parseSignature();
       fail("Exception is expected in case of malformed header");
     } catch (OS3Exception ex) {
       assertEquals("AuthorizationHeaderMalformed", ex.getCode());
@@ -79,7 +85,9 @@ public class TestAuthorizationHeaderV4 {
           "Credential=" + curDate + "/us-east-1/s3/aws4_request, " +
           "SignedHeaders=host;range;x-amz-date, " +
           "Signature=fe5f80f77d5fa3beca038a248ff027";
-      new AuthorizationHeaderV4(auth);
+      AuthorizationV4HeaderParser v4 =
+          new AuthorizationV4HeaderParser(auth, SAMPLE_DATE);
+      v4.parseSignature();
       fail("Exception is expected in case of malformed header");
     } catch (OS3Exception ex) {
       assertEquals("AuthorizationHeaderMalformed", ex.getCode());
@@ -95,16 +103,17 @@ public class TestAuthorizationHeaderV4 {
             + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027";
-    AuthorizationHeaderV4 v4 = new AuthorizationHeaderV4(auth);
 
-    assertEquals("AWS4-HMAC-SHA256", v4.getAlgorithm());
-    assertEquals("ozone", v4.getAccessKeyID());
-    assertEquals(curDate, v4.getDate());
-    assertEquals("us-east-1", v4.getAwsRegion());
-    assertEquals("aws4_request", v4.getAwsRequest());
+    AuthorizationV4HeaderParser v4 = new AuthorizationV4HeaderParser(auth,
+        SAMPLE_DATE);
+    SignatureInfo signature = v4.parseSignature();
+
+    assertEquals("AWS4-HMAC-SHA256", signature.getAlgorithm());
+    assertEquals("ozone", signature.getAwsAccessId());
+    assertEquals(curDate, signature.getDate());
     assertEquals("host;x-amz-content-sha256;x-amz-date",
-        v4.getSignedHeaderString());
-    assertEquals("fe5f80f77d5fa3beca038a248ff027", v4.getSignature());
+        signature.getSignedHeaders());
+    assertEquals("fe5f80f77d5fa3beca038a248ff027", signature.getSignature());
 
   }
 
@@ -113,15 +122,15 @@ public class TestAuthorizationHeaderV4 {
     // Case 1: valid date within range.
     LocalDate now = LocalDate.now();
     String dateStr = DATE_FORMATTER.format(now);
-    validateResponse(dateStr);
+    testRequestWithSpecificDate(dateStr);
 
     // Case 2: Valid date with in range.
     dateStr = DATE_FORMATTER.format(now.plus(1, DAYS));
-    validateResponse(dateStr);
+    testRequestWithSpecificDate(dateStr);
 
     // Case 3: Valid date with in range.
     dateStr = DATE_FORMATTER.format(now.minus(1, DAYS));
-    validateResponse(dateStr);
+    testRequestWithSpecificDate(dateStr);
   }
 
   @Test
@@ -130,54 +139,57 @@ public class TestAuthorizationHeaderV4 {
     LocalDate now = LocalDate.now();
     String dateStr = "";
     LambdaTestUtils.intercept(OS3Exception.class, "",
-        () -> validateResponse(dateStr));
+        () -> testRequestWithSpecificDate(dateStr));
 
     // Case 2: Date after yesterday.
     String dateStr2 = DATE_FORMATTER.format(now.plus(2, DAYS));
     LambdaTestUtils.intercept(OS3Exception.class, "",
-        () -> validateResponse(dateStr2));
+        () -> testRequestWithSpecificDate(dateStr2));
 
     // Case 3: Date before yesterday.
     String dateStr3 = DATE_FORMATTER.format(now.minus(2, DAYS));
     LambdaTestUtils.intercept(OS3Exception.class, "",
-        () -> validateResponse(dateStr3));
+        () -> testRequestWithSpecificDate(dateStr3));
   }
 
-  private void validateResponse(String dateStr) throws OS3Exception {
+  private void testRequestWithSpecificDate(String dateStr) throws OS3Exception {
     String auth =
         "AWS4-HMAC-SHA256 Credential=ozone/" + dateStr + "/us-east-1/s3" +
             "/aws4_request,"
             + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027";
-    AuthorizationHeaderV4 v4 = new AuthorizationHeaderV4(auth);
+    AuthorizationV4HeaderParser v4 =
+        new AuthorizationV4HeaderParser(auth, SAMPLE_DATE);
+    SignatureInfo signature = v4.parseSignature();
 
-    assertEquals("AWS4-HMAC-SHA256", v4.getAlgorithm());
-    assertEquals("ozone", v4.getAccessKeyID());
-    assertEquals(dateStr, v4.getDate());
-    assertEquals("us-east-1", v4.getAwsRegion());
-    assertEquals("aws4_request", v4.getAwsRequest());
+    assertEquals("AWS4-HMAC-SHA256", signature.getAlgorithm());
+    assertEquals("ozone", signature.getAwsAccessId());
+    assertEquals(dateStr, signature.getDate());
     assertEquals("host;x-amz-content-sha256;x-amz-date",
-        v4.getSignedHeaderString());
-    assertEquals("fe5f80f77d5fa3beca038a248ff027", v4.getSignature());
+        signature.getSignedHeaders());
+    assertEquals("fe5f80f77d5fa3beca038a248ff027", signature.getSignature());
   }
 
   @Test
   public void testV4HeaderRegionValidationFailure() throws Exception {
     String auth =
-        "AWS4-HMAC-SHA256 Credential=ozone/" + curDate + "//s3/aws4_request,"
+        "AWS4-HMAC-SHA256 Credential=ozone/" + curDate +
+            "//s3/aws4_request,"
             + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027%";
     LambdaTestUtils.intercept(OS3Exception.class, "",
-        () -> new AuthorizationHeaderV4(auth));
+        () -> new AuthorizationV4HeaderParser(auth, SAMPLE_DATE)
+            .parseSignature());
     String auth2 =
         "AWS4-HMAC-SHA256 Credential=ozone/" + curDate + "s3/aws4_request,"
             + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027%";
     LambdaTestUtils.intercept(OS3Exception.class, "",
-        () -> new AuthorizationHeaderV4(auth2));
+        () -> new AuthorizationV4HeaderParser(auth2, SAMPLE_DATE)
+            .parseSignature());
   }
 
   @Test
@@ -189,7 +201,8 @@ public class TestAuthorizationHeaderV4 {
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027";
     LambdaTestUtils.intercept(OS3Exception.class, "",
-        () -> new AuthorizationHeaderV4(auth));
+        () -> new AuthorizationV4HeaderParser(auth, SAMPLE_DATE)
+            .parseSignature());
 
     String auth2 =
         "AWS4-HMAC-SHA256 Credential=ozone/" + curDate + "/us-east-1" +
@@ -198,7 +211,8 @@ public class TestAuthorizationHeaderV4 {
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027";
     LambdaTestUtils.intercept(OS3Exception.class, "",
-        () -> new AuthorizationHeaderV4(auth2));
+        () -> new AuthorizationV4HeaderParser(auth2, SAMPLE_DATE)
+            .parseSignature());
   }
 
   @Test
@@ -210,7 +224,8 @@ public class TestAuthorizationHeaderV4 {
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027";
     LambdaTestUtils.intercept(OS3Exception.class, "",
-        () -> new AuthorizationHeaderV4(auth));
+        () -> new AuthorizationV4HeaderParser(auth, SAMPLE_DATE)
+            .parseSignature());
 
     String auth2 =
         "AWS4-HMAC-SHA256 Credential=ozone/" + curDate + "/us-east-1/s3" +
@@ -219,7 +234,8 @@ public class TestAuthorizationHeaderV4 {
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027";
     LambdaTestUtils.intercept(OS3Exception.class, "",
-        () -> new AuthorizationHeaderV4(auth2));
+        () -> new AuthorizationV4HeaderParser(auth2, SAMPLE_DATE)
+            .parseSignature());
 
     String auth3 =
         "AWS4-HMAC-SHA256 Credential=ozone/" + curDate + "/us-east-1/s3" +
@@ -228,7 +244,8 @@ public class TestAuthorizationHeaderV4 {
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027";
     LambdaTestUtils.intercept(OS3Exception.class, "",
-        () -> new AuthorizationHeaderV4(auth3));
+        () -> new AuthorizationV4HeaderParser(auth3, SAMPLE_DATE)
+            .parseSignature());
   }
 
   @Test
@@ -240,7 +257,8 @@ public class TestAuthorizationHeaderV4 {
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027";
     LambdaTestUtils.intercept(OS3Exception.class, "",
-        () -> new AuthorizationHeaderV4(auth));
+        () -> new AuthorizationV4HeaderParser(auth, SAMPLE_DATE)
+            .parseSignature());
 
     String auth2 =
         "AWS4-HMAC-SHA256 Credential=ozone/" + curDate + "/us-east-1/s3" +
@@ -249,7 +267,8 @@ public class TestAuthorizationHeaderV4 {
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027";
     LambdaTestUtils.intercept(OS3Exception.class, "",
-        () -> new AuthorizationHeaderV4(auth2));
+        () -> new AuthorizationV4HeaderParser(auth2, SAMPLE_DATE)
+            .parseSignature());
 
     String auth3 =
         "AWS4-HMAC-SHA256 Credential=ozone/" + curDate + "/us-east-1/s3" +
@@ -258,7 +277,8 @@ public class TestAuthorizationHeaderV4 {
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027";
     LambdaTestUtils.intercept(OS3Exception.class, "",
-        () -> new AuthorizationHeaderV4(auth3));
+        () -> new AuthorizationV4HeaderParser(auth3, SAMPLE_DATE)
+            .parseSignature());
 
     String auth4 =
         "AWS4-HMAC-SHA256 Credential=ozone/" + curDate + "/us-east-1/s3" +
@@ -267,7 +287,8 @@ public class TestAuthorizationHeaderV4 {
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027";
     LambdaTestUtils.intercept(OS3Exception.class, "",
-        () -> new AuthorizationHeaderV4(auth4));
+        () -> new AuthorizationV4HeaderParser(auth4, SAMPLE_DATE)
+            .parseSignature());
   }
 
   @Test
@@ -279,7 +300,8 @@ public class TestAuthorizationHeaderV4 {
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027%";
     LambdaTestUtils.intercept(OS3Exception.class, "",
-        () -> new AuthorizationHeaderV4(auth));
+        () -> new AuthorizationV4HeaderParser(auth, SAMPLE_DATE)
+            .parseSignature());
 
     String auth2 =
         "AWS4-HMAC-SHA256 Credential=ozone/" + curDate + "/us-east-1/s3" +
@@ -288,7 +310,8 @@ public class TestAuthorizationHeaderV4 {
             + "Signature"
             + "=";
     LambdaTestUtils.intercept(OS3Exception.class, "",
-        () -> new AuthorizationHeaderV4(auth2));
+        () -> new AuthorizationV4HeaderParser(auth2, SAMPLE_DATE)
+            .parseSignature());
 
     String auth3 =
         "AWS4-HMAC-SHA256 Credential=ozone/" + curDate + "/us-east-1/s3" +
@@ -297,7 +320,8 @@ public class TestAuthorizationHeaderV4 {
             + ""
             + "=";
     LambdaTestUtils.intercept(OS3Exception.class, "",
-        () -> new AuthorizationHeaderV4(auth3));
+        () -> new AuthorizationV4HeaderParser(auth3, SAMPLE_DATE)
+            .parseSignature());
   }
 
   @Test
@@ -309,7 +333,8 @@ public class TestAuthorizationHeaderV4 {
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027";
     LambdaTestUtils.intercept(OS3Exception.class, "",
-        () -> new AuthorizationHeaderV4(auth));
+        () -> new AuthorizationV4HeaderParser(auth, SAMPLE_DATE)
+            .parseSignature());
 
     String auth2 =
         "SHA-256 Credential=ozone/" + curDate + "/us-east-1/s3" +
@@ -317,8 +342,8 @@ public class TestAuthorizationHeaderV4 {
             + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027";
-    LambdaTestUtils.intercept(OS3Exception.class, "",
-        () -> new AuthorizationHeaderV4(auth2));
+    Assert.assertNull(new AuthorizationV4HeaderParser(auth2, SAMPLE_DATE)
+        .parseSignature());
 
     String auth3 =
         " Credential=ozone/" + curDate + "/us-east-1/s3" +
@@ -326,8 +351,8 @@ public class TestAuthorizationHeaderV4 {
             + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027";
-    LambdaTestUtils.intercept(OS3Exception.class, "",
-        () -> new AuthorizationHeaderV4(auth3));
+    Assert.assertNull(new AuthorizationV4HeaderParser(auth3, SAMPLE_DATE)
+        .parseSignature());
   }
 
   @Test
@@ -339,7 +364,8 @@ public class TestAuthorizationHeaderV4 {
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027";
     LambdaTestUtils.intercept(OS3Exception.class, "",
-        () -> new AuthorizationHeaderV4(auth));
+        () -> new AuthorizationV4HeaderParser(auth, SAMPLE_DATE)
+            .parseSignature());
 
     String auth2 =
         "AWS4-HMAC-SHA =/" + curDate + "//" +
@@ -348,7 +374,8 @@ public class TestAuthorizationHeaderV4 {
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027";
     LambdaTestUtils.intercept(OS3Exception.class, "",
-        () -> new AuthorizationHeaderV4(auth2));
+        () -> new AuthorizationV4HeaderParser(auth2, SAMPLE_DATE)
+            .parseSignature());
   }
 
 }
