@@ -160,7 +160,7 @@ public class OMTenantUserCreateRequest extends OMVolumeRequest {
     final String tenantUsername = request.getTenantUsername();
     final String fullUsername = tenantName +
         OzoneConsts.TENANT_NAME_USER_NAME_DELIMITER + tenantUsername;
-
+    final String volumeName = tenantName;  // TODO: Configurable
     IOException exception = null;
     try {
       // Check ACL: access_key_id should be tenant admin
@@ -175,9 +175,8 @@ public class OMTenantUserCreateRequest extends OMVolumeRequest {
             OMException.ResultCodes.INVALID_TENANT_USER_NAME);
       }
 
-      final String dbVolumeKey = omMetadataManager.getVolumeKey(tenantName);
       acquiredVolumeLock = omMetadataManager.getLock().acquireWriteLock(
-          VOLUME_LOCK, dbVolumeKey);
+          VOLUME_LOCK, volumeName);
 
       // Check tenant existence in tenantStateTable
       if (omMetadataManager.getTenantStateTable().isExist(tenantName)) {
@@ -267,7 +266,7 @@ public class OMTenantUserCreateRequest extends OMVolumeRequest {
             S3_SECRET_LOCK, kerberosID);
       }
       if (acquiredVolumeLock) {
-        omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, tenantName);
+        omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
       }
     }
 

@@ -150,7 +150,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   public static final String PREFIX_TABLE = "prefixTable";
   public static final String TRANSACTION_INFO_TABLE = "transactionInfoTable";
   // Tables for S3 multi-tenancy
-  public static final String TENANT_USER_TABLE = "tenantTable";
+  public static final String TENANT_USER_TABLE = "tenantUserTable";
   public static final String TENANT_STATE_TABLE = "tenantStateTable";
   public static final String TENANT_GROUP_TABLE = "tenantGroupTable";
   public static final String TENANT_ROLE_TABLE = "tenantRoleTable";
