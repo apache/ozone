@@ -199,7 +199,7 @@ public class SCMSecurityProtocolFailoverProxyProvider implements
    * @return the new proxy index
    */
   private synchronized int incrementProxyIndex() {
-    currentProxyIndex = (currentProxyIndex + 1) % scmProxies.size();
+    currentProxyIndex = (currentProxyIndex + 1) % scmProxyInfoMap.size();
     currentProxySCMNodeId = scmNodeIds.get(currentProxyIndex);
     return currentProxyIndex;
   }

@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
 import java.io.IOException;
+import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -40,6 +41,7 @@ import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.security.token.BlockTokenVerifier;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
+import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
@@ -167,8 +169,14 @@ public class OzoneContainer {
     blockDeletingService =
         new BlockDeletingService(this, svcInterval.toMillis(), serviceTimeout,
             TimeUnit.MILLISECONDS, config);
-    tlsClientConfig = RatisHelper.createTlsClientConfig(
-        secConf, certClient != null ? certClient.getCACertificate() : null);
+
+    List< X509Certificate > x509Certificates = null;
+    if (certClient != null) {
+      x509Certificates = HAUtils.buildCAX509List(certClient, conf);
+    }
+
+    tlsClientConfig = RatisHelper.createTlsClientConfig(secConf,
+        x509Certificates);
 
     isStarted = new AtomicBoolean(false);
   }
