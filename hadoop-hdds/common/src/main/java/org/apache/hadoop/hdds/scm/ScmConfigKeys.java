@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.ratis.proto.RaftProtos.ReplicationLevel;
 import org.apache.ratis.util.TimeDuration;
 
+import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -509,6 +510,11 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_HA_SECURITY_SUPPORTED =
       "hdds.scm.ha.security.enable";
   public static final boolean OZONE_SCM_HA_SECURITY_SUPPORTED_DEFAULT = false;
+
+  public static final String OZONE_SCM_INFO_WAIT_DURATION = "ozone.scm.info" +
+      ".wait.duration";
+  public static final long OZONE_SCM_INFO_WAIT_DURATION_DEFAULT =
+      10 * 60;
 
   /**
    * Never constructed.
