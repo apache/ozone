@@ -2751,4 +2751,13 @@
       filesystem semantics.
     </description>
   </property>
+
+  <property>
+    <name>ozone.scm.info.wait.duration</name>
+    <tag>OZONE, SCM, OM</tag>
+    <value>10m</value>
+    <description> Maximum amount of duration OM/SCM waits to get Scm Info
+      during OzoneManager init/SCM bootstrap.
+    </description>
+  </property>
 </configuration>
