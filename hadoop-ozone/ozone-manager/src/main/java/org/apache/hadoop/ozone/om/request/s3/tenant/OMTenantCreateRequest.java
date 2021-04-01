@@ -109,12 +109,16 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
           OMException.ResultCodes.INVALID_VOLUME_NAME);
     }
 
-    // TODO: Use access_key_id
+    // getUserName returns:
+    // - Kerberos principal when Kerberos security is enabled
+    // - User's login name when security is not enabled
+    // - AWS_ACCESS_KEY_ID if the original request comes from S3 Gateway.
+    //    Not Applicable to TenantCreateRequest.
     final String owner = getOmRequest().getUserInfo().getUserName();
     final String volumeName = tenantName;  // TODO: Configurable
     final VolumeInfo volumeInfo = VolumeInfo.newBuilder()
         .setVolume(volumeName)
-        .setAdminName(owner)  // TODO: admin?
+        .setAdminName(owner)
         .setOwnerName(owner)
         .build();
     // Verify volume name
@@ -166,7 +170,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     final String dbVolumeKey = omMetadataManager.getVolumeKey(volumeName);
     IOException exception = null;
     try {
-      // Check ACL. TODO: access_key_id should have volume create permission.
+      // Check ACL: requires volume create permission. TODO: tenant create perm?
       if (ozoneManager.getAclsEnabled()) {
         checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
             OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.CREATE,

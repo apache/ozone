@@ -109,8 +109,7 @@ public class OMTenantUserCreateRequest extends OMVolumeRequest {
           ". Tenant user name should not contain delimiter.",
           OMException.ResultCodes.INVALID_TENANT_USER_NAME);
     }
-
-    // Tenant and tenant user existence check won't be done here.
+    // Tenant and tenant user existence check won't be performed here.
 
     // Generate S3 secret
     // TODO: Equivalent, but not a real kerberosID: tenant$username
@@ -123,7 +122,6 @@ public class OMTenantUserCreateRequest extends OMVolumeRequest {
             .setAwsSecret(s3Secret)
             .setKerberosID(kerberosID).build();
 
-    // TODO: Start from OMRequest.newBuilder() if better
     final OMRequest.Builder omRequestBuilder = getOmRequest().toBuilder()
         .setUserInfo(getUserInfo())
         .setUpdateGetS3SecretRequest(updateGetS3SecretRequest)
