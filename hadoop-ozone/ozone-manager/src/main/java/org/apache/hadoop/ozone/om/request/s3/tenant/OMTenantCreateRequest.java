@@ -159,7 +159,6 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     boolean acquiredVolumeLock = false, acquiredUserLock = false;
     Tenant tenant = null;
     final String owner = getOmRequest().getUserInfo().getUserName();
-    LOG.info("owner: {}", owner);  // TODO: owner should be access_key_id
     Map<String, String> auditMap = new HashMap<>();
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     CreateTenantRequest request = getOmRequest().getCreateTenantRequest();

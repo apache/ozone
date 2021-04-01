@@ -156,20 +156,21 @@ public class OMTenantUserCreateRequest extends OMVolumeRequest {
         getOmRequest().getCreateTenantUserRequest();
     final String tenantName = request.getTenantName();
     final String tenantUsername = request.getTenantUsername();
-    final String fullUsername = tenantName +
+    final String principal = tenantName +
         OzoneConsts.TENANT_NAME_USER_NAME_DELIMITER + tenantUsername;
     final String volumeName = tenantName;  // TODO: Configurable
     IOException exception = null;
     try {
-      // Check ACL: access_key_id should be tenant admin
-//      if (ozoneManager.getAclsEnabled()) {  // TODO: Use OMMultiTenantManager?
+      // Check ACL: requires ozone admin or tenant admin permission
+//      if (ozoneManager.getAclsEnabled()) {
+//        // TODO: Call OMMultiTenantManager?
 //      }
 
-      // Sanity check full user name with kerberosID in UpdateGetS3SecretRequest
-      if (!fullUsername.equals(kerberosID)) {
-        LOG.error("fullUsername {} mismatches kerberosID {}.",
-            fullUsername, kerberosID);
-        throw new OMException("fullUsername mismatches kerberosID",
+      // Sanity check principal with kerberosID in UpdateGetS3SecretRequest
+      if (!principal.equals(kerberosID)) {
+        LOG.error("principal '{}' does not match kerberosID '{}'.",
+            principal, kerberosID);
+        throw new OMException("principal does not match kerberosID",
             OMException.ResultCodes.INVALID_TENANT_USER_NAME);
       }
 
@@ -183,8 +184,8 @@ public class OMTenantUserCreateRequest extends OMVolumeRequest {
             OMException.ResultCodes.TENANT_NOT_FOUND);
       }
       // Check user existence in tenantUserTable
-      if (omMetadataManager.getTenantUserTable().isExist(fullUsername)) {
-        LOG.debug("tenant full user name: {} already exists", fullUsername);
+      if (omMetadataManager.getTenantUserTable().isExist(principal)) {
+        LOG.debug("tenant full user name: {} already exists", principal);
         throw new OMException("User already exists in tenant",
             OMException.ResultCodes.TENANT_USER_ALREADY_EXISTS);
       }
@@ -193,10 +194,10 @@ public class OMTenantUserCreateRequest extends OMVolumeRequest {
       acquiredS3SecretLock = omMetadataManager.getLock()
           .acquireWriteLock(S3_SECRET_LOCK, kerberosID);
 
-      // Sanity check. fullUsername secret should not exist in S3SecretTable
-      if (omMetadataManager.getS3SecretTable().isExist(fullUsername)) {
-        LOG.debug("Unexpected S3 secret table entry for {}", fullUsername);
-        throw new OMException("S3 secret for " + fullUsername +
+      // Sanity check. principal secret should not exist in S3SecretTable
+      if (omMetadataManager.getS3SecretTable().isExist(principal)) {
+        LOG.debug("Unexpected S3 secret table entry for {}", principal);
+        throw new OMException("S3 secret for " + principal +
             " shouldn't have existed", OMException.ResultCodes.INVALID_REQUEST);
       }
 
@@ -211,24 +212,24 @@ public class OMTenantUserCreateRequest extends OMVolumeRequest {
 
       // Add to tenantUserTable
       omMetadataManager.getTenantUserTable().addCacheEntry(
-          new CacheKey<>(fullUsername),
+          new CacheKey<>(principal),
           new CacheValue<>(Optional.of(tenantName), transactionLogIndex));
       // Add to tenantGroupTable
       final String defaultGroupName =
           tenantName + OzoneConsts.DEFAULT_TENANT_USER_GROUP_SUFFIX;
       omMetadataManager.getTenantGroupTable().addCacheEntry(
-          new CacheKey<>(fullUsername),
+          new CacheKey<>(principal),
           new CacheValue<>(Optional.of(defaultGroupName), transactionLogIndex));
       // Add to tenantRoleTable
       final String roleName = "dummy-role";
       omMetadataManager.getTenantRoleTable().addCacheEntry(
-          new CacheKey<>(fullUsername),
+          new CacheKey<>(principal),
           new CacheValue<>(Optional.of(roleName), transactionLogIndex));
 
       // Call OMMultiTenantManager
       //  TODO: Check usage with Prashant
 //      tenantPrincipal = ozoneManager.getMultiTenantManager()
-//          .createUser(tenantName, fullUsername /* TODO: full/short name? */);
+//          .createUser(tenantName, principal /* TODO: or tenantUsername */);
 
       omResponse.setCreateTenantUserResponse(
           CreateTenantUserResponse.newBuilder().setSuccess(true)
@@ -237,7 +238,7 @@ public class OMTenantUserCreateRequest extends OMVolumeRequest {
               .build());
       omClientResponse = new OMTenantUserCreateResponse(
           omResponse.build(), s3SecretValue,
-          fullUsername, tenantName, defaultGroupName, roleName);
+          principal, tenantName, defaultGroupName, roleName);
     } catch (IOException ex) {
       exception = ex;
       // Set response success flag to false
@@ -274,7 +275,7 @@ public class OMTenantUserCreateRequest extends OMVolumeRequest {
 
     if (exception == null) {
       LOG.info("Created user: {}, in tenant: {}. User principal: {}",
-          tenantUsername, tenantName, fullUsername);
+          tenantUsername, tenantName, principal);
       // TODO: omMetrics.incNumTenantUsers()
     } else {
       LOG.error("Failed to create tenant user {}", tenantName, exception);
