@@ -97,7 +97,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Test SCM and DataNode Upgrade sequence.
  */
-//@Ignore
+@Ignore
 public class TestHDDSUpgrade {
 
   /**
