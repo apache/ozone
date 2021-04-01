@@ -647,7 +647,7 @@ public class ChunkInputStream extends InputStream
 
 
   /**
-   * Release a buffers upto the given index.
+   * Release the buffers upto the given index.
    * @param releaseUptoBufferIndex bufferIndex (inclusive) upto which the
    *                               buffers must be released
    */
