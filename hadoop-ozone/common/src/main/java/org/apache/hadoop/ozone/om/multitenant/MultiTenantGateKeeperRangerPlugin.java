@@ -66,16 +66,16 @@ public class MultiTenantGateKeeperRangerPlugin implements
   private static final Logger LOG = LoggerFactory
       .getLogger(MultiTenantGateKeeperRangerPlugin.class);
 
-  private static OzoneConfiguration conf;
-  private static boolean ignoreServerCert = false;
-  private static int connectionTimeout;
-  private static int connectionRequestTimeout;
-  private static String authHeaderValue;
-  private static String rangerHttpsAddress;
+  private OzoneConfiguration conf;
+  private boolean ignoreServerCert = false;
+  private int connectionTimeout;
+  private int connectionRequestTimeout;
+  private String authHeaderValue;
+  private String rangerHttpsAddress;
 
   @Override
   public void init(Configuration configuration) throws IOException {
-    conf = (OzoneConfiguration)configuration;
+    conf = new OzoneConfiguration(configuration);
     rangerHttpsAddress = conf.get(OZONE_RANGER_HTTPS_ADDRESS_KEY);
     initializeRangerConnection();
   }
@@ -138,7 +138,8 @@ public class MultiTenantGateKeeperRangerPlugin implements
     String auth = userName + ":" + passwd;
     byte[] encodedAuth =
         Base64.encodeBase64(auth.getBytes(StandardCharsets.UTF_8));
-    authHeaderValue = "Basic " + new String(encodedAuth);
+    authHeaderValue = "Basic " +
+        new String(encodedAuth, StandardCharsets.UTF_8);
   }
 
 

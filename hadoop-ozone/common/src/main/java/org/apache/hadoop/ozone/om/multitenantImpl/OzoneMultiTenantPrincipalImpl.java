@@ -21,6 +21,7 @@ import static org.apache.hadoop.ozone.om.multitenant.OzoneMultiTenantPrincipal.O
 
 import java.security.Principal;
 
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.multitenant.OzoneMultiTenantPrincipal;
 import org.apache.http.auth.BasicUserPrincipal;
 
@@ -28,7 +29,8 @@ public class OzoneMultiTenantPrincipalImpl
     implements OzoneMultiTenantPrincipal {
 
   // TODO: This separator should come from Ozone Config.
-  private final String tenantIDSeparator = "$";
+  private static final String tenantIDSeparator =
+      OzoneConsts.TENANT_NAME_USER_NAME_DELIMITER;
   private OzonePrincipalType  principalType = USER_PRINCIPAL;
   private Principal principalUserIDPart;
   private Principal principalTenantIDPart;
