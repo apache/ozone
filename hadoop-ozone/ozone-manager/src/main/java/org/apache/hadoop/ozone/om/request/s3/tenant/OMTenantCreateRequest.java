@@ -258,14 +258,14 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       omResponse.setCreateTenantResponse(
           CreateTenantResponse.newBuilder().setSuccess(false).build());
       // Cleanup any state maintained by OMMultiTenantManager
-      if (tenant != null) {
-        try {
-          ozoneManager.getMultiTenantManager().destroyTenant(tenant);
-        } catch (Exception e) {
-          // Ignore for now. Multi-Tenant Manager is responsible for
-          // cleaning up stale state eventually.
-        }
-      }
+//      if (tenant != null) {
+//        try {
+//          ozoneManager.getMultiTenantManager().destroyTenant(tenant);
+//        } catch (Exception e) {
+//          // Ignore for now. Multi-Tenant Manager is responsible for
+//          // cleaning up stale state eventually.
+//        }
+//      }
       omClientResponse = new OMTenantCreateResponse(
           createErrorOMResponse(omResponse, ex));
     } finally {

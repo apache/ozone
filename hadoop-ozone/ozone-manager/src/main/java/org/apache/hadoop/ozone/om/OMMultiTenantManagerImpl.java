@@ -313,4 +313,8 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     }
     return tenantVolumeAccessPolicy;
   }
+
+  public OzoneConfiguration getConf() {
+    return conf;
+  }
 }
