@@ -18,29 +18,33 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.Iterator;
+import java.util.Collection;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.stream.Collectors;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.conf.Parameters;
 import org.apache.ratis.conf.RaftProperties;
+import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.RaftClientReply;
 import org.apache.ratis.protocol.RaftClientRequest;
@@ -240,12 +244,22 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   }
 
   @Override
-  public List<String> getRatisRoles() {
-    return division.getGroup().getPeers().stream()
-        .map(peer -> peer.getAddress() == null ? "" : peer.getAddress())
-        .collect(Collectors.toList());
+  public List<String> getRatisRoles() throws IOException {
+    Collection<RaftPeer> peers = division.getGroup().getPeers();
+    List<String> ratisRoles = new ArrayList<>();
+    for (RaftPeer peer : peers) {
+      InetAddress peerInetAddress = InetAddress.getByName(
+              HddsUtils.getHostName(peer.getAddress()).get());
+      boolean isLocal = NetUtils.isLocalAddress(peerInetAddress);
+      ratisRoles.add((peer.getAddress() == null ? "" :
+              peer.getAddress().concat(isLocal ?
+                      ":".concat(RaftProtos.RaftPeerRole.LEADER
+                              .toString()) :
+                      ":".concat(RaftProtos.RaftPeerRole.FOLLOWER
+                              .toString()))));
+    }
+    return ratisRoles;
   }
-
   /**
    * {@inheritDoc}
    */

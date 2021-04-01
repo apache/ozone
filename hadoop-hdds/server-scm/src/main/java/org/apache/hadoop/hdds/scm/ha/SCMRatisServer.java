@@ -47,7 +47,7 @@ public interface SCMRatisServer {
   /**
    * Returns roles of ratis peers.
    */
-  List<String> getRatisRoles();
+  List<String> getRatisRoles() throws IOException;
 
   /**
    * Returns NotLeaderException with useful info.
