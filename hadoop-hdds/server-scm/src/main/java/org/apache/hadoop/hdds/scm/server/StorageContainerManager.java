@@ -232,6 +232,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
   private final SCMHANodeDetails scmHANodeDetails;
 
+  private ContainerBalancer containerBalancer;
+
   /**
    * Creates a new StorageContainerManager. Configuration will be
    * updated with information on the actual listening addresses used
@@ -393,15 +395,17 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     eventQueue.addHandler(SCMEvents.PIPELINE_ACTIONS, pipelineActionHandler);
     eventQueue.addHandler(SCMEvents.PIPELINE_REPORT, pipelineReportHandler);
 
+    containerBalancer = new ContainerBalancer(scmNodeManager,
+        containerManager, replicationManager, conf);
+    LOG.info(String.format("Initialised Container Balancer.%n" +
+        containerBalancer.toString()));
+
     // Emit initial safe mode status, as now handlers are registered.
     scmSafeModeManager.emitSafeModeStatus();
 
     registerMXBean();
     registerMetricsSource(this);
 
-    ContainerBalancer containerBalancer =
-        new ContainerBalancer(scmNodeManager, containerManager,
-            replicationManager, conf);
   }
 
   public OzoneConfiguration getConfiguration() {

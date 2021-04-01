@@ -38,31 +38,41 @@ public class ContainerBalancer {
   private NodeManager nodeManager;
   private ContainerManagerV2 containerManager;
   private ReplicationManager replicationManager;
-  private OzoneConfiguration conf;
+  private OzoneConfiguration ozoneConfiguration;
   private double threshold;
   private int maxDatanodesToBalance;
   private long maxSizeToMove;
   private boolean balancerRunning;
+  private List<DatanodeUsageInfo> sourceNodes;
+  private List<DatanodeUsageInfo> targetNodes;
+  private ContainerBalancerConfiguration config;
 
   public ContainerBalancer(
       NodeManager nodeManager,
       ContainerManagerV2 containerManager,
       ReplicationManager replicationManager,
-      OzoneConfiguration conf) {
+      OzoneConfiguration ozoneConfiguration) {
     this.nodeManager = nodeManager;
     this.containerManager = containerManager;
     this.replicationManager = replicationManager;
-    this.conf = conf;
+    this.ozoneConfiguration = ozoneConfiguration;
     this.balancerRunning = false;
+    this.config = new ContainerBalancerConfiguration();
+    start(new ContainerBalancerConfiguration());
   }
 
   /**
    * Start ContainerBalancer. Current implementation is incomplete.
-   * @param config Configuration values.
+   *
+   * @param balancerConfiguration Configuration values.
    */
-  public void start(ContainerBalancerConfiguration config) {
-    conf = new OzoneConfiguration();
+  public void start(ContainerBalancerConfiguration balancerConfiguration) {
     this.balancerRunning = true;
+
+    ozoneConfiguration = new OzoneConfiguration();
+
+    // initialise configs
+    this.config = balancerConfiguration;
     this.threshold = config.getThreshold();
     this.maxDatanodesToBalance =
         config.getMaxDatanodesToBalance();
@@ -70,13 +80,31 @@ public class ContainerBalancer {
 
     LOG.info("Starting Container Balancer...");
 
+    // sorted list in order from most to least used
     List<DatanodeUsageInfo> nodes = nodeManager.
         getMostOrLeastUsedDatanodes(true);
     double avgUtilisation = calculateAvgUtilisation(nodes);
 
+    // under utilized nodes have utilization(that is, used / capacity) less
+    // than lower limit
     double lowerLimit = avgUtilisation - threshold;
+
+    // over utilized nodes have utilization(that is, used / capacity) greater
+    // than upper limit
     double upperLimit = avgUtilisation + threshold;
 
+    // find over utilised(source) and under utilised(target) nodes
+    // current implementation might change
+    for (DatanodeUsageInfo node : nodes) {
+      SCMNodeStat stat = node.getScmNodeStat();
+      double utilization = stat.getScmUsed().get().doubleValue() /
+          stat.getCapacity().get().doubleValue();
+      if (utilization > upperLimit) {
+        sourceNodes.add(node);
+      } else if (utilization < lowerLimit || utilization < avgUtilisation) {
+        targetNodes.add(node);
+      }
+    }
   }
 
   // calculate the average datanode utilisation across the cluster
@@ -91,7 +119,16 @@ public class ContainerBalancer {
   }
 
   public void stop() {
+    LOG.info("Stopping Container Balancer...");
     balancerRunning = false;
+    LOG.info("Container Balancer stopped.");
   }
 
+  @Override
+  public String toString() {
+    String status = String.format("Container Balancer status:%n" +
+        "%-30s %s%n" +
+        "%-30s %b%n", "Key", "Value", "Running", balancerRunning);
+    return status + config.toString();
+  }
 }

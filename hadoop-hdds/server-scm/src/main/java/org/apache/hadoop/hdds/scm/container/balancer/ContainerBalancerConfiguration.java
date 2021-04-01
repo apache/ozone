@@ -27,28 +27,28 @@ import org.apache.hadoop.hdds.conf.ConfigType;
 /**
  * This class contains configuration values for the ContainerBalancer.
  */
-@ConfigGroup(prefix = "hdds.container.balancer")
+@ConfigGroup(prefix = "hdds.container.balancer.")
 public final class ContainerBalancerConfiguration {
-  @Config(key = "threshold", type = ConfigType.AUTO, defaultValue = "0.1",
-      tags = {ConfigTag.BALANCER}, description = "Threshold is a fraction " +
-      "in the range of 0 to 1. A cluster is considered balanced if for each " +
-      "datanode, the utilization of the datanode (used space to capacity " +
-      "ratio) differs from the utilization of the cluster (used " +
-      "space to capacity ratio of the entire cluster) no more than the " +
-      "threshold value.")
-  private double threshold;
+  @Config(key = "utilization.threshold", type = ConfigType.AUTO, defaultValue =
+      "0.1", tags = {ConfigTag.BALANCER},
+      description = "Threshold is a fraction in the range of 0 to 1. A " +
+          "cluster is considered balanced if for each datanode, the " +
+          "utilization of the datanode (used space to capacity ratio) differs" +
+          " from the utilization of the cluster (used space to capacity ratio" +
+          " of the entire cluster) no more than the threshold value.")
+  private double threshold = 0.1;
 
-  @Config(key = "max.datanodes.balanced", type = ConfigType.INT,
+  @Config(key = "datanodes.balanced.max", type = ConfigType.INT,
       defaultValue = "5", tags = {ConfigTag.BALANCER}, description = "The " +
       "maximum number of datanodes that should be balanced. Container " +
       "Balancer will not balance more number of datanodes than this limit.")
-  private int maxDatanodesToBalance;
+  private int maxDatanodesToBalance = 5;
 
-  @Config(key = "max.size.moved", type = ConfigType.LONG,
+  @Config(key = "size.moved.max", type = ConfigType.LONG,
       defaultValue = "10737418240L", tags = {ConfigTag.BALANCER},
       description = "The maximum size of data in Bytes that will be moved " +
           "by the Container Balancer.")
-  private long maxSizeToMove;
+  private long maxSizeToMove = 10737418240L;
 
   /**
    * Get the threshold value for Container Balancer.
@@ -100,5 +100,16 @@ public final class ContainerBalancerConfiguration {
    */
   public void setMaxSizeToMove(long maxSizeToMove) {
     this.maxSizeToMove = maxSizeToMove;
+  }
+
+  @Override
+  public String toString() {
+    return String.format("Container Balancer Configuration values:%n" +
+            "%-30s %s%n" +
+            "%-30s %f%n" +
+            "%-30s %d%n" +
+            "%-30s %dB%n", "Key", "Value", "Threshold",
+        threshold, "Max Datanodes to Balance", maxDatanodesToBalance,
+        "Max Size to Move", maxSizeToMove);
   }
 }
