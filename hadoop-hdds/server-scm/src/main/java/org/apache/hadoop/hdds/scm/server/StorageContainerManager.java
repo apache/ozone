@@ -868,9 +868,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         // to existing SCM ring post node regular start up.
 
         if(OzoneSecurityUtil.isSecurityEnabled(conf)) {
-          HASecurityUtils.initializeSecurity(scmStorageConfig,
-              scmInfo.getScmId(), config, getScmAddress(scmhaNodeDetails, conf),
-              false);
+          HASecurityUtils.initializeSecurity(scmStorageConfig, config,
+              getScmAddress(scmhaNodeDetails, conf), false);
         }
         scmStorageConfig.setPrimaryScmNodeId(scmInfo.getScmId());
         scmStorageConfig.initialize();
@@ -924,9 +923,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         }
 
         if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
-          HASecurityUtils.initializeSecurity(scmStorageConfig,
-              scmStorageConfig.getScmId(), conf, getScmAddress(haDetails,
-                  conf), true);
+          HASecurityUtils.initializeSecurity(scmStorageConfig, conf,
+              getScmAddress(haDetails, conf), true);
         }
         scmStorageConfig.setPrimaryScmNodeId(scmStorageConfig.getScmId());
         scmStorageConfig.initialize();

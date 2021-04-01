@@ -78,13 +78,12 @@ public final class HASecurityUtils {
    * Initialize Security which generates public, private key pair and get SCM
    * signed certificate and persist to local disk.
    * @param scmStorageConfig
-   * @param fetchedScmId
    * @param conf
    * @param scmAddress
    * @throws IOException
    */
   public static void initializeSecurity(SCMStorageConfig scmStorageConfig,
-      String fetchedScmId, OzoneConfiguration conf,
+      OzoneConfiguration conf,
       InetSocketAddress scmAddress, boolean primaryscm)
       throws IOException {
     LOG.info("Initializing secure StorageContainerManager.");
@@ -99,11 +98,11 @@ public final class HASecurityUtils {
       break;
     case GETCERT:
       if (!primaryscm) {
-        getRootCASignedSCMCert(certClient, conf, fetchedScmId, scmStorageConfig,
+        getRootCASignedSCMCert(certClient, conf, scmStorageConfig,
             scmAddress);
       } else {
-        getPrimarySCMSelfSignedCert(certClient, conf, fetchedScmId,
-            scmStorageConfig, scmAddress);
+        getPrimarySCMSelfSignedCert(certClient, conf, scmStorageConfig,
+            scmAddress);
       }
       LOG.info("Successfully stored SCM signed certificate.");
       break;
@@ -127,18 +126,18 @@ public final class HASecurityUtils {
    * client.
    */
   private static void getRootCASignedSCMCert(CertificateClient client,
-      OzoneConfiguration config, String fetchedSCMId,
+      OzoneConfiguration config,
       SCMStorageConfig scmStorageConfig, InetSocketAddress scmAddress) {
     try {
       // Generate CSR.
       PKCS10CertificationRequest csr = generateCSR(client, scmStorageConfig,
-          config, scmAddress, fetchedSCMId);
+          config, scmAddress);
 
       ScmNodeDetailsProto scmNodeDetailsProto =
           ScmNodeDetailsProto.newBuilder()
               .setClusterId(scmStorageConfig.getClusterID())
               .setHostName(scmAddress.getHostName())
-              .setScmNodeId(fetchedSCMId).build();
+              .setScmNodeId(scmStorageConfig.getScmId()).build();
 
       // Create SCM security client.
       SCMSecurityProtocolClientSideTranslatorPB secureScmClient =
@@ -179,8 +178,8 @@ public final class HASecurityUtils {
    * root CA certificate server and store it using certificate client.
    */
   private static void getPrimarySCMSelfSignedCert(CertificateClient client,
-      OzoneConfiguration config, String fetchedSCMId,
-      SCMStorageConfig scmStorageConfig, InetSocketAddress scmAddress) {
+      OzoneConfiguration config, SCMStorageConfig scmStorageConfig,
+      InetSocketAddress scmAddress) {
 
     try {
 
@@ -188,7 +187,7 @@ public final class HASecurityUtils {
           initializeRootCertificateServer(config, null, scmStorageConfig);
 
       PKCS10CertificationRequest csr = generateCSR(client, scmStorageConfig,
-          config, scmAddress, fetchedSCMId);
+          config, scmAddress);
 
       X509CertificateHolder subSCMCertHolder = rootCAServer.
           requestCertificate(csr, KERBEROS_TRUSTED, SCM).get();
@@ -252,8 +251,8 @@ public final class HASecurityUtils {
    */
   private static PKCS10CertificationRequest generateCSR(
       CertificateClient client, SCMStorageConfig scmStorageConfig,
-      OzoneConfiguration config, InetSocketAddress scmAddress,
-      String fetchedSCMId) throws IOException {
+      OzoneConfiguration config, InetSocketAddress scmAddress)
+      throws IOException {
     CertificateSignRequest.Builder builder = client.getCSRBuilder();
     KeyPair keyPair = new KeyPair(client.getPublicKey(),
         client.getPrivateKey());
@@ -265,13 +264,13 @@ public final class HASecurityUtils {
 
     builder.setKey(keyPair)
         .setConfiguration(config)
-        .setScmID(fetchedSCMId)
+        .setScmID(scmStorageConfig.getScmId())
         .setClusterID(scmStorageConfig.getClusterID())
         .setSubject(subject);
 
 
     LOG.info("Creating csr for SCM->hostName:{},scmId:{},clusterId:{}," +
-            "subject:{}", hostname, fetchedSCMId,
+            "subject:{}", hostname, scmStorageConfig.getScmId(),
         scmStorageConfig.getClusterID(), subject);
 
     return builder.build();
