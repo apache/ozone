@@ -419,7 +419,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // For testing purpose only, not hit scm from om as Hadoop UGI can't login
     // two principals in the same JVM.
     if (!testSecureOmFlag) {
-      ScmInfo scmInfo = getScmInfo(configuration);
+      ScmInfo scmInfo = HAUtils.getScmInfo(configuration);
       if (!(scmInfo.getClusterId().equals(omStorage.getClusterID()) && scmInfo
           .getScmId().equals(omStorage.getScmId()))) {
         logVersionMismatch(conf, scmInfo);
@@ -968,7 +968,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     StorageState state = omStorage.getState();
     if (state != StorageState.INITIALIZED) {
       try {
-        ScmInfo scmInfo = getScmInfo(conf);
+        ScmInfo scmInfo = HAUtils.getScmInfo(conf);
         String clusterId = scmInfo.getClusterId();
         String scmId = scmInfo.getScmId();
         if (clusterId == null || clusterId.isEmpty()) {
@@ -1044,11 +1044,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           response);
       throw new RuntimeException("OM security initialization failed.");
     }
-  }
-
-  private static ScmInfo getScmInfo(OzoneConfiguration conf)
-      throws IOException {
-    return HAUtils.getScmInfo(conf);
   }
 
   /**
