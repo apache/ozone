@@ -15,48 +15,44 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.apache.hadoop.ozone.s3.signature;
 
-package org.apache.hadoop.ozone.s3.header;
-
-import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
+import org.apache.hadoop.ozone.s3.signature.SignatureInfo.Version;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
 /**
- * Authorization Header v2.
+ * Class to parse V2 auth information from header.
  */
-public class AuthorizationHeaderV2 {
+public class AuthorizationV2HeaderParser implements SignatureParser {
 
   public static final String IDENTIFIER = "AWS";
-  private String authHeader;
-  private String identifier;
-  private String accessKeyID;
-  private String signature;
 
-  public AuthorizationHeaderV2(String auth) throws OS3Exception {
-    Preconditions.checkNotNull(auth);
-    this.authHeader = auth;
-    parseHeader();
+  private final String authHeader;
+
+  public AuthorizationV2HeaderParser(String authHeader) {
+    this.authHeader = authHeader;
   }
 
   /**
    * This method parses the authorization header.
-   *
+   * <p>
    * Authorization header sample:
    * AWS AKIAIOSFODNN7EXAMPLE:frJIUN8DYpKDtOLCwo//yllqDzg=
-   *
-   * @throws OS3Exception
    */
-  @SuppressWarnings("StringSplitter")
-  public void parseHeader() throws OS3Exception {
+  @Override
+  public SignatureInfo parseSignature() throws OS3Exception {
+    if (authHeader == null || !authHeader.startsWith(IDENTIFIER + " ")) {
+      return null;
+    }
     String[] split = authHeader.split(" ");
     if (split.length != 2) {
       throw S3ErrorTable.newError(S3ErrorTable.MALFORMED_HEADER, authHeader);
     }
 
-    identifier = split[0];
+    String identifier = split[0];
     if (!IDENTIFIER.equals(identifier)) {
       throw S3ErrorTable.newError(S3ErrorTable.MALFORMED_HEADER, authHeader);
     }
@@ -67,31 +63,21 @@ public class AuthorizationHeaderV2 {
       throw S3ErrorTable.newError(S3ErrorTable.MALFORMED_HEADER, authHeader);
     }
 
-    accessKeyID = remainingSplit[0];
-    signature = remainingSplit[1];
+    String accessKeyID = remainingSplit[0];
+    String signature = remainingSplit[1];
     if (isBlank(accessKeyID) || isBlank(signature)) {
       throw S3ErrorTable.newError(S3ErrorTable.MALFORMED_HEADER, authHeader);
     }
+    return new SignatureInfo(
+        Version.V2,
+        "",
+        "",
+        accessKeyID,
+        signature,
+        "",
+        "",
+        "",
+        false
+    );
   }
-
-  public String getAuthHeader() {
-    return authHeader;
-  }
-
-  public void setAuthHeader(String authHeader) {
-    this.authHeader = authHeader;
-  }
-
-  public String getIdentifier() {
-    return identifier;
-  }
-
-  public String getAccessKeyID() {
-    return accessKeyID;
-  }
-
-  public String getSignature() {
-    return signature;
-  }
-
 }

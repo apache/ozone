@@ -26,7 +26,6 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
@@ -228,30 +227,8 @@ public class FilePerChunkStrategy implements ChunkManager {
     }
 
     long len = info.getLen();
-
-    long bufferCapacity = 0;
-    if (info.isReadDataIntoSingleBuffer()) {
-      // Older client - read all chunk data into one single buffer.
-      bufferCapacity = len;
-    } else {
-      // Set buffer capacity to checksum boundary size so that each buffer
-      // corresponds to one checksum. If checksum is NONE, then set buffer
-      // capacity to default (OZONE_CHUNK_READ_BUFFER_DEFAULT_SIZE_KEY = 64KB).
-      ChecksumData checksumData = info.getChecksumData();
-
-      if (checksumData != null) {
-        if (checksumData.getChecksumType() ==
-            ContainerProtos.ChecksumType.NONE) {
-          bufferCapacity = defaultReadBufferCapacity;
-        } else {
-          bufferCapacity = checksumData.getBytesPerChecksum();
-        }
-      }
-    }
-    // If the buffer capacity is 0, set all the data into one ByteBuffer
-    if (bufferCapacity == 0) {
-      bufferCapacity = len;
-    }
+    long bufferCapacity = ChunkManager.getBufferCapacityForChunkRead(info,
+        defaultReadBufferCapacity);
 
     ByteBuffer[] dataBuffers = BufferUtils.assignByteBuffers(len,
         bufferCapacity);
@@ -296,7 +273,7 @@ public class FilePerChunkStrategy implements ChunkManager {
         if (ex.getResult() != UNABLE_TO_FIND_CHUNK) {
           throw ex;
         }
-        dataBuffers = null;
+        BufferUtils.clearBuffers(dataBuffers);
       }
     }
     throw new StorageContainerException(
