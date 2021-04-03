@@ -962,7 +962,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     } else {
       if (OzoneSecurityUtil.isSecurityEnabled(conf) &&
           omStorage.getOmCertSerialId() == null) {
-        ScmInfo scmInfo = getScmInfo(conf);
+        ScmInfo scmInfo = HAUtils.getScmInfo(conf);
         String scmId = scmInfo.getScmId();
         if (scmId == null || scmId.isEmpty()) {
           throw new IOException("Invalid SCM ID");
