@@ -106,11 +106,6 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
         omKeyInfo.getModificationTime());
 
     // Check block location.
-    List<OmKeyLocationInfo> locationInfoListFromCommitKeyRequest =
-        commitKeyRequest.getKeyArgs().getKeyLocationsList().stream()
-            .map(OmKeyLocationInfo::getFromProtobuf)
-            .collect(Collectors.toList());
-
     Assert.assertEquals(allocatedLocationList,
         omKeyInfo.getLatestVersionLocations().getLocationList());
 

@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Objects;
 
 import org.apache.hadoop.fs.FileEncryptionInfo;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
@@ -150,6 +151,17 @@ public final class OmKeyInfo extends WithObjectID {
    */
   public void updateLocationInfoList(List<OmKeyLocationInfo> locationInfoList,
       boolean isMpu) {
+    updateLocationInfoList(locationInfoList, isMpu, false);
+  }
+
+  /**
+   * updates the length of the each block in the list given.
+   * This will be called when the key is being committed to OzoneManager.
+   *
+   * @param locationInfoList list of locationInfo
+   */
+  public void updateLocationInfoList(List<OmKeyLocationInfo> locationInfoList,
+      boolean isMpu, boolean skipBlockIDCheck) {
     long latestVersion = getLatestVersionLocations().getVersion();
     OmKeyLocationInfoGroup keyLocationInfoGroup = getLatestVersionLocations();
 
@@ -157,24 +169,12 @@ public final class OmKeyInfo extends WithObjectID {
 
     // Compare user given block location against allocatedBlockLocations
     // present in OmKeyInfo.
-    List<OmKeyLocationInfo> allocatedBlockLocations =
-        keyLocationInfoGroup.getBlocksLatestVersionOnly();
-    List<OmKeyLocationInfo> updatedBlockLocations = new ArrayList<>();
-    for (OmKeyLocationInfo modifiedLocationInfo : locationInfoList) {
-      boolean unKnownBlockID = true;
-      for (OmKeyLocationInfo existingLocationInfo : allocatedBlockLocations) {
-        if (modifiedLocationInfo.getBlockID()
-            .equals(existingLocationInfo.getBlockID())) {
-          updatedBlockLocations.add(modifiedLocationInfo);
-          unKnownBlockID = false;
-          break;
-        }
-      }
-      if (unKnownBlockID) {
-        LOG.warn("UnKnown BlockLocation:{}, where the blockID of given "
-            + "location doesn't match with the stored/allocated block of"
-            + " keyName:{}", modifiedLocationInfo, keyName);
-      }
+    List<OmKeyLocationInfo> updatedBlockLocations;
+    if (skipBlockIDCheck) {
+      updatedBlockLocations = locationInfoList;
+    } else {
+      updatedBlockLocations =
+          verifyAndGetKeyLocations(locationInfoList, keyLocationInfoGroup);
     }
     // Updates the latest locationList in the latest version only with
     // given locationInfoList here.
@@ -189,7 +189,34 @@ public final class OmKeyInfo extends WithObjectID {
     keyLocationInfoGroup.addAll(latestVersion, updatedBlockLocations);
   }
 
+  private List<OmKeyLocationInfo> verifyAndGetKeyLocations(
+      List<OmKeyLocationInfo> locationInfoList,
+      OmKeyLocationInfoGroup keyLocationInfoGroup) {
 
+    List<OmKeyLocationInfo> allocatedBlockLocations =
+        keyLocationInfoGroup.getBlocksLatestVersionOnly();
+    List<OmKeyLocationInfo> updatedBlockLocations = new ArrayList<>();
+
+    for (OmKeyLocationInfo modifiedLocationInfo : locationInfoList) {
+      boolean unKnownBlockID = true;
+      BlockID modifiedBlockID = modifiedLocationInfo.getBlockID();
+      for (OmKeyLocationInfo existingLocationInfo : allocatedBlockLocations) {
+        BlockID existingBlockID = existingLocationInfo.getBlockID();
+        if (modifiedBlockID.getContainerBlockID()
+            .equals(existingBlockID.getContainerBlockID())) {
+          updatedBlockLocations.add(modifiedLocationInfo);
+          unKnownBlockID = false;
+          break;
+        }
+      }
+      if (unKnownBlockID) {
+        LOG.warn("UnKnown BlockLocation:{}, where the blockID of given "
+            + "location doesn't match with the stored/allocated block of"
+            + " keyName:{}", modifiedLocationInfo, keyName);
+      }
+    }
+    return updatedBlockLocations;
+  }
 
   /**
    * Append a set of blocks to the latest version. Note that these blocks are
