@@ -34,6 +34,8 @@ import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.util.Time;
 
 import com.google.common.base.Preconditions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Args for key block. The block instance for the key requested in putKey.
@@ -41,6 +43,7 @@ import com.google.common.base.Preconditions;
  * datanode. Also, this is the metadata written to om.db on server side.
  */
 public final class OmKeyInfo extends WithObjectID {
+  private static final Logger LOG = LoggerFactory.getLogger(OmKeyInfo.class);
   private final String volumeName;
   private final String bucketName;
   // name of key client specified
@@ -151,6 +154,28 @@ public final class OmKeyInfo extends WithObjectID {
     OmKeyLocationInfoGroup keyLocationInfoGroup = getLatestVersionLocations();
 
     keyLocationInfoGroup.setMultipartKey(isMpu);
+
+    // Compare user given block location against allocatedBlockLocations
+    // present in OmKeyInfo.
+    List<OmKeyLocationInfo> allocatedBlockLocations =
+        keyLocationInfoGroup.getBlocksLatestVersionOnly();
+    List<OmKeyLocationInfo> updatedBlockLocations = new ArrayList<>();
+    for (OmKeyLocationInfo modifiedLocationInfo : locationInfoList) {
+      boolean unKnownBlockID = true;
+      for (OmKeyLocationInfo existingLocationInfo : allocatedBlockLocations) {
+        if (modifiedLocationInfo.getBlockID()
+            .equals(existingLocationInfo.getBlockID())) {
+          updatedBlockLocations.add(modifiedLocationInfo);
+          unKnownBlockID = false;
+          break;
+        }
+      }
+      if (unKnownBlockID) {
+        LOG.warn("UnKnown BlockLocation:{}, where the blockID of given "
+            + "location doesn't match with the stored/allocated block of"
+            + " keyName:{}", modifiedLocationInfo, keyName);
+      }
+    }
     // Updates the latest locationList in the latest version only with
     // given locationInfoList here.
     // TODO : The original allocated list and the updated list here may vary
@@ -159,9 +184,9 @@ public final class OmKeyInfo extends WithObjectID {
     // need to be garbage collected in case the ozone client dies.
     keyLocationInfoGroup.removeBlocks(latestVersion);
     // set each of the locationInfo object to the latest version
-    locationInfoList.forEach(omKeyLocationInfo -> omKeyLocationInfo
+    updatedBlockLocations.forEach(omKeyLocationInfo -> omKeyLocationInfo
         .setCreateVersion(latestVersion));
-    keyLocationInfoGroup.addAll(latestVersion, locationInfoList);
+    keyLocationInfoGroup.addAll(latestVersion, updatedBlockLocations);
   }
 
 
