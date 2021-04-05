@@ -43,6 +43,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Sets;
 import com.google.protobuf.Descriptors.Descriptor;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus.Status;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
@@ -608,7 +609,7 @@ public class StateContext {
    * termOfLeaderSCM with the max term found in commandQueue.
    *
    * The init process also works for non-HA mode. In that case, term of all
-   * SCMCommands will be 0.
+   * SCMCommands will be SCMContext.INVALID_TERM.
    */
   private void initTermOfLeaderSCM() {
     // only init once
@@ -653,7 +654,6 @@ public class StateContext {
       LOG.error("should init termOfLeaderSCM before update it.");
       return;
     }
-
     termOfLeaderSCM = Optional.of(
         Long.max(termOfLeaderSCM.get(), command.getTerm()));
   }

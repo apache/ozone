@@ -252,7 +252,7 @@ public class TestHDDSUpgrade {
     });
   }
 
-  @Ignore("Needs PipelineManager logic refactor after SCM HA merge.")
+//  @Ignore("Needs PipelineManager logic refactor after SCM HA merge.")
   @Test
   public void testFinalizationFromInitialVersionToLatestVersion()
       throws Exception {
