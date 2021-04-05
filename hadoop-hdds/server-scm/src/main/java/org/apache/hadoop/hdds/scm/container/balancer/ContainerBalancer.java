@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class ContainerBalancer {
@@ -91,19 +92,22 @@ public class ContainerBalancer {
     // over utilized nodes have utilization(that is, used / capacity) greater
     // than upper limit
     double upperLimit = avgUtilisation + threshold;
+    LOG.info("Lower limit for utilization is {}", lowerLimit);
+    LOG.info("Upper limit for utilization is {}", upperLimit);
 
     // find over utilised(source) and under utilised(target) nodes
-    // current implementation might change
-    for (DatanodeUsageInfo node : nodes) {
-      SCMNodeStat stat = node.getScmNodeStat();
-      double utilization = stat.getScmUsed().get().doubleValue() /
-          stat.getCapacity().get().doubleValue();
-      if (utilization > upperLimit) {
-        sourceNodes.add(node);
-      } else if (utilization < lowerLimit || utilization < avgUtilisation) {
-        targetNodes.add(node);
-      }
-    }
+    sourceNodes = new ArrayList<>();
+    targetNodes = new ArrayList<>();
+//    for (DatanodeUsageInfo node : nodes) {
+//      SCMNodeStat stat = node.getScmNodeStat();
+//      double utilization = stat.getScmUsed().get().doubleValue() /
+//          stat.getCapacity().get().doubleValue();
+//      if (utilization > upperLimit) {
+//        sourceNodes.add(node);
+//      } else if (utilization < lowerLimit || utilization < avgUtilisation) {
+//        targetNodes.add(node);
+//      }
+//    }
   }
 
   // calculate the average datanode utilisation across the cluster
