@@ -135,7 +135,7 @@ public class DirectoryDeletingService extends BackgroundService {
             // step-1: get all sub directories under the deletedDir
             List<OmKeyInfo> dirs =
                 keyManager.getPendingDeletionSubDirs(pendingDeletedDirInfo,
-                    --count);
+                    count);
             count = count - dirs.size();
             List<OmKeyInfo> deletedSubDirList = new ArrayList<>();
             for (OmKeyInfo dirInfo : dirs) {
@@ -149,7 +149,8 @@ public class DirectoryDeletingService extends BackgroundService {
             // step-2: get all sub files under the deletedDir
             List<OmKeyInfo> purgeDeletedFiles =
                 keyManager.getPendingDeletionSubFiles(pendingDeletedDirInfo,
-                    --count);
+                    count);
+            count = count - purgeDeletedFiles.size();
 
             if (LOG.isDebugEnabled()) {
               for (OmKeyInfo fileInfo : purgeDeletedFiles) {

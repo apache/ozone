@@ -48,6 +48,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
@@ -56,10 +57,10 @@ import static org.junit.Assert.fail;
 /**
  * Directory deletion service test cases.
  */
-public class TestDirectoryDeletingServiceV1 {
+public class TestDirectoryDeletingServiceWithFSOBucket {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(TestDirectoryDeletingServiceV1.class);
+      LoggerFactory.getLogger(TestDirectoryDeletingServiceWithFSOBucket.class);
 
   /**
    * Set a timeout for each test.
@@ -79,7 +80,8 @@ public class TestDirectoryDeletingServiceV1 {
   @BeforeClass
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setInt(OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL, 5);
+    conf.setInt(OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL, 3);
+    conf.setInt(OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK, 5);
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     if (isBucketFSOptimized) {
@@ -142,44 +144,92 @@ public class TestDirectoryDeletingServiceV1 {
     Table<String, OmDirectoryInfo> dirTable =
         cluster.getOzoneManager().getMetadataManager().getDirectoryTable();
 
-    // Before delete
-    GenericTestUtils.waitFor(() ->
-            assertTableRowCount(0, deletedDirTable),
-        1000, 120000); // 2 minutes
 
-    GenericTestUtils.waitFor(() ->
-            assertTableRowCount(2, dirTable),
-        1000, 120000); // 2 minutes
+    DirectoryDeletingService dirDeletingService =
+        (DirectoryDeletingService) cluster.getOzoneManager().getKeyManager()
+            .getDirDeletingService();
+    // Before delete
+    assertTableRowCount(deletedDirTable, 0);
+    assertTableRowCount(dirTable, 2);
+
+    assertSubPathsCount(dirDeletingService.getDeletedDirsCount(), 0);
+    assertSubPathsCount(dirDeletingService.getMovedFilesCount(), 0);
 
     // Delete the appRoot, empty dir
     fs.delete(appRoot, true);
 
-
     // After Delete
     checkPath(appRoot);
 
-    GenericTestUtils.waitFor(() ->
-            assertTableRowCount(0, deletedDirTable),
-        1000, 120000); // 2 minutes
+    assertTableRowCount(deletedDirTable, 0);
+    assertTableRowCount(dirTable, 1);
 
-    GenericTestUtils.waitFor(() ->
-            assertTableRowCount(1, dirTable),
-        1000, 120000); // 2 minutes
+    assertSubPathsCount(dirDeletingService.getDeletedDirsCount(), 1);
+    assertSubPathsCount(dirDeletingService.getMovedFilesCount(), 0);
 
     Assert.assertTrue(dirTable.iterator().hasNext());
     Assert.assertEquals(root.getName(),
         dirTable.iterator().next().getValue().getName());
 
+    Assert.assertTrue(dirDeletingService.getRunCount() > 1);
+  }
+
+  /**
+   * Tests verifies that directories and files are getting purged in multiple
+   * batches.
+   */
+  @Test
+  public void testDeleteWithLargeSubPathsThanBatchSize() throws Exception {
+    Path root = new Path("/rootDir");
+    Path appRoot = new Path(root, "appRoot");
+    // Creates 2 parent dirs from root.
+    fs.mkdirs(appRoot);
+
+    // create 2 more levels. In each level, creates 5 subdirs and 5 subfiles.
+    // This will create total of 3 parentDirs + (3 * 5) childDirs and
+    // Total of (3 * 5) childFiles
+    for (int i = 1; i <= 3; i++) {
+      Path childDir = new Path(appRoot, "parentDir" + i);
+      for (int j = 1; j <= 5; j++) {
+        // total 5 sub-dirs + 5 sub-files = 10 items in this level.
+        Path childSubDir = new Path(childDir, "childDir" + j);
+        Path childSubFile = new Path(childDir, "childFile" + j);
+        ContractTestUtils.touch(fs, childSubFile); // create sub file
+        fs.mkdirs(childSubDir); // create sub dir
+      }
+    }
+
+    Table<String, OmKeyInfo> deletedDirTable =
+        cluster.getOzoneManager().getMetadataManager().getDeletedDirTable();
+    Table<String, OmKeyInfo> keyTable =
+        cluster.getOzoneManager().getMetadataManager().getKeyTable();
+    Table<String, OmDirectoryInfo> dirTable =
+        cluster.getOzoneManager().getMetadataManager().getDirectoryTable();
+
     DirectoryDeletingService dirDeletingService =
         (DirectoryDeletingService) cluster.getOzoneManager().getKeyManager()
             .getDirDeletingService();
 
-    GenericTestUtils.waitFor(
-        () -> dirDeletingService.getDeletedDirsCount() >= 1,
-        1000, 10000);
-    GenericTestUtils.waitFor(
-        () -> dirDeletingService.getMovedFilesCount() >= 0,
-        1000, 10000);
+    // Before delete
+    assertTableRowCount(deletedDirTable, 0);
+    assertTableRowCount(keyTable, 15);
+    assertTableRowCount(dirTable, 20);
+
+    assertSubPathsCount(dirDeletingService.getMovedFilesCount(), 0);
+    assertSubPathsCount(dirDeletingService.getDeletedDirsCount(), 0);
+
+    // Delete the appRoot
+    fs.delete(appRoot, true);
+
+    // After Delete
+    checkPath(appRoot);
+
+    assertTableRowCount(deletedDirTable, 0);
+    assertTableRowCount(keyTable, 0);
+    assertTableRowCount(dirTable, 1);
+
+    assertSubPathsCount(dirDeletingService.getMovedFilesCount(), 15);
+    assertSubPathsCount(dirDeletingService.getDeletedDirsCount(), 19);
 
     Assert.assertTrue(dirDeletingService.getRunCount() > 1);
   }
@@ -202,18 +252,17 @@ public class TestDirectoryDeletingServiceV1 {
     Table<String, OmDirectoryInfo> dirTable =
         cluster.getOzoneManager().getMetadataManager().getDirectoryTable();
 
+    DirectoryDeletingService dirDeletingService =
+        (DirectoryDeletingService) cluster.getOzoneManager().getKeyManager()
+            .getDirDeletingService();
+
     // Before delete
-    GenericTestUtils.waitFor(() ->
-            assertTableRowCount(0, deletedDirTable),
-        1000, 120000); // 2 minutes
+    assertTableRowCount(deletedDirTable, 0);
+    assertTableRowCount(dirTable, 5);
+    assertTableRowCount(keyTable, 3);
 
-    GenericTestUtils.waitFor(() ->
-            assertTableRowCount(3, keyTable),
-        1000, 120000); // 2 minutes
-
-    GenericTestUtils.waitFor(() ->
-            assertTableRowCount(5, dirTable),
-        1000, 120000); // 2 minutes
+    assertSubPathsCount(dirDeletingService.getMovedFilesCount(), 0);
+    assertSubPathsCount(dirDeletingService.getDeletedDirsCount(), 0);
 
     // Delete the rootDir, which should delete all keys.
     fs.delete(root, true);
@@ -221,30 +270,25 @@ public class TestDirectoryDeletingServiceV1 {
     // After Delete
     checkPath(root);
 
-    GenericTestUtils.waitFor(() ->
-            assertTableRowCount(0, deletedDirTable),
-        1000, 120000); // 2 minutes
+    assertTableRowCount(deletedDirTable, 0);
+    assertTableRowCount(keyTable, 0);
+    assertTableRowCount(dirTable, 0);
 
-    GenericTestUtils.waitFor(() ->
-            assertTableRowCount(0, keyTable),
-        1000, 120000); // 2 minutes
-
-    GenericTestUtils.waitFor(() ->
-            assertTableRowCount(0, dirTable),
-        1000, 120000); // 2 minutes
-
-    DirectoryDeletingService dirDeletingService =
-        (DirectoryDeletingService) cluster.getOzoneManager().getKeyManager()
-            .getDirDeletingService();
-
-    GenericTestUtils.waitFor(
-        () -> dirDeletingService.getDeletedDirsCount() >= 5,
-        1000, 10000);
-    GenericTestUtils.waitFor(
-        () -> dirDeletingService.getMovedFilesCount() >= 3,
-        1000, 10000);
+    assertSubPathsCount(dirDeletingService.getMovedFilesCount(), 3);
+    assertSubPathsCount(dirDeletingService.getDeletedDirsCount(), 5);
 
     Assert.assertTrue(dirDeletingService.getRunCount() > 1);
+  }
+
+  private void assertSubPathsCount(long pathCount, long expectedCount)
+      throws TimeoutException, InterruptedException {
+    GenericTestUtils.waitFor(() -> pathCount >= expectedCount, 1000, 120000);
+  }
+
+  private void assertTableRowCount(Table<String, ?> table, int count)
+      throws TimeoutException, InterruptedException {
+    GenericTestUtils.waitFor(() -> assertTableRowCount(count, table), 1000,
+        120000); // 2 minutes
   }
 
   private boolean assertTableRowCount(int expectedCount,
@@ -253,7 +297,8 @@ public class TestDirectoryDeletingServiceV1 {
     try {
       count = cluster.getOzoneManager().getMetadataManager()
           .countRowsInTable(table);
-      LOG.info("{} row count={}", table.getName(), count);
+      LOG.info("{} actual row count={}, expectedCount={}", table.getName(),
+          count, expectedCount);
     } catch (IOException ex) {
       fail("testDoubleBuffer failed with: " + ex);
     }
