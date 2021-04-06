@@ -48,6 +48,7 @@ import org.apache.hadoop.ozone.om.request.key.OMKeyPurgeRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRenameRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRenameRequestV1;
 import org.apache.hadoop.ozone.om.request.key.OMKeysRenameRequest;
+import org.apache.hadoop.ozone.om.request.key.OMPathsPurgeRequestV1;
 import org.apache.hadoop.ozone.om.request.key.OMTrashRecoverRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeyAddAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeyAddAclRequestV1;
@@ -184,6 +185,8 @@ public final class OzoneManagerRatisUtils {
       return new OMFileCreateRequest(omRequest);
     case PurgeKeys:
       return new OMKeyPurgeRequest(omRequest);
+    case PurgePaths:
+      return new OMPathsPurgeRequestV1(omRequest);
     case InitiateMultiPartUpload:
       if (isBucketFSOptimized()) {
         return new S3InitiateMultipartUploadRequestV1(omRequest);

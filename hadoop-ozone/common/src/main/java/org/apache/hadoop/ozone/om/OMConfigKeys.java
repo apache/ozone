@@ -253,4 +253,17 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_LAYOUT_VERSION_DEFAULT = "V0";
 
   public static final String OZONE_OM_LAYOUT_VERSION_V1 = "V1";
+
+  /**
+   * Configuration properties for Directory Deleting Service.
+   */
+  public static final String OZONE_DIR_DELETING_SERVICE_INTERVAL =
+      "ozone.directory.deleting.service.interval";
+  public static final String OZONE_DIR_DELETING_SERVICE_INTERVAL_DEFAULT
+      = "60s";
+
+  public static final String OZONE_PATH_DELETING_LIMIT_PER_TASK =
+      "ozone.path.deleting.limit.per.task";
+  public static final int OZONE_PATH_DELETING_LIMIT_PER_TASK_DEFAULT = 10000;
+
 }
