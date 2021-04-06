@@ -150,14 +150,20 @@ public class ContainerReader implements Runnable {
             File[] containerDirs = containerTopDir.listFiles();
             if (containerDirs != null) {
               for (File containerDir : containerDirs) {
-                File containerFile = ContainerUtils.getContainerFile(
-                    containerDir);
-                long containerID = ContainerUtils.getContainerID(containerDir);
-                if (containerFile.exists()) {
-                  verifyContainerFile(storageLoc, containerID, containerFile);
-                } else {
-                  LOG.error("Missing .container file for ContainerID: {}",
-                      containerDir.getName());
+                try {
+                  File containerFile = ContainerUtils.getContainerFile(
+                      containerDir);
+                  long containerID =
+                      ContainerUtils.getContainerID(containerDir);
+                  if (containerFile.exists()) {
+                    verifyContainerFile(storageLoc, containerID, containerFile);
+                  } else {
+                    LOG.error("Missing .container file for ContainerID: {}",
+                        containerDir.getName());
+                  }
+                } catch (Throwable e) {
+                  LOG.error("Failed to load container from {}",
+                      containerDir.getAbsolutePath(), e);
                 }
               }
             }
