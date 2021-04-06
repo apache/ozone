@@ -32,16 +32,22 @@ import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATI
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.STARTING_FINALIZATION;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 
+import org.apache.hadoop.hdds.client.ReplicationFactor;
+import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -54,6 +60,7 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
@@ -102,6 +109,7 @@ public class TestHDDSUpgrade {
     conf = new OzoneConfiguration();
     conf.setTimeDuration(HDDS_PIPELINE_REPORT_INTERVAL, 1000,
             TimeUnit.MILLISECONDS);
+
     conf.set(OZONE_DATANODE_PIPELINE_LIMIT, "1");
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(NUM_DATA_NODES)
@@ -142,6 +150,18 @@ public class TestHDDSUpgrade {
     Assert.assertEquals(scmVersionManager.getSoftwareLayoutVersion(),
         scmVersionManager.getMetadataLayoutVersion());
     Assert.assertTrue(scmVersionManager.getMetadataLayoutVersion() >= 1);
+
+    // SCM should not return from finalization until there is at least one
+    // pipeline to use.
+    int pipelineCount = scmPipelineManager.getPipelines(RATIS, THREE, OPEN)
+        .size();
+    Assert.assertTrue(pipelineCount >= 1);
+
+    // SCM will not return from finalization until there is at least one
+    // RATIS 3 pipeline. For this to exist, all three of our datanodes must
+    // be in the HEALTHY state.
+    testDataNodesStateOnSCM(HEALTHY);
+
     int countContainers = 0;
     for (ContainerInfo ci : scmContainerManager.getContainers()) {
       HddsProtos.LifeCycleState ciState = ci.getState();
@@ -218,17 +238,6 @@ public class TestHDDSUpgrade {
     Assert.assertTrue(countContainers >= 1);
   }
 
-  private void testPostUpgradePipelineCreation() throws IOException {
-    ratisPipeline1 = scmPipelineManager.createPipeline(RATIS, THREE);
-    scmPipelineManager.openPipeline(ratisPipeline1.getId());
-    Assert.assertEquals(0,
-        scmPipelineManager.getNumberOfContainers(ratisPipeline1.getId()));
-    PipelineID pid = scmContainerManager.allocateContainer(RATIS, THREE,
-        "Owner1").getPipelineID();
-    Assert.assertEquals(1, scmPipelineManager.getNumberOfContainers(pid));
-    Assert.assertEquals(pid, ratisPipeline1.getId());
-  }
-
   private void testDataNodesStateOnSCM(NodeState state) {
     int countNodes = 0;
     for (DatanodeDetails dn : scm.getScmNodeManager().getAllNodes()){
@@ -252,7 +261,6 @@ public class TestHDDSUpgrade {
     });
   }
 
-//  @Ignore("Needs PipelineManager logic refactor after SCM HA merge.")
   @Test
   public void testFinalizationFromInitialVersionToLatestVersion()
       throws Exception {
@@ -275,6 +283,12 @@ public class TestHDDSUpgrade {
     testPreUpgradeConditionsSCM();
     testPreUpgradeConditionsDataNodes();
 
+    Set<PipelineID> preUpgradeOpenPipelines =
+        scmPipelineManager.getPipelines(RATIS, THREE, OPEN)
+            .stream()
+            .map(Pipeline::getId)
+            .collect(Collectors.toSet());
+
     // Trigger Finalization on the SCM
     StatusAndMessages status = scm.finalizeUpgrade("xyz");
     Assert.assertEquals(STARTING_FINALIZATION, status.status());
@@ -284,27 +298,32 @@ public class TestHDDSUpgrade {
       status = scm.queryUpgradeFinalizationProgress("xyz", false);
     }
 
+    Set<PipelineID> postUpgradeOpenPipelines =
+        scmPipelineManager.getPipelines(RATIS, THREE, OPEN)
+            .stream()
+            .map(Pipeline::getId)
+            .collect(Collectors.toSet());
+
+    // No pipelines from before the upgrade should still be open after the
+    // upgrade.
+    long numPreUpgradeOpenPipelines = preUpgradeOpenPipelines
+        .stream()
+        .filter(postUpgradeOpenPipelines::contains)
+        .count();
+    Assert.assertEquals(0, numPreUpgradeOpenPipelines);
+
     // Verify Post-Upgrade conditions on the SCM.
     testPostUpgradeConditionsSCM();
-
-    // All datanodes on the SCM should have moved to HEALTHY-READONLY state.
-    testDataNodesStateOnSCM(HEALTHY_READONLY);
 
     // Verify the SCM has driven all the DataNodes through Layout Upgrade.
     testPostUpgradeConditionsDataNodes();
 
-    // Need to wait for post finalization heartbeat from DNs.
-    LambdaTestUtils.await(30000, 5000, () -> {
-      try {
-        testDataNodesStateOnSCM(HEALTHY);
-      } catch (Throwable ex) {
-        LOG.info(ex.getMessage());
-        return false;
-      }
-      return true;
-    });
-
-    // Verify that new pipeline can be created with upgraded datanodes.
-    testPostUpgradePipelineCreation();
+    // Test that we can use a pipeline after upgrade.
+    // Will fail with exception if there are no pipelines.
+    ObjectStore store = cluster.getClient().getObjectStore();
+    store.createVolume("vol1");
+    store.getVolume("vol1").createBucket("buc1");
+    store.getVolume("vol1").getBucket("buc1").createKey("key1", 100,
+        ReplicationType.RATIS, ReplicationFactor.THREE, new HashMap<>());
   }
 }
