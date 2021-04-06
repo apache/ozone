@@ -233,19 +233,16 @@ public class TestStorageContainerManagerHA {
 
   @Test
   public void testBootStrapSCM() throws Exception {
-    StorageContainerManager scm1 = cluster.getStorageContainerManagers().get(0);
     StorageContainerManager scm2 = cluster.getStorageContainerManagers().get(1);
     OzoneConfiguration conf2 = scm2.getConfiguration();
-    conf2.set(ScmConfigKeys.OZONE_SCM_PRIMORDIAL_NODE_ID_KEY,
-        scm1.getSCMNodeId());
-    conf2.set(ScmConfigKeys.OZONE_SCM_PRIMORDIAL_NODE_ID_KEY,
-        scm1.getSCMNodeId());
     boolean isDeleted = scm2.getScmStorageConfig().getVersionFile().delete();
     Assert.assertTrue(isDeleted);
     final SCMStorageConfig scmStorageConfig = new SCMStorageConfig(conf2);
     scmStorageConfig.setClusterId(UUID.randomUUID().toString());
     scmStorageConfig.getCurrentDir().delete();
     scmStorageConfig.initialize();
+    conf2.setBoolean(ScmConfigKeys.OZONE_SCM_SKIP_BOOTSTRAP_VALIDATION_KEY,
+        false);
     Assert.assertFalse(StorageContainerManager.scmBootstrap(conf2));
     conf2.setBoolean(ScmConfigKeys.OZONE_SCM_SKIP_BOOTSTRAP_VALIDATION_KEY,
         true);
