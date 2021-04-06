@@ -377,7 +377,7 @@ prepare_for_binary_image() {
 ##   (no binaries included)
 ## @param `ozone-runner` image version (optional)
 prepare_for_runner_image() {
-  local default_version=20210226-1 # set at build-time from Maven property
+  local default_version=${docker.ozone-runner.version} # set at build-time from Maven property
   local runner_version=${OZONE_RUNNER_VERSION:-${default_version}} # may be specified by user running the test
   local v=${1:-${runner_version}} # prefer explicit argument
 
