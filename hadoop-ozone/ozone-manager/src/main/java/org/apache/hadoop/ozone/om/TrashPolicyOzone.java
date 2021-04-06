@@ -36,8 +36,10 @@ import org.apache.hadoop.fs.TrashPolicyDefault;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.fs.InvalidPathException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.conf.OMClientConfig;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -118,6 +120,25 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
         emptierInterval);
   }
 
+  @Override
+  public boolean moveToTrash(Path path) throws IOException {
+    this.fs.getFileStatus(path);
+    Path trashRoot = this.fs.getTrashRoot(path);
+    Path trashCurrent = new Path(trashRoot, CURRENT);
+
+    String key = path.toUri().getPath();
+    String trashRootKey = trashRoot.toUri().getPath();
+
+    if (!OzoneFSUtils.isValidName(key)) {
+      throw new InvalidPathException("Invalid path Name " + key);
+    }
+
+    if (trashRootKey.startsWith(key) || key.startsWith(trashRootKey)) {
+      return false;
+    } else {
+      return super.moveToTrash(path);
+    }
+  }
 
   protected class Emptier implements Runnable {
 
