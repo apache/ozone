@@ -79,7 +79,7 @@ public class OMUpgradeFinalizer extends BasicUpgradeFinalizer<OzoneManager,
   }
 
   @Override
-  protected void finalizeVersionManager(Storage storageConfig)
+  protected void finalizeUpgrade(Storage storageConfig)
       throws UpgradeException {
     for (OMLayoutFeature f : versionManager.unfinalizedFeatures()) {
       Optional<? extends UpgradeAction> action = f.action(ON_FINALIZE);
@@ -87,6 +87,7 @@ public class OMUpgradeFinalizer extends BasicUpgradeFinalizer<OzoneManager,
       updateLayoutVersionInVersionFile(f, storageConfig);
       versionManager.finalized(f);
     }
+    versionManager.completeFinalization();
   }
 
   @Override

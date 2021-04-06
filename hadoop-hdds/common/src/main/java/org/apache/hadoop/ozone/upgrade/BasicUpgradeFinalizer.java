@@ -57,7 +57,7 @@ public abstract class BasicUpgradeFinalizer
   protected V versionManager;
   protected String clientID;
   protected T component;
-  protected UpgradeFinalizationExecutor finalizationExecutor;
+  protected DefaultUpgradeFinalizationExecutor finalizationExecutor;
 
   private Queue<String> msgs = new ConcurrentLinkedQueue<>();
   protected boolean isDone = false;
@@ -65,16 +65,16 @@ public abstract class BasicUpgradeFinalizer
   public BasicUpgradeFinalizer(V versionManager) {
     this.versionManager = versionManager;
     this.finalizationExecutor =
-        new UpgradeFinalizationExecutor();
+        new DefaultUpgradeFinalizationExecutor();
   }
 
   @Override
-  public void setFinalizationExecutor(UpgradeFinalizationExecutor executor) {
+  public void setFinalizationExecutor(DefaultUpgradeFinalizationExecutor executor) {
     finalizationExecutor = executor;
   }
 
   @Override
-  public UpgradeFinalizationExecutor getFinalizationExecutor() {
+  public DefaultUpgradeFinalizationExecutor getFinalizationExecutor() {
     return finalizationExecutor;
   }
 
@@ -457,14 +457,10 @@ public abstract class BasicUpgradeFinalizer
     throw new UnsupportedOperationException();
   }
 
-  protected void postFinalizeUpgrade() throws IOException {
-  }
+  protected abstract void postFinalizeUpgrade() throws IOException;
 
-  protected void finalizeVersionManager(Storage storageConfig)
-      throws UpgradeException {
-  }
+  protected abstract void finalizeUpgrade(Storage storageConfig)
+      throws UpgradeException;
 
-  protected boolean preFinalizeUpgrade() throws IOException {
-    return true;
-  }
+  protected abstract boolean preFinalizeUpgrade() throws IOException;
 }

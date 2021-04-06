@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.upgrade;
 import static org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor.UpgradeTestInjectionPoints.AFTER_COMPLETE_FINALIZATION;
 import static org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor.UpgradeTestInjectionPoints.AFTER_POST_FINALIZE_UPGRADE;
 import static org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor.UpgradeTestInjectionPoints.AFTER_PRE_FINALIZE_UPGRADE;
-import static org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor.UpgradeTestInjectionPoints.BEFORE_COMPLETE_FINALIZATION;
 import static org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor.UpgradeTestInjectionPoints.BEFORE_PRE_FINALIZE_UPGRADE;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_IN_PROGRESS;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_REQUIRED;
@@ -33,12 +32,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Failure injected extension of UpgradeFinalizationExecutor that can be used by
+ * Failure injected extension of DefaultUpgradeFinalizationExecutor that can be used by
  * Unit/Integration Tests.
  */
 @SuppressWarnings("checkstyle:VisibilityModifier")
 public class InjectedUpgradeFinalizationExecutor extends
-    UpgradeFinalizationExecutor {
+    DefaultUpgradeFinalizationExecutor {
   static final Logger LOG =
       LoggerFactory.getLogger(InjectedUpgradeFinalizationExecutor.class);
 
@@ -48,7 +47,6 @@ public class InjectedUpgradeFinalizationExecutor extends
   public enum UpgradeTestInjectionPoints {
     BEFORE_PRE_FINALIZE_UPGRADE(1),
     AFTER_PRE_FINALIZE_UPGRADE(2),
-    BEFORE_COMPLETE_FINALIZATION(3),
     AFTER_COMPLETE_FINALIZATION(4),
     AFTER_POST_FINALIZE_UPGRADE(5);
 
@@ -82,10 +80,8 @@ public class InjectedUpgradeFinalizationExecutor extends
       }
       injectTestFunctionAtThisPoint(AFTER_PRE_FINALIZE_UPGRADE);
 
-      basicUpgradeFinalizer.finalizeVersionManager(storageConfig);
+      basicUpgradeFinalizer.finalizeUpgrade(storageConfig);
 
-      injectTestFunctionAtThisPoint(BEFORE_COMPLETE_FINALIZATION);
-      basicUpgradeFinalizer.getVersionManager().completeFinalization();
       injectTestFunctionAtThisPoint(AFTER_COMPLETE_FINALIZATION);
 
       basicUpgradeFinalizer.postFinalizeUpgrade();

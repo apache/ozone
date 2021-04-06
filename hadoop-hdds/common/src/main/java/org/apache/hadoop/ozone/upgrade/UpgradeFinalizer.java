@@ -191,10 +191,10 @@ public interface UpgradeFinalizer<T> {
    * Sets the Finalization Executor driver.
    * @param executor FinalizationExecutor.
    */
-  void setFinalizationExecutor(UpgradeFinalizationExecutor executor);
+  void setFinalizationExecutor(DefaultUpgradeFinalizationExecutor executor);
 
   /**
    * get the Finalization Executor driver.
    */
-  UpgradeFinalizationExecutor getFinalizationExecutor();
+  DefaultUpgradeFinalizationExecutor getFinalizationExecutor();
 }

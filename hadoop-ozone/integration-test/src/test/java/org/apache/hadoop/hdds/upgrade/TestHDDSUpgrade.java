@@ -33,7 +33,6 @@ import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.INITIAL_VERSION;
 import static org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor.UpgradeTestInjectionPoints.AFTER_COMPLETE_FINALIZATION;
 import static org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor.UpgradeTestInjectionPoints.AFTER_POST_FINALIZE_UPGRADE;
 import static org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor.UpgradeTestInjectionPoints.AFTER_PRE_FINALIZE_UPGRADE;
-import static org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor.UpgradeTestInjectionPoints.BEFORE_COMPLETE_FINALIZATION;
 import static org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor.UpgradeTestInjectionPoints.BEFORE_PRE_FINALIZE_UPGRADE;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.ALREADY_FINALIZED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_DONE;
@@ -97,7 +96,6 @@ import org.slf4j.LoggerFactory;
 /**
  * Test SCM and DataNode Upgrade sequence.
  */
-@Ignore
 public class TestHDDSUpgrade {
 
   /**
@@ -661,30 +659,6 @@ public class TestHDDSUpgrade {
    * One node(SCM) failure case:
    * Thread-Context : SCM-Upgrade
    *
-   * Test SCM failure During SCM Upgrade before execution point
-   * "CompleteFinalization". All meaningful Upgrade execution points
-   * are defined in UpgradeFinalizer:UpgradeTestInjectionPoints.
-   */
-  @Test
-  public void testScmFailuresBeforeScmCompleteFinalization()
-      throws Exception {
-    testPassed.set(true);
-    InjectedUpgradeFinalizationExecutor scmFinalizationExecutor =
-        new InjectedUpgradeFinalizationExecutor();
-    scm.getUpgradeFinalizer().setFinalizationExecutor(scmFinalizationExecutor);
-    scmFinalizationExecutor.configureTestInjectionFunction(
-        BEFORE_COMPLETE_FINALIZATION,
-        () -> {
-          return this.injectSCMFailureDuringSCMUpgrade();
-        });
-    testFinalizationWithFailuerInjectionHelper(null);
-    Assert.assertTrue(testPassed.get());
-  }
-
-  /*
-   * One node(SCM) failure case:
-   * Thread-Context : SCM-Upgrade
-   *
    * Test SCM failure During SCM Upgrade after execution point
    * "CompleteFinalization". All meaningful Upgrade execution points
    * are defined in UpgradeFinalizer:UpgradeTestInjectionPoints.
@@ -781,30 +755,6 @@ public class TestHDDSUpgrade {
    * Multi node(all DataNodes) failure case:
    * Thread-Context : SCM-Upgrade
    *
-   * Test all DataNode failures During SCM Upgrade before execution point
-   * "CompleteFinalization". All meaningful Upgrade execution points
-   * are defined in UpgradeFinalizer:UpgradeTestInjectionPoints.
-   */
-  @Test
-  public void testAllDataNodeFailuresBeforeScmCompleteFinalization()
-      throws Exception {
-    testPassed.set(true);
-    InjectedUpgradeFinalizationExecutor scmFinalizationExecutor =
-        new InjectedUpgradeFinalizationExecutor();
-    scm.getUpgradeFinalizer().setFinalizationExecutor(scmFinalizationExecutor);
-    scmFinalizationExecutor.configureTestInjectionFunction(
-        BEFORE_COMPLETE_FINALIZATION,
-        () -> {
-          return injectDataNodeFailureDuringSCMUpgrade();
-        });
-    testFinalizationWithFailuerInjectionHelper(null);
-    Assert.assertTrue(testPassed.get());
-  }
-
-  /*
-   * Multi node(all DataNodes) failure case:
-   * Thread-Context : SCM-Upgrade
-   *
    * Test all DataNode failures During SCM Upgrade after execution point
    * "CompleteFinalization". All meaningful Upgrade execution points
    * are defined in UpgradeFinalizer:UpgradeTestInjectionPoints.
@@ -858,6 +808,7 @@ public class TestHDDSUpgrade {
    * Upgrade execution points as defined in
    * UpgradeFinalizer:UpgradeTestInjectionPoints.
    */
+  @Ignore
   @Test
   public void testDataNodeFailuresDuringDataNodeUpgrade()
       throws Exception {
@@ -901,6 +852,7 @@ public class TestHDDSUpgrade {
    * through upgrade-finalization. This test covers all the combinations of
    * SCM-Upgrade-execution points and DataNode-Upgrade-execution points.
    */
+  @Ignore
   @Test
   public void testAllPossibleDataNodeFailuresAndSCMFailures()
       throws Exception {
@@ -959,6 +911,7 @@ public class TestHDDSUpgrade {
    * through upgrade. This test covers all the combinations of
    * SCM-Upgrade-execution points.
    */
+  @Ignore
   @Test
   public void testDataNodeAndSCMFailuresTogetherDuringSCMUpgrade()
       throws Exception {
@@ -997,6 +950,7 @@ public class TestHDDSUpgrade {
    * through upgrade. This test covers all the combinations of
    * DataNode-Upgrade-execution points.
    */
+  @Ignore
   @Test
   public void testDataNodeAndSCMFailuresTogetherDuringDataNodeUpgrade()
       throws Exception {

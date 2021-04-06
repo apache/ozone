@@ -80,7 +80,7 @@ public class SCMUpgradeFinalizer extends
   }
 
   @Override
-  protected void finalizeVersionManager(Storage storageConfig)
+  protected void finalizeUpgrade(Storage storageConfig)
       throws UpgradeException {
     for (HDDSLayoutFeature f : versionManager.unfinalizedFeatures()) {
       Optional<? extends UpgradeAction> action = f.scmAction(ON_FINALIZE);
@@ -88,6 +88,7 @@ public class SCMUpgradeFinalizer extends
       updateLayoutVersionInVersionFile(f, storageConfig);
       versionManager.finalized(f);
     }
+    versionManager.completeFinalization();
   }
 
   public void postFinalizeUpgrade() throws IOException {

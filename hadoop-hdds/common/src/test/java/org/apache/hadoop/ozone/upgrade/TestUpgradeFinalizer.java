@@ -135,7 +135,7 @@ public class TestUpgradeFinalizer {
     }
 
     @Override
-    protected void finalizeVersionManager(Storage storageConfig)
+    protected void finalizeUpgrade(Storage storageConfig)
         throws UpgradeException {
       return;
     }

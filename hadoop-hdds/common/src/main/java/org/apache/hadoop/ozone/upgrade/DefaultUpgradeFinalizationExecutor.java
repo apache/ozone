@@ -26,17 +26,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * UpgradeFinalizationExecutor for driving the main part of finalization.
+ * DefaultUpgradeFinalizationExecutor for driving the main part of finalization.
  * Unit/Integration tests can override this to provide error injected version
  * of this class.
  */
 
 @SuppressWarnings("checkstyle:VisibilityModifier")
-public class UpgradeFinalizationExecutor {
+public class DefaultUpgradeFinalizationExecutor {
   static final Logger LOG =
-      LoggerFactory.getLogger(UpgradeFinalizationExecutor.class);
+      LoggerFactory.getLogger(DefaultUpgradeFinalizationExecutor.class);
 
-  public UpgradeFinalizationExecutor() {
+  public DefaultUpgradeFinalizationExecutor() {
   }
 
   public Void execute(Storage storageConfig,
@@ -56,9 +56,7 @@ public class UpgradeFinalizationExecutor {
         return null;
       }
 
-      basicUpgradeFinalizer.finalizeVersionManager(storageConfig);
-
-      basicUpgradeFinalizer.getVersionManager().completeFinalization();
+      basicUpgradeFinalizer.finalizeUpgrade(storageConfig);
 
       basicUpgradeFinalizer.postFinalizeUpgrade();
 

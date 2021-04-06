@@ -87,7 +87,7 @@ public class DataNodeUpgradeFinalizer extends
   }
 
   @Override
-  protected void finalizeVersionManager(Storage storageConfig)
+  protected void finalizeUpgrade(Storage storageConfig)
       throws UpgradeException {
     for (HDDSLayoutFeature f : versionManager.unfinalizedFeatures()) {
       Optional<? extends UpgradeAction> action =
@@ -97,6 +97,7 @@ public class DataNodeUpgradeFinalizer extends
           datanodeStateMachine.getLayoutStorage());
       versionManager.finalized(f);
     }
+    versionManager.completeFinalization();
   }
 
   @Override
