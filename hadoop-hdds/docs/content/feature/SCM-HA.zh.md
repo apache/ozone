@@ -1,5 +1,5 @@
 ---
-title: "SCM 高可用"
+title: "高可用SCM"
 weight: 1
 menu:
    main:
@@ -26,7 +26,7 @@ summary: Storage Container Manager 的 HA 设置可以避免任何单点故障�
 Ozone包含两个元数据管理节点(用于键管理的 *Ozone Manager* 和用于块空间管理的 *Storage Container management* )和多个存储节点(数据节点)。通过 RAFT 共识算法实现数据在数据节点之间的复制。
 
 <div class="alert alert-warning" role="alert">
-请注意，SCM-HA 尚未准备好在安全环境中进行生产。 安全工作正在进行中，将很快完成。
+请注意，SCM-HA 尚未准备好在安全环境中部署。 安全工作正在进行中，将很快完成。
 </div>
 
 为了避免任何单点故障，元数据管理器节点还应该具有 HA 设置。
@@ -75,11 +75,11 @@ Storage Container Manager 的 HA 模式可以在 `ozone-site.xml` 中进行以�
    <value>host1</value>
 </property>
 <property>
-   <name>ozone.scm.address.cluster1.scm1</name>
+   <name>ozone.scm.address.cluster1.scm2</name>
    <value>host2</value>
 </property>
 <property>
-   <name>ozone.scm.address.cluster1.scm1</name>
+   <name>ozone.scm.address.cluster1.scm3</name>
    <value>host3</value>
 </property>
 ```
@@ -117,7 +117,7 @@ SCM HA 使用 Apache Ratis 在 SCM HA 仲裁的成员之间复制状态。每个
 
 这个复制过程是 OM HA 复制过程的一个简单版本，因为它不使用任何双缓冲区(SCM 请求的总体 db 吞吐量更低)。
 
-数据节点将所有报告(容器报告、管道报告……)并发发送给 *所有* 数据节点。只有 leader 节点可以分配/创建新的容器，并且只有 leader 节点可以将命令返回给数据节点。
+数据节点将所有报告(容器报告、管道报告……)并发发送给 *所有* SCM 节点。只有 leader 节点可以分配/创建新的容器，并且只有 leader 节点可以将命令返回给数据节点。
 
 ## 验证SCM HA设置
 
@@ -155,7 +155,7 @@ bin/ozone debug ldb --db=/tmp/metadata/scm.db/ scan --with-keys --column_family=
 
 ## 从现有的SCM迁移
 
-可以在任何 Ozone 集群上打开 SCM HA。 首先启用 Ratis（`ozone.scm.ratis.enable`）并为 Ratis ring 配置一个节点（`ozone.scm.nodes.NAME` 应该有一个元素）。
+可以在任何 Ozone 集群上打开 SCM HA。 首先启用 Ratis（`ozone.scm.ratis.enable`）并为 Ratis ring 配置一个节点（`ozone.scm.nodes.serviceId` 应该有一个元素）。
 
 启动集群并测试它是否正常工作。
 
