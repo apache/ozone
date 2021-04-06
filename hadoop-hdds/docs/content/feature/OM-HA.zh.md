@@ -28,7 +28,7 @@ Ozone 有两个元数据管理节点（用于键管理的 *Ozone Manager* 和用
 
 为了避免任何单点故障，元数据管理节点也应该具备高可用的设置。
 
-Ozone 管理器和 Storage Container Manager 都支持 HA。在这种模式下，内部状态通过 RAFT (使用 Apache Ratis )复制。
+Ozone Manager 和 Storage Container Manager 都支持 HA。在这种模式下，内部状态通过 RAFT (使用 Apache Ratis )复制。
 
 本文档解释了 Ozone Manager (OM) HA的高可用设置，请查看[本页]({{< ref "SCM-HA" >}})的 SCM HA。虽然它们可以独立地为 HA 进行设置，但可靠的、完全的 HA 设置需要为两个服务启用 HA。
 
