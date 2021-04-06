@@ -59,6 +59,8 @@ import org.bouncycastle.pkcs.jcajce.JcaPKCS10CertificationRequestBuilder;
 import org.bouncycastle.util.io.pem.PemObject;
 import org.bouncycastle.util.io.pem.PemReader;
 
+import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.INVALID_CSR;
+
 /**
  * A certificate sign request object that wraps operations to build a
  * PKCS10CertificationRequest to CertificateServer.
@@ -134,7 +136,8 @@ public final class CertificateSignRequest {
     try (PemReader reader = new PemReader(new StringReader(csr))) {
       PemObject pemObject = reader.readPemObject();
       if(pemObject.getContent() == null) {
-        throw new SCMSecurityException("Invalid Certificate signing request");
+        throw new SCMSecurityException("Invalid Certificate signing request",
+            INVALID_CSR);
       }
       return new PKCS10CertificationRequest(pemObject.getContent());
     }

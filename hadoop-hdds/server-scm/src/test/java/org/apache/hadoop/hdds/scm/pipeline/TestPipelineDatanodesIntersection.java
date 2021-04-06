@@ -81,7 +81,7 @@ public class TestPipelineDatanodesIntersection {
     NodeManager nodeManager= new MockNodeManager(true, nodeCount);
     conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, nodeHeaviness);
     conf.setBoolean(OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE, false);
-    PipelineStateManager stateManager = new PipelineStateManager();
+    StateManager stateManager = new PipelineStateManager();
     PipelineProvider provider = new MockRatisPipelineProvider(nodeManager,
         stateManager, conf);
 

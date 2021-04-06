@@ -24,9 +24,11 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.utils.TransactionInfoCodec;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
@@ -50,6 +52,15 @@ public class SCMDBDefinition implements DBDefinition {
       VALID_CERTS =
       new DBColumnFamilyDefinition<>(
           "validCerts",
+          BigInteger.class,
+          new BigIntegerCodec(),
+          X509Certificate.class,
+          new X509CertificateCodec());
+
+  public static final DBColumnFamilyDefinition<BigInteger, X509Certificate>
+      VALID_SCM_CERTS =
+      new DBColumnFamilyDefinition<>(
+          "validSCMCerts",
           BigInteger.class,
           new BigIntegerCodec(),
           X509Certificate.class,
@@ -82,6 +93,15 @@ public class SCMDBDefinition implements DBDefinition {
           ContainerInfo.class,
           new ContainerInfoCodec());
 
+  public static final DBColumnFamilyDefinition<String, TransactionInfo>
+      TRANSACTIONINFO =
+      new DBColumnFamilyDefinition<>(
+          "scmTransactionInfos",
+          String.class,
+          new StringCodec(),
+          TransactionInfo.class,
+          new TransactionInfoCodec());
+
   public static final DBColumnFamilyDefinition<Long, CRLInfo> CRLS =
       new DBColumnFamilyDefinition<>(
           "crls",
@@ -94,6 +114,15 @@ public class SCMDBDefinition implements DBDefinition {
       CRL_SEQUENCE_ID =
       new DBColumnFamilyDefinition<>(
           "crlSequenceId",
+          String.class,
+          new StringCodec(),
+          Long.class,
+          new LongCodec());
+
+  public static final DBColumnFamilyDefinition<String, Long>
+      SEQUENCE_ID =
+      new DBColumnFamilyDefinition<>(
+          "sequenceId",
           String.class,
           new StringCodec(),
           Long.class,
@@ -112,6 +141,7 @@ public class SCMDBDefinition implements DBDefinition {
   @Override
   public DBColumnFamilyDefinition[] getColumnFamilies() {
     return new DBColumnFamilyDefinition[] {DELETED_BLOCKS, VALID_CERTS,
-        REVOKED_CERTS, PIPELINES, CONTAINERS, CRLS, CRL_SEQUENCE_ID};
+        VALID_SCM_CERTS, REVOKED_CERTS, PIPELINES, CONTAINERS, TRANSACTIONINFO,
+        CRLS, CRL_SEQUENCE_ID, SEQUENCE_ID};
   }
 }

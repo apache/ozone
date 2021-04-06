@@ -42,7 +42,7 @@ devDependencies:
   json-server: 0.15.1
   npm-run-all: 4.1.5
   xo: 0.30.0
-lockfileVersion: 5.1
+lockfileVersion: 5.2
 packages:
   /3d-view/2.0.0:
     dependencies:
@@ -2033,7 +2033,7 @@ packages:
       jest-haste-map: 24.9.0
       jest-message-util: 24.9.0
       jest-regex-util: 24.9.0
-      jest-resolve: 24.9.0_jest-resolve@24.9.0
+      jest-resolve: 24.9.0
       jest-resolve-dependencies: 24.9.0
       jest-runner: 24.9.0
       jest-runtime: 24.9.0
@@ -2088,7 +2088,7 @@ packages:
       istanbul-lib-source-maps: 3.0.6
       istanbul-reports: 2.2.7
       jest-haste-map: 24.9.0
-      jest-resolve: 24.9.0_jest-resolve@24.9.0
+      jest-resolve: 24.9.0
       jest-runtime: 24.9.0
       jest-util: 24.9.0
       jest-worker: 24.9.0
@@ -2196,7 +2196,7 @@ packages:
       integrity: sha1-zlblOfg1UrWNENZy6k1vya3HsjQ=
   /@mapbox/mapbox-gl-supported/1.5.0_mapbox-gl@1.10.1:
     dependencies:
-      mapbox-gl: 1.10.1_mapbox-gl@1.10.1
+      mapbox-gl: 1.10.1
     dev: false
     peerDependencies:
       mapbox-gl: '>=0.32.1 <2.0.0'
@@ -3470,7 +3470,7 @@ packages:
       mkdirp: 0.5.5
       pify: 4.0.1
       schema-utils: 2.7.0
-      webpack: 4.42.0_webpack@4.42.0
+      webpack: 4.42.0
     dev: false
     engines:
       node: '>= 6.9'
@@ -5016,7 +5016,7 @@ packages:
       postcss-modules-values: 3.0.0
       postcss-value-parser: 4.1.0
       schema-utils: 2.7.0
-      webpack: 4.42.0_webpack@4.42.0
+      webpack: 4.42.0
     dev: false
     engines:
       node: '>= 8.9.0'
@@ -6176,7 +6176,7 @@ packages:
       loader-utils: 1.4.0
       object-hash: 2.0.3
       schema-utils: 2.7.0
-      webpack: 4.42.0_webpack@4.42.0
+      webpack: 4.42.0
     dev: false
     engines:
       node: '>= 8.9.0'
@@ -6912,7 +6912,7 @@ packages:
     dependencies:
       loader-utils: 1.4.0
       schema-utils: 2.7.0
-      webpack: 4.42.0_webpack@4.42.0
+      webpack: 4.42.0
     dev: false
     engines:
       node: '>= 8.9.0'
@@ -8216,7 +8216,7 @@ packages:
       pretty-error: 2.1.1
       tapable: 1.1.3
       util.promisify: 1.0.0
-      webpack: 4.42.0_webpack@4.42.0
+      webpack: 4.42.0
     dev: false
     engines:
       node: '>=6.9'
@@ -9214,7 +9214,7 @@ packages:
       jest-get-type: 24.9.0
       jest-jasmine2: 24.9.0
       jest-regex-util: 24.9.0
-      jest-resolve: 24.9.0_jest-resolve@24.9.0
+      jest-resolve: 24.9.0
       jest-util: 24.9.0
       jest-validate: 24.9.0
       micromatch: 3.1.10
@@ -9403,7 +9403,7 @@ packages:
       integrity: sha512-3BEYN5WbSq9wd+SyLDES7AHnjH9A/ROBwmz7l2y+ol+NtSFO8DYiEBzoO1CeFc9a8DYy10EO4dDFVv/wN3zl1w==
   /jest-pnp-resolver/1.2.1_jest-resolve@24.9.0:
     dependencies:
-      jest-resolve: 24.9.0_jest-resolve@24.9.0
+      jest-resolve: 24.9.0
     dev: false
     engines:
       node: '>=6'
@@ -9430,7 +9430,7 @@ packages:
       node: '>= 6'
     resolution:
       integrity: sha512-Fm7b6AlWnYhT0BXy4hXpactHIqER7erNgIsIozDXWl5dVm+k8XdGVe1oTg1JyaFnOxarMEbax3wyRJqGP2Pq+g==
-  /jest-resolve/24.9.0_jest-resolve@24.9.0:
+  /jest-resolve/24.9.0:
     dependencies:
       '@jest/types': 24.9.0
       browser-resolve: 1.11.3
@@ -9440,8 +9440,6 @@ packages:
     dev: false
     engines:
       node: '>= 6'
-    peerDependencies:
-      jest-resolve: '*'
     resolution:
       integrity: sha512-TaLeLVL1l08YFZAt3zaPtjiVvyy4oSA6CRe+0AFPPVX3Q/VI0giIWWoAvoS5L96vj9Dqxj4fB5p2qrHCmTU/MQ==
   /jest-runner/24.9.0:
@@ -9459,7 +9457,7 @@ packages:
       jest-jasmine2: 24.9.0
       jest-leak-detector: 24.9.0
       jest-message-util: 24.9.0
-      jest-resolve: 24.9.0_jest-resolve@24.9.0
+      jest-resolve: 24.9.0
       jest-runtime: 24.9.0
       jest-util: 24.9.0
       jest-worker: 24.9.0
@@ -9487,7 +9485,7 @@ packages:
       jest-message-util: 24.9.0
       jest-mock: 24.9.0
       jest-regex-util: 24.9.0
-      jest-resolve: 24.9.0_jest-resolve@24.9.0
+      jest-resolve: 24.9.0
       jest-snapshot: 24.9.0
       jest-util: 24.9.0
       jest-validate: 24.9.0
@@ -9517,7 +9515,7 @@ packages:
       jest-get-type: 24.9.0
       jest-matcher-utils: 24.9.0
       jest-message-util: 24.9.0
-      jest-resolve: 24.9.0_jest-resolve@24.9.0
+      jest-resolve: 24.9.0
       mkdirp: 0.5.5
       natural-compare: 1.4.0
       pretty-format: 24.9.0
@@ -10289,7 +10287,7 @@ packages:
       node: '>=0.10.0'
     resolution:
       integrity: sha1-7Nyo8TFE5mDxtb1B8S80edmN+48=
-  /mapbox-gl/1.10.1_mapbox-gl@1.10.1:
+  /mapbox-gl/1.10.1:
     dependencies:
       '@mapbox/geojson-rewind': 0.5.0
       '@mapbox/geojson-types': 1.0.2
@@ -10317,8 +10315,6 @@ packages:
     dev: false
     engines:
       node: '>=6.4.0'
-    peerDependencies:
-      mapbox-gl: '*'
     resolution:
       integrity: sha512-0aHt+lFUpYfvh0kMIqXqNXqoYMuhuAsMlw87TbhWrw78Tx2zfuPI0Lx31/YPUgJ+Ire0tzQ4JnuBL7acDNXmMg==
   /marching-simplex-table/1.0.0:
@@ -10575,7 +10571,7 @@ packages:
       loader-utils: 1.4.0
       normalize-url: 1.9.1
       schema-utils: 1.0.0
-      webpack: 4.42.0_webpack@4.42.0
+      webpack: 4.42.0
       webpack-sources: 1.4.3
     dev: false
     engines:
@@ -11304,7 +11300,7 @@ packages:
     dependencies:
       cssnano: 4.1.10
       last-call-webpack-plugin: 3.0.0
-      webpack: 4.42.0_webpack@4.42.0
+      webpack: 4.42.0
     dev: false
     peerDependencies:
       webpack: ^4.0.0
@@ -11870,7 +11866,7 @@ packages:
       has-hover: 1.0.1
       has-passive-events: 1.0.0
       is-mobile: 2.2.1
-      mapbox-gl: 1.10.1_mapbox-gl@1.10.1
+      mapbox-gl: 1.10.1
       matrix-camera-controller: 2.1.3
       mouse-change: 1.4.0
       mouse-event-offset: 3.0.2
@@ -13658,7 +13654,7 @@ packages:
       identity-obj-proxy: 3.0.0
       jest: 24.9.0
       jest-environment-jsdom-fourteen: 1.0.1
-      jest-resolve: 24.9.0_jest-resolve@24.9.0
+      jest-resolve: 24.9.0
       jest-watch-typeahead: 0.4.2
       mini-css-extract-plugin: 0.9.0_webpack@4.42.0
       optimize-css-assets-webpack-plugin: 5.0.3_webpack@4.42.0
@@ -13679,7 +13675,7 @@ packages:
       ts-pnp: 1.1.6_typescript@3.4.5
       typescript: 3.4.5
       url-loader: 2.3.0_file-loader@4.3.0+webpack@4.42.0
-      webpack: 4.42.0_webpack@4.42.0
+      webpack: 4.42.0
       webpack-dev-server: 3.10.3_webpack@4.42.0
       webpack-manifest-plugin: 2.2.0_webpack@4.42.0
       workbox-webpack-plugin: 4.3.1_webpack@4.42.0
@@ -14512,7 +14508,7 @@ packages:
       neo-async: 2.6.1
       schema-utils: 2.7.0
       semver: 6.3.0
-      webpack: 4.42.0_webpack@4.42.0
+      webpack: 4.42.0
     dev: false
     engines:
       node: '>= 8.9.0'
@@ -15583,7 +15579,7 @@ packages:
       serialize-javascript: 3.1.0
       source-map: 0.6.1
       terser: 4.7.0
-      webpack: 4.42.0_webpack@4.42.0
+      webpack: 4.42.0
       webpack-sources: 1.4.3
       worker-farm: 1.7.0
     dev: false
@@ -15603,7 +15599,7 @@ packages:
       serialize-javascript: 2.1.2
       source-map: 0.6.1
       terser: 4.7.0
-      webpack: 4.42.0_webpack@4.42.0
+      webpack: 4.42.0
       webpack-sources: 1.4.3
     dev: false
     engines:
@@ -16188,7 +16184,7 @@ packages:
       loader-utils: 1.4.0
       mime: 2.4.6
       schema-utils: 2.7.0
-      webpack: 4.42.0_webpack@4.42.0
+      webpack: 4.42.0
     dev: false
     engines:
       node: '>= 8.9.0'
@@ -16491,7 +16487,7 @@ packages:
       mime: 2.4.6
       mkdirp: 0.5.5
       range-parser: 1.2.1
-      webpack: 4.42.0_webpack@4.42.0
+      webpack: 4.42.0
       webpack-log: 2.0.0
     dev: false
     engines:
@@ -16531,7 +16527,7 @@ packages:
       strip-ansi: 3.0.1
       supports-color: 6.1.0
       url: 0.11.0
-      webpack: 4.42.0_webpack@4.42.0
+      webpack: 4.42.0
       webpack-dev-middleware: 3.7.2_webpack@4.42.0
       webpack-log: 2.0.0
       ws: 6.2.1
@@ -16563,7 +16559,7 @@ packages:
       lodash: 4.17.15
       object.entries: 1.1.2
       tapable: 1.1.3
-      webpack: 4.42.0_webpack@4.42.0
+      webpack: 4.42.0
     dev: false
     engines:
       node: '>=6.11.5'
@@ -16578,7 +16574,7 @@ packages:
     dev: false
     resolution:
       integrity: sha512-lgTS3Xhv1lCOKo7SA5TjKXMjpSM4sBjNV5+q2bqesbSPs5FjGmU6jjtBSkX9b4qW87vDIsCIlUPOEhbZrMdjeQ==
-  /webpack/4.42.0_webpack@4.42.0:
+  /webpack/4.42.0:
     dependencies:
       '@webassemblyjs/ast': 1.8.5
       '@webassemblyjs/helper-module-context': 1.8.5
@@ -16607,8 +16603,6 @@ packages:
     engines:
       node: '>=6.11.5'
     hasBin: true
-    peerDependencies:
-      webpack: '*'
     resolution:
       integrity: sha512-EzJRHvwQyBiYrYqhyjW9AqM90dE4+s1/XtCfn7uWg6cS72zH+2VPFAlsnW0+W0cDi0XRjNKUMoJtpSi50+Ph6w==
   /websocket-driver/0.7.4:
@@ -16819,7 +16813,7 @@ packages:
     dependencies:
       '@babel/runtime': 7.10.2
       json-stable-stringify: 1.0.1
-      webpack: 4.42.0_webpack@4.42.0
+      webpack: 4.42.0
       workbox-build: 4.3.1
     dev: false
     engines:

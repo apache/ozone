@@ -17,10 +17,12 @@
  */
 package org.apache.hadoop.hdds.server.http;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
-
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.MetricsSystem;
@@ -29,9 +31,9 @@ import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
-
-import static java.nio.charset.StandardCharsets.UTF_8;
+import org.junit.After;
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Test;
 
 /**
@@ -39,67 +41,85 @@ import org.junit.Test;
  */
 public class TestPrometheusMetricsSink {
 
-  @Test
-  public void testPublish() throws IOException {
-    //GIVEN
-    MetricsSystem metrics = DefaultMetricsSystem.instance();
+  private MetricsSystem metrics;
+  private PrometheusMetricsSink sink;
+
+  private static final MetricsInfo PORT_INFO = new MetricsInfo() {
+    @Override
+    public String name() {
+      return "PORT";
+    }
+
+    @Override
+    public String description() {
+      return "port";
+    }
+  };
+
+  private static final MetricsInfo COUNTER_INFO = new MetricsInfo() {
+    @Override
+    public String name() {
+      return "COUNTER";
+    }
+
+    @Override
+    public String description() {
+      return "counter";
+    }
+  };
+
+  private static final int COUNTER_1 = 123;
+  private static final int COUNTER_2 = 234;
+
+  @Before
+  public void init() {
+    metrics = DefaultMetricsSystem.instance();
 
     metrics.init("test");
-    PrometheusMetricsSink sink = new PrometheusMetricsSink();
+    sink = new PrometheusMetricsSink();
     metrics.register("Prometheus", "Prometheus", sink);
-    TestMetrics testMetrics = metrics
-        .register("TestMetrics", "Testing metrics", new TestMetrics());
+  }
 
-    metrics.start();
-    testMetrics.numBucketCreateFails.incr();
-    metrics.publishMetricsNow();
-    ByteArrayOutputStream stream = new ByteArrayOutputStream();
-    OutputStreamWriter writer = new OutputStreamWriter(stream, UTF_8);
-
-    //WHEN
-    sink.writeMetrics(writer);
-    writer.flush();
-
-    //THEN
-    String writtenMetrics = stream.toString(UTF_8.name());
-    Assert.assertTrue(
-        "The expected metric line is missing from prometheus metrics output",
-        writtenMetrics.contains(
-            "test_metrics_num_bucket_create_fails{context=\"dfs\"")
-    );
-
+  @After
+  public void tearDown() {
     metrics.stop();
     metrics.shutdown();
   }
 
   @Test
-  public void testPublishWithSameName() throws IOException {
+  public void testPublish() throws IOException {
     //GIVEN
-    MetricsSystem metrics = DefaultMetricsSystem.instance();
+    TestMetrics testMetrics = metrics
+        .register("TestMetrics", "Testing metrics", new TestMetrics());
 
-    metrics.init("test");
-    PrometheusMetricsSink sink = new PrometheusMetricsSink();
-    metrics.register("Prometheus", "Prometheus", sink);
-    metrics.register("FooBar", "fooBar", (MetricsSource) (collector, all) -> {
-      collector.addRecord("RpcMetrics").add(new MetricsTag(PORT_INFO, "1234"))
-          .addGauge(COUNTER_INFO, 123).endRecord();
-
-      collector.addRecord("RpcMetrics").add(new MetricsTag(
-          PORT_INFO, "2345")).addGauge(COUNTER_INFO, 234).endRecord();
-    });
-
-    metrics.start();
-    metrics.publishMetricsNow();
-
-    ByteArrayOutputStream stream = new ByteArrayOutputStream();
-    OutputStreamWriter writer = new OutputStreamWriter(stream, UTF_8);
+    testMetrics.numBucketCreateFails.incr();
 
     //WHEN
-    sink.writeMetrics(writer);
-    writer.flush();
+    String writtenMetrics = publishMetricsAndGetOutput();
 
     //THEN
-    String writtenMetrics = stream.toString(UTF_8.name());
+    Assert.assertTrue(
+        "The expected metric line is missing from prometheus metrics output",
+        writtenMetrics.contains(
+            "test_metrics_num_bucket_create_fails{context=\"dfs\"")
+    );
+  }
+
+  @Test
+  public void testPublishWithSameName() throws IOException {
+    //GIVEN
+    metrics.register("FooBar", "fooBar", (MetricsSource) (collector, all) -> {
+      collector.addRecord("RpcMetrics").add(new MetricsTag(PORT_INFO, "1234"))
+          .addGauge(COUNTER_INFO, COUNTER_1).endRecord();
+
+      collector.addRecord("RpcMetrics").add(new MetricsTag(
+          PORT_INFO, "2345")).addGauge(COUNTER_INFO, COUNTER_2).endRecord();
+    });
+
+    // WHEN
+    String writtenMetrics = publishMetricsAndGetOutput();
+
+    // THEN
     Assert.assertTrue(
         "The expected metric line is missing from prometheus metrics output",
         writtenMetrics.contains(
@@ -110,15 +130,30 @@ public class TestPrometheusMetricsSink {
             + "output",
         writtenMetrics.contains(
             "rpc_metrics_counter{port=\"1234\""));
+  }
 
-    metrics.stop();
-    metrics.shutdown();
+  @Test
+  public void testTypeWithSameNameButDifferentLabels() throws IOException {
+    //GIVEN
+    metrics.register("SameName", "sameName",
+        (MetricsSource) (collector, all) -> {
+          collector.addRecord("SameName").add(new MetricsTag(PORT_INFO, "1234"))
+              .addGauge(COUNTER_INFO, COUNTER_1).endRecord();
+          collector.addRecord("SameName").add(new MetricsTag(PORT_INFO, "2345"))
+              .addGauge(COUNTER_INFO, COUNTER_2).endRecord();
+        });
+
+    // WHEN
+    String writtenMetrics = publishMetricsAndGetOutput();
+
+    // THEN
+    Assert.assertEquals(1, StringUtils.countMatches(writtenMetrics,
+        "# TYPE same_name_counter"));
   }
 
   @Test
   public void testNamingCamelCase() {
-    PrometheusMetricsSink sink = new PrometheusMetricsSink();
-
+    //THEN
     Assert.assertEquals("rpc_time_some_metrics",
         sink.prometheusName("RpcTime", "SomeMetrics"));
 
@@ -132,18 +167,19 @@ public class TestPrometheusMetricsSink {
   @Test
   public void testNamingRocksDB() {
     //RocksDB metrics are handled differently.
-    PrometheusMetricsSink sink = new PrometheusMetricsSink();
+    // THEN
     Assert.assertEquals("rocksdb_om_db_num_open_connections",
         sink.prometheusName("Rocksdb_om.db", "num_open_connections"));
   }
 
   @Test
   public void testNamingPipeline() {
-    PrometheusMetricsSink sink = new PrometheusMetricsSink();
-
+    // GIVEN
     String recordName = "SCMPipelineMetrics";
     String metricName = "NumBlocksAllocated-"
         + "RATIS-THREE-47659e3d-40c9-43b3-9792-4982fc279aba";
+
+    // THEN
     Assert.assertEquals(
         "scm_pipeline_metrics_"
             + "num_blocks_allocated_"
@@ -153,13 +189,26 @@ public class TestPrometheusMetricsSink {
 
   @Test
   public void testNamingSpaces() {
-    PrometheusMetricsSink sink = new PrometheusMetricsSink();
-
+    //GIVEN
     String recordName = "JvmMetrics";
     String metricName = "GcTimeMillisG1 Young Generation";
+
+    // THEN
     Assert.assertEquals(
         "jvm_metrics_gc_time_millis_g1_young_generation",
         sink.prometheusName(recordName, metricName));
+  }
+
+  private String publishMetricsAndGetOutput() throws IOException {
+    metrics.publishMetricsNow();
+
+    ByteArrayOutputStream stream = new ByteArrayOutputStream();
+    OutputStreamWriter writer = new OutputStreamWriter(stream, UTF_8);
+
+    sink.writeMetrics(writer);
+    writer.flush();
+
+    return stream.toString(UTF_8.name());
   }
 
   /**
@@ -171,29 +220,5 @@ public class TestPrometheusMetricsSink {
     @Metric
     private MutableCounterLong numBucketCreateFails;
   }
-
-  public static final MetricsInfo PORT_INFO = new MetricsInfo() {
-    @Override
-    public String name() {
-      return "PORT";
-    }
-
-    @Override
-    public String description() {
-      return "port";
-    }
-  };
-
-  public static final MetricsInfo COUNTER_INFO = new MetricsInfo() {
-    @Override
-    public String name() {
-      return "COUNTER";
-    }
-
-    @Override
-    public String description() {
-      return "counter";
-    }
-  };
 
 }

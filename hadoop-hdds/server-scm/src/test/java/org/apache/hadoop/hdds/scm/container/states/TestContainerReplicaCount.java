@@ -404,7 +404,7 @@ public class TestContainerReplicaCount {
       DatanodeDetails dn = r.getDatanodeDetails();
 
       ContainerReplica replace = new ContainerReplica.ContainerReplicaBuilder()
-          .setContainerID(new ContainerID(1))
+          .setContainerID(ContainerID.valueOf(1))
           .setContainerState(OPEN)
           .setDatanodeDetails(dn)
           .setOriginNodeId(dn.getUuid())
@@ -446,7 +446,7 @@ public class TestContainerReplicaCount {
       DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
       dn.setPersistedOpState(s);
       replica.add(new ContainerReplica.ContainerReplicaBuilder()
-          .setContainerID(new ContainerID(1))
+          .setContainerID(ContainerID.valueOf(1))
           .setContainerState(CLOSED)
           .setDatanodeDetails(dn)
           .setOriginNodeId(dn.getUuid())
@@ -458,7 +458,7 @@ public class TestContainerReplicaCount {
 
   private ContainerInfo createContainer(HddsProtos.LifeCycleState state) {
     return new ContainerInfo.Builder()
-        .setContainerID(new ContainerID(1).getId())
+        .setContainerID(ContainerID.valueOf(1).getId())
         .setState(state)
         .build();
   }
