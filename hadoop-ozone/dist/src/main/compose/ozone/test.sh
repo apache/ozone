@@ -35,12 +35,6 @@ execute_robot_test scm basic
 
 execute_robot_test scm gdpr
 
-for scheme in ofs o3fs; do
-  for bucket in link bucket; do
-    execute_robot_test scm -v SCHEME:${scheme} -v BUCKET_TYPE:${bucket} -N ozonefs-${scheme}-${bucket} ozonefs/ozonefs.robot
-  done
-done
-
 execute_robot_test scm security/ozone-secure-token.robot
 
 for bucket in link generated; do
@@ -56,5 +50,24 @@ execute_robot_test scm freon
 execute_robot_test scm cli
 
 stop_docker_env
+
+# running FS tests with different config requires restart of the cluster
+export OZONE_KEEP_RESULTS=true
+export OZONE_OM_LAYOUT_VERSION OZONE_OM_ENABLE_FILESYSTEM_PATHS
+for OZONE_OM_LAYOUT_VERSION in V0 V1; do
+  if [[ $OZONE_OM_LAYOUT_VERSION == "V1" ]]; then
+    OZONE_OM_ENABLE_FILESYSTEM_PATHS=true
+  else
+    OZONE_OM_ENABLE_FILESYSTEM_PATHS=false
+  fi
+
+  start_docker_env
+  for scheme in ofs o3fs; do
+    for bucket in link bucket; do
+      execute_robot_test scm -v SCHEME:${scheme} -v BUCKET_TYPE:${bucket} -N ozonefs-${OZONE_OM_LAYOUT_VERSION}-${scheme}-${bucket} ozonefs/ozonefs.robot
+    done
+  done
+  stop_docker_env
+done
 
 generate_report
