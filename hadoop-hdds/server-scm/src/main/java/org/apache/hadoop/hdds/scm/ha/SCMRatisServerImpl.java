@@ -44,6 +44,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.conf.Parameters;
 import org.apache.ratis.conf.RaftProperties;
+import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.RaftClientReply;
@@ -71,6 +72,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   private final ClientId clientId = ClientId.randomId();
   private final AtomicLong callId = new AtomicLong();
   private final RaftServer.Division division;
+  private final GrpcTlsConfig grpcTlsConfig;
 
   // TODO: Refactor and remove ConfigurationSource and use only
   //  SCMHAConfiguration.
@@ -91,9 +93,11 @@ public class SCMRatisServerImpl implements SCMRatisServer {
     // scm boots up, it has peer info embedded in the raft log and will
     // trigger leader election.
 
+    grpcTlsConfig = HASecurityUtils.createSCMRatisTLSConfig(new SecurityConfig(conf),
+            scm.getScmCertificateClient());
     Parameters parameters =
-        HASecurityUtils.createSCMServerTlsParameters(new SecurityConfig(conf),
-           scm.getScmCertificateClient());
+        HASecurityUtils.createSCMServerTlsParameters(grpcTlsConfig);
+
     this.server = newRaftServer(scm.getScmId(), conf)
         .setStateMachine(stateMachine)
         .setGroup(RaftGroup.valueOf(groupId))
@@ -114,6 +118,11 @@ public class SCMRatisServerImpl implements SCMRatisServer {
         server.close();
       }
     }
+  }
+
+  @Override
+  public GrpcTlsConfig getGrpcTlsConfig() {
+    return grpcTlsConfig;
   }
 
   public static void reinitialize(String clusterId, String scmId,

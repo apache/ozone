@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.ha;
 
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
+import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.apache.ratis.server.RaftServer;
 
@@ -57,4 +58,7 @@ public interface SCMRatisServer {
   boolean addSCM(AddSCMRequest request) throws IOException;
 
   SCMStateMachine getSCMStateMachine();
+
+  GrpcTlsConfig getGrpcTlsConfig();
+
 }
