@@ -25,6 +25,11 @@ x-common-config:
   env_file:
     - docker-config
 
+x-layout_version:
+  &layout_version
+  OZONE-SITE.XML_ozone.om.layout.version: ${OZONE_OM_LAYOUT_VERSION:-V0}
+  OZONE-SITE.XML_ozone.om.enable.filesystem.paths: ${OZONE_OM_ENABLE_FILESYSTEM_PATHS:-false}
+
 x-replication:
   &replication
   OZONE-SITE.XML_ozone.replication: ${OZONE_REPLICATION_FACTOR:-1}
@@ -37,6 +42,7 @@ services:
       - 9882
     environment:
       <<: *replication
+      <<: *layout_version
       OZONE_OPTS:
     command: ["ozone","datanode"]
   om:
@@ -45,6 +51,7 @@ services:
       ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
       OZONE_OPTS:
       <<: *replication
+      <<: *layout_version
     ports:
       - 9874:9874
       - 9862:9862
@@ -59,12 +66,14 @@ services:
       OZONE-SITE.XML_hdds.scm.safemode.min.datanode: ${OZONE_SAFEMODE_MIN_DATANODES:-1}
       OZONE_OPTS:
       <<: *replication
+      <<: *layout_version
     command: ["ozone","scm"]
   s3g:
     <<: *common-config
     environment:
       OZONE_OPTS:
       <<: *replication
+      <<: *layout_version
     ports:
       - 9878:9878
     command: ["ozone","s3g"]
@@ -75,4 +84,5 @@ services:
     environment:
       OZONE_OPTS:
       <<: *replication
+      <<: *layout_version
     command: ["ozone","recon"]
