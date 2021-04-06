@@ -334,7 +334,7 @@
                   <archiveBaseDirectory>../..</archiveBaseDirectory>
                   <appendAssemblyId>false</appendAssemblyId>
                   <attach>false</attach>
-                  <finalName>hadoop-ozone-${project.version}-src</finalName>
+                  <finalName>ozone-${project.version}-src</finalName>
                   <outputDirectory>target</outputDirectory>
                   <basedir>${project.basedir}/../..</basedir>
                   <!-- Not using descriptorRef and hadoop-assembly dependency -->
