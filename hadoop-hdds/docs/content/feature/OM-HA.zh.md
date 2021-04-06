@@ -4,7 +4,7 @@ weight: 1
 menu:
    main:
       parent: 特点
-summary: Ozone 管理器用于避免单点故障的高可用设置
+summary: Ozone Manager 用于避免单点故障的高可用设置
 ---
 
 <!---
