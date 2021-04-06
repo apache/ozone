@@ -436,4 +436,12 @@ public interface OMMetadataManager extends DBStoreHAManager {
    * @return bytes of DB key.
    */
   String getMultipartKey(long parentObjectId, String fileName, String uploadId);
+
+  /**
+   * Get Deleted Directory Table.
+   *
+   * @return Deleted Directory Table.
+   */
+  Table<String, OmKeyInfo> getDeletedDirTable();
+
 }

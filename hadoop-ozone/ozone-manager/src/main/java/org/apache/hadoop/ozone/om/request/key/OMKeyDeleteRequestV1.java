@@ -160,9 +160,9 @@ public class OMKeyDeleteRequestV1 extends OMKeyDeleteRequest {
       // TODO: Revisit if we need it later.
 
       omClientResponse = new OMKeyDeleteResponseV1(omResponse
-              .setDeleteKeyResponse(DeleteKeyResponse.newBuilder()).build(),
-              omKeyInfo, ozoneManager.isRatisEnabled(),
-              omBucketInfo.copyObject(), keyStatus.isDirectory());
+          .setDeleteKeyResponse(DeleteKeyResponse.newBuilder()).build(),
+          keyName, omKeyInfo, ozoneManager.isRatisEnabled(),
+          omBucketInfo.copyObject(), keyStatus.isDirectory());
 
       result = Result.SUCCESS;
     } catch (IOException ex) {

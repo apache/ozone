@@ -93,6 +93,8 @@ enum Type {
 
   ListTrash = 91;
   RecoverTrash = 92;
+
+  PurgePaths = 93;
 }
 
 message OMRequest {
@@ -165,6 +167,8 @@ message OMRequest {
 
   optional ListTrashRequest                 listTrashRequest               = 91;
   optional RecoverTrashRequest              RecoverTrashRequest            = 92;
+
+  optional PurgePathsRequest                purgePathsRequest              = 93;
 }
 
 message OMResponse {
@@ -235,6 +239,7 @@ message OMResponse {
 
   optional ListTrashResponse                  listTrashResponse            = 91;
   optional RecoverTrashResponse               RecoverTrashResponse         = 92;
+  optional PurgePathsResponse                 purgePathsResponse           = 93;
 }
 
 enum Status {
@@ -953,6 +958,16 @@ message PurgeKeysRequest {
 }
 
 message PurgeKeysResponse {
+
+}
+
+message PurgePathsRequest {
+    repeated string deletedDirs = 1;
+    repeated KeyInfo deletedSubFiles = 2;
+    repeated KeyInfo markDeletedSubDirs = 3;
+}
+
+message PurgePathsResponse {
 
 }
 

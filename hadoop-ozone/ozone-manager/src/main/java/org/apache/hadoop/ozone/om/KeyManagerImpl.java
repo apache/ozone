@@ -134,6 +134,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAU
 import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DIRECTORY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
@@ -176,6 +178,7 @@ public class KeyManagerImpl implements KeyManager {
   private final PrefixManager prefixManager;
 
   private final boolean enableFileSystemPaths;
+  private BackgroundService dirDeletingService;
 
 
   @VisibleForTesting
@@ -250,6 +253,22 @@ public class KeyManagerImpl implements KeyManager {
           serviceTimeout, configuration);
       keyDeletingService.start();
     }
+
+    // Start directory deletion service for FSO buckets.
+    if (OzoneManagerRatisUtils.isBucketFSOptimized()
+        && dirDeletingService == null) {
+      long dirDeleteInterval = configuration.getTimeDuration(
+          OZONE_DIR_DELETING_SERVICE_INTERVAL,
+          OZONE_DIR_DELETING_SERVICE_INTERVAL_DEFAULT,
+          TimeUnit.MILLISECONDS);
+      long serviceTimeout = configuration.getTimeDuration(
+          OZONE_BLOCK_DELETING_SERVICE_TIMEOUT,
+          OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT,
+          TimeUnit.MILLISECONDS);
+      dirDeletingService = new DirectoryDeletingService(dirDeleteInterval,
+          TimeUnit.SECONDS, serviceTimeout, ozoneManager);
+      dirDeletingService.start();
+    }
   }
 
   KeyProviderCryptoExtension getKMSProvider() {
@@ -261,6 +280,10 @@ public class KeyManagerImpl implements KeyManager {
     if (keyDeletingService != null) {
       keyDeletingService.shutdown();
       keyDeletingService = null;
+    }
+    if (dirDeletingService != null) {
+      dirDeletingService.shutdown();
+      dirDeletingService = null;
     }
   }
 
@@ -977,6 +1000,11 @@ public class KeyManagerImpl implements KeyManager {
   @Override
   public BackgroundService getDeletingService() {
     return keyDeletingService;
+  }
+
+  @Override
+  public BackgroundService getDirDeletingService() {
+    return dirDeletingService;
   }
 
   @Override
@@ -2893,5 +2921,89 @@ public class KeyManagerImpl implements KeyManager {
       nodeSet.add(node.getUuidString());
     }
     return nodeSet;
+  }
+
+  @Override
+  public OmKeyInfo getPendingDeletionDir() throws IOException {
+    OmKeyInfo omKeyInfo = null;
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+             deletedDirItr = metadataManager.getDeletedDirTable().iterator()) {
+      if (deletedDirItr.hasNext()) {
+        Table.KeyValue<String, OmKeyInfo> keyValue = deletedDirItr.next();
+        if (keyValue != null) {
+          omKeyInfo = keyValue.getValue();
+        }
+      }
+    }
+    return omKeyInfo;
+  }
+
+  @Override
+  public List<OmKeyInfo> getPendingDeletionSubDirs(OmKeyInfo parentInfo,
+      long numEntries) throws IOException {
+    List<OmKeyInfo> directories = new ArrayList<>();
+    String seekDirInDB = metadataManager.getOzonePathKey(
+        parentInfo.getObjectID(), "");
+    long countEntries = 0;
+
+    Table dirTable = metadataManager.getDirectoryTable();
+    TableIterator<String, ? extends Table.KeyValue<String, OmDirectoryInfo>>
+        iterator = dirTable.iterator();
+
+    iterator.seek(seekDirInDB);
+
+    while (iterator.hasNext() && numEntries - countEntries > 0) {
+      OmDirectoryInfo dirInfo = iterator.value().getValue();
+      if (!OMFileRequest.isImmediateChild(dirInfo.getParentObjectID(),
+          parentInfo.getObjectID())) {
+        break;
+      }
+      String dirName = OMFileRequest.getAbsolutePath(parentInfo.getKeyName(),
+          dirInfo.getName());
+      OmKeyInfo omKeyInfo = OMFileRequest.getOmKeyInfo(
+          parentInfo.getVolumeName(), parentInfo.getBucketName(), dirInfo,
+          dirName);
+      directories.add(omKeyInfo);
+      countEntries++;
+
+      // move to next entry in the DirTable
+      iterator.next();
+    }
+
+    return directories;
+  }
+
+  @Override
+  public List<OmKeyInfo> getPendingDeletionSubFiles(OmKeyInfo parentInfo,
+      long numEntries) throws IOException {
+    List<OmKeyInfo> files = new ArrayList<>();
+    String seekFileInDB = metadataManager.getOzonePathKey(
+        parentInfo.getObjectID(), "");
+    long countEntries = 0;
+
+    Table fileTable = metadataManager.getKeyTable();
+    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+        iterator = fileTable.iterator();
+
+    iterator.seek(seekFileInDB);
+
+    while (iterator.hasNext() && numEntries - countEntries > 0) {
+      OmKeyInfo fileInfo = iterator.value().getValue();
+      if (!OMFileRequest.isImmediateChild(fileInfo.getParentObjectID(),
+          parentInfo.getObjectID())) {
+        break;
+      }
+      fileInfo.setFileName(fileInfo.getKeyName());
+      String fullKeyPath = OMFileRequest.getAbsolutePath(
+          parentInfo.getKeyName(), fileInfo.getKeyName());
+      fileInfo.setKeyName(fullKeyPath);
+
+      files.add(fileInfo);
+      countEntries++;
+      // move to next entry in the KeyTable
+      iterator.next();
+    }
+
+    return files;
   }
 }

@@ -2779,4 +2779,23 @@
       existing unit test cases won't be affected. New OM version should be 'V1'
     </description>
   </property>
+  <property>
+    <name>ozone.directory.deleting.service.interval</name>
+    <value>1m</value>
+    <tag>OZONE, PERFORMANCE, OM</tag>
+    <description>Time interval of the directory deleting service. It runs on OM
+      periodically and cleanup orphan directory and its sub-tree. For every
+      orphan directory it deletes the sub-path tree structure(dirs/files). It
+      sends sub-files to KeyDeletingService to deletes its blocks. Unit could
+      be defined with postfix (ns,ms,s,m,h,d)
+    </description>
+  </property>
+  <property>
+    <name>ozone.path.deleting.limit.per.task</name>
+    <value>10000</value>
+    <tag>OZONE, PERFORMANCE, OM</tag>
+    <description>A maximum number of paths(dirs/files) to be deleted by
+      directory deleting service per time interval.
+    </description>
+  </property>
 </configuration>
