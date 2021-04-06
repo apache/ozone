@@ -137,6 +137,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
    * |----------------------------------------------------------------------|
    * |  multipartFileInfoTable | parentId/fileName/uploadId ->...           |
    * |----------------------------------------------------------------------|
+   * |  deletedDirTable      | parentId/directoryName -> KeyInfo            |
+   * |----------------------------------------------------------------------|
    * |  transactionInfoTable | #TRANSACTIONINFO -> OMTransactionInfo        |
    * |----------------------------------------------------------------------|
    */
@@ -155,6 +157,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   public static final String FILE_TABLE = "fileTable";
   public static final String OPEN_FILE_TABLE = "openFileTable";
   public static final String MULTIPARTFILEINFO_TABLE = "multipartFileInfoTable";
+  public static final String DELETED_DIR_TABLE = "deletedDirectoryTable";
   public static final String TRANSACTION_INFO_TABLE =
       "transactionInfoTable";
 
@@ -180,6 +183,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   private boolean isRatisEnabled;
   private boolean ignorePipelineinKey;
   private Table<String, OmMultipartKeyInfo> multipartFileInfoTable;
+  private Table deletedDirTable;
 
   // Epoch is used to generate the objectIDs. The most significant 2 bits of
   // objectIDs is set to this epoch. For clusters before HDDS-4315 there is
@@ -253,6 +257,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   @Override
   public Table<String, RepeatedOmKeyInfo> getDeletedTable() {
     return deletedTable;
+  }
+
+  @Override
+  public Table<String, OmKeyInfo> getDeletedDirTable() {
+    return deletedDirTable;
   }
 
   @Override
@@ -372,6 +381,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         .addTable(FILE_TABLE)
         .addTable(OPEN_FILE_TABLE)
         .addTable(MULTIPARTFILEINFO_TABLE)
+        .addTable(DELETED_DIR_TABLE)
         .addTable(TRANSACTION_INFO_TABLE)
         .addCodec(OzoneTokenIdentifier.class, new TokenIdentifierCodec())
         .addCodec(OmKeyInfo.class, new OmKeyInfoCodec(true))
@@ -453,6 +463,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     multipartFileInfoTable = this.store.getTable(MULTIPARTFILEINFO_TABLE,
             String.class, OmMultipartKeyInfo.class);
     checkTableStatus(multipartFileInfoTable, MULTIPARTFILEINFO_TABLE);
+
+    deletedDirTable = this.store.getTable(DELETED_DIR_TABLE, String.class,
+        OmKeyInfo.class);
+    checkTableStatus(deletedDirTable, DELETED_DIR_TABLE);
 
     transactionInfoTable = this.store.getTable(TRANSACTION_INFO_TABLE,
         String.class, TransactionInfo.class);
