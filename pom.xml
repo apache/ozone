@@ -156,7 +156,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <spotbugs.version>3.1.12</spotbugs.version>
     <dnsjava.version>2.1.7</dnsjava.version>
 
-    <guava.version>28.2-jre</guava.version>
+    <guava.version>30.1.1-jre</guava.version>
     <guice.version>4.0</guice.version>
 
     <!-- Required for testing LDAP integration -->
