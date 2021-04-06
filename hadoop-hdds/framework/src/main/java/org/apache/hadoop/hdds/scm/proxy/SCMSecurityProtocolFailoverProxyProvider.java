@@ -22,6 +22,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolPB;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
@@ -233,17 +234,12 @@ public class SCMSecurityProtocolFailoverProxyProvider implements
         // Perform fail over to next proxy, as right now we don't have any
         // suggested leader ID from server, we fail over to next one.
         // TODO: Act based on server response if leader id is passed.
-        performFailoverToNextProxy();
-        return getRetryAction(FAILOVER_AND_RETRY, failovers);
-      }
-
-      private RetryAction getRetryAction(RetryDecision fallbackAction,
-          int failovers) {
-        if (failovers < maxRetryCount) {
-          return new RetryAction(fallbackAction, getRetryInterval());
-        } else {
-          return RetryAction.FAIL;
+        if (!SCMHAUtils.isRetriableWithNoFailoverException(exception)) {
+          performFailoverToNextProxy();
         }
+        return SCMHAUtils
+            .getRetryAction(failovers, retries, exception, maxRetryCount,
+                getRetryInterval());
       }
     };
 
