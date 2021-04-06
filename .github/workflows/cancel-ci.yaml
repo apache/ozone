@@ -20,18 +20,11 @@ on:
     types: ['requested']
 
 jobs:
-  cancel-duplicate-ci-runs:
-    name: "Cancel duplicate CI runs"
+  cancel:
     runs-on: ubuntu-18.04
     steps:
-      - name: Checkout Cancel Workflow Runs action
-        uses: actions/checkout@v2
-        with:
-          repository: https://github.com/potiuk/cancel-workflow-runs.git
-          ref:  a81b3c4d59c61e27484cfacdc13897dd908419c9
-          persist-credentials: false
-      - uses: .
-        name: "Cancel duplicate workflow runs"
+      - uses: potiuk/cancel-workflow-runs@a81b3c4d59c61e27484cfacdc13897dd908419c9
+        name: "Cancel duplicate PR builds"
         with:
           cancelMode: allDuplicates
           cancelFutureDuplicates: true
