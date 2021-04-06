@@ -69,10 +69,10 @@ prepare_for_image() {
 ## @param The name of the function to run.
 callback() {
   local func="$1"
-  if type -t "$func" > /dev/null; then
+  if [[ "$(type -t "$func")" = function ]]; then
     "$func"
   else
-    echo "Skipping callback $func. No implementation found."
+    echo "Skipping callback $func. No function implementation found."
   fi
 }
 
