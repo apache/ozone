@@ -817,13 +817,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       LOG.error("Bootstrap is not supported without SCM HA.");
       return false;
     }
-    SCMHANodeDetails scmhaNodeDetails = SCMHANodeDetails.loadSCMHAConfig(conf);
-
-    loginAsSCMUserIfSecurityEnabled(scmhaNodeDetails, conf);
-    // The node here will try to fetch the cluster id from any of existing
-    // running SCM instances.
-
     String primordialSCM = SCMHAUtils.getPrimordialSCM(conf);
+    SCMHANodeDetails scmhaNodeDetails = SCMHANodeDetails.loadSCMHAConfig(conf);
     String selfNodeId = scmhaNodeDetails.getLocalNodeDetails().getNodeId();
     if (primordialSCM != null && SCMHAUtils.isPrimordialSCM(conf, selfNodeId)) {
       LOG.info(
@@ -832,15 +827,27 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
               + "Ignoring it.", primordialSCM, selfNodeId);
       return true;
     }
+    SCMStorageConfig scmStorageConfig = new SCMStorageConfig(conf);
+    final String persistedClusterId = scmStorageConfig.getClusterID();
+    StorageState state = scmStorageConfig.getState();
+    if (state == StorageState.INITIALIZED && conf
+        .getBoolean(ScmConfigKeys.OZONE_SCM_SKIP_BOOTSTRAP_VALIDATION_KEY,
+            ScmConfigKeys.OZONE_SCM_SKIP_BOOTSTRAP_VALIDATION_DEFAULT)) {
+      LOG.info("Skipping clusterId validation during bootstrap command.  "
+              + "ClusterId id {}, SCM id {}", persistedClusterId,
+          scmStorageConfig.getScmId());
+      return true;
+    }
+
+    loginAsSCMUserIfSecurityEnabled(scmhaNodeDetails, conf);
+    // The node here will try to fetch the cluster id from any of existing
+    // running SCM instances.
     OzoneConfiguration config =
         SCMHAUtils.removeSelfId(conf,
             scmhaNodeDetails.getLocalNodeDetails().getNodeId());
     final ScmInfo scmInfo = HAUtils.getScmInfo(config);
-    SCMStorageConfig scmStorageConfig = new SCMStorageConfig(conf);
-    final String persistedClusterId = scmStorageConfig.getClusterID();
     final String fetchedId = scmInfo.getClusterId();
     Preconditions.checkNotNull(fetchedId);
-    StorageState state = scmStorageConfig.getState();
     if (state == StorageState.INITIALIZED) {
       Preconditions.checkNotNull(scmStorageConfig.getScmId());
       if (!fetchedId.equals(persistedClusterId)) {
