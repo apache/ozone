@@ -39,7 +39,7 @@ This feature is strongly recommended to be turned ON when Ozone buckets are
 ## OzoneManager Metadata layout format
 OzoneManager supports two formats - LEGACY and PREFIX.
 
-![OM HA](PrefixFSO-Format.png)
+![FSO Format](PrefixFSO-Format.png)
 Legacy is the existing OM metadata format, which stores key entry with full path
  name. In Prefix based optimization, OM metadata format stores intermediate
   directories into DirectoryTable and files into FileTable as shown in the
@@ -50,12 +50,12 @@ Legacy is the existing OM metadata format, which stores key entry with full path
 ### Directory delete operation: ###
 Following picture describes the OM metadata changes while performing a delete
  operation on a directory.
-![OM HA](PrefixFSO-Delete.png)
+![FSO Delete](PrefixFSO-Delete.png)
 
 ### Directory rename operation: ###
 Following picture describes the OM metadata changes while performing a rename
  operation on a directory.
-![OM HA](PrefixFSO-Rename.png)
+![FSO Rename](PrefixFSO-Rename.png)
 
 ## Configuration
 By default the feature is disabled. It can be enabled with the following
