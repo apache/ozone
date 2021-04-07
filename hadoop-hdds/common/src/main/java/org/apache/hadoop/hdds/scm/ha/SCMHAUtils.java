@@ -51,17 +51,19 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY
 public final class SCMHAUtils {
   public static final Logger LOG =
       LoggerFactory.getLogger(SCMHAUtils.class);
-  private SCMHAUtils() {
-    // not used
-  }
 
-  private static final List<Class<? extends Exception>> EXCEPTION_LIST =
+  private static final List<Class<? extends Exception>>
+      RETRIABLE_WITH_NO_FAILOVER_EXCEPTION_LIST =
       ImmutableList.<Class<? extends Exception>>builder()
           .add(LeaderNotReadyException.class)
           .add(ReconfigurationInProgressException.class)
-          .add(ResourceUnavailableException.class)
           .add(ReconfigurationTimeoutException.class)
+          .add(ResourceUnavailableException.class)
           .build();
+
+  private SCMHAUtils() {
+    // not used
+  }
 
   // Check if SCM HA is enabled.
   public static boolean isSCMHAEnabled(ConfigurationSource conf) {
@@ -204,8 +206,9 @@ public final class SCMHAUtils {
   public static boolean isRetriableWithNoFailoverException(Exception e) {
     Throwable t = e;
     while (t != null && t.getCause() != null) {
-      for (Class<? extends Exception> cls : getExceptionList()) {
-        if (cls.isInstance(t)) {
+      for (Class<? extends Exception> clazz :
+          getRetriableWithNoFailoverExceptionList()) {
+        if (clazz.isInstance(t)) {
           return true;
         }
       }
@@ -214,8 +217,9 @@ public final class SCMHAUtils {
     return false;
   }
 
-  public static List<Class<? extends Exception>> getExceptionList() {
-    return EXCEPTION_LIST;
+  public static List<Class<? extends
+      Exception>> getRetriableWithNoFailoverExceptionList() {
+    return RETRIABLE_WITH_NO_FAILOVER_EXCEPTION_LIST;
   }
 
   public static RetryPolicy.RetryAction getRetryAction(int failovers, int retry,
@@ -227,12 +231,14 @@ public final class SCMHAUtils {
       } else {
         return RetryPolicy.RetryAction.FAIL;
       }
-    } else if (failovers < maxRetryCount) {
-      return new RetryPolicy.RetryAction(
-          RetryPolicy.RetryAction.RetryDecision.FAILOVER_AND_RETRY,
-          retryInterval);
     } else {
-      return RetryPolicy.RetryAction.FAIL;
+      if (failovers < maxRetryCount) {
+        return new RetryPolicy.RetryAction(
+            RetryPolicy.RetryAction.RetryDecision.FAILOVER_AND_RETRY,
+            retryInterval);
+      } else {
+        return RetryPolicy.RetryAction.FAIL;
+      }
     }
   }
 }

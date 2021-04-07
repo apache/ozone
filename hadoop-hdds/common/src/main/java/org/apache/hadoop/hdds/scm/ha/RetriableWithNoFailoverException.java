@@ -19,7 +19,7 @@ package org.apache.hadoop.hdds.scm.ha;
 
 import java.io.IOException;
 
-public class RetriableWithNoFailoverException  extends IOException {
+public class RetriableWithNoFailoverException extends IOException {
   public RetriableWithNoFailoverException(IOException exception) {
     super(exception);
   }
