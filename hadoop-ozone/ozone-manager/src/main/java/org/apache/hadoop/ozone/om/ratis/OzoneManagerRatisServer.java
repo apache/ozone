@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
+import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -37,6 +38,7 @@ import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.ipc.ProtobufRpcEngine.Server;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -647,13 +649,15 @@ public final class OzoneManagerRatisServer {
   }
 
   private static Parameters createServerTlsParameters(SecurityConfig conf,
-      CertificateClient caClient) {
+      CertificateClient caClient) throws IOException {
     Parameters parameters = new Parameters();
 
     if (conf.isSecurityEnabled() && conf.isGrpcTlsEnabled()) {
+      List<X509Certificate> caList = HAUtils.buildCAX509List(caClient,
+          conf.getConfiguration());
       GrpcTlsConfig config = new GrpcTlsConfig(
           caClient.getPrivateKey(), caClient.getCertificate(),
-          caClient.getCACertificate(), true);
+          caList, true);
       GrpcConfigKeys.Server.setTlsConf(parameters, config);
       GrpcConfigKeys.Admin.setTlsConf(parameters, config);
       GrpcConfigKeys.Client.setTlsConf(parameters, config);

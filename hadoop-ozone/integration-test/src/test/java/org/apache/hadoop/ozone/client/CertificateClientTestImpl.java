@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.client;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.security.KeyPair;
 import java.security.PrivateKey;
@@ -188,4 +189,27 @@ public class CertificateClientTestImpl implements CertificateClient {
     return null;
   }
 
+  @Override
+  public X509Certificate getRootCACertificate() {
+    return x509Certificate;
+  }
+
+  @Override
+  public void storeRootCACertificate(String pemEncodedCert, boolean force) {
+
+  }
+
+  @Override
+  public List<String> getCAList() {
+    return null;
+  }
+  @Override
+  public List<String> listCA() throws IOException  {
+    return null;
+  }
+
+  @Override
+  public List<String> updateCAList() throws IOException  {
+    return null;
+  }
 }

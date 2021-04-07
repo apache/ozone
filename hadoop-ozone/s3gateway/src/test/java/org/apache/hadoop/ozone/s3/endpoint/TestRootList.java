@@ -20,13 +20,10 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 
 import static org.junit.Assert.assertEquals;
-
-import org.apache.hadoop.ozone.s3.SignatureProcessor;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -54,27 +51,6 @@ public class TestRootList {
   @Test
   public void testListBucket() throws Exception {
 
-    rootEndpoint.setSignatureProcessor(new SignatureProcessor() {
-      @Override
-      public String getStringToSign() {
-        return null;
-      }
-
-      @Override
-      public String getSignature() {
-        return null;
-      }
-
-      @Override
-      public String getAwsAccessId() {
-        return OzoneConsts.OZONE;
-      }
-
-      @Override
-      public Exception getException() {
-        return null;
-      }
-    });
     // List operation should succeed even there is no bucket.
     ListBucketResponse response =
         (ListBucketResponse) rootEndpoint.get().getEntity();

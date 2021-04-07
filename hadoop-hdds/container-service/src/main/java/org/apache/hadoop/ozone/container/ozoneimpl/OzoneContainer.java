@@ -19,13 +19,14 @@
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
 import java.io.IOException;
+import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -40,6 +41,7 @@ import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.security.token.BlockTokenVerifier;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
+import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
@@ -62,6 +64,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT;
+
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -87,9 +90,13 @@ public class OzoneContainer {
   private List<ContainerDataScanner> dataScanners;
   private final BlockDeletingService blockDeletingService;
   private final GrpcTlsConfig tlsClientConfig;
-  private final AtomicBoolean isStarted;
+  private final AtomicReference<InitializingStatus> initializingStatus;
   private final ReplicationServer replicationServer;
   private DatanodeDetails datanodeDetails;
+
+  enum InitializingStatus {
+    UNINITIALIZED, INITIALIZING, INITIALIZED
+  }
 
   /**
    * Construct OzoneContainer object.
@@ -167,10 +174,17 @@ public class OzoneContainer {
     blockDeletingService =
         new BlockDeletingService(this, svcInterval.toMillis(), serviceTimeout,
             TimeUnit.MILLISECONDS, config);
-    tlsClientConfig = RatisHelper.createTlsClientConfig(
-        secConf, certClient != null ? certClient.getCACertificate() : null);
 
-    isStarted = new AtomicBoolean(false);
+    List< X509Certificate > x509Certificates = null;
+    if (certClient != null) {
+      x509Certificates = HAUtils.buildCAX509List(certClient, conf);
+    }
+
+    tlsClientConfig = RatisHelper.createTlsClientConfig(secConf,
+        x509Certificates);
+
+    initializingStatus =
+        new AtomicReference<>(InitializingStatus.UNINITIALIZED);
   }
 
   public GrpcTlsConfig getTlsClientConfig() {
@@ -257,10 +271,24 @@ public class OzoneContainer {
    * @throws IOException
    */
   public void start(String clusterId) throws IOException {
-    if (!isStarted.compareAndSet(false, true)) {
+    // If SCM HA is enabled, OzoneContainer#start() will be called multi-times
+    // from VersionEndpointTask. The first call should do the initializing job,
+    // the successive calls should wait until OzoneContainer is initialized.
+    if (!initializingStatus.compareAndSet(
+        InitializingStatus.UNINITIALIZED, InitializingStatus.INITIALIZING)) {
+
+      // wait OzoneContainer to finish its initializing.
+      while (initializingStatus.get() != InitializingStatus.INITIALIZED) {
+        try {
+          Thread.sleep(1);
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+        }
+      }
       LOG.info("Ignore. OzoneContainer already started.");
       return;
     }
+
     LOG.info("Attempting to start container services.");
     startContainerScrub();
 
@@ -272,6 +300,9 @@ public class OzoneContainer {
     hddsDispatcher.init();
     hddsDispatcher.setClusterId(clusterId);
     blockDeletingService.start();
+
+    // mark OzoneContainer as INITIALIZED.
+    initializingStatus.set(InitializingStatus.INITIALIZED);
   }
 
   /**

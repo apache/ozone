@@ -467,6 +467,11 @@ public final class ScmConfigKeys {
   public static final TimeDuration OZONE_SCM_RATIS_MINIMUM_TIMEOUT_DEFAULT
       = TimeDuration.valueOf(1, TimeUnit.SECONDS);
 
+  public static final String OZONE_SCM_RATIS_REQUEST_TIMEOUT_KEY
+      = "ozone.scm.ratis.minimum.timeout";
+  public static final String OZONE_SCM_RATIS_REQUEST_TIMEOUT_DEFAULT
+      = "30s";
+
   // SCM Ratis Leader Election configurations
   public static final String
       OZONE_SCM_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY =
@@ -504,6 +509,11 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_HA_SECURITY_SUPPORTED =
       "hdds.scm.ha.security.enable";
   public static final boolean OZONE_SCM_HA_SECURITY_SUPPORTED_DEFAULT = false;
+
+  public static final String OZONE_SCM_INFO_WAIT_DURATION =
+      "ozone.scm.info.wait.duration";
+  public static final long OZONE_SCM_INFO_WAIT_DURATION_DEFAULT =
+      10 * 60;
 
   /**
    * Never constructed.
