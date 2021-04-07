@@ -37,7 +37,7 @@ echo "--- RUNNING NON-ROLLING UPGRADE TEST FROM $OZONE_UPGRADE_FROM TO $OZONE_UP
 # Default compose cluster to use. May be overridden by callback.sh.
 source "$TEST_DIR"/compose/ha/load.sh
 source "$TEST_DIR"/testlib.sh
-source "$OZONE_UPGRADE_CALLBACK"
+[[ -f "$OZONE_UPGRADE_CALLBACK" ]] && source "$OZONE_UPGRADE_CALLBACK"
 
 prepare_oms() {
   if [[ "$OZONE_PREPARE_OMS" = 'true' ]]; then
