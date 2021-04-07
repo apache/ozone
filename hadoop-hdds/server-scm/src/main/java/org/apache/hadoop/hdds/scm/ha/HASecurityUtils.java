@@ -32,9 +32,18 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.SCMCertificateCli
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.ratis.RaftConfigKeys;
+import org.apache.ratis.client.RaftClient;
 import org.apache.ratis.conf.Parameters;
+import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.grpc.GrpcConfigKeys;
 import org.apache.ratis.grpc.GrpcTlsConfig;
+import org.apache.ratis.protocol.Message;
+import org.apache.ratis.protocol.RaftClientReply;
+import org.apache.ratis.protocol.RaftGroup;
+import org.apache.ratis.retry.RetryPolicies;
+import org.apache.ratis.rpc.RpcType;
+import org.apache.ratis.util.TimeDuration;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
@@ -46,7 +55,9 @@ import java.net.InetSocketAddress;
 import java.security.KeyPair;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.SCM;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateApprover.ApprovalType.KERBEROS_TRUSTED;
@@ -286,24 +297,81 @@ public final class HASecurityUtils {
 
   /**
    * Create Server TLS parameters required for Ratis Server.
-   * @param conf
-   * @param caClient
-   * @return
+
+   * @return Parameter map set with TLS config.
    */
-  public static Parameters createSCMServerTlsParameters(SecurityConfig conf,
-      CertificateClient caClient) {
+  public static Parameters createSCMServerTlsParameters(
+      GrpcTlsConfig grpcTlsConfig) {
     Parameters parameters = new Parameters();
 
-    if (conf.isSecurityEnabled() && conf.isGrpcTlsEnabled()) {
-      GrpcTlsConfig config = new GrpcTlsConfig(
-          caClient.getPrivateKey(), caClient.getCertificate(),
-          caClient.getCACertificate(), true);
-      GrpcConfigKeys.Server.setTlsConf(parameters, config);
-      GrpcConfigKeys.Admin.setTlsConf(parameters, config);
-      GrpcConfigKeys.Client.setTlsConf(parameters, config);
-      GrpcConfigKeys.TLS.setConf(parameters, config);
+    if (grpcTlsConfig != null) {
+      GrpcConfigKeys.Server.setTlsConf(parameters, grpcTlsConfig);
+      GrpcConfigKeys.Admin.setTlsConf(parameters, grpcTlsConfig);
+      GrpcConfigKeys.Client.setTlsConf(parameters, grpcTlsConfig);
+      GrpcConfigKeys.TLS.setConf(parameters, grpcTlsConfig);
     }
 
     return parameters;
   }
+
+  /**
+   * Create GrpcTlsConfig.
+   * @param conf
+   * @param certificateClient
+   * @return
+   */
+  public static GrpcTlsConfig createSCMRatisTLSConfig(SecurityConfig conf,
+      CertificateClient certificateClient) {
+    if (conf.isSecurityEnabled() && conf.isGrpcTlsEnabled()) {
+      return new GrpcTlsConfig(
+          certificateClient.getPrivateKey(), certificateClient.getCertificate(),
+          certificateClient.getCACertificate(), true);
+    }
+    return null;
+  }
+
+  /**
+   * Submit SCM certs request to ratis using RaftClient.
+   * @param raftGroup
+   * @param tlsConfig
+   * @param message
+   * @return SCMRatisResponse.
+   * @throws Exception
+   */
+  public static SCMRatisResponse submitScmCertsToRatis(RaftGroup raftGroup,
+      GrpcTlsConfig tlsConfig, Message message) throws Exception {
+    final RaftProperties properties = new RaftProperties();
+
+    // TODO: GRPC TLS only for now, netty/hadoop RPC TLS support later.
+    RaftConfigKeys.Rpc.setType(properties, RpcType.valueOf("GRPC"));
+
+
+    // For now not making anything configurable, RaftClient  is only used
+    // in SCM for DB updates of sub-ca certs go via Ratis.
+    RaftClient.Builder builder =  RaftClient.newBuilder()
+        .setRaftGroup(raftGroup)
+        .setLeaderId(null)
+        .setProperties(properties)
+        .setRetryPolicy(
+            RetryPolicies.retryUpToMaximumCountWithFixedSleep(15,
+                TimeDuration.valueOf(500, TimeUnit.MILLISECONDS)));
+
+    if (tlsConfig != null) {
+      Parameters parameters = new Parameters();
+      GrpcConfigKeys.Client.setTlsConf(parameters, tlsConfig);
+      builder.setParameters(parameters);
+    }
+
+    RaftClient raftClient =  builder.build();
+
+    CompletableFuture<RaftClientReply> future =
+        raftClient.async().send(message);
+
+    RaftClientReply raftClientReply = future.get();
+
+    return SCMRatisResponse.decode(raftClientReply);
+
+  }
+
+
 }
