@@ -35,11 +35,15 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.stream.Collectors;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
@@ -54,6 +58,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.states.NodeAlreadyExistsException;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -75,12 +80,8 @@ import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.ozone.protocol.commands.SetNodeOperationalStateCommand;
 import org.apache.hadoop.util.ReflectionUtils;
-
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
 import org.apache.hadoop.util.Time;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -119,6 +120,7 @@ public class SCMNodeManager implements NodeManager {
   private final int heavyNodeCriteria;
   private final HDDSLayoutVersionManager scmLayoutVersionManager;
   private final EventPublisher scmNodeEventPublisher;
+  private final SCMContext scmContext;
 
   /**
    * Constructs SCM machine Manager.
@@ -127,6 +129,7 @@ public class SCMNodeManager implements NodeManager {
                         SCMStorageConfig scmStorageConfig,
                         EventPublisher eventPublisher,
                         NetworkTopology networkTopology,
+                        SCMContext scmContext,
                         HDDSLayoutVersionManager layoutVersionManager) {
     this.scmNodeEventPublisher = eventPublisher;
     this.nodeStateManager = new NodeStateManager(conf, eventPublisher,
@@ -156,6 +159,7 @@ public class SCMNodeManager implements NodeManager {
             ScmConfigKeys.OZONE_SCM_PIPELINE_PER_METADATA_VOLUME_DEFAULT);
     String dnLimit = conf.get(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT);
     this.heavyNodeCriteria = dnLimit == null ? 0 : Integer.parseInt(dnLimit);
+    this.scmContext = scmContext;
   }
 
   private void registerMXBean() {
@@ -466,17 +470,24 @@ public class SCMNodeManager implements NodeManager {
     NodeStatus scmStatus = getNodeStatus(reportedDn);
     if (opStateDiffers(reportedDn, scmStatus)) {
       LOG.info("Scheduling a command to update the operationalState " +
-          "persisted on {} as the reported value does not " +
-          "match the value stored in SCM ({}, {})",
+              "persisted on {} as the reported value does not " +
+              "match the value stored in SCM ({}, {})",
           reportedDn,
           scmStatus.getOperationalState(),
           scmStatus.getOpStateExpiryEpochSeconds());
 
-      onMessage(new CommandForDatanode(reportedDn.getUuid(),
-          new SetNodeOperationalStateCommand(
-              Time.monotonicNow(), scmStatus.getOperationalState(),
-              scmStatus.getOpStateExpiryEpochSeconds())
-      ), null);
+      try {
+        SCMCommand<?> command = new SetNodeOperationalStateCommand(
+            Time.monotonicNow(),
+            scmStatus.getOperationalState(),
+            scmStatus.getOpStateExpiryEpochSeconds());
+        command.setTerm(scmContext.getTermOfLeader());
+        addDatanodeCommand(reportedDn.getUuid(), command);
+      } catch (NotLeaderException nle) {
+        LOG.warn("Skip sending SetNodeOperationalStateCommand,"
+            + " since current SCM is not leader.", nle);
+        return;
+      }
     }
     DatanodeDetails scmDnd = nodeStateManager.getNode(reportedDn);
     scmDnd.setPersistedOpStateExpiryEpochSec(
@@ -624,6 +635,41 @@ public class SCMNodeManager implements NodeManager {
       }
     }
     return nodeStats;
+  }
+
+  /**
+   * Gets a sorted list of most or least used DatanodeUsageInfo containing
+   * healthy, in-service nodes. If the specified mostUsed is true, the returned
+   * list is in descending order of usage. Otherwise, the returned list is in
+   * ascending order of usage.
+   *
+   * @param mostUsed true if most used, false if least used
+   * @return List of DatanodeUsageInfo
+   */
+  public List<DatanodeUsageInfo> getMostOrLeastUsedDatanodes(
+      boolean mostUsed) {
+    List<DatanodeDetails> healthyNodes =
+        getNodes(NodeOperationalState.IN_SERVICE, NodeState.HEALTHY);
+
+    List<DatanodeUsageInfo> datanodeUsageInfoList =
+        new ArrayList<>(healthyNodes.size());
+
+    // create a DatanodeUsageInfo from each DatanodeDetails and add it to the
+    // list
+    for (DatanodeDetails node : healthyNodes) {
+      SCMNodeStat stat = getNodeStatInternal(node);
+      datanodeUsageInfoList.add(new DatanodeUsageInfo(node, stat));
+    }
+
+    // sort the list according to appropriate comparator
+    if (mostUsed) {
+      datanodeUsageInfoList.sort(
+          DatanodeUsageInfo.getMostUsedByRemainingRatio().reversed());
+    } else {
+      datanodeUsageInfoList.sort(
+          DatanodeUsageInfo.getMostUsedByRemainingRatio());
+    }
+    return datanodeUsageInfoList;
   }
 
   /**

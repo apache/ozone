@@ -17,15 +17,15 @@
 
 package org.apache.hadoop.ozone.admin.om;
 
-import static org.apache.hadoop.hdds.scm.cli.upgrade.FinalizeUpgradeCommandUtil.emitCancellationMsg;
-import static org.apache.hadoop.hdds.scm.cli.upgrade.FinalizeUpgradeCommandUtil.emitExitMsg;
-import static org.apache.hadoop.hdds.scm.cli.upgrade.FinalizeUpgradeCommandUtil.emitFinishedMsg;
-import static org.apache.hadoop.hdds.scm.cli.upgrade.FinalizeUpgradeCommandUtil.emitGeneralErrorMsg;
-import static org.apache.hadoop.hdds.scm.cli.upgrade.FinalizeUpgradeCommandUtil.handleInvalidRequestAfterInitiatingFinalization;
-import static org.apache.hadoop.hdds.scm.cli.upgrade.FinalizeUpgradeCommandUtil.isDone;
-import static org.apache.hadoop.hdds.scm.cli.upgrade.FinalizeUpgradeCommandUtil.isFinalized;
-import static org.apache.hadoop.hdds.scm.cli.upgrade.FinalizeUpgradeCommandUtil.isInprogress;
-import static org.apache.hadoop.hdds.scm.cli.upgrade.FinalizeUpgradeCommandUtil.isStarting;
+import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.emitCancellationMsg;
+import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.emitExitMsg;
+import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.emitFinishedMsg;
+import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.emitGeneralErrorMsg;
+import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.handleInvalidRequestAfterInitiatingFinalization;
+import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.isDone;
+import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.isFinalized;
+import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.isInprogress;
+import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.isStarting;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;

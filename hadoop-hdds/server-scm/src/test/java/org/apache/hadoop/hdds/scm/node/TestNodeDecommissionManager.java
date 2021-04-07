@@ -22,7 +22,8 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.TestUtils;
+import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
@@ -229,18 +230,18 @@ public class TestNodeDecommissionManager {
         nodeManager.getNodeStatus(dns.get(2)).getOperationalState());
 
     // Try to go from maint to decom:
-    try {
-      decom.startDecommission(dns.get(1));
-      fail("Expected InvalidNodeStateException");
-    } catch (InvalidNodeStateException e) {
-    }
+    List<String> dn = new ArrayList<>();
+    dn.add(dns.get(1).getIpAddress());
+    List<DatanodeAdminError> errors = decom.decommissionNodes(dn);
+    assertEquals(1, errors.size());
+    assertEquals(dns.get(1).getHostName(), errors.get(0).getHostname());
 
     // Try to go from decom to maint:
-    try {
-      decom.startMaintenance(dns.get(2), 100);
-      fail("Expected InvalidNodeStateException");
-    } catch (InvalidNodeStateException e) {
-    }
+    dn = new ArrayList<>();
+    dn.add(dns.get(2).getIpAddress());
+    errors = decom.startMaintenanceNodes(dn, 100);
+    assertEquals(1, errors.size());
+    assertEquals(dns.get(2).getHostName(), errors.get(0).getHostname());
 
     // Ensure the states are still as before
     assertEquals(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
@@ -249,11 +250,9 @@ public class TestNodeDecommissionManager {
         nodeManager.getNodeStatus(dns.get(2)).getOperationalState());
   }
 
-
-
   private SCMNodeManager createNodeManager(OzoneConfiguration config)
       throws IOException, AuthenticationException {
-    scm = HddsTestUtils.getScm(config);
+    scm = TestUtils.getScm(config);
     return (SCMNodeManager) scm.getScmNodeManager();
   }
 

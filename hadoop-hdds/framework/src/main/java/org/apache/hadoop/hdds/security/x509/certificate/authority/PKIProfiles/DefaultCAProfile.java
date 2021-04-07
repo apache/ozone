@@ -19,8 +19,12 @@
 
 package org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles;
 
+import org.bouncycastle.asn1.ASN1ObjectIdentifier;
+import org.bouncycastle.asn1.x509.BasicConstraints;
 import org.bouncycastle.asn1.x509.Extension;
+import org.bouncycastle.asn1.x509.KeyUsage;
 
+import java.util.Map;
 import java.util.function.BiFunction;
 
 import static java.lang.Boolean.TRUE;
@@ -32,7 +36,7 @@ import static java.lang.Boolean.TRUE;
  */
 public class DefaultCAProfile extends DefaultProfile {
   static final BiFunction<Extension, PKIProfile, Boolean>
-      VALIDATE_BASIC_CONSTRAINTS = (e, b) -> TRUE;
+      VALIDATE_BASIC_CONSTRAINTS = DefaultCAProfile::validateBasicExtensions;
   static final BiFunction<Extension, PKIProfile, Boolean>
       VALIDATE_CRL_NUMBER = (e, b) -> TRUE;
   static final BiFunction<Extension, PKIProfile, Boolean>
@@ -43,4 +47,38 @@ public class DefaultCAProfile extends DefaultProfile {
       VALIDATE_NAME_CONSTRAINTS = (e, b) -> TRUE;
   static final BiFunction<Extension, PKIProfile, Boolean>
       VALIDATE_CRL_DISTRIBUTION_POINTS = (e, b) -> TRUE;
+
+
+  private static boolean validateBasicExtensions(Extension ext,
+      PKIProfile pkiProfile) {
+    BasicConstraints constraints =
+        BasicConstraints.getInstance(ext.getParsedValue());
+    if(constraints.isCA()) {
+      if (pkiProfile.isCA()) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  @Override
+  public boolean isCA() {
+    return true;
+  }
+
+  @Override
+  public Map<ASN1ObjectIdentifier,
+      BiFunction< Extension, PKIProfile, Boolean>> getExtensionsMap() {
+    // Add basic constraint.
+    EXTENSIONS_MAP.putIfAbsent(Extension.basicConstraints,
+        VALIDATE_BASIC_CONSTRAINTS);
+    return EXTENSIONS_MAP;
+  }
+
+  @Override
+  public KeyUsage getKeyUsage() {
+    return new KeyUsage(KeyUsage.digitalSignature | KeyUsage.keyEncipherment
+        | KeyUsage.dataEncipherment | KeyUsage.keyAgreement | KeyUsage.cRLSign
+        | KeyUsage.keyCertSign);
+  }
 }

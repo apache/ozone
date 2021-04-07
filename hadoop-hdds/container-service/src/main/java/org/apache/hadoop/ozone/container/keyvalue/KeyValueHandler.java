@@ -259,7 +259,7 @@ public class KeyValueHandler extends Handler {
     boolean created = false;
     try (AutoCloseableLock l = containerCreationLock.acquire()) {
       if (containerSet.getContainer(containerID) == null) {
-        newContainer.create(volumeSet, volumeChoosingPolicy, scmID);
+        newContainer.create(volumeSet, volumeChoosingPolicy, clusterId);
         created = containerSet.addContainer(newContainer);
       } else {
         // The create container request for an already existing container can
@@ -288,7 +288,7 @@ public class KeyValueHandler extends Handler {
       HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(volumeSet
           .getVolumesList(), container.getContainerData().getMaxSize());
       String hddsVolumeDir = containerVolume.getHddsRootDir().toString();
-      container.populatePathFields(scmID, containerVolume, hddsVolumeDir);
+      container.populatePathFields(clusterId, containerVolume, hddsVolumeDir);
     } finally {
       volumeSet.readUnlock();
     }

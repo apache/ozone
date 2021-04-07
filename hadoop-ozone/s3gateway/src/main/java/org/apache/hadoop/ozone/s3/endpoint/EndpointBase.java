@@ -29,7 +29,6 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
-import org.apache.hadoop.ozone.s3.SignatureProcessor;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 
@@ -42,9 +41,6 @@ public class EndpointBase {
 
   @Inject
   private OzoneClient client;
-
-  @Inject
-  private SignatureProcessor signatureProcessor;
 
   protected OzoneBucket getBucket(OzoneVolume volume, String bucketName)
       throws OS3Exception, IOException {
@@ -169,16 +165,6 @@ public class EndpointBase {
         throw e;
       }
     }
-  }
-
-  public SignatureProcessor getSignatureProcessor() {
-    return signatureProcessor;
-  }
-
-  @VisibleForTesting
-  public void setSignatureProcessor(
-      SignatureProcessor signatureProcessor) {
-    this.signatureProcessor = signatureProcessor;
   }
 
   @VisibleForTesting

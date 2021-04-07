@@ -74,6 +74,7 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.testutils.BlockDeletingServiceTestImpl;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.test.GenericTestUtils.LogCapturer;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 
 import static java.util.stream.Collectors.toList;
 import static org.apache.commons.lang3.RandomStringUtils.randomAlphanumeric;
@@ -87,7 +88,6 @@ import org.junit.runners.Parameterized;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_CONTAINER_LIMIT_PER_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_VERSIONS;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V1;
@@ -113,7 +113,7 @@ public class TestBlockDeletingService {
 
   private final ChunkLayOutVersion layout;
   private final String schemaVersion;
-  private int blockLimitPerTask;
+  private int blockLimitPerInterval;
   private static VolumeSet volumeSet;
 
   public TestBlockDeletingService(LayoutInfo layoutInfo) {
@@ -206,10 +206,11 @@ public class TestBlockDeletingService {
       containerSet.addContainer(container);
       data = (KeyValueContainerData) containerSet.getContainer(
           containerID).getContainerData();
-      if (data.getSchemaVersion().equals(SCHEMA_V1)) {
+      data.setSchemaVersion(schemaVersion);
+      if (schemaVersion.equals(SCHEMA_V1)) {
         createPendingDeleteBlocksSchema1(numOfBlocksPerContainer, data,
             containerID, numOfChunksPerBlock, buffer, chunkManager, container);
-      } else if (data.getSchemaVersion().equals(SCHEMA_V2)) {
+      } else if (schemaVersion.equals(SCHEMA_V2)) {
         createPendingDeleteBlocksSchema2(numOfBlocksPerContainer, txnID,
             containerID, numOfChunksPerBlock, buffer, chunkManager, container,
             data);
@@ -254,7 +255,6 @@ public class TestBlockDeletingService {
       ChunkManager chunkManager, KeyValueContainer container,
       KeyValueContainerData data) {
     List<Long> containerBlocks = new ArrayList<>();
-    int blockCount = 0;
     for (int i = 0; i < numOfBlocksPerContainer; i++) {
       txnID = txnID + 1;
       BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
@@ -273,20 +273,12 @@ public class TestBlockDeletingService {
       }
       container.getContainerData().incrPendingDeletionBlocks(1);
 
-      // In below if statements we are checking if a single container
-      // consists of more blocks than 'blockLimitPerTask' then we create
-      // (totalBlocksInContainer / blockLimitPerTask) transactions which
-      // consists of blocks equal to blockLimitPerTask and last transaction
-      // consists of blocks equal to
-      // (totalBlocksInContainer % blockLimitPerTask).
+      // Below we are creating one transaction per block just for
+      // testing purpose
+
       containerBlocks.add(blockID.getLocalID());
-      blockCount++;
-      if (blockCount == blockLimitPerTask || i == (numOfBlocksPerContainer
-          - 1)) {
-        createTxn(data, containerBlocks, txnID, containerID);
-        containerBlocks.clear();
-        blockCount = 0;
-      }
+      createTxn(data, containerBlocks, txnID, containerID);
+      containerBlocks.clear();
     }
     updateMetaData(data, container, numOfBlocksPerContainer,
         numOfChunksPerBlock);
@@ -405,11 +397,10 @@ public class TestBlockDeletingService {
 
   @Test
   public void testBlockDeletion() throws Exception {
-    conf.setInt(OZONE_BLOCK_DELETING_CONTAINER_LIMIT_PER_INTERVAL, 10);
-    conf.setInt(OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER, 2);
-    this.blockLimitPerTask =
-        conf.getInt(OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER,
-            OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER_DEFAULT);
+    DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
+    dnConf.setBlockDeletionLimit(3);
+    this.blockLimitPerInterval = dnConf.getBlockDeletionLimit();
+    conf.setFromObject(dnConf);
     ContainerSet containerSet = new ContainerSet();
     createToDeleteBlocks(containerSet, 1, 3, 1);
     ContainerMetrics metrics = ContainerMetrics.create(conf);
@@ -511,11 +502,10 @@ public class TestBlockDeletingService {
 
   @Test
   public void testBlockDeletionTimeout() throws Exception {
-    conf.setInt(OZONE_BLOCK_DELETING_CONTAINER_LIMIT_PER_INTERVAL, 10);
-    conf.setInt(OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER, 2);
-    this.blockLimitPerTask =
-        conf.getInt(OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER,
-            OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER_DEFAULT);
+    DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
+    dnConf.setBlockDeletionLimit(3);
+    blockLimitPerInterval = dnConf.getBlockDeletionLimit();
+    conf.setFromObject(dnConf);
     ContainerSet containerSet = new ContainerSet();
     createToDeleteBlocks(containerSet, 1, 3, 1);
     ContainerMetrics metrics = ContainerMetrics.create(conf);
@@ -546,8 +536,9 @@ public class TestBlockDeletingService {
     svc.shutdown();
 
     // test for normal case that doesn't have timeout limitation
-    timeout  = 0;
+
     createToDeleteBlocks(containerSet, 1, 3, 1);
+    timeout  = 0;
     svc = new BlockDeletingService(ozoneContainer,
         TimeUnit.MILLISECONDS.toNanos(1000), timeout, TimeUnit.MILLISECONDS,
         conf);
@@ -558,7 +549,6 @@ public class TestBlockDeletingService {
         (KeyValueContainer) containerSet.getContainerIterator().next();
     KeyValueContainerData data = container.getContainerData();
     try (ReferenceCountedDB meta = BlockUtils.getDB(data, conf)) {
-
       LogCapturer newLog = LogCapturer.captureLogs(BackgroundService.LOG);
       GenericTestUtils.waitFor(() -> {
         try {
@@ -611,11 +601,10 @@ public class TestBlockDeletingService {
     conf.set(
         ScmConfigKeys.OZONE_SCM_KEY_VALUE_CONTAINER_DELETION_CHOOSING_POLICY,
         TopNOrderedContainerDeletionChoosingPolicy.class.getName());
-    conf.setInt(OZONE_BLOCK_DELETING_CONTAINER_LIMIT_PER_INTERVAL, 1);
-    conf.setInt(OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER, 1);
-    this.blockLimitPerTask =
-        conf.getInt(OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER,
-            OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER_DEFAULT);
+    DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
+    dnConf.setBlockDeletionLimit(1);
+    this.blockLimitPerInterval = dnConf.getBlockDeletionLimit();
+    conf.setFromObject(dnConf);
     ContainerSet containerSet = new ContainerSet();
 
     int containerCount = 2;
@@ -650,7 +639,7 @@ public class TestBlockDeletingService {
       // containers should be zero.
       deleteAndWait(service, 2);
 
-      Assert.assertTrue((containerData.get(1).getBytesUsed() == 0) && (
+      Assert.assertTrue((containerData.get(0).getBytesUsed() == 0) && (
           containerData.get(1).getBytesUsed() == 0));
     } finally {
       service.shutdown();
@@ -675,12 +664,13 @@ public class TestBlockDeletingService {
     //  - Container limit per interval : 10
     //  - Block limit per container : 2
     //
-    // Each time containers can be all scanned, but only 2 blocks
-    // per container can be actually deleted. So it requires 2 waves
-    // to cleanup all blocks.
-    conf.setInt(OZONE_BLOCK_DELETING_CONTAINER_LIMIT_PER_INTERVAL, 10);
-    blockLimitPerTask = 2;
-    conf.setInt(OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER, blockLimitPerTask);
+    // Each time containers can be all scanned, but only 10 blocks
+    // can be actually deleted. So it requires 2 waves
+    // to cleanup all the 15 blocks.
+    DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
+    dnConf.setBlockDeletionLimit(10);
+    this.blockLimitPerInterval = dnConf.getBlockDeletionLimit();
+    conf.setFromObject(dnConf);
     ContainerSet containerSet = new ContainerSet();
     ContainerMetrics metrics = ContainerMetrics.create(conf);
     KeyValueHandler keyValueHandler =
@@ -703,14 +693,16 @@ public class TestBlockDeletingService {
     try {
       GenericTestUtils.waitFor(service::isStarted, 100, 3000);
       // Total blocks = 3 * 5 = 15
-      // block per task = 2
-      // number of containers = 5
-      // each interval will at most runDeletingTasks 5 * 2 = 10 blocks
+      // blockLimitPerInterval = 10
+      // each interval will at most runDeletingTasks = 10 blocks
+      // but as per of deletion policy (random/topNorder), it will fetch all 3
+      // blocks from first 3 containers and 1 block from last container.
+      // C1 - 3 BLOCKS, C2 - 3 BLOCKS, C3 - 3 BLOCKS, C4 - 1 BLOCK
 
       // Deleted space of 10 blocks should be equal to (initial total space
       // of container - current total space of container).
       deleteAndWait(service, 1);
-      Assert.assertEquals(blockLimitPerTask * containerCount * blockSpace,
+      Assert.assertEquals(blockLimitPerInterval * blockSpace,
           (totalContainerSpace - currentBlockSpace(containerData,
               containerCount)));
 

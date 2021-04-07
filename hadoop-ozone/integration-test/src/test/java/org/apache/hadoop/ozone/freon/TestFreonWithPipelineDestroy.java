@@ -130,6 +130,6 @@ public class TestFreonWithPipelineDestroy {
     PipelineManager pipelineManager =
         cluster.getStorageContainerManager().getPipelineManager();
     Pipeline pipeline = pipelineManager.getPipeline(id);
-    pipelineManager.finalizeAndDestroyPipeline(pipeline, false);
+    pipelineManager.closePipeline(pipeline, false);
   }
 }

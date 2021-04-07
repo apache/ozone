@@ -36,16 +36,16 @@ public final class KeyValueContainerLocationUtil {
    * Returns Container Metadata Location.
    * @param hddsVolumeDir base dir of the hdds volume where scm directories
    *                      are stored
-   * @param scmId
+   * @param clusterId
    * @param containerId
    * @return containerMetadata Path to container metadata location where
    * .container file will be stored.
    */
   public static File getContainerMetaDataPath(String hddsVolumeDir,
-                                              String scmId,
+                                              String clusterId,
                                               long containerId) {
     String containerMetaDataPath =
-        getBaseContainerLocation(hddsVolumeDir, scmId,
+        getBaseContainerLocation(hddsVolumeDir, clusterId,
             containerId);
     containerMetaDataPath = containerMetaDataPath + File.separator +
         OzoneConsts.CONTAINER_META_PATH;
@@ -56,35 +56,36 @@ public final class KeyValueContainerLocationUtil {
   /**
    * Returns Container Chunks Location.
    * @param baseDir
-   * @param scmId
+   * @param clusterId
    * @param containerId
    * @return chunksPath
    */
-  public static File getChunksLocationPath(String baseDir, String scmId,
+  public static File getChunksLocationPath(String baseDir, String clusterId,
                                            long containerId) {
-    String chunksPath = getBaseContainerLocation(baseDir, scmId, containerId)
-        + File.separator + OzoneConsts.STORAGE_DIR_CHUNKS;
+    String chunksPath =
+        getBaseContainerLocation(baseDir, clusterId, containerId)
+            + File.separator + OzoneConsts.STORAGE_DIR_CHUNKS;
     return new File(chunksPath);
   }
 
   /**
    * Returns base directory for specified container.
    * @param hddsVolumeDir
-   * @param scmId
+   * @param clusterId
    * @param containerId
    * @return base directory for container.
    */
   private static String getBaseContainerLocation(String hddsVolumeDir,
-                                                 String scmId,
+                                                 String clusterId,
                                                  long containerId) {
     Preconditions.checkNotNull(hddsVolumeDir, "Base Directory cannot be null");
-    Preconditions.checkNotNull(scmId, "scmUuid cannot be null");
+    Preconditions.checkNotNull(clusterId, "scmUuid cannot be null");
     Preconditions.checkState(containerId >= 0,
         "Container Id cannot be negative.");
 
     String containerSubDirectory = getContainerSubDirectory(containerId);
 
-    String containerMetaDataPath = hddsVolumeDir  + File.separator + scmId +
+    String containerMetaDataPath = hddsVolumeDir  + File.separator + clusterId +
         File.separator + Storage.STORAGE_DIR_CURRENT + File.separator +
         containerSubDirectory + File.separator + containerId;
 

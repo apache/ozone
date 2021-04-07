@@ -17,24 +17,13 @@
 
 package org.apache.hadoop.ozone.recon;
 
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
-import static org.apache.hadoop.hdds.scm.events.SCMEvents.CLOSE_CONTAINER;
-import static org.apache.hadoop.ozone.container.ozoneimpl.TestOzoneContainer.runTestOzoneContainerViaDataNode;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-
 import java.util.Optional;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
@@ -54,6 +43,17 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.junit.rules.Timeout;
 import org.slf4j.event.Level;
+
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
+import static org.apache.hadoop.hdds.scm.events.SCMEvents.CLOSE_CONTAINER;
+import static org.apache.hadoop.ozone.container.ozoneimpl.TestOzoneContainer.runTestOzoneContainerViaDataNode;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 /**
  * Recon's passive SCM integration tests.
@@ -116,8 +116,8 @@ public class TestReconAsPassiveScm {
         "Trying to create pipeline in Recon, which is prohibited!",
         () -> reconPipelineManager.createPipeline(RATIS, ONE));
 
-    ContainerManager scmContainerManager = scm.getContainerManager();
-    assertTrue(scmContainerManager.getContainerIDs().isEmpty());
+    ContainerManagerV2 scmContainerManager = scm.getContainerManager();
+    assertTrue(scmContainerManager.getContainers().isEmpty());
 
     // Verify if all the 3 nodes are registered with Recon.
     NodeManager reconNodeManager = reconScm.getScmNodeManager();
@@ -126,7 +126,7 @@ public class TestReconAsPassiveScm {
         reconNodeManager.getAllNodes().size());
 
     // Create container
-    ContainerManager reconContainerManager = reconScm.getContainerManager();
+    ContainerManagerV2 reconContainerManager = reconScm.getContainerManager();
     ContainerInfo containerInfo =
         scmContainerManager.allocateContainer(RATIS, ONE, "test");
     long containerID = containerInfo.getContainerID();
@@ -156,10 +156,10 @@ public class TestReconAsPassiveScm {
     StorageContainerManager scm = cluster.getStorageContainerManager();
 
     // Stop Recon
-    ContainerManager scmContainerManager = scm.getContainerManager();
-    assertTrue(scmContainerManager.getContainerIDs().isEmpty());
-    ContainerManager reconContainerManager = reconScm.getContainerManager();
-    assertTrue(reconContainerManager.getContainerIDs().isEmpty());
+    ContainerManagerV2 scmContainerManager = scm.getContainerManager();
+    assertTrue(scmContainerManager.getContainers().isEmpty());
+    ContainerManagerV2 reconContainerManager = reconScm.getContainerManager();
+    assertTrue(reconContainerManager.getContainers().isEmpty());
 
     LambdaTestUtils.await(60000, 5000,
         () -> (reconScm.getScmNodeManager().getAllNodes().size() == 3));
@@ -175,7 +175,7 @@ public class TestReconAsPassiveScm {
         scmPipelineManager.getPipeline(containerInfo.getPipelineID());
     XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf);
     runTestOzoneContainerViaDataNode(containerID, client);
-    assertFalse(scmContainerManager.getContainerIDs().isEmpty());
+    assertFalse(scmContainerManager.getContainers().isEmpty());
 
     // Close a pipeline
     Optional<Pipeline> pipelineToClose = scmPipelineManager
@@ -184,7 +184,7 @@ public class TestReconAsPassiveScm {
         .filter(p -> !p.getId().equals(containerInfo.getPipelineID()))
         .findFirst();
     assertTrue(pipelineToClose.isPresent());
-    scmPipelineManager.finalizeAndDestroyPipeline(pipelineToClose.get(), false);
+    scmPipelineManager.closePipeline(pipelineToClose.get(), false);
 
     // Start Recon
     cluster.startRecon();
@@ -205,6 +205,6 @@ public class TestReconAsPassiveScm {
 
     LambdaTestUtils.await(90000, 5000,
         () -> (newReconScm.getContainerManager()
-            .exists(ContainerID.valueof(containerID))));
+            .containerExist(ContainerID.valueOf(containerID))));
   }
 }
