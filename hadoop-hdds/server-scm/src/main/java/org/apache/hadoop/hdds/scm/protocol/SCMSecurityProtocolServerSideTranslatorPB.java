@@ -77,10 +77,14 @@ public class SCMSecurityProtocolServerSideTranslatorPB
   @Override
   public SCMSecurityResponse submitRequest(RpcController controller,
       SCMSecurityRequest request) throws ServiceException {
-    if (!scm.checkLeader()) {
-      throw new ServiceException(scm.getScmHAManager()
-          .getRatisServer()
-          .triggerNotLeaderException());
+    // For request type GetSCMCertificate we don't need leader check. As
+    // primary SCM may not be leader SCM.
+    if (!request.getCmdType().equals(GetSCMCertificate)) {
+      if (!scm.checkLeader()) {
+        throw new ServiceException(scm.getScmHAManager()
+            .getRatisServer()
+            .triggerNotLeaderException());
+      }
     }
     return dispatcher.processRequest(request, this::processRequest,
         request.getCmdType(), request.getTraceID());
