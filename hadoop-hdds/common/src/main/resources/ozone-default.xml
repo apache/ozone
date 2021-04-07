@@ -2771,12 +2771,15 @@
   </property>
 
   <property>
-    <name>ozone.om.layout.version</name>
+    <name>ozone.om.metadata.layout</name>
     <tag>OZONE, OM</tag>
-    <value>V0</value>
-    <description>Temporary workaround for OM upgrade and will be replaced once
-      upgrade HDDS-3698 story reaches consensus. Defaulting to 'V0' so that
-      existing unit test cases won't be affected. New OM version should be 'V1'
+    <value>LEGACY</value>
+    <description>
+      This property is used to define the metadata layout of file system
+      paths. If it is configured as PREFIX in combination with
+      ozone.om.enable.filesystem.paths to true then this allows to perform
+      atomic rename and delete of any directory at any level in the namespace.
+      Defaulting to LEGACY. Supported values: LEGACY and PREFIX.
     </description>
   </property>
   <property>

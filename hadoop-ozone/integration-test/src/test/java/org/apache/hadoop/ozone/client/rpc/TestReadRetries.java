@@ -103,8 +103,8 @@ public class TestReadRetries {
   @Parameterized.Parameters
   public static Collection<Object[]> data() {
     return Arrays.asList(
-            new Object[]{OMConfigKeys.OZONE_OM_LAYOUT_VERSION_DEFAULT},
-            new Object[]{OMConfigKeys.OZONE_OM_LAYOUT_VERSION_V1});
+            new Object[]{OMConfigKeys.OZONE_OM_METADATA_LAYOUT_DEFAULT },
+            new Object[]{OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX });
   }
 
   /**

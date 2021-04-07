@@ -467,8 +467,8 @@ public final class TestOMRequestUtils {
     metadataList.add(HddsProtos.KeyValue.newBuilder().setKey("key2").setValue(
             "value2").build());
     metadataList.add(HddsProtos.KeyValue.newBuilder().setKey(
-            OMConfigKeys.OZONE_OM_LAYOUT_VERSION).setValue(
-            OMConfigKeys.OZONE_OM_LAYOUT_VERSION_V1).build());
+            OMConfigKeys.OZONE_OM_METADATA_LAYOUT).setValue(
+            OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX).build());
     metadataList.add(HddsProtos.KeyValue.newBuilder().setKey(
             OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS).setValue(
             "false").build());
@@ -967,6 +967,6 @@ public final class TestOMRequestUtils {
       boolean enableFileSystemPaths, String version) {
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
             enableFileSystemPaths);
-    conf.set(OMConfigKeys.OZONE_OM_LAYOUT_VERSION, version);
+    conf.set(OMConfigKeys.OZONE_OM_METADATA_LAYOUT, version);
   }
 }

@@ -106,7 +106,7 @@ public class TestOzoneClientMultipartUploadV1 {
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     TestOMRequestUtils.configureFSOptimizedPaths(conf,
-            true, OMConfigKeys.OZONE_OM_LAYOUT_VERSION_V1);
+            true, OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX);
     startCluster(conf);
   }
 

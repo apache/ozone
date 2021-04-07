@@ -39,8 +39,8 @@ public class TestOMBucketCreateRequestV1 extends TestOMBucketCreateRequest {
 
   @Test
   public void testValidateAndUpdateCacheWithFSOBucket() throws Exception {
-    when(ozoneManager.getOMLayoutVersion()).thenReturn(
-            OMConfigKeys.OZONE_OM_LAYOUT_VERSION_V1);
+    when(ozoneManager.getOMMetadataLayout()).thenReturn(
+            OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX);
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 

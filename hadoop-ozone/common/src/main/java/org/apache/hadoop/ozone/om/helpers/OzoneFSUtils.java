@@ -216,18 +216,18 @@ public final class OzoneFSUtils {
    */
   public static boolean isFSOptimizedBucket(
       Map<String, String> bucketMetadata) {
-    // layout version V1 represents optimized FS path
-    boolean layoutVersionEnabled =
+    // layout 'PREFIX' represents optimized FS path
+    boolean metadataLayoutEnabled =
         org.apache.commons.lang3.StringUtils.equalsIgnoreCase(
-            OMConfigKeys.OZONE_OM_LAYOUT_VERSION_V1,
+            OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX,
             bucketMetadata
-                .get(OMConfigKeys.OZONE_OM_LAYOUT_VERSION));
+                .get(OMConfigKeys.OZONE_OM_METADATA_LAYOUT));
 
     boolean fsEnabled =
         Boolean.parseBoolean(bucketMetadata
             .get(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS));
 
-    return layoutVersionEnabled && fsEnabled;
+    return metadataLayoutEnabled && fsEnabled;
   }
 
   public static String removeTrailingSlashIfNeeded(String key) {

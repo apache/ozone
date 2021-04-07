@@ -102,7 +102,7 @@ public class TestObjectStoreV1 {
     scmId = UUID.randomUUID().toString();
     omId = UUID.randomUUID().toString();
     TestOMRequestUtils.configureFSOptimizedPaths(conf,
-            true, OMConfigKeys.OZONE_OM_LAYOUT_VERSION_V1);
+            true, OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX);
     cluster = MiniOzoneCluster.newBuilder(conf)
             .setClusterId(clusterId)
             .setScmId(scmId)

@@ -28,7 +28,7 @@ public class TestHadoopDirTreeGeneratorV1 extends TestHadoopDirTreeGenerator {
   protected OzoneConfiguration getOzoneConfiguration() {
     OzoneConfiguration conf = new OzoneConfiguration();
     TestOMRequestUtils.configureFSOptimizedPaths(conf,
-            true, OMConfigKeys.OZONE_OM_LAYOUT_VERSION_V1);
+            true, OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX);
     return conf;
   }
 
