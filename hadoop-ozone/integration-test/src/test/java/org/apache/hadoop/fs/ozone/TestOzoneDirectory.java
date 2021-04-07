@@ -151,7 +151,7 @@ public class TestOzoneDirectory {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(FS_TRASH_INTERVAL_KEY, 1);
     TestOMRequestUtils.configureFSOptimizedPaths(conf,
-            true, OMConfigKeys.OZONE_OM_LAYOUT_VERSION_V1);
+            true, OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX);
     cluster = MiniOzoneCluster.newBuilder(conf)
             .setNumDatanodes(3)
             .build();

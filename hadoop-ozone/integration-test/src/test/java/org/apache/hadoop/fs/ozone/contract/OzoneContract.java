@@ -88,8 +88,8 @@ class OzoneContract extends AbstractFSContract {
     if (fsOptimizedServer){
       conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
           true);
-      conf.set(OMConfigKeys.OZONE_OM_LAYOUT_VERSION,
-          OMConfigKeys.OZONE_OM_LAYOUT_VERSION_V1);
+      conf.set(OMConfigKeys.OZONE_OM_METADATA_LAYOUT,
+          OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX);
     }
 
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(5).build();
