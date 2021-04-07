@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
+import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -227,5 +228,23 @@ public class TestStorageContainerManagerHA {
     Assert.assertTrue(StorageContainerManager.scmBootstrap(conf2));
     Assert.assertTrue(
         StorageContainerManager.scmInit(conf2, scm2.getClusterId()));
+  }
+
+  @Test
+  public void testBootStrapSCM() throws Exception {
+    StorageContainerManager scm2 = cluster.getStorageContainerManagers().get(1);
+    OzoneConfiguration conf2 = scm2.getConfiguration();
+    boolean isDeleted = scm2.getScmStorageConfig().getVersionFile().delete();
+    Assert.assertTrue(isDeleted);
+    final SCMStorageConfig scmStorageConfig = new SCMStorageConfig(conf2);
+    scmStorageConfig.setClusterId(UUID.randomUUID().toString());
+    scmStorageConfig.getCurrentDir().delete();
+    scmStorageConfig.initialize();
+    conf2.setBoolean(ScmConfigKeys.OZONE_SCM_SKIP_BOOTSTRAP_VALIDATION_KEY,
+        false);
+    Assert.assertFalse(StorageContainerManager.scmBootstrap(conf2));
+    conf2.setBoolean(ScmConfigKeys.OZONE_SCM_SKIP_BOOTSTRAP_VALIDATION_KEY,
+        true);
+    Assert.assertTrue(StorageContainerManager.scmBootstrap(conf2));
   }
 }
