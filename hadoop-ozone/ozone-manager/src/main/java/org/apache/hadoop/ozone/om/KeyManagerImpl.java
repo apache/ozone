@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.Stack;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
@@ -1764,6 +1765,12 @@ public class KeyManagerImpl implements KeyManager {
       if (context.getAclRights() == IAccessAuthorizer.ACLType.WRITE) {
         keyInfo = metadataManager.getOpenKeyTable().get(objectKey);
       } else {
+        // Recursive check is done only for ACL_TYPE DELETE
+        // Rename and delete operations will send ACL_TYPE DELETE
+        if (context.isRecursiveAccessCheck()
+            && context.getAclRights() == IAccessAuthorizer.ACLType.DELETE) {
+          return checkChildrenAcls(ozObject, context);
+        }
         try {
           OzoneFileStatus fileStatus = getFileStatus(args);
           keyInfo = fileStatus.getKeyInfo();
@@ -1806,6 +1813,52 @@ public class KeyManagerImpl implements KeyManager {
     } finally {
       metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volume, bucket);
     }
+  }
+
+  /**
+   * check acls for all subpaths of a directory.
+   *
+   * @param ozObject
+   * @param context
+   * @return
+   * @throws IOException
+   */
+  private boolean checkChildrenAcls(OzoneObj ozObject, RequestContext context)
+      throws IOException {
+    OmKeyInfo keyInfo;
+    OzoneFileStatus ozoneFileStatus =
+        ozObject.getOzonePrefixPathViewer().getOzoneFileStatus();
+    keyInfo = ozoneFileStatus.getKeyInfo();
+    // Using stack to check acls for subpaths
+    Stack<OzoneFileStatus> directories = new Stack<>();
+    // check whether given file/dir  has access
+    boolean hasAccess = OzoneAclUtil.checkAclRight(keyInfo.getAcls(), context);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("user:{} has access rights for key:{} :{} ",
+          context.getClientUgi(), ozObject.getKeyName(), hasAccess);
+    }
+    if (ozoneFileStatus.isDirectory() && hasAccess) {
+      directories.add(ozoneFileStatus);
+    }
+    while (!directories.isEmpty() && hasAccess) {
+      ozoneFileStatus = directories.pop();
+      String keyPath = ozoneFileStatus.getTrimmedName();
+      Iterator<? extends OzoneFileStatus> children =
+          ozObject.getOzonePrefixPathViewer().getChildren(keyPath);
+      while (hasAccess && children.hasNext()) {
+        ozoneFileStatus = children.next();
+        keyInfo = ozoneFileStatus.getKeyInfo();
+        hasAccess = OzoneAclUtil.checkAclRight(keyInfo.getAcls(), context);
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("user:{} has access rights for key:{} :{} ",
+              context.getClientUgi(), keyInfo.getKeyName(), hasAccess);
+        }
+        if (hasAccess && ozoneFileStatus.isDirectory()) {
+          directories.add(ozoneFileStatus);
+        }
+      }
+    }
+    return hasAccess;
   }
 
   /**
