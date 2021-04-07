@@ -159,7 +159,7 @@ public class PipelineManagerV2Impl implements PipelineManager {
       recordMetricsForPipeline(pipeline);
       return pipeline;
     } catch (IOException ex) {
-      LOG.error("Failed to create pipeline of type {} and factor {}. " +
+      LOG.debug("Failed to create pipeline of type {} and factor {}. " +
           "Exception: {}", type, factor, ex.getMessage());
       metrics.incNumPipelineCreationFailed();
       throw ex;

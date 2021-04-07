@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.container.ContainerStateManagerV2;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
+import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.apache.ratis.server.RaftServer;
 import org.junit.Assert;
@@ -90,6 +91,11 @@ public class TestReplicationAnnotation {
       public SCMStateMachine getSCMStateMachine() {
         return null;
       }
+
+      @Override
+      public GrpcTlsConfig getGrpcTlsConfig() {
+        return null;
+      }
     };
   }
 
@@ -125,7 +131,7 @@ public class TestReplicationAnnotation {
     try {
       certificateStore.storeValidCertificate(BigInteger.valueOf(100L),
           KeyStoreTestUtil.generateCertificate("CN=Test", keyPair, 30,
-          "SHA256withRSA"), HddsProtos.NodeType.SCM);
+          "SHA256withRSA"), HddsProtos.NodeType.DATANODE);
       Assert.fail("Cannot reach here: should have seen a IOException");
     } catch (IOException ignore) {
       Assert.assertNotNull(ignore.getMessage() != null);
