@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -65,6 +66,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import org.junit.AfterClass;
@@ -117,6 +119,9 @@ public class TestDeleteWithSlowFollower {
         TimeUnit.SECONDS);
     conf.setTimeDuration(OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, 1000,
         TimeUnit.SECONDS);
+    conf.setTimeDuration(OZONE_SCM_PIPELINE_CREATION_INTERVAL, 1000,
+        TimeUnit.SECONDS);
+
     DatanodeRatisServerConfig ratisServerConfig =
         conf.getObject(DatanodeRatisServerConfig.class);
     ratisServerConfig.setFollowerSlownessTimeout(Duration.ofSeconds(1000));
@@ -278,9 +283,17 @@ public class TestDeleteWithSlowFollower {
     client.getObjectStore().getVolume(volumeName).getBucket(bucketName).
             deleteKey("ratis");
     GenericTestUtils.waitFor(() -> {
-      return
-          dnStateMachine.getCommandDispatcher().getDeleteBlocksCommandHandler()
-              .getInvocationCount() >= 1;
+      try {
+        if (SCMHAUtils.isSCMHAEnabled(cluster.getConf())) {
+          cluster.getStorageContainerManager().getScmHAManager()
+              .asSCMHADBTransactionBuffer().flush();
+        }
+        return
+            dnStateMachine.getCommandDispatcher()
+                .getDeleteBlocksCommandHandler().getInvocationCount() >= 1;
+      } catch (IOException e) {
+        return false;
+      }
     }, 500, 100000);
     Assert.assertTrue(containerData.getDeleteTransactionId() > delTrxId);
     Assert.assertTrue(

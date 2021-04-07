@@ -97,7 +97,7 @@ Delete file with Trash
                    Execute               ozone fs -rm ${DEEP_URL}/testFile.txt
     ${result} =    Execute               ozone fs -ls -R ${BASE_URL}/
                    Should not contain    ${result}     ${DEEP_URL}/testFile.txt
-                   Should Contain Any    ${result}     .Trash/hadoop    .Trash/testuser/scm@EXAMPLE.COM    .Trash/root
+                   Should Contain Any    ${result}     .Trash/hadoop    .Trash/testuser    .Trash/root
                    Should contain        ${result}     ${DEEP_DIR}/testFile.txt
 
 Delete recursively

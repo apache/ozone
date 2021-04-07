@@ -88,6 +88,12 @@ public class TestStorageContainerManagerStarter {
   }
 
   @Test
+  public void testPassingBootStrapSwitchCallsBootStrap() {
+    executeCommand("--bootstrap");
+    assertTrue(mock.bootStrapCalled);
+  }
+
+  @Test
   public void testInitSwitchAcceptsClusterIdSSwitch() {
     executeCommand("--init", "--clusterid=abcdefg");
     assertEquals("abcdefg", mock.clusterId);
@@ -100,10 +106,27 @@ public class TestStorageContainerManagerStarter {
   }
 
   @Test
+  public void testBootStrapSwitchWithInvalidParamDoesNotRun() {
+    executeCommand("--bootstrap", "--clusterid=abcdefg", "--invalid");
+    assertFalse(mock.bootStrapCalled);
+  }
+
+  @Test
   public void testUnSuccessfulInitThrowsException() {
     mock.throwOnInit = true;
     try {
       executeCommand("--init");
+      fail("Exception show have been thrown");
+    } catch (Exception e) {
+      assertTrue(true);
+    }
+  }
+
+  @Test
+  public void testUnSuccessfulBootStrapThrowsException() {
+    mock.throwOnBootstrap = true;
+    try {
+      executeCommand("--bootstrap");
       fail("Exception show have been thrown");
     } catch (Exception e) {
       assertTrue(true);
@@ -140,8 +163,10 @@ public class TestStorageContainerManagerStarter {
     private boolean initStatus = true;
     private boolean throwOnStart = false;
     private boolean throwOnInit  = false;
+    private boolean throwOnBootstrap  = false;
     private boolean startCalled = false;
     private boolean initCalled = false;
+    private boolean bootStrapCalled = false;
     private boolean generateCalled = false;
     private String clusterId = null;
 
@@ -161,6 +186,16 @@ public class TestStorageContainerManagerStarter {
       }
       initCalled = true;
       clusterId = cid;
+      return initStatus;
+    }
+
+    @Override
+    public boolean bootStrap(OzoneConfiguration conf)
+        throws IOException {
+      if (throwOnBootstrap) {
+        throw new IOException("Simulated error on init");
+      }
+      bootStrapCalled = true;
       return initStatus;
     }
 

@@ -167,7 +167,7 @@ public class TestSecureContainerServer {
     HddsDispatcher hddsDispatcher = new HddsDispatcher(
         conf, containerSet, volumeSet, handlers, context, metrics,
         new BlockTokenVerifier(new SecurityConfig((conf)), caClient));
-    hddsDispatcher.setScmId(scmId.toString());
+    hddsDispatcher.setClusterId(scmId.toString());
     return hddsDispatcher;
   }
 

@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.recon;
 
 import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.hdds.utils.HAUtils.checkSecurityAndSCMHAEnabled;
 
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.StringUtils;
@@ -75,6 +76,7 @@ public class ReconServer extends GenericCli {
         ReconServer.class, originalArgs, LOG);
 
     configuration = createOzoneConfiguration();
+    checkSecurityAndSCMHAEnabled(configuration);
     ConfigurationProvider.setConfiguration(configuration);
 
     injector =  Guice.createInjector(new

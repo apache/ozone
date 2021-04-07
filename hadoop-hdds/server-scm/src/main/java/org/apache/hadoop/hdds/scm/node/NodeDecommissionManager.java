@@ -21,8 +21,9 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
+import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -34,6 +35,7 @@ import java.net.InetAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.Executors;
@@ -49,7 +51,7 @@ public class NodeDecommissionManager {
   private DatanodeAdminMonitor monitor;
 
   private NodeManager nodeManager;
-  //private ContainerManager containerManager;
+  //private ContainerManagerV2 containerManager;
   private EventPublisher eventQueue;
   private ReplicationManager replicationManager;
   private OzoneConfiguration conf;
@@ -169,7 +171,7 @@ public class NodeDecommissionManager {
   }
 
   public NodeDecommissionManager(OzoneConfiguration config, NodeManager nm,
-      ContainerManager containerManager,
+      ContainerManagerV2 containerManager,
       EventPublisher eventQueue, ReplicationManager rm) {
     this.nodeManager = nm;
     conf = config;
@@ -213,9 +215,10 @@ public class NodeDecommissionManager {
     return monitor;
   }
 
-  public synchronized void decommissionNodes(List nodes)
-      throws InvalidHostStringException {
+  public synchronized List<DatanodeAdminError> decommissionNodes(
+      List<String> nodes) throws InvalidHostStringException {
     List<DatanodeDetails> dns = mapHostnamesToDatanodes(nodes);
+    List<DatanodeAdminError> errors = new ArrayList<>();
     for (DatanodeDetails dn : dns) {
       try {
         startDecommission(dn);
@@ -227,13 +230,13 @@ public class NodeDecommissionManager {
         // log a warning and ignore the exception
         LOG.warn("The host {} was not found in SCM. Ignoring the request to "+
             "decommission it", dn.getHostName());
+        errors.add(new DatanodeAdminError(dn.getHostName(),
+            "The host was not found in SCM"));
       } catch (InvalidNodeStateException e) {
-        // TODO - decide how to handle this. We may not want to fail all nodes
-        //        only one is in a bad state, as some nodes may have been OK
-        //        and already processed. Perhaps we should return a list of
-        //        error and feed that all the way back to the client?
+        errors.add(new DatanodeAdminError(dn.getHostName(), e.getMessage()));
       }
     }
+    return errors;
   }
 
   /**
@@ -272,9 +275,10 @@ public class NodeDecommissionManager {
     }
   }
 
-  public synchronized void recommissionNodes(List nodes)
-      throws InvalidHostStringException {
+  public synchronized List<DatanodeAdminError> recommissionNodes(
+      List<String> nodes) throws InvalidHostStringException {
     List<DatanodeDetails> dns = mapHostnamesToDatanodes(nodes);
+    List<DatanodeAdminError> errors = new ArrayList<>();
     for (DatanodeDetails dn : dns) {
       try {
         recommission(dn);
@@ -286,8 +290,11 @@ public class NodeDecommissionManager {
         // log a warning and ignore the exception
         LOG.warn("Host {} was not found in SCM. Ignoring the request to "+
             "recommission it.", dn.getHostName());
+        errors.add(new DatanodeAdminError(dn.getHostName(),
+            "The host was not found in SCM"));
       }
     }
+    return errors;
   }
 
   public synchronized void recommission(DatanodeDetails dn)
@@ -305,9 +312,10 @@ public class NodeDecommissionManager {
     }
   }
 
-  public synchronized void startMaintenanceNodes(List nodes, int endInHours)
-      throws InvalidHostStringException {
+  public synchronized List<DatanodeAdminError> startMaintenanceNodes(
+      List<String> nodes, int endInHours) throws InvalidHostStringException {
     List<DatanodeDetails> dns = mapHostnamesToDatanodes(nodes);
+    List<DatanodeAdminError> errors = new ArrayList<>();
     for (DatanodeDetails dn : dns) {
       try {
         startMaintenance(dn, endInHours);
@@ -320,12 +328,10 @@ public class NodeDecommissionManager {
         LOG.warn("The host {} was not found in SCM. Ignoring the request to "+
             "start maintenance on it", dn.getHostName());
       } catch (InvalidNodeStateException e) {
-        // TODO - decide how to handle this. We may not want to fail all nodes
-        //        only one is in a bad state, as some nodes may have been OK
-        //        and already processed. Perhaps we should return a list of
-        //        error and feed that all the way back to the client?
+        errors.add(new DatanodeAdminError(dn.getHostName(), e.getMessage()));
       }
     }
+    return errors;
   }
 
   // TODO - If startMaintenance is called on a host already in maintenance,

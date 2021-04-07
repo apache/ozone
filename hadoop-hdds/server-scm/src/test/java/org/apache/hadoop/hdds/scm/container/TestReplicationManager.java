@@ -19,7 +19,7 @@
 package org.apache.hadoop.hdds.scm.container;
 
 import com.google.common.primitives.Longs;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
@@ -33,6 +33,8 @@ import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -57,6 +59,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
@@ -86,15 +89,19 @@ public class TestReplicationManager {
   private EventQueue eventQueue;
   private DatanodeCommandHandler datanodeCommandHandler;
   private SimpleMockNodeManager nodeManager;
-  private ContainerManager containerManager;
-  private ConfigurationSource conf;
+  private ContainerManagerV2 containerManager;
+  private OzoneConfiguration conf;
   private SCMNodeManager scmNodeManager;
 
   @Before
   public void setup()
       throws IOException, InterruptedException, NodeNotFoundException {
     conf = new OzoneConfiguration();
-    containerManager = Mockito.mock(ContainerManager.class);
+    conf.setTimeDuration(
+        HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
+        0, TimeUnit.SECONDS);
+
+    containerManager = Mockito.mock(ContainerManagerV2.class);
     nodeManager = new SimpleMockNodeManager();
     eventQueue = new EventQueue();
     containerStateManager = new ContainerStateManager(conf);
@@ -102,8 +109,15 @@ public class TestReplicationManager {
     datanodeCommandHandler = new DatanodeCommandHandler();
     eventQueue.addHandler(SCMEvents.DATANODE_COMMAND, datanodeCommandHandler);
 
-    Mockito.when(containerManager.getContainerIDs())
-        .thenAnswer(invocation -> containerStateManager.getAllContainerIDs());
+    Mockito.when(containerManager.getContainers())
+        .thenAnswer(invocation -> {
+          Set<ContainerID> ids = containerStateManager.getAllContainerIDs();
+          List<ContainerInfo> containers = new ArrayList<>();
+          for (ContainerID id : ids) {
+            containers.add(containerStateManager.getContainer(id));
+          }
+          return containers;
+        });
 
     Mockito.when(containerManager.getContainer(Mockito.any(ContainerID.class)))
         .thenAnswer(invocation -> containerStateManager
@@ -139,28 +153,43 @@ public class TestReplicationManager {
         Mockito.any(DatanodeDetails.class)))
         .thenReturn(NodeStatus.inServiceHealthy());
 
+    SCMServiceManager serviceManager = new SCMServiceManager();
+
     replicationManager = new ReplicationManager(
-        new ReplicationManagerConfiguration(),
+        conf,
         containerManager,
         containerPlacementPolicy,
         eventQueue,
+        SCMContext.emptyContext(),
+        serviceManager,
         new LockManager<>(conf),
         nodeManager);
-    replicationManager.start();
+
+    serviceManager.notifyStatusChanged();
     Thread.sleep(100L);
   }
 
   private void createReplicationManager(ReplicationManagerConfiguration rmConf)
       throws InterruptedException {
+    OzoneConfiguration config = new OzoneConfiguration();
+    config.setTimeDuration(
+        HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
+        0, TimeUnit.SECONDS);
+    config.setFromObject(rmConf);
+
+    SCMServiceManager serviceManager = new SCMServiceManager();
+
     replicationManager = new ReplicationManager(
-        rmConf,
+        config,
         containerManager,
         containerPlacementPolicy,
         eventQueue,
-        new LockManager<ContainerID>(conf),
+        SCMContext.emptyContext(),
+        serviceManager,
+        new LockManager<ContainerID>(config),
         nodeManager);
 
-    replicationManager.start();
+    serviceManager.notifyStatusChanged();
     Thread.sleep(100L);
   }
 

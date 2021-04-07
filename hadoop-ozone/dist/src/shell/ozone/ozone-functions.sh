@@ -1443,13 +1443,35 @@ function ozone_translate_cygwin_path
 ## @replaceable  yes
 function ozone_add_default_gc_opts
 {
+  java_major_version=$(ozone_get_java_major_version)
   if [[ "${OZONE_SUBCMD_SUPPORTDAEMONIZATION}" == true ]]; then
     if [[ ! "$OZONE_OPTS" =~ "-XX" ]] ; then
-       ozone_error "No '-XX:...' jvm parameters are set. Adding safer GC settings '-XX:ParallelGCThreads=8 -XX:+UseConcMarkSweepGC -XX:CMSInitiatingOccupancyFraction=70 -XX:+CMSParallelRemarkEnabled' to the OZONE_OPTS"
-       OZONE_OPTS="${OZONE_OPTS} -XX:ParallelGCThreads=8 -XX:+UseConcMarkSweepGC -XX:CMSInitiatingOccupancyFraction=70 -XX:+CMSParallelRemarkEnabled"
+      OZONE_OPTS="${OZONE_OPTS} -XX:ParallelGCThreads=8"
+      if [[ "$java_major_version" -lt 15 ]]; then
+        OZONE_OPTS="${OZONE_OPTS} -XX:+UseConcMarkSweepGC -XX:CMSInitiatingOccupancyFraction=70 -XX:+CMSParallelRemarkEnabled"
+        ozone_error "No '-XX:...' jvm parameters are set. Adding safer GC settings '-XX:ParallelGCThreads=8 -XX:+UseConcMarkSweepGC -XX:CMSInitiatingOccupancyFraction=70 -XX:+CMSParallelRemarkEnabled' to the OZONE_OPTS"
+      else
+        ozone_error "No '-XX:...' jvm parameters are set. Adding safer GC settings '-XX:ParallelGCThreads=8' to the OZONE_OPTS"
+      fi
     fi
   fi
 }
+
+## @description  Get Java Major version
+## @audience     private
+## @stability    yes
+## @replaceable  yes
+function ozone_get_java_major_version
+{
+  version=$("${JAVA}" -version 2>&1 | awk -F '"' '/version/ {print $2}')
+  if [[ "$version" =~ ^1\..* ]]; then
+    major=$(echo $version | cut -d. -f2)
+  else
+    major=$(echo $version | cut -d. -f1)
+  fi
+  echo "$major"
+}
+
 ## @description  Adds the OZONE_CLIENT_OPTS variable to
 ## @description  OZONE_OPTS if OZONE_SUBCMD_SUPPORTDAEMONIZATION is false
 ## @audience     public

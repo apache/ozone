@@ -172,11 +172,7 @@ public class ReconControllerModule extends AbstractModule {
   StorageContainerLocationProtocol getSCMProtocol(
       final OzoneConfiguration configuration) {
     StorageContainerLocationProtocol storageContainerLocationProtocol = null;
-    try {
-      storageContainerLocationProtocol = newContainerRpcClient(configuration);
-    } catch (IOException e) {
-      LOG.error("Error in provisioning StorageContainerLocationProtocol ", e);
-    }
+    storageContainerLocationProtocol = newContainerRpcClient(configuration);
     return storageContainerLocationProtocol;
   }
 

@@ -32,32 +32,30 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ScmOps;
 import org.apache.hadoop.hdds.scm.PipelineRequestInformation;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.ScmUtils;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
-import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
-import org.apache.hadoop.hdds.scm.safemode.SafeModePrecheck;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.apache.hadoop.hdds.utils.UniqueId;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.util.StringUtils;
 
 import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.INVALID_BLOCK_SIZE;
+import static org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator.LOCAL_ID;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT;
+
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,17 +68,18 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
   // Currently only user of the block service is Ozone, CBlock manages blocks
   // by itself and does not rely on the Block service offered by SCM.
 
+  private final StorageContainerManager scm;
   private final PipelineManager pipelineManager;
-  private final ContainerManager containerManager;
+  private final ContainerManagerV2 containerManager;
 
   private final long containerSize;
 
-  private final DeletedBlockLog deletedBlockLog;
+  private DeletedBlockLog deletedBlockLog;
   private final SCMBlockDeletingService blockDeletingService;
 
   private ObjectName mxBean;
-  private SafeModePrecheck safeModePrecheck;
-  private PipelineChoosePolicy pipelineChoosePolicy;
+  private final PipelineChoosePolicy pipelineChoosePolicy;
+  private final SequenceIdGenerator sequenceIdGen;
 
   /**
    * Constructor.
@@ -93,9 +92,11 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
                           final StorageContainerManager scm)
       throws IOException {
     Objects.requireNonNull(scm, "SCM cannot be null");
+    this.scm = scm;
     this.pipelineManager = scm.getPipelineManager();
     this.containerManager = scm.getContainerManager();
     this.pipelineChoosePolicy = scm.getPipelineChoosePolicy();
+    this.sequenceIdGen = scm.getSequenceIdGen();
     this.containerSize = (long)conf.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,
@@ -104,8 +105,13 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
     mxBean = MBeans.register("BlockManager", "BlockManagerImpl", this);
 
     // SCM block deleting transaction log and deleting service.
-    deletedBlockLog = new DeletedBlockLogImpl(conf, scm.getContainerManager(),
-        scm.getScmMetadataStore());
+    deletedBlockLog = new DeletedBlockLogImplV2(conf,
+        scm.getContainerManager(),
+        scm.getScmHAManager().getRatisServer(),
+        scm.getScmMetadataStore().getDeletedBlocksTXTable(),
+        scm.getScmHAManager().getDBTransactionBuffer(),
+        scm.getScmContext(),
+        scm.getSequenceIdGen());
     Duration svcInterval = conf.getObject(
             ScmConfig.class).getBlockDeletionInterval();
     long serviceTimeout =
@@ -115,9 +121,8 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
             TimeUnit.MILLISECONDS);
     blockDeletingService =
         new SCMBlockDeletingService(deletedBlockLog, containerManager,
-            scm.getScmNodeManager(), scm.getEventQueue(), svcInterval,
-            serviceTimeout, conf);
-    safeModePrecheck = new SafeModePrecheck(conf);
+            scm.getScmNodeManager(), scm.getEventQueue(), scm.getScmContext(),
+            scm.getSCMServiceManager(), svcInterval, serviceTimeout, conf);
   }
 
   /**
@@ -159,7 +164,10 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
     if (LOG.isTraceEnabled()) {
       LOG.trace("Size : {} , type : {}, factor : {} ", size, type, factor);
     }
-    ScmUtils.preCheck(ScmOps.allocateBlock, safeModePrecheck);
+    if (scm.getScmContext().isInSafeMode()) {
+      throw new SCMException("SafeModePrecheck failed for allocateBlock",
+          SCMException.ResultCodes.SAFE_MODE_EXCEPTION);
+    }
     if (size < 0 || size > containerSize) {
       LOG.warn("Invalid block size requested : {}", size);
       throw new SCMException("Unsupported block size: " + size,
@@ -258,12 +266,12 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
    * @param containerInfo - Container Info.
    * @return AllocatedBlock
    */
-  private AllocatedBlock newBlock(ContainerInfo containerInfo) {
+  private AllocatedBlock newBlock(ContainerInfo containerInfo)
+      throws NotLeaderException {
     try {
       final Pipeline pipeline = pipelineManager
           .getPipeline(containerInfo.getPipelineID());
-      // TODO : Revisit this local ID allocation when HA is added.
-      long localID = UniqueId.next();
+      long localID = sequenceIdGen.getNextId(LOCAL_ID);
       long containerID = containerInfo.getContainerID();
       AllocatedBlock.Builder abb =  new AllocatedBlock.Builder()
           .setContainerBlockID(new ContainerBlockID(containerID, localID))
@@ -294,8 +302,10 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
   @Override
   public void deleteBlocks(List<BlockGroup> keyBlocksInfoList)
       throws IOException {
-    ScmUtils.preCheck(ScmOps.deleteBlock, safeModePrecheck);
-
+    if (scm.getScmContext().isInSafeMode()) {
+      throw new SCMException("SafeModePrecheck failed for deleteBlocks",
+          SCMException.ResultCodes.SAFE_MODE_EXCEPTION);
+    }
     Map<Long, List<Long>> containerBlocks = new HashMap<>();
     // TODO: track the block size info so that we can reclaim the container
     // TODO: used space when the block is deleted.
@@ -366,23 +376,10 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
   }
 
   /**
-   * Returns status of scm safe mode determined by SAFE_MODE_STATUS event.
-   * */
-  public boolean isScmInSafeMode() {
-    return this.safeModePrecheck.isInSafeMode();
-  }
-
-  /**
    * Get class logger.
    * */
   public static Logger getLogger() {
     return LOG;
-  }
-
-  @Override
-  public void onMessage(SafeModeStatus status,
-      EventPublisher publisher) {
-    this.safeModePrecheck.setInSafeMode(status.isInSafeMode());
   }
 
   /**

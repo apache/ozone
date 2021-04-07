@@ -61,7 +61,7 @@ public class TestContainerActionsHandler {
     queue.fireEvent(SCMEvents.CONTAINER_ACTIONS, containerActions);
     queue.processAll(1000L);
     verify(closeContainerEventHandler, times(1))
-        .onMessage(ContainerID.valueof(1L), queue);
+        .onMessage(ContainerID.valueOf(1L), queue);
 
   }
 
