@@ -53,9 +53,9 @@ stop_docker_env
 
 # running FS tests with different config requires restart of the cluster
 export OZONE_KEEP_RESULTS=true
-export OZONE_OM_LAYOUT_VERSION OZONE_OM_ENABLE_FILESYSTEM_PATHS
-for OZONE_OM_LAYOUT_VERSION in V0 V1; do
-  if [[ $OZONE_OM_LAYOUT_VERSION == "V1" ]]; then
+export OZONE_OM_METADATA_LAYOUT OZONE_OM_ENABLE_FILESYSTEM_PATHS
+for OZONE_OM_METADATA_LAYOUT in LEGACY PREFIX; do
+  if [[ $OZONE_OM_METADATA_LAYOUT == "PREFIX" ]]; then
     OZONE_OM_ENABLE_FILESYSTEM_PATHS=true
   else
     OZONE_OM_ENABLE_FILESYSTEM_PATHS=false
@@ -64,7 +64,7 @@ for OZONE_OM_LAYOUT_VERSION in V0 V1; do
   start_docker_env
   for scheme in ofs o3fs; do
     for bucket in link bucket; do
-      execute_robot_test scm -v SCHEME:${scheme} -v BUCKET_TYPE:${bucket} -N ozonefs-${OZONE_OM_LAYOUT_VERSION}-${scheme}-${bucket} ozonefs/ozonefs.robot
+      execute_robot_test scm -v SCHEME:${scheme} -v BUCKET_TYPE:${bucket} -N ozonefs-${OZONE_OM_METADATA_LAYOUT}-${scheme}-${bucket} ozonefs/ozonefs.robot
     done
   done
   stop_docker_env

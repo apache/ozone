@@ -382,9 +382,9 @@ public class OMBucketCreateRequest extends OMClientRequest {
     }
     // TODO: Many unit test cases has null config and done a simple null
     //  check now. It can be done later, to avoid massive test code changes.
-    if(StringUtils.isNotBlank(ozoneManager.getOMLayoutVersion())){
-      String layOutVersion = ozoneManager.getOMLayoutVersion();
-      metadata.put(OMConfigKeys.OZONE_OM_LAYOUT_VERSION, layOutVersion);
+    if(StringUtils.isNotBlank(ozoneManager.getOMMetadataLayout())){
+      String metadataLayout = ozoneManager.getOMMetadataLayout();
+      metadata.put(OMConfigKeys.OZONE_OM_METADATA_LAYOUT, metadataLayout);
       boolean fsPathsEnabled = ozoneManager.getEnableFileSystemPaths();
       metadata.put(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
               Boolean.toString(fsPathsEnabled));

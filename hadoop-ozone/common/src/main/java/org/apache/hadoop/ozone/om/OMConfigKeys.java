@@ -245,14 +245,17 @@ public final class OMConfigKeys {
 
   public static final long  OZONE_FS_TRASH_CHECKPOINT_INTERVAL_DEFAULT = 0;
 
-  // TODO: Temporary workaround for OM upgrade path and will be replaced once
-  //  upgrade HDDS-3698 story reaches consensus. Defaulting to 'V0' so that
-  //  existing unit test cases won't be affected. New OM version should be 'V1'.
-  public static final String OZONE_OM_LAYOUT_VERSION =
-          "ozone.om.layout.version";
-  public static final String OZONE_OM_LAYOUT_VERSION_DEFAULT = "V0";
+//  This property is used to define the metadata layout of file system
+//  paths. If it is configured as PREFIX in combination with
+//  ozone.om.enable.filesystem.paths to true then this allows to perform
+//  atomic rename and delete of any directory at any level in the namespace.
+//  Defaulting to LEGACY. Supported values: LEGACY and PREFIX.
 
-  public static final String OZONE_OM_LAYOUT_VERSION_V1 = "V1";
+  public static final String OZONE_OM_METADATA_LAYOUT =
+          "ozone.om.metadata.layout";
+  public static final String OZONE_OM_METADATA_LAYOUT_DEFAULT = "LEGACY";
+
+  public static final String OZONE_OM_METADATA_LAYOUT_PREFIX = "PREFIX";
 
   /**
    * Configuration properties for Directory Deleting Service.

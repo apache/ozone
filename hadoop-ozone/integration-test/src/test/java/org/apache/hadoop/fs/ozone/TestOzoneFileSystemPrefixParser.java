@@ -62,7 +62,7 @@ public class TestOzoneFileSystemPrefixParser {
     configuration = new OzoneConfiguration();
 
     TestOMRequestUtils.configureFSOptimizedPaths(configuration,
-        true, OMConfigKeys.OZONE_OM_LAYOUT_VERSION_V1);
+        true, OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX);
 
     cluster = MiniOzoneCluster.newBuilder(configuration)
         .setNumDatanodes(3)

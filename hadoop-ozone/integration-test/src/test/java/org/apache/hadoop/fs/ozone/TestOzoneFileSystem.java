@@ -149,11 +149,11 @@ public class TestOzoneFileSystem {
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     if (isBucketFSOptimized) {
-      TestOMRequestUtils.configureFSOptimizedPaths(conf,
-              enabledFileSystemPaths, OMConfigKeys.OZONE_OM_LAYOUT_VERSION_V1);
+      TestOMRequestUtils.configureFSOptimizedPaths(conf, enabledFileSystemPaths,
+          OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX);
     } else {
       conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
-              enabledFileSystemPaths);
+          enabledFileSystemPaths);
     }
     cluster = MiniOzoneCluster.newBuilder(conf)
             .setNumDatanodes(3)
