@@ -59,6 +59,9 @@ import org.apache.ratis.server.RaftServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.hdds.scm.ha.HASecurityUtils.createSCMRatisTLSConfig;
+import static org.apache.hadoop.hdds.scm.ha.HASecurityUtils.createSCMServerTlsParameters;
+
 /**
  * TODO.
  */
@@ -93,10 +96,9 @@ public class SCMRatisServerImpl implements SCMRatisServer {
     // scm boots up, it has peer info embedded in the raft log and will
     // trigger leader election.
 
-    grpcTlsConfig = HASecurityUtils.createSCMRatisTLSConfig(new SecurityConfig(conf),
-            scm.getScmCertificateClient());
-    Parameters parameters =
-        HASecurityUtils.createSCMServerTlsParameters(grpcTlsConfig);
+    grpcTlsConfig = createSCMRatisTLSConfig(new SecurityConfig(conf),
+        scm.getScmCertificateClient());
+    Parameters parameters = createSCMServerTlsParameters(grpcTlsConfig);
 
     this.server = newRaftServer(scm.getScmId(), conf)
         .setStateMachine(stateMachine)
