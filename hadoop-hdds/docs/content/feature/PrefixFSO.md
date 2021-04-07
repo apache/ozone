@@ -27,7 +27,7 @@ The prefix based FileSystem optimization feature supports atomic rename and
  delete of any directory at any level in the namespace. Also, it will perform
   rename and delete of any directory in a deterministic/constant time.
 
-Note: This feature works only when ozone.om.enable.filesystem.paths is
+Note: This feature works only when `ozone.om.enable.filesystem.paths` is
  enabled which means that Hadoop Compatible File System compatibility is
   favored instead of S3 compatibility. Some irregular S3 key names may be
    rejected or normalized.
@@ -37,14 +37,14 @@ This feature is strongly recommended to be turned ON when Ozone buckets are
   files in deep directory hierarchy.
 
 ## OzoneManager Metadata layout format
-OzoneManager supports two formats - legacy and prefix.
+OzoneManager supports two metadata layout formats - legacy and prefix.
 
 Legacy is the existing OM metadata format, which stores key entry with full path
  name. In Prefix based optimization, OM metadata format stores intermediate
-  directories into DirectoryTable and files into FileTable as shown in the
-   above picture. The key to the table is the name of a directory or a file
-    prefixed by the unique identifier of its parent directory, \<parent
-     unique-id>/\<filename>. 
+  directories into `DirectoryTable` and files into `FileTable` as shown in the
+   below picture. The key to the table is the name of a directory or a file
+    prefixed by the unique identifier of its parent directory, `<parent
+     unique-id>/<filename>`. 
      
 ![FSO Format](PrefixFSO-Format.png)
 
