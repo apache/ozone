@@ -22,6 +22,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.hadoop.util.Time;
@@ -89,11 +90,29 @@ public class SCMHAInvocationHandler implements InvocationHandler {
       throws Exception {
     long startTime = Time.monotonicNowNanos();
     Preconditions.checkNotNull(ratisHandler);
-    final SCMRatisResponse response =  ratisHandler.submitRequest(
-        SCMRatisRequest.of(requestType, method.getName(),
-            method.getParameterTypes(), args));
+    SCMRatisRequest scmRatisRequest = SCMRatisRequest.of(requestType,
+        method.getName(), method.getParameterTypes(), args);
+
+    // Scm Cert DB updates should use RaftClient.
+    // As rootCA which is primary SCM only can issues certificates to sub-CA.
+    // In case primary is not leader SCM, still sub-ca cert DB updates should go
+    // via ratis. So, in this special scenario we use RaftClient.
+    final SCMRatisResponse response;
+    if (method.getName().equals("storeValidCertificate") &&
+        args[args.length -1].equals(HddsProtos.NodeType.SCM)) {
+      response =
+          HASecurityUtils.submitScmCertsToRatis(
+              ratisHandler.getDivision().getGroup(),
+              ratisHandler.getGrpcTlsConfig(),
+              scmRatisRequest.encode());
+
+    } else {
+      response = ratisHandler.submitRequest(
+          scmRatisRequest);
+    }
     LOG.info("Invoking method {} on target {}, cost {}us",
         method, ratisHandler, (Time.monotonicNowNanos() - startTime) / 1000.0);
+
     if (response.isSuccess()) {
       return response.getResult();
     }
