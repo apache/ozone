@@ -247,7 +247,7 @@ public class TestContainerReader {
             keyValueContainer.getContainerData().getContainerPath();
         File containerPath = new File(containerPathStr);
         String renamePath = containerPathStr + "-aa";
-        containerPath.renameTo(new File(renamePath));
+        Assert.assertTrue(containerPath.renameTo(new File(renamePath)));
       }
     }
 

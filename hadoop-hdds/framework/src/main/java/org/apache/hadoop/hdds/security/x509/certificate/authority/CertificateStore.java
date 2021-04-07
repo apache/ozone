@@ -45,6 +45,11 @@ public interface CertificateStore {
 
   /**
    * Writes a new certificate that was issued to the persistent store.
+   *
+   * Note: Don't rename this method, as it is used in
+   * SCMHAInvocationHandler#invokeRatis. If for any case renaming this
+   * method name is required, change it over there.
+   *
    * @param serialID - Certificate Serial Number.
    * @param certificate - Certificate to persist.
    * @param role - OM/DN/SCM.
