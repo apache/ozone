@@ -214,8 +214,15 @@ public class DefaultCAServer implements CertificateServer {
       CertificateApprover.ApprovalType approverType, NodeType role) {
     LocalDate beginDate = LocalDate.now().atStartOfDay().toLocalDate();
     LocalDateTime temp = LocalDateTime.of(beginDate, LocalTime.MIDNIGHT);
-    LocalDate endDate =
-        temp.plus(config.getDefaultCertDuration()).toLocalDate();
+
+    LocalDate endDate;
+    // When issuing certificates for sub-ca use the max certificate duration
+    // similar to self signed root certificate.
+    if (role == NodeType.SCM) {
+      endDate = temp.plus(config.getMaxCertificateDuration()).toLocalDate();
+    } else {
+      endDate = temp.plus(config.getDefaultCertDuration()).toLocalDate();
+    }
 
     CompletableFuture<X509CertificateHolder> xcertHolder =
         approver.inspectCSR(csr);

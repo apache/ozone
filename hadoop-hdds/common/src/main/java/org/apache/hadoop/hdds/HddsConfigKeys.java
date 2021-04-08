@@ -140,7 +140,8 @@ public final class HddsConfigKeys {
       "hdds.block.token.expiry.time";
   public static final String HDDS_BLOCK_TOKEN_EXPIRY_TIME_DEFAULT = "1d";
   /**
-   * Maximum duration of certificates issued by SCM including Self-Signed Roots.
+   * Maximum duration of certificates issued by SCM including Self-Signed
+   * Roots and sub-ca certificates issued by root CA.
    * The formats accepted are based on the ISO-8601 duration format PnDTnHnMn.nS
    * Default value is 5 years and written as P1865D.
    */
