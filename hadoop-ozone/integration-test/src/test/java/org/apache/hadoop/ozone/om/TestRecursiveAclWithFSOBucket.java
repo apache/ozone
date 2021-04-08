@@ -256,7 +256,7 @@ public class TestRecursiveAclWithFSOBucket {
     conf.setBoolean(OZONE_ACL_ENABLED, true);
 
     TestOMRequestUtils.configureFSOptimizedPaths(conf, true,
-        OMConfigKeys.OZONE_OM_LAYOUT_VERSION_V1);
+        OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX);
 
     cluster =
         MiniOzoneCluster.newBuilder(conf).setClusterId(clusterId)
