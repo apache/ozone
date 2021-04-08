@@ -47,7 +47,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_PATH_DELETING_LIMIT_
  * <p>
  * This will scan the metadata of om periodically to get the orphan dirs from
  * DeletedDirectoryTable and find its sub paths. It will fetch all sub-files
- * from KeyTable and move those to DeletedTable so that OM's
+ * from FileTable and move those to DeletedTable so that OM's
  * KeyDeletingService will cleanup those files later. It will fetch all
  * sub-directories from the DirectoryTable and move those to
  * DeletedDirectoryTable so that these will be visited in next iterations.
