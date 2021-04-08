@@ -72,6 +72,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>jaxb-api</artifactId>
     </dependency>
     <dependency>
+      <groupId>org.glassfish.jaxb</groupId>
+      <artifactId>jaxb-runtime</artifactId>
+    </dependency>
+    <dependency>
       <groupId>javax.activation</groupId>
       <artifactId>activation</artifactId>
     </dependency>
