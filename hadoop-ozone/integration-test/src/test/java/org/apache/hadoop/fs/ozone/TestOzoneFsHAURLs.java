@@ -102,7 +102,6 @@ public class TestOzoneFsHAURLs {
 
     OMStorage omStore = new OMStorage(conf);
     omStore.setClusterId(clusterId);
-    omStore.setScmId(scmId);
     // writes the version file properties
     omStore.initialize();
 

@@ -84,7 +84,6 @@ public class TestOzoneManagerConfiguration {
 
     OMStorage omStore = new OMStorage(conf);
     omStore.setClusterId("testClusterId");
-    omStore.setScmId("testScmId");
     // writes the version file properties
     omStore.initialize();
   }
