@@ -19,18 +19,27 @@ author: Aravindan Vijayan
 -->
 
 # Terminologies
+
 ## Layout Feature
 A layout feature is any new Ozone feature that makes a backward incompatible change to the on disk layout. Each layout feature is associated with a layout version that it defines. A component has a list of monotonically increasing layout features (versions) that it supports. 
+
 ##Finalizing & Pre-Finalized State
 When upgrading a component from an older version to a newer version which has a higher layout version, the component automatically goes into a pre-finalized state after which an explicit ‘finalize’ action is required from the user to finalize it. In the pre-finalized state, commands/APIs/on disk structures used and created by newer layout features are meant to be unsupported or unused. After finalizing, the newer layout feature APIs are supported.
+
 ## Downgrade
 Downgrade to a lower version is allowed from the pre-finalized state. This involves stopping the component, replacing the artifacts to the older version, and then starting it up again.
 
 # Useful framework tools to use
 
-## LayoutFeature (org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature & org
-.apache.hadoop.hdds.upgrade.HDDSLayoutFeature)
+## LayoutFeature
+    org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature
+    org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature
 Class to add  a new layout feature being brought in. Layout version is typically 1 + last layout feature in that catalog. 
+
+## LayoutVersionManager
+    org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager
+    org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager
+Every component carries an instance of this interface, which provides APIs to get runtime layout version, and if a feature is allowed based on that or not.
 
 ## @DisallowedUntilLayoutVersion Annotation
 Method level annotation used to "disallow" an API if current layout version does not include the associated layout feature. Currently it is added only to the OM module, but can easily be moved down to a common module based on need on the HDDS layer.
