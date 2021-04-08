@@ -51,7 +51,6 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.mockito.Mockito;
 import org.rocksdb.ColumnFamilyOptions;
-import org.rocksdb.DBOptions;
 
 import java.io.File;
 
