@@ -202,28 +202,6 @@ public class TestHddsClientUtils {
   }
 
   @Test
-  public void testBlockClientFailsWithMultipleScmNames() {
-    // When OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY and OZONE_SCM_CLIENT_ADDRESS_KEY
-    // are undefined, fail if OZONE_SCM_NAMES has multiple SCMs.
-    final String scmHost = "host123,host456";
-    final OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(OZONE_SCM_NAMES, scmHost);
-    thrown.expect(IllegalArgumentException.class);
-    HddsUtils.getScmAddressForBlockClients(conf);
-  }
-
-  @Test
-  public void testClientFailsWithMultipleScmNames() {
-    // When OZONE_SCM_CLIENT_ADDRESS_KEY is undefined, fail if OZONE_SCM_NAMES
-    // has multiple SCMs.
-    final String scmHost = "host123,host456";
-    final OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(OZONE_SCM_NAMES, scmHost);
-    thrown.expect(IllegalArgumentException.class);
-    HddsUtils.getScmAddressForClients(conf);
-  }
-
-  @Test
   public void testVerifyResourceName() {
     final String validName = "my-bucket.01";
     HddsClientUtils.verifyResourceName(validName);

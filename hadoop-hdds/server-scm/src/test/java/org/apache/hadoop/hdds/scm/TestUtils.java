@@ -33,7 +33,10 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.protocol.proto
         .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
@@ -43,8 +46,6 @@ import org.apache.hadoop.hdds.scm.server
 import org.apache.hadoop.hdds.scm.server
     .SCMDatanodeHeartbeatDispatcher.PipelineReportFromDatanode;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.container.ContainerManager;
-
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
@@ -64,6 +65,7 @@ import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.Storage;
+import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
 import org.apache.hadoop.security.authentication.client
     .AuthenticationException;
@@ -430,7 +432,7 @@ public final class TestUtils {
   }
 
   public static org.apache.hadoop.hdds.scm.container.ContainerInfo
-      allocateContainer(ContainerManager containerManager)
+      allocateContainer(ContainerManagerV2 containerManager)
       throws IOException {
     return containerManager
         .allocateContainer(HddsProtos.ReplicationType.RATIS,
@@ -438,8 +440,8 @@ public final class TestUtils {
 
   }
 
-  public static void closeContainer(ContainerManager containerManager,
-      ContainerID id) throws IOException {
+  public static void closeContainer(ContainerManagerV2 containerManager,
+      ContainerID id) throws IOException, InvalidStateTransitionException {
     containerManager.updateContainerState(
         id, HddsProtos.LifeCycleEvent.FINALIZE);
     containerManager.updateContainerState(
@@ -453,13 +455,31 @@ public final class TestUtils {
    * @param id
    * @throws IOException
    */
-  public static void quasiCloseContainer(ContainerManager containerManager,
-      ContainerID id) throws IOException {
+  public static void quasiCloseContainer(ContainerManagerV2 containerManager,
+      ContainerID id) throws IOException, InvalidStateTransitionException {
     containerManager.updateContainerState(
         id, HddsProtos.LifeCycleEvent.FINALIZE);
     containerManager.updateContainerState(
         id, HddsProtos.LifeCycleEvent.QUASI_CLOSE);
 
+  }
+
+  /**
+   * Construct and returns StorageContainerManager instance using the given
+   * configuration.
+   *
+   * @param conf OzoneConfiguration
+   * @return StorageContainerManager instance
+   * @throws IOException
+   * @throws AuthenticationException
+   */
+  public static StorageContainerManager getScmSimple(OzoneConfiguration conf)
+      throws IOException, AuthenticationException {
+    SCMConfigurator configurator = new SCMConfigurator();
+    // The default behaviour whether ratis will be enabled or not
+    // in SCM will be inferred from ozone-default.xml.
+    // conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
+    return StorageContainerManager.createSCM(conf, configurator);
   }
 
   /**
@@ -474,7 +494,10 @@ public final class TestUtils {
    */
   public static StorageContainerManager getScm(OzoneConfiguration conf)
       throws IOException, AuthenticationException {
-    return getScm(conf, new SCMConfigurator());
+    SCMConfigurator configurator = new SCMConfigurator();
+    configurator.setSCMHAManager(MockSCMHAManager.getInstance(true));
+    configurator.setScmContext(SCMContext.emptyContext());
+    return getScm(conf, configurator);
   }
 
   /**
@@ -504,7 +527,7 @@ public final class TestUtils {
       // writes the version file properties
       scmStore.initialize();
     }
-    return new StorageContainerManager(conf, configurator);
+    return StorageContainerManager.createSCM(conf, configurator);
   }
 
   public static ContainerInfo getContainer(

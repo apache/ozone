@@ -40,7 +40,7 @@ import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
@@ -72,7 +72,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     ReconStorageContainerManagerFacade scmMock =
         mock(ReconStorageContainerManagerFacade.class);
     MockPlacementPolicy placementMock = new MockPlacementPolicy();
-    ContainerManager containerManagerMock = mock(ContainerManager.class);
+    ContainerManagerV2 containerManagerMock = mock(ContainerManagerV2.class);
     ContainerReplica unhealthyReplicaMock = mock(ContainerReplica.class);
     when(unhealthyReplicaMock.getState()).thenReturn(State.UNHEALTHY);
     ContainerReplica healthyReplicaMock = mock(ContainerReplica.class);
@@ -87,19 +87,19 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
       when(containerManagerMock.getContainer(c.containerID())).thenReturn(c);
     }
     // Under replicated
-    when(containerManagerMock.getContainerReplicas(new ContainerID(1L)))
+    when(containerManagerMock.getContainerReplicas(ContainerID.valueOf(1L)))
         .thenReturn(getMockReplicas(1L, State.CLOSED, State.UNHEALTHY));
 
     // return one UNHEALTHY replica for container ID 2 -> Missing
-    when(containerManagerMock.getContainerReplicas(new ContainerID(2L)))
+    when(containerManagerMock.getContainerReplicas(ContainerID.valueOf(2L)))
         .thenReturn(getMockReplicas(2L, State.UNHEALTHY));
 
     // return 0 replicas for container ID 3 -> Missing
-    when(containerManagerMock.getContainerReplicas(new ContainerID(3L)))
+    when(containerManagerMock.getContainerReplicas(ContainerID.valueOf(3L)))
         .thenReturn(Collections.emptySet());
 
     // Return 5 Healthy -> Over replicated
-    when(containerManagerMock.getContainerReplicas(new ContainerID(4L)))
+    when(containerManagerMock.getContainerReplicas(ContainerID.valueOf(4L)))
         .thenReturn(getMockReplicas(4L, State.CLOSED, State.CLOSED,
         State.CLOSED, State.CLOSED, State.CLOSED));
 
@@ -108,11 +108,11 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
         State.CLOSED, State.CLOSED, State.CLOSED);
     placementMock.setMisRepWhenDnPresent(
         misReplicas.iterator().next().getDatanodeDetails().getUuid());
-    when(containerManagerMock.getContainerReplicas(new ContainerID(5L)))
+    when(containerManagerMock.getContainerReplicas(ContainerID.valueOf(5L)))
         .thenReturn(misReplicas);
 
     // Return 3 Healthy -> Healthy container
-    when(containerManagerMock.getContainerReplicas(new ContainerID(6L)))
+    when(containerManagerMock.getContainerReplicas(ContainerID.valueOf(6L)))
         .thenReturn(getMockReplicas(6L,
             State.CLOSED, State.CLOSED, State.CLOSED));
 
@@ -162,20 +162,20 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     // Now run the job again, to check that relevant records are updated or
     // removed as appropriate. Need to adjust the return value for all the mocks
     // Under replicated -> Delta goes from 2 to 1
-    when(containerManagerMock.getContainerReplicas(new ContainerID(1L)))
+    when(containerManagerMock.getContainerReplicas(ContainerID.valueOf(1L)))
         .thenReturn(getMockReplicas(1L, State.CLOSED, State.CLOSED));
 
     // ID 2 was missing - make it healthy now
-    when(containerManagerMock.getContainerReplicas(new ContainerID(2L)))
+    when(containerManagerMock.getContainerReplicas(ContainerID.valueOf(2L)))
         .thenReturn(getMockReplicas(2L,
             State.CLOSED, State.CLOSED, State.CLOSED));
 
     // return 0 replicas for container ID 3 -> Still Missing
-    when(containerManagerMock.getContainerReplicas(new ContainerID(3L)))
+    when(containerManagerMock.getContainerReplicas(ContainerID.valueOf(3L)))
         .thenReturn(Collections.emptySet());
 
     // Return 4 Healthy -> Delta changes from -2 to -1
-    when(containerManagerMock.getContainerReplicas(new ContainerID(4L)))
+    when(containerManagerMock.getContainerReplicas(ContainerID.valueOf(4L)))
         .thenReturn(getMockReplicas(4L, State.CLOSED, State.CLOSED,
             State.CLOSED, State.CLOSED));
 
@@ -213,7 +213,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
       replicas.add(ContainerReplica.newBuilder()
           .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails())
           .setContainerState(s)
-          .setContainerID(new ContainerID(containerId))
+          .setContainerID(ContainerID.valueOf(containerId))
           .setSequenceId(1)
           .build());
     }
@@ -227,7 +227,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
       when(c.getContainerID()).thenReturn((long)i);
       when(c.getReplicationFactor())
           .thenReturn(HddsProtos.ReplicationFactor.THREE);
-      when(c.containerID()).thenReturn(new ContainerID(i));
+      when(c.containerID()).thenReturn(ContainerID.valueOf(i));
       containers.add(c);
     }
     return containers;

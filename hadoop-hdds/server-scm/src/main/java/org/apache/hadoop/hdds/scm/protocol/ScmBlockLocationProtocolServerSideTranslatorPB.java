@@ -36,12 +36,14 @@ import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.SCMB
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.SortDatanodesRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.SortDatanodesResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.Status;
+import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolPB;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
@@ -63,6 +65,7 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
     implements ScmBlockLocationProtocolPB {
 
   private final ScmBlockLocationProtocol impl;
+  private final StorageContainerManager scm;
 
   private static final Logger LOG = LoggerFactory
       .getLogger(ScmBlockLocationProtocolServerSideTranslatorPB.class);
@@ -78,9 +81,11 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
    */
   public ScmBlockLocationProtocolServerSideTranslatorPB(
       ScmBlockLocationProtocol impl,
+      StorageContainerManager scm,
       ProtocolMessageMetrics<ProtocolMessageEnum> metrics)
       throws IOException {
     this.impl = impl;
+    this.scm = scm;
     dispatcher = new OzoneProtocolMessageDispatcher<>(
         "BlockLocationProtocol", metrics, LOG);
 
@@ -97,6 +102,11 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
   @Override
   public SCMBlockLocationResponse send(RpcController controller,
       SCMBlockLocationRequest request) throws ServiceException {
+    if (!scm.getScmContext().isLeader()) {
+      throw new ServiceException(scm.getScmHAManager()
+                                    .getRatisServer()
+                                    .triggerNotLeaderException());
+    }
     return dispatcher.processRequest(
         request,
         this::processMessage,
@@ -125,6 +135,10 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
       case GetScmInfo:
         response.setGetScmInfoResponse(
             getScmInfo(request.getGetScmInfoRequest()));
+        break;
+      case AddScm:
+        response.setAddScmResponse(
+            getAddSCMResponse(request.getAddScmRequestProto()));
         break;
       case SortDatanodes:
         response.setSortDatanodesResponse(sortDatanodes(
@@ -209,6 +223,15 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
     return HddsProtos.GetScmInfoResponseProto.newBuilder()
         .setClusterId(scmInfo.getClusterId())
         .setScmId(scmInfo.getScmId())
+        .build();
+  }
+
+  public HddsProtos.AddScmResponseProto getAddSCMResponse(
+      HddsProtos.AddScmRequestProto req)
+      throws IOException {
+    boolean status = impl.addSCM(AddSCMRequest.getFromProtobuf(req));
+    return HddsProtos.AddScmResponseProto.newBuilder()
+        .setSuccess(status)
         .build();
   }
 

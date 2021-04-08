@@ -285,7 +285,7 @@ public class OFSPath {
    */
   public static String getTempMountBucketNameOfCurrentUser()
       throws IOException {
-    String username = UserGroupInformation.getCurrentUser().getUserName();
+    String username = UserGroupInformation.getCurrentUser().getShortUserName();
     return getTempMountBucketName(username);
   }
 

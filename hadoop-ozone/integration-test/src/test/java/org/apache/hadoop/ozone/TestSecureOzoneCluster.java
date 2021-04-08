@@ -36,12 +36,17 @@ import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
-import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmInfo;
+import org.apache.hadoop.hdds.scm.TestUtils;
+import org.apache.hadoop.hdds.scm.ha.HASecurityUtils;
+import org.apache.hadoop.hdds.scm.ha.SCMHANodeDetails;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
+import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
@@ -49,10 +54,10 @@ import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.Client;
-import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.minikdc.MiniKdc;
+import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.client.CertificateClientTestImpl;
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.om.OMStorage;
@@ -88,6 +93,8 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_D
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PORT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_GRPC_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.net.ServerSocketUtil.getPort;
@@ -98,6 +105,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_KEY
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_EXPIRED;
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
 import org.apache.ratis.protocol.ClientId;
@@ -168,6 +176,11 @@ public final class TestSecureOzoneCluster {
           getPort(OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT, 100));
       conf.setInt(OZONE_SCM_SECURITY_SERVICE_PORT_KEY,
           getPort(OZONE_SCM_SECURITY_SERVICE_PORT_DEFAULT, 100));
+      // use the same base ports as MiniOzoneHACluster
+      conf.setInt(OZONE_SCM_RATIS_PORT_KEY, getPort(1200, 100));
+      conf.setInt(OZONE_SCM_GRPC_PORT_KEY, getPort(1201, 100));
+      conf.set(OZONE_OM_ADDRESS_KEY, "localhost:1202");
+
 
       DefaultMetricsSystem.setMiniClusterMode(true);
       final String path = folder.newFolder().toString();
@@ -265,7 +278,7 @@ public final class TestSecureOzoneCluster {
   public void testSecureScmStartupSuccess() throws Exception {
 
     initSCM();
-    scm = StorageContainerManager.createSCM(conf);
+    scm = TestUtils.getScmSimple(conf);
     //Reads the SCM Info from SCM instance
     ScmInfo scmInfo = scm.getClientProtocolServer().getScmInfo();
     assertEquals(clusterId, scmInfo.getClusterId());
@@ -276,7 +289,7 @@ public final class TestSecureOzoneCluster {
   public void testSCMSecurityProtocol() throws Exception {
 
     initSCM();
-    scm = HddsTestUtils.getScm(conf);
+    scm = TestUtils.getScmSimple(conf);
     //Reads the SCM Info from SCM instance
     try {
       scm.start();
@@ -291,8 +304,12 @@ public final class TestSecureOzoneCluster {
       assertNotNull(scmSecurityProtocolClient);
       String caCert = scmSecurityProtocolClient.getCACertificate();
       assertNotNull(caCert);
-      LambdaTestUtils.intercept(RemoteException.class, "Certificate not found",
-          () -> scmSecurityProtocolClient.getCertificate("1"));
+      // Get some random certificate, used serial id 100 which will be
+      // unavailable as our serial id is time stamp. Serial id 1 is root CA,
+      // and it is persisted in DB.
+      LambdaTestUtils.intercept(SCMSecurityException.class,
+          "Certificate not found",
+          () -> scmSecurityProtocolClient.getCertificate("100"));
 
       // Case 2: User without Kerberos credentials should fail.
       ugi = UserGroupInformation.createRemoteUser("test");
@@ -324,8 +341,16 @@ public final class TestSecureOzoneCluster {
     SCMStorageConfig scmStore = new SCMStorageConfig(conf);
     scmStore.setClusterId(clusterId);
     scmStore.setScmId(scmId);
+    HASecurityUtils.initializeSecurity(scmStore, scmId, conf,
+        NetUtils.createSocketAddr(InetAddress.getLocalHost().getHostName(),
+            OZONE_SCM_CLIENT_PORT_DEFAULT), true);
+    scmStore.setPrimaryScmNodeId(scmId);
     // writes the version file properties
     scmStore.initialize();
+    if (SCMHAUtils.isSCMHAEnabled(conf)) {
+      SCMRatisServerImpl.initialize(clusterId, scmId,
+          SCMHANodeDetails.loadSCMHAConfig(conf).getLocalNodeDetails(), conf);
+    }
   }
 
   @Test
@@ -336,7 +361,7 @@ public final class TestSecureOzoneCluster {
 
     LambdaTestUtils.intercept(IOException.class,
         "Running in secure mode, but config doesn't have a keytab",
-        () -> StorageContainerManager.createSCM(conf));
+        () -> TestUtils.getScmSimple(conf));
 
     conf.set(HDDS_SCM_KERBEROS_PRINCIPAL_KEY,
         "scm/_HOST@EXAMPLE.com");
@@ -344,7 +369,7 @@ public final class TestSecureOzoneCluster {
         "/etc/security/keytabs/scm.keytab");
 
     testCommonKerberosFailures(
-        () -> StorageContainerManager.createSCM(conf));
+        () -> TestUtils.getScmSimple(conf));
 
   }
 
@@ -373,7 +398,7 @@ public final class TestSecureOzoneCluster {
   public void testSecureOMInitializationFailure() throws Exception {
     initSCM();
     // Create a secure SCM instance as om client will connect to it
-    scm = StorageContainerManager.createSCM(conf);
+    scm = TestUtils.getScmSimple(conf);
     setupOm(conf);
     conf.set(OZONE_OM_KERBEROS_PRINCIPAL_KEY,
         "non-existent-user@EXAMPLE.com");
@@ -387,7 +412,7 @@ public final class TestSecureOzoneCluster {
   public void testSecureOmInitializationSuccess() throws Exception {
     initSCM();
     // Create a secure SCM instance as om client will connect to it
-    scm = StorageContainerManager.createSCM(conf);
+    scm = TestUtils.getScmSimple(conf);
     LogCapturer logs = LogCapturer.captureLogs(OzoneManager.getLogger());
     GenericTestUtils.setLogLevel(OzoneManager.getLogger(), INFO);
 
@@ -405,7 +430,7 @@ public final class TestSecureOzoneCluster {
   public void testAccessControlExceptionOnClient() throws Exception {
     initSCM();
     // Create a secure SCM instance as om client will connect to it
-    scm = StorageContainerManager.createSCM(conf);
+    scm = TestUtils.getScmSimple(conf);
     LogCapturer logs = LogCapturer.captureLogs(OzoneManager.getLogger());
     GenericTestUtils.setLogLevel(OzoneManager.getLogger(), INFO);
     setupOm(conf);
@@ -625,7 +650,7 @@ public final class TestSecureOzoneCluster {
 
     initSCM();
     try {
-      scm = HddsTestUtils.getScm(conf);
+      scm = TestUtils.getScmSimple(conf);
       scm.start();
       conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, false);
       OMStorage omStore = new OMStorage(conf);
@@ -671,7 +696,7 @@ public final class TestSecureOzoneCluster {
     omLogs.clearOutput();
     initSCM();
     try {
-      scm = HddsTestUtils.getScm(conf);
+      scm = TestUtils.getScmSimple(conf);
       scm.start();
 
       OMStorage omStore = new OMStorage(conf);
@@ -698,6 +723,9 @@ public final class TestSecureOzoneCluster {
       if (scm != null) {
         scm.stop();
       }
+      if (om != null) {
+        om.stop();
+      }
       IOUtils.closeQuietly(om);
     }
 
@@ -709,7 +737,7 @@ public final class TestSecureOzoneCluster {
     X500Name x500Issuer = new JcaX509CertificateHolder(cert).getIssuer();
     RDN cn = x500Issuer.getRDNs(BCStyle.CN)[0];
     String hostName = InetAddress.getLocalHost().getHostName();
-    String scmUser = "scm@" + hostName;
+    String scmUser = OzoneConsts.SCM_SUB_CA_PREFIX + hostName;
     assertEquals(scmUser, cn.getFirst().getValue().toString());
 
     // Subject name should be om login user in real world but in this test

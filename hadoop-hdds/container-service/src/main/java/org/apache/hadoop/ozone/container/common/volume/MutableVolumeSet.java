@@ -138,6 +138,18 @@ public class MutableVolumeSet implements VolumeSet {
     initializeVolumeSet();
   }
 
+  public MutableVolumeSet(ConfigurationSource conf) throws IOException {
+    this.datanodeUuid = null;
+    this.clusterID = null;
+    this.conf = conf;
+    this.volumeSetRWLock = new ReentrantReadWriteLock();
+    this.volumeChecker = getVolumeChecker(conf);
+    this.diskCheckerservice = null;
+    this.periodicDiskChecker = null;
+    this.usageCheckFactory = null;
+    initializeVolumeSet();
+  }
+
   public void setFailedVolumeListener(Runnable runnable) {
     failedVolumeListener = runnable;
   }
@@ -459,9 +471,16 @@ public class MutableVolumeSet implements VolumeSet {
   }
 
   private void stopDiskChecker() {
-    periodicDiskChecker.cancel(true);
-    volumeChecker.shutdownAndWait(0, TimeUnit.SECONDS);
-    diskCheckerservice.shutdownNow();
+    if (periodicDiskChecker != null) {
+      periodicDiskChecker.cancel(true);
+    }
+    if (volumeChecker != null) {
+      volumeChecker.shutdownAndWait(0, TimeUnit.SECONDS);
+    }
+
+    if (diskCheckerservice != null) {
+      diskCheckerservice.shutdownNow();
+    }
   }
 
   @Override

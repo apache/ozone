@@ -96,7 +96,7 @@ public class ExportContainer implements SubcommandWithParent, Callable<Void> {
 
     String datanodeUuid = getDatanodeUUID(firstStorageDir, conf);
 
-    String scmId = getScmId(firstStorageDir);
+    String clusterId = getClusterId(firstStorageDir);
 
     MutableVolumeSet volumeSet = new MutableVolumeSet(datanodeUuid, conf);
 
@@ -113,7 +113,7 @@ public class ExportContainer implements SubcommandWithParent, Callable<Void> {
               metrics,
               containerReplicaProto -> {
               });
-      handler.setScmID(scmId);
+      handler.setClusterID(clusterId);
       handlers.put(containerType, handler);
     }
 
@@ -151,7 +151,7 @@ public class ExportContainer implements SubcommandWithParent, Callable<Void> {
     return null;
   }
 
-  public String getScmId(String storageDir) throws IOException {
+  public String getClusterId(String storageDir) throws IOException {
     Preconditions.checkNotNull(storageDir);
     final Path firstStorageDirPath = Files.list(Paths.get(storageDir, "hdds"))
         .filter(Files::isDirectory)

@@ -15,6 +15,7 @@
 name: build-branch
 on:
   pull_request:
+    types: [opened, reopened, ready_for_review, synchronize]
   push:
   schedule:
     - cron: 30 0,12 * * *
@@ -23,6 +24,7 @@ env:
 jobs:
   compile:
     runs-on: ubuntu-18.04
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     strategy:
       matrix:
         java: [ 8, 11 ]
@@ -66,6 +68,7 @@ jobs:
         if: always()
   bats:
     runs-on: ubuntu-18.04
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     steps:
       - name: Checkout project
         uses: actions/checkout@v2
@@ -89,6 +92,7 @@ jobs:
         continue-on-error: true
   rat:
     runs-on: ubuntu-18.04
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     steps:
       - name: Checkout project
         uses: actions/checkout@v2
@@ -108,6 +112,7 @@ jobs:
         continue-on-error: true
   author:
     runs-on: ubuntu-18.04
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     steps:
       - name: Checkout project
         uses: actions/checkout@v2
@@ -125,6 +130,7 @@ jobs:
         continue-on-error: true
   unit:
     runs-on: ubuntu-18.04
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     steps:
       - name: Checkout project
         uses: actions/checkout@v2
@@ -144,6 +150,7 @@ jobs:
         continue-on-error: true
   checkstyle:
     runs-on: ubuntu-18.04
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     steps:
       - name: Checkout project
         uses: actions/checkout@v2
@@ -163,6 +170,7 @@ jobs:
         continue-on-error: true
   findbugs:
     runs-on: ubuntu-18.04
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     steps:
       - name: Checkout project
         uses: actions/checkout@v2
@@ -183,6 +191,7 @@ jobs:
   acceptance:
     needs: compile
     runs-on: ubuntu-18.04
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     strategy:
       matrix:
         suite:
@@ -228,6 +237,7 @@ jobs:
         continue-on-error: true
   integration:
     runs-on: ubuntu-18.04
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     strategy:
       matrix:
         profile:
@@ -294,6 +304,7 @@ jobs:
   kubernetes:
     needs: compile
     runs-on: ubuntu-18.04
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     steps:
       - name: Checkout project
         uses: actions/checkout@v2

@@ -28,14 +28,13 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
-import org.apache.hadoop.hdds.server.events.EventHandler;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 
 /**
  * Interface which exposes the api for pipeline management.
  */
-public interface PipelineManager extends Closeable, PipelineManagerMXBean,
-    EventHandler<SafeModeStatus> {
+public interface PipelineManager extends Closeable, PipelineManagerMXBean {
 
   Pipeline createPipeline(ReplicationType type, ReplicationFactor factor)
       throws IOException;
@@ -55,7 +54,7 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean,
       ReplicationFactor factor);
 
   List<Pipeline> getPipelines(ReplicationType type,
-      Pipeline.PipelineState state);
+      Pipeline.PipelineState state) throws NotLeaderException;
 
   List<Pipeline> getPipelines(ReplicationType type,
       ReplicationFactor factor, Pipeline.PipelineState state);
@@ -77,8 +76,7 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean,
 
   void openPipeline(PipelineID pipelineId) throws IOException;
 
-  void finalizeAndDestroyPipeline(Pipeline pipeline, boolean onTimeout)
-      throws IOException;
+  void closePipeline(Pipeline pipeline, boolean onTimeout) throws IOException;
 
   void scrubPipeline(ReplicationType type, ReplicationFactor factor)
       throws IOException;
@@ -125,4 +123,11 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean,
    * @return boolean
    */
   boolean getSafeModeStatus();
+
+  /**
+   * Reinitialize the pipelineManager with the lastest pipeline store
+   * during SCM reload.
+   */
+  void reinitialize(Table<PipelineID, Pipeline> pipelineStore)
+      throws IOException;
 }

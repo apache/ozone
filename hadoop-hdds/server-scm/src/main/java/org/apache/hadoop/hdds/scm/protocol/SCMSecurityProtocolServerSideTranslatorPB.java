@@ -26,12 +26,15 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCer
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertificateRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetDataNodeCertRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetOMCertRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetSCMCertRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMListCertificateRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMListCertificateResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityRequest;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityResponse;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.Status;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolPB;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 
@@ -40,6 +43,8 @@ import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.Type.GetSCMCertificate;
 
 /**
  * This class is the server-side translator that forwards requests received on
@@ -53,14 +58,17 @@ public class SCMSecurityProtocolServerSideTranslatorPB
       LoggerFactory.getLogger(SCMSecurityProtocolServerSideTranslatorPB.class);
 
   private final SCMSecurityProtocol impl;
+  private final StorageContainerManager scm;
 
   private OzoneProtocolMessageDispatcher<SCMSecurityRequest,
       SCMSecurityResponse, ProtocolMessageEnum>
       dispatcher;
 
   public SCMSecurityProtocolServerSideTranslatorPB(SCMSecurityProtocol impl,
+      StorageContainerManager storageContainerManager,
       ProtocolMessageMetrics messageMetrics) {
     this.impl = impl;
+    this.scm = storageContainerManager;
     this.dispatcher =
         new OzoneProtocolMessageDispatcher<>("ScmSecurityProtocol",
             messageMetrics, LOG);
@@ -69,55 +77,83 @@ public class SCMSecurityProtocolServerSideTranslatorPB
   @Override
   public SCMSecurityResponse submitRequest(RpcController controller,
       SCMSecurityRequest request) throws ServiceException {
+    // For request type GetSCMCertificate we don't need leader check. As
+    // primary SCM may not be leader SCM.
+    if (!request.getCmdType().equals(GetSCMCertificate)) {
+      if (!scm.checkLeader()) {
+        throw new ServiceException(scm.getScmHAManager()
+            .getRatisServer()
+            .triggerNotLeaderException());
+      }
+    }
     return dispatcher.processRequest(request, this::processRequest,
         request.getCmdType(), request.getTraceID());
   }
 
-  public SCMSecurityResponse processRequest(SCMSecurityRequest request)
-      throws ServiceException {
+  public SCMSecurityResponse processRequest(SCMSecurityRequest request) {
+    SCMSecurityResponse.Builder scmSecurityResponse =
+        SCMSecurityResponse.newBuilder().setCmdType(request.getCmdType())
+        .setStatus(Status.OK);
     try {
       switch (request.getCmdType()) {
       case GetCertificate:
-        return SCMSecurityResponse.newBuilder()
-            .setCmdType(request.getCmdType())
-            .setStatus(Status.OK)
-            .setGetCertResponseProto(
-                getCertificate(request.getGetCertificateRequest()))
-            .build();
+        return scmSecurityResponse.setGetCertResponseProto(
+            getCertificate(request.getGetCertificateRequest())).build();
       case GetCACertificate:
-        return SCMSecurityResponse.newBuilder()
-            .setCmdType(request.getCmdType())
-            .setStatus(Status.OK)
-            .setGetCertResponseProto(
-                getCACertificate(request.getGetCACertificateRequest()))
-            .build();
+        return scmSecurityResponse.setGetCertResponseProto(
+            getCACertificate(request.getGetCACertificateRequest())).build();
       case GetOMCertificate:
-        return SCMSecurityResponse.newBuilder()
-            .setCmdType(request.getCmdType())
-            .setStatus(Status.OK)
-            .setGetCertResponseProto(
-                getOMCertificate(request.getGetOMCertRequest()))
+        return scmSecurityResponse.setGetCertResponseProto(
+            getOMCertificate(request.getGetOMCertRequest()))
             .build();
       case GetDataNodeCertificate:
-        return SCMSecurityResponse.newBuilder()
-            .setCmdType(request.getCmdType())
-            .setStatus(Status.OK)
-            .setGetCertResponseProto(
-                getDataNodeCertificate(request.getGetDataNodeCertRequest()))
+        return scmSecurityResponse.setGetCertResponseProto(
+            getDataNodeCertificate(request.getGetDataNodeCertRequest()))
             .build();
       case ListCertificate:
-        return SCMSecurityResponse.newBuilder()
-            .setCmdType(request.getCmdType())
-            .setStatus(Status.OK)
-            .setListCertificateResponseProto(
-                listCertificate(request.getListCertificateRequest()))
+        return scmSecurityResponse.setListCertificateResponseProto(
+            listCertificate(request.getListCertificateRequest()))
             .build();
+      case GetSCMCertificate:
+        return scmSecurityResponse.setGetCertResponseProto(getSCMCertificate(
+            request.getGetSCMCertificateRequest())).build();
+      case GetRootCACertificate:
+        return scmSecurityResponse.setGetCertResponseProto(
+            getRootCACertificate()).build();
+      case ListCACertificate:
+        return scmSecurityResponse.setListCertificateResponseProto(
+            listCACertificate()).build();
       default:
         throw new IllegalArgumentException(
             "Unknown request type: " + request.getCmdType());
       }
     } catch (IOException e) {
-      throw new ServiceException(e);
+      scmSecurityResponse.setSuccess(false);
+      scmSecurityResponse.setStatus(exceptionToResponseStatus(e));
+      // If actual cause is set in SCMSecurityException, set message with
+      // actual cause message.
+      if (e.getMessage() != null) {
+        scmSecurityResponse.setMessage(e.getMessage());
+      } else {
+        if (e.getCause() != null && e.getCause().getMessage() != null) {
+          scmSecurityResponse.setMessage(e.getCause().getMessage());
+        }
+      }
+      return scmSecurityResponse.build();
+    }
+  }
+
+  /**
+   * Convert exception to corresponsing status.
+   * @param ex
+   * @return SCMSecurityProtocolProtos.Status code of the error.
+   */
+  private Status exceptionToResponseStatus(IOException ex) {
+    if (ex instanceof SCMSecurityException) {
+      return Status.values()[
+          ((SCMSecurityException) ex).getErrorCode().ordinal()];
+    } else {
+      return Status.INTERNAL_ERROR;
     }
   }
 
@@ -140,7 +176,33 @@ public class SCMSecurityProtocolServerSideTranslatorPB
             .newBuilder()
             .setResponseCode(ResponseCode.success)
             .setX509Certificate(certificate)
-            .setX509CACertificate(impl.getCACertificate());
+            .setX509CACertificate(impl.getCACertificate())
+            .setX509RootCACertificate(impl.getRootCACertificate());
+
+    return builder.build();
+
+  }
+
+  /**
+   * Get signed certificate for SCM.
+   *
+   * @param request - SCMGetSCMCertRequestProto
+   * @return SCMGetCertResponseProto.
+   */
+
+  public SCMGetCertResponseProto getSCMCertificate(
+      SCMGetSCMCertRequestProto request)
+      throws IOException {
+
+    String certificate = impl.getSCMCertificate(request.getScmDetails(),
+        request.getCSR());
+    SCMGetCertResponseProto.Builder builder =
+        SCMGetCertResponseProto
+            .newBuilder()
+            .setResponseCode(ResponseCode.success)
+            .setX509Certificate(certificate)
+            .setX509CACertificate(impl.getRootCACertificate())
+            .setX509RootCACertificate(impl.getRootCACertificate());
 
     return builder.build();
 
@@ -162,7 +224,8 @@ public class SCMSecurityProtocolServerSideTranslatorPB
             .newBuilder()
             .setResponseCode(ResponseCode.success)
             .setX509Certificate(certificate)
-            .setX509CACertificate(impl.getCACertificate());
+            .setX509CACertificate(impl.getCACertificate())
+            .setX509RootCACertificate(impl.getRootCACertificate());
     return builder.build();
 
   }
@@ -189,7 +252,9 @@ public class SCMSecurityProtocolServerSideTranslatorPB
         SCMGetCertResponseProto
             .newBuilder()
             .setResponseCode(ResponseCode.success)
-            .setX509Certificate(certificate);
+            .setX509Certificate(certificate)
+            .setX509CACertificate(certificate)
+            .setX509RootCACertificate(impl.getRootCACertificate());
     return builder.build();
 
   }
@@ -209,4 +274,33 @@ public class SCMSecurityProtocolServerSideTranslatorPB
 
 
   }
+
+
+  public SCMGetCertResponseProto getRootCACertificate() throws IOException {
+    String rootCACertificate = impl.getRootCACertificate();
+    SCMGetCertResponseProto.Builder builder =
+        SCMGetCertResponseProto
+            .newBuilder()
+            .setResponseCode(ResponseCode.success)
+            .setX509Certificate(rootCACertificate)
+            .setX509RootCACertificate(rootCACertificate);
+    return builder.build();
+  }
+
+  public SCMListCertificateResponseProto listCACertificate()
+      throws IOException {
+
+    List<String> certs = impl.listCACertificate();
+
+    SCMListCertificateResponseProto.Builder builder =
+        SCMListCertificateResponseProto
+            .newBuilder()
+            .setResponseCode(SCMListCertificateResponseProto
+                .ResponseCode.success)
+            .addAllCertificates(certs);
+    return builder.build();
+
+  }
+
+
 }
