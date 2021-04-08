@@ -1858,8 +1858,9 @@
     <value>P1865D</value>
     <tag>OZONE, HDDS, SECURITY</tag>
     <description>Max time for which certificate issued by SCM CA are valid.
-      . The formats accepted are based on the ISO-8601 duration format
-      PnDTnHnMn.nS</description>
+      This duration is used for self-signed root cert and scm sub-ca certs
+      issued by root ca. The formats accepted are based on the ISO-8601
+      duration format PnDTnHnMn.nS</description>
   </property>
   <property>
     <name>hdds.x509.signature.algorithm</name>
@@ -1954,6 +1955,15 @@
       If a cluster is upgraded from non-ratis to ratis based SCM, scm --init
       needs to re-run for switching from
       non-ratis based SCM to ratis-based SCM on the primary node.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.skip.bootstrap.validation</name>
+    <value>false</value>
+    <tag>OZONE, SCM, HA</tag>
+    <description>
+      optional config, the config when set to true skips the clusterId
+      validation from leader scm during bootstrap
     </description>
   </property>
   <property>
@@ -2064,6 +2074,14 @@
     <value>1s</value>
     <tag>OZONE, SCM, HA, RATIS</tag>
     <description>The minimum timeout duration for SCM's Ratis server rpc.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.scm.ratis.minimum.timeout</name>
+    <value>30s</value>
+    <tag>OZONE, SCM, HA, RATIS</tag>
+    <description>The request timeout duration for SCM's Ratis server request.
     </description>
   </property>
 
@@ -2741,6 +2759,15 @@
       requests where key paths are not normalized and any intermediate
       directories will not be created or any file checks happens to check
       filesystem semantics.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.scm.info.wait.duration</name>
+    <tag>OZONE, SCM, OM</tag>
+    <value>10m</value>
+    <description> Maximum amount of duration OM/SCM waits to get Scm Info
+      during OzoneManager init/SCM bootstrap.
     </description>
   </property>
 </configuration>

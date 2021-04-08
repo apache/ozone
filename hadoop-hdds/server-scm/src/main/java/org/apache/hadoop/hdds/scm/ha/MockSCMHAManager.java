@@ -28,6 +28,7 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
+import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftClientReply;
@@ -229,6 +230,11 @@ public final class MockSCMHAManager implements SCMHAManager {
     @Override
     public boolean addSCM(AddSCMRequest request) throws IOException {
       return false;
+    }
+
+    @Override
+    public GrpcTlsConfig getGrpcTlsConfig() {
+      return null;
     }
   }
 }

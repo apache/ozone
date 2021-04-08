@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.om.request.bucket;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import com.google.common.base.Optional;
 
@@ -263,17 +262,15 @@ public class OMBucketCreateRequest extends OMClientRequest {
    */
   private void addDefaultAcls(OmBucketInfo omBucketInfo,
       OmVolumeArgs omVolumeArgs) {
-    // Add default acls from volume.
+    // Add default acls for bucket creator.
     List<OzoneAcl> acls = new ArrayList<>();
     if (omBucketInfo.getAcls() != null) {
       acls.addAll(omBucketInfo.getAcls());
     }
 
-    List<OzoneAcl> defaultVolumeAclList = omVolumeArgs.getAclMap()
-        .getDefaultAclList().stream().map(OzoneAcl::fromProtobuf)
-        .collect(Collectors.toList());
-
-    OzoneAclUtil.inheritDefaultAcls(acls, defaultVolumeAclList);
+    // Add default acls from volume.
+    List<OzoneAcl> defaultVolumeAcls = omVolumeArgs.getDefaultAcls();
+    OzoneAclUtil.inheritDefaultAcls(acls, defaultVolumeAcls);
     omBucketInfo.setAcls(acls);
   }
 

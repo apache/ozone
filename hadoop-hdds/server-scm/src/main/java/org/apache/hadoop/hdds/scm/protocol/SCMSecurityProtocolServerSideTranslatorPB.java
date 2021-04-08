@@ -44,6 +44,8 @@ import com.google.protobuf.ServiceException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.Type.GetSCMCertificate;
+
 /**
  * This class is the server-side translator that forwards requests received on
  * {@link SCMSecurityProtocolPB} to the {@link
@@ -75,10 +77,14 @@ public class SCMSecurityProtocolServerSideTranslatorPB
   @Override
   public SCMSecurityResponse submitRequest(RpcController controller,
       SCMSecurityRequest request) throws ServiceException {
-    if (!scm.checkLeader()) {
-      throw new ServiceException(scm.getScmHAManager()
-          .getRatisServer()
-          .triggerNotLeaderException());
+    // For request type GetSCMCertificate we don't need leader check. As
+    // primary SCM may not be leader SCM.
+    if (!request.getCmdType().equals(GetSCMCertificate)) {
+      if (!scm.checkLeader()) {
+        throw new ServiceException(scm.getScmHAManager()
+            .getRatisServer()
+            .triggerNotLeaderException());
+      }
     }
     return dispatcher.processRequest(request, this::processRequest,
         request.getCmdType(), request.getTraceID());
@@ -170,7 +176,8 @@ public class SCMSecurityProtocolServerSideTranslatorPB
             .newBuilder()
             .setResponseCode(ResponseCode.success)
             .setX509Certificate(certificate)
-            .setX509CACertificate(impl.getCACertificate());
+            .setX509CACertificate(impl.getCACertificate())
+            .setX509RootCACertificate(impl.getRootCACertificate());
 
     return builder.build();
 
@@ -194,7 +201,8 @@ public class SCMSecurityProtocolServerSideTranslatorPB
             .newBuilder()
             .setResponseCode(ResponseCode.success)
             .setX509Certificate(certificate)
-            .setX509CACertificate(impl.getCACertificate());
+            .setX509CACertificate(impl.getRootCACertificate())
+            .setX509RootCACertificate(impl.getRootCACertificate());
 
     return builder.build();
 
@@ -216,7 +224,8 @@ public class SCMSecurityProtocolServerSideTranslatorPB
             .newBuilder()
             .setResponseCode(ResponseCode.success)
             .setX509Certificate(certificate)
-            .setX509CACertificate(impl.getCACertificate());
+            .setX509CACertificate(impl.getCACertificate())
+            .setX509RootCACertificate(impl.getRootCACertificate());
     return builder.build();
 
   }
@@ -243,7 +252,9 @@ public class SCMSecurityProtocolServerSideTranslatorPB
         SCMGetCertResponseProto
             .newBuilder()
             .setResponseCode(ResponseCode.success)
-            .setX509Certificate(certificate);
+            .setX509Certificate(certificate)
+            .setX509CACertificate(certificate)
+            .setX509RootCACertificate(impl.getRootCACertificate());
     return builder.build();
 
   }
@@ -271,6 +282,7 @@ public class SCMSecurityProtocolServerSideTranslatorPB
         SCMGetCertResponseProto
             .newBuilder()
             .setResponseCode(ResponseCode.success)
+            .setX509Certificate(rootCACertificate)
             .setX509RootCACertificate(rootCACertificate);
     return builder.build();
   }

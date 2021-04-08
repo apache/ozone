@@ -173,4 +173,15 @@ public final class SCMHAUtils {
     }
     return conf;
   }
+
+  /**
+   * Get SCM Node Id list.
+   * @param configuration
+   * @return list of node ids.
+   */
+  public static Collection<String> getSCMNodeIds(
+      ConfigurationSource configuration) {
+    String scmServiceId = getScmServiceId(configuration);
+    return getSCMNodeIds(configuration, scmServiceId);
+  }
 }

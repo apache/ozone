@@ -159,7 +159,7 @@ public class PipelineManagerV2Impl implements PipelineManager {
       recordMetricsForPipeline(pipeline);
       return pipeline;
     } catch (IOException ex) {
-      LOG.error("Failed to create pipeline with replicationConfig {}.",
+      LOG.debug("Failed to create pipeline with replicationConfig {}.",
           replicationConfig, conf, ex);
       metrics.incNumPipelineCreationFailed();
       throw ex;
