@@ -14,20 +14,11 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ * <p>
+ * Freon related helper classes used for load testing.
  */
-package org.apache.hadoop.ozone.util;
-
-import org.apache.ratis.util.ExitUtils;
-import org.slf4j.Logger;
 
 /**
- * An Exit Manager used to shutdown service in case of unrecoverable error.
- * This class will be helpful to test exit functionality.
+ * Generic HDDS related utilities and helper classes.
  */
-public class ExitManager {
-
-  public void exitSystem(int status, String message, Throwable throwable,
-      Logger log) {
-    ExitUtils.terminate(status, message, throwable, log);
-  }
-}
+package org.apache.hadoop.hdds;

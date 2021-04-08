@@ -18,7 +18,7 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.ozone.ha.NodeDetails;
+import org.apache.hadoop.hdds.NodeDetails;
 import org.apache.ratis.protocol.RaftGroup;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.slf4j.Logger;
