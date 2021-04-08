@@ -121,7 +121,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
     <!-- jersey version -->
     <jersey.version>1.19</jersey.version>
-    <jersey2.version>2.27</jersey2.version>
+    <jersey2.version>2.33</jersey2.version>
 
     <!-- jackson versions -->
     <jackson2.version>2.12.1</jackson2.version>
@@ -865,6 +865,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       <dependency>
         <groupId>org.glassfish.jersey.media</groupId>
         <artifactId>jersey-media-json-jackson</artifactId>
+        <version>${jersey2.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.glassfish.jersey.media</groupId>
+        <artifactId>jersey-media-jaxb</artifactId>
         <version>${jersey2.version}</version>
       </dependency>
 
