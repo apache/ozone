@@ -62,6 +62,10 @@
       </includes>
     </fileSet>
     <fileSet>
+      <directory>dev-support</directory>
+      <useDefaultExcludes>true</useDefaultExcludes>
+    </fileSet>
+    <fileSet>
       <directory>hadoop-hdds</directory>
       <useDefaultExcludes>true</useDefaultExcludes>
       <excludes>
