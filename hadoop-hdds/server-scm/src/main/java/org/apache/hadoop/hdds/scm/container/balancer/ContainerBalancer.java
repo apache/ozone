@@ -59,10 +59,11 @@ public class ContainerBalancer {
     this.ozoneConfiguration = ozoneConfiguration;
     this.balancerRunning = false;
     this.config = new ContainerBalancerConfiguration();
+    start(new ContainerBalancerConfiguration());
   }
 
   /**
-   * Start ContainerBalancer. Current implementation is incomplete.
+   * Starts ContainerBalancer. Current implementation is incomplete.
    *
    * @param balancerConfiguration Configuration values.
    */
@@ -83,35 +84,40 @@ public class ContainerBalancer {
     // sorted list in order from most to least used
     List<DatanodeUsageInfo> nodes = nodeManager.
         getMostOrLeastUsedDatanodes(true);
-    double avgUtilisation = calculateAvgUtilisation(nodes);
+    double avgUtilization = calculateAvgUtilization(nodes);
 
     // under utilized nodes have utilization(that is, used / capacity) less
     // than lower limit
-    double lowerLimit = avgUtilisation - threshold;
+    double lowerLimit = avgUtilization - threshold;
 
     // over utilized nodes have utilization(that is, used / capacity) greater
     // than upper limit
-    double upperLimit = avgUtilisation + threshold;
+    double upperLimit = avgUtilization + threshold;
     LOG.info("Lower limit for utilization is {}", lowerLimit);
     LOG.info("Upper limit for utilization is {}", upperLimit);
 
-    // find over utilised(source) and under utilised(target) nodes
+    // find over utilized(source) and under utilized or less utilized(target)
+    // nodes
     sourceNodes = new ArrayList<>();
     targetNodes = new ArrayList<>();
-//    for (DatanodeUsageInfo node : nodes) {
-//      SCMNodeStat stat = node.getScmNodeStat();
-//      double utilization = stat.getScmUsed().get().doubleValue() /
-//          stat.getCapacity().get().doubleValue();
-//      if (utilization > upperLimit) {
-//        sourceNodes.add(node);
-//      } else if (utilization < lowerLimit || utilization < avgUtilisation) {
-//        targetNodes.add(node);
-//      }
-//    }
+    for (DatanodeUsageInfo node : nodes) {
+      double utilization = calculateUtilization(node);
+      if (utilization > upperLimit) {
+        sourceNodes.add(node);
+      } else if (utilization < avgUtilization) {
+        targetNodes.add(node);
+      }
+    }
   }
 
-  // calculate the average datanode utilisation across the cluster
-  private double calculateAvgUtilisation(List<DatanodeUsageInfo> nodes) {
+  /**
+   * Calculates the average datanode utilization for the specified nodes.
+   * Utilization is used space divided by capacity.
+   *
+   * @param nodes List of DatanodeUsageInfo to find the average utilization for
+   * @return Average utilization value
+   */
+  private double calculateAvgUtilization(List<DatanodeUsageInfo> nodes) {
     SCMNodeStat aggregatedStats = new SCMNodeStat(
         0, 0, 0);
     for (DatanodeUsageInfo node : nodes) {
@@ -119,6 +125,20 @@ public class ContainerBalancer {
     }
     return aggregatedStats.getScmUsed().get().doubleValue() /
         aggregatedStats.getCapacity().get().doubleValue();
+  }
+
+  /**
+   * Calculate the utilization, that is used space divided by capacity, for
+   * the given datanodeUsageInfo.
+   *
+   * @param datanodeUsageInfo DatanodeUsageInfo to calculate utilization for
+   * @return Utilization value
+   */
+  private double calculateUtilization(DatanodeUsageInfo datanodeUsageInfo) {
+    SCMNodeStat stat = datanodeUsageInfo.getScmNodeStat();
+
+    return stat.getScmUsed().get().doubleValue() /
+        stat.getCapacity().get().doubleValue();
   }
 
   public void stop() {
