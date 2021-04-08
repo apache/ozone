@@ -1858,8 +1858,9 @@
     <value>P1865D</value>
     <tag>OZONE, HDDS, SECURITY</tag>
     <description>Max time for which certificate issued by SCM CA are valid.
-      . The formats accepted are based on the ISO-8601 duration format
-      PnDTnHnMn.nS</description>
+      This duration is used for self-signed root cert and scm sub-ca certs
+      issued by root ca. The formats accepted are based on the ISO-8601
+      duration format PnDTnHnMn.nS</description>
   </property>
   <property>
     <name>hdds.x509.signature.algorithm</name>
