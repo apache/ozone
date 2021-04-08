@@ -342,20 +342,21 @@ public class TestDirectoryDeletingServiceWithFSOBucket {
       }
     }
 
+    KeyDeletingService keyDeletingService =
+        (KeyDeletingService) cluster.getOzoneManager().getKeyManager()
+            .getDeletingService();
+
     // Before delete
     assertTableRowCount(deletedDirTable, 0);
     assertTableRowCount(keyTable, 10);
     assertTableRowCount(dirTable, 1);
+    Assert.assertEquals(0, keyDeletingService.getDeletedKeyCount().get());
 
     fs.delete(root, true);
 
     DirectoryDeletingService dirDeletingService =
         (DirectoryDeletingService) cluster.getOzoneManager().getKeyManager()
             .getDirDeletingService();
-
-    KeyDeletingService keyDeletingService =
-        (KeyDeletingService) cluster.getOzoneManager().getKeyManager()
-            .getDeletingService();
 
     // After delete
     assertTableRowCount(keyTable, 0);
@@ -395,10 +396,15 @@ public class TestDirectoryDeletingServiceWithFSOBucket {
       }
     }
 
+    KeyDeletingService keyDeletingService =
+        (KeyDeletingService) cluster.getOzoneManager().getKeyManager()
+            .getDeletingService();
+
     // Before delete
     assertTableRowCount(deletedDirTable, 0);
     assertTableRowCount(keyTable, 10);
     assertTableRowCount(dirTable, 1);
+    Assert.assertEquals(0, keyDeletingService.getDeletedKeyCount().get());
 
     for (int i = 0; i<10; i++) {
       Path path = new Path(root, "testKey" + i);
@@ -409,9 +415,6 @@ public class TestDirectoryDeletingServiceWithFSOBucket {
         (DirectoryDeletingService) cluster.getOzoneManager().getKeyManager()
             .getDirDeletingService();
 
-    KeyDeletingService keyDeletingService =
-        (KeyDeletingService) cluster.getOzoneManager().getKeyManager()
-            .getDeletingService();
 
     // After delete
     assertTableRowCount(keyTable, 0);
