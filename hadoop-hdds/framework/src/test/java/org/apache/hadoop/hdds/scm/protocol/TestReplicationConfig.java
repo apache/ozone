@@ -80,7 +80,7 @@ public class TestReplicationConfig {
   }
 
   @Test
-  public void fromTypeAndString() {
+  public void fromTypeAndStringName() {
 
     ReplicationConfig replicationConfig = null;
 
@@ -115,6 +115,20 @@ public class TestReplicationConfig {
             .getReplicationFactor(),
         ReplicationFactor.ONE);
 
+  }
+
+
+  @Test
+  public void fromTypeAndStringInteger() {
+    //RATIS-THREE
+    ReplicationConfig replicationConfig = ReplicationConfig.fromTypeAndString(
+        org.apache.hadoop.hdds.client.ReplicationType.RATIS, "3");
+
+    Assert.assertEquals(replicationConfig.getReplicationType(),
+        ReplicationType.RATIS);
+    Assert.assertEquals(
+        ((RatisReplicationConfig) replicationConfig).getReplicationFactor(),
+        ReplicationFactor.THREE);
   }
 
   @Test

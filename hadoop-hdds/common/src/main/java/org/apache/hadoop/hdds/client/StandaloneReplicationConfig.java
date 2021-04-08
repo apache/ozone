@@ -34,10 +34,15 @@ public class StandaloneReplicationConfig implements ReplicationConfig {
     this.replicationFactor = replicationFactor;
   }
 
-  public StandaloneReplicationConfig(String factor) {
-    this.replicationFactor = ReplicationFactor.valueOf(factor);
+  public StandaloneReplicationConfig(String factorString) {
+    ReplicationFactor factor = null;
+    try {
+      factor = ReplicationFactor.valueOf(Integer.parseInt(factorString));
+    } catch (NumberFormatException ex) {
+      factor = ReplicationFactor.valueOf(factorString);
+    }
+    this.replicationFactor = factor;
   }
-
   public ReplicationFactor getReplicationFactor() {
     return replicationFactor;
   }

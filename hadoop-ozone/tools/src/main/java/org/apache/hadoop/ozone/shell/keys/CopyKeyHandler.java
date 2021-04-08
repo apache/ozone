@@ -25,6 +25,7 @@ import java.util.Map;
 
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -91,7 +92,9 @@ public class CopyKeyHandler extends BucketHandler {
     }
 
     if (replication == null) {
-      replication = getConf().get(OZONE_REPLICATION, OZONE_REPLICATION_DEFAULT);
+      replication = ReplicationFactor
+          .valueOf(getConf().get(OZONE_REPLICATION, OZONE_REPLICATION_DEFAULT))
+          .toString();
     }
 
     ReplicationConfig replicationConfig =

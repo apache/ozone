@@ -35,8 +35,14 @@ public class RatisReplicationConfig
     this.replicationFactor = replicationFactor;
   }
 
-  public RatisReplicationConfig(String factor) {
-    this.replicationFactor = ReplicationFactor.valueOf(factor);
+  public RatisReplicationConfig(String factorString) {
+    ReplicationFactor factor = null;
+    try {
+      factor = ReplicationFactor.valueOf(Integer.parseInt(factorString));
+    } catch (NumberFormatException ex) {
+      factor = ReplicationFactor.valueOf(factorString);
+    }
+    this.replicationFactor = factor;
   }
 
   public static boolean hasFactor(ReplicationConfig replicationConfig,
