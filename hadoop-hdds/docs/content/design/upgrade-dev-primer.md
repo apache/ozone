@@ -18,45 +18,45 @@ author: Aravindan Vijayan
   limitations under the License. See accompanying LICENSE file.
 -->
 
-#Terminologies
-##Layout Feature
+# Terminologies
+## Layout Feature
 A layout feature is any new Ozone feature that makes a backward incompatible change to the on disk layout. Each layout feature is associated with a layout version that it defines. A component has a list of monotonically increasing layout features (versions) that it supports. 
 ##Finalizing & Pre-Finalized State
 When upgrading a component from an older version to a newer version which has a higher layout version, the component automatically goes into a pre-finalized state after which an explicit ‘finalize’ action is required from the user to finalize it. In the pre-finalized state, commands/APIs/on disk structures used and created by newer layout features are meant to be unsupported or unused. After finalizing, the newer layout feature APIs are supported.
-##Downgrade
+## Downgrade
 Downgrade to a lower version is allowed from the pre-finalized state. This involves stopping the component, replacing the artifacts to the older version, and then starting it up again.
 
-#Useful framework tools to use
+# Useful framework tools to use
 
-##LayoutFeature (org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature & org
+## LayoutFeature (org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature & org
 .apache.hadoop.hdds.upgrade.HDDSLayoutFeature)
 Class to add  a new layout feature being brought in. Layout version is typically 1 + last layout feature in that catalog. 
 
-##@DisallowedUntilLayoutVersion Annotation
+## @DisallowedUntilLayoutVersion Annotation
 Method level annotation used to "disallow" an API if current layout version does not include the associated layout feature. Currently it is added only to the OM module, but can easily be moved down to a common module based on need on the HDDS layer.
 
-##@BelongsToLayoutVersion Annotation
+## @BelongsToLayoutVersion Annotation
 Annotation to mark an OM request class that it belongs to a specific Layout Version. Until that version is available post finalize, this request will not be supported. A newer version of an existing OM request can be created (by inheritance or a fully new class) and marked with a newer layout version. Until finalizing this layout version, the older request class is used. Post finalizing, the newer version of the request class is used.
 
-##LayoutVersionInstanceFactory<T>
+## LayoutVersionInstanceFactory<T>
 Generic factory which stores different instances of Type 'T' sharded by a key & version. A single key can be associated with different versions of 'T'.
 
-###Why does this class exist?
+### Why does this class exist?
 A typical use case during upgrade is to have multiple versions of a class / method / object and choose them based  on the current layout version at runtime. Before finalizing, an older version is typically needed, and after finalization, a newer version is needed. This class serves this purpose in a generic way. For example, we can create a Factory to create multiple versions of OMRequests sharded by Request Type & Layout Version Supported.
 
-##Upgrade Action (UpgradeActionOm & UpgradeActionHdds)
+## Upgrade Action (UpgradeActionOm & UpgradeActionHdds)
 Annotation to specify upgrade action run during specific upgrade phases. Each layout feature can optionally define an upgrade action for every supported phase. These are the supported phases of action callbacks.
 
-####UNFINALIZED_STATE_VALIDATION
+#### UNFINALIZED_STATE_VALIDATION
 A ‘validation’ action run every time a component is started up with this layout feature being unfinalized.
 
-####ON_FIRST_UPGRADE_START
+#### ON_FIRST_UPGRADE_START
 A backward compatible action run exactly once when an upgraded cluster is detected with this new  layout version.
 
-####ON_FINALIZE
+#### ON_FINALIZE
 An action run exactly once during finalization of layout version (feature).
 
-##‘Prepare’ the Ozone Manager
+## ‘Prepare’ the Ozone Manager
 Used to flush all transactions to disk, take a DB snapshot, and purge the logs, leaving Ratis in a clean state without unapplied log entries. This prepares the OM for upgrades/downgrades so that no request in the log is applied to the database in the old version of the code in one OM, and the new version of the code in another OM.
 
 To prepare an OM quorum, run
@@ -68,16 +68,16 @@ To cancel preparation of an OM quorum, run
     ozone admin om -id=<om-sevice-id> cancelprepare
 
 
-##When do you bring in a change as a Layout feature?
+## When do you bring in a change as a Layout feature?
 By using the new feature, if it creates a change in disk layout (RocksDB, HDDS Volume etc) that is incompatible with the older version, then that qualifies as a layout feature.
 
-####What are some examples of changes that need not be layout features?
+#### What are some examples of changes that need not be layout features?
 - A feature that creates a table and writes into it. On downgrade, the table
 is no longer accessed (as expected), but does not interfere with the existing
  functionality.
 - A change to an existing OM request that does not change on disk layout.  
 
-##Testing layout feature onboarding
+## Testing layout feature onboarding
 - Ability to deploy Mini ozone cluster with any layout version
     - org.apache.hadoop.ozone.MiniOzoneCluster.Builder#setScmLayoutVersion
     - org.apache.hadoop.ozone.MiniOzoneCluster.Builder#setOmLayoutVersion
