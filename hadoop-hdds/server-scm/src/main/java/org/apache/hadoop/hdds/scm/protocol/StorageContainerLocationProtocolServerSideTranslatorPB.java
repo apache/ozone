@@ -331,9 +331,6 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             "Unknown command type: " + request.getCmdType());
       }
     } catch (IOException e) {
-      if (SCMHAUtils.isRetriableWithNoFailoverException(e)) {
-        throw new ServiceException(new RetriableWithNoFailoverException(e));
-      }
       throw new ServiceException(e);
     }
   }
