@@ -63,4 +63,73 @@ public class TestReplicationConfig {
     Assert.assertEquals(ReplicationFactor.ONE,
         standalone.getReplicationFactor());
   }
+
+  @Test
+  public void fromJavaObjects() {
+
+    final ReplicationConfig replicationConfig = ReplicationConfig
+        .fromTypeAndFactor(org.apache.hadoop.hdds.client.ReplicationType.RATIS,
+            org.apache.hadoop.hdds.client.ReplicationFactor.THREE);
+
+    Assert.assertEquals(replicationConfig.getReplicationType(),
+        ReplicationType.RATIS);
+    Assert.assertEquals(
+        ((RatisReplicationConfig) replicationConfig).getReplicationFactor(),
+        ReplicationFactor.THREE);
+
+  }
+
+  @Test
+  public void fromTypeAndString() {
+
+    ReplicationConfig replicationConfig = null;
+
+    //RATIS-THREE
+    replicationConfig = ReplicationConfig.fromTypeAndString(
+        org.apache.hadoop.hdds.client.ReplicationType.RATIS, "THREE");
+
+    Assert.assertEquals(replicationConfig.getReplicationType(),
+        ReplicationType.RATIS);
+    Assert.assertEquals(
+        ((RatisReplicationConfig) replicationConfig).getReplicationFactor(),
+        ReplicationFactor.THREE);
+
+    //RATIS-ONE
+    replicationConfig = ReplicationConfig.fromTypeAndString(
+        org.apache.hadoop.hdds.client.ReplicationType.RATIS, "ONE");
+
+    Assert.assertEquals(replicationConfig.getReplicationType(),
+        ReplicationType.RATIS);
+    Assert.assertEquals(
+        ((RatisReplicationConfig) replicationConfig).getReplicationFactor(),
+        ReplicationFactor.ONE);
+
+    //STANDALONE-ONE
+    replicationConfig = ReplicationConfig.fromTypeAndString(
+        org.apache.hadoop.hdds.client.ReplicationType.STAND_ALONE, "ONE");
+
+    Assert.assertEquals(replicationConfig.getReplicationType(),
+        ReplicationType.STAND_ALONE);
+    Assert.assertEquals(
+        ((StandaloneReplicationConfig) replicationConfig)
+            .getReplicationFactor(),
+        ReplicationFactor.ONE);
+
+  }
+
+  @Test
+  public void adjustReplication() {
+    ReplicationConfig config = new RatisReplicationConfig(ReplicationFactor.ONE);
+
+    final ReplicationConfig replicationConfig =
+        ReplicationConfig.adjustReplication(config, (short) 1);
+
+    Assert.assertEquals(replicationConfig.getReplicationType(),
+        ReplicationType.RATIS);
+    Assert.assertEquals(
+        ((RatisReplicationConfig) replicationConfig)
+            .getReplicationFactor(),
+        ReplicationFactor.ONE);
+
+  }
 }

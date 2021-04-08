@@ -34,6 +34,10 @@ public class StandaloneReplicationConfig implements ReplicationConfig {
     this.replicationFactor = replicationFactor;
   }
 
+  public StandaloneReplicationConfig(String factor) {
+    this.replicationFactor = ReplicationFactor.valueOf(factor);
+  }
+
   public ReplicationFactor getReplicationFactor() {
     return replicationFactor;
   }

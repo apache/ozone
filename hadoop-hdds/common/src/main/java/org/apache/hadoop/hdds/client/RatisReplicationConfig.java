@@ -35,6 +35,10 @@ public class RatisReplicationConfig
     this.replicationFactor = replicationFactor;
   }
 
+  public RatisReplicationConfig(String factor) {
+    this.replicationFactor = ReplicationFactor.valueOf(factor);
+  }
+
   public static boolean hasFactor(ReplicationConfig replicationConfig,
       ReplicationFactor factor) {
     if (replicationConfig instanceof RatisReplicationConfig) {

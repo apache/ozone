@@ -71,6 +71,8 @@ public enum ReplicationFactor {
     }
   }
 
+
+
   /**
    * Returns integer representation of ReplicationFactor.
    * @return replication value
