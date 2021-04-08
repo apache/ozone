@@ -350,7 +350,7 @@ public class TestDirectoryDeletingServiceWithFSOBucket {
     assertTableRowCount(deletedDirTable, 0);
     assertTableRowCount(keyTable, 10);
     assertTableRowCount(dirTable, 1);
-    Assert.assertEquals(0, keyDeletingService.getDeletedKeyCount().get());
+    long prevDeletedKeyCount = keyDeletingService.getDeletedKeyCount().get();
 
     fs.delete(root, true);
 
@@ -369,7 +369,8 @@ public class TestDirectoryDeletingServiceWithFSOBucket {
     assertSubPathsCount(dirDeletingService.getMovedFilesCount(), 10);
     assertSubPathsCount(dirDeletingService.getDeletedDirsCount(), 1);
     // verify whether KeyDeletingService has purged the keys
-    Assert.assertEquals(10, keyDeletingService.getDeletedKeyCount().get());
+    long currentDeletedKeyCount = keyDeletingService.getDeletedKeyCount().get();
+    Assert.assertEquals(currentDeletedKeyCount, prevDeletedKeyCount + 10);
   }
 
   @Test
@@ -404,7 +405,7 @@ public class TestDirectoryDeletingServiceWithFSOBucket {
     assertTableRowCount(deletedDirTable, 0);
     assertTableRowCount(keyTable, 10);
     assertTableRowCount(dirTable, 1);
-    Assert.assertEquals(0, keyDeletingService.getDeletedKeyCount().get());
+    long prevDeletedKeyCount = keyDeletingService.getDeletedKeyCount().get();
 
     for (int i = 0; i<10; i++) {
       Path path = new Path(root, "testKey" + i);
@@ -427,6 +428,7 @@ public class TestDirectoryDeletingServiceWithFSOBucket {
     assertSubPathsCount(dirDeletingService.getMovedFilesCount(), 0);
     assertSubPathsCount(dirDeletingService.getDeletedDirsCount(), 0);
     // verify whether KeyDeletingService has purged the keys
-    Assert.assertEquals(10, keyDeletingService.getDeletedKeyCount().get());
+    long currentDeletedKeyCount = keyDeletingService.getDeletedKeyCount().get();
+    Assert.assertEquals(currentDeletedKeyCount, prevDeletedKeyCount + 10);
   }
 }
