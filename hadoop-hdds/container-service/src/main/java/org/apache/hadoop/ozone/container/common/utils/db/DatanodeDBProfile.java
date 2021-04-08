@@ -31,72 +31,60 @@ public abstract class DatanodeDBProfile {
 
 
   public static class SSD extends DatanodeDBProfile {
-    private static final StorageBasedProfile ssdStorageBasedProfile =
+    private static final StorageBasedProfile SSD_STORAGE_BASED_PROFILE =
         new StorageBasedProfile(DBProfile.SSD);
 
     @Override
     public DBOptions getDBOptions() {
-      return ssdStorageBasedProfile.getDBOptions();
+      return SSD_STORAGE_BASED_PROFILE.getDBOptions();
     }
 
     @Override
     public ColumnFamilyOptions getColumnFamilyOptions(
         ConfigurationSource config) {
-      return ssdStorageBasedProfile.getColumnFamilyOptions(config);
+      return SSD_STORAGE_BASED_PROFILE.getColumnFamilyOptions(config);
     }
   }
 
 
 
   public static class Disk extends DatanodeDBProfile {
-    private static final StorageBasedProfile diskStorageBasedProfile =
+    private static final StorageBasedProfile DISK_STORAGE_BASED_PROFILE =
         new StorageBasedProfile(DBProfile.DISK);
 
     @Override
     public DBOptions getDBOptions() {
-      return diskStorageBasedProfile.getDBOptions();
+      return DISK_STORAGE_BASED_PROFILE.getDBOptions();
     }
 
     @Override
     public ColumnFamilyOptions getColumnFamilyOptions(
         ConfigurationSource config) {
-      return diskStorageBasedProfile.getColumnFamilyOptions(config);
+      return DISK_STORAGE_BASED_PROFILE.getColumnFamilyOptions(config);
     }
   }
 
 
 
   private static class StorageBasedProfile {
-    private static final AtomicReference<DBOptions> dbOptions =
-        new AtomicReference<>();
-    private static final AtomicReference<ColumnFamilyOptions> cfOptions =
+    private static final AtomicReference<ColumnFamilyOptions> CF_OPTIONS =
         new AtomicReference<>();
     private final DBProfile baseProfile;
 
-    public StorageBasedProfile(DBProfile profile) {
+    private StorageBasedProfile(DBProfile profile) {
       baseProfile = profile;
     }
 
     private DBOptions getDBOptions() {
-      dbOptions
-          .updateAndGet(op -> op != null ? op : baseProfile.getDBOptions());
-      return dbOptions.get();
-    }
-
-    private ColumnFamilyOptions getColumnFamilyOptions() {
-      return getColumnFamilyOptions(null);
-    }
-
-    private BlockBasedTableConfig getBlockBasedTableConfig() {
-      return getBlockBasedTableConfig(null);
+      return baseProfile.getDBOptions();
     }
 
     private ColumnFamilyOptions getColumnFamilyOptions(
         ConfigurationSource config) {
-      cfOptions.updateAndGet(op -> op != null ? op :
+      CF_OPTIONS.updateAndGet(op -> op != null ? op :
           baseProfile.getColumnFamilyOptions()
               .setTableFormatConfig(getBlockBasedTableConfig(config)));
-      return cfOptions.get();
+      return CF_OPTIONS.get();
     }
 
     private BlockBasedTableConfig getBlockBasedTableConfig(

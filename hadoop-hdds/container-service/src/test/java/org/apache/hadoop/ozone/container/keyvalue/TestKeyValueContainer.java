@@ -439,10 +439,6 @@ public class TestKeyValueContainer {
       ColumnFamilyOptions columnFamilyOptions2 = dbProfileSupplier.get()
           .getColumnFamilyOptions(new OzoneConfiguration());
       Assert.assertEquals(columnFamilyOptions1, columnFamilyOptions2);
-
-      DBOptions dbOptions1 = dbProfileSupplier.get().getDBOptions();
-      DBOptions dbOptions2 = dbProfileSupplier.get().getDBOptions();
-      Assert.assertEquals(dbOptions1, dbOptions2);
     }
   }
 }
