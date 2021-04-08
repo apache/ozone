@@ -23,7 +23,7 @@ author: Aravindan Vijayan
 ## Layout Feature
 A layout feature is any new Ozone feature that makes a backward incompatible change to the on disk layout. Each layout feature is associated with a layout version that it defines. A component has a list of monotonically increasing layout features (versions) that it supports. 
 
-##Finalizing & Pre-Finalized State
+## Finalizing & Pre-Finalized State
 When upgrading a component from an older version to a newer version which has a higher layout version, the component automatically goes into a pre-finalized state after which an explicit ‘finalize’ action is required from the user to finalize it. In the pre-finalized state, commands/APIs/on disk structures used and created by newer layout features are meant to be unsupported or unused. After finalizing, the newer layout feature APIs are supported.
 
 ## Downgrade
