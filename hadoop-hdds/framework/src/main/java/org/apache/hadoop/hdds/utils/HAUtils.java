@@ -357,20 +357,6 @@ public final class HAUtils {
     return false;
   }
 
-  public static void checkSecurityAndSCMHAEnabled(OzoneConfiguration conf) {
-    boolean enable =
-        conf.getBoolean(ScmConfigKeys.OZONE_SCM_HA_SECURITY_SUPPORTED,
-            ScmConfigKeys.OZONE_SCM_HA_SECURITY_SUPPORTED_DEFAULT);
-    if (OzoneSecurityUtil.isSecurityEnabled(conf) && !enable) {
-      List<SCMNodeInfo> scmNodeInfo = SCMNodeInfo.buildNodeInfo(conf);
-      if (scmNodeInfo.size() > 1) {
-        System.err.println("Ozone Services cannot be started on a secure SCM " +
-            "HA enabled cluster");
-        System.exit(1);
-      }
-    }
-  }
-
   /**
    * Build CA list which need to be passed to client.
    *
