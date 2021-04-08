@@ -92,9 +92,7 @@ public class CopyKeyHandler extends BucketHandler {
     }
 
     if (replication == null) {
-      replication = ReplicationFactor
-          .valueOf(getConf().get(OZONE_REPLICATION, OZONE_REPLICATION_DEFAULT))
-          .toString();
+      replication = getConf().get(OZONE_REPLICATION, OZONE_REPLICATION_DEFAULT);
     }
 
     ReplicationConfig replicationConfig =
