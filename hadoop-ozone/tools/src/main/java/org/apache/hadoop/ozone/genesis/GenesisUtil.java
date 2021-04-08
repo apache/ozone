@@ -180,7 +180,6 @@ public final class GenesisUtil {
     SCMStorageConfig scmStore = new SCMStorageConfig(conf);
     if (omStorage.getState() != Storage.StorageState.INITIALIZED) {
       omStorage.setClusterId(scmStore.getClusterID());
-      omStorage.setScmId(scmStore.getScmId());
       omStorage.setOmId(UUID.randomUUID().toString());
       omStorage.initialize();
     }

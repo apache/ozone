@@ -725,13 +725,10 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         return;
       }
       omStorage.setClusterId(clusterId);
-      if (scmId.isPresent()) {
-        omStorage.setScmId(scmId.get());
-      }
       omStorage.setOmId(omId.orElse(UUID.randomUUID().toString()));
       // Initialize ozone certificate client if security is enabled.
       if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
-        OzoneManager.initializeSecurity(conf, omStorage);
+        OzoneManager.initializeSecurity(conf, omStorage, scmId.get());
       }
       omStorage.initialize();
     }
