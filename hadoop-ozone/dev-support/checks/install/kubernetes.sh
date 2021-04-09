@@ -16,9 +16,6 @@
 
 # This script installs dependencies for the tests run by `kubernetes.sh`.
 
-# Install robotframework
-sudo pip install robotframework
-
 # Install k3s
 curl -sfL https://get.k3s.io | sh -
 
