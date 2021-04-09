@@ -35,7 +35,6 @@ import org.rocksdb.DBOptions;
 import org.rocksdb.LRUCache;
 import org.rocksdb.Statistics;
 import org.rocksdb.StatsLevel;
-import org.rocksdb.util.SizeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
