@@ -22,6 +22,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolPB;
+import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.utils.HAUtils;
@@ -181,6 +182,41 @@ public class SCMSecurityProtocolFailoverProxyProvider implements
     }
   }
 
+  public void performFailoverToAssignedLeader(String newLeader, Exception e) {
+    ServerNotLeaderException snle =
+        (ServerNotLeaderException) SCMHAUtils.getServerNotLeaderException(e);
+    if (snle != null && snle.getSuggestedLeader() != null) {
+      newLeader = scmProxyInfoMap.values().stream().filter(
+          proxyInfo -> NetUtils.getHostPortString(proxyInfo.getAddress())
+              .equals(snle.getSuggestedLeader())).findFirst().get().getNodeId();
+      LOG.debug("Performing failover to suggested leader {}, nodeId {}",
+          snle.getSuggestedLeader(), newLeader);
+    }
+    if (newLeader == null) {
+      // If newLeader is not assigned, it will fail over to next proxy.
+      performFailoverToNextProxy();
+      LOG.debug("Performing failover to next proxy node {}",
+          currentProxySCMNodeId);
+    } else {
+      if (!assignLeaderToNode(newLeader)) {
+        LOG.debug("Failing over SCM proxy to nodeId: {}", newLeader);
+        performFailoverToNextProxy();
+      }
+    }
+  }
+
+  private boolean assignLeaderToNode(String newLeaderNodeId) {
+    if (!currentProxySCMNodeId.equals(newLeaderNodeId)
+        && scmProxies.containsKey(newLeaderNodeId)) {
+      currentProxySCMNodeId = newLeaderNodeId;
+      currentProxyIndex = scmNodeIds.indexOf(currentProxySCMNodeId);
+
+      LOG.debug("Failing over SCM proxy to nodeId: {}", newLeaderNodeId);
+      return true;
+    }
+
+    return false;
+  }
   /**
    * Performs fail-over to the next proxy.
    */
@@ -228,11 +264,8 @@ public class SCMSecurityProtocolFailoverProxyProvider implements
           return RetryAction.FAIL;
         }
 
-        // Perform fail over to next proxy, as right now we don't have any
-        // suggested leader ID from server, we fail over to next one.
-        // TODO: Act based on server response if leader id is passed.
         if (!SCMHAUtils.isRetriableWithNoFailoverException(exception)) {
-          performFailoverToNextProxy();
+          performFailoverToAssignedLeader(null, exception);
         }
         return SCMHAUtils
             .getRetryAction(failovers, retries, exception, maxRetryCount,

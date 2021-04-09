@@ -122,7 +122,7 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
       if (response.getStatus() ==
           ScmBlockLocationProtocolProtos.Status.SCM_NOT_LEADER) {
         failoverProxyProvider
-            .performFailoverToAssignedLeader(response.getLeaderSCMNodeId());
+            .performFailoverToAssignedLeader(response.getLeaderSCMNodeId(), null);
       }
       return response;
     } catch (ServiceException e) {

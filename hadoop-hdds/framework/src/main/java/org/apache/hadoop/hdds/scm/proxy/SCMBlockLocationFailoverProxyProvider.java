@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolPB;
@@ -29,7 +30,6 @@ import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.io.retry.FailoverProxyProvider;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
-import org.apache.hadoop.io.retry.RetryPolicy.RetryAction;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.net.NetUtils;
@@ -131,7 +131,14 @@ public class SCMBlockLocationFailoverProxyProvider implements
   }
 
   @VisibleForTesting
-  public synchronized String getCurrentProxyOMNodeId() {
+  public void changeCurrentProxy(String nodeId) {
+    currentProxyIndex = scmNodeIds.indexOf(nodeId);
+    currentProxySCMNodeId = nodeId;
+    nextProxyIndex();
+  }
+
+  @VisibleForTesting
+  public synchronized String getCurrentProxySCMNodeId() {
     return currentProxySCMNodeId;
   }
 
@@ -145,13 +152,24 @@ public class SCMBlockLocationFailoverProxyProvider implements
   @Override
   public void performFailover(ScmBlockLocationProtocolPB newLeader) {
     // Should do nothing here.
-    LOG.debug("Failing over to next proxy. {}", getCurrentProxyOMNodeId());
+    LOG.debug("Failing over to next proxy. {}", getCurrentProxySCMNodeId());
   }
 
-  public void performFailoverToAssignedLeader(String newLeader) {
+  public void performFailoverToAssignedLeader(String newLeader, Exception e) {
+    ServerNotLeaderException snle =
+        (ServerNotLeaderException) SCMHAUtils.getServerNotLeaderException(e);
+    if (snle != null && snle.getSuggestedLeader() != null) {
+      newLeader = scmProxyInfoMap.values().stream().filter(
+          proxyInfo -> NetUtils.getHostPortString(proxyInfo.getAddress())
+              .equals(snle.getSuggestedLeader())).findFirst().get().getNodeId();
+      LOG.debug("Performing failover to suggested leader {}, nodeId {}",
+          snle.getSuggestedLeader(), newLeader);
+    }
     if (newLeader == null) {
       // If newLeader is not assigned, it will fail over to next proxy.
       nextProxyIndex();
+      LOG.debug("Performing failover to next proxy node {}",
+          currentProxySCMNodeId);
     } else {
       if (!assignLeaderToNode(newLeader)) {
         LOG.debug("Failing over SCM proxy to nodeId: {}", newLeader);
@@ -250,7 +268,7 @@ public class SCMBlockLocationFailoverProxyProvider implements
       public RetryAction shouldRetry(Exception e, int retry,
                                      int failover, boolean b) {
         if (!SCMHAUtils.isRetriableWithNoFailoverException(e)) {
-          performFailoverToAssignedLeader(newLeader);
+          performFailoverToAssignedLeader(newLeader, e);
         }
         return SCMHAUtils.getRetryAction(failover, retry, e, maxRetryCount,
             getRetryInterval());

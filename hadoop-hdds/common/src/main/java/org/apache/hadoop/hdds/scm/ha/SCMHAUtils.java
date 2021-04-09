@@ -24,15 +24,18 @@ import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.io.retry.RetryPolicy;
+import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.ratis.protocol.exceptions.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -198,14 +201,28 @@ public final class SCMHAUtils {
     return getSCMNodeIds(configuration, scmServiceId);
   }
 
+  private static Throwable unwrapException(Exception e) {
+    IOException ioException = null;
+    Throwable cause = e.getCause();
+    if (cause instanceof RemoteException) {
+      ioException = ((RemoteException) cause).unwrapRemoteException();
+    }
+    return ioException == null ? e : ioException;
+  }
+
+  public static boolean isNonRetriableException(Exception e) {
+    Throwable t = unwrapException(e);
+    return StateMachineException.class.isInstance(t);
+  }
+
   // This will return the underlying exception after unwrapping
   // the exception to see if it matches with expected exception
   // list , returns true otherwise will return false.
   public static boolean isRetriableWithNoFailoverException(Exception e) {
-    Throwable t = e;
-    while (t != null && t.getCause() != null) {
-      for (Class<? extends Exception> clazz :
-          getRetriableWithNoFailoverExceptionList()) {
+
+    Throwable t = unwrapException(e);
+    while (t != null) {
+      for (Class<? extends Exception> clazz : getRetriableWithNoFailoverExceptionList()) {
         if (clazz.isInstance(t)) {
           return true;
         }
@@ -215,8 +232,34 @@ public final class SCMHAUtils {
     return false;
   }
 
-  public static List<Class<? extends
-      Exception>> getRetriableWithNoFailoverExceptionList() {
+  public static Throwable getNotLeaderException(Exception e) {
+    return getExceptionForClass(e, NotLeaderException.class);
+  }
+
+  public static Throwable getServerNotLeaderException(Exception e) {
+    return getExceptionForClass(e, ServerNotLeaderException.class);
+  }
+
+  // This will return the underlying NotLeaderException exception
+  public static Throwable getExceptionForClass(Exception e,
+      Class<? extends Exception> clazz) {
+    IOException ioException = null;
+    Throwable cause = e.getCause();
+    if (cause instanceof RemoteException) {
+      ioException = ((RemoteException) cause).unwrapRemoteException();
+    }
+    Throwable t = ioException == null ? e : ioException;
+    while (t != null) {
+      if (clazz.isInstance(t)) {
+        return t;
+      }
+      t = t.getCause();
+    }
+    return null;
+  }
+
+  public static List<Class<? extends Exception>>
+  getRetriableWithNoFailoverExceptionList() {
     return RETRIABLE_WITH_NO_FAILOVER_EXCEPTION_LIST;
   }
 
@@ -229,6 +272,8 @@ public final class SCMHAUtils {
       } else {
         return RetryPolicy.RetryAction.FAIL;
       }
+    } else if (SCMHAUtils.isNonRetriableException(e)) {
+      return RetryPolicy.RetryAction.FAIL;
     } else {
       if (failovers < maxRetryCount) {
         return new RetryPolicy.RetryAction(

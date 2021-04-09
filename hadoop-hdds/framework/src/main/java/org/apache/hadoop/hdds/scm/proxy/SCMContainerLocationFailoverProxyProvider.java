@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
@@ -131,6 +132,13 @@ public class SCMContainerLocationFailoverProxyProvider implements
     return currentProxySCMNodeId;
   }
 
+  @VisibleForTesting
+  public void changeCurrentProxy(String nodeId) {
+    currentProxyIndex = scmNodeIds.indexOf(nodeId);
+    currentProxySCMNodeId = nodeId;
+    nextProxyIndex();
+  }
+
   @Override
   public synchronized ProxyInfo<StorageContainerLocationProtocolPB> getProxy() {
     ProxyInfo<StorageContainerLocationProtocolPB> currentProxyInfo
@@ -154,13 +162,26 @@ public class SCMContainerLocationFailoverProxyProvider implements
     LOG.debug("Failing over to next proxy. {}", getCurrentProxySCMNodeId());
   }
 
-  public synchronized void performFailoverToAssignedLeader(String newLeader) {
+  public void performFailoverToAssignedLeader(String newLeader, Exception e) {
+    ServerNotLeaderException snle =
+        (ServerNotLeaderException) SCMHAUtils.getServerNotLeaderException(e);
+    if (snle != null && snle.getSuggestedLeader() != null) {
+      newLeader = scmProxyInfoMap.values().stream().filter(
+          proxyInfo -> NetUtils.getHostPortString(proxyInfo.getAddress())
+              .equals(snle.getSuggestedLeader())).findFirst().get().getNodeId();
+      LOG.debug("Performing failover to suggested leader {}, nodeId {}",
+          snle.getSuggestedLeader(), newLeader);
+    }
     if (newLeader == null) {
-      // If newLeader is not assigned, fail over to next proxy.
+      // If newLeader is not assigned, it will fail over to next proxy.
       nextProxyIndex();
-    } else if (!assignLeaderToNode(newLeader)) {
-      // If failed to fail over to newLeader, fail over to next proxy.
-      nextProxyIndex();
+      LOG.debug("Performing failover to next proxy node {}",
+          currentProxySCMNodeId);
+    } else {
+      if (!assignLeaderToNode(newLeader)) {
+        LOG.debug("Failing over SCM proxy to nodeId: {}", newLeader);
+        nextProxyIndex();
+      }
     }
   }
 
@@ -178,24 +199,6 @@ public class SCMContainerLocationFailoverProxyProvider implements
       if (scmProxy != null) {
         RPC.stopProxy(scmProxy);
       }
-    }
-  }
-
-  public RetryPolicy.RetryAction getRetryAction(int failovers, int retry,
-      Exception e) {
-    if (SCMHAUtils.isRetriableWithNoFailoverException(e)) {
-      if (retry < maxRetryCount) {
-        return new RetryPolicy.RetryAction(
-            RetryPolicy.RetryAction.RetryDecision.RETRY, getRetryInterval());
-      } else {
-        return RetryPolicy.RetryAction.FAIL;
-      }
-    } else if (failovers < maxRetryCount) {
-      return new RetryPolicy.RetryAction(
-          RetryPolicy.RetryAction.RetryDecision.FAILOVER_AND_RETRY,
-          getRetryInterval());
-    } else {
-      return RetryPolicy.RetryAction.FAIL;
     }
   }
 
@@ -220,7 +223,6 @@ public class SCMContainerLocationFailoverProxyProvider implements
       LOG.debug("Failing over SCM proxy to nodeId: {}", newLeaderNodeId);
       return true;
     }
-
     return false;
   }
 
@@ -272,7 +274,7 @@ public class SCMContainerLocationFailoverProxyProvider implements
       public RetryAction shouldRetry(Exception e, int retry,
                                      int failover, boolean b) {
         if (!SCMHAUtils.isRetriableWithNoFailoverException(e)) {
-          performFailoverToAssignedLeader(null);
+          performFailoverToAssignedLeader(null, e);
         }
         return SCMHAUtils.getRetryAction(failover, retry, e, maxRetryCount,
             getRetryInterval());

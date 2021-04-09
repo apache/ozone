@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecuri
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityResponse;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.Status;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolPB;
+import org.apache.hadoop.hdds.scm.ha.RatisUtil;
 import org.apache.hadoop.hdds.scm.ha.RetriableWithNoFailoverException;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -89,9 +90,9 @@ public class SCMSecurityProtocolServerSideTranslatorPB
     // primary SCM may not be leader SCM.
     if (!request.getCmdType().equals(GetSCMCertificate)) {
       if (!scm.checkLeader()) {
-        throw new ServiceException(scm.getScmHAManager()
-            .getRatisServer()
-            .triggerNotLeaderException());
+        RatisUtil.checkRatisException(
+            scm.getScmHAManager().getRatisServer().triggerNotLeaderException(),
+            scm.getSecurityProtocolRpcPort(), scm.getScmId());
       }
     }
     return dispatcher.processRequest(request, this::processRequest,
@@ -148,11 +149,8 @@ public class SCMSecurityProtocolServerSideTranslatorPB
             "Unknown request type: " + request.getCmdType());
       }
     } catch (IOException e) {
-      if (SCMHAUtils.isRetriableWithNoFailoverException(e)) {
-        throw new ServiceException(new RetriableWithNoFailoverException(e));
-      } else if (e instanceof NotLeaderException) {
-        throw new ServiceException(e);
-      }
+      RatisUtil.checkRatisException(e, scm.getSecurityProtocolRpcPort(),
+          scm.getScmId());
       scmSecurityResponse.setSuccess(false);
       scmSecurityResponse.setStatus(exceptionToResponseStatus(e));
       // If actual cause is set in SCMSecurityException, set message with
