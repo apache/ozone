@@ -163,7 +163,7 @@ public class TestOzoneClient {
       Assert.assertEquals(keyName, key.getName());
       OzoneInputStream is = bucket.readKey(keyName);
       byte[] fileContent = new byte[value.getBytes(UTF_8).length];
-      is.read(fileContent);
+      Assert.assertEquals(value.length(), is.read(fileContent));
       is.close();
       Assert.assertEquals(value, new String(fileContent, UTF_8));
       Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
