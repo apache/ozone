@@ -41,10 +41,8 @@ jobs:
         uses: actions/cache@v2
         with:
           path: ~/.m2/repository
-          key: maven-repo-${{ hashFiles('**/pom.xml') }}-${{ matrix.java }}
-          restore-keys: |
-            maven-repo-${{ hashFiles('**/pom.xml') }}
-            maven-repo-
+          key: maven-repo-${{ hashFiles('**/pom.xml') }}
+          restore-keys: maven-repo-
       - name: Setup java
         uses: actions/setup-java@v1
         with:
@@ -64,51 +62,122 @@ jobs:
           rm -rf ~/.m2/repository/org/apache/hadoop/hadoop-hdds*
           rm -rf ~/.m2/repository/org/apache/hadoop/hadoop-ozone*
         if: always()
-  basic:
+  bats:
     runs-on: ubuntu-18.04
-    strategy:
-      matrix:
-        check:
-          - author
-          - bats
-          - checkstyle
-          - findbugs
-          - rat
-          - unit
-      fail-fast: false
     steps:
       - name: Checkout project
         uses: actions/checkout@v2
-      - name: Cache for maven dependencies
-        uses: actions/cache@v2
-        with:
-          path: ~/.m2/repository
-          key: maven-repo-${{ hashFiles('**/pom.xml') }}-8-${{ matrix.check }}
-          restore-keys: |
-            maven-repo-${{ hashFiles('**/pom.xml') }}-8
-            maven-repo-${{ hashFiles('**/pom.xml') }}
-            maven-repo-
-        if: ${{ !contains('author,bats', matrix.check) }}
-      - name: Install dependencies
-        run: hadoop-ozone/dev-support/checks/install/_install.sh ${{ matrix.check }}
+      - name: Install bats
+        run: |
+          cd /tmp
+          curl -LSs https://github.com/bats-core/bats-core/archive/v1.2.1.tar.gz | tar xzf -
+          cd bats-core-1.2.1
+          sudo ./install.sh /usr/local
       - name: Execute tests
-        run: hadoop-ozone/dev-support/checks/${{ matrix.check }}.sh
+        run: ./hadoop-ozone/dev-support/checks/${{ github.job }}.sh
       - name: Summary of failures
-        run: cat target/${{ matrix.check }}/summary.txt
+        run: cat target/${{ github.job }}/summary.txt
         if: always()
       - name: Archive build results
         uses: actions/upload-artifact@v2
         if: always()
         with:
-          name: ${{ matrix.check }}
-          path: target/${{ matrix.check }}
+          name: ${{ github.job }}
+          path: target/${{ github.job }}
         continue-on-error: true
-      - name: Delete temporary build artifacts before caching
-        run: |
-          #Never cache local artifacts
-          rm -rf ~/.m2/repository/org/apache/hadoop/hadoop-hdds*
-          rm -rf ~/.m2/repository/org/apache/hadoop/hadoop-ozone*
+  rat:
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v2
+      - name: Execute tests
+        uses: ./.github/buildenv
+        with:
+          args: ./hadoop-ozone/dev-support/checks/rat.sh
+      - name: Summary of failures
+        run: cat target/${{ github.job }}/summary.txt
         if: always()
+      - name: Archive build results
+        uses: actions/upload-artifact@v2
+        if: always()
+        with:
+          name: rat
+          path: target/rat
+        continue-on-error: true
+  author:
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v2
+      - name: Execute tests
+        run: hadoop-ozone/dev-support/checks/author.sh
+      - name: Summary of failures
+        run: cat target/${{ github.job }}/summary.txt
+        if: always()
+      - name: Archive build results
+        uses: actions/upload-artifact@v2
+        if: always()
+        with:
+          name: author
+          path: target/author
+        continue-on-error: true
+  unit:
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v2
+      - name: Execute tests
+        uses: ./.github/buildenv
+        with:
+          args: ./hadoop-ozone/dev-support/checks/unit.sh
+      - name: Summary of failures
+        run: cat target/${{ github.job }}/summary.txt
+        if: always()
+      - name: Archive build results
+        uses: actions/upload-artifact@v2
+        if: always()
+        with:
+          name: unit
+          path: target/unit
+        continue-on-error: true
+  checkstyle:
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v2
+      - name: Execute tests
+        uses: ./.github/buildenv
+        with:
+          args: ./hadoop-ozone/dev-support/checks/checkstyle.sh
+      - name: Summary of failures
+        run: cat target/${{ github.job }}/summary.txt
+        if: always()
+      - name: Archive build results
+        uses: actions/upload-artifact@v2
+        if: always()
+        with:
+          name: checkstyle
+          path: target/checkstyle
+        continue-on-error: true
+  findbugs:
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v2
+      - name: Execute tests
+        uses: ./.github/buildenv
+        with:
+          args: ./hadoop-ozone/dev-support/checks/findbugs.sh
+      - name: Summary of failures
+        run: cat target/${{ github.job }}/summary.txt
+        if: always()
+      - name: Archive build results
+        uses: actions/upload-artifact@v2
+        if: always()
+        with:
+          name: findbugs
+          path: target/findbugs
+        continue-on-error: true
   acceptance:
     needs: compile
     runs-on: ubuntu-18.04
@@ -189,9 +258,9 @@ jobs:
     runs-on: ubuntu-18.04
     if: github.repository == 'apache/ozone' && github.event_name != 'pull_request'
     needs:
-      - basic
       - acceptance
       - integration
+      - unit
     steps:
       - name: Checkout project
         uses: actions/checkout@v2
