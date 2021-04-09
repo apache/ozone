@@ -174,7 +174,7 @@ public final class SCMEvents {
   public static final TypedEvent<DatanodeDetails>
       HEALTHY_READONLY_TO_HEALTHY_NODE =
       new TypedEvent<>(DatanodeDetails.class,
-          "READ_ONLY_HEALTHY_TO_HEALTHY_NODE");
+          "HEALTHY_READONLY_TO_HEALTHY_NODE");
 
   /**
    * This event will be triggered whenever a datanode is moved to a
