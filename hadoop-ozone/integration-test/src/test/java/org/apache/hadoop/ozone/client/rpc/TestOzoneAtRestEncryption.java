@@ -493,4 +493,11 @@ public class TestOzoneAtRestEncryption {
         offset + " and length " + readData.length,
         inputDataForComparison, readData);
   }
+
+  @Test
+  public void testGetKeyProvider() throws Exception {
+    KeyProvider kp1 = store.getKeyProvider();
+    KeyProvider kp2 = store.getKeyProvider();
+    Assert.assertEquals(kp1, kp2);
+  }
 }
