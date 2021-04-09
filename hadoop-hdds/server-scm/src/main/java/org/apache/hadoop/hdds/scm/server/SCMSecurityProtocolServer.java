@@ -39,6 +39,7 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolPB;
 import org.apache.hadoop.hdds.scm.protocol.SCMSecurityProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
+import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -320,6 +321,16 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
       return CertificateCodec.getPEMEncodedString(rootCACertificate);
     }
     return null;
+  }
+
+  @Override
+  public List<CRLInfo> getCrls(List<Long> crlIds) throws IOException {
+    return scmCertificateServer.getCrls(crlIds);
+  }
+
+  @Override
+  public long getLatestCrlId() {
+    return scmCertificateServer.getLatestCrlId();
   }
 
   public RPC.Server getRpcServer() {

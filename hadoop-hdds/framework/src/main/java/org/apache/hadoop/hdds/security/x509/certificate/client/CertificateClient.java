@@ -20,6 +20,7 @@
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
 import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
+import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
 
 import java.io.IOException;
@@ -260,5 +261,21 @@ public interface CertificateClient {
    * @throws IOException
    */
   List<String> updateCAList() throws IOException;
+
+
+  /**
+   * Get the CRLInfo based on the CRL Ids.
+   * @param crlIds - list of crl ids
+   * @return list of CRLInfo
+   * @throws IOException
+   */
+  List<CRLInfo> getCrls(List<Long> crlIds) throws IOException;
+
+  /**
+   * Get the latest CRL id.
+   * @return latest CRL id.
+   * @throws IOException
+   */
+  long getLatestCrlId() throws IOException;
 
 }
