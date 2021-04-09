@@ -213,7 +213,6 @@ public class TestSCMNodeManager {
    */
   @Test
   public void testScmLayoutOnHeartbeat() throws Exception {
-
     try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
       HDDSLayoutVersionManager layoutVersionManager =
           nodeManager.getLayoutVersionManager();
@@ -232,7 +231,8 @@ public class TestSCMNodeManager {
       LayoutVersionProto mlvSmallerLayout = toLayoutVersionProto(
           nodeManagerMLV - 1, nodeManagerSLV + 1);
 
-      // Register 3 nodes correctly.
+      // Register 2 nodes correctly.
+      // These will be used with a faulty node to test pipeline creation.
       TestUtils.createRandomDatanodeAndRegister(nodeManager);
       TestUtils.createRandomDatanodeAndRegister(nodeManager);
 
@@ -245,13 +245,15 @@ public class TestSCMNodeManager {
     }
   }
 
-  private void assertPipelineClosedAfterLayoutHeartbeat(SCMNodeManager nodeManager, LayoutVersionProto layout) throws Exception {
-    // Register node correctly.
+  private void assertPipelineClosedAfterLayoutHeartbeat(
+      SCMNodeManager nodeManager, LayoutVersionProto layout) throws Exception {
+    // Register a new node correctly.
     DatanodeDetails node = TestUtils
         .createRandomDatanodeAndRegister(nodeManager);
-    // Make pipeline while nodes are healthy.
-    Pipeline pipeline =
-        scm.getPipelineManager().createPipeline(HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.THREE);
+    // Make a pipeline while nodes are healthy.
+    Pipeline pipeline = scm.getPipelineManager()
+        .createPipeline(HddsProtos.ReplicationType.RATIS,
+            HddsProtos.ReplicationFactor.THREE);
     // node sends incorrect layout.
     nodeManager.processHeartbeat(node, layout);
     // Its pipeline should be closed.
