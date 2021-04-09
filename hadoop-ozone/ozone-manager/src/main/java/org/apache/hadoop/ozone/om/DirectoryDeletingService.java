@@ -239,7 +239,7 @@ public class DirectoryDeletingService extends BackgroundService {
     }
     for (OmKeyInfo purgeFile : purgeDeletedFiles) {
       purgePathsRequest.addDeletedSubFiles(
-          purgeFile.getProtobuf(CURRENT_VERSION));
+          purgeFile.getProtobuf(true, CURRENT_VERSION));
     }
 
     // Add these directories to deletedDirTable, so that its sub-paths will be

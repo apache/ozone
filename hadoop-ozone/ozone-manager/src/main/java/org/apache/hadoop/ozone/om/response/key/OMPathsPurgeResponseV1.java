@@ -112,8 +112,12 @@ public class OMPathsPurgeResponseV1 extends OMClientResponse {
       repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(keyInfo,
           repeatedOmKeyInfo, keyInfo.getUpdateID(), isRatisEnabled);
 
+      String deletedKey = omMetadataManager
+          .getOzoneKey(keyInfo.getVolumeName(), keyInfo.getBucketName(),
+              keyInfo.getKeyName());
+
       omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
-          keyInfo.getPath(), repeatedOmKeyInfo);
+          deletedKey, repeatedOmKeyInfo);
 
     }
   }
