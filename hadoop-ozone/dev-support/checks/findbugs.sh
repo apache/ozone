@@ -18,10 +18,6 @@ cd "$DIR/../../.." || exit 1
 
 MAVEN_OPTIONS='-B -fae -Dskip.npx -Dskip.installnpx'
 
-if [[ -n "${SPOTBUGS_HOME}" ]]; then
-  export PATH="${PATH}:${SPOTBUGS_HOME}/bin"
-fi
-
 if ! type unionBugs >/dev/null 2>&1 || ! type convertXmlToText >/dev/null 2>&1; then
   #shellcheck disable=SC2086
   mvn ${MAVEN_OPTIONS} test-compile spotbugs:check

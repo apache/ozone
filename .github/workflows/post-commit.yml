@@ -93,8 +93,6 @@ jobs:
         run: hadoop-ozone/dev-support/checks/install/_install.sh ${{ matrix.check }}
       - name: Execute tests
         run: hadoop-ozone/dev-support/checks/${{ matrix.check }}.sh
-        env:
-          SPOTBUGS_HOME: /tmp/spotbugs-3.1.12
       - name: Summary of failures
         run: cat target/${{ matrix.check }}/summary.txt
         if: always()
