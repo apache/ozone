@@ -400,6 +400,10 @@ public class HeartbeatEndpointTask
         FinalizeNewLayoutVersionCommand finalizeNewLayoutVersionCommand =
             FinalizeNewLayoutVersionCommand.getFromProtobuf(
                 commandResponseProto.getFinalizeNewLayoutVersionCommandProto());
+        if (commandResponseProto.hasTerm()) {
+          finalizeNewLayoutVersionCommand.setTerm(
+              commandResponseProto.getTerm());
+        }
         if (LOG.isDebugEnabled()) {
           LOG.debug("Received SCM finalize command {}",
               finalizeNewLayoutVersionCommand.getId());

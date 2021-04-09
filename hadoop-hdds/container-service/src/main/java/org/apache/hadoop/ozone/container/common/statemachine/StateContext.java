@@ -608,7 +608,7 @@ public class StateContext {
    * termOfLeaderSCM with the max term found in commandQueue.
    *
    * The init process also works for non-HA mode. In that case, term of all
-   * SCMCommands will be 0.
+   * SCMCommands will be SCMContext.INVALID_TERM.
    */
   private void initTermOfLeaderSCM() {
     // only init once
@@ -653,7 +653,6 @@ public class StateContext {
       LOG.error("should init termOfLeaderSCM before update it.");
       return;
     }
-
     termOfLeaderSCM = Optional.of(
         Long.max(termOfLeaderSCM.get(), command.getTerm()));
   }
