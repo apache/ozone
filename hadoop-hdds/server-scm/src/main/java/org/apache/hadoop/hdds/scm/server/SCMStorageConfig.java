@@ -27,8 +27,11 @@ import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
 
+import static org.apache.hadoop.ozone.OzoneConsts.PRIMARY_SCM_NODE_ID;
+import static org.apache.hadoop.ozone.OzoneConsts.SCM_CERT_SERIAL_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.STORAGE_DIR;
+
 
 /**
  * SCMStorageConfig is responsible for management of the
@@ -76,4 +79,42 @@ public class SCMStorageConfig extends Storage {
     return scmProperties;
   }
 
+  /**
+   * Sets the SCM Sub-CA certificate serial id.
+   * @param certSerialId
+   * @throws IOException
+   */
+  public void setScmCertSerialId(String certSerialId) throws IOException {
+    getStorageInfo().setProperty(SCM_CERT_SERIAL_ID, certSerialId);
+  }
+
+  /**
+   * Retrives the SCM Sub-CA certificate serial id from the version file.
+   * @return scm sub-CA certificate serial id
+   */
+  public String getScmCertSerialId() {
+    return getStorageInfo().getProperty(SCM_CERT_SERIAL_ID);
+  }
+
+  /**
+   * Set primary SCM node ID.
+   * @param scmId
+   * @throws IOException
+   */
+  public void setPrimaryScmNodeId(String scmId) throws IOException {
+    getStorageInfo().setProperty(PRIMARY_SCM_NODE_ID, scmId);
+
+  }
+
+  /**
+   * Retrieves the primary SCM node ID from the version file.
+   * @return Primary SCM node ID.
+   */
+  public String getPrimaryScmNodeId() {
+    return getStorageInfo().getProperty(PRIMARY_SCM_NODE_ID);
+  }
+
+  public boolean checkPrimarySCMIdInitialized() {
+    return getPrimaryScmNodeId() != null ? true : false;
+  }
 }

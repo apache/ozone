@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.DeleteBlockResult;
@@ -180,6 +181,11 @@ public class ScmBlockLocationTestingClient implements ScmBlockLocationProtocol {
             .setClusterId(clusterID)
             .setScmId(scmId);
     return builder.build();
+  }
+
+  @Override
+  public boolean addSCM(AddSCMRequest request) throws IOException {
+    return false;
   }
 
   @Override

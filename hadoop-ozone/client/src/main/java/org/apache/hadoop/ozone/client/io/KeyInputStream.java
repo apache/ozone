@@ -385,4 +385,9 @@ public class KeyInputStream extends InputStream
       is.unbuffer();
     }
   }
+
+  @VisibleForTesting
+  public List<BlockInputStream> getBlockStreams() {
+    return blockStreams;
+  }
 }

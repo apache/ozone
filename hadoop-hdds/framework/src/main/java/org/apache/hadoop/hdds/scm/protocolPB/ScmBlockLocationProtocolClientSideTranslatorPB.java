@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.SCMBlockLocationRequest;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.SCMBlockLocationResponse;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.Type;
@@ -39,16 +40,18 @@ import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos
     .SortDatanodesRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos
     .SortDatanodesResponseProto;
+import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
+import org.apache.hadoop.hdds.scm.proxy.SCMBlockLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.io.retry.RetryProxy;
 import org.apache.hadoop.ipc.ProtobufHelper;
 import org.apache.hadoop.ipc.ProtocolTranslator;
-import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
 
@@ -74,15 +77,21 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
   private static final RpcController NULL_RPC_CONTROLLER = null;
 
   private final ScmBlockLocationProtocolPB rpcProxy;
+  private SCMBlockLocationFailoverProxyProvider failoverProxyProvider;
 
   /**
    * Creates a new StorageContainerLocationProtocolClientSideTranslatorPB.
    *
-   * @param rpcProxy {@link StorageContainerLocationProtocolPB} RPC proxy
+   * @param proxyProvider {@link SCMBlockLocationFailoverProxyProvider}
+   * failover proxy provider.
    */
   public ScmBlockLocationProtocolClientSideTranslatorPB(
-      ScmBlockLocationProtocolPB rpcProxy) {
-    this.rpcProxy = rpcProxy;
+      SCMBlockLocationFailoverProxyProvider proxyProvider) {
+    Preconditions.checkState(proxyProvider != null);
+    this.failoverProxyProvider = proxyProvider;
+    this.rpcProxy = (ScmBlockLocationProtocolPB) RetryProxy.create(
+        ScmBlockLocationProtocolPB.class, failoverProxyProvider,
+        failoverProxyProvider.getSCMBlockLocationRetryPolicy(null));
   }
 
   /**
@@ -107,6 +116,11 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
     try {
       SCMBlockLocationResponse response =
           rpcProxy.send(NULL_RPC_CONTROLLER, req);
+      if (response.getStatus() ==
+          ScmBlockLocationProtocolProtos.Status.SCM_NOT_LEADER) {
+        failoverProxyProvider
+            .performFailoverToAssignedLeader(response.getLeaderSCMNodeId());
+      }
       return response;
     } catch (ServiceException e) {
       throw ProtobufHelper.getRemoteException(e);
@@ -235,6 +249,26 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
   }
 
   /**
+   * Request to add SCM to existing SCM HA group.
+   * @return status
+   * @throws IOException
+   */
+  @Override
+  public boolean addSCM(AddSCMRequest request) throws IOException {
+    HddsProtos.AddScmRequestProto requestProto =
+        request.getProtobuf();
+    HddsProtos.AddScmResponseProto resp;
+    SCMBlockLocationRequest wrapper = createSCMBlockRequest(
+        Type.AddScm)
+        .setAddScmRequestProto(requestProto)
+        .build();
+
+    final SCMBlockLocationResponse wrappedResponse =
+        handleError(submitRequest(wrapper));
+    resp = wrappedResponse.getAddScmResponse();
+    return resp.getSuccess();
+  }
+  /**
    * Sort the datanodes based on distance from client.
    * @return List<DatanodeDetails></>
    * @throws IOException
@@ -269,7 +303,7 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
   }
 
   @Override
-  public void close() {
-    RPC.stopProxy(rpcProxy);
+  public void close() throws IOException {
+    failoverProxyProvider.close();
   }
 }

@@ -78,7 +78,7 @@ public class ClusterStateEndpoint {
   @GET
   public Response getClusterState() {
     List<DatanodeDetails> datanodeDetails = nodeManager.getAllNodes();
-    int containers = this.containerManager.getContainerIDs().size();
+    int containers = this.containerManager.getContainers().size();
     int pipelines = this.pipelineManager.getPipelines().size();
     int healthyDatanodes =
         nodeManager.getNodeCount(NodeStatus.inServiceHealthy());

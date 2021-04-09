@@ -132,7 +132,7 @@ public final class GenesisUtil {
       // writes the version file properties
       scmStore.initialize();
     }
-    return new StorageContainerManager(conf, configurator);
+    return StorageContainerManager.createSCM(conf, configurator);
   }
 
   static void configureSCM(OzoneConfiguration conf, int numHandlers) {
@@ -180,7 +180,6 @@ public final class GenesisUtil {
     SCMStorageConfig scmStore = new SCMStorageConfig(conf);
     if (omStorage.getState() != Storage.StorageState.INITIALIZED) {
       omStorage.setClusterId(scmStore.getClusterID());
-      omStorage.setScmId(scmStore.getScmId());
       omStorage.setOmId(UUID.randomUUID().toString());
       omStorage.initialize();
     }

@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -31,13 +32,18 @@ import java.util.Set;
 import java.util.StringJoiner;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigType;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
@@ -46,16 +52,18 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.ha.SCMService;
+import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
-import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
-import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.lock.LockManager;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
@@ -70,6 +78,8 @@ import com.google.protobuf.GeneratedMessage;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.SCM;
+
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -79,8 +89,7 @@ import org.slf4j.LoggerFactory;
  * that the containers are properly replicated. Replication Manager deals only
  * with Quasi Closed / Closed container.
  */
-public class ReplicationManager
-    implements MetricsSource, EventHandler<SafeModeStatus> {
+public class ReplicationManager implements MetricsSource, SCMService {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(ReplicationManager.class);
@@ -90,7 +99,7 @@ public class ReplicationManager
   /**
    * Reference to the ContainerManager.
    */
-  private final ContainerManager containerManager;
+  private final ContainerManagerV2 containerManager;
 
   /**
    * PlacementPolicy which is used to identify where a container
@@ -102,6 +111,11 @@ public class ReplicationManager
    * EventPublisher to fire Replicate and Delete container events.
    */
   private final EventPublisher eventPublisher;
+
+  /**
+   * SCMContext from StorageContainerManager.
+   */
+  private final SCMContext scmContext;
 
   /**
    * Used for locking a container using its ID while processing it.
@@ -128,7 +142,7 @@ public class ReplicationManager
   /**
    * ReplicationManager specific configuration.
    */
-  private final ReplicationManagerConfiguration conf;
+  private final ReplicationManagerConfiguration rmConf;
 
   /**
    * ReplicationMonitor thread is the one which wakes up at configured
@@ -148,6 +162,16 @@ public class ReplicationManager
   private int minHealthyForMaintenance;
 
   /**
+   * SCMService related variables.
+   * After leaving safe mode, replicationMonitor needs to wait for a while
+   * before really take effect.
+   */
+  private final Lock serviceLock = new ReentrantLock();
+  private ServiceStatus serviceStatus = ServiceStatus.PAUSING;
+  private final long waitTimeInMillis;
+  private long lastTimeToBeReadyInMillis = 0;
+
+  /**
    * Constructs ReplicationManager instance with the given configuration.
    *
    * @param conf OzoneConfiguration
@@ -155,27 +179,43 @@ public class ReplicationManager
    * @param containerPlacement PlacementPolicy
    * @param eventPublisher EventPublisher
    */
-  public ReplicationManager(final ReplicationManagerConfiguration conf,
-                            final ContainerManager containerManager,
+  @SuppressWarnings("parameternumber")
+  public ReplicationManager(final ConfigurationSource conf,
+                            final ContainerManagerV2 containerManager,
                             final PlacementPolicy containerPlacement,
                             final EventPublisher eventPublisher,
+                            final SCMContext scmContext,
+                            final SCMServiceManager serviceManager,
                             final LockManager<ContainerID> lockManager,
                             final NodeManager nodeManager) {
     this.containerManager = containerManager;
     this.containerPlacement = containerPlacement;
     this.eventPublisher = eventPublisher;
+    this.scmContext = scmContext;
     this.lockManager = lockManager;
     this.nodeManager = nodeManager;
-    this.conf = conf;
+    this.rmConf = conf.getObject(ReplicationManagerConfiguration.class);
     this.running = false;
     this.inflightReplication = new ConcurrentHashMap<>();
     this.inflightDeletion = new ConcurrentHashMap<>();
-    this.minHealthyForMaintenance = conf.getMaintenanceReplicaMinimum();
+    this.minHealthyForMaintenance = rmConf.getMaintenanceReplicaMinimum();
+
+    this.waitTimeInMillis = conf.getTimeDuration(
+        HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
+        HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT_DEFAULT,
+        TimeUnit.MILLISECONDS);
+
+    // register ReplicationManager to SCMServiceManager.
+    serviceManager.register(this);
+
+    // start ReplicationManager.
+    start();
   }
 
   /**
    * Starts Replication Monitor thread.
    */
+  @Override
   public synchronized void start() {
 
     if (!isRunning()) {
@@ -243,15 +283,15 @@ public class ReplicationManager
     try {
       while (running) {
         final long start = Time.monotonicNow();
-        final Set<ContainerID> containerIds =
-            containerManager.getContainerIDs();
-        containerIds.forEach(this::processContainer);
+        final List<ContainerInfo> containers =
+            containerManager.getContainers();
+        containers.forEach(this::processContainer);
 
         LOG.info("Replication Monitor Thread took {} milliseconds for" +
                 " processing {} containers.", Time.monotonicNow() - start,
-            containerIds.size());
+            containers.size());
 
-        wait(conf.getInterval());
+        wait(rmConf.getInterval());
       }
     } catch (Throwable t) {
       // When we get runtime exception, we should terminate SCM.
@@ -263,12 +303,16 @@ public class ReplicationManager
   /**
    * Process the given container.
    *
-   * @param id ContainerID
+   * @param container ContainerInfo
    */
-  private void processContainer(ContainerID id) {
-    lockManager.writeLock(id);
+  private void processContainer(ContainerInfo container) {
+    if (!shouldRun()) {
+      return;
+    }
+
+    final ContainerID id = container.containerID();
+    lockManager.lock(id);
     try {
-      final ContainerInfo container = containerManager.getContainer(id);
       final Set<ContainerReplica> replicas = containerManager
           .getContainerReplicas(container.containerID());
       final LifeCycleState state = container.getState();
@@ -407,7 +451,7 @@ public class ReplicationManager
       final Map<ContainerID, List<InflightAction>> inflightActions,
       final Predicate<InflightAction> filter) {
     final ContainerID id = container.containerID();
-    final long deadline = Time.monotonicNow() - conf.getEventTimeout();
+    final long deadline = Time.monotonicNow() - rmConf.getEventTimeout();
     if (inflightActions.containsKey(id)) {
       final List<InflightAction> actions = inflightActions.get(id);
 
@@ -554,7 +598,8 @@ public class ReplicationManager
    * @param replicas Set of ContainerReplicas
    */
   private void deleteContainerReplicas(final ContainerInfo container,
-      final Set<ContainerReplica> replicas) throws IOException {
+      final Set<ContainerReplica> replicas) throws IOException,
+      InvalidStateTransitionException {
     Preconditions.assertTrue(container.getState() ==
         LifeCycleState.CLOSED);
     Preconditions.assertTrue(container.getNumberOfKeys() == 0);
@@ -578,7 +623,8 @@ public class ReplicationManager
    * @param replicas Set of ContainerReplicas
    */
   private void handleContainerUnderDelete(final ContainerInfo container,
-      final Set<ContainerReplica> replicas) throws IOException {
+      final Set<ContainerReplica> replicas) throws IOException,
+      InvalidStateTransitionException {
     if (replicas.size() == 0) {
       containerManager.updateContainerState(container.containerID(),
           HddsProtos.LifeCycleEvent.CLEANUP);
@@ -781,6 +827,12 @@ public class ReplicationManager
 
       final List<ContainerReplica> eligibleReplicas = new ArrayList<>(replicas);
 
+      // Iterate replicas in deterministic order to avoid potential data loss.
+      // See https://issues.apache.org/jira/browse/HDDS-4589.
+      // N.B., sort replicas by (containerID, datanodeDetails).
+      eligibleReplicas.sort(
+          Comparator.comparingLong(ContainerReplica::hashCode));
+
       final Map<UUID, ContainerReplica> uniqueReplicas =
           new LinkedHashMap<>();
 
@@ -947,10 +999,16 @@ public class ReplicationManager
 
     LOG.info("Sending close container command for container {}" +
             " to datanode {}.", container.containerID(), datanode);
-
     CloseContainerCommand closeContainerCommand =
         new CloseContainerCommand(container.getContainerID(),
             container.getPipelineID(), force);
+    try {
+      closeContainerCommand.setTerm(scmContext.getTermOfLeader());
+    } catch (NotLeaderException nle) {
+      LOG.warn("Skip sending close container command,"
+          + " since current SCM is not leader.", nle);
+      return;
+    }
     eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
         new CommandForDatanode<>(datanode.getUuid(), closeContainerCommand));
   }
@@ -1017,6 +1075,13 @@ public class ReplicationManager
       final DatanodeDetails datanode,
       final SCMCommand<T> command,
       final Consumer<InflightAction> tracker) {
+    try {
+      command.setTerm(scmContext.getTermOfLeader());
+    } catch (NotLeaderException nle) {
+      LOG.warn("Skip sending datanode command,"
+          + " since current SCM is not leader.", nle);
+      return;
+    }
     final CommandForDatanode<T> datanodeCommand =
         new CommandForDatanode<>(datanode.getUuid(), command);
     eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND, datanodeCommand);
@@ -1086,14 +1151,6 @@ public class ReplicationManager
         .addGauge(ReplicationManagerMetrics.INFLIGHT_DELETION,
             inflightDeletion.size())
         .endRecord();
-  }
-
-  @Override
-  public void onMessage(SafeModeStatus status,
-      EventPublisher publisher) {
-    if (!status.isInSafeMode() && !this.isRunning()) {
-      this.start();
-    }
   }
 
   /**
@@ -1208,5 +1265,43 @@ public class ReplicationManager
           .add("description=" + desc)
           .toString();
     }
+  }
+
+  @Override
+  public void notifyStatusChanged() {
+    serviceLock.lock();
+    try {
+      // 1) SCMContext#isLeader returns true.
+      // 2) not in safe mode.
+      if (scmContext.isLeader() && !scmContext.isInSafeMode()) {
+        // transition from PAUSING to RUNNING
+        if (serviceStatus != ServiceStatus.RUNNING) {
+          LOG.info("Service {} transitions to RUNNING.", getServiceName());
+          lastTimeToBeReadyInMillis = Time.monotonicNow();
+          serviceStatus = ServiceStatus.RUNNING;
+        }
+      } else {
+        serviceStatus = ServiceStatus.PAUSING;
+      }
+    } finally {
+      serviceLock.unlock();
+    }
+  }
+
+  @Override
+  public boolean shouldRun() {
+    serviceLock.lock();
+    try {
+      // If safe mode is off, then this SCMService starts to run with a delay.
+      return serviceStatus == ServiceStatus.RUNNING &&
+          Time.monotonicNow() - lastTimeToBeReadyInMillis >= waitTimeInMillis;
+    } finally {
+      serviceLock.unlock();
+    }
+  }
+
+  @Override
+  public String getServiceName() {
+    return ReplicationManager.class.getSimpleName();
   }
 }
