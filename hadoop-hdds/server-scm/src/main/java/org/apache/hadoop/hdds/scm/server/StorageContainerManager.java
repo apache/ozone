@@ -644,7 +644,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     // as for SCM CA is root-CA.
     securityProtocolServer = new SCMSecurityProtocolServer(conf,
         rootCertificateServer, scmCertificateServer,
-        scmCertificateClient.getCACertificate(), this);
+        scmCertificateClient != null ?
+            scmCertificateClient.getCACertificate() : null, this);
   }
 
   /** Persist primary SCM root ca cert and sub-ca certs to DB.
