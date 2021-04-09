@@ -124,16 +124,19 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
   public boolean moveToTrash(Path path) throws IOException {
     this.fs.getFileStatus(path);
     Path trashRoot = this.fs.getTrashRoot(path);
-    Path trashCurrent = new Path(trashRoot, CURRENT);
 
     String key = path.toUri().getPath();
+    LOG.debug("Key path to moveToTrash: "+ key);
     String trashRootKey = trashRoot.toUri().getPath();
+    LOG.debug("TrashrootKey for moveToTrash: "+ trashRootKey);
 
     if (!OzoneFSUtils.isValidName(key)) {
       throw new InvalidPathException("Invalid path Name " + key);
     }
-
-    if (trashRootKey.startsWith(key) || key.startsWith(trashRootKey)) {
+    // first condition tests when length key is <= length trash
+    // and second when length key > length trash
+    if ((key.contains(this.fs.TRASH_PREFIX)) && (trashRootKey.startsWith(key))
+            || key.startsWith(trashRootKey)) {
       return false;
     } else {
       return super.moveToTrash(path);

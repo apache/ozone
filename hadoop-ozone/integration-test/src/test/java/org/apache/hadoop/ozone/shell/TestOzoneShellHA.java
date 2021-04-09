@@ -623,6 +623,8 @@ public class TestOzoneShellHA {
               +" Trash: "+trashPathKey1.toString());
       fs.getFileStatus(trashPathKey1);
 
+      LOG.info("Executing testDeleteTrashNoSkipTrash: deleting trash FsShell "
+              +"with args{}: ", Arrays.asList(rmTrashArgs));
       res = ToolRunner.run(shell, rmTrashArgs);
       Assert.assertEquals(0, res);
 
