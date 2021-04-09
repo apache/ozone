@@ -766,8 +766,8 @@ public class OzoneBucket extends WithMetadata {
       ReplicationConfig replicationConfig, boolean overWrite,
       boolean recursive) throws IOException {
     return proxy
-        .createFile(volumeName, name, keyName, size, replicationConfig, overWrite,
-            recursive);
+        .createFile(volumeName, name, keyName, size, replicationConfig,
+            overWrite, recursive);
   }
 
   /**

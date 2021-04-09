@@ -15,11 +15,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdds.scm.protocol;
+package org.apache.hadoop.hdds.client;
 
-import org.apache.hadoop.hdds.client.RatisReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.junit.Assert;
@@ -133,7 +130,8 @@ public class TestReplicationConfig {
 
   @Test
   public void adjustReplication() {
-    ReplicationConfig config = new RatisReplicationConfig(ReplicationFactor.ONE);
+    ReplicationConfig config =
+        new RatisReplicationConfig(ReplicationFactor.ONE);
 
     final ReplicationConfig replicationConfig =
         ReplicationConfig.adjustReplication(config, (short) 1);
