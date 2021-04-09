@@ -319,6 +319,11 @@ copy_results() {
 
 run_test_script() {
   local d="$1"
+  local test_script="$2"
+
+  if [[ -z "$test_script" ]]; then
+    test_script=./test.sh
+  fi
 
   echo "Executing test in ${d}"
 
@@ -326,7 +331,7 @@ run_test_script() {
   cd "${d}" || return
 
   ret=0
-  if ! ./test.sh; then
+  if ! "$test_script"; then
     ret=1
     echo "ERROR: Test execution of ${d} is FAILED!!!!"
   fi

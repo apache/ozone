@@ -90,7 +90,7 @@ run_test() {
   export OZONE_VOLUME="$test_subdir"/data
   export RESULT_DIR="$test_subdir"/result
 
-  if ! run_test_script "$test_dir"; then
+  if ! run_test_script "$test_dir" ./driver.sh; then
     RESULT=1
   fi
 
