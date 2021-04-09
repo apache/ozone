@@ -17,11 +17,13 @@
  */
 package org.apache.hadoop.hdds.scm.node;
 
+import java.awt.font.LayoutPath;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledFuture;
@@ -35,10 +37,13 @@ import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.NodeReportFromDatanode;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
@@ -52,7 +57,9 @@ import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
+import org.apache.hadoop.hdfs.TestDatanodeDeath;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
@@ -61,6 +68,7 @@ import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.commands.SetNodeOperationalStateCommand;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.hadoop.test.LambdaTestUtils;
 import org.apache.hadoop.test.PathUtils;
 import org.junit.After;
 import org.junit.Assert;
@@ -75,6 +83,7 @@ import java.util.Map;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IO_SORT_FACTOR_DEFAULT;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.NET_TOPOLOGY_TABLE_MAPPING_FILE_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
@@ -207,31 +216,134 @@ public class TestSCMNodeManager {
    * @throws TimeoutException
    */
   @Test
-  public void testScmLayoutOnRegister()
-      throws IOException, InterruptedException, AuthenticationException {
+  public void testScmLayoutOnHeartbeat() throws Exception {
 
     try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
       HDDSLayoutVersionManager layoutVersionManager =
           nodeManager.getLayoutVersionManager();
-      int nodeManagerMetadataLayoutVersion =
+      int nodeManagerMLV =
           layoutVersionManager.getMetadataLayoutVersion();
-      int nodeManagerSoftwareLayoutVersion =
+      int nodeManagerSLV =
           layoutVersionManager.getSoftwareLayoutVersion();
-      LayoutVersionProto layoutInfoSuccess = toLayoutVersionProto(
-          nodeManagerMetadataLayoutVersion, nodeManagerSoftwareLayoutVersion);
-      LayoutVersionProto layoutInfoFailure = toLayoutVersionProto(
-          nodeManagerSoftwareLayoutVersion + 1,
-          nodeManagerSoftwareLayoutVersion + 1);
-      RegisteredCommand rcmd = nodeManager.register(
-          MockDatanodeDetails.randomDatanodeDetails(), null,
-          getRandomPipelineReports(), layoutInfoSuccess);
-      assertTrue(rcmd.getError() == success);
-      rcmd = nodeManager.register(
-          MockDatanodeDetails.randomDatanodeDetails(), null,
-          getRandomPipelineReports(), layoutInfoFailure);
-      assertTrue(rcmd.getError() == errorNodeNotPermitted);
+
+      LayoutVersionProto slvLargerLayout = toLayoutVersionProto(
+          nodeManagerMLV, nodeManagerSLV + 1);
+      LayoutVersionProto slvSmallerLayout = toLayoutVersionProto(
+          nodeManagerMLV, nodeManagerSLV - 1);
+
+      LayoutVersionProto mlvLargerLayout = toLayoutVersionProto(
+          nodeManagerMLV + 1, nodeManagerSLV);
+      LayoutVersionProto mlvSmallerLayout = toLayoutVersionProto(
+          nodeManagerMLV - 1, nodeManagerSLV + 1);
+
+      // Register 3 nodes correctly.
+      TestUtils.createRandomDatanodeAndRegister(nodeManager);
+      TestUtils.createRandomDatanodeAndRegister(nodeManager);
+
+      scm.exitSafeMode();
+
+      assertPipelineClosedAfterLayoutHeartbeat(nodeManager, slvSmallerLayout);
+      assertPipelineClosedAfterLayoutHeartbeat(nodeManager, slvLargerLayout);
+      assertPipelineClosedAfterLayoutHeartbeat(nodeManager, mlvSmallerLayout);
+      assertPipelineClosedAfterLayoutHeartbeat(nodeManager, mlvLargerLayout);
     }
   }
+
+  private void assertPipelineClosedAfterLayoutHeartbeat(SCMNodeManager nodeManager, LayoutVersionProto layout) throws Exception {
+    // Register node correctly.
+    DatanodeDetails node = TestUtils
+        .createRandomDatanodeAndRegister(nodeManager);
+    // Make pipeline while nodes are healthy.
+    Pipeline pipeline =
+        scm.getPipelineManager().createPipeline(HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.THREE);
+    // node sends incorrect layout.
+    nodeManager.processHeartbeat(node, layout);
+    // Its pipeline should be closed.
+    LambdaTestUtils.await(5000, 1000, pipeline::isClosed);
+  }
+
+  /**
+   * Tests that Node manager handles Layout versions correctly.
+   *
+   * @throws IOException
+   * @throws InterruptedException
+   * @throws TimeoutException
+   */
+  @Test
+  public void testScmLayoutOnRegister()
+      throws Exception {
+
+    try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
+      HDDSLayoutVersionManager layoutVersionManager =
+          nodeManager.getLayoutVersionManager();
+      int nodeManagerMLV =
+          layoutVersionManager.getMetadataLayoutVersion();
+      int nodeManagerSLV =
+          layoutVersionManager.getSoftwareLayoutVersion();
+
+      LayoutVersionProto slvLargerLayout = toLayoutVersionProto(
+          nodeManagerMLV, nodeManagerSLV + 1);
+      LayoutVersionProto slvSmallerLayout = toLayoutVersionProto(
+          nodeManagerMLV, nodeManagerSLV - 1);
+
+      LayoutVersionProto mlvLargerLayout = toLayoutVersionProto(
+          nodeManagerMLV + 1, nodeManagerSLV);
+      LayoutVersionProto mlvSmallerLayout = toLayoutVersionProto(
+          nodeManagerMLV - 1, nodeManagerSLV + 1);
+      LayoutVersionProto correctLayout = toLayoutVersionProto(
+          nodeManagerMLV, nodeManagerSLV);
+
+      Assert.assertEquals(registerWithLayout(nodeManager, slvLargerLayout),
+          errorNodeNotPermitted);
+      Assert.assertEquals(registerWithLayout(nodeManager, slvSmallerLayout),
+          errorNodeNotPermitted);
+      Assert.assertEquals(registerWithLayout(nodeManager, mlvLargerLayout),
+          success);
+      Assert.assertEquals(registerWithLayout(nodeManager, mlvSmallerLayout),
+          success);
+      Assert.assertEquals(registerWithLayout(nodeManager, correctLayout),
+          success);
+
+      scm.exitSafeMode();
+      try {
+        scm.getPipelineManager().createPipeline(HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.THREE);
+        Assert.fail("3 nodes should not have been found for a pipeline.");
+      } catch (SCMException ex) {
+        Assert.assertTrue(ex.getMessage().contains("Required: 3 Found: 1"));
+      }
+    }
+  }
+
+  private StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto.ErrorCode registerWithLayout(SCMNodeManager manager,  LayoutVersionProto layout) {
+    return manager.register(
+        MockDatanodeDetails.randomDatanodeDetails(), null,
+        getRandomPipelineReports(), layout).getError();
+  }
+
+//  /**
+//   * Register nodes with various bad versions.
+//   * Try to create pipelines
+//   * Assert that it failes.
+//   */
+//  @Test
+//  public void testLayoutForPipelineRegister() {
+//    try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
+//      RegisteredCommand rcmd = nodeManager.register(
+//          MockDatanodeDetails.randomDatanodeDetails(), null,
+//          getRandomPipelineReports(),
+//          toLayoutVersionProto(HDDSLayoutFeature.INITIAL_VERSION, ));
+//    }
+//  }
+//
+//  /**
+//   * nodeManager#processHeartbeat
+//   * create pipelines
+//   * check that it fails.
+//   */
+//  @Test
+//  public void testLayoutForPipelineHeartbeat() {
+//
+//  }
 
   /**
    * asserts that if we send no heartbeats node manager stays in safemode.
