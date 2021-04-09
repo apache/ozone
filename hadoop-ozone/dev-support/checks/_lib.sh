@@ -104,3 +104,11 @@ _install_robot() {
   source venv/bin/activate
   pip install robotframework
 }
+
+install_spotbugs() {
+  _install_tool spotbugs spotbugs-3.1.12/bin
+}
+
+_install_spotbugs() {
+  curl -LSs https://repo.maven.apache.org/maven2/com/github/spotbugs/spotbugs/3.1.12/spotbugs-3.1.12.tgz | tar -xz -f -
+}
