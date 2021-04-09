@@ -59,6 +59,9 @@
       <includes>
         <include>pom.xml</include>
         <include>README.md</include>
+        <include>HISTORY.md</include>
+        <include>SECURITY.md</include>
+        <include>CONTRIBUTING.md</include>
       </includes>
     </fileSet>
     <fileSet>
