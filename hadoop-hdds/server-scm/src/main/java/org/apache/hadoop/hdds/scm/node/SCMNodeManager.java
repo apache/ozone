@@ -578,14 +578,22 @@ public class SCMNodeManager implements NodeManager {
               "MetadataLayoutVersion = {}",
           datanodeDetails.getHostName(), dnMlv, scmMlv);
 
-      // Send Finalize command to the data node. Its OK to
-      // send Finalize command multiple times.
-      scmNodeEventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
-          new CommandForDatanode<>(datanodeDetails.getUuid(),
-              new FinalizeNewLayoutVersionCommand(true,
-                  LayoutVersionProto.newBuilder()
-                      .setSoftwareLayoutVersion(dnSlv)
-                      .setMetadataLayoutVersion(dnSlv).build())));
+      FinalizeNewLayoutVersionCommand finalizeCmd =
+          new FinalizeNewLayoutVersionCommand(true,
+          LayoutVersionProto.newBuilder()
+              .setSoftwareLayoutVersion(dnSlv)
+              .setMetadataLayoutVersion(dnSlv).build());
+      try {
+        finalizeCmd.setTerm(scmContext.getTermOfLeader());
+
+        // Send Finalize command to the data node. Its OK to
+        // send Finalize command multiple times.
+        scmNodeEventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
+            new CommandForDatanode<>(datanodeDetails.getUuid(), finalizeCmd));
+      } catch(NotLeaderException ex) {
+        LOG.warn("Skip sending finalize upgrade command since current SCM is" +
+            "not leader.", ex);
+      }
     }
   }
 
