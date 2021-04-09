@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolPB;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
@@ -174,15 +175,6 @@ public class SCMBlockLocationFailoverProxyProvider implements
     }
   }
 
-  public RetryAction getRetryAction(int failovers) {
-    if (failovers < maxRetryCount) {
-      return new RetryAction(RetryAction.RetryDecision.FAILOVER_AND_RETRY,
-          getRetryInterval());
-    } else {
-      return RetryAction.FAIL;
-    }
-  }
-
   private synchronized long getRetryInterval() {
     // TODO add exponential backup
     return retryInterval;
@@ -257,8 +249,11 @@ public class SCMBlockLocationFailoverProxyProvider implements
       @Override
       public RetryAction shouldRetry(Exception e, int retry,
                                      int failover, boolean b) {
-        performFailoverToAssignedLeader(newLeader);
-        return getRetryAction(failover);
+        if (!SCMHAUtils.isRetriableWithNoFailoverException(e)) {
+          performFailoverToAssignedLeader(newLeader);
+        }
+        return SCMHAUtils.getRetryAction(failover, retry, e, maxRetryCount,
+            getRetryInterval());
       }
     };
     return retryPolicy;

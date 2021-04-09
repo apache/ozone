@@ -33,6 +33,8 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecuri
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityResponse;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.Status;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolPB;
+import org.apache.hadoop.hdds.scm.ha.RetriableWithNoFailoverException;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
@@ -41,6 +43,7 @@ import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import com.google.protobuf.ProtocolMessageEnum;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -90,10 +93,11 @@ public class SCMSecurityProtocolServerSideTranslatorPB
         request.getCmdType(), request.getTraceID());
   }
 
-  public SCMSecurityResponse processRequest(SCMSecurityRequest request) {
+  public SCMSecurityResponse processRequest(SCMSecurityRequest request)
+      throws ServiceException {
     SCMSecurityResponse.Builder scmSecurityResponse =
         SCMSecurityResponse.newBuilder().setCmdType(request.getCmdType())
-        .setStatus(Status.OK);
+            .setStatus(Status.OK);
     try {
       switch (request.getCmdType()) {
       case GetCertificate:
@@ -128,6 +132,11 @@ public class SCMSecurityProtocolServerSideTranslatorPB
             "Unknown request type: " + request.getCmdType());
       }
     } catch (IOException e) {
+      if (SCMHAUtils.isRetriableWithNoFailoverException(e)) {
+        throw new ServiceException(new RetriableWithNoFailoverException(e));
+      } else if (e instanceof NotLeaderException) {
+        throw new ServiceException(e);
+      }
       scmSecurityResponse.setSuccess(false);
       scmSecurityResponse.setStatus(exceptionToResponseStatus(e));
       // If actual cause is set in SCMSecurityException, set message with
