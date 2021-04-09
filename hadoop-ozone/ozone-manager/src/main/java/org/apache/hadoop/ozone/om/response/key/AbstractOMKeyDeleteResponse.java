@@ -100,6 +100,50 @@ public abstract class AbstractOMKeyDeleteResponse extends OMClientResponse {
     }
   }
 
+  /**
+   *  This method is used for FSO file deletes.
+   *  Since a common deletedTable is used ,it requires to add  key in the
+   *  full format (vol/buck/key). This method deletes the key from
+   *  file table (which is in prefix format) and adds the fullKey
+   *  into the deletedTable
+   * @param keyName     (format: objectId/key)
+   * @param fullKeyName (format: vol/buck/key)
+   * @param omKeyInfo
+   * @throws IOException
+   */
+  protected void addDeletionToBatch(
+      OMMetadataManager omMetadataManager,
+      BatchOperation batchOperation,
+      Table<String, ?> fromTable,
+      String keyName, String fullKeyName,
+      OmKeyInfo omKeyInfo) throws IOException {
+
+    // For OmResponse with failure, this should do nothing. This method is
+    // not called in failure scenario in OM code.
+    fromTable.deleteWithBatch(batchOperation, keyName);
+
+    // If Key is not empty add this to delete table.
+    if (!isKeyEmpty(omKeyInfo)) {
+      // If a deleted key is put in the table where a key with the same
+      // name already exists, then the old deleted key information would be
+      // lost. To avoid this, first check if a key with same name exists.
+      // deletedTable in OM Metadata stores <KeyName, RepeatedOMKeyInfo>.
+      // The RepeatedOmKeyInfo is the structure that allows us to store a
+      // list of OmKeyInfo that can be tied to same key name. For a keyName
+      // if RepeatedOMKeyInfo structure is null, we create a new instance,
+      // if it is not null, then we simply add to the list and store this
+      // instance in deletedTable.
+      RepeatedOmKeyInfo repeatedOmKeyInfo =
+          omMetadataManager.getDeletedTable().get(fullKeyName);
+      repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
+          omKeyInfo, repeatedOmKeyInfo, omKeyInfo.getUpdateID(),
+          isRatisEnabled);
+      omMetadataManager.getDeletedTable().putWithBatch(
+          batchOperation, fullKeyName, repeatedOmKeyInfo);
+    }
+  }
+
+
   @Override
   public abstract void addToDBBatch(OMMetadataManager omMetadataManager,
         BatchOperation batchOperation) throws IOException;

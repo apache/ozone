@@ -20,6 +20,7 @@ package org.apache.hadoop.fs.ozone;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -31,9 +32,11 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.om.DirectoryDeletingService;
+import org.apache.hadoop.ozone.om.KeyDeletingService;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.After;
@@ -315,4 +318,117 @@ public class TestDirectoryDeletingServiceWithFSOBucket {
     }
   }
 
+  @Test
+  public void testDeleteSubFiles() throws Exception {
+
+    Table<String, OmKeyInfo> deletedDirTable =
+        cluster.getOzoneManager().getMetadataManager().getDeletedDirTable();
+    Table<String, OmKeyInfo> keyTable =
+        cluster.getOzoneManager().getMetadataManager().getKeyTable();
+    Table<String, OmDirectoryInfo> dirTable =
+        cluster.getOzoneManager().getMetadataManager().getDirectoryTable();
+    Table<String, RepeatedOmKeyInfo> deletedKeyTable =
+        cluster.getOzoneManager().getMetadataManager().getDeletedTable();
+
+    Path root = new Path("/rootDir2");
+    // Create  parent dir from root.
+    fs.mkdirs(root);
+
+    // Added 10 sub files inside root dir
+    for (int i = 0; i<10; i++) {
+      Path path = new Path(root, "testKey" + i);
+      try (FSDataOutputStream stream = fs.create(path)) {
+        stream.write(1);
+      }
+    }
+
+    KeyDeletingService keyDeletingService =
+        (KeyDeletingService) cluster.getOzoneManager().getKeyManager()
+            .getDeletingService();
+
+    // Before delete
+    assertTableRowCount(deletedDirTable, 0);
+    assertTableRowCount(keyTable, 10);
+    assertTableRowCount(dirTable, 1);
+    long prevDeletedKeyCount = keyDeletingService.getDeletedKeyCount().get();
+
+    fs.delete(root, true);
+
+    DirectoryDeletingService dirDeletingService =
+        (DirectoryDeletingService) cluster.getOzoneManager().getKeyManager()
+            .getDirDeletingService();
+
+    // After delete
+    assertTableRowCount(keyTable, 0);
+    assertTableRowCount(dirTable, 0);
+
+    // Eventually keys would get cleaned up from deletedTables too
+    assertTableRowCount(deletedDirTable, 0);
+    assertTableRowCount(deletedKeyTable, 0);
+
+    assertSubPathsCount(dirDeletingService.getMovedFilesCount(), 10);
+    assertSubPathsCount(dirDeletingService.getDeletedDirsCount(), 1);
+    // verify whether KeyDeletingService has purged the keys
+    long currentDeletedKeyCount = keyDeletingService.getDeletedKeyCount().get();
+    Assert.assertEquals(currentDeletedKeyCount, prevDeletedKeyCount + 10);
+  }
+
+  @Test
+  public void testDeleteFiles() throws Exception {
+
+    Table<String, OmKeyInfo> deletedDirTable =
+        cluster.getOzoneManager().getMetadataManager().getDeletedDirTable();
+    Table<String, OmKeyInfo> keyTable =
+        cluster.getOzoneManager().getMetadataManager().getKeyTable();
+    Table<String, OmDirectoryInfo> dirTable =
+        cluster.getOzoneManager().getMetadataManager().getDirectoryTable();
+    Table<String, RepeatedOmKeyInfo> deletedKeyTable =
+        cluster.getOzoneManager().getMetadataManager().getDeletedTable();
+
+    Path root = new Path("/rootDir2");
+    // Create  parent dir from root.
+    fs.mkdirs(root);
+
+    // Added 10 sub files inside root dir
+    for (int i = 0; i<10; i++) {
+      Path path = new Path(root, "testKey" + i);
+      try (FSDataOutputStream stream = fs.create(path)) {
+        stream.write(1);
+      }
+    }
+
+    KeyDeletingService keyDeletingService =
+        (KeyDeletingService) cluster.getOzoneManager().getKeyManager()
+            .getDeletingService();
+
+    // Before delete
+    assertTableRowCount(deletedDirTable, 0);
+    assertTableRowCount(keyTable, 10);
+    assertTableRowCount(dirTable, 1);
+    long prevDeletedKeyCount = keyDeletingService.getDeletedKeyCount().get();
+
+    for (int i = 0; i<10; i++) {
+      Path path = new Path(root, "testKey" + i);
+      fs.delete(path, true);
+    }
+
+    DirectoryDeletingService dirDeletingService =
+        (DirectoryDeletingService) cluster.getOzoneManager().getKeyManager()
+            .getDirDeletingService();
+
+
+    // After delete
+    assertTableRowCount(keyTable, 0);
+    assertTableRowCount(dirTable, 1);
+
+    // Eventually keys would get cleaned up from deletedTables too
+    assertTableRowCount(deletedDirTable, 0);
+    assertTableRowCount(deletedKeyTable, 0);
+
+    assertSubPathsCount(dirDeletingService.getMovedFilesCount(), 0);
+    assertSubPathsCount(dirDeletingService.getDeletedDirsCount(), 0);
+    // verify whether KeyDeletingService has purged the keys
+    long currentDeletedKeyCount = keyDeletingService.getDeletedKeyCount().get();
+    Assert.assertEquals(currentDeletedKeyCount, prevDeletedKeyCount + 10);
+  }
 }

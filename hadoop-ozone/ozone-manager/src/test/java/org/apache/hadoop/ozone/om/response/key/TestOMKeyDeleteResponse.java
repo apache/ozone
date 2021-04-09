@@ -69,10 +69,13 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
 
     Assert.assertFalse(omMetadataManager.getKeyTable().isExist(ozoneKey));
 
+    String deletedKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
+        keyName);
+
     // As default key entry does not have any blocks, it should not be in
     // deletedKeyTable.
     Assert.assertFalse(omMetadataManager.getDeletedTable().isExist(
-        ozoneKey));
+        deletedKey));
   }
 
   @Test
@@ -124,9 +127,11 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
 
     Assert.assertFalse(omMetadataManager.getKeyTable().isExist(ozoneKey));
 
+    String deletedKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
+        keyName);
+
     // Key has blocks, it should not be in deletedKeyTable.
-    Assert.assertTrue(omMetadataManager.getDeletedTable().isExist(
-        ozoneKey));
+    Assert.assertTrue(omMetadataManager.getDeletedTable().isExist(deletedKey));
   }
 
 
