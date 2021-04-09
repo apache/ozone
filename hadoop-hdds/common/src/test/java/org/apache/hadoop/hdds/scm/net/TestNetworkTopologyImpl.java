@@ -72,7 +72,7 @@ public class TestNetworkTopologyImpl {
   }
 
   @Rule
-  public Timeout testTimeout = new Timeout(3000000);
+  public Timeout testTimeout = Timeout.seconds(300);
 
   @Parameters
   public static Collection<Object[]> setupDatanodes() {

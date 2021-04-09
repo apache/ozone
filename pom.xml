@@ -19,8 +19,8 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
   <groupId>org.apache.hadoop</groupId>
   <artifactId>hadoop-main-ozone</artifactId>
   <version>1.1.0-SNAPSHOT</version>
-  <description>Apache Hadoop Ozone Main</description>
-  <name>Apache Hadoop Ozone Main</name>
+  <description>Apache Ozone Main</description>
+  <name>Apache Ozone Main</name>
   <packaging>pom</packaging>
 
   <modules>
@@ -79,7 +79,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <declared.ozone.version>${ozone.version}</declared.ozone.version>
 
     <!-- Apache Ratis version -->
-    <ratis.version>1.1.0-0bdf24f-SNAPSHOT</ratis.version>
+    <ratis.version>2.0.0</ratis.version>
 
     <!-- Apache Ratis thirdparty version -->
     <ratis.thirdparty.version>0.6.0</ratis.thirdparty.version>
@@ -121,7 +121,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
     <!-- jersey version -->
     <jersey.version>1.19</jersey.version>
-    <jersey2.version>2.27</jersey2.version>
+    <jersey2.version>2.33</jersey2.version>
 
     <!-- jackson versions -->
     <jackson2.version>2.12.1</jackson2.version>
@@ -867,6 +867,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <artifactId>jersey-media-json-jackson</artifactId>
         <version>${jersey2.version}</version>
       </dependency>
+      <dependency>
+        <groupId>org.glassfish.jersey.media</groupId>
+        <artifactId>jersey-media-jaxb</artifactId>
+        <version>${jersey2.version}</version>
+      </dependency>
 
       <dependency>
         <groupId>org.codehaus.plexus</groupId>
@@ -1345,6 +1350,17 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>io.jaegertracing</groupId>
         <artifactId>jaeger-client</artifactId>
         <version>${jaeger.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>org.jetbrains.kotlin</groupId>
+            <artifactId>kotlin-stdlib</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>org.jetbrains.kotlin</groupId>
+        <artifactId>kotlin-stdlib</artifactId>
+        <version>1.4.31</version>
       </dependency>
       <dependency>
         <groupId>io.opentracing</groupId>

@@ -69,7 +69,7 @@ public class TestContainerStateMachine {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = new Timeout(300000);
+  public Timeout timeout = Timeout.seconds(300);
 
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf = new OzoneConfiguration();
@@ -114,6 +114,7 @@ public class TestContainerStateMachine {
             .setHbInterval(200)
             .setCertificateClient(new CertificateClientTestImpl(conf))
             .build();
+    cluster.setWaitForClusterToBeReadyTimeout(300000);
     cluster.waitForClusterToBeReady();
     cluster.getOzoneManager().startSecretManager();
     //the easiest way to create an open container is creating a key

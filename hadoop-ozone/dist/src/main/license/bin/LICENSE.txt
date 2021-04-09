@@ -236,7 +236,6 @@ CDDL
    com.sun.xml.bind:jaxb-impl
    javax.activation:activation
    javax.servlet.jsp:jsp-api
-   javax.ws.rs:javax.ws.rs-api
    javax.ws.rs:jsr311-api
    javax.xml.bind:jaxb-api
    org.glassfish.hk2.external:aopalliance-repackaged
@@ -314,9 +313,8 @@ Apache License
    io.opentracing:opentracing-api
    io.opentracing:opentracing-noop
    io.opentracing:opentracing-util
+   jakarta.validation:jakarta.validation-api
    javax.enterprise:cdi-api
-   javax.inject:javax.inject
-   javax.validation:validation-api
    log4j:log4j
    net.minidev:accessors-smart
    net.minidev:json-smart
@@ -357,6 +355,7 @@ EPL 2.0
 =====================
 
    jakarta.annotation:jakarta.annotation-api
+   jakarta.ws.rs:jakarta.ws.rs-api
 
 
 CDDL + GPLv2 with classpath exception

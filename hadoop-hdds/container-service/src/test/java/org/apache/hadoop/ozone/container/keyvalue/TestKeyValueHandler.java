@@ -74,7 +74,7 @@ import static org.mockito.Mockito.times;
 public class TestKeyValueHandler {
 
   @Rule
-  public TestRule timeout = new Timeout(300000);
+  public TestRule timeout = Timeout.seconds(300);
 
   private static final String DATANODE_UUID = UUID.randomUUID().toString();
 
@@ -372,7 +372,7 @@ public class TestKeyValueHandler {
       final KeyValueHandler kvHandler = new KeyValueHandler(conf,
           UUID.randomUUID().toString(), containerSet, volumeSet, metrics,
           c -> icrReceived.incrementAndGet());
-      kvHandler.setScmID(UUID.randomUUID().toString());
+      kvHandler.setClusterID(UUID.randomUUID().toString());
 
       final ContainerCommandRequestProto createContainer =
           ContainerCommandRequestProto.newBuilder()

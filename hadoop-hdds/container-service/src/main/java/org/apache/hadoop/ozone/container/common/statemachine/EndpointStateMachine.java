@@ -102,7 +102,7 @@ public class EndpointStateMachine
   }
 
   /**
-   * Sets the Version reponse we recieved from the SCM.
+   * Sets the Version response we received from the SCM.
    *
    * @param version VersionResponse
    */

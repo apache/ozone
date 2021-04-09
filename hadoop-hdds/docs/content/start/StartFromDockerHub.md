@@ -44,7 +44,7 @@ Container Manager) one data node  and the S3 compatible REST server
 If you would like to use a more realistic pseudo-cluster where each components
 run in own containers, you can start it with a docker-compose file.
 
-We have shipped a docker-compose and an enviorment file as part of the
+We have shipped a docker-compose and an environment file as part of the
 container image  that is uploaded to docker hub.
 
 The following commands can be used to extract these files from the image in the docker hub.

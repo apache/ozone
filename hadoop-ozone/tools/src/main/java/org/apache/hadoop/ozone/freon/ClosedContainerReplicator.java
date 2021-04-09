@@ -186,7 +186,7 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
               metrics,
               containerReplicaProto -> {
               });
-      handler.setScmID(UUID.randomUUID().toString());
+      handler.setClusterID(UUID.randomUUID().toString());
       handlers.put(containerType, handler);
     }
 

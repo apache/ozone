@@ -21,7 +21,7 @@ package org.apache.hadoop.hdds.security.exception;
 import java.io.IOException;
 
 /**
- * Root Security Exception call for all Certificate related Execptions.
+ * Root Security Exception call for all Certificate related Exceptions.
  */
 public class SCMSecurityException extends IOException {
   private final ErrorCode errorCode;
@@ -37,6 +37,16 @@ public class SCMSecurityException extends IOException {
 
   /**
    * Ctor.
+   * @param message - Error Message
+   * @param errorCode - Error code
+   */
+  public SCMSecurityException(String message, ErrorCode errorCode) {
+    super(message);
+    this.errorCode = errorCode;
+  }
+
+  /**
+   * Ctor.
    * @param message - Message.
    * @param cause  - Actual cause.
    */
@@ -47,11 +57,23 @@ public class SCMSecurityException extends IOException {
 
   /**
    * Ctor.
-   * @param message - Message.
+   * @param message - Error Message
+   * @param cause - Actual cause.
+   * @param errorCode - Error code.
+   */
+  public SCMSecurityException(String message, Throwable cause,
+      ErrorCode errorCode) {
+    super(message, cause);
+    this.errorCode = errorCode;
+  }
+
+  /**
+   * Ctor.
+   * @param cause - Actual cause.
    * @param error   - error code.
    */
-  public SCMSecurityException(String message, ErrorCode error) {
-    super(message);
+  public SCMSecurityException(Exception cause, ErrorCode error) {
+    super(cause);
     this.errorCode = error;
   }
 
@@ -72,8 +94,21 @@ public class SCMSecurityException extends IOException {
    * Error codes to make it easy to decode these exceptions.
    */
   public enum ErrorCode {
+    OK,
+    INVALID_CSR,
+    UNABLE_TO_ISSUE_CERTIFICATE,
+    GET_DN_CERTIFICATE_FAILED,
+    GET_OM_CERTIFICATE_FAILED,
+    GET_SCM_CERTIFICATE_FAILED,
+    GET_CERTIFICATE_FAILED,
+    GET_CA_CERT_FAILED,
+    CERTIFICATE_NOT_FOUND,
+    PEM_ENCODE_FAILED,
+    INTERNAL_ERROR,
     DEFAULT,
     MISSING_BLOCK_TOKEN,
-    BLOCK_TOKEN_VERIFICATION_FAILED
+    BLOCK_TOKEN_VERIFICATION_FAILED,
+    GET_ROOT_CA_CERT_FAILED,
+    NOT_A_PRIMARY_SCM
   }
 }

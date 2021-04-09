@@ -863,7 +863,7 @@ message LookupKeyResponse {
     // clients' followup request may carry this ID for stateful operations (similar
     // to a cookie).
     optional uint64 ID = 3;
-    // TODO : allow specifiying a particular version to read.
+    // TODO : allow specifying a particular version to read.
     optional uint64 openVersion = 4;
 }
 
@@ -1033,6 +1033,8 @@ message ServiceListResponse {
     // When security is enabled, return SCM CA certificate to Ozone client
     // to set up gRPC TLS for client to authenticate server(DN).
     optional string caCertificate = 3;
+
+    repeated string caCerts = 4;
 }
 
 message DBUpdatesResponse {

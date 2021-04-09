@@ -62,7 +62,7 @@ import java.util.TreeSet;
 import java.util.Iterator;
 import java.util.UUID;
 
-import static org.apache.hadoop.ozone.MiniOzoneHAClusterImpl.NODE_FAILURE_TIMEOUT;
+import static org.apache.hadoop.ozone.MiniOzoneOMHAClusterImpl.NODE_FAILURE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT;
 
 import static org.apache.ratis.metrics.RatisMetrics.RATIS_APPLICATION_NAME_METRICS;
@@ -208,7 +208,7 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
     // Get the new OM Proxy NodeId
     String newProxyNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
 
-    // Verify that a failover occured. the new proxy nodeId should be
+    // Verify that a failover occurred. the new proxy nodeId should be
     // different from the old proxy nodeId.
     Assert.assertNotEquals("Failover did not occur as expected",
         firstProxyNodeId, newProxyNodeId);

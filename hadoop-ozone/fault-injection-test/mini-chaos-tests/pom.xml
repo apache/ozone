@@ -23,8 +23,8 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <version>1.1.0-SNAPSHOT</version>
   </parent>
   <version>1.1.0-SNAPSHOT</version>
-  <description>Apache Hadoop Ozone Mini Ozone Chaos Tests</description>
-  <name>Apache Hadoop Ozone Mini Ozone Chaos Tests</name>
+  <description>Apache Ozone Mini Ozone Chaos Tests</description>
+  <name>Apache Ozone Mini Ozone Chaos Tests</name>
 
   <artifactId>mini-chaos-tests</artifactId>
   <dependencies>
@@ -45,6 +45,12 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-ozone-integration-test</artifactId>
+      <scope>test</scope>
+      <type>test-jar</type>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-hdds-server-scm</artifactId>
       <scope>test</scope>
       <type>test-jar</type>
     </dependency>

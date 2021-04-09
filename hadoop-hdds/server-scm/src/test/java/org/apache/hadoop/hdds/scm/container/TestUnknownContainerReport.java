@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.server
@@ -51,7 +52,7 @@ import org.mockito.Mockito;
 public class TestUnknownContainerReport {
 
   private NodeManager nodeManager;
-  private ContainerManager containerManager;
+  private ContainerManagerV2 containerManager;
   private ContainerStateManager containerStateManager;
   private EventPublisher publisher;
 
@@ -59,7 +60,7 @@ public class TestUnknownContainerReport {
   public void setup() throws IOException {
     final ConfigurationSource conf = new OzoneConfiguration();
     this.nodeManager = new MockNodeManager(true, 10);
-    this.containerManager = Mockito.mock(ContainerManager.class);
+    this.containerManager = Mockito.mock(ContainerManagerV2.class);
     this.containerStateManager = new ContainerStateManager(conf);
     this.publisher = Mockito.mock(EventPublisher.class);
 
@@ -103,7 +104,7 @@ public class TestUnknownContainerReport {
    */
   private void sendContainerReport(OzoneConfiguration conf) {
     ContainerReportHandler reportHandler = new ContainerReportHandler(
-        nodeManager, containerManager, conf);
+        nodeManager, containerManager, SCMContext.emptyContext(), conf);
 
     ContainerInfo container = getContainer(LifeCycleState.CLOSED);
     Iterator<DatanodeDetails> nodeIterator = nodeManager

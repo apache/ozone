@@ -16,6 +16,6 @@
  */
 package org.apache.hadoop.ozone.container.common.states.datanode;
 /**
- This package contians files that guide the state transitions from
+ This package contains files that guide the state transitions from
  Init->Running->Shutdown for the datanode.
  */

@@ -129,7 +129,7 @@ public class SCMConnectionManager
   /**
    * adds a new SCM machine to the target set.
    *
-   * @param address - Address of the SCM machine to send heatbeat to.
+   * @param address - Address of the SCM machine to send heartbeat to.
    * @throws IOException
    */
   public void addSCMServer(InetSocketAddress address) throws IOException {
@@ -220,7 +220,7 @@ public class SCMConnectionManager
   /**
    * Removes a  SCM machine for the target set.
    *
-   * @param address - Address of the SCM machine to send heatbeat to.
+   * @param address - Address of the SCM machine to send heartbeat to.
    * @throws IOException
    */
   public void removeSCMServer(InetSocketAddress address) throws IOException {

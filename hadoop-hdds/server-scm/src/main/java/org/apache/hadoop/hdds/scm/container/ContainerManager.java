@@ -95,6 +95,25 @@ public interface ContainerManager extends Closeable {
   List<ContainerInfo> listContainer(ContainerID startContainerID, int count);
 
   /**
+   * Returns containers under certain conditions.
+   * Search container IDs from start ID(exclusive),
+   * The max size of the searching range cannot exceed the
+   * value of count.
+   *
+   * @param startContainerID start containerID, >=0,
+   * start searching at the head if 0.
+   * @param count count must be >= 0
+   *              Usually the count will be replace with a very big
+   *              value instead of being unlimited in case the db is very big.
+   * @param state Container of this state will be returned. Can be null.
+   *
+   * @return a list of container.
+   * @throws IOException
+   */
+  List<ContainerInfo> listContainer(ContainerID startContainerID, int count,
+      HddsProtos.LifeCycleState state);
+
+  /**
    * Allocates a new container for a given keyName and replication factor.
    *
    * @param replicationFactor - replication factor of the container.

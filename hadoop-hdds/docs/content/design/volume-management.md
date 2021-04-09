@@ -91,7 +91,7 @@ Problem #5 can be easily supported with improving the `ozone s3` CLI. Ozone has 
 
  1. Let's always use `s3v` volume for all the s3 buckets **if the bucket is created from the s3 interface**.
 
-This is an easy an fast method, but with this approach not all the volumes are avilable via the S3 interface. We need to provide a method to publish any of the ozone volumes / buckets.
+This is an easy an fast method, but with this approach not all the volumes are available via the S3 interface. We need to provide a method to publish any of the ozone volumes / buckets.
 
  2. Let's improve the existing toolset to expose **any** Ozone volume/bucket as an s3 bucket. (Eg. expose `o3:/vol1/bucketx` as an S3 bucket `s3://foobar` )
 
@@ -104,7 +104,7 @@ This is an easy an fast method, but with this approach not all the volumes are a
    1. Store some metadata (** s3 bucket name **) on each of the buckets
    2. Implement a **symbolic link** mechanism which makes it possible to *link* to any volume/buckets from the "s3" volume.
 
-The first approach required a secondary cache table and it violates the naming hierarchy. The s3 bucket name is a global unique name, therefore it's more than just a single attribute on a specific object. It's more like an element in the hierachy. For this reason the second option is proposed:
+The first approach required a secondary cache table and it violates the naming hierarchy. The s3 bucket name is a global unique name, therefore it's more than just a single attribute on a specific object. It's more like an element in the hierarchy. For this reason the second option is proposed:
 
 For example if the default s3 volume is `s3v`
 
@@ -184,7 +184,7 @@ We can also make volumes a lightweight *bucket group* object by removing it from
 
  * __pro__: can be the most simple solution. Easy to understand as there are no more volumes in the path.
  * __con__: Bigger change (all the API can't be modified to make volumes optional)
- * __con__: Harder to dis-joint namespaces based on volumes. (With the current scheme, it's easier to delegate the responsibilties for one volumes to a different OM).
+ * __con__: Harder to dis-joint namespaces based on volumes. (With the current scheme, it's easier to delegate the responsibilities for one volumes to a different OM).
  * __con__: We lose volumes as the top-level directories in `ofs` scheme.
  * __con__: One level of hierarchy might not be enough in case of multi-tenancy.
  * __con__: One level of hierarchy is not enough if we would like to provide separated level for users and admins 

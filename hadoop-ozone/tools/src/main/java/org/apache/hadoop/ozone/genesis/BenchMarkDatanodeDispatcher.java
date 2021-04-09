@@ -113,7 +113,7 @@ public class BenchMarkDatanodeDispatcher {
           containerType, conf, "datanodeid",
           containerSet, volumeSet, metrics,
           c -> {});
-      handler.setScmID("scm");
+      handler.setClusterID("scm");
       handlers.put(containerType, handler);
     }
     dispatcher = new HddsDispatcher(conf, containerSet, volumeSet, handlers,
@@ -203,7 +203,8 @@ public class BenchMarkDatanodeDispatcher {
     ReadChunkRequestProto.Builder readChunkRequest = ReadChunkRequestProto
         .newBuilder()
         .setBlockID(blockID.getDatanodeBlockIDProtobuf())
-        .setChunkData(getChunkInfo(blockID, chunkName));
+        .setChunkData(getChunkInfo(blockID, chunkName))
+        .setReadChunkVersion(ContainerProtos.ReadChunkVersion.V1);
 
     ContainerCommandRequestProto.Builder request = ContainerCommandRequestProto
         .newBuilder();

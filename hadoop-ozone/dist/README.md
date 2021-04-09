@@ -43,7 +43,7 @@ Please refer to the Getting Started guide for a couple of options for testing Oz
 
 ### Monitoring
 
-Apache Hadoop Ozone supports Prometheus out of the box. It contains a prometheus-compatible exporter servlet. To start monitoring you need a Prometheus deployment in your Kubernetes cluster:
+Apache Ozone supports Prometheus out of the box. It contains a prometheus-compatible exporter servlet. To start monitoring you need a Prometheus deployment in your Kubernetes cluster:
 
 ```
 cd src/main/k8s/prometheus
