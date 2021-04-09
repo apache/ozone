@@ -249,11 +249,11 @@ public final class OMConfigKeys {
 //  paths. If it is configured as PREFIX in combination with
 //  ozone.om.enable.filesystem.paths to true then this allows to perform
 //  atomic rename and delete of any directory at any level in the namespace.
-//  Defaulting to LEGACY. Supported values: LEGACY and PREFIX.
+//  Defaulting to SIMPLE. Supported values: SIMPLE and PREFIX.
 
   public static final String OZONE_OM_METADATA_LAYOUT =
           "ozone.om.metadata.layout";
-  public static final String OZONE_OM_METADATA_LAYOUT_DEFAULT = "LEGACY";
+  public static final String OZONE_OM_METADATA_LAYOUT_DEFAULT = "SIMPLE";
 
   public static final String OZONE_OM_METADATA_LAYOUT_PREFIX = "PREFIX";
 
