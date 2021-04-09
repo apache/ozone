@@ -84,7 +84,7 @@ import org.apache.hadoop.hdds.scm.node.NewNodeHandler;
 import org.apache.hadoop.hdds.scm.node.StartDatanodeAdminHandler;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeReportHandler;
-import org.apache.hadoop.hdds.scm.node.NonHealthyToReadOnlyHealthyNodeHandler;
+import org.apache.hadoop.hdds.scm.node.HealthyReadOnlyNodeHandler;
 import org.apache.hadoop.hdds.scm.node.ReadOnlyHealthyToHealthyNodeHandler;
 import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.node.StaleNodeHandler;
@@ -370,9 +370,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         new StartDatanodeAdminHandler(scmNodeManager, pipelineManager);
     ReadOnlyHealthyToHealthyNodeHandler readOnlyHealthyToHealthyNodeHandler =
         new ReadOnlyHealthyToHealthyNodeHandler(conf, serviceManager);
-    NonHealthyToReadOnlyHealthyNodeHandler
-        nonHealthyToReadOnlyHealthyNodeHandler =
-        new NonHealthyToReadOnlyHealthyNodeHandler(scmNodeManager,
+    HealthyReadOnlyNodeHandler
+        healthyReadOnlyNodeHandler =
+        new HealthyReadOnlyNodeHandler(scmNodeManager,
             pipelineManager, conf);
     ContainerActionsHandler actionsHandler = new ContainerActionsHandler();
     PendingDeleteHandler pendingDeleteHandler =
@@ -410,10 +410,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     eventQueue.addHandler(SCMEvents.CLOSE_CONTAINER, closeContainerHandler);
     eventQueue.addHandler(SCMEvents.NEW_NODE, newNodeHandler);
     eventQueue.addHandler(SCMEvents.STALE_NODE, staleNodeHandler);
-    eventQueue.addHandler(SCMEvents.READ_ONLY_HEALTHY_TO_HEALTHY_NODE,
+    eventQueue.addHandler(SCMEvents.HEALTHY_READONLY_TO_HEALTHY_NODE,
         readOnlyHealthyToHealthyNodeHandler);
-    eventQueue.addHandler(SCMEvents.NON_HEALTHY_TO_READONLY_HEALTHY_NODE,
-        nonHealthyToReadOnlyHealthyNodeHandler);
+    eventQueue.addHandler(SCMEvents.HEALTHY_READONLY_NODE,
+        healthyReadOnlyNodeHandler);
     eventQueue.addHandler(SCMEvents.DEAD_NODE, deadNodeHandler);
     eventQueue.addHandler(SCMEvents.START_ADMIN_ON_NODE,
         datanodeStartAdminHandler);

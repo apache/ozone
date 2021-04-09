@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.NodeReportFromDatanode;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
@@ -56,7 +57,6 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
-import org.apache.hadoop.hdfs.server.protocol.RegisterCommand;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
@@ -117,6 +117,18 @@ public class TestSCMNodeManager {
 
   private File testDir;
   private StorageContainerManager scm;
+
+  private static final int maxLV = HDDSLayoutVersionManager.maxLayoutVersion();
+  private static final LayoutVersionProto largerSlvLayoutProto =
+      toLayoutVersionProto(maxLV, maxLV + 1);
+  private static final LayoutVersionProto smallerSlvLayoutProto =
+      toLayoutVersionProto(maxLV, maxLV - 1);
+  private static final LayoutVersionProto largerMlvLayoutProto =
+      toLayoutVersionProto(maxLV + 1, maxLV);
+  private static final LayoutVersionProto smallerMlvLayoutProto =
+      toLayoutVersionProto(maxLV - 1, maxLV);
+  private static final LayoutVersionProto correctLayout =
+      toLayoutVersionProto(maxLV, maxLV);
 
   @Rule
   public ExpectedException thrown = ExpectedException.none();
@@ -205,7 +217,8 @@ public class TestSCMNodeManager {
   }
 
   /**
-   * Tests that Node manager handles Layout versions correctly.
+   * Tests that Node manager handles layout version changes from heartbeats
+   * correctly.
    *
    * @throws IOException
    * @throws InterruptedException
@@ -213,24 +226,11 @@ public class TestSCMNodeManager {
    */
   @Test
   public void testScmLayoutOnHeartbeat() throws Exception {
-    try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
-      HDDSLayoutVersionManager layoutVersionManager =
-          nodeManager.getLayoutVersionManager();
-      int nodeManagerMLV =
-          layoutVersionManager.getMetadataLayoutVersion();
-      int nodeManagerSLV =
-          layoutVersionManager.getSoftwareLayoutVersion();
+    OzoneConfiguration conf = getConf();
+    conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL,
+        1, TimeUnit.DAYS);
 
-      LayoutVersionProto slvLargerLayout = toLayoutVersionProto(
-          nodeManagerMLV, nodeManagerSLV + 1);
-      LayoutVersionProto slvSmallerLayout = toLayoutVersionProto(
-          nodeManagerMLV, nodeManagerSLV - 1);
-
-      LayoutVersionProto mlvLargerLayout = toLayoutVersionProto(
-          nodeManagerMLV + 1, nodeManagerSLV);
-      LayoutVersionProto mlvSmallerLayout = toLayoutVersionProto(
-          nodeManagerMLV - 1, nodeManagerSLV + 1);
-
+    try (SCMNodeManager nodeManager = createNodeManager(conf)) {
       // Register 2 nodes correctly.
       // These will be used with a faulty node to test pipeline creation.
       TestUtils.createRandomDatanodeAndRegister(nodeManager);
@@ -238,10 +238,10 @@ public class TestSCMNodeManager {
 
       scm.exitSafeMode();
 
-      assertPipelineClosedAfterLayoutHeartbeat(nodeManager, slvSmallerLayout);
-      assertPipelineClosedAfterLayoutHeartbeat(nodeManager, slvLargerLayout);
-      assertPipelineClosedAfterLayoutHeartbeat(nodeManager, mlvSmallerLayout);
-      assertPipelineClosedAfterLayoutHeartbeat(nodeManager, mlvLargerLayout);
+      assertPipelineClosedAfterLayoutHeartbeat(nodeManager, smallerMlvLayoutProto);
+      assertPipelineClosedAfterLayoutHeartbeat(nodeManager, largerMlvLayoutProto);
+      assertPipelineClosedAfterLayoutHeartbeat(nodeManager, smallerSlvLayoutProto);
+      assertPipelineClosedAfterLayoutHeartbeat(nodeManager, largerSlvLayoutProto);
     }
   }
 
@@ -251,17 +251,32 @@ public class TestSCMNodeManager {
     DatanodeDetails node = TestUtils
         .createRandomDatanodeAndRegister(nodeManager);
     // Make a pipeline while nodes are healthy.
-    Pipeline pipeline = scm.getPipelineManager()
+    PipelineID id = scm.getPipelineManager()
         .createPipeline(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE);
+            HddsProtos.ReplicationFactor.THREE).getId();
+
+    Pipeline pipeline = scm.getPipelineManager().getPipeline(id);
+    Assert.assertEquals(Pipeline.PipelineState.ALLOCATED,
+        pipeline.getPipelineState());
+
     // node sends incorrect layout.
     nodeManager.processHeartbeat(node, layout);
-    // Its pipeline should be closed.
-    LambdaTestUtils.await(5000, 1000, pipeline::isClosed);
+
+    // Its pipeline should be closed then removed.
+    LambdaTestUtils.await(5000, 1000, () -> {
+      boolean pipelineRemoved = false;
+      try {
+        scm.getPipelineManager().getPipeline(id);
+      } catch (PipelineNotFoundException ex) {
+        pipelineRemoved = ex.getMessage().contains(id.toString());
+      }
+      return pipelineRemoved;
+    });
   }
 
   /**
-   * Tests that Node manager handles Layout versions correctly.
+   * Tests that Node manager handles layout versions for newly registered nodes
+   * correctly.
    *
    * @throws IOException
    * @throws InterruptedException
@@ -279,33 +294,14 @@ public class TestSCMNodeManager {
         1, TimeUnit.DAYS);
 
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
-      HDDSLayoutVersionManager layoutVersionManager =
-          nodeManager.getLayoutVersionManager();
-      int nodeManagerMLV =
-          layoutVersionManager.getMetadataLayoutVersion();
-      int nodeManagerSLV =
-          layoutVersionManager.getSoftwareLayoutVersion();
-
-      LayoutVersionProto slvLargerLayout = toLayoutVersionProto(
-          nodeManagerMLV, nodeManagerSLV + 1);
-      LayoutVersionProto slvSmallerLayout = toLayoutVersionProto(
-          nodeManagerMLV, nodeManagerSLV - 1);
-
-      LayoutVersionProto mlvLargerLayout = toLayoutVersionProto(
-          nodeManagerMLV + 1, nodeManagerSLV);
-      LayoutVersionProto mlvSmallerLayout = toLayoutVersionProto(
-          nodeManagerMLV - 1, nodeManagerSLV);
-      LayoutVersionProto correctLayout = toLayoutVersionProto(
-          nodeManagerMLV, nodeManagerSLV);
-
       // Nodes with mismatched SLV cannot join the cluster.
-      assertRegister(nodeManager, slvLargerLayout, errorNodeNotPermitted);
-      assertRegister(nodeManager, slvSmallerLayout, errorNodeNotPermitted);
+      assertRegister(nodeManager, largerSlvLayoutProto, errorNodeNotPermitted);
+      assertRegister(nodeManager, smallerSlvLayoutProto, errorNodeNotPermitted);
       // Nodes with mismatched MLV can join, but should not be allowed in
       // pipelines.
-      DatanodeDetails badMlvNode1 = assertRegister(nodeManager, mlvLargerLayout,
+      DatanodeDetails badMlvNode1 = assertRegister(nodeManager, largerMlvLayoutProto,
           success);
-      DatanodeDetails badMlvNode2 = assertRegister(nodeManager, mlvSmallerLayout,
+      DatanodeDetails badMlvNode2 = assertRegister(nodeManager, smallerMlvLayoutProto,
           success);
       // This node has correct MLV and SLV, so it can join and be used in
       // pipelines.

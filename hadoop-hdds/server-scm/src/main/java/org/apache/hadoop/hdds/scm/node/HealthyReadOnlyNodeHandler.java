@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.node;
 
+import java.io.IOException;
 import java.util.Set;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -24,6 +25,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.slf4j.Logger;
@@ -32,16 +34,16 @@ import org.slf4j.LoggerFactory;
 /**
  * Handles non healthy to healthy(ReadOnly) node event.
  */
-public class NonHealthyToReadOnlyHealthyNodeHandler
+public class HealthyReadOnlyNodeHandler
     implements EventHandler<DatanodeDetails> {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(NonHealthyToReadOnlyHealthyNodeHandler.class);
+      LoggerFactory.getLogger(HealthyReadOnlyNodeHandler.class);
   private final PipelineManager pipelineManager;
   private final NodeManager nodeManager;
   private final ConfigurationSource conf;
 
-  public NonHealthyToReadOnlyHealthyNodeHandler(
+  public HealthyReadOnlyNodeHandler(
       NodeManager nodeManager, PipelineManager pipelineManager,
       OzoneConfiguration conf) {
     this.pipelineManager = pipelineManager;
@@ -52,14 +54,18 @@ public class NonHealthyToReadOnlyHealthyNodeHandler
   @Override
   public void onMessage(DatanodeDetails datanodeDetails,
       EventPublisher publisher) {
-    Set<PipelineID> pipelineIds =
-        nodeManager.getPipelines(datanodeDetails);
-    LOG.info("Datanode {} moved to HEALTH READ ONLY state.",
-        datanodeDetails);
-    if (!pipelineIds.isEmpty()) {
-      LOG.error("Datanode {} is part of pipelines {} in HEALTH READ ONLY " +
-              "state.",
-          datanodeDetails, pipelineIds);
+    LOG.info("Datanode {} moved to HEALTHY READONLY state.", datanodeDetails);
+
+    Set<PipelineID> pipelineIDs = nodeManager.getPipelines(datanodeDetails);
+    for (PipelineID id: pipelineIDs) {
+      LOG.info("Closing pipeline {} which uses HEALTHY READONLY datanode {} ",
+              id,  datanodeDetails);
+      try {
+        pipelineManager.closePipeline(pipelineManager.getPipeline(id), false);
+      } catch (IOException ex) {
+        LOG.error("Failed to close pipeline {} which uses HEALTHY READONLY " +
+            "datanode {}: ", id, datanodeDetails, ex);
+      }
     }
   }
 }
