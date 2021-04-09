@@ -20,9 +20,9 @@ package org.apache.hadoop.ozone.om.response.upgrade;
 import static org.apache.hadoop.ozone.OzoneConsts.PREPARE_MARKER_KEY;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TRANSACTION_INFO_TABLE;
 
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -53,7 +53,7 @@ public class OMPrepareResponse extends OMClientResponse {
     if (prepareIndex != -1) {
       omMetadataManager.getTransactionInfoTable().putWithBatch(batchOperation,
           PREPARE_MARKER_KEY,
-          new OMTransactionInfo.Builder()
+          new TransactionInfo.Builder()
               .setTransactionIndex(prepareIndex).build());
     }
   }

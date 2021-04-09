@@ -18,7 +18,9 @@
 package org.apache.hadoop.hdds.scm.protocol;
 
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -28,8 +30,11 @@ import org.apache.hadoop.security.KerberosInfo;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.EnumSet;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 
@@ -46,6 +51,14 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * Version 1: Initial version.
    */
   long versionID = 1L;
+
+  /**
+   * Admin command should take effect on all SCM instance.
+   */
+  Set<Type> ADMIN_COMMAND_TYPE = Collections.unmodifiableSet(EnumSet.of(
+      Type.StartReplicationManager,
+      Type.StopReplicationManager,
+      Type.ForceExitSafeMode));
 
   /**
    * Asks SCM where a container should be allocated. SCM responds with the
@@ -150,12 +163,14 @@ public interface StorageContainerLocationProtocol extends Closeable {
       HddsProtos.NodeState state, HddsProtos.QueryScope queryScope,
       String poolName, int clientVersion) throws IOException;
 
-  void decommissionNodes(List<String> nodes) throws IOException;
-
-  void recommissionNodes(List<String> nodes) throws IOException;
-
-  void startMaintenanceNodes(List<String> nodes, int endInHours)
+  List<DatanodeAdminError> decommissionNodes(List<String> nodes)
       throws IOException;
+
+  List<DatanodeAdminError> recommissionNodes(List<String> nodes)
+      throws IOException;
+
+  List<DatanodeAdminError> startMaintenanceNodes(List<String> nodes,
+      int endInHours) throws IOException;
 
   /**
    * Close a container.
@@ -261,21 +276,33 @@ public interface StorageContainerLocationProtocol extends Closeable {
    */
   boolean getReplicationManagerStatus() throws IOException;
 
-  StatusAndMessages finalizeScmUpgrade(String upgradeClientID)
-      throws IOException;
-
-  StatusAndMessages queryUpgradeFinalizationProgress(String upgradeClientID,
-      boolean force) throws IOException;
-
   /**
    * Get Datanode usage information by ip or uuid.
    *
-   * @param ipaddress - datanode IP address String
-   * @param uuid - datanode UUID String
-   * @return List of DatanodeUsageInfo. Each element contains info such as
+   * @param ipaddress datanode IP address String
+   * @param uuid datanode UUID String
+   * @return List of DatanodeUsageInfoProto. Each element contains info such as
    * capacity, SCMused, and remaining space.
    * @throws IOException
    */
-  List<HddsProtos.DatanodeUsageInfo> getDatanodeUsageInfo(String ipaddress,
-      String uuid) throws IOException;
+  List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
+      String ipaddress, String uuid) throws IOException;
+
+  /**
+   * Get usage information of most or least used datanodes.
+   *
+   * @param mostUsed true if most used, false if least used
+   * @param count Integer number of nodes to get info for
+   * @return List of DatanodeUsageInfoProto. Each element contains info such as
+   * capacity, SCMUsed, and remaining space.
+   * @throws IOException
+   */
+  List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
+      boolean mostUsed, int count) throws IOException;
+
+  StatusAndMessages finalizeScmUpgrade(String upgradeClientID)
+      throws IOException;
+
+  StatusAndMessages queryUpgradeFinalizationProgress(
+      String upgradeClientID, boolean force) throws IOException;
 }

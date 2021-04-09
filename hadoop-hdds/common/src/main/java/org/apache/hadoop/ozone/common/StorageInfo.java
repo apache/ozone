@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.apache.hadoop.ozone.OzoneConsts;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -262,6 +263,6 @@ public class StorageInfo {
    * @return new clusterID
    */
   public static String newClusterID() {
-    return "CID-" + UUID.randomUUID().toString();
+    return OzoneConsts.CLUSTER_ID_PREFIX + UUID.randomUUID().toString();
   }
 }

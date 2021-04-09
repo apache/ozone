@@ -20,7 +20,8 @@ package org.apache.hadoop.hdds.scm.node;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.scm.ha.SCMService.Event;
+import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.slf4j.Logger;
@@ -32,24 +33,24 @@ import org.slf4j.LoggerFactory;
  */
 public class ReadOnlyHealthyToHealthyNodeHandler
     implements EventHandler<DatanodeDetails> {
-
   private static final Logger LOG =
       LoggerFactory.getLogger(ReadOnlyHealthyToHealthyNodeHandler.class);
 
-  private final PipelineManager pipelineManager;
   private final ConfigurationSource conf;
+  private final SCMServiceManager serviceManager;
 
   public ReadOnlyHealthyToHealthyNodeHandler(
-      PipelineManager pipelineManager, OzoneConfiguration conf) {
-    this.pipelineManager = pipelineManager;
+      OzoneConfiguration conf, SCMServiceManager serviceManager) {
     this.conf = conf;
+    this.serviceManager = serviceManager;
   }
 
   @Override
   public void onMessage(DatanodeDetails datanodeDetails,
-      EventPublisher publisher) {
+                        EventPublisher publisher) {
     LOG.info("Datanode {} moved to HEALTHY state.",
         datanodeDetails);
-    pipelineManager.triggerPipelineCreation();
+    serviceManager.notifyEventTriggered(
+        Event.UNHEALTHY_TO_HEALTHY_NODE_HANDLER_TRIGGERED);
   }
 }

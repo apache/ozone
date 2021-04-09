@@ -319,6 +319,10 @@ message SCMCommandProto {
   optional SetNodeOperationalStateCommandProto setNodeOperationalStateCommandProto = 9;
   optional FinalizeNewLayoutVersionCommandProto
   finalizeNewLayoutVersionCommandProto = 10;
+
+  // If running upon Ratis, holds term of underlying RaftServer iff current
+  // SCM is a leader. If running without Ratis, holds SCMContext.INVALID_TERM.
+  optional int64 term = 15;
 }
 
 /**

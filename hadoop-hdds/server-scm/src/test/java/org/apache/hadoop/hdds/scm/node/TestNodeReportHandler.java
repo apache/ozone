@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.NodeReportFromDatanode;
@@ -71,7 +72,7 @@ public class TestNodeReportHandler implements EventPublisher {
         .thenReturn(maxLayoutVersion());
     nodeManager =
         new SCMNodeManager(conf, storageConfig, new EventQueue(), clusterMap,
-            versionManager);
+            SCMContext.emptyContext(), versionManager);
     nodeReportHandler = new NodeReportHandler(nodeManager);
   }
 

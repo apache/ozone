@@ -30,13 +30,20 @@ import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.block.BlockManager;
 import org.apache.hadoop.hdds.scm.container.CloseContainerEventHandler;
 import org.apache.hadoop.hdds.scm.container.ContainerActionsHandler;
-import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.container.ContainerReportHandler;
 import org.apache.hadoop.hdds.scm.container.IncrementalContainerReportHandler;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementPolicyFactory;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementMetrics;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.ha.SCMHANodeDetails;
+import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
+import org.apache.hadoop.hdds.scm.metadata.SCMDBTransactionBufferImpl;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.node.DeadNodeHandler;
@@ -72,14 +79,20 @@ import org.slf4j.LoggerFactory;
 public class ReconStorageContainerManagerFacade
     implements OzoneStorageContainerManager {
 
+  // TODO: Fix Recon.
+
   private static final Logger LOG = LoggerFactory
       .getLogger(ReconStorageContainerManagerFacade.class);
 
   private final OzoneConfiguration ozoneConfiguration;
   private final ReconDatanodeProtocolServer datanodeProtocolServer;
   private final EventQueue eventQueue;
+  private final SCMContext scmContext;
   private final SCMStorageConfig scmStorageConfig;
   private final DBStore dbStore;
+  private final SCMHANodeDetails scmHANodeDetails;
+  private final SCMHAManager scmhaManager;
+  private final SequenceIdGenerator sequenceIdGen;
 
   private ReconNodeManager nodeManager;
   private ReconPipelineManager pipelineManager;
@@ -98,16 +111,22 @@ public class ReconStorageContainerManagerFacade
       ContainerHealthSchemaManager containerHealthSchemaManager,
       ContainerDBServiceProvider containerDBServiceProvider)
       throws IOException {
+    scmHANodeDetails = SCMHANodeDetails.loadSCMHAConfig(conf);
     this.eventQueue = new EventQueue();
     eventQueue.setSilent(true);
+    this.scmContext = SCMContext.emptyContext();
     this.ozoneConfiguration = getReconScmConfiguration(conf);
     this.scmStorageConfig = new ReconStorageConfig(conf);
     this.clusterMap = new NetworkTopologyImpl(conf);
-    dbStore = DBStoreBuilder
+    this.dbStore = DBStoreBuilder
         .createDBStore(ozoneConfiguration, new ReconSCMDBDefinition());
 
     this.scmLayoutVersionManager =
         new HDDSLayoutVersionManager(scmStorageConfig.getLayoutVersion());
+    this.scmhaManager = MockSCMHAManager.getInstance(
+        true, new SCMDBTransactionBufferImpl());
+    this.sequenceIdGen = new SequenceIdGenerator(
+        conf, scmhaManager, ReconSCMDBDefinition.SEQUENCE_ID.getTable(dbStore));
     this.nodeManager =
         new ReconNodeManager(conf, scmStorageConfig, eventQueue, clusterMap,
             ReconSCMDBDefinition.NODES.getTable(dbStore),
@@ -115,18 +134,22 @@ public class ReconStorageContainerManagerFacade
     placementMetrics = SCMContainerPlacementMetrics.create();
     this.containerPlacementPolicy =
         ContainerPlacementPolicyFactory.getPolicy(conf, nodeManager,
-        clusterMap, true, placementMetrics);
+            clusterMap, true, placementMetrics);
     this.datanodeProtocolServer = new ReconDatanodeProtocolServer(
         conf, this, eventQueue);
-    this.pipelineManager =
-        new ReconPipelineManager(conf,
-            nodeManager,
-            ReconSCMDBDefinition.PIPELINES.getTable(dbStore),
-            eventQueue);
+    this.pipelineManager = ReconPipelineManager.newReconPipelineManager(
+        conf,
+        nodeManager,
+        ReconSCMDBDefinition.PIPELINES.getTable(dbStore),
+        eventQueue,
+        scmhaManager,
+        scmContext);
     this.containerManager = new ReconContainerManager(conf,
+        dbStore,
         ReconSCMDBDefinition.CONTAINERS.getTable(dbStore),
-        dbStore, pipelineManager, scmServiceProvider,
-        containerHealthSchemaManager, containerDBServiceProvider);
+        pipelineManager, scmServiceProvider,
+        containerHealthSchemaManager, containerDBServiceProvider,
+        scmhaManager, sequenceIdGen);
     this.scmServiceProvider = scmServiceProvider;
 
     NodeReportHandler nodeReportHandler =
@@ -134,11 +157,11 @@ public class ReconStorageContainerManagerFacade
 
     SafeModeManager safeModeManager = new ReconSafeModeManager();
     ReconPipelineReportHandler pipelineReportHandler =
-        new ReconPipelineReportHandler(
-            safeModeManager, pipelineManager, conf, scmServiceProvider);
+        new ReconPipelineReportHandler(safeModeManager,
+            pipelineManager, scmContext, conf, scmServiceProvider);
 
     PipelineActionHandler pipelineActionHandler =
-        new PipelineActionHandler(pipelineManager, conf);
+        new PipelineActionHandler(pipelineManager, scmContext, conf);
 
     StaleNodeHandler staleNodeHandler =
         new StaleNodeHandler(nodeManager, pipelineManager, conf);
@@ -150,9 +173,10 @@ public class ReconStorageContainerManagerFacade
 
     IncrementalContainerReportHandler icrHandler =
         new ReconIncrementalContainerReportHandler(nodeManager,
-            containerManager);
+            containerManager, scmContext);
     CloseContainerEventHandler closeContainerHandler =
-        new CloseContainerEventHandler(pipelineManager, containerManager);
+        new CloseContainerEventHandler(
+            pipelineManager, containerManager, scmContext);
     ContainerActionsHandler actionsHandler = new ContainerActionsHandler();
     ReconNewNodeHandler newNodeHandler = new ReconNewNodeHandler(nodeManager);
 
@@ -286,7 +310,7 @@ public class ReconStorageContainerManagerFacade
   }
 
   @Override
-  public ContainerManager getContainerManager() {
+  public ContainerManagerV2 getContainerManager() {
     return containerManager;
   }
 
@@ -298,6 +322,11 @@ public class ReconStorageContainerManagerFacade
   @Override
   public InetSocketAddress getDatanodeRpcAddress() {
     return getDatanodeProtocolServer().getDatanodeRpcAddress();
+  }
+
+  @Override
+  public SCMNodeDetails getScmNodeDetails() {
+    return scmHANodeDetails.getLocalNodeDetails();
   }
 
   public EventQueue getEventQueue() {

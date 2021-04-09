@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds;
 
 import javax.management.ObjectName;
+import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -27,6 +28,7 @@ import java.net.UnknownHostException;
 import java.nio.file.Path;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
@@ -39,6 +41,8 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
+import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.net.DNS;
 import org.apache.hadoop.net.NetUtils;
@@ -51,6 +55,11 @@ import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_DNS_NAMESE
 import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_HOST_NAME_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_PORT_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -224,27 +233,50 @@ public final class HddsUtils {
    */
   public static Collection<InetSocketAddress> getSCMAddresses(
       ConfigurationSource conf) {
-    Collection<String> names =
-        conf.getTrimmedStringCollection(ScmConfigKeys.OZONE_SCM_NAMES);
-    if (names.isEmpty()) {
-      throw new IllegalArgumentException(ScmConfigKeys.OZONE_SCM_NAMES
-          + " need to be a set of valid DNS names or IP addresses."
-          + " Empty address list found.");
-    }
 
-    Collection<InetSocketAddress> addresses = new HashSet<>(names.size());
-    for (String address : names) {
-      Optional<String> hostname = getHostName(address);
-      if (!hostname.isPresent()) {
-        throw new IllegalArgumentException("Invalid hostname for SCM: "
-            + address);
+    // First check HA style config, if not defined fall back to OZONE_SCM_NAMES
+
+    if (SCMHAUtils.getScmServiceId(conf) != null) {
+      List<SCMNodeInfo> scmNodeInfoList = SCMNodeInfo.buildNodeInfo(conf);
+      Collection<InetSocketAddress> scmAddressList =
+          new HashSet<>(scmNodeInfoList.size());
+      for (SCMNodeInfo scmNodeInfo : scmNodeInfoList) {
+        scmAddressList.add(
+            NetUtils.createSocketAddr(scmNodeInfo.getScmDatanodeAddress()));
       }
-      int port = getHostPort(address)
-          .orElse(ScmConfigKeys.OZONE_SCM_DEFAULT_PORT);
-      InetSocketAddress addr = NetUtils.createSocketAddr(hostname.get(), port);
-      addresses.add(addr);
+      return scmAddressList;
+    } else {
+      // fall back to OZONE_SCM_NAMES.
+      Collection<String> names =
+          conf.getTrimmedStringCollection(ScmConfigKeys.OZONE_SCM_NAMES);
+      if (names.isEmpty()) {
+        throw new IllegalArgumentException(ScmConfigKeys.OZONE_SCM_NAMES
+            + " need to be a set of valid DNS names or IP addresses."
+            + " Empty address list found.");
+      }
+
+      Collection<InetSocketAddress> addresses = new HashSet<>(names.size());
+      for (String address : names) {
+        Optional<String> hostname = getHostName(address);
+        if (!hostname.isPresent()) {
+          throw new IllegalArgumentException("Invalid hostname for SCM: "
+              + address);
+        }
+        int port = getHostPort(address)
+            .orElse(conf.getInt(OZONE_SCM_DATANODE_PORT_KEY,
+                OZONE_SCM_DATANODE_PORT_DEFAULT));
+        InetSocketAddress addr = NetUtils.createSocketAddr(hostname.get(),
+            port);
+        addresses.add(addr);
+      }
+
+      if (addresses.size() > 1) {
+        LOG.warn("When SCM HA is configured, configure {} appended with " +
+            "serviceId and nodeId. {} is deprecated.", OZONE_SCM_ADDRESS_KEY,
+            OZONE_SCM_NAMES);
+      }
+      return addresses;
     }
-    return addresses;
   }
 
   /**
@@ -279,8 +311,8 @@ public final class HddsUtils {
   public static InetSocketAddress getSingleSCMAddress(
       ConfigurationSource conf) {
     Collection<InetSocketAddress> singleton = getSCMAddresses(conf);
-    Preconditions.checkArgument(singleton.size() == 1,
-        MULTIPLE_SCM_NOT_YET_SUPPORTED);
+   // Preconditions.checkArgument(singleton.size() == 1,
+    //    MULTIPLE_SCM_NOT_YET_SUPPORTED);
     return singleton.iterator().next();
   }
 
@@ -488,6 +520,14 @@ public final class HddsUtils {
     Preconditions.checkArgument(
         path.normalize().startsWith(ancestor.normalize()),
         "Path should be a descendant of %s", ancestor);
+  }
+
+  public static File createDir(String dirPath) {
+    File dirFile = new File(dirPath);
+    if (!dirFile.mkdirs() && !dirFile.exists()) {
+      throw new IllegalArgumentException("Unable to create path: " + dirFile);
+    }
+    return dirFile;
   }
 
   /**

@@ -28,7 +28,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
@@ -195,7 +195,7 @@ public final class TestHelper {
     for (long containerID : containerIdList) {
       ContainerInfo container =
           cluster.getStorageContainerManager().getContainerManager()
-              .getContainer(ContainerID.valueof(containerID));
+              .getContainer(ContainerID.valueOf(containerID));
       Pipeline pipeline =
           cluster.getStorageContainerManager().getPipelineManager()
               .getPipeline(container.getPipelineID());
@@ -227,8 +227,8 @@ public final class TestHelper {
       throws TimeoutException, InterruptedException, IOException {
     for (Pipeline pipeline1 : pipelineList) {
       // issue pipeline destroy command
-      cluster.getStorageContainerManager().getPipelineManager()
-          .finalizeAndDestroyPipeline(pipeline1, false);
+      cluster.getStorageContainerManager()
+          .getPipelineManager().closePipeline(pipeline1, false);
     }
 
     // wait for the pipeline to get destroyed in the datanodes
@@ -273,7 +273,7 @@ public final class TestHelper {
     for (long containerID : containerIdList) {
       ContainerInfo container =
           cluster.getStorageContainerManager().getContainerManager()
-              .getContainer(ContainerID.valueof(containerID));
+              .getContainer(ContainerID.valueOf(containerID));
       Pipeline pipeline =
           cluster.getStorageContainerManager().getPipelineManager()
               .getPipeline(container.getPipelineID());
@@ -294,7 +294,7 @@ public final class TestHelper {
         // send the order to close the container
         cluster.getStorageContainerManager().getEventQueue()
             .fireEvent(SCMEvents.CLOSE_CONTAINER,
-                ContainerID.valueof(containerID));
+                ContainerID.valueOf(containerID));
       }
     }
     int index = 0;
@@ -359,11 +359,11 @@ public final class TestHelper {
   }
 
   public static int countReplicas(long containerID, MiniOzoneCluster cluster) {
-    ContainerManager containerManager = cluster.getStorageContainerManager()
+    ContainerManagerV2 containerManager = cluster.getStorageContainerManager()
         .getContainerManager();
     try {
       Set<ContainerReplica> replicas = containerManager
-          .getContainerReplicas(ContainerID.valueof(containerID));
+          .getContainerReplicas(ContainerID.valueOf(containerID));
       LOG.info("Container {} has {} replicas on {}", containerID,
           replicas.size(),
           replicas.stream()

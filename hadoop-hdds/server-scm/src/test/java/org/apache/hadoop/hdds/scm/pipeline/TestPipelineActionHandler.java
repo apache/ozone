@@ -22,9 +22,11 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ClosePipelineInfo;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineAction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineActionsProto;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.PipelineActionsFromDatanode;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.junit.Test;
 import org.mockito.Mockito;
 
@@ -37,7 +39,7 @@ public class TestPipelineActionHandler {
 
   @Test
   public void testCloseActionForMissingPipeline()
-      throws PipelineNotFoundException {
+      throws PipelineNotFoundException, NotLeaderException {
     final PipelineManager manager = Mockito.mock(PipelineManager.class);
     final EventQueue queue = Mockito.mock(EventQueue.class);
 
@@ -45,7 +47,7 @@ public class TestPipelineActionHandler {
         .thenThrow(new PipelineNotFoundException());
 
     final PipelineActionHandler actionHandler =
-        new PipelineActionHandler(manager, null);
+        new PipelineActionHandler(manager, SCMContext.emptyContext(), null);
 
     final PipelineActionsProto actionsProto = PipelineActionsProto.newBuilder()
         .addPipelineActions(PipelineAction.newBuilder()

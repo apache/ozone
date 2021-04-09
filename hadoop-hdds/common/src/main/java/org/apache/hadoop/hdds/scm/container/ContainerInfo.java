@@ -125,6 +125,11 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
 
   }
 
+  /**
+   * This method is depricated, use {@code containerID()} which returns
+   * {@link ContainerID} object.
+   */
+  @Deprecated
   public long getContainerID() {
     return containerID;
   }
@@ -183,7 +188,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
   }
 
   public ContainerID containerID() {
-    return new ContainerID(getContainerID());
+    return ContainerID.valueOf(containerID);
   }
 
   /**

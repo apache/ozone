@@ -47,7 +47,7 @@ import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.BlockGroup;
-import org.apache.hadoop.ozone.om.codec.OMTransactionInfoCodec;
+import org.apache.hadoop.hdds.utils.TransactionInfoCodec;
 import org.apache.hadoop.ozone.om.codec.OmBucketInfoCodec;
 import org.apache.hadoop.ozone.om.codec.OmKeyInfoCodec;
 import org.apache.hadoop.ozone.om.codec.OmMultipartKeyInfoCodec;
@@ -70,7 +70,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
-import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.storage.proto
     .OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
@@ -289,7 +289,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
 
       // Check if there is a DB Inconsistent Marker in the metaDir. This
       // marker indicates that the DB is in an inconsistent state and hence
-      // the OM process should be terminated.
+      // the SCM process should be terminated.
       File markerFile = new File(metaDir, DB_TRANSIENT_MARKER);
       if (markerFile.exists()) {
         LOG.error("File {} marks that OM DB is in an inconsistent state.",
@@ -364,7 +364,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         .addCodec(OmMultipartKeyInfo.class, new OmMultipartKeyInfoCodec())
         .addCodec(S3SecretValue.class, new S3SecretValueCodec())
         .addCodec(OmPrefixInfo.class, new OmPrefixInfoCodec())
-        .addCodec(OMTransactionInfo.class, new OMTransactionInfoCodec());
+        .addCodec(TransactionInfo.class, new TransactionInfoCodec());
   }
 
   /**
@@ -419,7 +419,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     checkTableStatus(prefixTable, PREFIX_TABLE);
 
     transactionInfoTable = this.store.getTable(TRANSACTION_INFO_TABLE,
-        String.class, OMTransactionInfo.class);
+        String.class, TransactionInfo.class);
     checkTableStatus(transactionInfoTable, TRANSACTION_INFO_TABLE);
 
     metaTable = this.store.getTable(META_TABLE, String.class, String.class);
@@ -1154,7 +1154,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   }
 
   @Override
-  public Table<String, OMTransactionInfo> getTransactionInfoTable() {
+  public Table<String, TransactionInfo> getTransactionInfoTable() {
     return transactionInfoTable;
   }
 

@@ -24,8 +24,6 @@ import java.util.List;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
-import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
-import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.ozone.common.BlockGroup;
 
 /**
@@ -33,8 +31,7 @@ import org.apache.hadoop.ozone.common.BlockGroup;
  *  Block APIs.
  *  Container is transparent to these APIs.
  */
-public interface BlockManager extends Closeable,
-    EventHandler<SafeModeStatus> {
+public interface BlockManager extends Closeable {
   /**
    * Allocates a new block for a given size.
    * @param size - Block Size

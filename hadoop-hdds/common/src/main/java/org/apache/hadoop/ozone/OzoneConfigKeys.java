@@ -440,6 +440,8 @@ public final class OzoneConfigKeys {
   public static final boolean OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT =
       false;
 
+  public static final int OZONE_INIT_DEFAULT_LAYOUT_VERSION_DEFAULT = -1;
+
   /**
    * There is no need to instantiate this class.
    */

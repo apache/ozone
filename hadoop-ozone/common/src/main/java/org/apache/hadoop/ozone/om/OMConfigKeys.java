@@ -245,9 +245,4 @@ public final class OMConfigKeys {
 
   public static final long  OZONE_FS_TRASH_CHECKPOINT_INTERVAL_DEFAULT = 0;
 
-  public static final String OZONE_OM_RATIS_BASED_FINALIZATION_TIMEOUT =
-      "ozone.om.finalization.ratis.based.timeout";
-  public static final TimeDuration
-      OZONE_OM_RATIS_BASED_FINALIZATION_TIMEOUT_DEFAULT
-      = TimeDuration.valueOf(30, TimeUnit.SECONDS);
 }
