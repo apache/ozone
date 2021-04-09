@@ -2773,13 +2773,13 @@
   <property>
     <name>ozone.om.metadata.layout</name>
     <tag>OZONE, OM</tag>
-    <value>LEGACY</value>
+    <value>SIMPLE</value>
     <description>
       This property is used to define the metadata layout of file system
       paths. If it is configured as PREFIX in combination with
       ozone.om.enable.filesystem.paths to true then this allows to perform
       atomic rename and delete of any directory at any level in the namespace.
-      Defaulting to LEGACY. Supported values: LEGACY and PREFIX.
+      Defaulting to SIMPLE. Supported values: SIMPLE and PREFIX.
     </description>
   </property>
   <property>

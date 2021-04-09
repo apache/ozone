@@ -37,9 +37,9 @@ This feature is strongly recommended to be turned ON when Ozone buckets are
   files in deep directory hierarchy.
 
 ## OzoneManager Metadata layout format
-OzoneManager supports two metadata layout formats - legacy and prefix.
+OzoneManager supports two metadata layout formats - simple and prefix.
 
-Legacy is the existing OM metadata format, which stores key entry with full path
+Simple is the existing OM metadata format, which stores key entry with full path
  name. In Prefix based optimization, OM metadata format stores intermediate
   directories into `DirectoryTable` and files into `FileTable` as shown in the
    below picture. The key to the table is the name of a directory or a file
