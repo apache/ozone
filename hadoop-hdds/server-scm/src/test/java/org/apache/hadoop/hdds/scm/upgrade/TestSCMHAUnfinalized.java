@@ -1,7 +1,6 @@
 package org.apache.hadoop.hdds.scm.upgrade;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -31,7 +30,7 @@ public class TestSCMHAUnfinalized {
   public void testSCMHAConfigsUsedUnfinalized() throws Exception {
     // Build unfinalized SCM with HA configuration enabled.
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,true);
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
     conf.setInt(ScmConfig.ConfigStrings.HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION,
         HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
     conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS,
