@@ -17,13 +17,11 @@
  */
 package org.apache.hadoop.hdds.scm.node;
 
-import java.awt.font.LayoutPath;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledFuture;
@@ -57,9 +55,8 @@ import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
-import org.apache.hadoop.hdfs.TestDatanodeDeath;
+import org.apache.hadoop.hdfs.server.protocol.RegisterCommand;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
@@ -83,7 +80,6 @@ import java.util.Map;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
-import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IO_SORT_FACTOR_DEFAULT;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.NET_TOPOLOGY_TABLE_MAPPING_FILE_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
@@ -273,7 +269,14 @@ public class TestSCMNodeManager {
   public void testScmLayoutOnRegister()
       throws Exception {
 
-    try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
+    // Disable automatic pipeline creation.
+    // Lets us test that nodes moving to healthy actually triggers pipeline
+    // creation.
+    OzoneConfiguration conf = getConf();
+    conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL,
+        1, TimeUnit.DAYS);
+
+    try (SCMNodeManager nodeManager = createNodeManager(conf)) {
       HDDSLayoutVersionManager layoutVersionManager =
           nodeManager.getLayoutVersionManager();
       int nodeManagerMLV =
@@ -289,35 +292,72 @@ public class TestSCMNodeManager {
       LayoutVersionProto mlvLargerLayout = toLayoutVersionProto(
           nodeManagerMLV + 1, nodeManagerSLV);
       LayoutVersionProto mlvSmallerLayout = toLayoutVersionProto(
-          nodeManagerMLV - 1, nodeManagerSLV + 1);
+          nodeManagerMLV - 1, nodeManagerSLV);
       LayoutVersionProto correctLayout = toLayoutVersionProto(
           nodeManagerMLV, nodeManagerSLV);
 
-      Assert.assertEquals(registerWithLayout(nodeManager, slvLargerLayout),
-          errorNodeNotPermitted);
-      Assert.assertEquals(registerWithLayout(nodeManager, slvSmallerLayout),
-          errorNodeNotPermitted);
-      Assert.assertEquals(registerWithLayout(nodeManager, mlvLargerLayout),
+      // Nodes with mismatched SLV cannot join the cluster.
+      assertRegister(nodeManager, slvLargerLayout, errorNodeNotPermitted);
+      assertRegister(nodeManager, slvSmallerLayout, errorNodeNotPermitted);
+      // Nodes with mismatched MLV can join, but should not be allowed in
+      // pipelines.
+      DatanodeDetails badMlvNode1 = assertRegister(nodeManager, mlvLargerLayout,
           success);
-      Assert.assertEquals(registerWithLayout(nodeManager, mlvSmallerLayout),
+      DatanodeDetails badMlvNode2 = assertRegister(nodeManager, mlvSmallerLayout,
           success);
-      Assert.assertEquals(registerWithLayout(nodeManager, correctLayout),
-          success);
+      // This node has correct MLV and SLV, so it can join and be used in
+      // pipelines.
+      assertRegister(nodeManager, correctLayout, success);
+
+      Assert.assertEquals(3, nodeManager.getAllNodes().size());
 
       scm.exitSafeMode();
       try {
-        scm.getPipelineManager().createPipeline(HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.THREE);
+        scm.getPipelineManager()
+            .createPipeline(HddsProtos.ReplicationType.RATIS,
+                HddsProtos.ReplicationFactor.THREE);
         Assert.fail("3 nodes should not have been found for a pipeline.");
       } catch (SCMException ex) {
-        Assert.assertTrue(ex.getMessage().contains("Required: 3 Found: 1"));
+        Assert.assertTrue(ex.getMessage().contains("Required 3. Found 1."));
       }
+
+      // SCM should auto create a factor 1 pipeline for the one healthy node.
+      LambdaTestUtils.await(5000, 1000, () ->
+        scm.getPipelineManager().getPipelines(HddsProtos.ReplicationType.RATIS,
+                HddsProtos.ReplicationFactor.ONE).size() == 1);
+
+      // Heartbeat bad MLV nodes back to healthy.
+      nodeManager.processHeartbeat(badMlvNode1, correctLayout);
+      nodeManager.processHeartbeat(badMlvNode2, correctLayout);
+
+      // After moving out of healthy readonly, pipeline creation should be
+      // triggered.
+      LambdaTestUtils.await(5000, 1000, () -> {
+        int numOne = scm.getPipelineManager()
+            .getPipelines(HddsProtos.ReplicationType.RATIS,
+                HddsProtos.ReplicationFactor.ONE).size();
+        int numThree = scm.getPipelineManager()
+            .getPipelines(HddsProtos.ReplicationType.RATIS,
+                HddsProtos.ReplicationFactor.THREE).size();
+
+        // Moving nodes out of healthy readonly should have triggered
+        // pipeline creation. With 3 healthy nodes, we should have at least one
+        // factor 3 pipeline now, and factor 1s should have been auto created
+        // for all nodes.
+        return (numOne == 3) && (numThree >= 1);
+      });
     }
   }
 
-  private StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto.ErrorCode registerWithLayout(SCMNodeManager manager,  LayoutVersionProto layout) {
-    return manager.register(
+  private DatanodeDetails assertRegister(SCMNodeManager manager,
+                                         LayoutVersionProto layout,
+                                         StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto.ErrorCode expectedResult) {
+    RegisteredCommand cmd = manager.register(
         MockDatanodeDetails.randomDatanodeDetails(), null,
-        getRandomPipelineReports(), layout).getError();
+        getRandomPipelineReports(), layout);
+
+    Assert.assertEquals(expectedResult, cmd.getError());
+    return cmd.getDatanode();
   }
 
 //  /**

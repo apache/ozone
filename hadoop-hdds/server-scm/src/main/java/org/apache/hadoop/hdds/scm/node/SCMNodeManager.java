@@ -345,7 +345,7 @@ public class SCMNodeManager implements NodeManager {
       DatanodeDetails datanodeDetails, NodeReportProto nodeReport,
       PipelineReportsProto pipelineReportsProto,
       LayoutVersionProto layoutInfo) {
-    if (layoutInfo.getSoftwareLayoutVersion() >
+    if (layoutInfo.getSoftwareLayoutVersion() !=
         scmLayoutVersionManager.getSoftwareLayoutVersion()) {
       return RegisteredCommand.newBuilder()
           .setErrorCode(ErrorCode.errorNodeNotPermitted)
