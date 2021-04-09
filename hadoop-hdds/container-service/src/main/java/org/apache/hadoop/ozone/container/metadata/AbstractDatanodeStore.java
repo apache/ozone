@@ -245,7 +245,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
         StorageUnit.BYTES);
 
     BlockBasedTableConfig tableConfig = new BlockBasedTableConfig();
-    tableConfig.setBlockCache(new LRUCache(cacheSize * SizeUnit.MB))
+    tableConfig.setBlockCache(new LRUCache(cacheSize))
         .setPinL0FilterAndIndexBlocksInCache(true)
         .setFilterPolicy(new BloomFilter());
 
