@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.security.x509.certificate.CertInfo;
 import org.apache.hadoop.hdds.utils.DBStoreHAManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -92,7 +93,7 @@ public interface SCMMetadataStore extends DBStoreHAManager {
    *
    * @return Table.
    */
-  Table<BigInteger, X509Certificate> getRevokedCertsTable();
+  Table<BigInteger, CertInfo> getRevokedCertsTable();
 
   /**
    * A table that maintains X509 Certificate Revocation Lists and its metadata.
