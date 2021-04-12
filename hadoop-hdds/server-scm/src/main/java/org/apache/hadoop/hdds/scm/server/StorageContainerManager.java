@@ -1745,6 +1745,27 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
      * find enough Healthy data nodes.
      */
     pipelineManager.resumePipelineCreation();
+
+    // Wait for at least one pipeline to be created before finishing
+    // finalization, so clients can write.
+    boolean hasPipeline = false;
+    while (!hasPipeline) {
+      int pipelineCount = pipelineManager.getPipelines(
+          HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.THREE,
+          Pipeline.PipelineState.OPEN).size();
+
+      hasPipeline = (pipelineCount >= 1);
+      if (!hasPipeline) {
+        LOG.info("Waiting for at least one pipeline after SCM finalization.");
+        try {
+          Thread.sleep(5000);
+        } catch (InterruptedException e) {
+          // Try again on next loop iteration.
+        }
+      } else {
+        LOG.info("Pipeline found after SCM finalization");
+      }
+    }
   }
 
   public StatusAndMessages finalizeUpgrade(String upgradeClientID)
