@@ -30,7 +30,7 @@ set +u
 
 source "$TEST_DIR"/compose/non-ha/load.sh
 source "$TEST_DIR"/testlib.sh
-[[ -f "$OZONE_UPGRADE_CALLBACK" ]] && source "$OZONE_UPGRADE_CALLBACK"
+[[ ! -f "$OZONE_UPGRADE_CALLBACK" ]] || source "$OZONE_UPGRADE_CALLBACK"
 
 echo "--- RUNNING MANUAL UPGRADE TEST FROM $OZONE_UPGRADE_FROM TO $OZONE_UPGRADE_TO ---"
 
