@@ -43,7 +43,7 @@ public enum DBProfile {
   SSD {
     @Override
     public String toString() {
-      return "DBProfile.SSD";
+      return "SSD";
     }
 
     @Override
@@ -90,7 +90,7 @@ public enum DBProfile {
   DISK {
     @Override
     public String toString() {
-      return "DBProfile.DISK";
+      return "DISK";
     }
 
     @Override

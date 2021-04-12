@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.common;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.GatheringByteChannel;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
@@ -119,6 +120,12 @@ final class ChunkBufferImplWithByteBuffer implements ChunkBuffer {
   @Override
   public ByteString toByteStringImpl(Function<ByteBuffer, ByteString> f) {
     return f.apply(buffer);
+  }
+
+  @Override
+  public List<ByteString> toByteStringListImpl(
+      Function<ByteBuffer, ByteString> f) {
+    return Arrays.asList(f.apply(buffer));
   }
 
   @Override

@@ -24,6 +24,8 @@ import java.util.List;
 
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -59,6 +61,9 @@ public class BlockManagerImpl implements BlockManager {
   private static final String NO_SUCH_BLOCK_ERR_MSG =
       "Unable to find the block.";
 
+  // Default Read Buffer capacity when Checksum is not present
+  private final long defaultReadBufferCapacity;
+
   /**
    * Constructs a Block Manager.
    *
@@ -67,6 +72,10 @@ public class BlockManagerImpl implements BlockManager {
   public BlockManagerImpl(ConfigurationSource conf) {
     Preconditions.checkNotNull(conf, "Config cannot be null");
     this.config = conf;
+    this.defaultReadBufferCapacity = (long) config.getStorageSize(
+        ScmConfigKeys.OZONE_CHUNK_READ_BUFFER_DEFAULT_SIZE_KEY,
+        ScmConfigKeys.OZONE_CHUNK_READ_BUFFER_DEFAULT_SIZE_DEFAULT,
+        StorageUnit.BYTES);
   }
 
   /**
@@ -242,6 +251,11 @@ public class BlockManagerImpl implements BlockManager {
       BlockData blockData = getBlockByID(db, blockID);
       return blockData.getSize();
     }
+  }
+
+  @Override
+  public long getDefaultReadBufferCapacity() {
+    return defaultReadBufferCapacity;
   }
 
   /**

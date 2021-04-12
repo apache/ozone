@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.om.request.volume.acl;
 
 import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.om.helpers.OmOzoneAclMap;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.om.request.volume.TestOMVolumeRequest;
@@ -30,6 +29,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.junit.Assert;
 import org.junit.Test;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -97,8 +97,8 @@ public class TestOMVolumeRemoveAclRequest extends TestOMVolumeRequest {
         omMetadataManager.getVolumeTable().get(volumeKey);
     // As request is valid volume table should have entry.
     Assert.assertNotNull(omVolumeArgs);
-    OmOzoneAclMap aclMapBeforeRemove = omVolumeArgs.getAclMap();
-    Assert.assertEquals(acl, aclMapBeforeRemove.getAcl().get(0));
+    List<OzoneAcl> aclsBeforeRemove = omVolumeArgs.getAcls();
+    Assert.assertEquals(acl, aclsBeforeRemove.get(0));
 
     OMClientResponse omClientRemoveResponse =
         omVolumeRemoveAclRequest.validateAndUpdateCache(ozoneManager, 2,
@@ -110,9 +110,9 @@ public class TestOMVolumeRemoveAclRequest extends TestOMVolumeRequest {
         omRemoveAclResponse.getStatus());
 
     // acl is removed from aclMapAfterSet
-    OmOzoneAclMap aclMapAfterRemove = omMetadataManager
-        .getVolumeTable().get(volumeKey).getAclMap();
-    Assert.assertEquals(0, aclMapAfterRemove.getAcl().size());
+    List<OzoneAcl> aclsAfterRemove = omMetadataManager
+        .getVolumeTable().get(volumeKey).getAcls();
+    Assert.assertEquals(0, aclsAfterRemove.size());
   }
 
   @Test

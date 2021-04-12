@@ -281,10 +281,22 @@ public final class ContainerUtils {
     if (msg.hasReadChunk() || msg.hasGetSmallFile()) {
       ContainerCommandResponseProto.Builder builder = msg.toBuilder();
       if (msg.hasReadChunk()) {
-        builder.getReadChunkBuilder().setData(REDACTED);
+        if (msg.getReadChunk().hasData()) {
+          builder.getReadChunkBuilder().setData(REDACTED);
+        }
+        if (msg.getReadChunk().hasDataBuffers()) {
+          builder.getReadChunkBuilder().getDataBuffersBuilder()
+              .addBuffers(REDACTED);
+        }
       }
       if (msg.hasGetSmallFile()) {
-        builder.getGetSmallFileBuilder().getDataBuilder().setData(REDACTED);
+        if (msg.getGetSmallFile().getData().hasData()) {
+          builder.getGetSmallFileBuilder().getDataBuilder().setData(REDACTED);
+        }
+        if (msg.getGetSmallFile().getData().hasDataBuffers()) {
+          builder.getGetSmallFileBuilder().getDataBuilder()
+              .getDataBuffersBuilder().addBuffers(REDACTED);
+        }
       }
       return builder.build();
     }

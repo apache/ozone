@@ -115,6 +115,11 @@ if [ -n "$ENSURE_SCM_INITIALIZED" ]; then
     # Improve om and scm start up options
     /opt/hadoop/bin/ozone scm --init || /opt/hadoop/bin/ozone scm -init
   fi
+elif [ -n "$ENSURE_SCM_BOOTSTRAPPED" ]; then
+  if [ ! -f "$ENSURE_SCM_BOOTSTRAPPED" ]; then
+    # Improve om and scm start up options
+    /opt/hadoop/bin/ozone scm --bootstrap
+  fi
 fi
 
 if [ -n "$ENSURE_OM_INITIALIZED" ]; then

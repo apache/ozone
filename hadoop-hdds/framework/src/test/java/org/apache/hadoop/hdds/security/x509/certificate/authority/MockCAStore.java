@@ -19,9 +19,10 @@
 
 package org.apache.hadoop.hdds.security.x509.certificate.authority;
 
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.cert.X509CertificateHolder;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
+import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
@@ -36,9 +37,18 @@ import java.util.Optional;
 public class MockCAStore implements CertificateStore {
   @Override
   public void storeValidCertificate(BigInteger serialID,
-                                    X509Certificate certificate)
+      X509Certificate certificate, NodeType role)
       throws IOException {
 
+  }
+
+  @Override
+  public void checkValidCertID(BigInteger serialID) throws IOException {
+  }
+
+  @Override
+  public void storeValidScmCertificate(BigInteger serialID,
+      X509Certificate certificate) throws IOException {
   }
 
   @Override
@@ -65,9 +75,12 @@ public class MockCAStore implements CertificateStore {
   }
 
   @Override
-  public List<X509Certificate> listCertificate(HddsProtos.NodeType role,
+  public List<X509Certificate> listCertificate(NodeType role,
       BigInteger startSerialID, int count, CertType certType)
       throws IOException {
     return Collections.emptyList();
   }
+
+  @Override
+  public void reinitialize(SCMMetadataStore metadataStore) {}
 }

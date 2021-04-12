@@ -58,7 +58,7 @@ public class ChunkManagerDispatcher implements ChunkManager {
 
   ChunkManagerDispatcher(boolean sync, BlockManager manager) {
     handlers.put(FILE_PER_CHUNK, new FilePerChunkStrategy(sync, manager));
-    handlers.put(FILE_PER_BLOCK, new FilePerBlockStrategy(sync));
+    handlers.put(FILE_PER_BLOCK, new FilePerBlockStrategy(sync, manager));
   }
 
   @Override

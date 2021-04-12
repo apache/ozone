@@ -160,7 +160,7 @@ public class TestMultiBlockWritesWithDnFailures {
     long containerId = locationInfoList.get(1).getContainerID();
     ContainerInfo container = cluster.getStorageContainerManager()
         .getContainerManager()
-        .getContainer(ContainerID.valueof(containerId));
+        .getContainer(ContainerID.valueOf(containerId));
     Pipeline pipeline =
         cluster.getStorageContainerManager().getPipelineManager()
             .getPipeline(container.getPipelineID());
@@ -207,7 +207,7 @@ public class TestMultiBlockWritesWithDnFailures {
     long containerId = streamEntryList.get(0).getBlockID().getContainerID();
     ContainerInfo container =
         cluster.getStorageContainerManager().getContainerManager()
-            .getContainer(ContainerID.valueof(containerId));
+            .getContainer(ContainerID.valueOf(containerId));
     Pipeline pipeline =
         cluster.getStorageContainerManager().getPipelineManager()
             .getPipeline(container.getPipelineID());
