@@ -127,7 +127,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <jackson2.version>2.12.1</jackson2.version>
 
     <!-- jaegertracing veresion -->
-    <jaeger.version>1.2.0</jaeger.version>
+    <jaeger.version>1.6.0</jaeger.version>
     <opentracing.version>0.33.0</opentracing.version>
 
     <jmh.version>1.19</jmh.version>
@@ -1351,6 +1351,10 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <artifactId>jaeger-client</artifactId>
         <version>${jaeger.version}</version>
         <exclusions>
+          <exclusion>
+            <groupId>org.apache.tomcat.embed</groupId>
+            <artifactId>tomcat-embed-core</artifactId>
+          </exclusion>
           <exclusion>
             <groupId>org.jetbrains.kotlin</groupId>
             <artifactId>kotlin-stdlib</artifactId>
