@@ -40,8 +40,6 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.NodeReportFromDatanode;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
@@ -77,6 +75,7 @@ import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
 import java.util.Map;
+import java.util.function.Predicate;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -217,7 +216,7 @@ public class TestSCMNodeManager {
   }
 
   /**
-   * Tests that Node manager handles layout version changes from heartbeats
+   * Tests that node manager handles layout version changes from heartbeats
    * correctly.
    *
    * @throws IOException
@@ -251,35 +250,38 @@ public class TestSCMNodeManager {
 
   private void assertPipelineClosedAfterLayoutHeartbeat(
       SCMNodeManager nodeManager, LayoutVersionProto layout) throws Exception {
+
+    // Initial condition: 2 healthy nodes registered.
+    assertPipelineCounts(oneCount -> oneCount == 2,
+        threeCount -> threeCount == 0);
+
+    // Even when safemode exit or new node addition trigger pipeline
+    // creation, they will fail with not enough healthy nodes for ratis 3
+    // pipeline. Therefore we do not have to worry about this create call
+    // failing due to datanodes reaching their maximum pipeline limit.
+    assertPipelineCreationFailsWithNotEnoughNodes(2);
+
     // Register a new node correctly.
     DatanodeDetails node = TestUtils
         .createRandomDatanodeAndRegister(nodeManager);
-    // Make a pipeline while nodes are healthy.
-    PipelineID id = scm.getPipelineManager()
-        .createPipeline(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE).getId();
 
-    Pipeline pipeline = scm.getPipelineManager().getPipeline(id);
-    Assert.assertEquals(Pipeline.PipelineState.ALLOCATED,
-        pipeline.getPipelineState());
+    // Safemode exit and adding the new node should trigger pipeline creation.
+    assertPipelineCounts(oneCount -> oneCount == 3,
+        threeCount -> threeCount >= 1);
 
     // node sends incorrect layout.
     nodeManager.processHeartbeat(node, layout);
 
-    // Its pipeline should be closed then removed.
-    LambdaTestUtils.await(5000, 1000, () -> {
-      boolean pipelineRemoved = false;
-      try {
-        scm.getPipelineManager().getPipeline(id);
-      } catch (PipelineNotFoundException ex) {
-        pipelineRemoved = ex.getMessage().contains(id.toString());
-      }
-      return pipelineRemoved;
-    });
+    // Its pipelines should be closed then removed, meaning there is not
+    // enough nodes for factor 3 pipelines.
+    assertPipelineCounts(oneCount -> oneCount == 2,
+        threeCount -> threeCount == 0);
+
+    assertPipelineCreationFailsWithNotEnoughNodes(2);
   }
 
   /**
-   * Tests that Node manager handles layout versions for newly registered nodes
+   * Tests that node manager handles layout versions for newly registered nodes
    * correctly.
    *
    * @throws IOException
@@ -290,9 +292,6 @@ public class TestSCMNodeManager {
   public void testScmLayoutOnRegister()
       throws Exception {
 
-    // Disable automatic pipeline creation.
-    // Lets us test that nodes moving to healthy actually triggers pipeline
-    // creation.
     OzoneConfiguration conf = getConf();
     conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL,
         1, TimeUnit.DAYS);
@@ -316,20 +315,17 @@ public class TestSCMNodeManager {
       Assert.assertEquals(3, nodeManager.getAllNodes().size());
 
       scm.exitSafeMode();
-      try {
-        scm.getPipelineManager()
-            .createPipeline(HddsProtos.ReplicationType.RATIS,
-                HddsProtos.ReplicationFactor.THREE);
-        Assert.fail("3 nodes should not have been found for a pipeline.");
-      } catch (SCMException ex) {
-        Assert.assertTrue(ex.getMessage().contains("Required 3. Found 1."));
-      }
 
       // SCM should auto create a factor 1 pipeline for the one healthy node.
-      LambdaTestUtils.await(5000, 1000, () ->
-          scm.getPipelineManager().getPipelines(
-              HddsProtos.ReplicationType.RATIS,
-                HddsProtos.ReplicationFactor.ONE).size() == 1);
+      // Still should not have enough healthy nodes for ratis 3 pipeline.
+      assertPipelineCounts(oneCount -> oneCount == 1,
+          threeCount -> threeCount == 0);
+
+      // Even when safemode exit or new node addition trigger pipeline
+      // creation, they will fail with not enough healthy nodes for ratis 3
+      // pipeline. Therefore we do not have to worry about this create call
+      // failing due to datanodes reaching their maximum pipeline limit.
+      assertPipelineCreationFailsWithNotEnoughNodes(1);
 
       // Heartbeat bad MLV nodes back to healthy.
       nodeManager.processHeartbeat(badMlvNode1, CORRECT_LAYOUT_PROTO);
@@ -337,20 +333,8 @@ public class TestSCMNodeManager {
 
       // After moving out of healthy readonly, pipeline creation should be
       // triggered.
-      LambdaTestUtils.await(5000, 1000, () -> {
-        int numOne = scm.getPipelineManager()
-            .getPipelines(HddsProtos.ReplicationType.RATIS,
-                HddsProtos.ReplicationFactor.ONE).size();
-        int numThree = scm.getPipelineManager()
-            .getPipelines(HddsProtos.ReplicationType.RATIS,
-                HddsProtos.ReplicationFactor.THREE).size();
-
-        // Moving nodes out of healthy readonly should have triggered
-        // pipeline creation. With 3 healthy nodes, we should have at least one
-        // factor 3 pipeline now, and factor 1s should have been auto created
-        // for all nodes.
-        return (numOne == 3) && (numThree >= 1);
-      });
+      assertPipelineCounts(oneCount -> oneCount == 3,
+          threeCount -> threeCount >= 1);
     }
   }
 
@@ -362,6 +346,37 @@ public class TestSCMNodeManager {
 
     Assert.assertEquals(expectedResult, cmd.getError());
     return cmd.getDatanode();
+  }
+
+  private void assertPipelineCreationFailsWithNotEnoughNodes(
+      int actualNodeCount) throws Exception {
+    try {
+      scm.getPipelineManager()
+          .createPipeline(HddsProtos.ReplicationType.RATIS,
+              HddsProtos.ReplicationFactor.THREE);
+      Assert.fail("3 nodes should not have been found for a pipeline.");
+    } catch (SCMException ex) {
+      Assert.assertTrue(ex.getMessage().contains("Required 3. Found " +
+          actualNodeCount));
+    }
+  }
+
+  private void assertPipelineCounts(Predicate<Integer> factorOneCheck,
+      Predicate<Integer> factorThreeCheck) throws Exception {
+    LambdaTestUtils.await(5000, 1000, () -> {
+      int numOne = scm.getPipelineManager()
+          .getPipelines(HddsProtos.ReplicationType.RATIS,
+              HddsProtos.ReplicationFactor.ONE).size();
+      int numThree = scm.getPipelineManager()
+          .getPipelines(HddsProtos.ReplicationType.RATIS,
+              HddsProtos.ReplicationFactor.THREE).size();
+
+      // Moving nodes out of healthy readonly should have triggered
+      // pipeline creation. With 3 healthy nodes, we should have at least one
+      // factor 3 pipeline now, and factor 1s should have been auto created
+      // for all nodes.
+      return factorOneCheck.test(numOne) && factorThreeCheck.test(numThree);
+    });
   }
 
   /**
