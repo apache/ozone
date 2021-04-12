@@ -252,6 +252,7 @@ public class NodeDecommissionManager {
     if (opState == NodeOperationalState.DECOMMISSIONING
         || opState == NodeOperationalState.ENTERING_MAINTENANCE
         || opState == NodeOperationalState.IN_MAINTENANCE) {
+      LOG.info("Continue admin for datanode {}", dn);
       monitor.startMonitoring(dn);
     }
   }
@@ -375,4 +376,20 @@ public class NodeDecommissionManager {
     return nodeManager.getNodeStatus(dn);
   }
 
+  /**
+   * Called in SCMStateMachine#notifyLeaderChanged when current SCM becomes
+   *  leader.
+   */
+  public void onBecomeLeader() {
+    nodeManager.getAllNodes().forEach(datanodeDetails -> {
+      try {
+        continueAdminForNode(datanodeDetails);
+      } catch (NodeNotFoundException e) {
+        // Should not happen, as the node has just registered to call this event
+        // handler.
+        LOG.warn("NodeNotFound when adding the node to the decommissionManager",
+            e);
+      }
+    });
+  }
 }
