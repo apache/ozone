@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -14,8 +15,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-HDDS_VERSION=${hdds.version}
-OZONE_RUNNER_VERSION=${docker.ozone-runner.version}
-OZONE_IMAGE=apache/ozone-runner:${docker.ozone-runner.version}
-OZONE_DIR=/opt/hadoop
-OZONE_VOLUME=.
+# Fail if required variables are not set.
+set -u
+: "${OZONE_VOLUME}"
+: "${TEST_DIR}"
+set +u
+
+source "$TEST_DIR/testlib.sh"
+
+export COMPOSE_FILE="$TEST_DIR/compose/ha/docker-compose.yaml"
+export OM_SERVICE_ID=omservice
+create_data_dirs "${OZONE_VOLUME}"/{om1,om2,om3,dn1,dn2,dn3,recon,s3g,scm}

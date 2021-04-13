@@ -15,27 +15,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Version that will be run using the local build.
-: "${OZONE_CURRENT_VERSION:=1.1.0}"
-export OZONE_CURRENT_VERSION
+# Fail if required variables are not set.
+set -u
+: "${OZONE_VOLUME}"
+: "${TEST_DIR}"
+set +u
 
-TEST_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )
 source "$TEST_DIR/testlib.sh"
 
-# Export variables needed by tests and ../testlib.sh.
-export TEST_DIR
-export COMPOSE_DIR="$TEST_DIR"
-
-RESULT_DIR="$ALL_RESULT_DIR" create_results_dir
-
-# Upgrade tests to be run.
-# Run all upgrades even if one fails.
-# Any failure will save a failing return code to $RESULT.
-set +e
-run_test manual-upgrade 0.5.0 1.1.0
-run_test non-rolling-upgrade 1.0.0 1.1.0
-set -e
-
-generate_report "upgrade" "$ALL_RESULT_DIR"
-
-exit "$RESULT"
+export COMPOSE_FILE="$TEST_DIR/compose/non-ha/docker-compose.yaml"
+create_data_dirs "${OZONE_VOLUME}"/{om,dn1,dn2,dn3,recon,s3g,scm}
