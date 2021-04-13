@@ -41,6 +41,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMHAInvocationHandler;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
+import org.apache.hadoop.hdds.security.x509.certificate.CertInfo;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CRLApprover;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
@@ -174,8 +175,12 @@ public final class SCMCertStore implements CertificateStore {
           // only if the revocation time has passed.
           if (now.after(revocationTime) || now.equals(revocationTime)) {
             for (X509Certificate cert : certsToRevoke) {
-              scmMetadataStore.getRevokedCertsTable()
-                  .putWithBatch(batch, cert.getSerialNumber(), cert);
+              CertInfo certInfo = new CertInfo.Builder()
+                  .setX509Certificate(cert)
+                  .setTimestamp(now.getTime())
+                  .build();
+              scmMetadataStore.getRevokedCertsV2Table()
+                  .putWithBatch(batch, cert.getSerialNumber(), certInfo);
               scmMetadataStore.getValidCertsTable()
                   .deleteWithBatch(batch, cert.getSerialNumber());
             }
@@ -214,63 +219,74 @@ public final class SCMCertStore implements CertificateStore {
     if (certType == VALID_CERTS) {
       return scmMetadataStore.getValidCertsTable().get(serialID);
     } else {
-      return scmMetadataStore.getRevokedCertsTable().get(serialID);
+      CertInfo certInfo = getRevokedCertificateInfoByID(serialID);
+      return certInfo != null ? certInfo.getX509Certificate() : null;
     }
+  }
+
+  @Override
+  public CertInfo getRevokedCertificateInfoByID(BigInteger serialID)
+      throws IOException {
+    return scmMetadataStore.getRevokedCertsV2Table().get(serialID);
   }
 
   @Override
   public List<X509Certificate> listCertificate(NodeType role,
       BigInteger startSerialID, int count, CertType certType)
       throws IOException {
-
+    List<X509Certificate> results = new ArrayList<>();
+    String errorMessage = "Fail to list certificate from SCM metadata store";
     Preconditions.checkNotNull(startSerialID);
 
     if (startSerialID.longValue() == 0) {
       startSerialID = null;
     }
 
-    List<? extends Table.KeyValue<BigInteger, X509Certificate>> certs =
-        getCertTableList(role, certType, startSerialID, count);
+    if (certType == VALID_CERTS) {
+      List<? extends Table.KeyValue<BigInteger, X509Certificate>> certs =
+          getValidCertTableList(role, startSerialID, count);
 
-    List<X509Certificate> results = new ArrayList<>(certs.size());
+      for (Table.KeyValue<BigInteger, X509Certificate> kv : certs) {
+        try {
+          X509Certificate cert = kv.getValue();
+          results.add(cert);
+        } catch (IOException e) {
+          LOG.error(errorMessage, e);
+          throw new SCMSecurityException(errorMessage);
+        }
+      }
+    } else {
+      List<? extends Table.KeyValue<BigInteger, CertInfo>> certs =
+          scmMetadataStore.getRevokedCertsV2Table().getRangeKVs(
+          startSerialID, count);
 
-    for (Table.KeyValue<BigInteger, X509Certificate> kv : certs) {
-      try {
-        X509Certificate cert = kv.getValue();
-        results.add(cert);
-      } catch (IOException e) {
-        LOG.error("Fail to list certificate from SCM metadata store", e);
-        throw new SCMSecurityException(
-            "Fail to list certificate from SCM metadata store.");
+      for (Table.KeyValue<BigInteger, CertInfo> kv : certs) {
+        try {
+          CertInfo certInfo = kv.getValue();
+          X509Certificate cert = certInfo != null ?
+              certInfo.getX509Certificate() : null;
+          results.add(cert);
+        } catch (IOException e) {
+          LOG.error(errorMessage, e);
+          throw new SCMSecurityException(errorMessage);
+        }
       }
     }
     return results;
   }
 
   private List<? extends Table.KeyValue<BigInteger, X509Certificate>>
-      getCertTableList(NodeType role, CertType certType,
-      BigInteger startSerialID, int count)
+      getValidCertTableList(NodeType role, BigInteger startSerialID, int count)
       throws IOException {
     // Implemented for role SCM and CertType VALID_CERTS.
-    // TODO: Implement for role OM/Datanode and for SCM for CertType
-    //  REVOKED_CERTS.
+    // TODO: Implement for role OM/Datanode
 
     if (role == SCM) {
-      if (certType == VALID_CERTS) {
-        return scmMetadataStore.getValidSCMCertsTable().getRangeKVs(
-            startSerialID, count);
-      } else {
-        return scmMetadataStore.getRevokedCertsTable().getRangeKVs(
-            startSerialID, count);
-      }
+      return scmMetadataStore.getValidSCMCertsTable().getRangeKVs(
+          startSerialID, count);
     } else {
-      if (certType == VALID_CERTS) {
-        return scmMetadataStore.getValidCertsTable().getRangeKVs(
-            startSerialID, count);
-      } else {
-        return scmMetadataStore.getRevokedCertsTable().getRangeKVs(
-            startSerialID, count);
-      }
+      return scmMetadataStore.getValidCertsTable().getRangeKVs(
+          startSerialID, count);
     }
   }
 

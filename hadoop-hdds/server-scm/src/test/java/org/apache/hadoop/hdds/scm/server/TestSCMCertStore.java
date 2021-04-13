@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.x509.certificate.CertInfo;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CRLApprover;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.DefaultCRLApprover;
@@ -147,9 +148,12 @@ public class TestSCMCertStore {
         scmCertStore.getCertificateByID(serialID,
             VALID_CERTS));
 
-    assertNotNull(
-        scmCertStore.getCertificateByID(serialID,
-            CertificateStore.CertType.REVOKED_CERTS));
+    CertInfo certInfo = scmCertStore.getRevokedCertificateInfoByID(serialID);
+
+    assertNotNull(certInfo);
+    assertNotNull(certInfo.getX509Certificate());
+    assertTrue("Timestamp should be greater than 0",
+        certInfo.getTimestamp() > 0L);
 
     // CRL Info table should have a CRL with sequence id
     assertNotNull(scmMetadataStore.getCRLInfoTable()
@@ -225,7 +229,7 @@ public class TestSCMCertStore {
 
     // Revoked certs table should have 3 certs
     assertEquals(3L,
-        getTableSize(scmMetadataStore.getRevokedCertsTable().iterator()));
+        getTableSize(scmMetadataStore.getRevokedCertsV2Table().iterator()));
   }
 
   @Test
@@ -254,8 +258,7 @@ public class TestSCMCertStore {
             VALID_CERTS));
 
     assertNull(
-        scmCertStore.getCertificateByID(serialID,
-            CertificateStore.CertType.REVOKED_CERTS));
+        scmCertStore.getRevokedCertificateInfoByID(serialID));
   }
 
   private X509Certificate generateX509Cert() throws Exception {
