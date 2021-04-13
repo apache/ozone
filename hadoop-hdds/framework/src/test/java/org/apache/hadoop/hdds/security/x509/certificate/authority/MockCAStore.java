@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.hdds.security.x509.certificate.authority;
 
+import org.apache.hadoop.hdds.security.x509.certificate.CertInfo;
 import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
@@ -70,6 +71,12 @@ public class MockCAStore implements CertificateStore {
   @Override
   public X509Certificate getCertificateByID(BigInteger serialID,
                                             CertType certType)
+      throws IOException {
+    return null;
+  }
+
+  @Override
+  public CertInfo getRevokedCertificateInfoByID(BigInteger serialID)
       throws IOException {
     return null;
   }
