@@ -215,7 +215,7 @@ public class TestHDDSUpgrade {
         int pipelineCount = scmPipelineManager.getPipelines(RATIS, THREE, OPEN)
             .size();
         if (pipelineCount >= 1) {
-            return true;
+          return true;
         }
         return false;
       }, 500, 60000);
