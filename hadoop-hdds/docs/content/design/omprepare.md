@@ -39,7 +39,20 @@ author: Aravindan Vijayan
  * For an OM that is not operational during the prepare step, it should get a
   Ratis snapshot (entire OM RocksDB) to get up to speed with the rest of the OMs after the upgrade.
 
-  
+# Usage
+
+## How do you prepare an Ozone manager quorum
+    ozone admin om -id=<om-sevice-id> prepare
+    
+This leaves the Ozone manager in a state where it cannot accept new writes.
+
+## How do you cancel a "prepared" Ozone manager quorum
+
+In the case of a cancelled upgrade, the OM can be brought out off the
+prepared state by using the following command.
+ 
+    ozone admin om -id=<om-sevice-id> cancelprepare
+
 # Link
 
   https://issues.apache.org/jira/secure/attachment/13015491/OM%20Prepare%20Upgrade.pdf
