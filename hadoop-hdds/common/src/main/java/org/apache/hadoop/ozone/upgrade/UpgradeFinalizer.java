@@ -188,12 +188,6 @@ public interface UpgradeFinalizer<T> {
       throws IOException;
 
   /**
-   * Sets the Finalization Executor driver.
-   * @param executor FinalizationExecutor.
-   */
-  void setFinalizationExecutor(DefaultUpgradeFinalizationExecutor executor);
-
-  /**
    * get the Finalization Executor driver.
    */
   DefaultUpgradeFinalizationExecutor getFinalizationExecutor();

@@ -32,8 +32,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Failure injected extension of DefaultUpgradeFinalizationExecutor that can be used by
- * Unit/Integration Tests.
+ * Failure injected extension of DefaultUpgradeFinalizationExecutor that
+ * can be used by Unit/Integration Tests.
  */
 @SuppressWarnings("checkstyle:VisibilityModifier")
 public class InjectedUpgradeFinalizationExecutor extends

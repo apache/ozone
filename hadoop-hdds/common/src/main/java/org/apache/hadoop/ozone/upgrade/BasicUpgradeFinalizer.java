@@ -68,8 +68,13 @@ public abstract class BasicUpgradeFinalizer
         new DefaultUpgradeFinalizationExecutor();
   }
 
-  @Override
-  public void setFinalizationExecutor(DefaultUpgradeFinalizationExecutor executor) {
+  /**
+   * Sets the Finalization Executor driver.
+   * @param executor FinalizationExecutor.
+   */
+
+  public void setFinalizationExecutor(DefaultUpgradeFinalizationExecutor
+                                          executor) {
     finalizationExecutor = executor;
   }
 
