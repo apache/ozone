@@ -44,6 +44,7 @@ import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.CRLS;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.CRL_SEQUENCE_ID;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.DELETED_BLOCKS;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.PIPELINES;
+import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.REVOKED_CERTS;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.REVOKED_CERTS_V2;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.TRANSACTIONINFO;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.VALID_CERTS;
@@ -67,7 +68,9 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
 
   private Table<BigInteger, X509Certificate> validSCMCertsTable;
 
-  private Table<BigInteger, CertInfo> revokedCertsTable;
+  private Table<BigInteger, X509Certificate> revokedCertsTable;
+
+  private Table<BigInteger, CertInfo> revokedCertsV2Table;
 
   private Table<ContainerID, ContainerInfo> containerTable;
 
@@ -136,9 +139,13 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
 
       checkTableStatus(validSCMCertsTable, VALID_SCM_CERTS.getName());
 
-      revokedCertsTable = REVOKED_CERTS_V2.getTable(store);
+      revokedCertsTable = REVOKED_CERTS.getTable(store);
 
-      checkTableStatus(revokedCertsTable, REVOKED_CERTS_V2.getName());
+      checkTableStatus(revokedCertsTable, REVOKED_CERTS.getName());
+
+      revokedCertsV2Table = REVOKED_CERTS_V2.getTable(store);
+
+      checkTableStatus(revokedCertsV2Table, REVOKED_CERTS_V2.getName());
 
       pipelineTable = PIPELINES.getTable(store);
 
@@ -180,7 +187,6 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
     return deletedBlocksTable;
   }
 
-
   @Override
   public Table<BigInteger, X509Certificate> getValidCertsTable() {
     return validCertsTable;
@@ -192,8 +198,13 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
   }
 
   @Override
-  public Table<BigInteger, CertInfo> getRevokedCertsTable() {
+  public Table<BigInteger, X509Certificate> getRevokedCertsTable() {
     return revokedCertsTable;
+  }
+
+  @Override
+  public Table<BigInteger, CertInfo> getRevokedCertsV2Table() {
+    return revokedCertsV2Table;
   }
 
   /**

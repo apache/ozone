@@ -81,6 +81,7 @@ public interface CertificateStore {
    * Otherwise, returns the newly generated CRL sequence ID.
    * @throws IOException - on failure.
    */
+  @Replicate
   Optional<Long> revokeCertificates(List<BigInteger> serialIDs,
                                     X509CertificateHolder caCertificateHolder,
                                     CRLReason reason,

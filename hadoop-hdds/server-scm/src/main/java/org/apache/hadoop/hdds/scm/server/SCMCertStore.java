@@ -179,7 +179,7 @@ public final class SCMCertStore implements CertificateStore {
                   .setX509Certificate(cert)
                   .setTimestamp(now.getTime())
                   .build();
-              scmMetadataStore.getRevokedCertsTable()
+              scmMetadataStore.getRevokedCertsV2Table()
                   .putWithBatch(batch, cert.getSerialNumber(), certInfo);
               scmMetadataStore.getValidCertsTable()
                   .deleteWithBatch(batch, cert.getSerialNumber());
@@ -227,7 +227,7 @@ public final class SCMCertStore implements CertificateStore {
   @Override
   public CertInfo getRevokedCertificateInfoByID(BigInteger serialID)
       throws IOException {
-    return scmMetadataStore.getRevokedCertsTable().get(serialID);
+    return scmMetadataStore.getRevokedCertsV2Table().get(serialID);
   }
 
   @Override
@@ -257,7 +257,7 @@ public final class SCMCertStore implements CertificateStore {
       }
     } else {
       List<? extends Table.KeyValue<BigInteger, CertInfo>> certs =
-          scmMetadataStore.getRevokedCertsTable().getRangeKVs(
+          scmMetadataStore.getRevokedCertsV2Table().getRangeKVs(
           startSerialID, count);
 
       for (Table.KeyValue<BigInteger, CertInfo> kv : certs) {

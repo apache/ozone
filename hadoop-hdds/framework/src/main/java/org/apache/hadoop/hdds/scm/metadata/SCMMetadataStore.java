@@ -89,11 +89,21 @@ public interface SCMMetadataStore extends DBStoreHAManager {
   Table<BigInteger, X509Certificate> getValidSCMCertsTable();
 
   /**
+   * This method is Deprecated in favor of getRevokedCertsV2Table().
    * A Table that maintains all revoked certificates until they expire.
    *
    * @return Table.
    */
-  Table<BigInteger, CertInfo> getRevokedCertsTable();
+  @Deprecated
+  Table<BigInteger, X509Certificate> getRevokedCertsTable();
+
+  /**
+   * A Table that maintains all revoked certificates and the time of
+   * revocation until they expire.
+   *
+   * @return Table.
+   */
+  Table<BigInteger, CertInfo> getRevokedCertsV2Table();
 
   /**
    * A table that maintains X509 Certificate Revocation Lists and its metadata.

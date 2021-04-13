@@ -100,7 +100,12 @@ public class TestSCMStoreImplWithOldPipelineIDKeyFormat
   }
 
   @Override
-  public Table<BigInteger, CertInfo> getRevokedCertsTable() {
+  public Table<BigInteger, X509Certificate> getRevokedCertsTable() {
+    return null;
+  }
+
+  @Override
+  public Table<BigInteger, CertInfo> getRevokedCertsV2Table() {
     return null;
   }
 

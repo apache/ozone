@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
+import java.io.Serializable;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.Comparator;
@@ -33,9 +34,10 @@ import java.util.Objects;
  * Class that wraps Certificate Info.
  */
 public class CertInfo implements Comparator<CertInfo>,
-    Comparable<CertInfo> {
+    Comparable<CertInfo>, Serializable {
 
   private X509Certificate x509Certificate;
+  // Timestamp when the certificate got persisted in the DB.
   private long timestamp;
 
   private CertInfo(X509Certificate x509Certificate, long timestamp) {
