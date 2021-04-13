@@ -229,7 +229,7 @@ public class TestSCMCertStore {
 
     // Revoked certs table should have 3 certs
     assertEquals(3L,
-        getTableSize(scmMetadataStore.getRevokedCertsTable().iterator()));
+        getTableSize(scmMetadataStore.getRevokedCertsV2Table().iterator()));
   }
 
   @Test
