@@ -35,7 +35,6 @@ import org.rocksdb.DBOptions;
 import org.rocksdb.LRUCache;
 import org.rocksdb.Statistics;
 import org.rocksdb.StatsLevel;
-import org.rocksdb.util.SizeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -245,7 +244,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
         StorageUnit.BYTES);
 
     BlockBasedTableConfig tableConfig = new BlockBasedTableConfig();
-    tableConfig.setBlockCache(new LRUCache(cacheSize * SizeUnit.MB))
+    tableConfig.setBlockCache(new LRUCache(cacheSize))
         .setPinL0FilterAndIndexBlocksInCache(true)
         .setFilterPolicy(new BloomFilter());
 
