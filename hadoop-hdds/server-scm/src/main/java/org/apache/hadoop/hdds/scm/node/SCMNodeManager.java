@@ -423,7 +423,7 @@ public class SCMNodeManager implements NodeManager {
    *
    * On follower SCM, datanode notifies follower SCM its latest operational
    * state or expiry via heartbeat. If the operational state or expiry
-   * reported in the datanode heartbeat do not match those store in SCM,
+   * reported in the datanode heartbeat do not match those stored in SCM,
    * just update the state in follower SCM accordingly.
    *
    * @param reportedDn The DatanodeDetails taken from the node heartbeat.
