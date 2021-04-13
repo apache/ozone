@@ -431,19 +431,6 @@ public class TestHDDSUpgrade {
     store.getVolume("vol1").getBucket("buc1").createKey("key1", 100,
         ReplicationType.RATIS, ReplicationFactor.THREE, new HashMap<>());
 
-    // Need to wait for post finalization heartbeat from DNs.
-    LambdaTestUtils.await(30000, 1000, () -> {
-      try {
-        testDataNodesStateOnSCM(HEALTHY, null);
-      } catch (Throwable ex) {
-        LOG.info(ex.getMessage());
-        return false;
-      }
-      return true;
-    });
-
-    // Verify that new pipeline can be created with upgraded datanodes.
-    testPostUpgradePipelineCreation();
   }
 
   /*
@@ -470,6 +457,21 @@ public class TestHDDSUpgrade {
       cluster.restartStorageContainerManager(true);
       loadSCMState();
     }
+    // The ongoing current SCM Upgrade is getting aborted at this point. We
+    // need to schedule a new SCM Upgrade on a different thread context.
+    Thread t = new Thread(new Runnable() {
+      @Override
+      public void run() {
+        try {
+          loadSCMState();
+          scm.finalizeUpgrade("xyz");
+        } catch (IOException e) {
+          e.printStackTrace();
+          testPassed.set(false);
+        }
+      }
+    });
+    t.start();
     return true;
   }
 
