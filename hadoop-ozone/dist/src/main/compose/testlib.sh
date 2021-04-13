@@ -110,7 +110,7 @@ wait_for_om_leader() {
 
   #Don't give it up until 120 seconds
   while [[ $SECONDS -lt 120 ]]; do
-    local command="ozone admin om roles --service-id '${OM_SERVICE_ID}'"
+    local command="ozone admin om getserviceroles --service-id '${OM_SERVICE_ID}'"
     if [[ "${SECURITY_ENABLED}" == 'true' ]]; then
       status=$(docker-compose exec -T ${SCM} bash -c "kinit -k scm/${SCM}@EXAMPLE.COM -t /etc/security/keytabs/scm.keytab && $command" | grep LEADER)
     else
@@ -144,7 +144,7 @@ start_docker_env(){
   if ! { docker-compose --no-ansi up -d --scale datanode="${datanode_count}" \
       && wait_for_safemode_exit \
       && wait_for_om_leader ; }; then
-    OUTPUT_NAME="$COMPOSE_ENV_NAME"
+    [[ -n "$OUTPUT_NAME" ]] || OUTPUT_NAME="$COMPOSE_ENV_NAME"
     stop_docker_env
     return 1
   fi
@@ -163,7 +163,7 @@ execute_robot_test(){
   TEST_NAME=$(basename "$TEST")
   TEST_NAME="$(basename "$COMPOSE_DIR")-${TEST_NAME%.*}"
   set +e
-  OUTPUT_NAME="$COMPOSE_ENV_NAME-$TEST_NAME-$CONTAINER"
+  [[ -n "$OUTPUT_NAME" ]] || OUTPUT_NAME="$COMPOSE_ENV_NAME-$TEST_NAME-$CONTAINER"
 
   # find unique filename
   declare -i i=0
@@ -319,6 +319,11 @@ copy_results() {
 
 run_test_script() {
   local d="$1"
+  local test_script="$2"
+
+  if [[ -z "$test_script" ]]; then
+    test_script=./test.sh
+  fi
 
   echo "Executing test in ${d}"
 
@@ -326,7 +331,7 @@ run_test_script() {
   cd "${d}" || return
 
   ret=0
-  if ! ./test.sh; then
+  if ! "$test_script"; then
     ret=1
     echo "ERROR: Test execution of ${d} is FAILED!!!!"
   fi
@@ -388,15 +393,6 @@ prepare_for_runner_image() {
 
   export OZONE_DIR=/opt/hadoop
   export OZONE_IMAGE="apache/ozone-runner:${v}"
-}
-
-## @description Print the logical version for a specific release
-## @param the release for which logical version should be printed
-get_logical_version() {
-  local v="$1"
-
-  # shellcheck source=/dev/null
-  echo $(source "${_testlib_dir}/versions/${v}.sh" && ozone_logical_version)
 }
 
 ## @description Activate the version-specific behavior for a given release
