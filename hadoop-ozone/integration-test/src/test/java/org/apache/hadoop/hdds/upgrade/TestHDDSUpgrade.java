@@ -210,6 +210,18 @@ public class TestHDDSUpgrade {
 
     // SCM should not return from finalization until there is at least one
     // pipeline to use.
+    try {
+      GenericTestUtils.waitFor(() -> {
+        int pipelineCount = scmPipelineManager.getPipelines(RATIS, THREE, OPEN)
+            .size();
+        if (pipelineCount >= 1) {
+            return true;
+        }
+        return false;
+      }, 500, 60000);
+    } catch (TimeoutException | InterruptedException e) {
+      Assert.fail("Timeout waiting for Upgrade to complete on SCM.");
+    }
     int pipelineCount = scmPipelineManager.getPipelines(RATIS, THREE, OPEN)
         .size();
     Assert.assertTrue(pipelineCount >= 1);
