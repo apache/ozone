@@ -261,12 +261,12 @@ public class TestNodeDecommissionManager {
 
     // Put 1 node into entering_maintenance, 1 node into decommissioning
     // and 1 node into in_maintenance.
-    nodeManager.setNodeOperationalState(
-        dns.get(1), HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE, maintenanceEnd);
-    nodeManager.setNodeOperationalState(
-        dns.get(2), HddsProtos.NodeOperationalState.DECOMMISSIONING, 0);
-    nodeManager.setNodeOperationalState(
-        dns.get(3), HddsProtos.NodeOperationalState.IN_MAINTENANCE, maintenanceEnd);
+    nodeManager.setNodeOperationalState(dns.get(1),
+        HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE, maintenanceEnd);
+    nodeManager.setNodeOperationalState(dns.get(2),
+        HddsProtos.NodeOperationalState.DECOMMISSIONING, 0);
+    nodeManager.setNodeOperationalState(dns.get(3),
+        HddsProtos.NodeOperationalState.IN_MAINTENANCE, maintenanceEnd);
 
     // trackedNodes should be empty now.
     assertEquals(decom.getMonitor().getTrackedNodes().size(), 0);
