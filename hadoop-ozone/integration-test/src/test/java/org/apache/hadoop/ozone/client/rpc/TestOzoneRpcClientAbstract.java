@@ -46,11 +46,13 @@ import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OmUtils;
@@ -135,6 +137,8 @@ import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.slf4j.event.Level.DEBUG;
+
 import org.junit.Test;
 
 /**
@@ -1486,6 +1490,93 @@ public abstract class TestOzoneRpcClientAbstract {
       fail("Reading corrupted data should fail.");
     } catch (IOException e) {
       GenericTestUtils.assertExceptionContains("Checksum mismatch", e);
+    }
+  }
+
+  @Test
+  public void testReadKeyWithUnhealthyContainerReplia() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+
+    String value = "sample value";
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+    String keyName1 = UUID.randomUUID().toString();
+
+    // Write first key
+    OzoneOutputStream out = bucket.createKey(keyName1,
+        value.getBytes(UTF_8).length, ReplicationType.RATIS,
+        THREE, new HashMap<>());
+    out.write(value.getBytes(UTF_8));
+    out.close();
+
+    // Write second key
+    String keyName2 = UUID.randomUUID().toString();
+    value = "unhealthy container replica";
+    out = bucket.createKey(keyName2,
+        value.getBytes(UTF_8).length, ReplicationType.RATIS,
+        THREE, new HashMap<>());
+    out.write(value.getBytes(UTF_8));
+    out.close();
+
+    // Find container ID
+    OzoneKey key = bucket.getKey(keyName2);
+    long containerID = ((OzoneKeyDetails) key).getOzoneKeyLocations().get(0)
+        .getContainerID();
+
+    // Set container replica to UNHEALTHY
+    Container container = null;
+    int index = 0;
+    for (HddsDatanodeService hddsDatanode : cluster.getHddsDatanodes()) {
+      container = hddsDatanode.getDatanodeStateMachine().getContainer()
+          .getContainerSet().getContainer(containerID);
+      Assert.assertNotNull("Container not found", container);
+      container.markContainerUnhealthy();
+      // Change first and second replica commit sequenceId
+      if (index < cluster.getHddsDatanodes().size() - 1) {
+        long newBCSID = container.getBlockCommitSequenceId() - 1;
+        try(ReferenceCountedDB db = BlockUtils.getDB(
+            (KeyValueContainerData)container.getContainerData(),
+            cluster.getConf())) {
+          db.getStore().getMetadataTable().put(
+              OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID, newBCSID);
+        }
+        container.updateBlockCommitSequenceId(newBCSID);
+        index++;
+      }
+    }
+
+    // Restart DNs
+    int dnCount = cluster.getHddsDatanodes().size();
+    for (index = 0; index < dnCount; index++) {
+      cluster.restartHddsDatanode(index, true);
+    }
+
+    StorageContainerManager scm = cluster.getStorageContainerManager();
+    long containerId = container.getContainerData().getContainerID();
+    GenericTestUtils.waitFor(() -> {
+      try {
+        ContainerInfo containerInfo = scm.getContainerInfo(containerId);
+        System.out.println("state " + containerInfo.getState());
+        return containerInfo.getState() == HddsProtos.LifeCycleState.CLOSING;
+      } catch (IOException e) {
+        fail("Failed to get container info for " + e.getMessage());
+        return false;
+      }
+    }, 1000, 5000);
+
+    // Try reading keyName2
+    try {
+      GenericTestUtils.setLogLevel(XceiverClientGrpc.getLogger(), DEBUG);
+      OzoneInputStream is = bucket.readKey(keyName2);
+      byte[] content = new byte[100];
+      is.read(content);
+      String retValue = new String(content);
+      Assert.assertTrue(value.equals(retValue.trim()));
+    } catch (IOException e) {
+      fail("Reading unhealthy replica should succeed.");
     }
   }
 
