@@ -22,6 +22,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.Collection;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -185,10 +186,16 @@ public class SCMStateMachine extends BaseStateMachine {
   public CompletableFuture<TermIndex> notifyInstallSnapshotFromLeader(
       RaftProtos.RoleInfoProto roleInfoProto, TermIndex firstTermIndexInLog) {
 
-    String leaderNodeId = RaftPeerId.valueOf(roleInfoProto.getFollowerInfo()
-        .getLeaderInfo().getId().getId()).toString();
+    String leaderNode = roleInfoProto.getFollowerInfo()
+        .getLeaderInfo().getId().getAddress();
+    Optional<SCMNodeDetails> leaderDetails =
+        scm.getSCMHANodeDetails().getPeerNodeDetails().stream().filter(
+            p -> p.getRatisHostPortStr().equals(p.getRatisHostPortStr()))
+            .findFirst();
+    Preconditions.checkNotNull(leaderDetails);
+    final String leaderNodeId = leaderDetails.get().getNodeId();
     LOG.info("Received install snapshot notification from SCM leader: {} with "
-        + "term index: {}", leaderNodeId, firstTermIndexInLog);
+        + "term index: {}", leaderNode, firstTermIndexInLog);
 
     CompletableFuture<TermIndex> future = CompletableFuture.supplyAsync(
         () -> scm.getScmHAManager().installSnapshotFromLeader(leaderNodeId),
