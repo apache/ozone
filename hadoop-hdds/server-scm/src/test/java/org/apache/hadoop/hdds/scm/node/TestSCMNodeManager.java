@@ -316,6 +316,7 @@ public class TestSCMNodeManager {
    * @throws TimeoutException
    */
   @Test
+  @Ignore("HDDS-5098")
   public void testScmDetectStaleAndDeadNode()
       throws IOException, InterruptedException, AuthenticationException {
     final int interval = 100;

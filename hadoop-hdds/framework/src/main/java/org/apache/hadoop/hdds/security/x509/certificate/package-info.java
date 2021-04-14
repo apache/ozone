@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -15,19 +15,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.util;
-
-import org.apache.ratis.util.ExitUtils;
-import org.slf4j.Logger;
 
 /**
- * An Exit Manager used to shutdown service in case of unrecoverable error.
- * This class will be helpful to test exit functionality.
+ * This package contains the common routines used for maintaining
+ * X509 Certificates.
  */
-public class ExitManager {
-
-  public void exitSystem(int status, String message, Throwable throwable,
-      Logger log) {
-    ExitUtils.terminate(status, message, throwable, log);
-  }
-}
+package org.apache.hadoop.hdds.security.x509.certificate;

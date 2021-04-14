@@ -72,12 +72,6 @@ jobs:
     steps:
       - name: Checkout project
         uses: actions/checkout@v2
-      - name: Install bats
-        run: |
-          cd /tmp
-          curl -LSs https://github.com/bats-core/bats-core/archive/v1.2.1.tar.gz | tar xzf -
-          cd bats-core-1.2.1
-          sudo ./install.sh /usr/local
       - name: Execute tests
         run: ./hadoop-ozone/dev-support/checks/${{ github.job }}.sh
       - name: Summary of failures
@@ -217,8 +211,6 @@ jobs:
           mkdir -p /mnt/ozone/hadoop-ozone/dist/target
           tar xzvf hadoop-ozone*.tar.gz -C /mnt/ozone/hadoop-ozone/dist/target
           sudo chmod -R a+rwX /mnt/ozone/hadoop-ozone/dist/target
-      - name: Install robotframework
-        run: sudo pip install robotframework
       - name: Execute tests
         run: |
           cd /mnt/ozone/hadoop-ozone/dist/target/ozone-* && sudo mkdir .aws && sudo chmod 777 .aws && sudo chown 1000 .aws
@@ -322,21 +314,6 @@ jobs:
         run: |
           mkdir -p /mnt/ozone/hadoop-ozone/dist/target
           tar xzvf hadoop-ozone*.tar.gz -C /mnt/ozone/hadoop-ozone/dist/target
-      - name: Install robotframework
-        run: sudo pip install robotframework
-      - name: Install k3s
-        run: curl -sfL https://get.k3s.io | sh -
-      - name: Copy Kubernetes config file
-        run: |
-          sudo mkdir ~/.kube
-          sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
-          sudo chown $(id -u) ~/.kube/config
-      - name: Install flekszible
-        run: |
-          cd /tmp
-          wget https://github.com/elek/flekszible/releases/download/v1.8.1/flekszible_1.8.1_Linux_x86_64.tar.gz -O - | tar -zx
-          chmod +x flekszible
-          sudo mv flekszible /usr/bin/flekszible
       - name: Execute tests
         run: |
           cd /mnt/ozone/hadoop-ozone/dist/target/ozone-* && sudo mkdir .aws && sudo chmod 777 .aws && sudo chown 1000 .aws

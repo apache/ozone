@@ -61,7 +61,7 @@ Setup v4 headers
     Run Keyword if      '${SECURITY_ENABLED}' == 'false'    Setup dummy credentials for S3
 
 Setup secure v4 headers
-    ${result} =         Execute                    ozone s3 getsecret
+    ${result} =         Execute                    ozone s3 getsecret ${OM_HA_PARAM}
     ${accessKey} =      Get Regexp Matches         ${result}     (?<=awsAccessKey=).*
     ${accessKey} =      Get Variable Value         ${accessKey}  sdsdasaasdasd
     ${secret} =         Get Regexp Matches         ${result}     (?<=awsSecret=).*
