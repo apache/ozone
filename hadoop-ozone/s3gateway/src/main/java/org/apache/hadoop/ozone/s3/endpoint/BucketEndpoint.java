@@ -166,8 +166,8 @@ public class BucketEndpoint extends EndpointBase {
           if (!dirName.equals(prevDir)) {
             response.addPrefix(prefix + dirName + delimiter);
             prevDir = dirName;
-            count++;
           }
+          count++;
         } else if (relativeKeyName.endsWith(delimiter)) {
           // means or key is same as prefix with delimiter at end and ends with
           // delimiter. ex: dir/, where prefix is dir and delimiter is /
