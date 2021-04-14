@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.security.x509.certificate.CertInfo;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -44,6 +45,7 @@ import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.CRL_SEQUENCE_I
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.DELETED_BLOCKS;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.PIPELINES;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.REVOKED_CERTS;
+import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.REVOKED_CERTS_V2;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.TRANSACTIONINFO;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.VALID_CERTS;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.VALID_SCM_CERTS;
@@ -67,6 +69,8 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
   private Table<BigInteger, X509Certificate> validSCMCertsTable;
 
   private Table<BigInteger, X509Certificate> revokedCertsTable;
+
+  private Table<BigInteger, CertInfo> revokedCertsV2Table;
 
   private Table<ContainerID, ContainerInfo> containerTable;
 
@@ -139,6 +143,10 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
 
       checkTableStatus(revokedCertsTable, REVOKED_CERTS.getName());
 
+      revokedCertsV2Table = REVOKED_CERTS_V2.getTable(store);
+
+      checkTableStatus(revokedCertsV2Table, REVOKED_CERTS_V2.getName());
+
       pipelineTable = PIPELINES.getTable(store);
 
       checkTableStatus(pipelineTable, PIPELINES.getName());
@@ -179,7 +187,6 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
     return deletedBlocksTable;
   }
 
-
   @Override
   public Table<BigInteger, X509Certificate> getValidCertsTable() {
     return validCertsTable;
@@ -193,6 +200,11 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
   @Override
   public Table<BigInteger, X509Certificate> getRevokedCertsTable() {
     return revokedCertsTable;
+  }
+
+  @Override
+  public Table<BigInteger, CertInfo> getRevokedCertsV2Table() {
+    return revokedCertsV2Table;
   }
 
   /**

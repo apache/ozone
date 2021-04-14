@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.security.x509.certificate.CertInfo;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -66,6 +67,10 @@ public class SCMDBDefinition implements DBDefinition {
           X509Certificate.class,
           new X509CertificateCodec());
 
+  /**
+   * This column family is Deprecated in favor of REVOKED_CERTS_V2.
+   */
+  @Deprecated
   public static final DBColumnFamilyDefinition<BigInteger, X509Certificate>
       REVOKED_CERTS =
       new DBColumnFamilyDefinition<>(
@@ -74,6 +79,15 @@ public class SCMDBDefinition implements DBDefinition {
           new BigIntegerCodec(),
           X509Certificate.class,
           new X509CertificateCodec());
+
+  public static final DBColumnFamilyDefinition<BigInteger, CertInfo>
+      REVOKED_CERTS_V2 =
+      new DBColumnFamilyDefinition<>(
+          "revokedCertsV2",
+          BigInteger.class,
+          new BigIntegerCodec(),
+          CertInfo.class,
+          new CertInfoCodec());
 
   public static final DBColumnFamilyDefinition<PipelineID, Pipeline>
       PIPELINES =
@@ -141,7 +155,7 @@ public class SCMDBDefinition implements DBDefinition {
   @Override
   public DBColumnFamilyDefinition[] getColumnFamilies() {
     return new DBColumnFamilyDefinition[] {DELETED_BLOCKS, VALID_CERTS,
-        VALID_SCM_CERTS, REVOKED_CERTS, PIPELINES, CONTAINERS, TRANSACTIONINFO,
-        CRLS, CRL_SEQUENCE_ID, SEQUENCE_ID};
+        VALID_SCM_CERTS, REVOKED_CERTS, REVOKED_CERTS_V2, PIPELINES, CONTAINERS,
+        TRANSACTIONINFO, CRLS, CRL_SEQUENCE_ID, SEQUENCE_ID};
   }
 }

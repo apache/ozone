@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.OzoneManagerDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ScmNodeDetailsProto;
 import org.apache.hadoop.hdds.scm.ScmConfig;
+import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.security.KerberosInfo;
 
 /**
@@ -131,5 +132,19 @@ public interface SCMSecurityProtocol {
    * @throws IOException
    */
   List<String> listCACertificate() throws IOException;
+
+  /**
+   * Get the CRLInfo based on the CRL Id.
+   * @param crlIds - crl ids
+   * @return list of CRLInfo
+   * @throws IOException
+   */
+  List<CRLInfo> getCrls(List<Long> crlIds) throws IOException;
+
+  /**
+   * Get the latest CRL id.
+   * @return latest CRL id.
+   */
+  long getLatestCrlId() throws IOException;
 
 }
