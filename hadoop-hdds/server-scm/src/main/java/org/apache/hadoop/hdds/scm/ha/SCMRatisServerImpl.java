@@ -247,7 +247,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
    */
   @Override
   public NotLeaderException triggerNotLeaderException() {
-     ByteString leaderId =
+    ByteString leaderId =
         division.getInfo().getRoleInfoProto().getFollowerInfo().getLeaderInfo()
             .getId().getId();
     RaftPeer suggestedLeader = leaderId.isEmpty() ?

@@ -131,7 +131,7 @@ public class SCMBlockLocationFailoverProxyProvider implements
   }
 
   @VisibleForTesting
-  public void changeCurrentProxy(String nodeId) {
+  public synchronized void changeCurrentProxy(String nodeId) {
     currentProxyIndex = scmNodeIds.indexOf(nodeId);
     currentProxySCMNodeId = nodeId;
     nextProxyIndex();

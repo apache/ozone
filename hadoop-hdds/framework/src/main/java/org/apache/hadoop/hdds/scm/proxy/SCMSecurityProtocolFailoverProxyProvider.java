@@ -205,7 +205,7 @@ public class SCMSecurityProtocolFailoverProxyProvider implements
     }
   }
 
-  private boolean assignLeaderToNode(String newLeaderNodeId) {
+  private synchronized boolean assignLeaderToNode(String newLeaderNodeId) {
     if (!currentProxySCMNodeId.equals(newLeaderNodeId)
         && scmProxies.containsKey(newLeaderNodeId)) {
       currentProxySCMNodeId = newLeaderNodeId;

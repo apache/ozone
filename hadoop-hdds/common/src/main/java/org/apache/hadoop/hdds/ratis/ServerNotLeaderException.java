@@ -41,8 +41,8 @@ public class ServerNotLeaderException extends IOException {
 
   public ServerNotLeaderException(RaftPeerId currentPeerId,
       String suggestedLeader) {
-    super("Server:" + currentPeerId + " is not the leader. Suggested leader is" +
-        " Server:" + suggestedLeader + ".");
+    super("Server:" + currentPeerId + " is not the leader. Suggested leader is"
+        + " Server:" + suggestedLeader + ".");
     this.currentPeerId = currentPeerId.toString();
     this.leader = suggestedLeader;
   }

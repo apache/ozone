@@ -222,7 +222,8 @@ public final class SCMHAUtils {
 
     Throwable t = unwrapException(e);
     while (t != null) {
-      for (Class<? extends Exception> clazz : getRetriableWithNoFailoverExceptionList()) {
+      for (Class<? extends Exception> clazz :
+          getRetriableWithNoFailoverExceptionList()) {
         if (clazz.isInstance(t)) {
           return true;
         }
@@ -258,8 +259,8 @@ public final class SCMHAUtils {
     return null;
   }
 
-  public static List<Class<? extends Exception>>
-  getRetriableWithNoFailoverExceptionList() {
+  public static List<Class<? extends
+      Exception>> getRetriableWithNoFailoverExceptionList() {
     return RETRIABLE_WITH_NO_FAILOVER_EXCEPTION_LIST;
   }
 

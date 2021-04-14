@@ -114,7 +114,7 @@ public class TestFailoverWithSCMHA {
             conf);
     scmBlockLocationProtocol.getScmInfo();
     Assert.assertTrue(logCapture.getOutput()
-       .contains("Performing failover to suggested leader"));
+        .contains("Performing failover to suggested leader"));
     scm = getLeader(cluster);
     SCMContainerLocationFailoverProxyProvider proxyProvider =
         new SCMContainerLocationFailoverProxyProvider(conf);

@@ -20,7 +20,7 @@ package org.apache.hadoop.hdds.scm.ha;
 import java.io.IOException;
 
 /**
- * exception for which there should be no retry
+ * exception for which there should be no retry.
  */
 public class NonRetriableException extends IOException {
 
