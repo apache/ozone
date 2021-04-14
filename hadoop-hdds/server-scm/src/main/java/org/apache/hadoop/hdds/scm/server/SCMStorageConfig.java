@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
 
+import static org.apache.hadoop.ozone.OzoneConsts.PRIMARY_SCM_NODE_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_CERT_SERIAL_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.STORAGE_DIR;
@@ -93,5 +94,27 @@ public class SCMStorageConfig extends Storage {
    */
   public String getScmCertSerialId() {
     return getStorageInfo().getProperty(SCM_CERT_SERIAL_ID);
+  }
+
+  /**
+   * Set primary SCM node ID.
+   * @param scmId
+   * @throws IOException
+   */
+  public void setPrimaryScmNodeId(String scmId) throws IOException {
+    getStorageInfo().setProperty(PRIMARY_SCM_NODE_ID, scmId);
+
+  }
+
+  /**
+   * Retrieves the primary SCM node ID from the version file.
+   * @return Primary SCM node ID.
+   */
+  public String getPrimaryScmNodeId() {
+    return getStorageInfo().getProperty(PRIMARY_SCM_NODE_ID);
+  }
+
+  public boolean checkPrimarySCMIdInitialized() {
+    return getPrimaryScmNodeId() != null ? true : false;
   }
 }

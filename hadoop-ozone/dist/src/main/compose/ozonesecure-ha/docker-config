@@ -27,12 +27,19 @@ OZONE-SITE.XML_ozone.om.http-address.id1.om2=om2
 OZONE-SITE.XML_ozone.om.http-address.id1.om3=om3
 OZONE-SITE.XML_ozone.om.ratis.enable=true
 
+OZONE-SITE.XML_ozone.scm.service.ids=scmservice
+OZONE-SITE.XML_ozone.scm.nodes.scmservice=scm1,scm2,scm3
+OZONE-SITE.XML_ozone.scm.address.scmservice.scm1=scm1.org
+OZONE-SITE.XML_ozone.scm.address.scmservice.scm2=scm2.org
+OZONE-SITE.XML_ozone.scm.address.scmservice.scm3=scm3.org
+OZONE-SITE.XML_ozone.scm.ratis.enable=true
+OZONE-SITE.XML_hdds.scm.ha.security.enable=true
+
 OZONE-SITE.XML_ozone.om.volume.listall.allowed=false
 
 OZONE-SITE.XML_ozone.scm.container.size=1GB
 OZONE-SITE.XML_ozone.scm.pipeline.creation.interval=30s
 OZONE-SITE.XML_ozone.scm.pipeline.owner.container.count=1
-OZONE-SITE.XML_ozone.scm.names=scm
 OZONE-SITE.XML_ozone.scm.datanode.id.dir=/data
 OZONE-SITE.XML_ozone.scm.block.client.address=scm
 OZONE-SITE.XML_ozone.metadata.dirs=/data/metadata
@@ -61,7 +68,7 @@ CORE-SITE.XML_hadoop.security.auth_to_local=RULE:[2:$1](testuser2.*) RULE:[2:$1@
 CORE-SITE.XML_hadoop.security.key.provider.path=kms://http@kms:9600/kms
 
 
-OZONE-SITE.XML_hdds.scm.kerberos.principal=scm/scm@EXAMPLE.COM
+OZONE-SITE.XML_hdds.scm.kerberos.principal=scm/_HOST@EXAMPLE.COM
 OZONE-SITE.XML_hdds.scm.kerberos.keytab.file=/etc/security/keytabs/scm.keytab
 OZONE-SITE.XML_ozone.om.kerberos.principal=om/_HOST@EXAMPLE.COM
 OZONE-SITE.XML_ozone.om.kerberos.keytab.file=/etc/security/keytabs/om.keytab
@@ -83,7 +90,7 @@ OZONE-SITE.XML_hdds.datanode.http.auth.type=kerberos
 OZONE-SITE.XML_ozone.s3g.http.auth.type=kerberos
 OZONE-SITE.XML_ozone.recon.http.auth.type=kerberos
 
-OZONE-SITE.XML_hdds.scm.http.auth.kerberos.principal=HTTP/scm@EXAMPLE.COM
+OZONE-SITE.XML_hdds.scm.http.auth.kerberos.principal=HTTP/_HOST@EXAMPLE.COM
 OZONE-SITE.XML_hdds.scm.http.auth.kerberos.keytab=/etc/security/keytabs/HTTP.keytab
 OZONE-SITE.XML_ozone.om.http.auth.kerberos.principal=HTTP/_HOST@EXAMPLE.COM
 OZONE-SITE.XML_ozone.om.http.auth.kerberos.keytab=/etc/security/keytabs/HTTP.keytab

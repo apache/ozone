@@ -41,6 +41,8 @@ import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.ha.RetriableWithNoFailoverException;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolPB;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -52,6 +54,7 @@ import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import com.google.protobuf.ProtocolMessageEnum;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -151,6 +154,11 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
             " in ScmBlockLocationProtocol");
       }
     } catch (IOException e) {
+      if (SCMHAUtils.isRetriableWithNoFailoverException(e)) {
+        throw new ServiceException(new RetriableWithNoFailoverException(e));
+      } else if (e instanceof NotLeaderException) {
+        throw new ServiceException(e);
+      }
       response.setSuccess(false);
       response.setStatus(exceptionToResponseStatus(e));
       if (e.getMessage() != null) {

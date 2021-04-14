@@ -22,13 +22,13 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolPB;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.io.retry.FailoverProxyProvider;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
-import org.apache.hadoop.io.retry.RetryPolicy.RetryAction.RetryDecision;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.net.NetUtils;
@@ -43,8 +43,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import static org.apache.hadoop.io.retry.RetryPolicy.RetryAction.RetryDecision.FAILOVER_AND_RETRY;
 
 /**
  * Failover proxy provider for SCMSecurityProtocol server.
@@ -199,7 +197,7 @@ public class SCMSecurityProtocolFailoverProxyProvider implements
    * @return the new proxy index
    */
   private synchronized int incrementProxyIndex() {
-    currentProxyIndex = (currentProxyIndex + 1) % scmProxies.size();
+    currentProxyIndex = (currentProxyIndex + 1) % scmProxyInfoMap.size();
     currentProxySCMNodeId = scmNodeIds.get(currentProxyIndex);
     return currentProxyIndex;
   }
@@ -233,17 +231,12 @@ public class SCMSecurityProtocolFailoverProxyProvider implements
         // Perform fail over to next proxy, as right now we don't have any
         // suggested leader ID from server, we fail over to next one.
         // TODO: Act based on server response if leader id is passed.
-        performFailoverToNextProxy();
-        return getRetryAction(FAILOVER_AND_RETRY, failovers);
-      }
-
-      private RetryAction getRetryAction(RetryDecision fallbackAction,
-          int failovers) {
-        if (failovers < maxRetryCount) {
-          return new RetryAction(fallbackAction, getRetryInterval());
-        } else {
-          return RetryAction.FAIL;
+        if (!SCMHAUtils.isRetriableWithNoFailoverException(exception)) {
+          performFailoverToNextProxy();
         }
+        return SCMHAUtils
+            .getRetryAction(failovers, retries, exception, maxRetryCount,
+                getRetryInterval());
       }
     };
 

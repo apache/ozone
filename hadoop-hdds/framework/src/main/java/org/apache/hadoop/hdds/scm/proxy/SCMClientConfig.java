@@ -68,7 +68,7 @@ public class SCMClientConfig {
       tags = {OZONE, SCM, CLIENT},
       timeUnit = TimeUnit.MILLISECONDS,
       description = "SCM Client timeout on waiting for the next connection " +
-          "retry to other SCM IP. The default value is set to 2 minutes. "
+          "retry to other SCM IP. The default value is set to 2 seconds. "
   )
   private long retryInterval = 2 * 1000;
 

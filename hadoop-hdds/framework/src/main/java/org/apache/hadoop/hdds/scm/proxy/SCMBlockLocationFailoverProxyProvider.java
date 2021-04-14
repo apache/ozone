@@ -22,10 +22,12 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolPB;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.io.retry.FailoverProxyProvider;
+import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.io.retry.RetryPolicy.RetryAction;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
@@ -70,10 +72,19 @@ public class SCMBlockLocationFailoverProxyProvider implements
   private final int maxRetryCount;
   private final long retryInterval;
 
+  private final UserGroupInformation ugi;
+
 
   public SCMBlockLocationFailoverProxyProvider(ConfigurationSource conf) {
     this.conf = conf;
     this.scmVersion = RPC.getProtocolVersion(ScmBlockLocationProtocolPB.class);
+
+    try {
+      this.ugi = UserGroupInformation.getCurrentUser();
+    } catch (IOException ex) {
+      LOG.error("Unable to fetch user credentials from UGI", ex);
+      throw new RuntimeException(ex);
+    }
 
     // Set some constant for non-HA.
     if (scmServiceId == null) {
@@ -164,15 +175,6 @@ public class SCMBlockLocationFailoverProxyProvider implements
     }
   }
 
-  public RetryAction getRetryAction(int failovers) {
-    if (failovers < maxRetryCount) {
-      return new RetryAction(RetryAction.RetryDecision.FAILOVER_AND_RETRY,
-          getRetryInterval());
-    } else {
-      return RetryAction.FAIL;
-    }
-  }
-
   private synchronized long getRetryInterval() {
     // TODO add exponential backup
     return retryInterval;
@@ -230,10 +232,16 @@ public class SCMBlockLocationFailoverProxyProvider implements
         LegacyHadoopConfigurationSource.asHadoopConfiguration(conf);
     RPC.setProtocolEngine(hadoopConf, ScmBlockLocationProtocolPB.class,
         ProtobufRpcEngine.class);
-    return RPC.getProxy(ScmBlockLocationProtocolPB.class, scmVersion,
-        scmAddress, UserGroupInformation.getCurrentUser(), hadoopConf,
+    // FailoverOnNetworkException ensures that the IPC layer does not attempt
+    // retries on the same OM in case of connection exception. This retry
+    // policy essentially results in TRY_ONCE_THEN_FAIL.
+    RetryPolicy connectionRetryPolicy = RetryPolicies
+        .failoverOnNetworkException(0);
+    return RPC.getProtocolProxy(ScmBlockLocationProtocolPB.class, scmVersion,
+        scmAddress, ugi, hadoopConf,
         NetUtils.getDefaultSocketFactory(hadoopConf),
-        (int)conf.getObject(SCMClientConfig.class).getRpcTimeOut());
+        (int)conf.getObject(SCMClientConfig.class).getRpcTimeOut(),
+        connectionRetryPolicy).getProxy();
   }
 
   public RetryPolicy getSCMBlockLocationRetryPolicy(String newLeader) {
@@ -241,8 +249,11 @@ public class SCMBlockLocationFailoverProxyProvider implements
       @Override
       public RetryAction shouldRetry(Exception e, int retry,
                                      int failover, boolean b) {
-        performFailoverToAssignedLeader(newLeader);
-        return getRetryAction(failover);
+        if (!SCMHAUtils.isRetriableWithNoFailoverException(e)) {
+          performFailoverToAssignedLeader(newLeader);
+        }
+        return SCMHAUtils.getRetryAction(failover, retry, e, maxRetryCount,
+            getRetryInterval());
       }
     };
     return retryPolicy;
