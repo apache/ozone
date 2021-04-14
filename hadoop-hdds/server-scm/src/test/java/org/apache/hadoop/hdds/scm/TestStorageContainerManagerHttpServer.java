@@ -45,12 +45,17 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Test http server os SCM with various HTTP option.
  */
 @RunWith(value = Parameterized.class)
 public class TestStorageContainerManagerHttpServer {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TestStorageContainerManagerHttpServer.class);
   private static final String BASEDIR = GenericTestUtils
       .getTempPath(TestStorageContainerManagerHttpServer.class.getSimpleName());
   private static String keystoresDir;
@@ -130,13 +135,13 @@ public class TestStorageContainerManagerHttpServer {
     if (addr == null) {
       return false;
     }
+    String url = scheme + "://" + NetUtils.getHostPortString(addr) + "/jmx";
     try {
-      URL url =
-          new URL(scheme + "://" + NetUtils.getHostPortString(addr) + "/jmx");
-      URLConnection conn = connectionFactory.openConnection(url);
+      URLConnection conn = connectionFactory.openConnection(new URL(url));
       conn.connect();
       conn.getContent();
     } catch (IOException e) {
+      LOG.info("Cannot access {}", url, e);
       return false;
     }
     return true;
