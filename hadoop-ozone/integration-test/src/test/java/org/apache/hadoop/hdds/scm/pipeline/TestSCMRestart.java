@@ -21,7 +21,7 @@ package org.apache.hadoop.hdds.scm.pipeline;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.junit.AfterClass;
@@ -56,8 +56,8 @@ public class TestSCMRestart {
   private static OzoneConfiguration conf;
   private static Pipeline ratisPipeline1;
   private static Pipeline ratisPipeline2;
-  private static ContainerManager containerManager;
-  private static ContainerManager newContainerManager;
+  private static ContainerManagerV2 containerManager;
+  private static ContainerManagerV2 newContainerManager;
   private static PipelineManager pipelineManager;
 
   /**

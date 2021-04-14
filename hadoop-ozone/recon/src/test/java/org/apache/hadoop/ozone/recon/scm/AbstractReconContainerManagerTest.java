@@ -25,6 +25,11 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdds.scm.ha.MockSCMHADBTransactionBuffer;
+import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -66,6 +71,9 @@ public class AbstractReconContainerManagerTest {
   private ReconPipelineManager pipelineManager;
   private ReconContainerManager containerManager;
   private DBStore store;
+  private SCMHAManager scmhaManager;
+  private SCMContext scmContext;
+  private SequenceIdGenerator sequenceIdGen;
 
   @Before
   public void setUp() throws Exception {
@@ -74,21 +82,33 @@ public class AbstractReconContainerManagerTest {
         temporaryFolder.newFolder().getAbsolutePath());
     conf.set(OZONE_SCM_NAMES, "localhost");
     store = DBStoreBuilder.createDBStore(conf, new ReconSCMDBDefinition());
+    scmhaManager = MockSCMHAManager.getInstance(
+        true, new MockSCMHADBTransactionBuffer(store));
+    sequenceIdGen = new SequenceIdGenerator(
+        conf, scmhaManager, ReconSCMDBDefinition.SEQUENCE_ID.getTable(store));
+    scmContext = SCMContext.emptyContext();
     scmStorageConfig = new ReconStorageConfig(conf);
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     EventQueue eventQueue = new EventQueue();
-    NodeManager nodeManager =
-        new SCMNodeManager(conf, scmStorageConfig, eventQueue, clusterMap);
-    pipelineManager = new ReconPipelineManager(conf, nodeManager,
-        ReconSCMDBDefinition.PIPELINES.getTable(store), eventQueue);
+    NodeManager nodeManager = new SCMNodeManager(conf, scmStorageConfig,
+        eventQueue, clusterMap, scmContext);
+    pipelineManager = ReconPipelineManager.newReconPipelineManager(
+        conf,
+        nodeManager,
+        ReconSCMDBDefinition.PIPELINES.getTable(store),
+        eventQueue,
+        scmhaManager,
+        scmContext);
     containerManager = new ReconContainerManager(
         conf,
-        ReconSCMDBDefinition.CONTAINERS.getTable(store),
         store,
+        ReconSCMDBDefinition.CONTAINERS.getTable(store),
         pipelineManager,
         getScmServiceProvider(),
         mock(ContainerHealthSchemaManager.class),
-        mock(ContainerDBServiceProvider.class));
+        mock(ContainerDBServiceProvider.class),
+        scmhaManager,
+        sequenceIdGen);
   }
 
   @After
@@ -115,7 +135,7 @@ public class AbstractReconContainerManagerTest {
     Pipeline pipeline = getRandomPipeline();
     getPipelineManager().addPipeline(pipeline);
 
-    ContainerID containerID = new ContainerID(100L);
+    ContainerID containerID = ContainerID.valueOf(100L);
     ContainerInfo containerInfo =
         new ContainerInfo.Builder()
             .setContainerID(containerID.getId())
@@ -142,7 +162,7 @@ public class AbstractReconContainerManagerTest {
 
   protected ContainerWithPipeline getTestContainer(LifeCycleState state)
       throws IOException {
-    ContainerID containerID = new ContainerID(100L);
+    ContainerID containerID = ContainerID.valueOf(100L);
     Pipeline pipeline = getRandomPipeline();
     pipelineManager.addPipeline(pipeline);
     ContainerInfo containerInfo =
@@ -161,7 +181,7 @@ public class AbstractReconContainerManagerTest {
   protected ContainerWithPipeline getTestContainer(long id,
                                                    LifeCycleState state)
       throws IOException {
-    ContainerID containerID = new ContainerID(id);
+    ContainerID containerID = ContainerID.valueOf(id);
     Pipeline pipeline = getRandomPipeline();
     pipelineManager.addPipeline(pipeline);
     ContainerInfo containerInfo =

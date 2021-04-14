@@ -24,6 +24,7 @@ import java.util.List;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
@@ -34,32 +35,28 @@ import org.apache.hadoop.hdds.server.events.EventQueue;
 public class MockRatisPipelineProvider extends RatisPipelineProvider {
 
   private boolean autoOpenPipeline;
-  private  boolean isHealthy;
 
-  public MockRatisPipelineProvider(NodeManager nodeManager,
-      PipelineStateManager stateManager, ConfigurationSource conf,
-      EventPublisher eventPublisher, boolean autoOpen) {
-    super(nodeManager, stateManager, conf, eventPublisher);
+  public MockRatisPipelineProvider(
+      NodeManager nodeManager, StateManager stateManager,
+      ConfigurationSource conf, EventPublisher eventPublisher,
+      boolean autoOpen) {
+    super(nodeManager, stateManager,
+        conf, eventPublisher, SCMContext.emptyContext());
     autoOpenPipeline = autoOpen;
   }
 
   public MockRatisPipelineProvider(NodeManager nodeManager,
-      PipelineStateManager stateManager,
+      StateManager stateManager,
       ConfigurationSource conf) {
-    super(nodeManager, stateManager, conf, new EventQueue());
+    super(nodeManager, stateManager,
+        conf, new EventQueue(), SCMContext.emptyContext());
   }
 
-  public MockRatisPipelineProvider(NodeManager nodeManager,
-      PipelineStateManager stateManager,
-      ConfigurationSource conf, boolean isHealthy) {
-    super(nodeManager, stateManager, conf, new EventQueue());
-    this.isHealthy = isHealthy;
-  }
-
-  public MockRatisPipelineProvider(NodeManager nodeManager,
-      PipelineStateManager stateManager, ConfigurationSource conf,
-      EventPublisher eventPublisher) {
-    super(nodeManager, stateManager, conf, eventPublisher);
+  public MockRatisPipelineProvider(
+      NodeManager nodeManager, StateManager stateManager,
+      ConfigurationSource conf, EventPublisher eventPublisher) {
+    super(nodeManager, stateManager,
+        conf, eventPublisher, SCMContext.emptyContext());
     autoOpenPipeline = true;
   }
 
@@ -82,14 +79,16 @@ public class MockRatisPipelineProvider extends RatisPipelineProvider {
           .setFactor(factor)
           .setNodes(initialPipeline.getNodes())
           .build();
-      if (isHealthy) {
-        for (DatanodeDetails datanodeDetails : initialPipeline.getNodes()) {
-          pipeline.reportDatanode(datanodeDetails);
-        }
-        pipeline.setLeaderId(initialPipeline.getFirstNode().getUuid());
-      }
       return pipeline;
     }
+  }
+
+  public static void markPipelineHealthy(Pipeline pipeline)
+      throws IOException {
+    for (DatanodeDetails datanodeDetails : pipeline.getNodes()) {
+      pipeline.reportDatanode(datanodeDetails);
+    }
+    pipeline.setLeaderId(pipeline.getFirstNode().getUuid());
   }
 
   @Override

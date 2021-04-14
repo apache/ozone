@@ -161,7 +161,7 @@ public class TestContainerReplicationEndToEnd {
     long containerID = omKeyLocationInfo.getContainerID();
     PipelineID pipelineID =
         cluster.getStorageContainerManager().getContainerManager()
-            .getContainer(new ContainerID(containerID)).getPipelineID();
+            .getContainer(ContainerID.valueOf(containerID)).getPipelineID();
     Pipeline pipeline =
         cluster.getStorageContainerManager().getPipelineManager()
             .getPipeline(pipelineID);
@@ -169,13 +169,13 @@ public class TestContainerReplicationEndToEnd {
 
     HddsProtos.LifeCycleState containerState =
         cluster.getStorageContainerManager().getContainerManager()
-            .getContainer(new ContainerID(containerID)).getState();
+            .getContainer(ContainerID.valueOf(containerID)).getState();
     LoggerFactory.getLogger(TestContainerReplicationEndToEnd.class).info(
         "Current Container State is {}",  containerState);
     if ((containerState != HddsProtos.LifeCycleState.CLOSING) &&
         (containerState != HddsProtos.LifeCycleState.CLOSED)) {
       cluster.getStorageContainerManager().getContainerManager()
-          .updateContainerState(new ContainerID(containerID),
+          .updateContainerState(ContainerID.valueOf(containerID),
               HddsProtos.LifeCycleEvent.FINALIZE);
     }
     // wait for container to move to OPEN state in SCM

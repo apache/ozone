@@ -39,6 +39,7 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
+import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.junit.AfterClass;
@@ -123,7 +124,7 @@ public class TestCloseContainerByPipeline {
 
     long containerID = omKeyLocationInfo.getContainerID();
     ContainerInfo container = cluster.getStorageContainerManager()
-        .getContainerManager().getContainer(ContainerID.valueof(containerID));
+        .getContainerManager().getContainer(ContainerID.valueOf(containerID));
     Pipeline pipeline = cluster.getStorageContainerManager()
         .getPipelineManager().getPipeline(container.getPipelineID());
     List<DatanodeDetails> datanodes = pipeline.getNodes();
@@ -144,9 +145,12 @@ public class TestCloseContainerByPipeline {
             .getCloseContainerHandler();
     int lastInvocationCount = closeContainerHandler.getInvocationCount();
     //send the order to close the container
+    SCMCommand<?> command = new CloseContainerCommand(
+        containerID, pipeline.getId());
+    command.setTerm(
+        cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
     cluster.getStorageContainerManager().getScmNodeManager()
-        .addDatanodeCommand(datanodeDetails.getUuid(),
-            new CloseContainerCommand(containerID, pipeline.getId()));
+        .addDatanodeCommand(datanodeDetails.getUuid(), command);
     GenericTestUtils
         .waitFor(() -> isContainerClosed(cluster, containerID, datanodeDetails),
             500, 5 * 1000);
@@ -180,7 +184,7 @@ public class TestCloseContainerByPipeline {
 
     long containerID = omKeyLocationInfo.getContainerID();
     ContainerInfo container = cluster.getStorageContainerManager()
-        .getContainerManager().getContainer(ContainerID.valueof(containerID));
+        .getContainerManager().getContainer(ContainerID.valueOf(containerID));
     Pipeline pipeline = cluster.getStorageContainerManager()
         .getPipelineManager().getPipeline(container.getPipelineID());
     List<DatanodeDetails> datanodes = pipeline.getNodes();
@@ -192,9 +196,12 @@ public class TestCloseContainerByPipeline {
 
     // Send the order to close the container, give random pipeline id so that
     // the container will not be closed via RATIS
+    SCMCommand<?> command = new CloseContainerCommand(
+        containerID, pipeline.getId());
+    command.setTerm(
+        cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
     cluster.getStorageContainerManager().getScmNodeManager()
-        .addDatanodeCommand(datanodeDetails.getUuid(),
-            new CloseContainerCommand(containerID, pipeline.getId()));
+        .addDatanodeCommand(datanodeDetails.getUuid(), command);
 
     //double check if it's really closed (waitFor also throws an exception)
     // TODO: change the below line after implementing QUASI_CLOSED to CLOSED
@@ -205,7 +212,7 @@ public class TestCloseContainerByPipeline {
     Assert.assertTrue(isContainerClosed(cluster, containerID, datanodeDetails));
 
     cluster.getStorageContainerManager().getPipelineManager()
-        .finalizeAndDestroyPipeline(pipeline, false);
+        .closePipeline(pipeline, false);
     Thread.sleep(5000);
     // Pipeline close should not affect a container in CLOSED state
     Assert.assertTrue(isContainerClosed(cluster, containerID, datanodeDetails));
@@ -233,7 +240,7 @@ public class TestCloseContainerByPipeline {
 
     long containerID = omKeyLocationInfo.getContainerID();
     ContainerInfo container = cluster.getStorageContainerManager()
-        .getContainerManager().getContainer(ContainerID.valueof(containerID));
+        .getContainerManager().getContainer(ContainerID.valueOf(containerID));
     Pipeline pipeline = cluster.getStorageContainerManager()
         .getPipelineManager().getPipeline(container.getPipelineID());
     List<DatanodeDetails> datanodes = pipeline.getNodes();
@@ -243,9 +250,12 @@ public class TestCloseContainerByPipeline {
     for (DatanodeDetails details : datanodes) {
       Assert.assertFalse(isContainerClosed(cluster, containerID, details));
       //send the order to close the container
+      SCMCommand<?> command = new CloseContainerCommand(
+          containerID, pipeline.getId());
+      command.setTerm(cluster.getStorageContainerManager()
+          .getScmContext().getTermOfLeader());
       cluster.getStorageContainerManager().getScmNodeManager()
-          .addDatanodeCommand(details.getUuid(),
-              new CloseContainerCommand(containerID, pipeline.getId()));
+          .addDatanodeCommand(details.getUuid(), command);
       int index = cluster.getHddsDatanodeIndex(details);
       Container dnContainer = cluster.getHddsDatanodes().get(index)
           .getDatanodeStateMachine().getContainer().getContainerSet()
@@ -296,7 +306,7 @@ public class TestCloseContainerByPipeline {
 
     long containerID = omKeyLocationInfo.getContainerID();
     ContainerInfo container = cluster.getStorageContainerManager()
-        .getContainerManager().getContainer(ContainerID.valueof(containerID));
+        .getContainerManager().getContainer(ContainerID.valueOf(containerID));
     Pipeline pipeline = cluster.getStorageContainerManager()
         .getPipelineManager().getPipeline(container.getPipelineID());
     List<DatanodeDetails> datanodes = pipeline.getNodes();
@@ -308,7 +318,7 @@ public class TestCloseContainerByPipeline {
 
     // close the pipeline
     cluster.getStorageContainerManager()
-        .getPipelineManager().finalizeAndDestroyPipeline(pipeline, false);
+        .getPipelineManager().closePipeline(pipeline, false);
 
     // All the containers in OPEN or CLOSING state should transition to
     // QUASI-CLOSED after pipeline close
@@ -320,9 +330,12 @@ public class TestCloseContainerByPipeline {
 
     // Send close container command from SCM to datanode with forced flag as
     // true
+    SCMCommand<?> command = new CloseContainerCommand(
+        containerID, pipeline.getId(), true);
+    command.setTerm(
+        cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
     cluster.getStorageContainerManager().getScmNodeManager()
-        .addDatanodeCommand(datanodeDetails.getUuid(),
-            new CloseContainerCommand(containerID, pipeline.getId(), true));
+        .addDatanodeCommand(datanodeDetails.getUuid(), command);
     GenericTestUtils
         .waitFor(() -> isContainerClosed(
             cluster, containerID, datanodeDetails), 500, 5 * 1000);

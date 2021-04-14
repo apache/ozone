@@ -93,6 +93,23 @@ public class DatanodeConfiguration {
     this.blockDeletionInterval = duration.toMillis();
   }
 
+  @Config(key = "block.deleting.limit.per.interval",
+      defaultValue = "5000",
+      type = ConfigType.INT,
+      tags = { ConfigTag.SCM, ConfigTag.DELETION },
+      description =
+          "Number of blocks to be deleted in an interval."
+  )
+  private int blockLimitPerInterval = 5000;
+
+  public int getBlockDeletionLimit() {
+    return blockLimitPerInterval;
+  }
+
+  public void setBlockDeletionLimit(int limit) {
+    this.blockLimitPerInterval = limit;
+  }
+
   @PostConstruct
   public void validate() {
     if (replicationMaxStreams < 1) {

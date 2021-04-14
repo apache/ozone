@@ -22,6 +22,7 @@ import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.security.SecurityUtil;
 
 import javax.annotation.Nonnull;
@@ -59,7 +60,7 @@ public final class OzoneS3Util {
     int counter = 0;
     for (String nodeId : omNodeIds) {
       counter++;
-      String rpcAddrKey = OmUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY,
+      String rpcAddrKey = ConfUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY,
           serviceId, nodeId);
       String rpcAddrStr = OmUtils.getOmRpcAddress(configuration, rpcAddrKey);
       if (rpcAddrStr == null || rpcAddrStr.isEmpty()) {

@@ -116,7 +116,6 @@ public class TestSecureOzoneManager {
         LogCapturer.captureLogs(OzoneManager.getLogger());
     OMStorage omStorage = new OMStorage(conf);
     omStorage.setClusterId(clusterId);
-    omStorage.setScmId(scmId);
     omStorage.setOmId(omId);
     omLogs.clearOutput();
 
@@ -206,12 +205,11 @@ public class TestSecureOzoneManager {
     OzoneConfiguration config = new OzoneConfiguration(conf);
     OMStorage omStorage = new OMStorage(config);
     omStorage.setClusterId(clusterId);
-    omStorage.setScmId(scmId);
     omStorage.setOmId(omId);
     config.set(OZONE_OM_ADDRESS_KEY, "om-unknown");
     LambdaTestUtils.intercept(RuntimeException.class, "Can't get SCM signed" +
             " certificate",
-        () -> OzoneManager.initializeSecurity(config, omStorage));
+        () -> OzoneManager.initializeSecurity(config, omStorage, scmId));
   }
 
 }

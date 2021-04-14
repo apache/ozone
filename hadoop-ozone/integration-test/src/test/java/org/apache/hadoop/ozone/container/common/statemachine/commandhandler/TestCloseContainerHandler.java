@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
+import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.test.GenericTestUtils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -108,7 +109,7 @@ public class TestCloseContainerHandler {
         cluster.getOzoneManager().lookupKey(keyArgs).getKeyLocationVersions()
             .get(0).getBlocksLatestVersionOnly().get(0);
 
-    ContainerID containerId = ContainerID.valueof(
+    ContainerID containerId = ContainerID.valueOf(
         omKeyLocationInfo.getContainerID());
     ContainerInfo container = cluster.getStorageContainerManager()
         .getContainerManager().getContainer(containerId);
@@ -120,9 +121,12 @@ public class TestCloseContainerHandler {
     DatanodeDetails datanodeDetails =
         cluster.getHddsDatanodes().get(0).getDatanodeDetails();
     //send the order to close the container
+    SCMCommand<?> command = new CloseContainerCommand(
+        containerId.getId(), pipeline.getId());
+    command.setTerm(
+        cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
     cluster.getStorageContainerManager().getScmNodeManager()
-        .addDatanodeCommand(datanodeDetails.getUuid(),
-            new CloseContainerCommand(containerId.getId(), pipeline.getId()));
+        .addDatanodeCommand(datanodeDetails.getUuid(), command);
 
     GenericTestUtils.waitFor(() ->
             isContainerClosed(cluster, containerId.getId()),
