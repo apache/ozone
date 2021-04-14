@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
@@ -60,6 +61,7 @@ import org.apache.hadoop.ozone.container.replication.SimpleContainerDownloader;
 import org.apache.hadoop.ozone.container.upgrade.DataNodeUpgradeFinalizer;
 import org.apache.hadoop.ozone.container.upgrade.DatanodeMetadataFeatures;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.util.JvmPauseMonitor;
 import org.apache.hadoop.util.Time;
@@ -601,8 +603,7 @@ public class DatanodeStateMachine implements Closeable {
     return layoutStorage;
   }
 
-  @VisibleForTesting
-  public boolean canFinalizeDataNode() {
+  private boolean canFinalizeDataNode() {
     // Lets be sure that we do not have any open container before we return
     // from here. This function should be called in its own finalizer thread
     // context.
@@ -610,10 +611,13 @@ public class DatanodeStateMachine implements Closeable {
         getContainer().getController().getContainers();
     while (containerIt.hasNext()) {
       Container ctr = containerIt.next();
-      switch (ctr.getContainerState()) {
+      State state = ctr.getContainerState();
+      switch (state) {
       case OPEN:
       case CLOSING:
       case UNHEALTHY:
+        LOG.warn("FinalizeUpgrade : Waiting for container to close, current " +
+            "state is: {}", state);
         return false;
       default:
         continue;
@@ -641,5 +645,8 @@ public class DatanodeStateMachine implements Closeable {
       throws IOException{
     return upgradeFinalizer.reportStatus(datanodeDetails.getUuidString(),
         false);
+  }
+  public UpgradeFinalizer<DatanodeStateMachine> getUpgradeFinalizer() {
+    return upgradeFinalizer;
   }
 }

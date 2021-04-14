@@ -1778,4 +1778,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   ) throws IOException {
     return upgradeFinalizer.reportStatus(upgradeClientID, takeover);
   }
+
+  public UpgradeFinalizer<StorageContainerManager> getUpgradeFinalizer() {
+    return upgradeFinalizer;
+  }
 }

@@ -64,7 +64,7 @@ public interface UpgradeFinalizer<T> {
     STARTING_FINALIZATION,
     FINALIZATION_IN_PROGRESS,
     FINALIZATION_DONE,
-    FINALIZATION_REQUIRED
+    FINALIZATION_REQUIRED,
   }
 
   /**
@@ -72,7 +72,6 @@ public interface UpgradeFinalizer<T> {
    * ongoing, the messages that should be passed to the initiating client of
    * finalization.
    * This translates to a counterpart in the RPC layer.
-   * @see UpgradeFinalizationStatus in OMClientProtocol.proto
    */
   class StatusAndMessages {
     private Status status;
@@ -187,4 +186,9 @@ public interface UpgradeFinalizer<T> {
    */
   void runPrefinalizeStateActions(Storage storage, T service)
       throws IOException;
+
+  /**
+   * get the Finalization Executor driver.
+   */
+  DefaultUpgradeFinalizationExecutor getFinalizationExecutor();
 }
