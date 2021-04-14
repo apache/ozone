@@ -148,7 +148,9 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
   /**
    * Allocates a block in a container and returns that info.
    *
-   * @param size        - Block Size
+   * @param size - Block Size
+   * @param replicationConfig - Replication config
+   * @param owner - Owner (service) of the container.
    * @param excludeList List of datanodes/containers to exclude during block
    *                    allocation.
    * @return Allocated block

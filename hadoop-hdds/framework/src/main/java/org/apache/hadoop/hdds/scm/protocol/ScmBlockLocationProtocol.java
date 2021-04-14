@@ -75,6 +75,7 @@ public interface ScmBlockLocationProtocol extends Closeable {
    * @param size              - size of the block.
    * @param numBlocks         - number of blocks.
    * @param replicationConfig - replicationConfiguration
+   * @param owner             - service owner of the new block
    * @param excludeList       List of datanodes/containers to exclude during
    *                          block
    *                          allocation.

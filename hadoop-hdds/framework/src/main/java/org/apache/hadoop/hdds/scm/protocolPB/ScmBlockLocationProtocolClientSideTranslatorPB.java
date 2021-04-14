@@ -144,6 +144,7 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
    * set of datanodes that should be used creating this block.
    * @param size - size of the block.
    * @param num - number of blocks.
+   * @param replicationConfig - replication configuration of the blocks.
    * @param excludeList - exclude list while allocating blocks.
    * @return allocated block accessing info (key, pipeline).
    * @throws IOException

@@ -251,7 +251,7 @@ public class ContainerStateManager {
         .hasFactor(replicationConfig, ReplicationFactor.ONE)
         && autoCreateRatisOne;
     boolean bgCreateThree = RatisReplicationConfig
-        .hasFactor(replicationConfig, ReplicationFactor.ONE);
+        .hasFactor(replicationConfig, ReplicationFactor.THREE);
 
     if (!pipelines.isEmpty() && (bgCreateOne || bgCreateThree)) {
       // let background create Ratis pipelines.

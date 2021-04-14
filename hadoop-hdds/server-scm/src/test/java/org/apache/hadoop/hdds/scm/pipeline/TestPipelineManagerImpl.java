@@ -138,7 +138,7 @@ public class TestPipelineManagerImpl {
     Assert.assertTrue(pipelineManager.containsPipeline(pipeline1.getId()));
 
     Pipeline pipeline2 = pipelineManager.createPipeline(
-        new RatisReplicationConfig(ReplicationFactor.THREE));
+        new RatisReplicationConfig(ReplicationFactor.ONE));
     Assert.assertEquals(2, pipelineManager.getPipelines().size());
     Assert.assertTrue(pipelineManager.containsPipeline(pipeline2.getId()));
     buffer1.close();
