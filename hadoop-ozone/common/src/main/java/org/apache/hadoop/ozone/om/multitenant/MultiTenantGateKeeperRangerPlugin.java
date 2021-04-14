@@ -316,16 +316,19 @@ public class MultiTenantGateKeeperRangerPlugin implements
     }
   }
 
-  public void deletePolicy(String policyId) throws Exception {
+  public void deletePolicy(String policyId) throws IOException {
 
     String rangerAdminUrl =
         rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_DELETE_POLICY_HTTP_ENDPOINT
             + policyId + "?forceDelete=true";
-
-    HttpsURLConnection conn = makeHttpsPostCall(rangerAdminUrl, null,
-        "DELETE", false);
-    int respnseCode = conn.getResponseCode();
-    if (respnseCode != 200 && respnseCode != 204) {
+    try {
+      HttpsURLConnection conn = makeHttpsPostCall(rangerAdminUrl, null,
+          "DELETE", false);
+      int respnseCode = conn.getResponseCode();
+      if (respnseCode != 200 && respnseCode != 204) {
+        throw new IOException("Couldnt delete policy " + policyId);
+      }
+    } catch (Exception e) {
       throw new IOException("Couldnt delete policy " + policyId);
     }
   }
