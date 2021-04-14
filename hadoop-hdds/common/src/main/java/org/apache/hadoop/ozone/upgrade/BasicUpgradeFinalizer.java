@@ -57,16 +57,42 @@ public abstract class BasicUpgradeFinalizer
   protected V versionManager;
   protected String clientID;
   protected T component;
+  protected DefaultUpgradeFinalizationExecutor finalizationExecutor;
 
   private Queue<String> msgs = new ConcurrentLinkedQueue<>();
   protected boolean isDone = false;
 
   public BasicUpgradeFinalizer(V versionManager) {
     this.versionManager = versionManager;
+    this.finalizationExecutor =
+        new DefaultUpgradeFinalizationExecutor();
+  }
+
+  /**
+   * Sets the Finalization Executor driver.
+   * @param executor FinalizationExecutor.
+   */
+
+  public void setFinalizationExecutor(DefaultUpgradeFinalizationExecutor
+                                          executor) {
+    finalizationExecutor = executor;
+  }
+
+  @Override
+  public DefaultUpgradeFinalizationExecutor getFinalizationExecutor() {
+    return finalizationExecutor;
   }
 
   public boolean isFinalizationDone() {
     return isDone;
+  }
+
+  public void markFinalizationDone() {
+    isDone = true;
+  }
+
+  public V getVersionManager() {
+    return versionManager;
   }
 
   public synchronized StatusAndMessages preFinalize(String upgradeClientID,
@@ -181,7 +207,6 @@ public abstract class BasicUpgradeFinalizer
     return status.equals(UpgradeFinalizer.Status.ALREADY_FINALIZED)
         || status.equals(FINALIZATION_DONE);
   }
-
 
   protected void finalizeFeature(LayoutFeature feature, Storage config,
                                  Optional<? extends UpgradeAction> action)
@@ -436,4 +461,11 @@ public abstract class BasicUpgradeFinalizer
   protected void updateLayoutVersionInDB(V vm, T comp) throws IOException {
     throw new UnsupportedOperationException();
   }
+
+  protected abstract void postFinalizeUpgrade() throws IOException;
+
+  protected abstract void finalizeUpgrade(Storage storageConfig)
+      throws UpgradeException;
+
+  protected abstract boolean preFinalizeUpgrade() throws IOException;
 }

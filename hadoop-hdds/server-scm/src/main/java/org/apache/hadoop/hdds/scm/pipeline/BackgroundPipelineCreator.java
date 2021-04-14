@@ -117,6 +117,7 @@ class BackgroundPipelineCreator {
     // TODO: #CLUTIL Different replication factor may need to be supported
 
     if(pausePipelineCreation.get()) {
+      LOG.info("Pipeline Creation is paused.");
       return;
     }
     HddsProtos.ReplicationType type = HddsProtos.ReplicationType.valueOf(

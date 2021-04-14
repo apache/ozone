@@ -130,6 +130,22 @@ public class TestUpgradeFinalizer {
     }
 
     @Override
+    protected void postFinalizeUpgrade() throws IOException {
+      return;
+    }
+
+    @Override
+    protected void finalizeUpgrade(Storage storageConfig)
+        throws UpgradeException {
+      return;
+    }
+
+    @Override
+    protected boolean preFinalizeUpgrade() throws IOException {
+      return false;
+    }
+
+    @Override
     public void runPrefinalizeStateActions(Storage storage,
                                            MockComponent mockComponent)
         throws IOException {

@@ -20,21 +20,18 @@ package org.apache.hadoop.ozone.om.upgrade;
 
 import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON_FINALIZE;
 import static org.apache.hadoop.ozone.OzoneConsts.LAYOUT_VERSION_KEY;
-import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_DONE;
-import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_IN_PROGRESS;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_REQUIRED;
 
 import org.apache.hadoop.ozone.common.Storage;
-import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 
 import java.io.IOException;
 import java.util.Optional;
-import java.util.concurrent.Callable;
 
 import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeAction;
+import org.apache.hadoop.ozone.upgrade.UpgradeException;
 
 /**
  * UpgradeFinalizer implementation for the Ozone Manager service.
@@ -42,6 +39,7 @@ import org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeAction;
 public class OMUpgradeFinalizer extends BasicUpgradeFinalizer<OzoneManager,
     OMLayoutVersionManager> {
   private  static final OmUpgradeAction NOOP = a -> {};
+  private OzoneManager ozoneManager;
 
   public OMUpgradeFinalizer(OMLayoutVersionManager versionManager) {
     super(versionManager);
@@ -50,6 +48,7 @@ public class OMUpgradeFinalizer extends BasicUpgradeFinalizer<OzoneManager,
   @Override
   public StatusAndMessages finalize(String upgradeClientID, OzoneManager om)
       throws IOException {
+    ozoneManager = om;
     StatusAndMessages response = preFinalize(upgradeClientID, om);
     if (response.status() != FINALIZATION_REQUIRED) {
       return response;
@@ -64,64 +63,36 @@ public class OMUpgradeFinalizer extends BasicUpgradeFinalizer<OzoneManager,
     //    ExecutorService executor =
     //        Executors.newSingleThreadExecutor(r -> new Thread(threadName));
     //    executor.submit(new Worker(om));
-    new Worker(om).call();
+    try {
+      getFinalizationExecutor().execute(ozoneManager.getOmStorage(),
+          this);
+    } catch (Exception e) {
+      e.printStackTrace();
+      throw (IOException) e;
+    }
     return STARTING_MSG;
   }
 
-  /**
-   * This class implements the finalization logic applied to every
-   * LayoutFeature that needs to be finalized.
-   *
-   * For the first approach this happens synchronously within the state machine
-   * during the FinalizeUpgrade request, but ideally this has to be moved to
-   * individual calls that are going into the StateMaching one by one.
-   * The prerequisits for this to happen in the background are the following:
-   * - more fine grained control for LayoutFeatures to prepare the
-   *    finalization outside the state machine, do the switch from old to new
-   *    logic inside the statemachine and apply the finalization, and then do
-   *    any cleanup necessary outside the state machine
-   * - a way to post a request to the state machine that is not part of the
-   *    client API, so basically not an OMRequest, but preferably an internal
-   *    request, which is posted from the leader OM to the follower OMs only.
-   * - ensure that there is a possibility to implement a rollback logic if
-   *    something goes wrong inside the state machine, to avoid OM stuck in an
-   *    intermediate state due to an error.
-   */
-  private class Worker implements Callable<Void> {
-    private OzoneManager ozoneManager;
+  @Override
+  protected void postFinalizeUpgrade() throws IOException {
+    return;
+  }
 
-    /**
-     * Initiates the Worker, for the specified OM instance.
-     * @param om the OzoneManager instance on which to finalize the new
-     *           LayoutFeatures.
-     */
-    Worker(OzoneManager om) {
-      ozoneManager = om;
+  @Override
+  protected void finalizeUpgrade(Storage storageConfig)
+      throws UpgradeException {
+    for (OMLayoutFeature f : versionManager.unfinalizedFeatures()) {
+      Optional<? extends UpgradeAction> action = f.action(ON_FINALIZE);
+      finalizeFeature(f, storageConfig, action);
+      updateLayoutVersionInVersionFile(f, storageConfig);
+      versionManager.finalized(f);
     }
+    versionManager.completeFinalization();
+  }
 
-    @Override
-    public Void call() throws IOException {
-      try {
-        emitStartingMsg();
-        versionManager.setUpgradeState(FINALIZATION_IN_PROGRESS);
-
-        OMStorage omStorage = ozoneManager.getOmStorage();
-
-        for (OMLayoutFeature f : versionManager.unfinalizedFeatures()) {
-          Optional<? extends UpgradeAction> action = f.action(ON_FINALIZE);
-          finalizeFeature(f, omStorage, action);
-          updateLayoutVersionInVersionFile(f, ozoneManager.getOmStorage());
-          versionManager.finalized(f);
-        }
-
-        versionManager.completeFinalization();
-        emitFinishedMsg();
-        return null;
-      } finally {
-        versionManager.setUpgradeState(FINALIZATION_DONE);
-        isDone = true;
-      }
-    }
+  @Override
+  protected boolean preFinalizeUpgrade() throws IOException {
+    return true;
   }
 
   public void runPrefinalizeStateActions(Storage storage, OzoneManager om)

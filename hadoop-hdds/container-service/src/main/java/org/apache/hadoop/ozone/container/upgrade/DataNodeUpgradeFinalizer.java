@@ -19,13 +19,10 @@
 package org.apache.hadoop.ozone.container.upgrade;
 
 import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON_FINALIZE;
-import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_DONE;
-import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_IN_PROGRESS;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_REQUIRED;
 
 import java.io.IOException;
 import java.util.Optional;
-import java.util.concurrent.Callable;
 
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
@@ -33,12 +30,18 @@ import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeAction;
+import org.apache.hadoop.ozone.upgrade.UpgradeException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * UpgradeFinalizer for the DataNode.
  */
 public class DataNodeUpgradeFinalizer extends
     BasicUpgradeFinalizer<DatanodeStateMachine, HDDSLayoutVersionManager> {
+  private static final Logger LOG =
+      LoggerFactory.getLogger(DataNodeUpgradeFinalizer.class);
+  private DatanodeStateMachine datanodeStateMachine;
 
   public DataNodeUpgradeFinalizer(HDDSLayoutVersionManager versionManager,
                                   String optionalClientID) {
@@ -50,54 +53,51 @@ public class DataNodeUpgradeFinalizer extends
   public StatusAndMessages finalize(String upgradeClientID,
                                     DatanodeStateMachine dsm)
       throws IOException {
+    datanodeStateMachine = dsm;
     StatusAndMessages response = preFinalize(upgradeClientID, dsm);
     if (response.status() != FINALIZATION_REQUIRED) {
       return response;
     }
-    new Worker(dsm).call();
+    try {
+      getFinalizationExecutor().execute(dsm.getLayoutStorage(),
+          this);
+    } catch (Exception e) {
+      e.printStackTrace();
+      throw new IOException(e.getMessage());
+    }
     return STARTING_MSG;
   }
 
-  private class Worker implements Callable<Void> {
-    private DatanodeStateMachine datanodeStateMachine;
-
-    /**
-     * Initiates the Worker, for the specified DataNode instance.
-     * @param dsm the DataNodeStateMachine instance on which to finalize the
-     *           new LayoutFeatures.
-     */
-    Worker(DatanodeStateMachine dsm) {
-      datanodeStateMachine = dsm;
-    }
-
-    @Override
-    public Void call() throws IOException {
-      if(!datanodeStateMachine.preFinalizeUpgrade()) {
-      // datanode is not yet ready to finalize.
+  @Override
+  public boolean preFinalizeUpgrade() throws IOException {
+    if(!datanodeStateMachine.preFinalizeUpgrade()) {
+      // DataNode is not yet ready to finalize.
       // Reset the Finalization state.
-        versionManager.setUpgradeState(FINALIZATION_REQUIRED);
-        return null;
-      }
-      try {
-        emitStartingMsg();
-        versionManager.setUpgradeState(FINALIZATION_IN_PROGRESS);
-        for (HDDSLayoutFeature f : versionManager.unfinalizedFeatures()) {
-          Optional<? extends UpgradeAction> action =
-              f.datanodeAction(ON_FINALIZE);
-          finalizeFeature(f, datanodeStateMachine.getLayoutStorage(), action);
-          updateLayoutVersionInVersionFile(f,
-              datanodeStateMachine.getLayoutStorage());
-          versionManager.finalized(f);
-        }
-        versionManager.completeFinalization();
-        datanodeStateMachine.postFinalizeUpgrade();
-        emitFinishedMsg();
-        return null;
-      } finally {
-        versionManager.setUpgradeState(FINALIZATION_DONE);
-        isDone = true;
-      }
+      versionManager.setUpgradeState(FINALIZATION_REQUIRED);
+      String msg = "Pre Finalization checks failed on the DataNode.";
+      logAndEmit(msg);
+      return false;
     }
+    return true;
+  }
+
+  @Override
+  public void postFinalizeUpgrade() throws  IOException {
+    datanodeStateMachine.postFinalizeUpgrade();
+  }
+
+  @Override
+  protected void finalizeUpgrade(Storage storageConfig)
+      throws UpgradeException {
+    for (HDDSLayoutFeature f : versionManager.unfinalizedFeatures()) {
+      Optional<? extends UpgradeAction> action =
+          f.datanodeAction(ON_FINALIZE);
+      finalizeFeature(f, datanodeStateMachine.getLayoutStorage(), action);
+      updateLayoutVersionInVersionFile(f,
+          datanodeStateMachine.getLayoutStorage());
+      versionManager.finalized(f);
+    }
+    versionManager.completeFinalization();
   }
 
   @Override
