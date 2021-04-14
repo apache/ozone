@@ -24,7 +24,11 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto.ResponseCode;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertificateRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCrlsRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCrlsResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetDataNodeCertRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetLatestCrlIdRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetLatestCrlIdResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetOMCertRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetSCMCertRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMListCertificateRequestProto;
@@ -37,6 +41,7 @@ import org.apache.hadoop.hdds.scm.ha.RetriableWithNoFailoverException;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
+import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 
@@ -127,6 +132,17 @@ public class SCMSecurityProtocolServerSideTranslatorPB
       case ListCACertificate:
         return scmSecurityResponse.setListCertificateResponseProto(
             listCACertificate()).build();
+      case GetCrls:
+        return SCMSecurityResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setGetCrlsResponseProto(getCrls(request.getGetCrlsRequest()))
+            .build();
+      case GetLatestCrlId:
+        return SCMSecurityResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setGetLatestCrlIdResponseProto(getLatestCrlId(
+                request.getGetLatestCrlIdRequest()))
+            .build();
       default:
         throw new IllegalArgumentException(
             "Unknown request type: " + request.getCmdType());
@@ -284,7 +300,31 @@ public class SCMSecurityProtocolServerSideTranslatorPB
             .addAllCertificates(certs);
     return builder.build();
 
+  }
 
+  public SCMGetCrlsResponseProto getCrls(
+      SCMGetCrlsRequestProto request) throws IOException {
+    List<CRLInfo> crls = impl.getCrls(request.getCrlIdList());
+    SCMGetCrlsResponseProto.Builder builder =
+        SCMGetCrlsResponseProto.newBuilder();
+    for (CRLInfo crl : crls) {
+      try {
+        builder.addCrlInfos(crl.getProtobuf());
+      } catch (SCMSecurityException e) {
+        LOG.error("Fail in parsing CRL info", e);
+        throw new SCMSecurityException("Fail in parsing CRL info", e);
+      }
+    }
+    return builder.build();
+  }
+
+  public SCMGetLatestCrlIdResponseProto getLatestCrlId(
+      SCMGetLatestCrlIdRequestProto request) throws IOException {
+    SCMGetLatestCrlIdResponseProto.Builder builder =
+        SCMGetLatestCrlIdResponseProto
+            .newBuilder().
+            setCrlId(impl.getLatestCrlId());
+    return builder.build();
   }
 
 

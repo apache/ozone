@@ -20,6 +20,7 @@
 package org.apache.hadoop.hdds.security.x509.certificate.authority;
 
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
+import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.security.x509.certificate.CertInfo;
 import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.cert.X509CertificateHolder;
@@ -141,6 +142,20 @@ public interface CertificateStore {
    * @param metadataStore SCMMetaStore.
    */
   void reinitialize(SCMMetadataStore metadataStore);
+
+  /**
+   * Get the CRLInfo based on the CRL Ids.
+   * @param crlIds - list of crl ids
+   * @return CRLInfo
+   * @throws IOException
+   */
+  List<CRLInfo> getCrls(List<Long> crlIds) throws IOException;
+
+  /**
+   * Get the latest CRL id.
+   * @return latest CRL id.
+   */
+  long getLatestCrlId();
 
   /**
    * Different kind of Certificate stores.
