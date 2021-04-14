@@ -185,8 +185,8 @@ public class SCMSecurityProtocolServerSideTranslatorPB
             .newBuilder()
             .setResponseCode(ResponseCode.success)
             .setX509Certificate(certificate)
-            .setX509CACertificate(impl.getCACertificate())
-            .setX509RootCACertificate(impl.getRootCACertificate());
+            .setX509CACertificate(impl.getCACertificate());
+    setRootCAIfNeeded(builder);
 
     return builder.build();
 
@@ -203,6 +203,9 @@ public class SCMSecurityProtocolServerSideTranslatorPB
       SCMGetSCMCertRequestProto request)
       throws IOException {
 
+    if (!scm.getScmStorageConfig().checkPrimarySCMIdInitialized()) {
+      throw createNotHAException();
+    }
     String certificate = impl.getSCMCertificate(request.getScmDetails(),
         request.getCSR());
     SCMGetCertResponseProto.Builder builder =
@@ -233,8 +236,8 @@ public class SCMSecurityProtocolServerSideTranslatorPB
             .newBuilder()
             .setResponseCode(ResponseCode.success)
             .setX509Certificate(certificate)
-            .setX509CACertificate(impl.getCACertificate())
-            .setX509RootCACertificate(impl.getRootCACertificate());
+            .setX509CACertificate(impl.getCACertificate());
+    setRootCAIfNeeded(builder);
     return builder.build();
 
   }
@@ -262,8 +265,8 @@ public class SCMSecurityProtocolServerSideTranslatorPB
             .newBuilder()
             .setResponseCode(ResponseCode.success)
             .setX509Certificate(certificate)
-            .setX509CACertificate(certificate)
-            .setX509RootCACertificate(impl.getRootCACertificate());
+            .setX509CACertificate(certificate);
+    setRootCAIfNeeded(builder);
     return builder.build();
 
   }
@@ -286,6 +289,9 @@ public class SCMSecurityProtocolServerSideTranslatorPB
 
 
   public SCMGetCertResponseProto getRootCACertificate() throws IOException {
+    if (scm.getScmStorageConfig().checkPrimarySCMIdInitialized()) {
+      throw createNotHAException();
+    }
     String rootCACertificate = impl.getRootCACertificate();
     SCMGetCertResponseProto.Builder builder =
         SCMGetCertResponseProto
@@ -311,5 +317,16 @@ public class SCMSecurityProtocolServerSideTranslatorPB
 
   }
 
+  private SCMSecurityException createNotHAException() {
+    return new SCMSecurityException("SCM is not Ratis enabled. Enable ozone" +
+        ".scm.ratis.enable config");
+  }
+
+  private void setRootCAIfNeeded(SCMGetCertResponseProto.Builder builder)
+      throws IOException {
+    if (scm.getScmStorageConfig().checkPrimarySCMIdInitialized()) {
+      builder.setX509RootCACertificate(impl.getRootCACertificate());
+    }
+  }
 
 }
