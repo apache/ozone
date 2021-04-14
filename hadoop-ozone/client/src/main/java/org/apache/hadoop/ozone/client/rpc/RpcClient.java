@@ -116,6 +116,10 @@ import org.apache.hadoop.security.token.Token;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.RemovalListener;
+import com.google.common.cache.RemovalNotification;
 
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_KEY_PROVIDER_CACHE_EXPIRY;
@@ -124,10 +128,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.OLD_QUOTA_DEFAULT;
 
 import org.apache.logging.log4j.util.Strings;
 import org.apache.ratis.protocol.ClientId;
-import org.apache.ratis.thirdparty.com.google.common.cache.Cache;
-import org.apache.ratis.thirdparty.com.google.common.cache.CacheBuilder;
-import org.apache.ratis.thirdparty.com.google.common.cache.RemovalListener;
-import org.apache.ratis.thirdparty.com.google.common.cache.RemovalNotification;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -1380,5 +1380,10 @@ public class RpcClient implements ClientProtocol {
   @VisibleForTesting
   public OzoneManagerProtocol getOzoneManagerClient() {
     return ozoneManagerClient;
+  }
+
+  @VisibleForTesting
+  public Cache<URI, KeyProvider> getKeyProviderCache() {
+    return keyProviderCache;
   }
 }
