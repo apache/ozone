@@ -155,7 +155,8 @@ public class SCMBlockLocationFailoverProxyProvider implements
     LOG.debug("Failing over to next proxy. {}", getCurrentProxySCMNodeId());
   }
 
-  public void performFailoverToAssignedLeader(String newLeader, Exception e) {
+  public synchronized void performFailoverToAssignedLeader(String newLeader,
+      Exception e) {
     ServerNotLeaderException snle =
         (ServerNotLeaderException) SCMHAUtils.getServerNotLeaderException(e);
     if (snle != null && snle.getSuggestedLeader() != null) {

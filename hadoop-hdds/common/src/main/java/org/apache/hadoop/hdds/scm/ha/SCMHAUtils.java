@@ -212,7 +212,7 @@ public final class SCMHAUtils {
 
   public static boolean isNonRetriableException(Exception e) {
     Throwable t = unwrapException(e);
-    return StateMachineException.class.isInstance(t);
+    return NonRetriableException.class.isInstance(t);
   }
 
   // This will return the underlying exception after unwrapping

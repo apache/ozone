@@ -24,6 +24,9 @@ import java.io.IOException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/**
+ * Exception thrown when a server is not a leader for Ratis group.
+ */
 public class ServerNotLeaderException extends IOException {
   private final String currentPeerId;
   private final String leader;

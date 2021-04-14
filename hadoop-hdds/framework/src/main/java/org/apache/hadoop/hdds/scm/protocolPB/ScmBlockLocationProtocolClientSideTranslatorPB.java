@@ -119,12 +119,6 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
     try {
       SCMBlockLocationResponse response =
           rpcProxy.send(NULL_RPC_CONTROLLER, req);
-      if (response.getStatus() ==
-          ScmBlockLocationProtocolProtos.Status.SCM_NOT_LEADER) {
-        failoverProxyProvider
-            .performFailoverToAssignedLeader(response.getLeaderSCMNodeId(),
-                null);
-      }
       return response;
     } catch (ServiceException e) {
       throw ProtobufHelper.getRemoteException(e);
