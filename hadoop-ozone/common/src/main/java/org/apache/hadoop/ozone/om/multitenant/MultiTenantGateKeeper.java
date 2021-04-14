@@ -99,7 +99,7 @@ public interface MultiTenantGateKeeper extends IAccessAuthorizer {
    * @param policyId that was returned earlier by the createAccessPolicy().
    * @throws Exception
    */
-  void deletePolicy(String policyId) throws Exception;
+  void deletePolicy(String policyId) throws IOException;
 
   /**
    * Grant user aclType access to bucketNameSpace.

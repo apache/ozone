@@ -88,9 +88,12 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     try {
       allTenants.put(tenantID, tenant);
 
-      //TBD : for now just create state in the Ranger.
-      // OM state is already created in ValidateAndUpdateCache for
-      // the ratis transaction.
+      // TODO : for now just create state in the Ranger. OM state is already
+      //  created in ValidateAndUpdateCache for the ratis transaction.
+
+      // TODO : Make it an idempotent operation. If any ranger state creation
+      //  fails because it already exists, Ignore it.
+
       OzoneMultiTenantPrincipal groupTenantAllUsers = getOzonePrincipal(
           tenantID, "GroupTenantAllUsers", GROUP_PRINCIPAL);
       String groupTenantAllUsersID =
@@ -115,6 +118,12 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
         tenant.addTenantAccessPolicy(tenantBucketCreatePolicy);
       }
     } catch (Exception e) {
+      try {
+        destroyTenant(tenant);
+      } catch (Exception exception) {
+        // Best effort cleanup.
+        throw new IOException(e.getMessage());
+      }
       throw new IOException(e.getMessage());
     }
     return tenant;
@@ -122,7 +131,15 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
 
   @Override
   public Tenant getTenantInfo(String tenantID) throws IOException {
-    return null;
+    if (!allTenants.containsKey(tenantID)) {
+      return null;
+    }
+    for (Map.Entry<String, Tenant> entry: allTenants.entrySet()) {
+      if (entry.getKey().equals(tenantID)) {
+        return entry.getValue();
+      }
+    }
+    throw new IOException("All Tenants Map is corrupt");
   }
 
   @Override
@@ -138,6 +155,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     for (String groupID : tenant.getTenantGroups()) {
       gateKeeper.deleteGroup(groupID);
     }
+    allTenants.remove(tenant.getTenantId());
   }
 
   @Override

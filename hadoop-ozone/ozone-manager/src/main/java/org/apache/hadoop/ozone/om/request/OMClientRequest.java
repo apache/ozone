@@ -99,6 +99,15 @@ public abstract class OMClientRequest implements RequestAuditor {
   }
 
   /**
+   * Performs any request specific failure handling during request
+   * submission. An example of this would be an undo of any steps
+   * taken during pre-execute.
+   */
+  public void handleRequestFailure(OzoneManager ozoneManager) {
+    // Most requests would not have any un-do processing.
+  }
+
+  /**
    * Validate the OMRequest and update the cache.
    * This step should verify that the request can be executed, perform
    * any authorization steps and update the in-memory cache.

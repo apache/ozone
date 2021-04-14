@@ -135,7 +135,7 @@ public interface OMMultiTenantManager {
 
   /**
    * Given a user, deactivate them. We will need a recon command/job to cleanup
-   * any data owned by this user. (ReconMultiTenantManager)
+   * any data owned by this user (ReconMultiTenantManager).
    * @param user
    */
   void deactivateUser(OzoneMultiTenantPrincipal user) throws IOException;
