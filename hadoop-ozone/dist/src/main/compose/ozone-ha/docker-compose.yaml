@@ -41,6 +41,7 @@ services:
   om1:
     <<: *common-config
     environment:
+      WAITFOR: scm3:9865
       ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
       <<: *replication
     ports:
@@ -51,6 +52,7 @@ services:
   om2:
     <<: *common-config
     environment:
+      WAITFOR: scm3:9865
       ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
       <<: *replication
     ports:
@@ -61,6 +63,7 @@ services:
   om3:
     <<: *common-config
     environment:
+      WAITFOR: scm3:9865
       ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
       <<: *replication
     ports:

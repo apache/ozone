@@ -65,3 +65,5 @@ hadoop-hdds/docs/public
 hadoop-ozone/recon/node_modules
 
 .mvn
+
+.dev-tools

@@ -33,7 +33,7 @@ import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
-import org.apache.hadoop.ozone.util.ExitManager;
+import org.apache.hadoop.hdds.ExitManager;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.util.FileUtils;
 import org.slf4j.Logger;
@@ -344,7 +344,10 @@ public class SCMHAManagerImpl implements SCMHAManager {
     scm.getScmBlockManager().getDeletedBlockLog().reinitialize(
         metadataStore.getDeletedBlocksTXTable());
     if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
-      scm.getCertificateServer().reinitialize(metadataStore);
+      if (scm.getRootCertificateServer() != null) {
+        scm.getRootCertificateServer().reinitialize(metadataStore);
+      }
+      scm.getScmCertificateServer().reinitialize(metadataStore);
     }
   }
 

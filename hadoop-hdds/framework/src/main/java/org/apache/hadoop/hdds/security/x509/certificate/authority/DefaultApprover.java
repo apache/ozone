@@ -67,6 +67,7 @@ public class DefaultApprover extends BaseApprover {
 
   /**
    * Sign function signs a Certificate.
+   *
    * @param config - Security Config.
    * @param caPrivate - CAs private Key.
    * @param caCertificate - CA Certificate.
@@ -81,7 +82,7 @@ public class DefaultApprover extends BaseApprover {
    */
   @SuppressWarnings("ParameterNumber")
   @Override
-  public  X509CertificateHolder sign(
+  public X509CertificateHolder sign(
       SecurityConfig config,
       PrivateKey caPrivate,
       X509CertificateHolder caCertificate,
@@ -110,7 +111,7 @@ public class DefaultApprover extends BaseApprover {
     String csrClusterId = x500Name.getRDNs(BCStyle.O)[0].getFirst().getValue().
         toASN1Primitive().toString();
 
-    if (!scmId.equals(csrScmId) || !clusterId.equals(csrClusterId)) {
+    if (!clusterId.equals(csrClusterId)) {
       if (csrScmId.equalsIgnoreCase("null") &&
           csrClusterId.equalsIgnoreCase("null")) {
         // Special case to handle DN certificate generation as DN might not know

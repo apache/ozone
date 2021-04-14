@@ -1,10 +1,10 @@
 ---
-title: "高可用"
+title: "高可用OM"
 weight: 1
 menu:
    main:
       parent: 特点
-summary: Ozone 用于避免单点故障的高可用设置
+summary: Ozone Manager 用于避免单点故障的高可用设置
 ---
 
 <!---
@@ -24,12 +24,13 @@ summary: Ozone 用于避免单点故障的高可用设置
   limitations under the License.
 -->
 
-Ozone 有两个leader节点（用于键管理的 *Ozone Manager* 和用于块空间管理的 *Storage Container Management* ）以及存储节点（数据节点）。数据是借助 RAFT 共识算法在数据节点之间复制。
+Ozone 有两个元数据管理节点（用于键管理的 *Ozone Manager* 和用于块空间管理的 *Storage Container Management* ）以及多个存储节点（数据节点）。数据是借助 RAFT 共识算法在数据节点之间复制。
 
-为了避免任何单点故障，leader 节点也应该具备高可用的设置。
+为了避免任何单点故障，元数据管理节点也应该具备高可用的设置。
 
-1. Ozone Manager 的高可用是借助 RAFT 协议实现的；
-2. Storage Container Manager 的高可用则 [还在实现中]({{< ref path="scmha.md" lang="en">}}) 。
+Ozone Manager 和 Storage Container Manager 都支持 HA。在这种模式下，内部状态通过 RAFT (使用 Apache Ratis )复制。
+
+本文档解释了 Ozone Manager (OM) HA的高可用设置，请查看[本页]({{< ref "SCM-HA" >}})的 SCM HA。虽然它们可以独立地为 HA 进行设置，但可靠的、完全的 HA 设置需要为两个服务启用 HA。
 
 ## Ozone Manager 的高可用
 

@@ -18,15 +18,26 @@ package org.apache.hadoop.hdds.utils;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import com.google.protobuf.ServiceException;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.function.SupplierWithIOException;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
+import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.proxy.SCMBlockLocationFailoverProxyProvider;
+import org.apache.hadoop.hdds.scm.proxy.SCMClientConfig;
+import org.apache.hadoop.hdds.scm.proxy.SCMContainerLocationFailoverProxyProvider;
+import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
+import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
@@ -35,6 +46,7 @@ import org.apache.hadoop.hdds.utils.db.RocksDBConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
+import org.apache.hadoop.util.Time;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.FileUtils;
 import org.slf4j.Logger;
@@ -47,9 +59,15 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.cert.X509Certificate;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURATION;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURATION_DEFAULT;
 import static org.apache.hadoop.hdds.server.ServerUtils.getOzoneMetaDirPath;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
@@ -65,8 +83,23 @@ public final class HAUtils {
 
   public static ScmInfo getScmInfo(OzoneConfiguration conf)
       throws IOException {
+    OzoneConfiguration configuration = new OzoneConfiguration(conf);
     try {
-      return getScmBlockClient(conf).getScmInfo();
+      long duration = conf.getTimeDuration(OZONE_SCM_INFO_WAIT_DURATION,
+          OZONE_SCM_INFO_WAIT_DURATION_DEFAULT, TimeUnit.SECONDS);
+      SCMClientConfig scmClientConfig =
+          configuration.getObject(SCMClientConfig.class);
+      int retryCount =
+          (int) (duration / (scmClientConfig.getRetryInterval()/1000));
+
+      // If duration is set to lesser value, fall back to actual default
+      // retry count.
+      if (retryCount > scmClientConfig.getRetryCount()) {
+        scmClientConfig.setRetryCount(retryCount);
+        configuration.setFromObject(scmClientConfig);
+      }
+
+      return getScmBlockClient(configuration).getScmInfo();
     } catch (IOException e) {
       throw e;
     } catch (Exception e) {
@@ -102,13 +135,24 @@ public final class HAUtils {
    * @throws IOException
    */
   public static ScmBlockLocationProtocol getScmBlockClient(
-      OzoneConfiguration conf) throws IOException {
+      OzoneConfiguration conf) {
     ScmBlockLocationProtocolClientSideTranslatorPB scmBlockLocationClient =
         new ScmBlockLocationProtocolClientSideTranslatorPB(
             new SCMBlockLocationFailoverProxyProvider(conf));
     return TracingUtil
         .createProxy(scmBlockLocationClient, ScmBlockLocationProtocol.class,
             conf);
+  }
+
+  public static StorageContainerLocationProtocol getScmContainerClient(
+      ConfigurationSource conf) {
+    SCMContainerLocationFailoverProxyProvider proxyProvider =
+        new SCMContainerLocationFailoverProxyProvider(conf);
+    StorageContainerLocationProtocol scmContainerClient =
+        TracingUtil.createProxy(
+            new StorageContainerLocationProtocolClientSideTranslatorPB(
+                proxyProvider), StorageContainerLocationProtocol.class, conf);
+    return scmContainerClient;
   }
 
   /**
@@ -326,4 +370,146 @@ public final class HAUtils {
       }
     }
   }
+
+  /**
+   * Build CA list which need to be passed to client.
+   *
+   * If certificate client is null, obtain the list of CA using SCM security
+   * client, else it uses certificate client.
+   * @param certClient
+   * @param configuration
+   * @return list of CA
+   * @throws IOException
+   */
+  public static List<String> buildCAList(CertificateClient certClient,
+      ConfigurationSource configuration) throws IOException {
+    //TODO: make it configurable.
+    List<String> caCertPemList;
+    if (certClient != null) {
+      caCertPemList = new ArrayList<>();
+      if (!SCMHAUtils.isSCMHAEnabled(configuration)) {
+        if (certClient.getRootCACertificate() != null) {
+          caCertPemList.add(CertificateCodec.getPEMEncodedString(
+              certClient.getRootCACertificate()));
+        }
+        caCertPemList.add(CertificateCodec.getPEMEncodedString(
+            certClient.getCACertificate()));
+      } else {
+        Collection<String> scmNodes = SCMHAUtils.getSCMNodeIds(configuration);
+        int expectedCount = scmNodes.size() + 1;
+        if (scmNodes.size() > 1) {
+          // First check if cert client has ca list initialized.
+          // This is being done, when this method is called multiple times we
+          // don't make call to SCM, we return from in-memory.
+          caCertPemList = certClient.getCAList();
+          if (caCertPemList != null && caCertPemList.size() == expectedCount) {
+            return caCertPemList;
+          }
+          caCertPemList = waitForCACerts(() -> certClient.updateCAList(),
+              expectedCount);
+          checkCertCount(caCertPemList.size(), expectedCount);
+        } else {
+          caCertPemList = certClient.listCA();
+        }
+      }
+    } else {
+      SCMSecurityProtocolClientSideTranslatorPB scmSecurityProtocolClient =
+          HddsServerUtil.getScmSecurityClient(configuration);
+      if (!SCMHAUtils.isSCMHAEnabled(configuration)) {
+        caCertPemList = new ArrayList<>();
+        SCMGetCertResponseProto scmGetCertResponseProto =
+            scmSecurityProtocolClient.getCACert();
+        if (scmGetCertResponseProto.hasX509Certificate()) {
+          caCertPemList.add(scmGetCertResponseProto.getX509Certificate());
+        }
+        if (scmGetCertResponseProto.hasX509RootCACertificate()) {
+          caCertPemList.add(scmGetCertResponseProto.getX509RootCACertificate());
+        }
+      } else {
+        Collection<String> scmNodes = SCMHAUtils.getSCMNodeIds(configuration);
+        int expectedCount = scmNodes.size() + 1;
+        if (scmNodes.size() > 1) {
+          caCertPemList = waitForCACerts(
+              () -> scmSecurityProtocolClient.listCACertificate(),
+              expectedCount);
+          checkCertCount(caCertPemList.size(), expectedCount);
+        } else{
+          caCertPemList = scmSecurityProtocolClient.listCACertificate();
+        }
+      }
+    }
+    return caCertPemList;
+  }
+
+  private static List<String> waitForCACerts(
+      final SupplierWithIOException<List<String>> applyFunction,
+      int expectedCount) throws IOException {
+    //TODO: make wait time and sleep time configurable if needed.
+    // TODO: If SCMs are bootstrapped later, then listCA need to be
+    //  refetched if listCA size is less than scm ha config node list size.
+    // For now when Client of SCM's are started we compare their node list
+    // size and ca list size if it is as expected, we return the ca list.
+    boolean caListUpToDate;
+    long waitTime = 5 * 60 * 1000L;
+    long retryTime = 10 * 1000L;
+    long currentTime = Time.monotonicNow();
+    List<String> caCertPemList;
+    do {
+      caCertPemList = applyFunction.get();
+      caListUpToDate =
+          caCertPemList.size() == expectedCount ? true : false;
+      if (!caListUpToDate) {
+        LOG.info("Expected CA list size {}, where as received CA List size " +
+            "{}. Retry to fetch CA List after {} seconds", expectedCount,
+            caCertPemList.size(), waitTime/1000);
+        try {
+          Thread.sleep(retryTime);
+        } catch (InterruptedException ex) {
+          Thread.currentThread().interrupt();
+        }
+      }
+    } while (!caListUpToDate &&
+        Time.monotonicNow() - currentTime < waitTime);
+    return caCertPemList;
+  }
+
+
+  private static void checkCertCount(int certCount, int expectedCount)
+      throws SCMSecurityException{
+    if (certCount != expectedCount) {
+      LOG.error("Unable to obtain CA list for SCM cluster, obtained CA list " +
+              "size is {}, where as expected list size is {}",
+          certCount, expectedCount);
+      throw new SCMSecurityException("Unable to obtain complete CA list");
+    }
+  }
+
+  /**
+   * Build CA List in the format of X509Certificate.
+   * If certificate client is null, obtain the list of CA using SCM
+   * security client, else it uses certificate client.
+   * @param certClient
+   * @param conf
+   * @return list of CA X509Certificates.
+   * @throws IOException
+   */
+  public static List<X509Certificate> buildCAX509List(
+      CertificateClient certClient,
+      ConfigurationSource conf) throws IOException {
+    if (certClient != null) {
+      // Do this here to avoid extra conversion of X509 to pem and again to
+      // X509 by buildCAList.
+      if (!SCMHAUtils.isSCMHAEnabled(conf)) {
+        List<X509Certificate> x509Certificates = new ArrayList<>();
+        if (certClient.getRootCACertificate() != null) {
+          x509Certificates.add(certClient.getRootCACertificate());
+        }
+        x509Certificates.add(certClient.getCACertificate());
+        return x509Certificates;
+      }
+    }
+    List<String> pemEncodedCerts = HAUtils.buildCAList(certClient, conf);
+    return OzoneSecurityUtil.convertToX509(pemEncodedCerts);
+  }
+
 }

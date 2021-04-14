@@ -16,27 +16,28 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.s3.header;
+package org.apache.hadoop.ozone.s3.signature;
 
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
-import org.junit.Test;
 
-
+import org.junit.Assert;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
+import org.junit.Test;
 
 /**
  * This class tests Authorization header format v2.
  */
-public class TestAuthorizationHeaderV2 {
+public class TestAuthorizationV2HeaderParser {
 
   @Test
   public void testAuthHeaderV2() throws OS3Exception {
     try {
       String auth = "AWS accessKey:signature";
-      AuthorizationHeaderV2 v2 = new AuthorizationHeaderV2(auth);
-      assertEquals(v2.getAccessKeyID(), "accessKey");
-      assertEquals(v2.getSignature(), "signature");
+      AuthorizationV2HeaderParser v2 = new AuthorizationV2HeaderParser(auth);
+      final SignatureInfo signatureInfo = v2.parseSignature();
+      assertEquals(signatureInfo.getAwsAccessId(), "accessKey");
+      assertEquals(signatureInfo.getSignature(), "signature");
     } catch (OS3Exception ex) {
       fail("testAuthHeaderV2 failed");
     }
@@ -44,20 +45,18 @@ public class TestAuthorizationHeaderV2 {
 
   @Test
   public void testIncorrectHeader1() throws OS3Exception {
-    try {
-      String auth = "AAA accessKey:signature";
-      new AuthorizationHeaderV2(auth);
-      fail("testIncorrectHeader");
-    } catch (OS3Exception ex) {
-      assertEquals("AuthorizationHeaderMalformed", ex.getCode());
-    }
+    String auth = "AAA accessKey:signature";
+    AuthorizationV2HeaderParser v2 = new AuthorizationV2HeaderParser(auth);
+    Assert.assertNull(v2.parseSignature());
+
   }
 
   @Test
   public void testIncorrectHeader2() throws OS3Exception {
     try {
       String auth = "AWS :accessKey";
-      new AuthorizationHeaderV2(auth);
+      AuthorizationV2HeaderParser v2 = new AuthorizationV2HeaderParser(auth);
+      Assert.assertNull(v2.parseSignature());
       fail("testIncorrectHeader");
     } catch (OS3Exception ex) {
       assertEquals("AuthorizationHeaderMalformed", ex.getCode());
@@ -68,7 +67,8 @@ public class TestAuthorizationHeaderV2 {
   public void testIncorrectHeader3() throws OS3Exception {
     try {
       String auth = "AWS :signature";
-      new AuthorizationHeaderV2(auth);
+      AuthorizationV2HeaderParser v2 = new AuthorizationV2HeaderParser(auth);
+      Assert.assertNull(v2.parseSignature());
       fail("testIncorrectHeader");
     } catch (OS3Exception ex) {
       assertEquals("AuthorizationHeaderMalformed", ex.getCode());
@@ -79,7 +79,8 @@ public class TestAuthorizationHeaderV2 {
   public void testIncorrectHeader4() throws OS3Exception {
     try {
       String auth = "AWS accessKey:";
-      new AuthorizationHeaderV2(auth);
+      AuthorizationV2HeaderParser v2 = new AuthorizationV2HeaderParser(auth);
+      Assert.assertNull(v2.parseSignature());
       fail("testIncorrectHeader");
     } catch (OS3Exception ex) {
       assertEquals("AuthorizationHeaderMalformed", ex.getCode());

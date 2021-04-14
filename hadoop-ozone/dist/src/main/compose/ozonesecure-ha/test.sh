@@ -20,18 +20,20 @@ export COMPOSE_DIR
 
 export SECURITY_ENABLED=true
 export OM_SERVICE_ID="id1"
+export SCM=scm1.org
 
 # shellcheck source=/dev/null
 source "$COMPOSE_DIR/../testlib.sh"
 
 start_docker_env
 
-execute_robot_test scm kinit.robot
+execute_robot_test ${SCM} kinit.robot
 
-execute_robot_test scm freon
+execute_robot_test ${SCM} freon
 
-execute_robot_test scm basic/links.robot
+execute_robot_test ${SCM} basic/links.robot
 
+execute_robot_test ${SCM} s3
 stop_docker_env
 
 generate_report
