@@ -20,6 +20,7 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.junit.Assert;
@@ -285,9 +286,12 @@ public class TestOzoneManagerHAWithACL extends TestOzoneManagerHA {
     Assert.assertTrue(containsAcl(userAcl, acls));
 
     // Add an already existing acl.
-    addAcl = objectStore.addAcl(ozoneObj, userAcl);
-    Assert.assertFalse(addAcl);
-
+    OzoneAcl finalUserAcl = userAcl;
+    Assert.assertThrows(OMException.class,() -> {
+      objectStore.addAcl(ozoneObj, finalUserAcl);
+    });
+    /*addAcl = objectStore.addAcl(ozoneObj, userAcl);
+    Assert.assertFalse(addAcl);*/
     // Add an acl by changing acl type with same type, name and scope.
     userAcl = new OzoneAcl(USER, remoteUserName,
         WRITE, DEFAULT);
@@ -305,11 +309,14 @@ public class TestOzoneManagerHAWithACL extends TestOzoneManagerHA {
     Assert.assertTrue(acls.size() > 0);
 
     // Remove an existing acl.
-    boolean removeAcl = objectStore.removeAcl(ozoneObj, acls.get(0));
-    Assert.assertTrue(removeAcl);
+    Assert.assertThrows(OMException.class,() -> {
+      objectStore.removeAcl(ozoneObj, acls.get(0));
+    });
+    /*boolean removeAcl = objectStore.removeAcl(ozoneObj, acls.get(0));
+    Assert.assertTrue(removeAcl);*/
 
     // Trying to remove an already removed acl.
-    removeAcl = objectStore.removeAcl(ozoneObj, acls.get(0));
+    boolean removeAcl = objectStore.removeAcl(ozoneObj, acls.get(0));
     Assert.assertFalse(removeAcl);
 
     boolean addAcl = objectStore.addAcl(ozoneObj, userAcl);
