@@ -336,4 +336,27 @@ public final class SCMCertStore implements CertificateStore {
 
     }
   }
+
+  @Override
+  public List<CRLInfo> getCrls(List<Long> crlIds) throws IOException {
+    List<CRLInfo> results = new ArrayList<>();
+    for (Long crlId : crlIds) {
+      try {
+        CRLInfo crlInfo =
+            scmMetadataStore.getCRLInfoTable().get(crlId);
+        results.add(crlInfo);
+      } catch (IOException e) {
+        LOG.error("Fail to get CRLs from SCM metadata store for crlId: "
+            + crlId, e);
+        throw new SCMSecurityException("Fail to get CRLs from SCM metadata " +
+            "store for crlId: " + crlId, e);
+      }
+    }
+    return results;
+  }
+
+  @Override
+  public long getLatestCrlId() {
+    return crlSequenceId.get();
+  }
 }
