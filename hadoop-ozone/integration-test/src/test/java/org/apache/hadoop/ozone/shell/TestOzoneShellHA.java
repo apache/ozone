@@ -584,8 +584,9 @@ public class TestOzoneShellHA {
 
     // setup configuration to use TrashPolicyOzone
     // (default is TrashPolicyDefault)
+    final String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + omServiceId;
     OzoneConfiguration clientConf =
-            getClientConfForOzoneTrashPolicy("ofs://localhost", conf);
+            getClientConfForOzoneTrashPolicy(hostPrefix, conf);
     OzoneFsShell shell = new OzoneFsShell(clientConf);
 
     int res;
