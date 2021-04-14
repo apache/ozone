@@ -48,9 +48,14 @@ services:
     ports:
       - 9864:9999
     command: ["/opt/hadoop/bin/ozone","datanode"]
+    extra_hosts:
+      - "scm1.org: 172.25.0.116"
+      - "scm2.org: 172.25.0.117"
+      - "scm3.org: 172.25.0.118"
     env_file:
       - docker-config
     environment:
+      WAITFOR: scm3.org:9865
       KERBEROS_KEYTABS: dn HTTP
       OZONE_OPTS:
     networks:
@@ -63,9 +68,14 @@ services:
     ports:
       - 9866:9999
     command: ["/opt/hadoop/bin/ozone","datanode"]
+    extra_hosts:
+      - "scm1.org: 172.25.0.116"
+      - "scm2.org: 172.25.0.117"
+      - "scm3.org: 172.25.0.118"
     env_file:
       - docker-config
     environment:
+      WAITFOR: scm3.org:9865
       KERBEROS_KEYTABS: dn HTTP
       OZONE_OPTS:
     networks:
@@ -78,9 +88,14 @@ services:
     ports:
       - 9868:9999
     command: ["/opt/hadoop/bin/ozone","datanode"]
+    extra_hosts:
+      - "scm1.org: 172.25.0.116"
+      - "scm2.org: 172.25.0.117"
+      - "scm3.org: 172.25.0.118"
     env_file:
       - docker-config
     environment:
+      WAITFOR: scm3.org:9865
       KERBEROS_KEYTABS: dn HTTP
       OZONE_OPTS:
     networks:
@@ -96,12 +111,17 @@ services:
       - 9890:9872
       #- 18001:18001
     environment:
+      WAITFOR: scm3.org:9865
       ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
       KERBEROS_KEYTABS: om HTTP
       OZONE_OPTS:
     env_file:
       - ./docker-config
     command: ["/opt/hadoop/bin/ozone","om"]
+    extra_hosts:
+      - "scm1.org: 172.25.0.116"
+      - "scm2.org: 172.25.0.117"
+      - "scm3.org: 172.25.0.118"
     networks:
       ozone_net:
         ipv4_address: 172.25.0.111
@@ -115,12 +135,17 @@ services:
       - 9892:9872
       #- 18002:18002
     environment:
+      WAITFOR: scm3.org:9865
       ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
       KERBEROS_KEYTABS: om HTTP
       OZONE_OPTS:
     env_file:
       - ./docker-config
     command: ["/opt/hadoop/bin/ozone","om"]
+    extra_hosts:
+      - "scm1.org: 172.25.0.116"
+      - "scm2.org: 172.25.0.117"
+      - "scm3.org: 172.25.0.118"
     networks:
       ozone_net:
         ipv4_address: 172.25.0.112
@@ -134,12 +159,17 @@ services:
       - 9894:9872
       #- 18003:18003
     environment:
+      WAITFOR: scm3.org:9865
       ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
       KERBEROS_KEYTABS: om HTTP
       OZONE_OPTS:
     env_file:
       - ./docker-config
     command: ["/opt/hadoop/bin/ozone","om"]
+    extra_hosts:
+      - "scm1.org: 172.25.0.116"
+      - "scm2.org: 172.25.0.117"
+      - "scm3.org: 172.25.0.118"
     networks:
       ozone_net:
         ipv4_address: 172.25.0.113
@@ -159,35 +189,14 @@ services:
     networks:
       ozone_net:
         ipv4_address: 172.25.0.114
-  recon:
+  scm1.org:
     image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
-    hostname: recon
+    hostname: scm1.org
     volumes:
       - ../..:/opt/hadoop
     ports:
-      - 9888:9888
-      #- 18000:18000
-    env_file:
-      - ./docker-config
-    environment:
-      KERBEROS_KEYTABS: recon HTTP
-      OZONE_OPTS:
-    command: ["/opt/hadoop/bin/ozone","recon"]
-    extra_hosts:
-      - "om1: 172.25.0.111"
-      - "om2: 172.25.0.112"
-      - "om3: 172.25.0.113"
-    networks:
-      ozone_net:
-        ipv4_address: 172.25.0.115
-  scm:
-    image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
-    hostname: scm
-    volumes:
-      - ../..:/opt/hadoop
-    ports:
-      - 9876:9876
-      - 9860:9860
+      - 9990:9876
+      - 9992:9860
     env_file:
       - docker-config
     environment:
@@ -200,9 +209,66 @@ services:
       - "om1: 172.25.0.111"
       - "om2: 172.25.0.112"
       - "om3: 172.25.0.113"
+      - "scm1.org: 172.25.0.116"
+      - "scm2.org: 172.25.0.117"
+      - "scm3.org: 172.25.0.118"
     networks:
       ozone_net:
         ipv4_address: 172.25.0.116
+  scm2.org:
+    image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
+    hostname: scm2.org
+    volumes:
+      - ../..:/opt/hadoop
+    ports:
+      - 9994:9876
+      - 9996:9860
+    env_file:
+      - docker-config
+    environment:
+      WAITFOR: scm1.org:9865
+      KERBEROS_KEYTABS: scm HTTP testuser testuser2
+      ENSURE_SCM_BOOTSTRAPPED: /data/metadata/scm/current/VERSION
+      OZONE-SITE.XML_hdds.scm.safemode.min.datanode: "${OZONE_SAFEMODE_MIN_DATANODES:-3}"
+      OZONE_OPTS:
+    command: ["/opt/hadoop/bin/ozone","scm"]
+    extra_hosts:
+      - "om1: 172.25.0.111"
+      - "om2: 172.25.0.112"
+      - "om3: 172.25.0.113"
+      - "scm1.org: 172.25.0.116"
+      - "scm2.org: 172.25.0.117"
+      - "scm3.org: 172.25.0.118"
+    networks:
+      ozone_net:
+        ipv4_address: 172.25.0.117
+  scm3.org:
+    image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
+    hostname: scm3.org
+    volumes:
+      - ../..:/opt/hadoop
+    ports:
+      - 9998:9876
+      - 10002:9860
+    env_file:
+      - docker-config
+    environment:
+      WAITFOR: scm2.org:9865
+      KERBEROS_KEYTABS: scm HTTP testuser testuser2
+      ENSURE_SCM_BOOTSTRAPPED: /data/metadata/scm/current/VERSION
+      OZONE-SITE.XML_hdds.scm.safemode.min.datanode: "${OZONE_SAFEMODE_MIN_DATANODES:-3}"
+      OZONE_OPTS:
+    command: ["/opt/hadoop/bin/ozone","scm"]
+    extra_hosts:
+      - "om1: 172.25.0.111"
+      - "om2: 172.25.0.112"
+      - "om3: 172.25.0.113"
+      - "scm1.org: 172.25.0.116"
+      - "scm2.org: 172.25.0.117"
+      - "scm3.org: 172.25.0.118"
+    networks:
+      ozone_net:
+        ipv4_address: 172.25.0.118
 networks:
   ozone_net:
     ipam:

@@ -44,5 +44,6 @@ public enum ConfigTag {
   DATANODE,
   RECON,
   DELETION,
-  HA
+  HA,
+  BALANCER
 }

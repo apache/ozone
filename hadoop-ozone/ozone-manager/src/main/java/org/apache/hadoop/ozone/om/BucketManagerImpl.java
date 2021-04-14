@@ -33,7 +33,6 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.util.StringUtils;
@@ -160,11 +159,8 @@ public class BucketManagerImpl implements BucketManager {
       OmBucketInfo.Builder omBucketInfoBuilder = bucketInfo.toBuilder()
           .setCreationTime(Time.now());
 
-      List<OzoneManagerProtocolProtos.OzoneAclInfo> defaultAclList =
-          volumeArgs.getAclMap().getDefaultAclList();
-      for (OzoneManagerProtocolProtos.OzoneAclInfo a : defaultAclList) {
-        omBucketInfoBuilder.addAcl(OzoneAcl.fromProtobufWithAccessType(a));
-      }
+      OzoneAclUtil.inheritDefaultAcls(omBucketInfoBuilder.getAcls(),
+          volumeArgs.getDefaultAcls());
 
       if (bekb != null) {
         omBucketInfoBuilder.setBucketEncryptionKey(bekb.build());

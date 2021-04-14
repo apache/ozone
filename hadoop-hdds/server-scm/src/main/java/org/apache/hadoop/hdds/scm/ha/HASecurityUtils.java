@@ -20,18 +20,31 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ScmNodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
-import org.apache.hadoop.hdds.scm.server.SCMCertStore;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateServer;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.DefaultCAServer;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.DefaultCAProfile;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.PKIProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse;
 import org.apache.hadoop.hdds.security.x509.certificate.client.SCMCertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.ratis.RaftConfigKeys;
+import org.apache.ratis.client.RaftClient;
+import org.apache.ratis.conf.Parameters;
+import org.apache.ratis.conf.RaftProperties;
+import org.apache.ratis.grpc.GrpcConfigKeys;
+import org.apache.ratis.grpc.GrpcTlsConfig;
+import org.apache.ratis.protocol.Message;
+import org.apache.ratis.protocol.RaftClientReply;
+import org.apache.ratis.protocol.RaftGroup;
+import org.apache.ratis.retry.RetryPolicies;
+import org.apache.ratis.rpc.RpcType;
+import org.apache.ratis.util.TimeDuration;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
@@ -43,7 +56,9 @@ import java.net.InetSocketAddress;
 import java.security.KeyPair;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.SCM;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateApprover.ApprovalType.KERBEROS_TRUSTED;
@@ -64,13 +79,12 @@ public final class HASecurityUtils {
    * Initialize Security which generates public, private key pair and get SCM
    * signed certificate and persist to local disk.
    * @param scmStorageConfig
-   * @param fetchedScmId
    * @param conf
    * @param scmAddress
    * @throws IOException
    */
   public static void initializeSecurity(SCMStorageConfig scmStorageConfig,
-      String fetchedScmId, OzoneConfiguration conf,
+      OzoneConfiguration conf,
       InetSocketAddress scmAddress, boolean primaryscm)
       throws IOException {
     LOG.info("Initializing secure StorageContainerManager.");
@@ -85,11 +99,11 @@ public final class HASecurityUtils {
       break;
     case GETCERT:
       if (!primaryscm) {
-        getRootCASignedSCMCert(certClient, conf, fetchedScmId, scmStorageConfig,
+        getRootCASignedSCMCert(certClient, conf, scmStorageConfig,
             scmAddress);
       } else {
-        getPrimarySCMSelfSignedCert(certClient, conf, fetchedScmId,
-            scmStorageConfig, scmAddress);
+        getPrimarySCMSelfSignedCert(certClient, conf, scmStorageConfig,
+            scmAddress);
       }
       LOG.info("Successfully stored SCM signed certificate.");
       break;
@@ -113,18 +127,18 @@ public final class HASecurityUtils {
    * client.
    */
   private static void getRootCASignedSCMCert(CertificateClient client,
-      OzoneConfiguration config, String fetchedSCMId,
+      OzoneConfiguration config,
       SCMStorageConfig scmStorageConfig, InetSocketAddress scmAddress) {
     try {
       // Generate CSR.
       PKCS10CertificationRequest csr = generateCSR(client, scmStorageConfig,
-          config, scmAddress, fetchedSCMId);
+          config, scmAddress);
 
       ScmNodeDetailsProto scmNodeDetailsProto =
           ScmNodeDetailsProto.newBuilder()
               .setClusterId(scmStorageConfig.getClusterID())
               .setHostName(scmAddress.getHostName())
-              .setScmNodeId(fetchedSCMId).build();
+              .setScmNodeId(scmStorageConfig.getScmId()).build();
 
       // Create SCM security client.
       SCMSecurityProtocolClientSideTranslatorPB secureScmClient =
@@ -165,16 +179,17 @@ public final class HASecurityUtils {
    * root CA certificate server and store it using certificate client.
    */
   private static void getPrimarySCMSelfSignedCert(CertificateClient client,
-      OzoneConfiguration config, String fetchedSCMId,
-      SCMStorageConfig scmStorageConfig, InetSocketAddress scmAddress) {
+      OzoneConfiguration config, SCMStorageConfig scmStorageConfig,
+      InetSocketAddress scmAddress) {
 
     try {
 
       CertificateServer rootCAServer =
-          initializeRootCertificateServer(config, null, scmStorageConfig);
+          initializeRootCertificateServer(config, null, scmStorageConfig,
+              new DefaultCAProfile());
 
       PKCS10CertificationRequest csr = generateCSR(client, scmStorageConfig,
-          config, scmAddress, fetchedSCMId);
+          config, scmAddress);
 
       X509CertificateHolder subSCMCertHolder = rootCAServer.
           requestCertificate(csr, KERBEROS_TRUSTED, SCM).get();
@@ -216,15 +231,15 @@ public final class HASecurityUtils {
    * @param scmStorageConfig
    */
   public static CertificateServer initializeRootCertificateServer(
-      OzoneConfiguration config, SCMCertStore scmCertStore,
-      SCMStorageConfig scmStorageConfig)
+      OzoneConfiguration config, CertificateStore scmCertStore,
+      SCMStorageConfig scmStorageConfig, PKIProfile pkiProfile)
       throws IOException {
     String subject = SCM_ROOT_CA_PREFIX +
         InetAddress.getLocalHost().getHostName();
 
     DefaultCAServer rootCAServer = new DefaultCAServer(subject,
         scmStorageConfig.getClusterID(),
-        scmStorageConfig.getScmId(), scmCertStore, new DefaultCAProfile(),
+        scmStorageConfig.getScmId(), scmCertStore, pkiProfile,
         SCM_ROOT_CA_COMPONENT_NAME);
 
     rootCAServer.init(new SecurityConfig(config),
@@ -238,8 +253,8 @@ public final class HASecurityUtils {
    */
   private static PKCS10CertificationRequest generateCSR(
       CertificateClient client, SCMStorageConfig scmStorageConfig,
-      OzoneConfiguration config, InetSocketAddress scmAddress,
-      String fetchedSCMId) throws IOException {
+      OzoneConfiguration config, InetSocketAddress scmAddress)
+      throws IOException {
     CertificateSignRequest.Builder builder = client.getCSRBuilder();
     KeyPair keyPair = new KeyPair(client.getPublicKey(),
         client.getPrivateKey());
@@ -251,13 +266,13 @@ public final class HASecurityUtils {
 
     builder.setKey(keyPair)
         .setConfiguration(config)
-        .setScmID(fetchedSCMId)
+        .setScmID(scmStorageConfig.getScmId())
         .setClusterID(scmStorageConfig.getClusterID())
         .setSubject(subject);
 
 
     LOG.info("Creating csr for SCM->hostName:{},scmId:{},clusterId:{}," +
-            "subject:{}", hostname, fetchedSCMId,
+            "subject:{}", hostname, scmStorageConfig.getScmId(),
         scmStorageConfig.getClusterID(), subject);
 
     return builder.build();
@@ -280,5 +295,84 @@ public final class HASecurityUtils {
 
     certCodec.writeCertificate(certificateHolder);
   }
+
+  /**
+   * Create Server TLS parameters required for Ratis Server.
+
+   * @return Parameter map set with TLS config.
+   */
+  public static Parameters createSCMServerTlsParameters(
+      GrpcTlsConfig grpcTlsConfig) {
+    Parameters parameters = new Parameters();
+
+    if (grpcTlsConfig != null) {
+      GrpcConfigKeys.Server.setTlsConf(parameters, grpcTlsConfig);
+      GrpcConfigKeys.Admin.setTlsConf(parameters, grpcTlsConfig);
+      GrpcConfigKeys.Client.setTlsConf(parameters, grpcTlsConfig);
+      GrpcConfigKeys.TLS.setConf(parameters, grpcTlsConfig);
+    }
+
+    return parameters;
+  }
+
+  /**
+   * Create GrpcTlsConfig.
+   * @param conf
+   * @param certificateClient
+   * @return
+   */
+  public static GrpcTlsConfig createSCMRatisTLSConfig(SecurityConfig conf,
+      CertificateClient certificateClient) {
+    if (conf.isSecurityEnabled() && conf.isGrpcTlsEnabled()) {
+      return new GrpcTlsConfig(
+          certificateClient.getPrivateKey(), certificateClient.getCertificate(),
+          certificateClient.getCACertificate(), true);
+    }
+    return null;
+  }
+
+  /**
+   * Submit SCM certs request to ratis using RaftClient.
+   * @param raftGroup
+   * @param tlsConfig
+   * @param message
+   * @return SCMRatisResponse.
+   * @throws Exception
+   */
+  public static SCMRatisResponse submitScmCertsToRatis(RaftGroup raftGroup,
+      GrpcTlsConfig tlsConfig, Message message) throws Exception {
+    final RaftProperties properties = new RaftProperties();
+
+    // TODO: GRPC TLS only for now, netty/hadoop RPC TLS support later.
+    RaftConfigKeys.Rpc.setType(properties, RpcType.valueOf("GRPC"));
+
+
+    // For now not making anything configurable, RaftClient  is only used
+    // in SCM for DB updates of sub-ca certs go via Ratis.
+    RaftClient.Builder builder =  RaftClient.newBuilder()
+        .setRaftGroup(raftGroup)
+        .setLeaderId(null)
+        .setProperties(properties)
+        .setRetryPolicy(
+            RetryPolicies.retryUpToMaximumCountWithFixedSleep(15,
+                TimeDuration.valueOf(500, TimeUnit.MILLISECONDS)));
+
+    if (tlsConfig != null) {
+      Parameters parameters = new Parameters();
+      GrpcConfigKeys.Client.setTlsConf(parameters, tlsConfig);
+      builder.setParameters(parameters);
+    }
+
+    RaftClient raftClient =  builder.build();
+
+    CompletableFuture<RaftClientReply> future =
+        raftClient.async().send(message);
+
+    RaftClientReply raftClientReply = future.get();
+
+    return SCMRatisResponse.decode(raftClientReply);
+
+  }
+
 
 }

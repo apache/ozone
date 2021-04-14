@@ -3093,7 +3093,7 @@ public abstract class TestOzoneRpcClientAbstract {
     if(expectedAcls.size()>0) {
       OzoneAcl oldAcl = expectedAcls.get(0);
       OzoneAcl newAcl = new OzoneAcl(oldAcl.getType(), oldAcl.getName(),
-          ACLType.READ_ACL, ACCESS);
+          ACLType.READ_ACL, oldAcl.getAclScope());
       // Verify that operation successful.
       assertTrue(store.addAcl(ozObj, newAcl));
 
