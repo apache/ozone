@@ -498,6 +498,23 @@ public class TestOzoneShellHA {
     return clientConf;
   }
 
+  /**
+   * Helper function to retrieve Ozone client configuration for ozone
+   * trash testing with TrashPolicyOzone.
+   * @param hostPrefix Scheme + Authority. e.g. ofs://om-service-test1
+   * @param configuration Server config to generate client config from.
+   * @return Config ofs configuration added with fs.trash.classname
+   * = TrashPolicyOzone.
+   */
+  private OzoneConfiguration getClientConfForOzoneTrashPolicy(
+          String hostPrefix, OzoneConfiguration configuration) {
+    OzoneConfiguration clientConf =
+            getClientConfForOFS(hostPrefix, configuration);
+    clientConf.setClass("fs.trash.classname", TrashPolicyOzone.class,
+            TrashPolicy.class);
+    return clientConf;
+  }
+
   @Test
   public void testDeleteToTrashOrSkipTrash() throws Exception {
     final String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + omServiceId;
@@ -567,11 +584,8 @@ public class TestOzoneShellHA {
 
     // setup configuration to use TrashPolicyOzone
     // (default is TrashPolicyDefault)
-    OzoneConfiguration clientConf = new OzoneConfiguration(conf);
-    clientConf.set(FS_DEFAULT_NAME_KEY, "ofs://localhost");
-    clientConf.setInt(FS_TRASH_INTERVAL_KEY, 60);
-    clientConf.setClass("fs.trash.classname", TrashPolicyOzone.class,
-                        TrashPolicy.class);
+    OzoneConfiguration clientConf =
+            getClientConfForOzoneTrashPolicy("ofs://localhost", conf);
     OzoneFsShell shell = new OzoneFsShell(clientConf);
 
     int res;
