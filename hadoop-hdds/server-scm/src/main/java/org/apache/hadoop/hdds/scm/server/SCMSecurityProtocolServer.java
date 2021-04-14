@@ -316,7 +316,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
   public String getRootCACertificate() throws IOException {
     LOGGER.debug("Getting Root CA certificate.");
     if (storageContainerManager.getScmStorageConfig()
-        .getPrimaryScmNodeId() != null) {
+        .checkPrimarySCMIdInitialized()) {
       return CertificateCodec.getPEMEncodedString(rootCACertificate);
     }
     return null;
