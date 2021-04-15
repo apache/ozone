@@ -139,7 +139,9 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.slf4j.event.Level.DEBUG;
 
+import org.junit.FixMethodOrder;
 import org.junit.Test;
+import org.junit.runners.MethodSorters;
 
 /**
  * This is an abstract class to test all the public facing APIs of Ozone
@@ -148,6 +150,7 @@ import org.junit.Test;
  * requests directly to OzoneManager. {@link TestOzoneRpcClientWithRatis}
  * tests the Ozone Client by submitting requests to OM's Ratis server.
  */
+@FixMethodOrder(MethodSorters.NAME_ASCENDING)
 public abstract class TestOzoneRpcClientAbstract {
 
   private static MiniOzoneCluster cluster = null;
@@ -1493,8 +1496,9 @@ public abstract class TestOzoneRpcClientAbstract {
     }
   }
 
+  // Make this executed at last, for it has some side effect to other UTs
   @Test
-  public void testReadKeyWithUnhealthyContainerReplia() throws Exception {
+  public void testZReadKeyWithUnhealthyContainerReplia() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
@@ -1528,17 +1532,20 @@ public abstract class TestOzoneRpcClientAbstract {
 
     // Set container replica to UNHEALTHY
     Container container = null;
-    int index = 0;
+    int index = 1;
+    List<HddsDatanodeService> involvedDNs = new ArrayList<>();
     for (HddsDatanodeService hddsDatanode : cluster.getHddsDatanodes()) {
       container = hddsDatanode.getDatanodeStateMachine().getContainer()
           .getContainerSet().getContainer(containerID);
-      Assert.assertNotNull("Container not found", container);
+      if (container == null) {
+        continue;
+      }
       container.markContainerUnhealthy();
       // Change first and second replica commit sequenceId
-      if (index < cluster.getHddsDatanodes().size() - 1) {
+      if (index < 3) {
         long newBCSID = container.getBlockCommitSequenceId() - 1;
-        try(ReferenceCountedDB db = BlockUtils.getDB(
-            (KeyValueContainerData)container.getContainerData(),
+        try (ReferenceCountedDB db = BlockUtils.getDB(
+            (KeyValueContainerData) container.getContainerData(),
             cluster.getConf())) {
           db.getStore().getMetadataTable().put(
               OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID, newBCSID);
@@ -1546,19 +1553,26 @@ public abstract class TestOzoneRpcClientAbstract {
         container.updateBlockCommitSequenceId(newBCSID);
         index++;
       }
+      involvedDNs.add(hddsDatanode);
     }
 
     // Restart DNs
-    int dnCount = cluster.getHddsDatanodes().size();
+    int dnCount = involvedDNs.size();
     for (index = 0; index < dnCount; index++) {
-      cluster.restartHddsDatanode(index, true);
+      if (index == dnCount - 1) {
+        cluster.restartHddsDatanode(
+            involvedDNs.get(index).getDatanodeDetails(), true);
+      } else {
+        cluster.restartHddsDatanode(
+            involvedDNs.get(index).getDatanodeDetails(), false);
+      }
     }
 
+    Thread.currentThread().sleep(5000);
     StorageContainerManager scm = cluster.getStorageContainerManager();
-    long containerId = container.getContainerData().getContainerID();
     GenericTestUtils.waitFor(() -> {
       try {
-        ContainerInfo containerInfo = scm.getContainerInfo(containerId);
+        ContainerInfo containerInfo = scm.getContainerInfo(containerID);
         System.out.println("state " + containerInfo.getState());
         return containerInfo.getState() == HddsProtos.LifeCycleState.CLOSING;
       } catch (IOException e) {
@@ -1573,7 +1587,7 @@ public abstract class TestOzoneRpcClientAbstract {
       OzoneInputStream is = bucket.readKey(keyName2);
       byte[] content = new byte[100];
       is.read(content);
-      String retValue = new String(content);
+      String retValue = new String(content, UTF_8);
       Assert.assertTrue(value.equals(retValue.trim()));
     } catch (IOException e) {
       fail("Reading unhealthy replica should succeed.");
@@ -3552,9 +3566,8 @@ public abstract class TestOzoneRpcClientAbstract {
     }
   }
 
-
   @Test
-  public void setS3VolumeAcl() throws Exception {
+  public void testSetS3VolumeAcl() throws Exception {
     OzoneObj s3vVolume = new OzoneObjInfo.Builder()
         .setVolumeName(HddsClientUtils.getS3VolumeName(cluster.getConf()))
         .setResType(OzoneObj.ResourceType.VOLUME)
