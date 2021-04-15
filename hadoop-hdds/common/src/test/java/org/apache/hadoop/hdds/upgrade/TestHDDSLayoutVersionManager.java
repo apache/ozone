@@ -89,4 +89,14 @@ public class TestHDDSLayoutVersionManager {
     verify(mockObj, times(0)).mockMethodScm();
     verify(mockObj, times(1)).mockMethodDn();
   }
+
+  @Test
+  public void testHDDSLayoutFeaturesHaveIncreasingLayoutVersion() {
+    HDDSLayoutFeature[] values = HDDSLayoutFeature.values();
+    int currVersion = Integer.MIN_VALUE;
+    for (HDDSLayoutFeature lf : values) {
+      assertTrue(currVersion < lf.layoutVersion());
+      currVersion = lf.layoutVersion();
+    }
+  }
 }

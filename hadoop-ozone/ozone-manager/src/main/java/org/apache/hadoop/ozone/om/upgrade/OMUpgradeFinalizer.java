@@ -18,19 +18,15 @@
 
 package org.apache.hadoop.ozone.om.upgrade;
 
-import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON_FINALIZE;
 import static org.apache.hadoop.ozone.OzoneConsts.LAYOUT_VERSION_KEY;
-import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_REQUIRED;
 
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 
 import java.io.IOException;
-import java.util.Optional;
 
 import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
-import org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeAction;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
 
 /**
@@ -38,8 +34,6 @@ import org.apache.hadoop.ozone.upgrade.UpgradeException;
  */
 public class OMUpgradeFinalizer extends BasicUpgradeFinalizer<OzoneManager,
     OMLayoutVersionManager> {
-  private  static final OmUpgradeAction NOOP = a -> {};
-  private OzoneManager ozoneManager;
 
   public OMUpgradeFinalizer(OMLayoutVersionManager versionManager) {
     super(versionManager);
@@ -48,51 +42,22 @@ public class OMUpgradeFinalizer extends BasicUpgradeFinalizer<OzoneManager,
   @Override
   public StatusAndMessages finalize(String upgradeClientID, OzoneManager om)
       throws IOException {
-    ozoneManager = om;
-    StatusAndMessages response = preFinalize(upgradeClientID, om);
-    if (response.status() != FINALIZATION_REQUIRED) {
-      return response;
-    }
-    // This requires some more investigation on how to do it properly while
-    // requests are on the fly, and post finalize features one by one.
-    // Until that is done, monitoring is not really doing anything meaningful
-    // but this is a tradoff we can take for the first iteration either if
-    // needed, as the finalization of the first few features should not take
-    // that long. Follow up JIRA is in HDDS-4286
-    //    String threadName = "OzoneManager-Upgrade-Finalizer";
-    //    ExecutorService executor =
-    //        Executors.newSingleThreadExecutor(r -> new Thread(threadName));
-    //    executor.submit(new Worker(om));
-    try {
-      getFinalizationExecutor().execute(ozoneManager.getOmStorage(),
-          this);
-    } catch (Exception e) {
-      e.printStackTrace();
-      throw (IOException) e;
-    }
-    return STARTING_MSG;
+    return super.finalize(upgradeClientID, om);
   }
 
   @Override
-  protected void postFinalizeUpgrade() throws IOException {
+  public void postFinalizeUpgrade(OzoneManager om) {
     return;
   }
 
   @Override
-  protected void finalizeUpgrade(Storage storageConfig)
+  public void finalizeUpgrade(OzoneManager om)
       throws UpgradeException {
-    for (OMLayoutFeature f : versionManager.unfinalizedFeatures()) {
-      Optional<? extends UpgradeAction> action = f.action(ON_FINALIZE);
-      finalizeFeature(f, storageConfig, action);
-      updateLayoutVersionInVersionFile(f, storageConfig);
-      versionManager.finalized(f);
-    }
-    versionManager.completeFinalization();
+    super.finalizeUpgrade(om::getOmStorage);
   }
 
   @Override
-  protected boolean preFinalizeUpgrade() throws IOException {
-    return true;
+  public void preFinalizeUpgrade(OzoneManager om) {
   }
 
   public void runPrefinalizeStateActions(Storage storage, OzoneManager om)
@@ -107,6 +72,7 @@ public class OMUpgradeFinalizer extends BasicUpgradeFinalizer<OzoneManager,
    * @param om OM instance
    * @throws IOException on Error.
    */
+  @Override
   public void updateLayoutVersionInDB(OMLayoutVersionManager lvm,
                                       OzoneManager om)
       throws IOException {

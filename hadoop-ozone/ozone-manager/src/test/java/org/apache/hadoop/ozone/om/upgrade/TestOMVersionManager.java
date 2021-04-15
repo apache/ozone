@@ -78,7 +78,8 @@ public class TestOMVersionManager {
   }
 
   @Test
-  public void testOMLayoutFeatureCatalog() throws Exception {
+  public void testOMLayoutFeaturesHaveIncreasingLayoutVersion()
+      throws Exception {
     OMLayoutFeature[] values = OMLayoutFeature.values();
     int currVersion = Integer.MIN_VALUE;
     OMLayoutFeature lastFeature = null;
