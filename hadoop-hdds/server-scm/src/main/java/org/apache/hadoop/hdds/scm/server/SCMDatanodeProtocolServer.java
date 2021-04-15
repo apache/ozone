@@ -26,6 +26,7 @@ import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.fs.CommonConfigurationKeys;
@@ -94,6 +95,8 @@ import static org.apache.hadoop.hdds.scm.events.SCMEvents.PIPELINE_REPORT;
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.startRpcServer;
 import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
+
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -108,6 +111,9 @@ public class SCMDatanodeProtocolServer implements
 
   private static final AuditLogger AUDIT =
       new AuditLogger(AuditLoggerType.SCMLOGGER);
+
+  //only used for tracing containerReport
+  private AtomicLong containerReportCount;
 
   /**
    * The RPC server that listens to requests from DataNodes.
@@ -132,6 +138,7 @@ public class SCMDatanodeProtocolServer implements
 
     this.scm = scm;
     this.eventPublisher = eventPublisher;
+    this.containerReportCount = new AtomicLong(0);
 
     heartbeatDispatcher = new SCMDatanodeHeartbeatDispatcher(
         scm.getScmNodeManager(), eventPublisher);
@@ -221,6 +228,11 @@ public class SCMDatanodeProtocolServer implements
         .register(datanodeDetails, nodeReport, pipelineReportsProto);
     if (registeredCommand.getError()
         == SCMRegisteredResponseProto.ErrorCode.success) {
+      LOG.trace("fire CONTAINER_REPORT event of " +
+              "uuid {} at {} when processing register,"
+              +"and register containerReportCount is {}",
+          datanodeDetails.getUuid(), Time.now(),
+          containerReportCount.addAndGet(1L));
       eventPublisher.fireEvent(CONTAINER_REPORT,
           new SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode(
               datanodeDetails, containerReportsProto));

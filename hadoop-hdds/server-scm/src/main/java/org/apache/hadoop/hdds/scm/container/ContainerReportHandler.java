@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,6 +43,7 @@ import java.io.IOException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 /**
@@ -57,6 +59,8 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
   private final ContainerManagerV2 containerManager;
   private final String unknownContainerHandleAction;
 
+  //only used for tracing containerReport
+  private AtomicLong processedContainerReportCount;
   /**
    * The action taken by ContainerReportHandler to handle
    * unknown containers.
@@ -79,6 +83,7 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
     super(containerManager, scmContext, LOG);
     this.nodeManager = nodeManager;
     this.containerManager = containerManager;
+    this.processedContainerReportCount = new AtomicLong(0);
 
     if (conf != null) {
       ScmConfig scmConfig = conf.getObject(ScmConfig.class);
@@ -102,7 +107,6 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
   @Override
   public void onMessage(final ContainerReportFromDatanode reportFromDatanode,
                         final EventPublisher publisher) {
-
     final DatanodeDetails dnFromReport =
         reportFromDatanode.getDatanodeDetails();
     DatanodeDetails datanodeDetails =
@@ -114,10 +118,13 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
     }
     final ContainerReportsProto containerReport =
         reportFromDatanode.getReport();
-
+    long startTime = Time.monotonicNow();
     try {
       final List<ContainerReplicaProto> replicas =
           containerReport.getReportsList();
+      LOG.info("begin processing ContainerReport of {} at {}," +
+          "which contains {} ContainerReplicaProto",
+          datanodeDetails.getUuid(), Time.now(), replicas.size());
       final Set<ContainerID> containersInSCM =
           nodeManager.getContainers(datanodeDetails);
 
@@ -144,7 +151,10 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
       LOG.error("Received container report from unknown datanode {}.",
           datanodeDetails, ex);
     }
-
+    long endTime = Time.monotonicNow();
+    LOG.info("complete processing ContainerReport of {} , latency is {}," +
+        "and processedContainerReportCount is {}", datanodeDetails.getUuid(),
+        endTime - startTime, processedContainerReportCount.addAndGet(1L));
   }
 
   /**

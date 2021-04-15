@@ -41,11 +41,13 @@ import org.apache.hadoop.ozone.protocol.commands.ReregisterCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 
 import com.google.protobuf.GeneratedMessage;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.CONTAINER_ACTIONS;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.CONTAINER_REPORT;
@@ -68,6 +70,8 @@ public final class SCMDatanodeHeartbeatDispatcher {
   private final NodeManager nodeManager;
   private final EventPublisher eventPublisher;
 
+  //only used for tracing containerReport
+  private AtomicLong containerReportCount;
 
   public SCMDatanodeHeartbeatDispatcher(NodeManager nodeManager,
                                         EventPublisher eventPublisher) {
@@ -75,6 +79,7 @@ public final class SCMDatanodeHeartbeatDispatcher {
     Preconditions.checkNotNull(eventPublisher);
     this.nodeManager = nodeManager;
     this.eventPublisher = eventPublisher;
+    this.containerReportCount = new AtomicLong(0);
   }
 
 
@@ -115,6 +120,11 @@ public final class SCMDatanodeHeartbeatDispatcher {
 
       if (heartbeat.hasContainerReport()) {
         LOG.debug("Dispatching Container Report.");
+        LOG.trace("fire CONTAINER_REPORT event of " +
+                "uuid {} at {} when processing heartbeat" +
+                "and heartbeat containerReportCount is {}",
+            datanodeDetails.getUuid(), Time.now(),
+            containerReportCount.addAndGet(1L));
         eventPublisher.fireEvent(
             CONTAINER_REPORT,
             new ContainerReportFromDatanode(
