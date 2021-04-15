@@ -224,6 +224,8 @@ public class SCMStateMachine extends BaseStateMachine {
     Preconditions.checkArgument(
         deletedBlockLog instanceof DeletedBlockLogImplV2);
     ((DeletedBlockLogImplV2) deletedBlockLog).onBecomeLeader();
+
+    scm.getScmDecommissionManager().onBecomeLeader();
   }
 
   @Override
