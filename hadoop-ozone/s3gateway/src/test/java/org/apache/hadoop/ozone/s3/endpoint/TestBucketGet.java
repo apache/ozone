@@ -238,22 +238,18 @@ public class TestBucketGet {
             "test/", null, null, null, null, null).getEntity();
 
     Assert.assertEquals(0, getBucketResponse.getContents().size());
-    Assert.assertEquals(2, getBucketResponse.getCommonPrefixes().size());
+    Assert.assertEquals(1, getBucketResponse.getCommonPrefixes().size());
     Assert.assertEquals("test/dir1/",
         getBucketResponse.getCommonPrefixes().get(0).getPrefix());
-    Assert.assertEquals("test/dir2/",
-        getBucketResponse.getCommonPrefixes().get(1).getPrefix());
 
     getBucketResponse =
         (ListObjectResponse) getBucket.list("b1", "/", null, null, maxKeys,
             "test/", null, getBucketResponse.getNextToken(), null, null, null)
             .getEntity();
-    Assert.assertEquals(1, getBucketResponse.getContents().size());
+    Assert.assertEquals(0, getBucketResponse.getContents().size());
     Assert.assertEquals(1, getBucketResponse.getCommonPrefixes().size());
-    Assert.assertEquals("test/dir3/",
+    Assert.assertEquals("test/dir2/",
         getBucketResponse.getCommonPrefixes().get(0).getPrefix());
-    Assert.assertEquals("test/file8",
-        getBucketResponse.getContents().get(0).getKey());
 
   }
 
