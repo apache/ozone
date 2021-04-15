@@ -565,7 +565,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           pipelineManager, eventQueue, serviceManager, scmContext);
     }
     scmDecommissionManager = new NodeDecommissionManager(conf, scmNodeManager,
-        containerManager, eventQueue, replicationManager);
+        containerManager, scmContext, eventQueue, replicationManager);
   }
 
   /**
