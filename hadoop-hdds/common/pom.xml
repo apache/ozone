@@ -49,9 +49,8 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     </dependency>
     <!-- for the annotations in OzoneConfiguration -->
     <dependency>
-      <groupId>com.sun.xml.bind</groupId>
-      <artifactId>jaxb-impl</artifactId>
-      <version>2.1.13</version>
+      <groupId>org.glassfish.jaxb</groupId>
+      <artifactId>jaxb-runtime</artifactId>
       <scope>provided</scope>
     </dependency>
     <dependency>
