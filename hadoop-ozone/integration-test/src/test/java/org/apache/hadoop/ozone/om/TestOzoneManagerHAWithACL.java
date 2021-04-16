@@ -35,6 +35,7 @@ import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE;
+import static org.junit.Assert.assertThrows;
 
 /**
  * Test Ozone Manager ACL operation in distributed handler scenario.
@@ -286,8 +287,8 @@ public class TestOzoneManagerHAWithACL extends TestOzoneManagerHA {
     Assert.assertTrue(containsAcl(userAcl, acls));
 
     // Add an already existing acl.
-    addAcl = objectStore.addAcl(ozoneObj, userAcl);
-    Assert.assertFalse(addAcl);
+    OzoneAcl finalUserAcl = userAcl;
+    assertThrows(OMException.class, () -> objectStore.addAcl(ozoneObj, finalUserAcl));
 
     // Add an acl by changing acl type with same type, name and scope.
     userAcl = new OzoneAcl(USER, remoteUserName,
@@ -310,8 +311,8 @@ public class TestOzoneManagerHAWithACL extends TestOzoneManagerHA {
     Assert.assertTrue(removeAcl);
 
     // Trying to remove an already removed acl.
-    removeAcl = objectStore.removeAcl(ozoneObj, acls.get(0));
-    Assert.assertFalse(removeAcl);
+    OzoneAcl finalUserAcl = userAcl;
+    assertThrows(OMException.class, () -> objectStore.removeAcl(ozoneObj, acls.get(0)));
 
     boolean addAcl = objectStore.addAcl(ozoneObj, userAcl);
     Assert.assertTrue(addAcl);
