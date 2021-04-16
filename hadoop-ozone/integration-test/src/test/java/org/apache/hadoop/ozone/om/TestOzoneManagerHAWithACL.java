@@ -289,7 +289,7 @@ public class TestOzoneManagerHAWithACL extends TestOzoneManagerHA {
     // Add an already existing acl.
     OzoneAcl finalUserAcl = userAcl;
     assertThrows(OMException.class,
-            () -> objectStore.addAcl(ozoneObj, finalUserAcl));
+        () -> objectStore.addAcl(ozoneObj, finalUserAcl));
 
     // Add an acl by changing acl type with same type, name and scope.
     userAcl = new OzoneAcl(USER, remoteUserName,
@@ -314,7 +314,7 @@ public class TestOzoneManagerHAWithACL extends TestOzoneManagerHA {
     // Trying to remove an already removed acl.
     OzoneAcl finalUserAcl = userAcl;
     assertThrows(OMException.class,
-            () -> objectStore.removeAcl(ozoneObj, acls.get(0)));
+        () -> objectStore.removeAcl(ozoneObj, acls.get(0)));
 
     boolean addAcl = objectStore.addAcl(ozoneObj, userAcl);
     Assert.assertTrue(addAcl);
