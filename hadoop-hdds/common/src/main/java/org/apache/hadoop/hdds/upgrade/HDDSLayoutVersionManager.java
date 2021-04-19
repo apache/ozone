@@ -46,7 +46,7 @@ public class HDDSLayoutVersionManager extends
   private static final Logger LOG =
       LoggerFactory.getLogger(HDDSLayoutVersionManager.class);
   private static final String[] HDDS_CLASS_UPGRADE_PACKAGES = new String[]{
-      "org.apache.hadoop.hdds.server.scm",
+      "org.apache.hadoop.hdds.scm.server",
       "org.apache.hadoop.ozone.container"};
 
   public HDDSLayoutVersionManager(int layoutVersion) throws IOException {
