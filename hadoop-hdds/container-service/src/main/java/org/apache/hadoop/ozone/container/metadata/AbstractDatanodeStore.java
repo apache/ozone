@@ -33,10 +33,8 @@ import org.rocksdb.BloomFilter;
 import org.rocksdb.ColumnFamilyOptions;
 import org.rocksdb.DBOptions;
 import org.rocksdb.LRUCache;
-import org.rocksdb.RocksDB;
 import org.rocksdb.Statistics;
 import org.rocksdb.StatsLevel;
-import org.rocksdb.util.SizeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,6 +45,8 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.concurrent.ConcurrentHashMap;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
+import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.HDDS_DEFAULT_DB_PROFILE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF;
@@ -74,7 +74,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   private final long containerID;
   private final ColumnFamilyOptions cfOptions;
 
-  private static final DBProfile DEFAULT_PROFILE = DBProfile.DISK;
+  private final DBProfile dbProfile;
   private static final Map<ConfigurationSource, ColumnFamilyOptions>
       OPTIONS_CACHE = new ConcurrentHashMap<>();
   private final boolean openReadOnly;
@@ -88,6 +88,9 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   protected AbstractDatanodeStore(ConfigurationSource config, long containerID,
       AbstractDatanodeDBDefinition dbDef, boolean openReadOnly)
       throws IOException {
+
+    dbProfile = config.getEnum(HDDS_DB_PROFILE,
+        HDDS_DEFAULT_DB_PROFILE);
 
     // The same config instance is used on each datanode, so we can share the
     // corresponding column family options, providing a single shared cache
@@ -107,7 +110,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   public void start(ConfigurationSource config)
       throws IOException {
     if (this.store == null) {
-      DBOptions options = DEFAULT_PROFILE.getDBOptions();
+      DBOptions options = dbProfile.getDBOptions();
       options.setCreateIfMissing(true);
       options.setCreateMissingColumnFamilies(true);
 
@@ -216,6 +219,11 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
     return Collections.unmodifiableMap(OPTIONS_CACHE);
   }
 
+  @VisibleForTesting
+  public DBProfile getDbProfile() {
+    return dbProfile;
+  }
+
   private static void checkTableStatus(Table<?, ?> table, String name)
           throws IOException {
     String logMessage = "Unable to get a reference to %s table. Cannot " +
@@ -228,23 +236,19 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
     }
   }
 
-  private static ColumnFamilyOptions buildColumnFamilyOptions(
+  private ColumnFamilyOptions buildColumnFamilyOptions(
       ConfigurationSource config) {
     long cacheSize = (long) config.getStorageSize(
         HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE,
         HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE_DEFAULT,
         StorageUnit.BYTES);
 
-    // Enables static creation of RocksDB objects.
-    RocksDB.loadLibrary();
-
     BlockBasedTableConfig tableConfig = new BlockBasedTableConfig();
-    tableConfig.setBlockCache(new LRUCache(cacheSize * SizeUnit.MB))
+    tableConfig.setBlockCache(new LRUCache(cacheSize))
         .setPinL0FilterAndIndexBlocksInCache(true)
         .setFilterPolicy(new BloomFilter());
 
-    return DEFAULT_PROFILE
-        .getColumnFamilyOptions()
+    return dbProfile.getColumnFamilyOptions()
         .setTableFormatConfig(tableConfig);
   }
 
