@@ -24,10 +24,8 @@ import org.apache.hadoop.hdds.function.SupplierWithIOException;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
-import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolClientSideTranslatorPB;
@@ -355,20 +353,6 @@ public final class HAUtils {
       }
     }
     return false;
-  }
-
-  public static void checkSecurityAndSCMHAEnabled(OzoneConfiguration conf) {
-    boolean enable =
-        conf.getBoolean(ScmConfigKeys.OZONE_SCM_HA_SECURITY_SUPPORTED,
-            ScmConfigKeys.OZONE_SCM_HA_SECURITY_SUPPORTED_DEFAULT);
-    if (OzoneSecurityUtil.isSecurityEnabled(conf) && !enable) {
-      List<SCMNodeInfo> scmNodeInfo = SCMNodeInfo.buildNodeInfo(conf);
-      if (scmNodeInfo.size() > 1) {
-        System.err.println("Ozone Services cannot be started on a secure SCM " +
-            "HA enabled cluster");
-        System.exit(1);
-      }
-    }
   }
 
   /**
