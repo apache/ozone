@@ -54,21 +54,14 @@ public class SCMSnapshotProvider {
   private final File scmSnapshotDir;
 
 
-  private final int downloadClientPort;
-
-  private final long downloadClientTimeout;
-
-  private SCMSnapshotDownloader downloadClient;
+  private final ConfigurationSource conf;
 
   private Map<String, SCMNodeDetails> peerNodesMap;
 
   public SCMSnapshotProvider(ConfigurationSource conf,
       List<SCMNodeDetails> peerNodes) {
     LOG.info("Initializing SCM Snapshot Provider");
-    downloadClientPort = conf.getInt(ScmConfigKeys.OZONE_SCM_GRPC_PORT_KEY,
-        ScmConfigKeys.OZONE_SCM_GRPC_PORT_DEFAULT);
-    downloadClientTimeout =
-        conf.getObject(SCMHAConfiguration.class).getGrpcDeadlineInterval();
+    this.conf = conf;
     // Create Ratis storage dir
     String scmRatisDirectory = SCMHAUtils.getSCMRatisDirectory(conf);
 
@@ -87,13 +80,13 @@ public class SCMSnapshotProvider {
         this.peerNodesMap.put(peerNode.getNodeId(), peerNode);
       }
     }
-    this.downloadClient = null;
   }
 
   @VisibleForTesting
   public void setPeerNodesMap(Map<String, SCMNodeDetails> peerNodesMap) {
     this.peerNodesMap = peerNodesMap;
   }
+
   /**
    * Download the latest checkpoint from SCM Leader .
    * @param leaderSCMNodeID leader SCM Node ID.
@@ -109,24 +102,19 @@ public class SCMSnapshotProvider {
             .getAbsolutePath();
     File targetFile = new File(snapshotFilePath + ".tar.gz");
 
-    // the downloadClient instance will be initialized only when first install
-    // snapshot notification from ratis leader will be received.
-    if (downloadClient == null) {
-      int port = peerNodesMap.get(leaderSCMNodeID).getGrpcPort();
-      // if the leader grpc port details are not setup in the peer Map,
-      // fall back to default grpc port.
-      if (port == 0) {
-        port = downloadClientPort;
-      }
-      downloadClient = new InterSCMGrpcClient(
-          peerNodesMap.get(leaderSCMNodeID).getInetAddress().getHostAddress(),
-          port, downloadClientTimeout);
-    }
+    // the downloadClient instance will be craeted as and when install snapshot
+    // request is received. No caching of the client as it should be a very rare
+    int port = peerNodesMap.get(leaderSCMNodeID).getGrpcPort();
+    SCMSnapshotDownloader downloadClient = new InterSCMGrpcClient(
+        peerNodesMap.get(leaderSCMNodeID).getInetAddress().getHostAddress(),
+        port, conf);
     try {
       downloadClient.download(targetFile.toPath()).get();
-    } catch (InterruptedException | ExecutionException e) {
+    } catch (Exception e) {
       LOG.error("Rocks DB checkpoint downloading failed", e);
       throw new IOException(e);
+    } finally {
+      downloadClient.close();
     }
 
 
@@ -149,8 +137,5 @@ public class SCMSnapshotProvider {
   }
 
   public void stop() throws Exception {
-    if (downloadClient != null) {
-      downloadClient.close();
-    }
   }
 }

@@ -52,6 +52,7 @@ import org.apache.ratis.statemachine.impl.BaseStateMachine;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.ratis.statemachine.impl.SimpleStateMachineStorage;
 import org.apache.ratis.util.ExitUtils;
+import org.apache.ratis.util.JavaUtils;
 import org.apache.ratis.util.LifeCycle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -185,17 +186,20 @@ public class SCMStateMachine extends BaseStateMachine {
   @Override
   public CompletableFuture<TermIndex> notifyInstallSnapshotFromLeader(
       RaftProtos.RoleInfoProto roleInfoProto, TermIndex firstTermIndexInLog) {
-
-    String leaderNode = roleInfoProto.getFollowerInfo()
+    if (!roleInfoProto.getFollowerInfo().hasLeaderInfo()) {
+      return JavaUtils.completeExceptionally(new IOException("Failed " +
+          "notifyInstallSnapshotFromLeader due to missing leader info"));
+    }
+    String leaderAddress = roleInfoProto.getFollowerInfo()
         .getLeaderInfo().getId().getAddress();
     Optional<SCMNodeDetails> leaderDetails =
         scm.getSCMHANodeDetails().getPeerNodeDetails().stream().filter(
-            p -> p.getRatisHostPortStr().equals(p.getRatisHostPortStr()))
+            p -> p.getRatisHostPortStr().equals(leaderAddress))
             .findFirst();
     Preconditions.checkNotNull(leaderDetails);
     final String leaderNodeId = leaderDetails.get().getNodeId();
     LOG.info("Received install snapshot notification from SCM leader: {} with "
-        + "term index: {}", leaderNode, firstTermIndexInLog);
+        + "term index: {}", leaderAddress, firstTermIndexInLog);
 
     CompletableFuture<TermIndex> future = CompletableFuture.supplyAsync(
         () -> scm.getScmHAManager().installSnapshotFromLeader(leaderNodeId),

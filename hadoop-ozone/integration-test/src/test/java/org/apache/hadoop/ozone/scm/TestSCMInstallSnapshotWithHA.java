@@ -26,7 +26,6 @@ import java.util.UUID;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.ha.SCMHAConfiguration;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerImpl;
@@ -51,7 +50,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
-import org.junit.jupiter.api.Disabled;
 import org.slf4j.Logger;
 import org.slf4j.event.Level;
 
@@ -118,7 +116,6 @@ public class TestSCMInstallSnapshotWithHA {
   public void testInstallSnapshot() throws Exception {
     // Get the leader SCM
     StorageContainerManager leaderSCM = getLeader(cluster);
-    String leaderNodeId = leaderSCM.getScmNodeDetails().getNodeId();
     Assert.assertNotNull(leaderSCM);
     // Find the inactive SCM
     String followerId = getInactiveSCM(cluster).getScmId();

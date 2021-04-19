@@ -52,8 +52,16 @@ public class InterSCMGrpcClient implements SCMSnapshotDownloader{
   private final InterSCMProtocolServiceGrpc.InterSCMProtocolServiceStub
       client;
 
-  public InterSCMGrpcClient(final String host, final int port,
-      final long timeout) {
+  public InterSCMGrpcClient(final String host, final int leaderPort,
+      final ConfigurationSource conf) {
+    // if the leader grpc port details are not setup in the peer Map,
+    // fall back to default grpc port.
+    final int port = leaderPort == 0 ?
+        conf.getInt(ScmConfigKeys.OZONE_SCM_GRPC_PORT_KEY,
+            ScmConfigKeys.OZONE_SCM_GRPC_PORT_DEFAULT) :
+        leaderPort;
+    final long  timeout =
+        conf.getObject(SCMHAConfiguration.class).getGrpcDeadlineInterval();
     NettyChannelBuilder channelBuilder =
         NettyChannelBuilder.forAddress(host, port).usePlaintext()
             .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE);
@@ -89,7 +97,7 @@ public class InterSCMGrpcClient implements SCMSnapshotDownloader{
   }
 
   @Override
-  public void close() throws Exception {
+  public void close() {
     shutdown();
   }
 
