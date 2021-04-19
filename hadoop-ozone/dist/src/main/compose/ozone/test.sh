@@ -64,7 +64,6 @@ start_docker_env
 
 execute_robot_test scm -v SCHEME:ofs -v BUCKET_TYPE:link -N ozonefs-prefix-ofs-link ozonefs/ozonefs.robot
 execute_robot_test scm -v SCHEME:o3fs -v BUCKET_TYPE:bucket -N ozonefs-prefix-o3fs-bucket ozonefs/ozonefs.robot
-execute_robot_test scm -v BUCKET:bucket -N s3-prefix-bucket s3/objectputget.robot
 
 stop_docker_env
 
