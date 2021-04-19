@@ -54,20 +54,21 @@ stop_docker_env
 # running FS tests with different config requires restart of the cluster
 export OZONE_KEEP_RESULTS=true
 export OZONE_OM_METADATA_LAYOUT OZONE_OM_ENABLE_FILESYSTEM_PATHS
-for OZONE_OM_METADATA_LAYOUT in SIMPLE PREFIX; do
-  if [[ $OZONE_OM_METADATA_LAYOUT == "PREFIX" ]]; then
-    OZONE_OM_ENABLE_FILESYSTEM_PATHS=true
-  else
-    OZONE_OM_ENABLE_FILESYSTEM_PATHS=false
-  fi
 
-  start_docker_env
-  for scheme in ofs o3fs; do
-    for bucket in link bucket; do
-      execute_robot_test scm -v SCHEME:${scheme} -v BUCKET_TYPE:${bucket} -N ozonefs-${OZONE_OM_METADATA_LAYOUT}-${scheme}-${bucket} ozonefs/ozonefs.robot
-    done
-  done
-  stop_docker_env
-done
+execute_robot_test scm -v SCHEME:ofs -v BUCKET_TYPE:bucket -N ozonefs-simple-ofs-bucket ozonefs/ozonefs.robot
+execute_robot_test scm -v SCHEME:o3fs -v BUCKET_TYPE:link -N ozonefs-simple-o3fs-link ozonefs/ozonefs.robot
+
+stop_docker_env
+
+## Restarting the cluster with prefix layout enabled
+OZONE_OM_METADATA_LAYOUT=PREFIX
+OZONE_OM_ENABLE_FILESYSTEM_PATHS=true
+start_docker_env
+
+execute_robot_test scm -v SCHEME:ofs -v BUCKET_TYPE:link -N ozonefs-prefix-ofs-link ozonefs/ozonefs.robot
+execute_robot_test scm -v SCHEME:o3fs -v BUCKET_TYPE:bucket -N ozonefs-prefix-o3fs-bucket ozonefs/ozonefs.robot
+execute_robot_test scm -v BUCKET:bucket -N s3-prefix-bucket s3/objectputget.robot
+
+stop_docker_env
 
 generate_report
