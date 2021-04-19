@@ -105,6 +105,7 @@ public class PipelineManagerV2Impl implements PipelineManager {
         HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL,
         HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS);
+    this.freezePipelineCreation = new AtomicBoolean();
   }
 
   public static PipelineManagerV2Impl newPipelineManager(
@@ -151,6 +152,14 @@ public class PipelineManagerV2Impl implements PipelineManager {
       throw new IOException("Pipeline creation is not allowed as safe mode " +
           "prechecks have not yet passed");
     }
+
+    if (freezePipelineCreation.get()) {
+      String message = "Cannot create new pipelines while pipeline creation " +
+          "is frozen.";
+      LOG.info(message);
+      throw new IOException(message);
+    }
+
     lock.lock();
     try {
       Pipeline pipeline = pipelineFactory.create(type, factor);
