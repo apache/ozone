@@ -52,7 +52,6 @@ public class DefaultUpgradeFinalizationExecutor<T> {
       finalizer.postFinalizeUpgrade(component);
 
       finalizer.emitFinishedMsg();
-      finalizer.markFinalizationDone();
       return null;
     } catch (Exception e) {
       LOG.warn("Upgrade Finalization failed with following Exception:");
@@ -61,6 +60,8 @@ public class DefaultUpgradeFinalizationExecutor<T> {
             .setUpgradeState(FINALIZATION_REQUIRED);
         throw (e);
       }
+    } finally {
+      finalizer.markFinalizationDone();
     }
     return null;
   }

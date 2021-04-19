@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.upgrade;
 
 import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON_FINALIZE;
 import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON_FIRST_UPGRADE_START;
-import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.UNFINALIZED_STATE_VALIDATION;
+import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.VALIDATE_IN_PREFINALIZE;
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.FIRST_UPGRADE_START_ACTION_FAILED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.LAYOUT_FEATURE_FINALIZATION_FAILED;
@@ -70,7 +70,7 @@ public abstract class BasicUpgradeFinalizer
 
   public StatusAndMessages finalize(String upgradeClientID, T service)
       throws IOException {
-    StatusAndMessages response = preFinalize(upgradeClientID, service);
+    StatusAndMessages response = initFinalize(upgradeClientID, service);
     if (response.status() != FINALIZATION_REQUIRED) {
       return response;
     }
@@ -92,9 +92,13 @@ public abstract class BasicUpgradeFinalizer
     return new StatusAndMessages(status, returningMsgs);
   }
 
-  protected abstract void preFinalizeUpgrade(T service) throws IOException;
+  protected void preFinalizeUpgrade(T service) throws IOException {
+    // No Op by default.
+  };
 
-  protected abstract void postFinalizeUpgrade(T service) throws IOException;
+  protected void postFinalizeUpgrade(T service) throws IOException {
+    // No Op by default.
+  }
 
   public abstract void finalizeUpgrade(T service) throws UpgradeException;
 
@@ -146,7 +150,7 @@ public abstract class BasicUpgradeFinalizer
     return versionManager;
   }
 
-  private synchronized StatusAndMessages preFinalize(
+  private synchronized StatusAndMessages initFinalize(
       String upgradeClientID, T id) throws UpgradeException {
     switch (versionManager.getUpgradeState()) {
     case STARTING_FINALIZATION:
@@ -247,7 +251,7 @@ public abstract class BasicUpgradeFinalizer
       Function<UpgradeActionType, Optional<? extends UpgradeAction>> function =
           aFunction.apply(lf);
       Optional<? extends UpgradeAction> action =
-          function.apply(UNFINALIZED_STATE_VALIDATION);
+          function.apply(VALIDATE_IN_PREFINALIZE);
       if (action.isPresent()) {
         runValidationAction(lf, action.get());
       }
@@ -459,6 +463,6 @@ public abstract class BasicUpgradeFinalizer
   }
 
   protected void updateLayoutVersionInDB(V vm, T comp) throws IOException {
-    throw new UnsupportedOperationException();
+    // No-Op by default.
   }
 }

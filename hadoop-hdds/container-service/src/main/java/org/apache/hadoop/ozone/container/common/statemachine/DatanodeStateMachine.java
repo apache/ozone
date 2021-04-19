@@ -607,7 +607,7 @@ public class DatanodeStateMachine implements Closeable {
   public StatusAndMessages queryUpgradeStatus()
       throws IOException{
     return upgradeFinalizer.reportStatus(datanodeDetails.getUuidString(),
-        false);
+        true);
   }
   public UpgradeFinalizer<DatanodeStateMachine> getUpgradeFinalizer() {
     return upgradeFinalizer;

@@ -286,6 +286,7 @@ public class TestHDDSUpgrade {
               return false;
             }
           } catch (IOException e) {
+            LOG.error("Exception. ", e);
             return false;
           }
         }

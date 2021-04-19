@@ -53,8 +53,8 @@ public interface LayoutFeature {
    */
   enum UpgradeActionType {
 
-    // Run every time an unfinalized component is started up.
-    UNFINALIZED_STATE_VALIDATION,
+    // Run every time an un-finalized component is started up.
+    VALIDATE_IN_PREFINALIZE,
 
     // Run exactly once when an upgraded cluster is detected with this new
     // layout version.

@@ -46,18 +46,9 @@ public class OMUpgradeFinalizer extends BasicUpgradeFinalizer<OzoneManager,
   }
 
   @Override
-  public void postFinalizeUpgrade(OzoneManager om) {
-    return;
-  }
-
-  @Override
   public void finalizeUpgrade(OzoneManager om)
       throws UpgradeException {
     super.finalizeUpgrade(om::getOmStorage);
-  }
-
-  @Override
-  public void preFinalizeUpgrade(OzoneManager om) {
   }
 
   public void runPrefinalizeStateActions(Storage storage, OzoneManager om)

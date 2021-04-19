@@ -91,12 +91,6 @@ public class DataNodeUpgradeFinalizer extends
   }
 
   @Override
-  public void postFinalizeUpgrade(DatanodeStateMachine dsm)
-      throws  UpgradeException {
-    // Do nothing here.
-  }
-
-  @Override
   public void finalizeUpgrade(DatanodeStateMachine dsm)
       throws UpgradeException {
     super.finalizeUpgrade(dsm::getLayoutStorage);

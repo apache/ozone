@@ -92,6 +92,8 @@ public class InjectedUpgradeFinalizationExecutor<T> extends
         finalizer.getVersionManager()
             .setUpgradeState(FINALIZATION_REQUIRED);
       }
+    } finally {
+      finalizer.markFinalizationDone();
     }
     return null;
   }
