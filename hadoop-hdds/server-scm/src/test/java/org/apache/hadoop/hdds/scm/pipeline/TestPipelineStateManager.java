@@ -37,7 +37,7 @@ import java.util.Set;
  */
 public class TestPipelineStateManager {
 
-  private PipelineStateManager stateManager;
+  private StateManager stateManager;
 
   @Before
   public void init() throws Exception {
@@ -290,14 +290,14 @@ public class TestPipelineStateManager {
     stateManager.addPipeline(pipeline);
     pipeline = stateManager.getPipeline(pipeline.getId());
     stateManager.addContainerToPipeline(pipeline.getId(),
-        ContainerID.valueof(++containerID));
+        ContainerID.valueOf(++containerID));
 
     // move pipeline to open state
     stateManager.openPipeline(pipeline.getId());
     stateManager.addContainerToPipeline(pipeline.getId(),
-        ContainerID.valueof(++containerID));
+        ContainerID.valueOf(++containerID));
     stateManager.addContainerToPipeline(pipeline.getId(),
-        ContainerID.valueof(++containerID));
+        ContainerID.valueOf(++containerID));
 
     //verify the number of containers returned
     Set<ContainerID> containerIDs =
@@ -307,7 +307,7 @@ public class TestPipelineStateManager {
     removePipeline(pipeline);
     try {
       stateManager.addContainerToPipeline(pipeline.getId(),
-          ContainerID.valueof(++containerID));
+          ContainerID.valueOf(++containerID));
       Assert.fail("Container should not have been added");
     } catch (IOException e) {
       // Can not add a container to removed pipeline
@@ -322,7 +322,7 @@ public class TestPipelineStateManager {
     // close the pipeline
     stateManager.openPipeline(pipeline.getId());
     stateManager
-        .addContainerToPipeline(pipeline.getId(), ContainerID.valueof(1));
+        .addContainerToPipeline(pipeline.getId(), ContainerID.valueOf(1));
 
     try {
       stateManager.removePipeline(pipeline.getId());
@@ -347,26 +347,26 @@ public class TestPipelineStateManager {
     stateManager.openPipeline(pipeline.getId());
 
     stateManager.addContainerToPipeline(pipeline.getId(),
-        ContainerID.valueof(containerID));
+        ContainerID.valueOf(containerID));
     Assert.assertEquals(1, stateManager.getContainers(pipeline.getId()).size());
     stateManager.removeContainerFromPipeline(pipeline.getId(),
-        ContainerID.valueof(containerID));
+        ContainerID.valueOf(containerID));
     Assert.assertEquals(0, stateManager.getContainers(pipeline.getId()).size());
 
     // add two containers in the pipeline
     stateManager.addContainerToPipeline(pipeline.getId(),
-        ContainerID.valueof(++containerID));
+        ContainerID.valueOf(++containerID));
     stateManager.addContainerToPipeline(pipeline.getId(),
-        ContainerID.valueof(++containerID));
+        ContainerID.valueOf(++containerID));
     Assert.assertEquals(2, stateManager.getContainers(pipeline.getId()).size());
 
     // move pipeline to closing state
     stateManager.finalizePipeline(pipeline.getId());
 
     stateManager.removeContainerFromPipeline(pipeline.getId(),
-        ContainerID.valueof(containerID));
+        ContainerID.valueOf(containerID));
     stateManager.removeContainerFromPipeline(pipeline.getId(),
-        ContainerID.valueof(--containerID));
+        ContainerID.valueOf(--containerID));
     Assert.assertEquals(0, stateManager.getContainers(pipeline.getId()).size());
 
     // clean up

@@ -51,7 +51,7 @@ public class TestHddsServerUtils {
       TestHddsServerUtils.class);
 
   @Rule
-  public Timeout timeout = new Timeout(300_000);
+  public Timeout timeout = Timeout.seconds(300);;
 
   @Rule
   public ExpectedException thrown= ExpectedException.none();
@@ -147,19 +147,6 @@ public class TestHddsServerUtils {
         HddsServerUtil.getScmAddressForDataNodes(conf);
     assertEquals(address.getHostName(), scmHost.split(":")[0]);
     assertEquals(OZONE_SCM_DATANODE_PORT_DEFAULT, address.getPort());
-  }
-
-  /**
-   * getScmAddressForDataNodes should fail when OZONE_SCM_NAMES has
-   * multiple addresses.
-   */
-  @Test
-  public void testClientFailsWithMultipleScmNames() {
-    final String scmHost = "host123,host456";
-    final OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(OZONE_SCM_NAMES, scmHost);
-    thrown.expect(IllegalArgumentException.class);
-    HddsServerUtil.getScmAddressForDataNodes(conf);
   }
 
   /**

@@ -22,6 +22,7 @@ Suite Setup         Create test data
 
 *** Variables ***
 ${CONTAINER}
+${SCM}       scm
 
 *** Keywords ***
 Create test data
@@ -40,8 +41,12 @@ List containers
                         Should contain   ${output}   OPEN
 
 List containers with explicit host
-    ${output} =         Execute          ozone admin container list --scm scm
+    ${output} =         Execute          ozone admin container list --scm ${SCM}
                         Should contain   ${output}   OPEN
+
+List containers with container state
+    ${output} =         Execute          ozone admin container list --state=CLOSED
+                        Should Not contain   ${output}   OPEN
 
 Container info
     ${output} =         Execute          ozone admin container info "${CONTAINER}"

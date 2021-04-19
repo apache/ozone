@@ -50,7 +50,7 @@ import org.junit.rules.Timeout;
  */
 public class TestHddsClientUtils {
   @Rule
-  public Timeout timeout = new Timeout(300000);
+  public Timeout timeout = Timeout.seconds(300);
 
   @Rule
   public ExpectedException thrown= ExpectedException.none();
@@ -199,28 +199,6 @@ public class TestHddsClientUtils {
     final InetSocketAddress address = HddsUtils.getScmAddressForClients(conf);
     assertEquals(scmHost.split(":")[0], address.getHostName());
     assertEquals(OZONE_SCM_CLIENT_PORT_DEFAULT, address.getPort());
-  }
-
-  @Test
-  public void testBlockClientFailsWithMultipleScmNames() {
-    // When OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY and OZONE_SCM_CLIENT_ADDRESS_KEY
-    // are undefined, fail if OZONE_SCM_NAMES has multiple SCMs.
-    final String scmHost = "host123,host456";
-    final OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(OZONE_SCM_NAMES, scmHost);
-    thrown.expect(IllegalArgumentException.class);
-    HddsUtils.getScmAddressForBlockClients(conf);
-  }
-
-  @Test
-  public void testClientFailsWithMultipleScmNames() {
-    // When OZONE_SCM_CLIENT_ADDRESS_KEY is undefined, fail if OZONE_SCM_NAMES
-    // has multiple SCMs.
-    final String scmHost = "host123,host456";
-    final OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(OZONE_SCM_NAMES, scmHost);
-    thrown.expect(IllegalArgumentException.class);
-    HddsUtils.getScmAddressForClients(conf);
   }
 
   @Test

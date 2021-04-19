@@ -28,8 +28,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.ozone.common.Storage;
 
-import static org.apache.hadoop.ozone.OzoneConsts.SCM_ID;
-
 /**
  * OMStorage is responsible for management of the StorageDirectories used by
  * the Ozone Manager.
@@ -48,14 +46,6 @@ public class OMStorage extends Storage {
     super(NodeType.OM, getOmDbDir(conf), STORAGE_DIR);
   }
 
-  public void setScmId(String scmId) throws IOException {
-    if (getState() == StorageState.INITIALIZED) {
-      throw new IOException("OM is already initialized.");
-    } else {
-      getStorageInfo().setProperty(SCM_ID, scmId);
-    }
-  }
-
   public void setOmCertSerialId(String certSerialId) throws IOException {
     getStorageInfo().setProperty(OM_CERT_SERIAL_ID, certSerialId);
   }
@@ -66,14 +56,6 @@ public class OMStorage extends Storage {
     } else {
       getStorageInfo().setProperty(OM_ID, omId);
     }
-  }
-
-  /**
-   * Retrieves the SCM ID from the version file.
-   * @return SCM_ID
-   */
-  public String getScmId() {
-    return getStorageInfo().getProperty(SCM_ID);
   }
 
   /**

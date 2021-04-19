@@ -223,7 +223,7 @@ public class TestCSMMetrics {
     }
 
     @Override
-    public void setScmId(String scmId) {
+    public void setClusterId(String scmId) {
 
     }
 

@@ -23,6 +23,7 @@ import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneIllegalArgumentException;
+import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -133,7 +134,7 @@ public class OMHANodeDetails {
         } else {
           isPeer = false;
         }
-        String rpcAddrKey = OmUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY,
+        String rpcAddrKey = ConfUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY,
             serviceId, nodeId);
         String rpcAddrStr = OmUtils.getOmRpcAddress(conf, rpcAddrKey);
         if (rpcAddrStr == null || rpcAddrStr.isEmpty()) {
@@ -147,7 +148,7 @@ public class OMHANodeDetails {
         // default
         isOMAddressSet = true;
 
-        String ratisPortKey = OmUtils.addKeySuffixes(OZONE_OM_RATIS_PORT_KEY,
+        String ratisPortKey = ConfUtils.addKeySuffixes(OZONE_OM_RATIS_PORT_KEY,
             serviceId, nodeId);
         int ratisPort = conf.getInt(ratisPortKey, OZONE_OM_RATIS_PORT_DEFAULT);
 
@@ -166,7 +167,7 @@ public class OMHANodeDetails {
               rpcAddrStr);
         }
 
-        if (!addr.isUnresolved() && !isPeer && OmUtils.isAddressLocal(addr)) {
+        if (!addr.isUnresolved() && !isPeer && ConfUtils.isAddressLocal(addr)) {
           localRpcAddress = addr;
           localOMServiceId = serviceId;
           localOMNodeId = nodeId;
@@ -188,7 +189,8 @@ public class OMHANodeDetails {
             localOMServiceId, localOMNodeId,
             NetUtils.getHostPortString(localRpcAddress), localRatisPort);
 
-        setOMNodeSpecificConfigs(conf, localOMServiceId, localOMNodeId);
+        ConfUtils.setNodeSpecificConfigs(genericConfigKeys, conf,
+            localOMServiceId, localOMNodeId, LOG);
         return new OMHANodeDetails(getHAOMNodeDetails(conf, localOMServiceId,
             localOMNodeId, localRpcAddress, localRatisPort), peerNodesList);
 
@@ -290,36 +292,6 @@ public class OMHANodeDetails {
         .setHttpAddress(httpAddr)
         .setHttpsAddress(httpsAddr)
         .build();
-  }
-
-  /**
-   * Check if any of the following configuration keys have been set using OM
-   * Node ID suffixed to the key. If yes, then set the base key with the
-   * configured valued.
-   *    1. {@link OMConfigKeys#OZONE_OM_HTTP_ADDRESS_KEY}
-   *    2. {@link OMConfigKeys#OZONE_OM_HTTPS_ADDRESS_KEY}
-   *    3. {@link OMConfigKeys#OZONE_OM_HTTP_BIND_HOST_KEY}
-   *    4. {@link OMConfigKeys#OZONE_OM_HTTPS_BIND_HOST_KEY}\
-   *    5. {@link OMConfigKeys#OZONE_OM_HTTP_KERBEROS_KEYTAB_FILE}
-   *    6. {@link OMConfigKeys#OZONE_OM_HTTP_KERBEROS_PRINCIPAL_KEY}
-   *    7. {@link OMConfigKeys#OZONE_OM_KERBEROS_KEYTAB_FILE_KEY}
-   *    8. {@link OMConfigKeys#OZONE_OM_KERBEROS_PRINCIPAL_KEY}
-   *    9. {@link OMConfigKeys#OZONE_OM_DB_DIRS}
-   *    10. {@link OMConfigKeys#OZONE_OM_ADDRESS_KEY}
-   */
-  private static void setOMNodeSpecificConfigs(
-      OzoneConfiguration ozoneConfiguration, String omServiceId,
-      String omNodeId) {
-
-    for (String confKey : genericConfigKeys) {
-      String confValue = OmUtils.getConfSuffixedWithOMNodeId(
-          ozoneConfiguration, confKey, omServiceId, omNodeId);
-      if (confValue != null) {
-        LOG.info("Setting configuration key {} with value of key {}: {}",
-            confKey, OmUtils.addKeySuffixes(confKey, omNodeId), confValue);
-        ozoneConfiguration.set(confKey, confValue);
-      }
-    }
   }
 
   private static void throwConfException(String message, String... arguments)

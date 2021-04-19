@@ -51,7 +51,7 @@ public class TestOmBlockVersioning {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = new Timeout(300000);
+  public Timeout timeout = Timeout.seconds(300);
   private static MiniOzoneCluster cluster = null;
   private static OzoneConfiguration conf;
   private static OzoneManager ozoneManager;

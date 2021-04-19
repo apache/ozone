@@ -52,7 +52,7 @@ public class TestYamlSchemaLoader {
   }
 
   @Rule
-  public Timeout testTimeout = new Timeout(30000);
+  public Timeout testTimeout = Timeout.seconds(30);
 
   @Parameters
   public static Collection<Object[]> getSchemaFiles() {

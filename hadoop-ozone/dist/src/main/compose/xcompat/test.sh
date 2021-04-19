@@ -21,7 +21,7 @@ basename=$(basename ${COMPOSE_DIR})
 
 current_version=1.1.0
 
-# shellcheck source=/dev/null
+# shellcheck source=hadoop-ozone/dist/src/main/compose/testlib.sh
 source "${COMPOSE_DIR}/../testlib.sh"
 
 old_client() {
@@ -80,14 +80,13 @@ create_results_dir
 # current cluster with various clients
 COMPOSE_FILE=new-cluster.yaml:clients.yaml cluster_version=${current_version} test_cross_compatibility
 
-for cluster_version in 1.0.0 0.5.0; do
-  # shellcheck source=/dev/null
-  source "${COMPOSE_DIR}/../upgrade/versions/ozone-${cluster_version}.sh"
-  # shellcheck source=/dev/null
-  source "${COMPOSE_DIR}/../testlib.sh"
+for cluster_version in 1.0.0; do
+  load_version_specifics ${cluster_version}
 
   export OZONE_VERSION=${cluster_version}
   COMPOSE_FILE=old-cluster.yaml:clients.yaml test_cross_compatibility
+
+  unload_version_specifics
 done
 
 generate_report

@@ -23,12 +23,14 @@ import java.io.IOException;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos
     .ContainerReplicaProto;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher
     .IncrementalContainerReportFromDatanode;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,8 +48,9 @@ public class IncrementalContainerReportHandler extends
 
   public IncrementalContainerReportHandler(
       final NodeManager nodeManager,
-      final ContainerManager containerManager)  {
-    super(containerManager, LOG);
+      final ContainerManagerV2 containerManager,
+      final SCMContext scmContext) {
+    super(containerManager, scmContext, LOG);
     this.nodeManager = nodeManager;
   }
 
@@ -71,7 +74,7 @@ public class IncrementalContainerReportHandler extends
     for (ContainerReplicaProto replicaProto :
         report.getReport().getReportList()) {
       try {
-        final ContainerID id = ContainerID.valueof(
+        final ContainerID id = ContainerID.valueOf(
             replicaProto.getContainerID());
         if (!replicaProto.getState().equals(
             ContainerReplicaProto.State.DELETED)) {
@@ -89,7 +92,7 @@ public class IncrementalContainerReportHandler extends
         success = false;
         LOG.warn("Container {} replica not found!",
             replicaProto.getContainerID());
-      } catch (IOException e) {
+      } catch (IOException | InvalidStateTransitionException e) {
         success = false;
         LOG.error("Exception while processing ICR for container {}",
             replicaProto.getContainerID(), e);

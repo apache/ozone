@@ -70,7 +70,7 @@ public class TestOzoneClientRetriesOnExceptions {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = new Timeout(300000);
+  public Timeout timeout = Timeout.seconds(300);
 
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf = new OzoneConfiguration();
@@ -162,7 +162,7 @@ public class TestOzoneClientRetriesOnExceptions {
     Assert.assertTrue(keyOutputStream.getStreamEntries().size() == 1);
     ContainerInfo container =
             cluster.getStorageContainerManager().getContainerManager()
-                    .getContainer(ContainerID.valueof(containerID));
+                    .getContainer(ContainerID.valueOf(containerID));
     Pipeline pipeline =
             cluster.getStorageContainerManager().getPipelineManager()
                     .getPipeline(container.getPipelineID());
@@ -209,7 +209,7 @@ public class TestOzoneClientRetriesOnExceptions {
       containerID = entry.getBlockID().getContainerID();
       ContainerInfo container =
           cluster.getStorageContainerManager().getContainerManager()
-              .getContainer(ContainerID.valueof(containerID));
+              .getContainer(ContainerID.valueOf(containerID));
       Pipeline pipeline =
           cluster.getStorageContainerManager().getPipelineManager()
               .getPipeline(container.getPipelineID());

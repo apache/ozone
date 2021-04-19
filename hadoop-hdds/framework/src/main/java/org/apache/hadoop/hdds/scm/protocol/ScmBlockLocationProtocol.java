@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.protocol;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.security.KerberosInfo;
@@ -76,6 +77,11 @@ public interface ScmBlockLocationProtocol extends Closeable {
    * Gets the Clusterid and SCM Id from SCM.
    */
   ScmInfo getScmInfo() throws IOException;
+
+  /**
+   * Request to add SCM instance to HA group.
+   */
+  boolean addSCM(AddSCMRequest request) throws IOException;
 
   /**
    * Sort datanodes with distance to client.

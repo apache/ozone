@@ -39,15 +39,15 @@ public class TestContainerAttribute {
   @Test
   public void testInsert() throws SCMException {
     ContainerAttribute<Integer> containerAttribute = new ContainerAttribute<>();
-    ContainerID id = new ContainerID(42);
+    ContainerID id = ContainerID.valueOf(42);
     containerAttribute.insert(1, id);
     Assert.assertEquals(1,
         containerAttribute.getCollection(1).size());
     Assert.assertTrue(containerAttribute.getCollection(1).contains(id));
 
-    // Insert again and verify that it overwrites an existing value.
+    // Insert again and verify that the new ContainerId is inserted.
     ContainerID newId =
-        new ContainerID(42);
+        ContainerID.valueOf(42);
     containerAttribute.insert(1, newId);
     Assert.assertEquals(1,
         containerAttribute.getCollection(1).size());
@@ -59,7 +59,7 @@ public class TestContainerAttribute {
     ContainerAttribute<Integer> containerAttribute = new ContainerAttribute<>();
 
     for (int x = 1; x < 42; x++) {
-      containerAttribute.insert(1, new ContainerID(x));
+      containerAttribute.insert(1, ContainerID.valueOf(x));
     }
     Assert.assertTrue(containerAttribute.hasKey(1));
     for (int x = 1; x < 42; x++) {
@@ -67,7 +67,7 @@ public class TestContainerAttribute {
     }
 
     Assert.assertFalse(containerAttribute.hasContainerID(1,
-        new ContainerID(42)));
+        ContainerID.valueOf(42)));
   }
 
   @Test
@@ -76,7 +76,7 @@ public class TestContainerAttribute {
     ContainerAttribute<String> containerAttribute = new ContainerAttribute<>();
     for (String k : keyslist) {
       for (int x = 1; x < 101; x++) {
-        containerAttribute.insert(k, new ContainerID(x));
+        containerAttribute.insert(k, ContainerID.valueOf(x));
       }
     }
     for (String k : keyslist) {
@@ -96,16 +96,16 @@ public class TestContainerAttribute {
 
     for (String k : keyslist) {
       for (int x = 1; x < 101; x++) {
-        containerAttribute.insert(k, new ContainerID(x));
+        containerAttribute.insert(k, ContainerID.valueOf(x));
       }
     }
     for (int x = 1; x < 101; x += 2) {
-      containerAttribute.remove("Key1", new ContainerID(x));
+      containerAttribute.remove("Key1", ContainerID.valueOf(x));
     }
 
     for (int x = 1; x < 101; x += 2) {
       Assert.assertFalse(containerAttribute.hasContainerID("Key1",
-          new ContainerID(x)));
+          ContainerID.valueOf(x)));
     }
 
     Assert.assertEquals(100,
@@ -125,7 +125,7 @@ public class TestContainerAttribute {
     String key3 = "Key3";
 
     ContainerAttribute<String> containerAttribute = new ContainerAttribute<>();
-    ContainerID id = new ContainerID(42);
+    ContainerID id = ContainerID.valueOf(42);
 
     containerAttribute.insert(key1, id);
     Assert.assertTrue(containerAttribute.hasContainerID(key1, id));

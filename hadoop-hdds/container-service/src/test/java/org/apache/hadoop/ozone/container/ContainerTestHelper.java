@@ -245,6 +245,7 @@ public final class ContainerTestHelper {
         ContainerProtos.ReadChunkRequestProto.newBuilder();
     readRequest.setBlockID(request.getBlockID());
     readRequest.setChunkData(request.getChunkData());
+    readRequest.setReadChunkVersion(ContainerProtos.ReadChunkVersion.V1);
 
     Builder newRequest =
         ContainerCommandRequestProto.newBuilder();

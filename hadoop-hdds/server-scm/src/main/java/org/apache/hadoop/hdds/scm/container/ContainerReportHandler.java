@@ -27,12 +27,14 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.block.PendingDeleteStatusList;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher
     .ContainerReportFromDatanode;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,7 +54,7 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
       LoggerFactory.getLogger(ContainerReportHandler.class);
 
   private final NodeManager nodeManager;
-  private final ContainerManager containerManager;
+  private final ContainerManagerV2 containerManager;
   private final String unknownContainerHandleAction;
 
   /**
@@ -71,9 +73,10 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
    * @param conf OzoneConfiguration instance
    */
   public ContainerReportHandler(final NodeManager nodeManager,
-                                final ContainerManager containerManager,
+                                final ContainerManagerV2 containerManager,
+                                final SCMContext scmContext,
                                 OzoneConfiguration conf) {
-    super(containerManager, LOG);
+    super(containerManager, scmContext, LOG);
     this.nodeManager = nodeManager;
     this.containerManager = containerManager;
 
@@ -86,8 +89,8 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
   }
 
   public ContainerReportHandler(final NodeManager nodeManager,
-      final ContainerManager containerManager) {
-    this(nodeManager, containerManager, null);
+      final ContainerManagerV2 containerManager) {
+    this(nodeManager, containerManager, SCMContext.emptyContext(), null);
   }
 
   /**
@@ -120,7 +123,7 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
 
       final Set<ContainerID> containersInDn = replicas.parallelStream()
           .map(ContainerReplicaProto::getContainerID)
-          .map(ContainerID::valueof).collect(Collectors.toSet());
+          .map(ContainerID::valueOf).collect(Collectors.toSet());
 
       final Set<ContainerID> missingReplicas = new HashSet<>(containersInSCM);
       missingReplicas.removeAll(containersInDn);
@@ -167,10 +170,10 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
         } else if (unknownContainerHandleAction.equals(
             UNKNOWN_CONTAINER_ACTION_DELETE)) {
           final ContainerID containerId = ContainerID
-              .valueof(replicaProto.getContainerID());
+              .valueOf(replicaProto.getContainerID());
           deleteReplica(containerId, datanodeDetails, publisher, "unknown");
         }
-      } catch (IOException e) {
+      } catch (IOException | InvalidStateTransitionException e) {
         LOG.error("Exception while processing container report for container" +
                 " {} from datanode {}.", replicaProto.getContainerID(),
             datanodeDetails, e);
@@ -221,7 +224,7 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
     for (ContainerReplicaProto replica : replicas) {
       try {
         final ContainerInfo containerInfo = containerManager.getContainer(
-            ContainerID.valueof(replica.getContainerID()));
+            ContainerID.valueOf(replica.getContainerID()));
         if (containerInfo.getDeleteTransactionId() >
             replica.getDeleteTransactionId()) {
           pendingDeleteStatusList.addPendingDeleteStatus(

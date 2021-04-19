@@ -66,7 +66,7 @@ public class TestDiscardPreallocatedBlocks{
    */
 
   @Rule
-  public Timeout timeout = new Timeout(300000);
+  public Timeout timeout = Timeout.seconds(300);
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf = new OzoneConfiguration();
   private static OzoneClient client;
@@ -154,7 +154,7 @@ public class TestDiscardPreallocatedBlocks{
     long containerID = locationInfos.get(0).getContainerID();
     ContainerInfo container =
         cluster.getStorageContainerManager().getContainerManager()
-            .getContainer(ContainerID.valueof(containerID));
+            .getContainer(ContainerID.valueOf(containerID));
     Pipeline pipeline =
         cluster.getStorageContainerManager().getPipelineManager()
             .getPipeline(container.getPipelineID());

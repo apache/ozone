@@ -29,6 +29,6 @@ CSI Socket check
 Check if CSI server is started
    Wait Until Keyword Succeeds      3min       1sec      CSI Socket check
 
-Test CSI identitiy service
+Test CSI identity service
    ${result} =             Execute                        csc -e unix:///tmp/csi.sock identity plugin-info
                            Should Contain                 ${result}             org.apache.hadoop.ozone

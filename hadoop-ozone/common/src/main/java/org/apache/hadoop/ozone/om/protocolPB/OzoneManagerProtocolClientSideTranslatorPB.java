@@ -648,6 +648,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setBucketName(args.getBucketName())
         .setKeyName(args.getKeyName())
         .setDataSize(args.getDataSize())
+        .setType(args.getType())
+        .setFactor(args.getFactor())
         .addAllKeyLocations(locationInfoList.stream()
             // TODO use OM version?
             .map(info -> info.getProtobuf(CURRENT_VERSION))
@@ -1076,7 +1078,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         resp.getServiceInfoList().stream()
             .map(ServiceInfo::getFromProtobuf)
             .collect(Collectors.toList()),
-        resp.getCaCertificate());
+        resp.getCaCertificate(), resp.getCaCertsList());
   }
 
   /**

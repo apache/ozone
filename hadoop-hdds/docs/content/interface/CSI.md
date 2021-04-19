@@ -24,6 +24,11 @@ summary: Ozone supports Container Storage Interface(CSI) protocol. You can use O
   limitations under the License.
 -->
 
+<div class="alert alert-warning" role="alert">
+
+Ozone CSI support is still in alpha phase and buckets can be mounted only via 3rd party S3 compatible Fuse implementation (like Goofys). Fuse over S3 can provide only limited performance compared to a native Fuse file system. Long-term Ozone may support a custom solution to mount buckets which provides better user experience (with fuse or NFS or any other solution). Until that CSI is recommended to use only if you can live with this limitation and your use case is tested carefully.
+</div>
+
 `Container Storage Interface` (CSI) will enable storage vendors (SP) to develop a plugin once and have it work across a number of container orchestration (CO) systems like Kubernetes or Yarn.
 
 To get more information about CSI at [SCI spec](https://github.com/container-storage-interface/spec/blob/master/spec.md)
