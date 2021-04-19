@@ -231,7 +231,7 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
               client = new XceiverClientGrpc(pipeline, conf, caCerts);
               break;
             case EC:
-              client = new XceiverClientGrpc(pipeline, conf, caCert);
+              client = new XceiverClientGrpc(pipeline, conf, caCerts);
               break;
             case CHAINED:
             default:
