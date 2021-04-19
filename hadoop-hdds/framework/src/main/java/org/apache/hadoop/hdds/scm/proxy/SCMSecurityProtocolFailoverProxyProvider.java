@@ -174,7 +174,7 @@ public class SCMSecurityProtocolFailoverProxyProvider implements
 
 
   @Override
-  public void performFailover(SCMSecurityProtocolPB currentProxy) {
+  public synchronized void performFailover(SCMSecurityProtocolPB currentProxy) {
     if (LOG.isDebugEnabled()) {
       int currentIndex = getCurrentProxyIndex();
       LOG.debug("Failing over SCM Security proxy to index: {}, nodeId: {}",
@@ -205,7 +205,7 @@ public class SCMSecurityProtocolFailoverProxyProvider implements
     }
   }
 
-  private synchronized boolean assignLeaderToNode(String newLeaderNodeId) {
+  private boolean assignLeaderToNode(String newLeaderNodeId) {
     if (!currentProxySCMNodeId.equals(newLeaderNodeId)
         && scmProxies.containsKey(newLeaderNodeId)) {
       currentProxySCMNodeId = newLeaderNodeId;
@@ -232,7 +232,7 @@ public class SCMSecurityProtocolFailoverProxyProvider implements
    * Update the proxy index to the next proxy in the list.
    * @return the new proxy index
    */
-  private synchronized int incrementProxyIndex() {
+  private int incrementProxyIndex() {
     currentProxyIndex = (currentProxyIndex + 1) % scmProxyInfoMap.size();
     currentProxySCMNodeId = scmNodeIds.get(currentProxyIndex);
     return currentProxyIndex;
@@ -283,7 +283,7 @@ public class SCMSecurityProtocolFailoverProxyProvider implements
   }
 
   @Override
-  public void close() throws IOException {
+  public synchronized void close() throws IOException {
     for (Map.Entry<String, ProxyInfo<SCMSecurityProtocolPB>> proxy :
         scmProxies.entrySet()) {
       if (proxy.getValue() != null) {
@@ -293,7 +293,7 @@ public class SCMSecurityProtocolFailoverProxyProvider implements
     }
   }
 
-  public synchronized String getCurrentProxySCMNodeId() {
+  public String getCurrentProxySCMNodeId() {
     return currentProxySCMNodeId;
   }
 
