@@ -65,7 +65,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
-import static org.apache.hadoop.hdds.scm.events.SCMEvents.NON_HEALTHY_TO_READONLY_HEALTHY_NODE;
+import static org.apache.hadoop.hdds.scm.events.SCMEvents.HEALTHY_READONLY_NODE;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -200,11 +200,12 @@ public class NodeStateManager implements Runnable, Closeable {
     checkPaused = false; // accessed only from test functions
 
     layoutMatchCondition =
-        (layout) -> layout.getMetadataLayoutVersion() ==
-             layoutVersionManager.getMetadataLayoutVersion();
-    layoutMisMatchCondition =
-        (layout) -> layout.getMetadataLayoutVersion() !=
-             layoutVersionManager.getMetadataLayoutVersion();
+        (layout) -> (layout.getMetadataLayoutVersion() ==
+             layoutVersionManager.getMetadataLayoutVersion()) &&
+            (layout.getSoftwareLayoutVersion() ==
+            layoutVersionManager.getSoftwareLayoutVersion());
+
+    layoutMisMatchCondition = (layout) -> !layoutMatchCondition.test(layout);
 
     scheduleNextHealthCheck();
   }
@@ -216,9 +217,9 @@ public class NodeStateManager implements Runnable, Closeable {
     state2EventMap.put(STALE, SCMEvents.STALE_NODE);
     state2EventMap.put(DEAD, SCMEvents.DEAD_NODE);
     state2EventMap
-        .put(HEALTHY, SCMEvents.READ_ONLY_HEALTHY_TO_HEALTHY_NODE);
+        .put(HEALTHY, SCMEvents.HEALTHY_READONLY_TO_HEALTHY_NODE);
     state2EventMap
-        .put(NodeState.HEALTHY_READONLY, NON_HEALTHY_TO_READONLY_HEALTHY_NODE);
+        .put(NodeState.HEALTHY_READONLY, HEALTHY_READONLY_NODE);
   }
 
   /*

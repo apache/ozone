@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.NodeReportFromDatanode;
@@ -53,6 +54,7 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto.ErrorCode;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
@@ -61,6 +63,7 @@ import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.commands.SetNodeOperationalStateCommand;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.hadoop.test.LambdaTestUtils;
 import org.apache.hadoop.test.PathUtils;
 import org.junit.After;
 import org.junit.Assert;
@@ -72,6 +75,7 @@ import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
 import java.util.Map;
+import java.util.function.Predicate;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -112,6 +116,20 @@ public class TestSCMNodeManager {
 
   private File testDir;
   private StorageContainerManager scm;
+
+  private static final int MAX_LV = HDDSLayoutVersionManager.maxLayoutVersion();
+  private static final LayoutVersionProto LARGER_SLV_LAYOUT_PROTO =
+      toLayoutVersionProto(MAX_LV, MAX_LV + 1);
+  private static final LayoutVersionProto SMALLER_MLV_LAYOUT_PROTO =
+      toLayoutVersionProto(MAX_LV - 1, MAX_LV);
+  // In a real cluster, startup is disallowed if MLV is larger than SLV, so
+  // increase both numbers to test smaller SLV or larger MLV.
+  private static final LayoutVersionProto SMALLER_MLV_SLV_LAYOUT_PROTO =
+      toLayoutVersionProto(MAX_LV - 1, MAX_LV - 1);
+  private static final LayoutVersionProto LARGER_MLV_SLV_LAYOUT_PROTO =
+      toLayoutVersionProto(MAX_LV + 1, MAX_LV + 1);
+  private static final LayoutVersionProto CORRECT_LAYOUT_PROTO =
+      toLayoutVersionProto(MAX_LV, MAX_LV);
 
   @Rule
   public ExpectedException thrown = ExpectedException.none();
@@ -200,7 +218,73 @@ public class TestSCMNodeManager {
   }
 
   /**
-   * Tests that Node manager handles Layout versions correctly.
+   * Tests that node manager handles layout version changes from heartbeats
+   * correctly.
+   *
+   * @throws IOException
+   * @throws InterruptedException
+   * @throws TimeoutException
+   */
+  @Test
+  public void testScmLayoutOnHeartbeat() throws Exception {
+    OzoneConfiguration conf = getConf();
+    conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL,
+        1, TimeUnit.DAYS);
+
+    try (SCMNodeManager nodeManager = createNodeManager(conf)) {
+      // Register 2 nodes correctly.
+      // These will be used with a faulty node to test pipeline creation.
+      TestUtils.createRandomDatanodeAndRegister(nodeManager);
+      TestUtils.createRandomDatanodeAndRegister(nodeManager);
+
+      scm.exitSafeMode();
+
+      assertPipelineClosedAfterLayoutHeartbeat(nodeManager,
+          SMALLER_MLV_LAYOUT_PROTO);
+      assertPipelineClosedAfterLayoutHeartbeat(nodeManager,
+          LARGER_MLV_SLV_LAYOUT_PROTO);
+      assertPipelineClosedAfterLayoutHeartbeat(nodeManager,
+          SMALLER_MLV_SLV_LAYOUT_PROTO);
+      assertPipelineClosedAfterLayoutHeartbeat(nodeManager,
+          LARGER_SLV_LAYOUT_PROTO);
+    }
+  }
+
+  private void assertPipelineClosedAfterLayoutHeartbeat(
+      SCMNodeManager nodeManager, LayoutVersionProto layout) throws Exception {
+
+    // Initial condition: 2 healthy nodes registered.
+    assertPipelineCounts(oneCount -> oneCount == 2,
+        threeCount -> threeCount == 0);
+
+    // Even when safemode exit or new node addition trigger pipeline
+    // creation, they will fail with not enough healthy nodes for ratis 3
+    // pipeline. Therefore we do not have to worry about this create call
+    // failing due to datanodes reaching their maximum pipeline limit.
+    assertPipelineCreationFailsWithNotEnoughNodes(2);
+
+    // Register a new node correctly.
+    DatanodeDetails node = TestUtils
+        .createRandomDatanodeAndRegister(nodeManager);
+
+    // Safemode exit and adding the new node should trigger pipeline creation.
+    assertPipelineCounts(oneCount -> oneCount == 3,
+        threeCount -> threeCount >= 1);
+
+    // node sends incorrect layout.
+    nodeManager.processHeartbeat(node, layout);
+
+    // Its pipelines should be closed then removed, meaning there is not
+    // enough nodes for factor 3 pipelines.
+    assertPipelineCounts(oneCount -> oneCount == 2,
+        threeCount -> threeCount == 0);
+
+    assertPipelineCreationFailsWithNotEnoughNodes(2);
+  }
+
+  /**
+   * Tests that node manager handles layout versions for newly registered nodes
+   * correctly.
    *
    * @throws IOException
    * @throws InterruptedException
@@ -208,29 +292,95 @@ public class TestSCMNodeManager {
    */
   @Test
   public void testScmLayoutOnRegister()
-      throws IOException, InterruptedException, AuthenticationException {
+      throws Exception {
 
-    try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
-      HDDSLayoutVersionManager layoutVersionManager =
-          nodeManager.getLayoutVersionManager();
-      int nodeManagerMetadataLayoutVersion =
-          layoutVersionManager.getMetadataLayoutVersion();
-      int nodeManagerSoftwareLayoutVersion =
-          layoutVersionManager.getSoftwareLayoutVersion();
-      LayoutVersionProto layoutInfoSuccess = toLayoutVersionProto(
-          nodeManagerMetadataLayoutVersion, nodeManagerSoftwareLayoutVersion);
-      LayoutVersionProto layoutInfoFailure = toLayoutVersionProto(
-          nodeManagerSoftwareLayoutVersion + 1,
-          nodeManagerSoftwareLayoutVersion + 1);
-      RegisteredCommand rcmd = nodeManager.register(
-          MockDatanodeDetails.randomDatanodeDetails(), null,
-          getRandomPipelineReports(), layoutInfoSuccess);
-      assertTrue(rcmd.getError() == success);
-      rcmd = nodeManager.register(
-          MockDatanodeDetails.randomDatanodeDetails(), null,
-          getRandomPipelineReports(), layoutInfoFailure);
-      assertTrue(rcmd.getError() == errorNodeNotPermitted);
+    OzoneConfiguration conf = getConf();
+    conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL,
+        1, TimeUnit.DAYS);
+
+    try (SCMNodeManager nodeManager = createNodeManager(conf)) {
+      // Nodes with mismatched SLV cannot join the cluster.
+      assertRegister(nodeManager,
+          LARGER_SLV_LAYOUT_PROTO, errorNodeNotPermitted);
+      assertRegister(nodeManager,
+          SMALLER_MLV_SLV_LAYOUT_PROTO, errorNodeNotPermitted);
+      assertRegister(nodeManager,
+          LARGER_MLV_SLV_LAYOUT_PROTO, errorNodeNotPermitted);
+      // Nodes with mismatched MLV can join, but should not be allowed in
+      // pipelines.
+      DatanodeDetails badMlvNode1 = assertRegister(nodeManager,
+          SMALLER_MLV_LAYOUT_PROTO, success);
+      DatanodeDetails badMlvNode2 = assertRegister(nodeManager,
+          SMALLER_MLV_LAYOUT_PROTO, success);
+      // This node has correct MLV and SLV, so it can join and be used in
+      // pipelines.
+      assertRegister(nodeManager, CORRECT_LAYOUT_PROTO, success);
+
+      Assert.assertEquals(3, nodeManager.getAllNodes().size());
+
+      scm.exitSafeMode();
+
+      // SCM should auto create a factor 1 pipeline for the one healthy node.
+      // Still should not have enough healthy nodes for ratis 3 pipeline.
+      assertPipelineCounts(oneCount -> oneCount == 1,
+          threeCount -> threeCount == 0);
+
+      // Even when safemode exit or new node addition trigger pipeline
+      // creation, they will fail with not enough healthy nodes for ratis 3
+      // pipeline. Therefore we do not have to worry about this create call
+      // failing due to datanodes reaching their maximum pipeline limit.
+      assertPipelineCreationFailsWithNotEnoughNodes(1);
+
+      // Heartbeat bad MLV nodes back to healthy.
+      nodeManager.processHeartbeat(badMlvNode1, CORRECT_LAYOUT_PROTO);
+      nodeManager.processHeartbeat(badMlvNode2, CORRECT_LAYOUT_PROTO);
+
+      // After moving out of healthy readonly, pipeline creation should be
+      // triggered.
+      assertPipelineCounts(oneCount -> oneCount == 3,
+          threeCount -> threeCount >= 1);
     }
+  }
+
+  private DatanodeDetails assertRegister(SCMNodeManager manager,
+      LayoutVersionProto layout, ErrorCode expectedResult) {
+    RegisteredCommand cmd = manager.register(
+        MockDatanodeDetails.randomDatanodeDetails(), null,
+        getRandomPipelineReports(), layout);
+
+    Assert.assertEquals(expectedResult, cmd.getError());
+    return cmd.getDatanode();
+  }
+
+  private void assertPipelineCreationFailsWithNotEnoughNodes(
+      int actualNodeCount) throws Exception {
+    try {
+      scm.getPipelineManager()
+          .createPipeline(HddsProtos.ReplicationType.RATIS,
+              HddsProtos.ReplicationFactor.THREE);
+      Assert.fail("3 nodes should not have been found for a pipeline.");
+    } catch (SCMException ex) {
+      Assert.assertTrue(ex.getMessage().contains("Required 3. Found " +
+          actualNodeCount));
+    }
+  }
+
+  private void assertPipelineCounts(Predicate<Integer> factorOneCheck,
+      Predicate<Integer> factorThreeCheck) throws Exception {
+    LambdaTestUtils.await(5000, 1000, () -> {
+      int numOne = scm.getPipelineManager()
+          .getPipelines(HddsProtos.ReplicationType.RATIS,
+              HddsProtos.ReplicationFactor.ONE).size();
+      int numThree = scm.getPipelineManager()
+          .getPipelines(HddsProtos.ReplicationType.RATIS,
+              HddsProtos.ReplicationFactor.THREE).size();
+
+      // Moving nodes out of healthy readonly should have triggered
+      // pipeline creation. With 3 healthy nodes, we should have at least one
+      // factor 3 pipeline now, and factor 1s should have been auto created
+      // for all nodes.
+      return factorOneCheck.test(numOne) && factorThreeCheck.test(numThree);
+    });
   }
 
   /**
