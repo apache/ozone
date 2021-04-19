@@ -136,6 +136,4 @@ public class SCMSnapshotProvider {
     return scmSnapshotDir;
   }
 
-  public void stop() throws Exception {
-  }
 }
