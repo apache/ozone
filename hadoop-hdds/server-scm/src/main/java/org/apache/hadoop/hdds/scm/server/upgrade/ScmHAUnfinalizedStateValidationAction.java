@@ -19,7 +19,7 @@
 package org.apache.hadoop.hdds.scm.server.upgrade;
 
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.SCM_HA;
-import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.UNFINALIZED_STATE_VALIDATION;
+import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.VALIDATE_IN_PREFINALIZE;
 import static org.apache.hadoop.ozone.upgrade.UpgradeActionHdds.Component.SCM;
 
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -27,16 +27,11 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.upgrade.HDDSUpgradeAction;
 import org.apache.hadoop.ozone.upgrade.UpgradeActionHdds;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 @UpgradeActionHdds(feature = SCM_HA, component = SCM,
-    type = UNFINALIZED_STATE_VALIDATION)
+    type = VALIDATE_IN_PREFINALIZE)
 public class ScmHAUnfinalizedStateValidationAction
     implements HDDSUpgradeAction<StorageContainerManager> {
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(ScmHAUnfinalizedStateValidationAction.class);
 
   @Override
   public void execute(StorageContainerManager scm) throws Exception {
@@ -48,7 +43,7 @@ public class ScmHAUnfinalizedStateValidationAction
       throw new UpgradeException(String.format("Configuration %s cannot be " +
           "used until SCM upgrade has been finalized",
           ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY),
-          UpgradeException.ResultCodes.PREFINALIZE_STATE_VALIDATION_FAILED);
+          UpgradeException.ResultCodes.PREFINALIZE_ACTION_VALIDATION_FAILED);
     }
   }
 }
