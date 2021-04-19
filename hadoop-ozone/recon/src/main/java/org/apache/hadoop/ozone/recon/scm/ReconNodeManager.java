@@ -92,8 +92,11 @@ public class ReconNodeManager extends SCMNodeManager {
         DatanodeDetails datanodeDetails = iterator.next().getValue();
         register(datanodeDetails, null, null,
             LayoutVersionProto.newBuilder()
-                .setMetadataLayoutVersion(0)
-                .setSoftwareLayoutVersion(0).build());
+                .setMetadataLayoutVersion(
+                    HDDSLayoutVersionManager.maxLayoutVersion())
+                .setSoftwareLayoutVersion(
+                    HDDSLayoutVersionManager.maxLayoutVersion())
+                .build());
         nodeCount++;
       }
       LOG.info("Loaded {} nodes from node DB.", nodeCount);

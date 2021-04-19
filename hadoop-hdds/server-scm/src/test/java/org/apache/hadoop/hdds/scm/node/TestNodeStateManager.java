@@ -202,7 +202,7 @@ public class TestNodeStateManager {
     dni.updateLastHeartbeatTime();
     nsm.checkNodesHealth();
     assertEquals(NodeState.HEALTHY_READONLY, nsm.getNodeStatus(dn).getHealth());
-    assertEquals(SCMEvents.NON_HEALTHY_TO_READONLY_HEALTHY_NODE,
+    assertEquals(SCMEvents.HEALTHY_READONLY_NODE,
         eventPublisher.getLastEvent());
 
     // Make the node stale again, and transition to healthy.
@@ -213,7 +213,7 @@ public class TestNodeStateManager {
     dni.updateLastHeartbeatTime();
     nsm.checkNodesHealth();
     assertEquals(NodeState.HEALTHY_READONLY, nsm.getNodeStatus(dn).getHealth());
-    assertEquals(SCMEvents.NON_HEALTHY_TO_READONLY_HEALTHY_NODE,
+    assertEquals(SCMEvents.HEALTHY_READONLY_NODE,
         eventPublisher.getLastEvent());
   }
 
@@ -247,7 +247,7 @@ public class TestNodeStateManager {
         HddsProtos.NodeOperationalState.values()) {
       eventPublisher.clearEvents();
       nsm.setNodeOperationalState(dn, s);
-      assertEquals(SCMEvents.NON_HEALTHY_TO_READONLY_HEALTHY_NODE,
+      assertEquals(SCMEvents.HEALTHY_READONLY_NODE,
           eventPublisher.getLastEvent());
     }
 
