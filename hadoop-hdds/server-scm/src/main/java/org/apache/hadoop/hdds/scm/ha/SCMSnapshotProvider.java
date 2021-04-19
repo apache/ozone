@@ -32,7 +32,6 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RocksDBCheckpoint;
 
@@ -110,7 +109,7 @@ public class SCMSnapshotProvider {
         port, conf);
     try {
       downloadClient.download(targetFile.toPath()).get();
-    } catch (Exception e) {
+    } catch (ExecutionException | InterruptedException e) {
       LOG.error("Rocks DB checkpoint downloading failed", e);
       throw new IOException(e);
     } finally {
