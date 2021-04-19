@@ -27,6 +27,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.IOzoneObj;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
+import org.codehaus.jettison.json.JSONObject;
 
 
 /**
@@ -35,7 +36,7 @@ import org.apache.hadoop.ozone.security.acl.RequestContext;
  */
 @InterfaceAudience.LimitedPrivate({"HDFS", "Yarn", "Ranger", "Hive", "HBase"})
 @InterfaceStability.Evolving
-public interface MultiTenantGateKeeper extends IAccessAuthorizer {
+public interface MultiTenantAccessAuthorizer extends IAccessAuthorizer {
 
   /**
    * Initialize the MultiTenantGateKeeper. Initialize any external state.
@@ -61,6 +62,21 @@ public interface MultiTenantGateKeeper extends IAccessAuthorizer {
    */
   String createUser(OzoneMultiTenantPrincipal principal,
                     List<String> groupIDs) throws Exception;
+
+  /**
+   * @param principal
+   * @return Unique userID maintained by the authorizer plugin.
+   * @throws Exception
+   */
+  String getUserId(OzoneMultiTenantPrincipal principal) throws Exception;
+
+  /**
+   * @param principal
+   * @return Unique groupID maintained by the authorizer plugin.
+   * @throws Exception
+   */
+  String getGroupId(OzoneMultiTenantPrincipal principal)
+      throws Exception;
 
   /**
    * Delete the user userID in MultiTenantGateKeeper plugin.
@@ -96,11 +112,25 @@ public interface MultiTenantGateKeeper extends IAccessAuthorizer {
 
   /**
    *
+   * @param policyName
+   * @return unique and opaque policy ID that is maintained by the plugin.
+   * @throws Exception
+   */
+  public AccessPolicy getAccessPolicyByName(String policyName) throws Exception;
+
+  /**
+   *
    * @param policyId that was returned earlier by the createAccessPolicy().
    * @throws Exception
    */
-  void deletePolicy(String policyId) throws IOException;
+  void deletePolicybyId(String policyId) throws IOException;
 
+  /**
+   *
+   * @param policyName unique policyName.
+   * @throws Exception
+   */
+  void deletePolicybyName(String policyName) throws Exception;
   /**
    * Grant user aclType access to bucketNameSpace.
    * @param bucketNameSpace

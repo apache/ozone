@@ -23,6 +23,9 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_ADMIN_CREATE_U
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_ADMIN_DELETE_GROUP_HTTP_ENDPOINT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_ADMIN_DELETE_POLICY_HTTP_ENDPOINT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_ADMIN_DELETE_USER_HTTP_ENDPOINT;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_ADMIN_GET_GROUP_HTTP_ENDPOINT;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_ADMIN_GET_POLICY_HTTP_ENDPOINT;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_ADMIN_GET_USER_HTTP_ENDPOINT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_USER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_HTTPS_ADDRESS_KEY;
@@ -56,15 +59,16 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.security.acl.IOzoneObj;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
+import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class MultiTenantGateKeeperRangerPlugin implements
-    MultiTenantGateKeeper {
+public class MultiTenantAccessAuthorizerRangerPlugin implements
+    MultiTenantAccessAuthorizer {
   private static final Logger LOG = LoggerFactory
-      .getLogger(MultiTenantGateKeeperRangerPlugin.class);
+      .getLogger(MultiTenantAccessAuthorizerRangerPlugin.class);
 
   private OzoneConfiguration conf;
   private boolean ignoreServerCert = false;
@@ -213,6 +217,64 @@ public class MultiTenantGateKeeperRangerPlugin implements
     return jsonCreateUserString;
   }
 
+  @Override
+  public String getGroupId(OzoneMultiTenantPrincipal principal)
+      throws Exception {
+    String rangerAdminUrl =
+        rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_GET_GROUP_HTTP_ENDPOINT +
+            principal.getFullMultiTenantPrincipalID();
+
+    HttpsURLConnection conn = makeHttpsGetCall(rangerAdminUrl,
+        "GET", false);
+    String response = getReponseData(conn);
+    String groupIDCreated = null;
+    try {
+      JSONObject jResonse = new JSONObject(response);
+      JSONArray info = jResonse.getJSONArray("vXGroups");
+      int numIndex = info.length();
+      for (int i = 0; i < numIndex; ++i) {
+        if (info.getJSONObject(i).getString("name").equals(principal.getFullMultiTenantPrincipalID())) {
+          groupIDCreated = info.getJSONObject(i).getString("id");
+          break;
+        }
+      }
+      System.out.println("Group ID is : " + groupIDCreated);
+    } catch (JSONException e) {
+      e.printStackTrace();
+      throw e;
+    }
+    return groupIDCreated;
+  }
+
+  @Override
+  public String getUserId(OzoneMultiTenantPrincipal principal)
+      throws Exception {
+    String rangerAdminUrl =
+        rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_GET_USER_HTTP_ENDPOINT +
+        principal.getFullMultiTenantPrincipalID();
+
+    HttpsURLConnection conn = makeHttpsGetCall(rangerAdminUrl,
+        "GET", false);
+    String response = getReponseData(conn);
+    String userIDCreated = null;
+    try {
+      JSONObject jResonse = new JSONObject(response);
+      JSONArray userinfo = jResonse.getJSONArray("vXUsers");
+      int numIndex = userinfo.length();
+      for (int i = 0; i < numIndex; ++i) {
+        if (userinfo.getJSONObject(i).getString("name").equals(principal.getFullMultiTenantPrincipalID())) {
+          userIDCreated = userinfo.getJSONObject(i).getString("id");
+          break;
+        }
+      }
+      System.out.println("User ID is : " + userIDCreated);
+    } catch (JSONException e) {
+      e.printStackTrace();
+      throw e;
+    }
+    return userIDCreated;
+  }
+
   public String createUser(OzoneMultiTenantPrincipal principal,
                            List<String> groupIDs)
       throws Exception {
@@ -273,7 +335,7 @@ public class MultiTenantGateKeeperRangerPlugin implements
         rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_CREATE_POLICY_HTTP_ENDPOINT;
 
     HttpsURLConnection conn = makeHttpsPostCall(rangerAdminUrl,
-        policy.getPolicyJsonString(),
+        policy.serializePolicyToJsonString(),
         "POST", false);
     String policyInfo = getReponseData(conn);
     String policyID;
@@ -286,6 +348,22 @@ public class MultiTenantGateKeeperRangerPlugin implements
       throw e;
     }
     return policyID;
+  }
+
+  public AccessPolicy getAccessPolicyByName(String policyName)
+      throws Exception {
+    String rangerAdminUrl =
+        rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_GET_POLICY_HTTP_ENDPOINT +
+        policyName;
+
+    HttpsURLConnection conn = makeHttpsGetCall(rangerAdminUrl,
+        "GET", false);
+    String policyInfo = getReponseData(conn);
+    JSONArray jArry = new JSONArray(policyInfo);
+    JSONObject jsonObject = jArry.getJSONObject(0);
+    AccessPolicy policy = new RangerAccessPolicy(policyName);
+    policy.deserializePolicyFromJsonString(jsonObject);
+    return policy;
   }
 
   public void deleteUser(String userId) throws Exception {
@@ -316,7 +394,15 @@ public class MultiTenantGateKeeperRangerPlugin implements
     }
   }
 
-  public void deletePolicy(String policyId) throws IOException {
+  @Override
+  public void deletePolicybyName(String policyName) throws Exception {
+    AccessPolicy policy = getAccessPolicyByName(policyName);
+    String  policyID = policy.getPolicyID();
+    System.out.println("policyID is : " + policyID);
+    deletePolicybyId(policyID);
+  }
+
+  public void deletePolicybyId(String policyId) throws IOException {
 
     String rangerAdminUrl =
         rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_DELETE_POLICY_HTTP_ENDPOINT
@@ -329,7 +415,7 @@ public class MultiTenantGateKeeperRangerPlugin implements
         throw new IOException("Couldnt delete policy " + policyId);
       }
     } catch (Exception e) {
-      throw new IOException("Couldnt delete policy " + policyId);
+      throw new IOException("Couldnt delete policy " + policyId, e);
     }
   }
 
@@ -372,6 +458,21 @@ public class MultiTenantGateKeeperRangerPlugin implements
         os.flush();
       }
     }
+
+    return urlConnection;
+  }
+
+  private HttpsURLConnection makeHttpsGetCall(String urlString,
+                                               String method, boolean isSpnego)
+      throws IOException, AuthenticationException {
+
+    URL url = new URL(urlString);
+    HttpsURLConnection urlConnection = (HttpsURLConnection)url.openConnection();
+    urlConnection.setRequestMethod(method);
+    urlConnection.setConnectTimeout(connectionTimeout);
+    urlConnection.setReadTimeout(connectionRequestTimeout);
+    urlConnection.setRequestProperty("Accept", "application/json");
+    urlConnection.setRequestProperty("Authorization", authHeaderValue);
 
     return urlConnection;
   }

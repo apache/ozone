@@ -102,7 +102,7 @@ public interface OMMultiTenantManager {
   /**
    * Given a TenantID, destroys all state associated with that tenant.
    * This is different from deactivateTenant() above.
-   * @param tenantID
+   * @param tenant
    * @return
    * @throws IOException
    */
@@ -113,11 +113,20 @@ public interface OMMultiTenantManager {
    * Creates a new user that exists for S3 API access to Ozone.
    * @param tenantName
    * @param userName
-   * @return OzoneMultiTenantPrincipal
+   * @return Unique UserID.
    * @throws IOException if there is any error condition detected.
    */
-  OzoneMultiTenantPrincipal createUser(String tenantName,
-                                       String userName)throws IOException;
+  String createUser(String tenantName, String userName)throws IOException;
+
+  /**
+   * Given a user, destroys all state associated with that user.
+   * This is different from deactivateUser().
+   * @param tenantName
+   @ @param userName
+   * @return
+   * @throws IOException
+   */
+  void destroyUser(String tenantName, String userName)throws IOException;
 
   /**
    * Given a user, return their S3-Secret Key.
@@ -131,7 +140,8 @@ public interface OMMultiTenantManager {
    * generated secret with getUserSecret();
    * @param user
    */
-  void modifyUser(OzoneMultiTenantPrincipal user) throws IOException;
+  void modifyUser(OzoneMultiTenantPrincipal user, List<String> groups_added,
+                  List<String> groups_removed) throws IOException;
 
   /**
    * Given a user, deactivate them. We will need a recon command/job to cleanup
@@ -181,6 +191,15 @@ public interface OMMultiTenantManager {
    */
   void grantAccess(OzoneMultiTenantPrincipal user,
                    BucketNameSpace bucketNameSpace) throws IOException;
+
+  /**
+   * grant given user access to the given BucketNameSpace.
+   * @param user
+   * @param bucketNameSpace
+   */
+  void grantBucketAccess(OzoneMultiTenantPrincipal user,
+                   BucketNameSpace bucketNameSpace, String bucketName)
+      throws IOException;
 
   /**
    * revoke user access from the given BucketNameSpace.

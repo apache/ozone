@@ -44,7 +44,6 @@ import org.apache.http.auth.BasicUserPrincipal;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
@@ -55,10 +54,9 @@ import org.slf4j.LoggerFactory;
  * Tests TestMultiTenantGateKeeperImplWithRanger.
  * Marking it as Ignore because it needs Ranger access point.
  */
-@Ignore
-public class TestMultiTenantGateKeeperRangerPlugin {
+public class TestMultiTenantAccessAuthorizerRangerPlugin {
   private static final Logger LOG = LoggerFactory
-      .getLogger(TestMultiTenantGateKeeperRangerPlugin.class);
+      .getLogger(TestMultiTenantAccessAuthorizerRangerPlugin.class);
 
   /**
    * Set a timeout for each test.
@@ -95,9 +93,9 @@ public class TestMultiTenantGateKeeperRangerPlugin {
   }
 
   @Test
-  public void testMultiTenantGateKeeperRangerPlugin() throws Exception {
+  public void testMultiTenantAccessAuthorizerRangerPlugin() throws Exception {
     simulateOzoneSiteXmlConfig();
-    MultiTenantGateKeeper omm = new MultiTenantGateKeeperRangerPlugin();
+    MultiTenantAccessAuthorizer omm = new MultiTenantAccessAuthorizerRangerPlugin();
     omm.init(conf);
 
     try {
@@ -132,11 +130,68 @@ public class TestMultiTenantGateKeeperRangerPlugin {
       Assert.fail(e.getMessage());
     } finally {
       for (String id : policyIdsCreated) {
-        omm.deletePolicy(id);
+        omm.deletePolicybyId(id);
       }
-      if (usersIdsCreated.size() == 1) {
-        omm.deleteUser(usersIdsCreated.get(0));
+      for (String id : usersIdsCreated) {
+        omm.deleteUser(id);
       }
+      for (String id : groupIdsCreated) {
+        omm.deleteGroup(id);
+      }
+    }
+  }
+
+  @Test
+  public void testMultiTenantAccessAuthorizerRangerPluginWithoutIds()
+      throws Exception {
+    OzoneMultiTenantPrincipal userPrincipal = null;
+    simulateOzoneSiteXmlConfig();
+    MultiTenantAccessAuthorizer omm = new MultiTenantAccessAuthorizerRangerPlugin();
+    omm.init(conf);
+
+    try {
+      Assert.assertTrue(policyIdsCreated.size() == 0);
+      OzoneMultiTenantPrincipal group1Principal = getTestPrincipal("tenant1",
+          "groupTestAdmin", GROUP_PRINCIPAL);
+      OzoneMultiTenantPrincipal group2Principal = getTestPrincipal("tenant1",
+          "groupTestUsers", GROUP_PRINCIPAL);
+      omm.createGroup(group1Principal);
+      groupIdsCreated.add(omm.getGroupId(group1Principal));
+      omm.createGroup(group2Principal);
+      groupIdsCreated.add(omm.getGroupId(group2Principal));
+
+      userPrincipal =
+          getTestPrincipal("tenant1", "user1Test", USER_PRINCIPAL);
+      omm.createUser(userPrincipal, groupIdsCreated);
+
+      AccessPolicy tenant1VolumeAccessPolicy = createVolumeAccessPolicy(
+          "vol1", "tenant1", "Users");
+      omm.createAccessPolicy(tenant1VolumeAccessPolicy);
+      policyIdsCreated.add(tenant1VolumeAccessPolicy.getPolicyName());
+
+      AccessPolicy tenant1BucketCreatePolicy = allowCreateBucketPolicy(
+          "vol1", "tenant1", "Users");
+      omm.createAccessPolicy(tenant1BucketCreatePolicy);
+      policyIdsCreated.add(tenant1BucketCreatePolicy.getPolicyName());
+
+      AccessPolicy tenant1BucketAccessPolicy = allowAccessBucketPolicy(
+          "vol1", "tenant1", "Users", "bucket1");
+      omm.createAccessPolicy(tenant1BucketAccessPolicy);
+      policyIdsCreated.add(tenant1BucketAccessPolicy.getPolicyName());
+
+      AccessPolicy tenant1KeyAccessPolicy = allowAccessKeyPolicy(
+          "vol1", "tenant1", "Users", "bucket1");
+      omm.createAccessPolicy(tenant1KeyAccessPolicy);
+      policyIdsCreated.add(tenant1KeyAccessPolicy.getPolicyName());
+
+    } catch (Exception e) {
+      Assert.fail(e.getMessage());
+    } finally {
+      for (String name : policyIdsCreated) {
+        omm.deletePolicybyName(name);
+      }
+      String userId = omm.getUserId(userPrincipal);
+      omm.deleteUser(userId);
       for (String id : groupIdsCreated) {
         omm.deleteGroup(id);
       }
