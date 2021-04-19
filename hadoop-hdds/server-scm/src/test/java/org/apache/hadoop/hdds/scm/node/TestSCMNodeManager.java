@@ -120,12 +120,14 @@ public class TestSCMNodeManager {
   private static final int MAX_LV = HDDSLayoutVersionManager.maxLayoutVersion();
   private static final LayoutVersionProto LARGER_SLV_LAYOUT_PROTO =
       toLayoutVersionProto(MAX_LV, MAX_LV + 1);
-  private static final LayoutVersionProto SMALLER_SLV_LAYOUT_PROTO =
-      toLayoutVersionProto(MAX_LV, MAX_LV - 1);
-  private static final LayoutVersionProto LARGER_MLV_LAYOUT_PROTO =
-      toLayoutVersionProto(MAX_LV + 1, MAX_LV);
   private static final LayoutVersionProto SMALLER_MLV_LAYOUT_PROTO =
       toLayoutVersionProto(MAX_LV - 1, MAX_LV);
+  // In a real cluster, startup is disallowed if MLV is larger than SLV, so
+  // increase both numbers to test smaller SLV or larger MLV.
+  private static final LayoutVersionProto SMALLER_MLV_SLV_LAYOUT_PROTO =
+      toLayoutVersionProto(MAX_LV - 1, MAX_LV - 1);
+  private static final LayoutVersionProto LARGER_MLV_SLV_LAYOUT_PROTO =
+      toLayoutVersionProto(MAX_LV + 1, MAX_LV + 1);
   private static final LayoutVersionProto CORRECT_LAYOUT_PROTO =
       toLayoutVersionProto(MAX_LV, MAX_LV);
 
@@ -240,9 +242,9 @@ public class TestSCMNodeManager {
       assertPipelineClosedAfterLayoutHeartbeat(nodeManager,
           SMALLER_MLV_LAYOUT_PROTO);
       assertPipelineClosedAfterLayoutHeartbeat(nodeManager,
-          LARGER_MLV_LAYOUT_PROTO);
+          LARGER_MLV_SLV_LAYOUT_PROTO);
       assertPipelineClosedAfterLayoutHeartbeat(nodeManager,
-          SMALLER_SLV_LAYOUT_PROTO);
+          SMALLER_MLV_SLV_LAYOUT_PROTO);
       assertPipelineClosedAfterLayoutHeartbeat(nodeManager,
           LARGER_SLV_LAYOUT_PROTO);
     }
@@ -301,11 +303,13 @@ public class TestSCMNodeManager {
       assertRegister(nodeManager,
           LARGER_SLV_LAYOUT_PROTO, errorNodeNotPermitted);
       assertRegister(nodeManager,
-          SMALLER_SLV_LAYOUT_PROTO, errorNodeNotPermitted);
+          SMALLER_MLV_SLV_LAYOUT_PROTO, errorNodeNotPermitted);
+      assertRegister(nodeManager,
+          LARGER_MLV_SLV_LAYOUT_PROTO, errorNodeNotPermitted);
       // Nodes with mismatched MLV can join, but should not be allowed in
       // pipelines.
       DatanodeDetails badMlvNode1 = assertRegister(nodeManager,
-          LARGER_MLV_LAYOUT_PROTO, success);
+          SMALLER_MLV_LAYOUT_PROTO, success);
       DatanodeDetails badMlvNode2 = assertRegister(nodeManager,
           SMALLER_MLV_LAYOUT_PROTO, success);
       // This node has correct MLV and SLV, so it can join and be used in
