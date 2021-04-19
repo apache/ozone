@@ -157,6 +157,8 @@ public class OMTenantUserCreateRequest extends OMVolumeRequest {
     final String tenantUsername = request.getTenantUsername();
     final String volumeName = tenantName;  // TODO: Configurable
     IOException exception = null;
+    String userId = null;
+
     try {
       // Check ACL: requires ozone admin or tenant admin permission
 //      if (ozoneManager.getAclsEnabled()) {
@@ -199,6 +201,9 @@ public class OMTenantUserCreateRequest extends OMVolumeRequest {
       omMetadataManager.getLock().releaseWriteLock(S3_SECRET_LOCK, principal);
       acquiredS3SecretLock = false;
 
+      userId =
+          ozoneManager.getMultiTenantManager().createUser(tenantName, tenantUsername);
+
       // Add to tenantUserTable
       omMetadataManager.getTenantUserTable().addCacheEntry(
           new CacheKey<>(principal),
@@ -226,6 +231,15 @@ public class OMTenantUserCreateRequest extends OMVolumeRequest {
       omClientResponse = new OMTenantUserCreateResponse(omResponse.build(),
           s3SecretValue, principal, tenantName, defaultGroupName, roleName);
     } catch (IOException ex) {
+      if (userId != null) {
+        try {
+          ozoneManager.getMultiTenantManager().destroyUser(tenantName,
+              tenantUsername);
+        } catch (IOException e) {
+          // Best Effort cleanup
+          e.printStackTrace();
+        }
+      }
       exception = ex;
       // Set response success flag to false
       omResponse.setCreateTenantUserResponse(

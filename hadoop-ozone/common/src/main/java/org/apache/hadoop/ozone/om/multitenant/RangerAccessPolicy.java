@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.multitenant;
 
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.codehaus.jettison.json.JSONObject;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -57,9 +58,16 @@ public class RangerAccessPolicy implements AccessPolicy {
   }
 
   @Override
-  public String getPolicyJsonString() throws Exception {
+  public String serializePolicyToJsonString() throws Exception {
     updatePolicyJsonString();
     return policyJsonString;
+  }
+
+  @Override
+  public String deserializePolicyFromJsonString(JSONObject jsonObject) throws Exception {
+    setPolicyID(jsonObject.getString("id"));
+    // TODO : retrieve other policy fields as well.
+    return null;
   }
 
   @Override

@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.codehaus.jettison.json.JSONObject;
 
 @InterfaceAudience.LimitedPrivate({"HDFS", "Yarn", "Ranger", "Hive", "HBase"})
 @InterfaceStability.Evolving
@@ -82,6 +83,11 @@ public interface AccessPolicy {
   String getPolicyID();
 
   /**
+   * @return unique policy-name for this policy.
+   */
+  String getPolicyName();
+
+  /**
    *
    * @return Policy in a Json string format. Individual implementation can
    * choose different AccessPolicyType e.g. Ranger-Compatible-Json-Policy,
@@ -90,7 +96,15 @@ public interface AccessPolicy {
    * All Authorizer policy engines are supposed to provide an implementation
    * of AccessPolicy interface.
    */
-  String getPolicyJsonString() throws Exception;
+  String serializePolicyToJsonString() throws Exception;
+
+  /**
+   * Given a serialized accessPolicy in a Json format, deserializes and
+   * constructs a valid access Policy.
+   * @return
+   * @throws Exception
+   */
+  String deserializePolicyFromJsonString(JSONObject jsonObject) throws Exception;
 
   /**
    * @return AccessPolicyType (Native or otherwise).

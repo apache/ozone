@@ -343,6 +343,11 @@ public final class OzoneConsts {
   public static final String DEFAULT_TENANT_POLICY_ID_SUFFIX = "-default";
   public static final String DEFAULT_TENANT_USER_GROUP_SUFFIX = "-users";
 
+  public static final String DEFAULT_TENANT_GROUP_ALL_ADMINS =
+      "GroupTenantAllAdmins";
+  public static final String DEFAULT_TENANT_GROUP_ALL_USERS =
+      "GroupTenantAllUsers";
+
   // For OM metrics saving to a file
   public static final String OM_METRICS_FILE = "omMetrics";
   public static final String OM_METRICS_TEMP_FILE = OM_METRICS_FILE + ".tmp";
@@ -452,17 +457,26 @@ public final class OzoneConsts {
   public static final String OZONE_OM_RANGER_ADMIN_CREATE_USER_HTTP_ENDPOINT =
       "/service/xusers/secure/users";
 
+  public static final String OZONE_OM_RANGER_ADMIN_GET_USER_HTTP_ENDPOINT =
+      "/service/xusers/users/?name=";
+
   public static final String OZONE_OM_RANGER_ADMIN_DELETE_USER_HTTP_ENDPOINT =
       "/service/xusers/secure/users/id/";
 
   public static final String OZONE_OM_RANGER_ADMIN_CREATE_GROUP_HTTP_ENDPOINT =
       "/service/xusers/secure/groups";
 
+  public static final String OZONE_OM_RANGER_ADMIN_GET_GROUP_HTTP_ENDPOINT =
+      "/service/xusers/groups?name=";
+
   public static final String OZONE_OM_RANGER_ADMIN_DELETE_GROUP_HTTP_ENDPOINT =
       "/service/xusers/secure/groups/id/";
 
   public static final String OZONE_OM_RANGER_ADMIN_CREATE_POLICY_HTTP_ENDPOINT =
       "/service/public/v2/api/policy";
+
+  public static final String OZONE_OM_RANGER_ADMIN_GET_POLICY_HTTP_ENDPOINT =
+      "/service/public/v2/api/policy/?policyName=";
 
   public static final String OZONE_OM_RANGER_ADMIN_DELETE_POLICY_HTTP_ENDPOINT =
       "/service/plugins/policies/";
