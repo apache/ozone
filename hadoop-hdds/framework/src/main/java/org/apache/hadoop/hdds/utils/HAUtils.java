@@ -445,7 +445,7 @@ public final class HAUtils {
       if (!caListUpToDate) {
         LOG.info("Expected CA list size {}, where as received CA List size " +
             "{}. Retry to fetch CA List after {} seconds", expectedCount,
-            caCertPemList.size(), waitTime/1000);
+            caCertPemList.size(), retryTime);
         try {
           Thread.sleep(retryTime);
         } catch (InterruptedException ex) {
