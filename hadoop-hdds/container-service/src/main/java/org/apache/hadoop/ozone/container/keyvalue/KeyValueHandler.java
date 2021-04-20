@@ -470,7 +470,6 @@ public class KeyValueHandler extends Handler {
       BlockID blockID = BlockID.getFromProtobuf(
           request.getGetBlock().getBlockID());
       checkContainerIsHealthy(kvContainer, blockID, Type.GetBlock);
-      BlockUtils.verifyBCSId(kvContainer, blockID);
       responseData = blockManager.getBlock(kvContainer, blockID)
           .getProtoBufMessage();
       final long numBytes = responseData.getSerializedSize();
@@ -618,7 +617,7 @@ public class KeyValueHandler extends Handler {
     kvContainer.readLock();
     try {
       if (kvContainer.getContainerData().getState() == State.UNHEALTHY) {
-        LOG.info("{} request {} for UNHEALTHY container {} replica", cmd,
+        LOG.warn("{} request {} for UNHEALTHY container {} replica", cmd,
             blockID, kvContainer.getContainerData().getContainerID());
       }
     } finally {
@@ -803,7 +802,6 @@ public class KeyValueHandler extends Handler {
       BlockID blockID = BlockID.getFromProtobuf(getSmallFileReq.getBlock()
           .getBlockID());
       checkContainerIsHealthy(kvContainer, blockID, Type.GetSmallFile);
-      BlockUtils.verifyBCSId(kvContainer, blockID);
       BlockData responseData = blockManager.getBlock(kvContainer, blockID);
 
       ContainerProtos.ChunkInfo chunkInfoProto = null;

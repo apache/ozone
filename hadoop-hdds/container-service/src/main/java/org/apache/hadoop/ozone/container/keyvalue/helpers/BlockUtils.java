@@ -193,7 +193,7 @@ public final class BlockUtils {
       throws IOException {
     long bcsId = blockID.getBlockCommitSequenceId();
     Preconditions.checkNotNull(blockID,
-        "BlockID cannot be null in GetBlock request");
+        "BlockID cannot be null");
     Preconditions.checkNotNull(container,
         "Container cannot be null");
 
