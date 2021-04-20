@@ -23,7 +23,9 @@ package org.apache.hadoop.ozone.s3.endpoint;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
+import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -198,15 +200,24 @@ public class TestBucketAcl {
     when(parameterMap.containsKey(ACL_MARKER)).thenReturn(true);
     when(headers.getHeaderString(S3Acl.GRANT_READ))
         .thenReturn(S3Acl.ACLIdentityType.USER.getHeaderType() + "=root");
+    // Put READ
     Response response =
         bucketEndpoint.put(BUCKET_NAME, ACL_MARKER, headers, null);
     assertEquals(HTTP_OK, response.getStatus());
     S3BucketAcl getResponse = bucketEndpoint.getAcl(BUCKET_NAME);
     assertEquals(1, getResponse.getAclList().getGrantList().size());
+    assertEquals(S3Acl.ACLType.READ.getValue(),
+        getResponse.getAclList().getGrantList().get(0).getPermission());
+    OzoneVolume volume = bucketEndpoint.getVolume();
+    assertEquals(1, volume.getAcls().size());
+    assertEquals(IAccessAuthorizer.ACLType.READ,
+        volume.getAcls().get(0).getAclList().get(0));
+
     when(headers.getHeaderString(S3Acl.GRANT_READ))
         .thenReturn(null);
     when(headers.getHeaderString(S3Acl.GRANT_WRITE))
         .thenReturn(S3Acl.ACLIdentityType.USER.getHeaderType() + "=root");
+    //Put WRITE
     response =
         bucketEndpoint.put(BUCKET_NAME, ACL_MARKER, headers, null);
     assertEquals(HTTP_OK, response.getStatus());
@@ -214,6 +225,10 @@ public class TestBucketAcl {
     assertEquals(1, getResponse.getAclList().getGrantList().size());
     assertEquals(S3Acl.ACLType.WRITE.getValue(),
         getResponse.getAclList().getGrantList().get(0).getPermission());
+    volume = bucketEndpoint.getVolume();
+    assertEquals(1, volume.getAcls().size());
+    assertEquals(IAccessAuthorizer.ACLType.READ,
+        volume.getAcls().get(0).getAclList().get(0));
   }
 
   @Test(expected = OS3Exception.class)

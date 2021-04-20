@@ -27,6 +27,7 @@ import org.apache.hadoop.ozone.client.OzoneMultipartUploadList;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
+import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.s3.commontypes.KeyMetadata;
 import org.apache.hadoop.ozone.s3.endpoint.MultiDeleteRequest.DeleteObject;
 import org.apache.hadoop.ozone.s3.endpoint.MultiDeleteResponse.DeletedObject;
@@ -64,6 +65,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
+import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NOT_IMPLEMENTED;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.ENCODING_TYPE;
 
@@ -482,9 +484,28 @@ public class BucketEndpoint extends EndpointBase {
         }
       }
 
-      // A put request will reset all previous ACLs
+      // A put request will reset all previous ACLs on bucket
       bucket.setAcl(ozoneAclListOnBucket);
-      volume.setAcl(ozoneAclListOnVolume);
+      // A put request will reset input user/group's permission on volume
+      List<OzoneAcl> acls = bucket.getAcls();
+      List<OzoneAcl> aclsToRemoveOnVolume = new ArrayList<>();
+      List<OzoneAcl> currentAclsOnVolume = volume.getAcls();
+      // Remove input user/group's permission from Volume first
+      if (currentAclsOnVolume.size() > 0) {
+        for (OzoneAcl acl : acls) {
+          if (acl.getAclScope() == ACCESS) {
+            aclsToRemoveOnVolume.addAll(OzoneAclUtil.filterAclList(
+                acl.getName(), acl.getType(), currentAclsOnVolume));
+          }
+        }
+        for (OzoneAcl acl : aclsToRemoveOnVolume) {
+          volume.removeAcl(acl);
+        }
+      }
+      // Add new permission on Volume
+      for(OzoneAcl acl : ozoneAclListOnVolume) {
+        volume.addAcl(acl);
+      }
     } catch (OMException exception) {
       LOG.error("Error in set ACL Request for bucket: {}", bucketName,
           exception);
@@ -531,7 +552,7 @@ public class BucketEndpoint extends EndpointBase {
           OzoneAcl.AclScope.DEFAULT);
       OzoneAcl accessOzoneAcl = new OzoneAcl(
           IAccessAuthorizer.ACLIdentityType.USER, part[1], aclsOnBucket,
-          OzoneAcl.AclScope.ACCESS);
+          ACCESS);
       ozoneAclList.add(defaultOzoneAcl);
       ozoneAclList.add(accessOzoneAcl);
     }
@@ -559,13 +580,9 @@ public class BucketEndpoint extends EndpointBase {
       // Build ACL on Volume
       BitSet aclsOnVolume =
           S3Acl.getOzoneAclOnVolumeFromS3Permission(permission);
-      OzoneAcl defaultOzoneAcl = new OzoneAcl(
-          IAccessAuthorizer.ACLIdentityType.USER, part[1], aclsOnVolume,
-          OzoneAcl.AclScope.DEFAULT);
       OzoneAcl accessOzoneAcl = new OzoneAcl(
           IAccessAuthorizer.ACLIdentityType.USER, part[1], aclsOnVolume,
-          OzoneAcl.AclScope.ACCESS);
-      ozoneAclList.add(defaultOzoneAcl);
+          ACCESS);
       ozoneAclList.add(accessOzoneAcl);
     }
     return ozoneAclList;

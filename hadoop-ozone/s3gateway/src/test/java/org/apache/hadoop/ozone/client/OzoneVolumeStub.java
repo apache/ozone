@@ -123,7 +123,7 @@ public class OzoneVolumeStub extends OzoneVolume {
 
   @Override
   public boolean removeAcl(OzoneAcl acl) throws IOException {
-    return aclList.add(acl);
+    return aclList.remove(acl);
   }
 
   @Override
