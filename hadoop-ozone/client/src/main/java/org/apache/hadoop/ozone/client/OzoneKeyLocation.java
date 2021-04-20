@@ -47,12 +47,12 @@ public class OzoneKeyLocation {
    * Constructs OzoneKeyLocation.
    */
   public OzoneKeyLocation(long containerID, long localID,
-                          long length, long offset) {
+                          long length, long offset, long keyOffset) {
     this.containerID = containerID;
     this.localID = localID;
     this.length = length;
     this.offset = offset;
-    this.keyOffset = length + offset;
+    this.keyOffset = keyOffset;
   }
 
   /**
