@@ -22,7 +22,6 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.scm.proto.InterSCMProtocolProtos;
 import org.apache.hadoop.hdds.protocol.scm.proto.InterSCMProtocolProtos.CopyDBCheckpointResponseProto;
 import org.apache.hadoop.hdds.protocol.scm.proto.InterSCMProtocolServiceGrpc;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.ratis.thirdparty.io.grpc.ManagedChannel;
 import org.apache.ratis.thirdparty.io.grpc.netty.NettyChannelBuilder;
@@ -54,12 +53,7 @@ public class InterSCMGrpcClient implements SCMSnapshotDownloader{
 
   public InterSCMGrpcClient(final String host, final int leaderPort,
       final ConfigurationSource conf) {
-    // if the leader grpc port details are not setup in the peer Map,
-    // fall back to default grpc port.
-    final int port = leaderPort == 0 ?
-        conf.getInt(ScmConfigKeys.OZONE_SCM_GRPC_PORT_KEY,
-            ScmConfigKeys.OZONE_SCM_GRPC_PORT_DEFAULT) :
-        leaderPort;
+    final int port = leaderPort;
     final long  timeout =
         conf.getObject(SCMHAConfiguration.class).getGrpcDeadlineInterval();
     NettyChannelBuilder channelBuilder =
