@@ -151,12 +151,12 @@ public class GeneratorOm extends BaseGenerator implements
         .setObjectID(1L)
         .setUpdateID(1L)
         .setQuotaInBytes(100L)
-        .addOzoneAcls(OzoneAcl.toProtobuf(
+        .addOzoneAcls(
             new OzoneAcl(IAccessAuthorizer.ACLIdentityType.WORLD, "",
-                IAccessAuthorizer.ACLType.ALL, ACCESS)))
-        .addOzoneAcls(OzoneAcl.toProtobuf(
-            new OzoneAcl(IAccessAuthorizer.ACLIdentityType.USER, getUserId(),
                 IAccessAuthorizer.ACLType.ALL, ACCESS))
+        .addOzoneAcls(
+            new OzoneAcl(IAccessAuthorizer.ACLIdentityType.USER, getUserId(),
+                IAccessAuthorizer.ACLType.ALL, ACCESS)
         ).build();
 
     volTable.put("/" + volumeName, omVolumeArgs);

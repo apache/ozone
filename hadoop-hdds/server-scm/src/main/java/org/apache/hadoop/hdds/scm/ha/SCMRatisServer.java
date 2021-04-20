@@ -19,12 +19,14 @@ package org.apache.hadoop.hdds.scm.ha;
 
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
+import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.apache.ratis.server.RaftServer;
 
 import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
 
 /**
  * TODO.
@@ -36,7 +38,8 @@ public interface SCMRatisServer {
   void registerStateMachineHandler(RequestType handlerType, Object handler);
 
   SCMRatisResponse submitRequest(SCMRatisRequest request)
-      throws IOException, ExecutionException, InterruptedException;
+      throws IOException, ExecutionException, InterruptedException,
+      TimeoutException;
 
   void stop() throws IOException;
 
@@ -45,7 +48,7 @@ public interface SCMRatisServer {
   /**
    * Returns roles of ratis peers.
    */
-  List<String> getRatisRoles();
+  List<String> getRatisRoles() throws IOException;
 
   /**
    * Returns NotLeaderException with useful info.
@@ -55,4 +58,7 @@ public interface SCMRatisServer {
   boolean addSCM(AddSCMRequest request) throws IOException;
 
   SCMStateMachine getSCMStateMachine();
+
+  GrpcTlsConfig getGrpcTlsConfig();
+
 }

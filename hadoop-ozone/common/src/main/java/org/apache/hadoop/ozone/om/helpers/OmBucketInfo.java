@@ -397,6 +397,10 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
       return this;
     }
 
+    public List<OzoneAcl> getAcls() {
+      return acls;
+    }
+
     public Builder addAcl(OzoneAcl ozoneAcl) {
       if (ozoneAcl != null) {
         this.acls.add(ozoneAcl);

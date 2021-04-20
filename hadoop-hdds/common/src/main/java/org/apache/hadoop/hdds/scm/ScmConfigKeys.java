@@ -313,6 +313,23 @@ public final class ScmConfigKeys {
    */
   public static final String OZONE_SCM_PRIMORDIAL_NODE_ID_KEY =
       "ozone.scm.primordial.node.id";
+
+  /**
+   * The config when set to true skips the clusterId validation from leader
+   * scm during bootstrap. In SCM HA, the primary node starts up the ratis
+   * server while other bootstrapping nodes will get added to the ratis group.
+   * Now, if all the bootstrapping SCM get stopped post the group formation,
+   * the primary node will now step down from leadership as it will loose
+   * majority. If the bootstrapping nodes are now bootstrapped again,
+   * the bootstrapping node will try to first validate the cluster id from the
+   * leader SCM with the persisted cluster id , but as there is no leader
+   * existing, bootstrapping will keep on failing and retrying until
+   * it shuts down.
+   */
+  public static final String OZONE_SCM_SKIP_BOOTSTRAP_VALIDATION_KEY =
+      "ozone.scm.skip.bootstrap.validation";
+  public static final boolean OZONE_SCM_SKIP_BOOTSTRAP_VALIDATION_DEFAULT =
+      false;
   // The path where datanode ID is to be written to.
   // if this value is not set then container startup will fail.
   public static final String OZONE_SCM_DATANODE_ID_DIR =
@@ -467,6 +484,11 @@ public final class ScmConfigKeys {
   public static final TimeDuration OZONE_SCM_RATIS_MINIMUM_TIMEOUT_DEFAULT
       = TimeDuration.valueOf(1, TimeUnit.SECONDS);
 
+  public static final String OZONE_SCM_RATIS_REQUEST_TIMEOUT_KEY
+      = "ozone.scm.ratis.minimum.timeout";
+  public static final String OZONE_SCM_RATIS_REQUEST_TIMEOUT_DEFAULT
+      = "30s";
+
   // SCM Ratis Leader Election configurations
   public static final String
       OZONE_SCM_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY =
@@ -504,6 +526,11 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_HA_SECURITY_SUPPORTED =
       "hdds.scm.ha.security.enable";
   public static final boolean OZONE_SCM_HA_SECURITY_SUPPORTED_DEFAULT = false;
+
+  public static final String OZONE_SCM_INFO_WAIT_DURATION =
+      "ozone.scm.info.wait.duration";
+  public static final long OZONE_SCM_INFO_WAIT_DURATION_DEFAULT =
+      10 * 60;
 
   /**
    * Never constructed.

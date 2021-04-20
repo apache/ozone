@@ -18,24 +18,34 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.Iterator;
+import java.util.Collection;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.stream.Collectors;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.util.Time;
+import org.apache.ratis.conf.Parameters;
 import org.apache.ratis.conf.RaftProperties;
+import org.apache.ratis.grpc.GrpcTlsConfig;
+import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.RaftClientReply;
 import org.apache.ratis.protocol.RaftClientRequest;
@@ -48,6 +58,9 @@ import org.apache.ratis.protocol.SetConfigurationRequest;
 import org.apache.ratis.server.RaftServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.hadoop.hdds.scm.ha.HASecurityUtils.createSCMRatisTLSConfig;
+import static org.apache.hadoop.hdds.scm.ha.HASecurityUtils.createSCMServerTlsParameters;
 
 /**
  * TODO.
@@ -62,6 +75,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   private final ClientId clientId = ClientId.randomId();
   private final AtomicLong callId = new AtomicLong();
   private final RaftServer.Division division;
+  private final GrpcTlsConfig grpcTlsConfig;
 
   // TODO: Refactor and remove ConfigurationSource and use only
   //  SCMHAConfiguration.
@@ -81,9 +95,15 @@ public class SCMRatisServerImpl implements SCMRatisServer {
     // persisted in the raft log post leader election. Now, when the primary
     // scm boots up, it has peer info embedded in the raft log and will
     // trigger leader election.
-    this.server =
-        newRaftServer(scm.getScmId(), conf).setStateMachine(stateMachine)
-            .setGroup(RaftGroup.valueOf(groupId)).build();
+
+    grpcTlsConfig = createSCMRatisTLSConfig(new SecurityConfig(conf),
+        scm.getScmCertificateClient());
+    Parameters parameters = createSCMServerTlsParameters(grpcTlsConfig);
+
+    this.server = newRaftServer(scm.getScmId(), conf)
+        .setStateMachine(stateMachine)
+        .setGroup(RaftGroup.valueOf(groupId))
+        .setParameters(parameters).build();
     this.division = server.getDivision(groupId);
   }
 
@@ -100,6 +120,11 @@ public class SCMRatisServerImpl implements SCMRatisServer {
         server.close();
       }
     }
+  }
+
+  @Override
+  public GrpcTlsConfig getGrpcTlsConfig() {
+    return grpcTlsConfig;
   }
 
   public static void reinitialize(String clusterId, String scmId,
@@ -195,7 +220,8 @@ public class SCMRatisServerImpl implements SCMRatisServer {
 
   @Override
   public SCMRatisResponse submitRequest(SCMRatisRequest request)
-      throws IOException, ExecutionException, InterruptedException {
+      throws IOException, ExecutionException, InterruptedException,
+      TimeoutException {
     final RaftClientRequest raftClientRequest = RaftClientRequest.newBuilder()
         .setClientId(clientId)
         .setServerId(getDivision().getId())
@@ -204,8 +230,14 @@ public class SCMRatisServerImpl implements SCMRatisServer {
         .setMessage(request.encode())
         .setType(RaftClientRequest.writeRequestType())
         .build();
+    // any request submitted to
+    final long requestTimeout = scm.getConfiguration()
+        .getTimeDuration(ScmConfigKeys.OZONE_SCM_RATIS_REQUEST_TIMEOUT_KEY,
+            ScmConfigKeys.OZONE_SCM_RATIS_REQUEST_TIMEOUT_DEFAULT,
+            TimeUnit.MILLISECONDS);
     final RaftClientReply raftClientReply =
-        server.submitClientRequestAsync(raftClientRequest).get();
+        server.submitClientRequestAsync(raftClientRequest)
+            .get(requestTimeout, TimeUnit.MILLISECONDS);
     if (LOG.isDebugEnabled()) {
       LOG.info("request {} Reply {}", raftClientRequest, raftClientReply);
     }
@@ -223,12 +255,22 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   }
 
   @Override
-  public List<String> getRatisRoles() {
-    return division.getGroup().getPeers().stream()
-        .map(peer -> peer.getAddress() == null ? "" : peer.getAddress())
-        .collect(Collectors.toList());
+  public List<String> getRatisRoles() throws IOException {
+    Collection<RaftPeer> peers = division.getGroup().getPeers();
+    List<String> ratisRoles = new ArrayList<>();
+    for (RaftPeer peer : peers) {
+      InetAddress peerInetAddress = InetAddress.getByName(
+              HddsUtils.getHostName(peer.getAddress()).get());
+      boolean isLocal = NetUtils.isLocalAddress(peerInetAddress);
+      ratisRoles.add((peer.getAddress() == null ? "" :
+              peer.getAddress().concat(isLocal ?
+                      ":".concat(RaftProtos.RaftPeerRole.LEADER
+                              .toString()) :
+                      ":".concat(RaftProtos.RaftPeerRole.FOLLOWER
+                              .toString()))));
+    }
+    return ratisRoles;
   }
-
   /**
    * {@inheritDoc}
    */

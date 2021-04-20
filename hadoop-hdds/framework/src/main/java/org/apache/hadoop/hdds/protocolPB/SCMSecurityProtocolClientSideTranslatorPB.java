@@ -18,12 +18,16 @@ package org.apache.hadoop.hdds.protocolPB;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.security.cert.CRLException;
+import java.security.cert.CertificateException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.CRLInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.OzoneManagerDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ScmNodeDetailsProto;
@@ -32,8 +36,10 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetSCM
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCACertificateRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertificateRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCrlsRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetDataNodeCertRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMListCACertificateRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetLatestCrlIdRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMListCertificateRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityRequest;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityRequest.Builder;
@@ -41,6 +47,7 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecuri
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.Type;
 import org.apache.hadoop.hdds.scm.proxy.SCMSecurityProtocolFailoverProxyProvider;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
+import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.io.retry.RetryProxy;
 import org.apache.hadoop.ipc.ProtobufHelper;
@@ -265,12 +272,16 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
    */
   @Override
   public String getCACertificate() throws IOException {
+    return getCACert().getX509Certificate();
+  }
+
+
+  public SCMGetCertResponseProto getCACert() throws IOException {
     SCMGetCACertificateRequestProto protoIns = SCMGetCACertificateRequestProto
         .getDefaultInstance();
     return submitRequest(Type.GetCACertificate,
         builder -> builder.setGetCACertificateRequest(protoIns))
-        .getGetCertResponseProto().getX509Certificate();
-
+        .getGetCertResponseProto();
   }
 
   /**
@@ -301,7 +312,7 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
   public String getRootCACertificate() throws IOException {
     SCMGetCACertificateRequestProto protoIns = SCMGetCACertificateRequestProto
         .getDefaultInstance();
-    return submitRequest(Type.GetCACertificate,
+    return submitRequest(Type.GetRootCACertificate,
         builder -> builder.setGetCACertificateRequest(protoIns))
         .getGetCertResponseProto().getX509RootCACertificate();
   }
@@ -313,6 +324,36 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
     return submitRequest(Type.ListCACertificate,
         builder -> builder.setListCACertificateRequestProto(proto))
         .getListCertificateResponseProto().getCertificatesList();
+  }
+
+  @Override
+  public List<CRLInfo> getCrls(List<Long> crlIds) throws IOException {
+    SCMGetCrlsRequestProto protoIns = SCMGetCrlsRequestProto
+        .newBuilder()
+        .addAllCrlId(crlIds)
+        .build();
+    List<CRLInfoProto> crlInfoProtoList = submitRequest(Type.GetCrls,
+        builder -> builder.setGetCrlsRequest(protoIns))
+        .getGetCrlsResponseProto().getCrlInfosList();
+    List<CRLInfo> result = new ArrayList<>();
+    for (CRLInfoProto crlProto : crlInfoProtoList) {
+      try {
+        CRLInfo crlInfo = CRLInfo.fromProtobuf(crlProto);
+        result.add(crlInfo);
+      } catch (CRLException | CertificateException e) {
+        throw new SCMSecurityException("Fail to parse CRL info", e);
+      }
+    }
+    return result;
+  }
+
+  @Override
+  public long getLatestCrlId() throws IOException {
+    SCMGetLatestCrlIdRequestProto protoIns =  SCMGetLatestCrlIdRequestProto
+        .getDefaultInstance();
+    return submitRequest(Type.GetLatestCrlId,
+        builder -> builder.setGetLatestCrlIdRequest(protoIns))
+        .getGetLatestCrlIdResponseProto().getCrlId();
   }
 
   /**

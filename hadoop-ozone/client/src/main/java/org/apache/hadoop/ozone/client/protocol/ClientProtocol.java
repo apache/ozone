@@ -125,6 +125,7 @@ public interface ClientProtocol {
    * This is possible for owners of the volume and admin users
    * @throws IOException
    */
+  @Deprecated
   boolean checkVolumeAccess(String volumeName, OzoneAcl acl)
       throws IOException;
 
@@ -228,6 +229,7 @@ public interface ClientProtocol {
    * @param bucketName Name of the Bucket
    * @throws IOException
    */
+  @Deprecated
   void checkBucketAccess(String volumeName, String bucketName)
       throws IOException;
 
