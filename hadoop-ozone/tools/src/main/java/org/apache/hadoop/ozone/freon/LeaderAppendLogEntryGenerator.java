@@ -191,7 +191,8 @@ public class LeaderAppendLogEntryGenerator extends BaseAppendLogGenerator
     Pipeline pipeline = Pipeline.newBuilder()
         .setId(PipelineID.valueOf(UUID.fromString(pipelineId)))
         .setState(PipelineState.OPEN)
-        .setReplicationConfig(new RatisReplicationConfig(ReplicationFactor.THREE))
+        .setReplicationConfig(
+            new RatisReplicationConfig(ReplicationFactor.THREE))
         .setLeaderId(UUID.fromString(serverId))
         .setNodes(datanodes)
         .build();

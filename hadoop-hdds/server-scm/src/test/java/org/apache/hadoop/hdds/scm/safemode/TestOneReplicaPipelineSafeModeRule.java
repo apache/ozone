@@ -178,7 +178,9 @@ public class TestOneReplicaPipelineSafeModeRule {
     Assert.assertFalse(rule.validate());
 
     pipelines =
-        pipelineManager.getPipelines(new RatisReplicationConfig(ReplicationFactor.THREE));
+        pipelineManager.getPipelines(
+            new RatisReplicationConfig(ReplicationFactor.THREE));
+
     firePipelineEvent(pipelines.subList(0, pipelineCountThree -1));
 
     GenericTestUtils.waitFor(() -> logCapturer.getOutput().contains(

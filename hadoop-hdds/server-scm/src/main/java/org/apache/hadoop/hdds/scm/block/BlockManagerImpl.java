@@ -218,8 +218,8 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
               "Datanodes may be used up.", replicationConfig, se);
           break;
         } catch (IOException e) {
-          LOG.warn("Pipeline creation failed for replicationConfig: {}. Retrying " +
-                  "get pipelines call once.", replicationConfig, e);
+          LOG.warn("Pipeline creation failed for replicationConfig: {}. "
+              + "Retrying get pipelines call once.", replicationConfig, e);
           availablePipelines = pipelineManager
               .getPipelines(replicationConfig, Pipeline.PipelineState.OPEN,
                   excludeList.getDatanodes(), excludeList.getPipelineIds());

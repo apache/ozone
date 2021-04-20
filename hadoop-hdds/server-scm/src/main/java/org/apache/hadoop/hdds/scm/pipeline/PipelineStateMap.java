@@ -151,7 +151,6 @@ class PipelineStateMap {
     return pipelines;
   }
 
-
   /**
    * Get list of pipeline corresponding to specified replication type,
    * replication factor and pipeline state.
@@ -341,7 +340,9 @@ class PipelineStateMap {
     Pipeline updatedPipeline = pipelineMap.compute(pipelineID,
         (id, p) -> Pipeline.newBuilder(pipeline).setState(state).build());
 
-    List<Pipeline> pipelineList = query2OpenPipelines.get(pipeline.getReplicationConfig());
+    List<Pipeline> pipelineList =
+        query2OpenPipelines.get(pipeline.getReplicationConfig());
+
     if (updatedPipeline.getPipelineState() == PipelineState.OPEN) {
       // for transition to OPEN state add pipeline to query2OpenPipelines
       if (pipelineList == null) {

@@ -212,7 +212,9 @@ public class TestPipelinePlacementPolicy {
     
     // Should max out pipeline usage.
     Assert.assertEquals(maxPipelineCount,
-        stateManager.getPipelines(new RatisReplicationConfig(ReplicationFactor.THREE)).size());
+        stateManager
+            .getPipelines(new RatisReplicationConfig(ReplicationFactor.THREE))
+            .size());
   }
 
   @Test

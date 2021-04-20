@@ -33,7 +33,8 @@ import org.apache.hadoop.hdds.scm.node.NodeStatus;
 /**
  * Interface for creating pipelines.
  */
-public abstract class PipelineProvider<REPLICATION_CONFIG extends ReplicationConfig> {
+public abstract class PipelineProvider<REPLICATION_CONFIG
+    extends ReplicationConfig> {
 
   private final NodeManager nodeManager;
   private final StateManager stateManager;

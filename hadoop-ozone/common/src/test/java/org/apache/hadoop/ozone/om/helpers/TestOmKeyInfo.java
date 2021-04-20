@@ -117,7 +117,8 @@ public class TestOmKeyInfo {
 
   Pipeline getPipeline() {
     return Pipeline.newBuilder()
-        .setReplicationConfig(new StandaloneReplicationConfig(ReplicationFactor.ONE))
+        .setReplicationConfig(
+            new StandaloneReplicationConfig(ReplicationFactor.ONE))
         .setId(PipelineID.randomId())
         .setNodes(Collections.EMPTY_LIST)
         .setState(Pipeline.PipelineState.OPEN)

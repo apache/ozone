@@ -113,7 +113,8 @@ public class TestReconAsPassiveScm {
     // Verify we can never create a pipeline in Recon.
     LambdaTestUtils.intercept(UnsupportedOperationException.class,
         "Trying to create pipeline in Recon, which is prohibited!",
-        () -> reconPipelineManager.createPipeline(new RatisReplicationConfig(ONE)));
+        () -> reconPipelineManager
+            .createPipeline(new RatisReplicationConfig(ONE)));
 
     ContainerManagerV2 scmContainerManager = scm.getContainerManager();
     assertTrue(scmContainerManager.getContainers().isEmpty());
@@ -127,7 +128,8 @@ public class TestReconAsPassiveScm {
     // Create container
     ContainerManagerV2 reconContainerManager = reconScm.getContainerManager();
     ContainerInfo containerInfo =
-        scmContainerManager.allocateContainer(new RatisReplicationConfig(ONE), "test");
+        scmContainerManager
+            .allocateContainer(new RatisReplicationConfig(ONE), "test");
     long containerID = containerInfo.getContainerID();
     Pipeline pipeline =
         scmPipelineManager.getPipeline(containerInfo.getPipelineID());
@@ -167,7 +169,8 @@ public class TestReconAsPassiveScm {
 
     // Create container in SCM.
     ContainerInfo containerInfo =
-        scmContainerManager.allocateContainer(new RatisReplicationConfig(ONE), "test");
+        scmContainerManager
+            .allocateContainer(new RatisReplicationConfig(ONE), "test");
     long containerID = containerInfo.getContainerID();
     PipelineManager scmPipelineManager = scm.getPipelineManager();
     Pipeline pipeline =

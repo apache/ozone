@@ -136,7 +136,8 @@ public class TestOMKeyRequest {
     Pipeline pipeline = Pipeline.newBuilder()
         .setState(Pipeline.PipelineState.OPEN)
         .setId(PipelineID.randomId())
-        .setReplicationConfig(new StandaloneReplicationConfig(ReplicationFactor.ONE))
+        .setReplicationConfig(
+            new StandaloneReplicationConfig(ReplicationFactor.ONE))
         .setNodes(new ArrayList<>())
         .build();
 

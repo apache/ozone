@@ -87,7 +87,8 @@ public class BenchMarkSCM {
         // prepare SCM
         PipelineManager pipelineManager = scm.getPipelineManager();
         for (Pipeline pipeline : pipelineManager
-            .getPipelines(new RatisReplicationConfig(ReplicationFactor.THREE))) {
+            .getPipelines(
+                new RatisReplicationConfig(ReplicationFactor.THREE))) {
           pipelineManager.openPipeline(pipeline.getId());
         }
         scm.getEventQueue().fireEvent(SCMEvents.SAFE_MODE_STATUS,

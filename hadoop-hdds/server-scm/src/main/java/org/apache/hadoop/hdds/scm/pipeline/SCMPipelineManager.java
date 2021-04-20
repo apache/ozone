@@ -365,7 +365,6 @@ public class SCMPipelineManager implements
     }
   }
 
-
   @Override
   public List<Pipeline> getPipelines(ReplicationConfig replicationConfig,
       Pipeline.PipelineState state,
@@ -497,8 +496,9 @@ public class SCMPipelineManager implements
    */
   @Override
   public void scrubPipeline(ReplicationConfig replicationConfig)
-      throws IOException{
-    if (!RatisReplicationConfig.hasFactor(replicationConfig, ReplicationFactor.THREE)) {
+      throws IOException {
+    if (!RatisReplicationConfig.hasFactor(replicationConfig,
+        ReplicationFactor.THREE)) {
       // Only srub pipeline for RATIS THREE pipeline
       return;
     }

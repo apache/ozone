@@ -409,8 +409,9 @@ public class TestDeletedBlockLog {
       throws IOException {
     List<DatanodeDetails> dns = Collections.singletonList(dd);
     Pipeline pipeline = Pipeline.newBuilder()
-            .setReplicationConfig(new StandaloneReplicationConfig(ReplicationFactor.ONE))
-            .setState(Pipeline.PipelineState.OPEN)
+        .setReplicationConfig(
+            new StandaloneReplicationConfig(ReplicationFactor.ONE))
+        .setState(Pipeline.PipelineState.OPEN)
             .setId(PipelineID.randomId())
             .setNodes(dns)
             .build();
@@ -419,7 +420,8 @@ public class TestDeletedBlockLog {
     builder.setContainerID(containerID)
         .setPipelineID(pipeline.getId())
         .setReplicationType(pipeline.getType())
-        .setReplicationFactor(ReplicationConfig.getLegacyFactor(pipeline.getReplicationConfig()));
+        .setReplicationFactor(
+            ReplicationConfig.getLegacyFactor(pipeline.getReplicationConfig()));
 
     ContainerInfo containerInfo = builder.build();
     Mockito.doReturn(containerInfo).when(containerManager)

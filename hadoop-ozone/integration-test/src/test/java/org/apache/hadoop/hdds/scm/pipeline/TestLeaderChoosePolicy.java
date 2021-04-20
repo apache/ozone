@@ -115,8 +115,9 @@ public class TestLeaderChoosePolicy {
     // make sure two pipelines are created
     waitForPipelines(pipelineNum);
     // No Factor ONE pipeline is auto created.
-    Assert.assertEquals(0, pipelineManager.getPipelines(new RatisReplicationConfig(
-        ReplicationFactor.ONE)).size());
+    Assert.assertEquals(0,
+        pipelineManager.getPipelines(new RatisReplicationConfig(
+            ReplicationFactor.ONE)).size());
 
     // pipelineNum pipelines in 3 datanodes,
     // each datanode has leaderNumOfEachDn leaders after balance

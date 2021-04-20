@@ -175,9 +175,6 @@ public final class Pipeline {
     return getNodeSet().equals(pipeline.getNodeSet());
   }
 
-  public ReplicationConfig getReplicationConfig() {
-    return replicationConfig;
-  }
 
   /**
    * Returns the leader if found else defaults to closest node.
@@ -257,6 +254,10 @@ public final class Pipeline {
 
   public boolean isEmpty() {
     return nodeStatus.isEmpty();
+  }
+
+  public ReplicationConfig getReplicationConfig() {
+    return replicationConfig;
   }
 
   public HddsProtos.Pipeline getProtobufMessage(int clientVersion)
@@ -440,7 +441,6 @@ public final class Pipeline {
       return this;
     }
 
-
     public Builder setLeaderId(UUID leaderId1) {
       this.leaderId = leaderId1;
       return this;
@@ -473,7 +473,8 @@ public final class Pipeline {
       Preconditions.checkNotNull(state);
       Preconditions.checkNotNull(nodeStatus);
       Pipeline pipeline =
-          new Pipeline(id, replicationConfig, state, nodeStatus, suggestedLeaderId);
+          new Pipeline(id, replicationConfig, state, nodeStatus,
+              suggestedLeaderId);
       pipeline.setLeaderId(leaderId);
       // overwrite with original creationTimestamp
       if (creationTimestamp != null) {

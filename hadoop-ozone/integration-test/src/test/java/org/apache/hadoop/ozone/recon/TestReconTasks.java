@@ -106,7 +106,8 @@ public class TestReconTasks {
     ReconContainerManager reconContainerManager =
         (ReconContainerManager) reconScm.getContainerManager();
     ContainerInfo containerInfo =
-        scmContainerManager.allocateContainer(new RatisReplicationConfig(ONE), "test");
+        scmContainerManager
+            .allocateContainer(new RatisReplicationConfig(ONE), "test");
     long containerID = containerInfo.getContainerID();
     Pipeline pipeline =
         scmPipelineManager.getPipeline(containerInfo.getPipelineID());

@@ -438,7 +438,8 @@ public final class TestUtils {
       allocateContainer(ContainerManagerV2 containerManager)
       throws IOException {
     return containerManager
-        .allocateContainer(new RatisReplicationConfig(ReplicationFactor.THREE), "root");
+        .allocateContainer(new RatisReplicationConfig(ReplicationFactor.THREE),
+            "root");
 
   }
 
@@ -586,7 +587,8 @@ public final class TestUtils {
     nodes.add(MockDatanodeDetails.randomDatanodeDetails());
     nodes.add(MockDatanodeDetails.randomDatanodeDetails());
     return Pipeline.newBuilder()
-        .setReplicationConfig(new RatisReplicationConfig(ReplicationFactor.THREE))
+        .setReplicationConfig(
+            new RatisReplicationConfig(ReplicationFactor.THREE))
         .setId(PipelineID.randomId())
         .setNodes(nodes)
         .setState(Pipeline.PipelineState.OPEN)

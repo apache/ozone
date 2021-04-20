@@ -142,10 +142,11 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
   /**
    * Asks SCM where a block should be allocated. SCM responds with the
    * set of datanodes that should be used creating this block.
-   * @param size - size of the block.
-   * @param num - number of blocks.
+   *
+   * @param size              - size of the block.
+   * @param num               - number of blocks.
    * @param replicationConfig - replication configuration of the blocks.
-   * @param excludeList - exclude list while allocating blocks.
+   * @param excludeList       - exclude list while allocating blocks.
    * @return allocated block accessing info (key, pipeline).
    * @throws IOException
    */
@@ -168,7 +169,8 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
     switch (replicationConfig.getReplicationType()) {
     case STAND_ALONE:
       requestBuilder.setFactor(
-          ((StandaloneReplicationConfig) replicationConfig).getReplicationFactor());
+          ((StandaloneReplicationConfig) replicationConfig)
+              .getReplicationFactor());
       break;
     case RATIS:
       requestBuilder.setFactor(

@@ -100,7 +100,8 @@ public class NodeEndpoint {
           DatanodePipeline datanodePipeline = new DatanodePipeline(
               pipelineID.getId(),
               pipeline.getReplicationConfig().getReplicationType().toString(),
-              ReplicationConfig.getLegacyFactor(pipeline.getReplicationConfig()).getNumber(),
+              ReplicationConfig.getLegacyFactor(pipeline.getReplicationConfig())
+                  .getNumber(),
               leaderNode
           );
           pipelines.add(datanodePipeline);

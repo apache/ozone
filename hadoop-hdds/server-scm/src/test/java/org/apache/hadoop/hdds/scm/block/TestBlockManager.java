@@ -215,7 +215,8 @@ public class TestBlockManager {
     TestUtils.openAllRatisPipelines(pipelineManager);
     ExcludeList excludeList = new ExcludeList();
     excludeList
-        .addPipeline(pipelineManager.getPipelines(replicationConfig).get(0).getId());
+        .addPipeline(pipelineManager.getPipelines(replicationConfig)
+            .get(0).getId());
     AllocatedBlock block = blockManager
         .allocateBlock(DEFAULT_BLOCK_SIZE, replicationConfig, OzoneConsts.OZONE,
             excludeList);
@@ -314,7 +315,9 @@ public class TestBlockManager {
       CompletableFuture
               .allOf(futureList.toArray(
                       new CompletableFuture[futureList.size()])).get();
-      Assert.assertTrue(pipelineManager.getPipelines(replicationConfig).size() == 1);
+
+      Assert.assertTrue(
+          pipelineManager.getPipelines(replicationConfig).size() == 1);
       Assert.assertTrue(
               allocatedBlockMap.size() == numContainerPerOwnerInPipeline);
       Assert.assertTrue(allocatedBlockMap.
@@ -375,8 +378,9 @@ public class TestBlockManager {
               .allOf(futureList.toArray(
                       new CompletableFuture[futureList.size()])).get();
       Assert.assertEquals(1,
-              pipelineManager.getPipelines(replicationConfig).size());
-      Pipeline pipeline = pipelineManager.getPipelines(replicationConfig).get(0);
+          pipelineManager.getPipelines(replicationConfig).size());
+      Pipeline pipeline =
+          pipelineManager.getPipelines(replicationConfig).get(0);
       // total no of containers to be created will be number of healthy
       // volumes * number of numContainerPerOwnerInPipeline which is equal to
       // the thread count
@@ -443,7 +447,8 @@ public class TestBlockManager {
               new CompletableFuture[futureList.size()])).get();
       Assert.assertTrue(
           pipelineManager.getPipelines(replicationConfig).size() == 1);
-      Pipeline pipeline = pipelineManager.getPipelines(replicationConfig).get(0);
+      Pipeline pipeline =
+          pipelineManager.getPipelines(replicationConfig).get(0);
       // the pipeline per raft log disk config is set to 1 by default
       int numContainers = (int)Math.ceil((double)
               (numContainerPerOwnerInPipeline *
@@ -515,7 +520,8 @@ public class TestBlockManager {
   private boolean verifyNumberOfContainersInPipelines(
       int numContainersPerPipeline) {
     try {
-      for (Pipeline pipeline : pipelineManager.getPipelines(replicationConfig)) {
+      for (Pipeline pipeline : pipelineManager
+          .getPipelines(replicationConfig)) {
         if (pipelineManager.getNumberOfContainers(pipeline.getId())
             != numContainersPerPipeline) {
           return false;
@@ -587,7 +593,8 @@ public class TestBlockManager {
     for (Pipeline pipeline : pipelineManager.getPipelines()) {
       pipelineManager.closePipeline(pipeline, false);
     }
-    Assert.assertEquals(0, pipelineManager.getPipelines(replicationConfig).size());
+    Assert.assertEquals(0,
+        pipelineManager.getPipelines(replicationConfig).size());
     Assert.assertNotNull(blockManager
         .allocateBlock(DEFAULT_BLOCK_SIZE, replicationConfig, OzoneConsts.OZONE,
             new ExcludeList()));

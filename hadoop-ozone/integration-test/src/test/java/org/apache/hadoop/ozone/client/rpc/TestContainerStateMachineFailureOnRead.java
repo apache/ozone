@@ -140,8 +140,9 @@ public class TestContainerStateMachineFailureOnRead {
   public void testReadStateMachineFailureClosesPipeline() throws Exception {
     // Stop one follower datanode
     List<Pipeline> pipelines =
-        cluster.getStorageContainerManager().getPipelineManager().getPipelines(new RatisReplicationConfig(
-            HddsProtos.ReplicationFactor.THREE));
+        cluster.getStorageContainerManager().getPipelineManager()
+            .getPipelines(new RatisReplicationConfig(
+                HddsProtos.ReplicationFactor.THREE));
     Assert.assertEquals(1, pipelines.size());
     Pipeline ratisPipeline = pipelines.iterator().next();
 

@@ -164,7 +164,8 @@ public class TestDeadNodeHandler {
 
     LambdaTestUtils.await(120000, 1000,
         () -> {
-          return pipelineManager.getPipelines(new RatisReplicationConfig(THREE)).size() > 3;
+          return pipelineManager.getPipelines(new RatisReplicationConfig(THREE))
+              .size() > 3;
         });
     TestUtils.openAllRatisPipelines(pipelineManager);
 
