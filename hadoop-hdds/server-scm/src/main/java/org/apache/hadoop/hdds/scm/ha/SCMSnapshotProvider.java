@@ -108,6 +108,7 @@ public class SCMSnapshotProvider {
     if (client == null) {
       client = new InterSCMGrpcClient(
           peerNodesMap.get(leaderSCMNodeID).getInetAddress().getHostAddress(),
+          peerNodesMap.get(leaderSCMNodeID).
           conf);
     }
     try {

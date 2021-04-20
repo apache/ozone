@@ -435,8 +435,6 @@ public final class HddsServerUtil {
    */
   public static SCMSecurityProtocolClientSideTranslatorPB getScmSecurityClient(
       ConfigurationSource conf) throws IOException {
-    // Certificate from SCM is required for DN startup to succeed, so retry
-    // for ever.
     return new SCMSecurityProtocolClientSideTranslatorPB(
         new SCMSecurityProtocolFailoverProxyProvider(conf,
             UserGroupInformation.getCurrentUser()));
