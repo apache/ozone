@@ -187,7 +187,7 @@ public class SCMStateMachine extends BaseStateMachine {
   public CompletableFuture<TermIndex> notifyInstallSnapshotFromLeader(
       RaftProtos.RoleInfoProto roleInfoProto, TermIndex firstTermIndexInLog) {
     if (!roleInfoProto.getFollowerInfo().hasLeaderInfo()) {
-      return JavaUtils.completeExceptionally(new IOException("Failed " +
+      return JavaUtils.completeExceptionally(new IOException("Failed to " +
           "notifyInstallSnapshotFromLeader due to missing leader info"));
     }
     String leaderAddress = roleInfoProto.getFollowerInfo()
@@ -196,7 +196,7 @@ public class SCMStateMachine extends BaseStateMachine {
         scm.getSCMHANodeDetails().getPeerNodeDetails().stream().filter(
             p -> p.getRatisHostPortStr().equals(leaderAddress))
             .findFirst();
-    Preconditions.checkNotNull(leaderDetails);
+    Preconditions.checkState(leaderDetails.isPresent());
     final String leaderNodeId = leaderDetails.get().getNodeId();
     LOG.info("Received install snapshot notification from SCM leader: {} with "
         + "term index: {}", leaderAddress, firstTermIndexInLog);

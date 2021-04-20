@@ -101,7 +101,7 @@ public class SCMSnapshotProvider {
             .getAbsolutePath();
     File targetFile = new File(snapshotFilePath + ".tar.gz");
 
-    // the downloadClient instance will be craeted as and when install snapshot
+    // the downloadClient instance will be created as and when install snapshot
     // request is received. No caching of the client as it should be a very rare
     int port = peerNodesMap.get(leaderSCMNodeID).getGrpcPort();
     SCMSnapshotDownloader downloadClient = new InterSCMGrpcClient(
