@@ -28,20 +28,39 @@ import java.net.InetSocketAddress;
 public abstract class NodeDetails {
   private String serviceId;
   private String nodeId;
-  private InetSocketAddress rpcAddress;
+  private String hostAddress;
+  private int rpcPort;
   private int ratisPort;
   private String httpAddress;
   private String httpsAddress;
+
+  private InetSocketAddress rpcAddress;
 
   /**
    * Constructs NodeDetails object.
    */
   public NodeDetails(String serviceId, String nodeId,
-                        InetSocketAddress rpcAddr, int ratisPort,
-                        String httpAddress, String httpsAddress) {
+      InetSocketAddress rpcAddress, int ratisPort,
+      String httpAddress, String httpsAddress) {
     this.serviceId = serviceId;
     this.nodeId = nodeId;
-    this.rpcAddress = rpcAddr;
+    this.rpcAddress = rpcAddress;
+    this.hostAddress = rpcAddress.getHostName();
+    this.rpcPort = rpcAddress.getPort();
+    this.ratisPort = ratisPort;
+    this.httpAddress = httpAddress;
+    this.httpsAddress = httpsAddress;
+  }
+
+  /**
+   * Constructs NodeDetails object.
+   */
+  public NodeDetails(String serviceId, String nodeId, String hostAddr,
+      int rpcPort, int ratisPort, String httpAddress, String httpsAddress) {
+    this.serviceId = serviceId;
+    this.nodeId = nodeId;
+    this.hostAddress = hostAddr;
+    this.rpcPort = rpcPort;
     this.ratisPort = ratisPort;
     this.httpAddress = httpAddress;
     this.httpsAddress = httpsAddress;
@@ -56,19 +75,26 @@ public abstract class NodeDetails {
   }
 
   public InetSocketAddress getRpcAddress() {
+    if (rpcAddress == null) {
+      rpcAddress = NetUtils.createSocketAddr(hostAddress, rpcPort);
+    }
     return rpcAddress;
   }
 
   public boolean isHostUnresolved() {
-    return rpcAddress.isUnresolved();
+    return getRpcAddress().isUnresolved();
   }
 
   public InetAddress getInetAddress() {
-    return rpcAddress.getAddress();
+    return getRpcAddress().getAddress();
   }
 
   public String getHostName() {
-    return rpcAddress.getHostName();
+    return getRpcAddress().getHostName();
+  }
+
+  public String getHostAddress() {
+    return hostAddress;
   }
 
   public String getRatisHostPortStr() {
@@ -93,7 +119,7 @@ public abstract class NodeDetails {
   }
 
   public String getRpcAddressString() {
-    return NetUtils.getHostPortString(rpcAddress);
+    return NetUtils.getHostPortString(getRpcAddress());
   }
 
   public String getHttpAddress() {

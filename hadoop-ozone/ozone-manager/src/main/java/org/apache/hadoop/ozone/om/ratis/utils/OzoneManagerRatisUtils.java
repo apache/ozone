@@ -18,12 +18,22 @@
 package org.apache.hadoop.ozone.om.ratis.utils;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
+import com.google.protobuf.ServiceException;
+import java.io.File;
+import java.nio.file.Paths;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.HAUtils;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
+import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
+import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketCreateRequest;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketDeleteRequest;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketSetPropertyRequest;
@@ -87,11 +97,17 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneObj.ObjectType;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.ratis.protocol.RaftPeerId;
 import org.rocksdb.RocksDBException;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_RATIS_SNAPSHOT_DIR;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_DIR;
 
 /**
  * Utility class used by OzoneManager HA.
@@ -101,6 +117,9 @@ public final class OzoneManagerRatisUtils {
   // TODO: Temporary workaround for OM upgrade path and will be replaced once
   //  upgrade HDDS-3698 story reaches consensus.
   private static boolean isBucketFSOptimized = false;
+
+  private static final Logger LOG = LoggerFactory
+      .getLogger(OzoneManagerRatisUtils.class);
 
   private OzoneManagerRatisUtils() {
   }
@@ -347,6 +366,72 @@ public final class OzoneManagerRatisUtils {
    */
   public static boolean isBucketFSOptimized() {
     return isBucketFSOptimized;
+  }
+
+  /**
+   * Get the local directory where ratis logs will be stored.
+   */
+  public static String getOMRatisDirectory(ConfigurationSource conf) {
+    String storageDir = conf.get(OMConfigKeys.OZONE_OM_RATIS_STORAGE_DIR);
+
+    if (Strings.isNullOrEmpty(storageDir)) {
+      storageDir = ServerUtils.getDefaultRatisDirectory(conf);
+    }
+    return storageDir;
+  }
+
+  public static String getOMRatisSnapshotDirectory(ConfigurationSource conf) {
+    String snapshotDir = conf.get(OZONE_OM_RATIS_SNAPSHOT_DIR);
+
+    // If ratis snapshot directory is not set, fall back to ozone.metadata.dir.
+    if (Strings.isNullOrEmpty(snapshotDir)) {
+      LOG.warn("{} is not configured. Falling back to {} config",
+          OZONE_OM_RATIS_SNAPSHOT_DIR, OZONE_METADATA_DIRS);
+      File metaDirPath = ServerUtils.getOzoneMetaDirPath(conf);
+      snapshotDir = Paths.get(metaDirPath.getPath(),
+          OM_RATIS_SNAPSHOT_DIR).toString();
+    }
+    return snapshotDir;
+  }
+
+  public static void checkLeaderStatus(RaftServerStatus raftServerStatus,
+      RaftPeerId raftPeerId) throws ServiceException {
+    switch (raftServerStatus) {
+    case LEADER_AND_READY: return;
+
+    case LEADER_AND_NOT_READY: throw createLeaderNotReadyException(raftPeerId);
+
+    case NOT_LEADER: throw createNotLeaderException(raftPeerId);
+
+    default: throw new IllegalStateException(
+        "Unknown Ratis Server state: " + raftServerStatus);
+    }
+  }
+
+  private static ServiceException createNotLeaderException(
+      RaftPeerId raftPeerId) {
+
+    // TODO: Set suggest leaderID. Right now, client is not using suggest
+    // leaderID. Need to fix this.
+
+    OMNotLeaderException notLeaderException =
+        new OMNotLeaderException(raftPeerId);
+
+    LOG.debug(notLeaderException.getMessage());
+
+    return new ServiceException(notLeaderException);
+  }
+
+  private static ServiceException createLeaderNotReadyException(
+      RaftPeerId raftPeerId) {
+
+    OMLeaderNotReadyException leaderNotReadyException =
+        new OMLeaderNotReadyException(raftPeerId.toString() + " is Leader " +
+            "but not ready to process request yet.");
+
+    LOG.debug(leaderNotReadyException.getMessage());
+
+    return new ServiceException(leaderNotReadyException);
   }
 
 }

@@ -68,26 +68,28 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
  * multiple OMs to connect to. In case of OM failover, client can try
  * connecting to another OM node from the list of proxies.
  */
-public class OMFailoverProxyProvider implements
-    FailoverProxyProvider<OzoneManagerProtocolPB>, Closeable {
+public class OMFailoverProxyProvider<T> implements
+    FailoverProxyProvider<T>, Closeable {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(OMFailoverProxyProvider.class);
 
+  private final String omServiceId;
+  private final ConfigurationSource conf;
+  private final Class<T> protocolClass;
+  private final long omVersion;
+  private final UserGroupInformation ugi;
+  private final Text delegationTokenService;
+
   // Map of OMNodeID to its proxy
-  private Map<String, ProxyInfo<OzoneManagerProtocolPB>> omProxies;
+  private Map<String, ProxyInfo<T>> omProxies;
   private Map<String, OMProxyInfo> omProxyInfos;
   private List<String> omNodeIDList;
 
   private String currentProxyOMNodeId;
   private int currentProxyIndex;
 
-  private final ConfigurationSource conf;
-  private final long omVersion;
-  private final UserGroupInformation ugi;
-  private final Text delegationTokenService;
-
-  private final String omServiceId;
+  private List<String> retryExceptions = new ArrayList<>();
 
   // OMFailoverProxyProvider, on encountering certain exception, tries each OM
   // once in a round robin fashion. After that it waits for configured time
@@ -101,11 +103,13 @@ public class OMFailoverProxyProvider implements
   private Set<String> accessControlExceptionOMs = new HashSet<>();
 
   public OMFailoverProxyProvider(ConfigurationSource configuration,
-      UserGroupInformation ugi, String omServiceId) throws IOException {
+      UserGroupInformation ugi, String omServiceId, Class<T> protocol)
+      throws IOException {
     this.conf = configuration;
-    this.omVersion = RPC.getProtocolVersion(OzoneManagerProtocolPB.class);
+    this.omVersion = RPC.getProtocolVersion(protocol);
     this.ugi = ugi;
     this.omServiceId = omServiceId;
+    this.protocolClass = protocol;
     loadOMClientConfigs(conf, this.omServiceId);
     this.delegationTokenService = computeDelegationTokenService();
 
@@ -171,20 +175,18 @@ public class OMFailoverProxyProvider implements
     return currentProxyOMNodeId;
   }
 
-  private OzoneManagerProtocolPB createOMProxy(InetSocketAddress omAddress)
-      throws IOException {
+  private T createOMProxy(InetSocketAddress omAddress) throws IOException {
     Configuration hadoopConf =
         LegacyHadoopConfigurationSource.asHadoopConfiguration(conf);
-    RPC.setProtocolEngine(hadoopConf, OzoneManagerProtocolPB.class,
-        ProtobufRpcEngine.class);
+    RPC.setProtocolEngine(hadoopConf, protocolClass, ProtobufRpcEngine.class);
 
     // FailoverOnNetworkException ensures that the IPC layer does not attempt
     // retries on the same OM in case of connection exception. This retry
     // policy essentially results in TRY_ONCE_THEN_FAIL.
     RetryPolicy connectionRetryPolicy = RetryPolicies
         .failoverOnNetworkException(0);
-    
-    return RPC.getProtocolProxy(OzoneManagerProtocolPB.class, omVersion,
+
+    return (T) RPC.getProtocolProxy(protocolClass, omVersion,
         omAddress, ugi, hadoopConf, NetUtils.getDefaultSocketFactory(
             hadoopConf), (int) OmUtils.getOMClientRpcTimeOut(conf),
         connectionRetryPolicy).getProxy();
@@ -197,7 +199,7 @@ public class OMFailoverProxyProvider implements
    * @return the OM proxy object to invoke methods upon
    */
   @Override
-  public synchronized ProxyInfo getProxy() {
+  public synchronized ProxyInfo<T> getProxy() {
     ProxyInfo currentProxyInfo = omProxies.get(currentProxyOMNodeId);
     if (currentProxyInfo == null) {
       currentProxyInfo = createOMProxy(currentProxyOMNodeId);
@@ -213,7 +215,7 @@ public class OMFailoverProxyProvider implements
     InetSocketAddress address = omProxyInfo.getAddress();
     ProxyInfo proxyInfo;
     try {
-      OzoneManagerProtocolPB proxy = createOMProxy(address);
+      T proxy = createOMProxy(address);
       // Create proxyInfo here, to make it work with all Hadoop versions.
       proxyInfo = new ProxyInfo<>(proxy, omProxyInfo.toString());
       omProxies.put(nodeId, proxyInfo);
@@ -328,8 +330,8 @@ public class OMFailoverProxyProvider implements
   }
 
   @Override
-  public Class<OzoneManagerProtocolPB> getInterface() {
-    return OzoneManagerProtocolPB.class;
+  public Class<T> getInterface() {
+    return protocolClass;
   }
 
   /**
@@ -350,7 +352,7 @@ public class OMFailoverProxyProvider implements
    * failover again.
    */
   @Override
-  public void performFailover(OzoneManagerProtocolPB currentProxy) {
+  public void performFailover(T currentProxy) {
     if (LOG.isDebugEnabled()) {
       int currentIndex = getCurrentProxyIndex();
       LOG.debug("Failing over OM proxy to index: {}, nodeId: {}",
@@ -483,7 +485,7 @@ public class OMFailoverProxyProvider implements
    */
   @Override
   public synchronized void close() throws IOException {
-    for (ProxyInfo<OzoneManagerProtocolPB> proxyInfo : omProxies.values()) {
+    for (ProxyInfo<T> proxyInfo : omProxies.values()) {
       if (proxyInfo != null) {
         RPC.stopProxy(proxyInfo.proxy);
       }
@@ -496,7 +498,7 @@ public class OMFailoverProxyProvider implements
   }
 
   @VisibleForTesting
-  public Map<String, ProxyInfo<OzoneManagerProtocolPB>> getOMProxyMap() {
+  public Map<String, ProxyInfo<T>> getOMProxyMap() {
     return omProxies;
   }
 
@@ -511,7 +513,7 @@ public class OMFailoverProxyProvider implements
    * @param exception
    * @return OMLeaderNotReadyException
    */
-  private static OMLeaderNotReadyException getLeaderNotReadyException(
+  public static OMLeaderNotReadyException getLeaderNotReadyException(
       Exception exception) {
     Throwable cause = exception.getCause();
     if (cause instanceof RemoteException) {
@@ -544,7 +546,7 @@ public class OMFailoverProxyProvider implements
 
   @VisibleForTesting
   protected void setProxiesForTesting(
-      Map<String, ProxyInfo<OzoneManagerProtocolPB>> testOMProxies,
+      Map<String, ProxyInfo<T>> testOMProxies,
       Map<String, OMProxyInfo> testOMProxyInfos,
       List<String> testOMNodeIDList) {
     this.omProxies = testOMProxies;

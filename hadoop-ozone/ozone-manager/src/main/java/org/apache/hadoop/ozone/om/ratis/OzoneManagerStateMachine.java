@@ -53,6 +53,7 @@ import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftClientRequest;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftPeerId;
+import org.apache.ratis.protocol.exceptions.RaftException;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.protocol.TermIndex;
@@ -173,6 +174,28 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     // with some information like its peers and termIndex). So, calling
     // updateLastApplied updates lastAppliedTermIndex.
     computeAndUpdateLastAppliedIndex(index, currentTerm, null, false);
+  }
+
+  /**
+   * Called to notify state machine about configuration changes.
+   * Configurations changes include addition of newly bootstrapped OM.
+   */
+  @Override
+  public void notifyConfigurationChanged(long term, long index,
+      RaftProtos.RaftConfigurationProto newRaftConfiguration) {
+    List<RaftProtos.RaftPeerProto> newPeers = newRaftConfiguration.getPeersList();
+    LOG.info("Received Configuration change notification from Ratis. New Peer" +
+        " list:\n{}", newPeers);
+    for (RaftProtos.RaftPeerProto raftPeerProto : newPeers) {
+      String omNodeId = RaftPeerId.valueOf(raftPeerProto.getId()).toString();
+      if (!ozoneManager.doesPeerExist(omNodeId)) {
+        LOG.info("Adding new OM {} to the cluster.", omNodeId);
+        ozoneManager.addOMNodeToPeers(omNodeId);
+      } else {
+        LOG.debug("Not adding OM {} to cluster as it is already present in " +
+            "peer list.", omNodeId);
+      }
+    }
   }
 
   /**
@@ -442,6 +465,15 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   @Override
   public String toStateMachineLogEntryString(StateMachineLogEntryProto proto) {
     return OMRatisHelper.smProtoToString(proto);
+  }
+
+  @Override
+  public void close() throws IOException {
+    // OM should be shutdown as the StateMachine has shutdown.
+    LOG.info("StateMachine has shutdown. Shutdown OzoneManager if not " +
+        "already shutdown.");
+    ozoneManager.shutdown(new RaftException("RaftServer called shutdown on " +
+        "StateMachine"));
   }
 
   /**

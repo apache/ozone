@@ -1,0 +1,64 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/**
+ * These .proto interfaces are private and unstable.
+ * Please see http://wiki.apache.org/hadoop/Compatibility
+ * for what changes are allowed for a *unstable* .proto interface.
+ */
+
+syntax = "proto2";
+option java_package = "org.apache.hadoop.ozone.protocol.proto";
+option java_outer_classname = "OzoneManagerInterServiceProtocolProtos";
+option java_generic_services = true;
+option java_generate_equals_and_hash = true;
+package hadoop.ozone;
+
+/**
+This file contains the protocol for communication between Ozone Managers in
+an HA setup.
+*/
+
+message BootstrapOMRequest {
+    required string nodeId = 1;
+    required string hostAddress = 2;
+    required uint32 ratisPort = 3;
+}
+
+message BootstrapOMResponse {
+    required bool success = 1;
+    optional BootstrapErrorCode errorCode = 2;
+    optional string errorMsg = 3;
+}
+
+enum BootstrapErrorCode {
+    RATIS_NOT_ENABLED = 1;
+    LEADER_UNDETERMINED = 2;
+    LEADER_NOT_READY = 3;
+    RATIS_BOOTSTRAP_ERROR = 4;
+    UNDEFINED_ERROR = 5;
+}
+
+/**
+ The OM service for OM-OM communication.
+*/
+service OzoneManagerInterService {
+    // RPC request from new OM to existing OM ring to bootstrap itself
+    rpc bootstrap(BootstrapOMRequest)
+    returns(BootstrapOMResponse);
+}

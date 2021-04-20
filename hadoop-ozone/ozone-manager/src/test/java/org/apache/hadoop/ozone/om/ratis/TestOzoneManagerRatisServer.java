@@ -36,7 +36,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.ha.ratis.RatisSnapshotInfo;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.ha.OMNodeDetails;
+import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -115,7 +115,7 @@ public class TestOzoneManagerRatisServer {
     secConfig = new SecurityConfig(conf);
     certClient = new OMCertificateClient(secConfig);
     omRatisServer = OzoneManagerRatisServer.newOMRatisServer(conf, ozoneManager,
-      omNodeDetails, Collections.emptyList(), secConfig, certClient);
+      omNodeDetails, Collections.emptyList(), secConfig, certClient, false);
     omRatisServer.start();
   }
 
@@ -155,7 +155,7 @@ public class TestOzoneManagerRatisServer {
 
     // Start new Ratis server. It should pick up and load the new SnapshotInfo
     omRatisServer = OzoneManagerRatisServer.newOMRatisServer(conf, ozoneManager,
-        omNodeDetails, Collections.emptyList(), secConfig, certClient);
+        omNodeDetails, Collections.emptyList(), secConfig, certClient, false);
     omRatisServer.start();
     TermIndex lastAppliedTermIndex =
         omRatisServer.getLastAppliedTermIndex();
@@ -225,7 +225,7 @@ public class TestOzoneManagerRatisServer {
     omRatisServer.stop();
     OzoneManagerRatisServer newOmRatisServer = OzoneManagerRatisServer
         .newOMRatisServer(newConf, ozoneManager, nodeDetails,
-            Collections.emptyList(), secConfig, certClient);
+            Collections.emptyList(), secConfig, certClient, false);
     newOmRatisServer.start();
 
     UUID uuid = UUID.nameUUIDFromBytes(customOmServiceId.getBytes(UTF_8));
