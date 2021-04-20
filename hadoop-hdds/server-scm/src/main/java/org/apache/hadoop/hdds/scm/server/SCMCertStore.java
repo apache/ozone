@@ -189,6 +189,7 @@ public final class SCMCertStore implements CertificateStore {
           CRLInfo crlInfo = new CRLInfo.Builder()
               .setX509CRL(crl)
               .setCreationTimestamp(now.getTime())
+              .setCrlSequenceID(id)
               .build();
           scmMetadataStore.getCRLInfoTable().putWithBatch(
               batch, id, crlInfo);
