@@ -210,7 +210,7 @@ public final class OmKeyInfo extends WithObjectID {
         }
       }
       if (unKnownBlockID) {
-        LOG.warn("UnKnown BlockLocation:{}, where the blockID of given "
+        LOG.warn("Unknown BlockLocation:{}, where the blockID of given "
             + "location doesn't match with the stored/allocated block of"
             + " keyName:{}", modifiedLocationInfo, keyName);
       }
