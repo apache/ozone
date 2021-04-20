@@ -34,7 +34,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
-import org.apache.commons.compress.compressors.CompressorOutputStream;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerPacker;
@@ -55,7 +54,6 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.commons.compress.compressors.CompressorStreamFactory.GZIP;
 
 /**
  * Test the tar/untar for a given container.
@@ -169,9 +167,7 @@ public class TestTarContainerPacker {
     //THEN: check the result
     TarArchiveInputStream tarStream = null;
     try (FileInputStream input = new FileInputStream(targetFile.toFile())) {
-      CompressorInputStream uncompressed = new CompressorStreamFactory()
-          .createCompressorInputStream(GZIP, input);
-      tarStream = new TarArchiveInputStream(uncompressed);
+      tarStream = new TarArchiveInputStream(input);
 
       TarArchiveEntry entry;
       Map<String, TarArchiveEntry> entries = new HashMap<>();
@@ -351,9 +347,7 @@ public class TestTarContainerPacker {
       throws Exception {
     File targetFile = TEMP_DIR.resolve("container.tar.gz").toFile();
     try (FileOutputStream output = new FileOutputStream(targetFile);
-         CompressorOutputStream gzipped = new CompressorStreamFactory()
-             .createCompressorOutputStream(GZIP, output);
-         ArchiveOutputStream archive = new TarArchiveOutputStream(gzipped)) {
+         ArchiveOutputStream archive = new TarArchiveOutputStream(output)) {
       TarContainerPacker.includeFile(file, entryName, archive);
     }
     return targetFile;

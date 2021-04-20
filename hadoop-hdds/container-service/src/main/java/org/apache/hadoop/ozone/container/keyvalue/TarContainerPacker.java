@@ -40,14 +40,12 @@ import org.apache.commons.compress.archivers.ArchiveInputStream;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
-import org.apache.commons.compress.compressors.CompressorException;
-import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.apache.commons.io.IOUtils;
 
 import static java.util.stream.Collectors.toList;
 
 /**
- * Compress/uncompress KeyValueContainer data to a tar.gz archive.
+ * Compress/uncompress KeyValueContainer data to a tar archive.
  */
 public class TarContainerPacker
     implements ContainerPacker<KeyValueContainerData> {
@@ -74,8 +72,7 @@ public class TarContainerPacker
     Path dbRoot = containerData.getDbFile().toPath();
     Path chunksRoot = Paths.get(containerData.getChunksPath());
 
-    try (InputStream decompressed = decompress(input);
-         ArchiveInputStream archiveInput = untar(decompressed)) {
+    try (ArchiveInputStream archiveInput = untar(input)) {
 
       ArchiveEntry entry = archiveInput.getNextEntry();
       while (entry != null) {
@@ -101,11 +98,6 @@ public class TarContainerPacker
       }
       return descriptorFileContent;
 
-    } catch (CompressorException e) {
-      throw new IOException(
-          "Can't uncompress the given container: " + container
-              .getContainerData().getContainerID(),
-          e);
     }
   }
 
@@ -149,8 +141,7 @@ public class TarContainerPacker
 
     KeyValueContainerData containerData = container.getContainerData();
 
-    try (OutputStream compressed = compress(output);
-         ArchiveOutputStream archiveOutput = tar(compressed)) {
+    try (ArchiveOutputStream archiveOutput = tar(output)) {
 
       includePath(containerData.getDbFile().toPath(), DB_DIR_NAME,
           archiveOutput);
@@ -160,18 +151,13 @@ public class TarContainerPacker
 
       includeFile(container.getContainerFile(), CONTAINER_FILE_NAME,
           archiveOutput);
-    } catch (CompressorException e) {
-      throw new IOException(
-          "Can't compress the container: " + containerData.getContainerID(),
-          e);
     }
   }
 
   @Override
   public byte[] unpackContainerDescriptor(InputStream input)
       throws IOException {
-    try (InputStream decompressed = decompress(input);
-         ArchiveInputStream archiveInput = untar(decompressed)) {
+    try (ArchiveInputStream archiveInput = untar(input)) {
 
       ArchiveEntry entry = archiveInput.getNextEntry();
       while (entry != null) {
@@ -181,10 +167,6 @@ public class TarContainerPacker
         }
         entry = archiveInput.getNextEntry();
       }
-    } catch (CompressorException e) {
-      throw new IOException(
-          "Can't read the container descriptor from the container archive",
-          e);
     }
 
     throw new IOException(
@@ -235,16 +217,5 @@ public class TarContainerPacker
     return new TarArchiveOutputStream(output);
   }
 
-  private static InputStream decompress(InputStream input)
-      throws CompressorException {
-    return new CompressorStreamFactory()
-        .createCompressorInputStream(CompressorStreamFactory.GZIP, input);
-  }
-
-  private static OutputStream compress(OutputStream output)
-      throws CompressorException {
-    return new CompressorStreamFactory()
-        .createCompressorOutputStream(CompressorStreamFactory.GZIP, output);
-  }
 
 }
