@@ -141,10 +141,13 @@ public class SCMRatisServerImpl implements SCMRatisServer {
           .equals(buildRaftGroupId(clusterId))) {
         LOG.info("Ratis group with group Id {} already exists.",
             group.getGroupId());
+        // start the server to transition the server to Running state to ensure
+        // all the log worker threads get stopped during close()
+        server.start();
         return;
       } else {
         // close the server instance so that pending locks on raft storage
-        // directory gets released if any and further initiliaze can succeed.
+        // directory gets released if any and further initialize can succeed.
         server.close();
         initialize(clusterId, scmId, details, conf);
       }
