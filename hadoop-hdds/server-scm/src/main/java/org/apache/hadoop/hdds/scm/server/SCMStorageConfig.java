@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.server;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.server.ServerUtils;
@@ -27,11 +28,7 @@ import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
 
-import static org.apache.hadoop.ozone.OzoneConsts.PRIMARY_SCM_NODE_ID;
-import static org.apache.hadoop.ozone.OzoneConsts.SCM_CERT_SERIAL_ID;
-import static org.apache.hadoop.ozone.OzoneConsts.SCM_ID;
-import static org.apache.hadoop.ozone.OzoneConsts.STORAGE_DIR;
-
+import static org.apache.hadoop.ozone.OzoneConsts.*;
 
 /**
  * SCMStorageConfig is responsible for management of the
@@ -60,12 +57,27 @@ public class SCMStorageConfig extends Storage {
     }
   }
 
+  public void setSCMHAFlag(boolean flag) {
+    if (!isSCMHAEnabled()) {
+      Preconditions.checkNotNull(flag);
+      getStorageInfo().setProperty(SCM_HA, Boolean.toString(flag));
+    }
+  }
+
   /**
    * Retrieves the SCM ID from the version file.
    * @return SCM_ID
    */
   public String getScmId() {
     return getStorageInfo().getProperty(SCM_ID);
+  }
+
+  /**
+   * Retrieves the SCM HA flag from the version file.
+   * @return SCM_ID
+   */
+  public boolean isSCMHAEnabled() {
+    return Boolean.valueOf(getStorageInfo().getProperty(SCM_HA));
   }
 
   @Override
