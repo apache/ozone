@@ -138,7 +138,7 @@ public class TestBlockData {
     final BlockID blockID = new BlockID(5, 123);
     blockID.setBlockCommitSequenceId(42);
     final BlockData subject = new BlockData(blockID);
-    assertEquals("[blockId=conID: 5 locID: 123 bcsId: 42,size=0]",
+    assertEquals("[blockId=conID: 5 locID: 123 bcsId: 42, size=0]",
         subject.toString());
   }
 }
