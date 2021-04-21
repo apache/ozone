@@ -273,7 +273,7 @@ public class SCMContainerLocationFailoverProxyProvider implements
       @Override
       public RetryAction shouldRetry(Exception e, int retry,
                                      int failover, boolean b) {
-        if (!SCMHAUtils.isRetriableWithNoFailoverException(e)) {
+        if (!SCMHAUtils.checkRetriableWithNoFailoverException(e)) {
           performFailoverToAssignedLeader(null, e);
         }
         return SCMHAUtils.getRetryAction(failover, retry, e, maxRetryCount,

@@ -264,7 +264,7 @@ public class SCMSecurityProtocolFailoverProxyProvider implements
           return RetryAction.FAIL;
         }
 
-        if (!SCMHAUtils.isRetriableWithNoFailoverException(exception)) {
+        if (!SCMHAUtils.checkRetriableWithNoFailoverException(exception)) {
           performFailoverToAssignedLeader(null, exception);
         }
         return SCMHAUtils

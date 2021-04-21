@@ -142,7 +142,7 @@ public final class HASecurityUtils {
 
       // Create SCM security client.
       SCMSecurityProtocolClientSideTranslatorPB secureScmClient =
-          HddsServerUtil.getScmSecurityClientWithFixedDuration(config);
+          HddsServerUtil.getScmSecurityClient(config);
 
       // Get SCM sub CA cert.
       SCMGetCertResponseProto response = secureScmClient.

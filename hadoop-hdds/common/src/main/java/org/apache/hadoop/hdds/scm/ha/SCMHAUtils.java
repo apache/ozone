@@ -210,7 +210,21 @@ public final class SCMHAUtils {
     return ioException == null ? e : ioException;
   }
 
+  /**
+   * Checks if the underlying exception if of type StateMachine. Used by scm
+   * clients.
+   */
   public static boolean isNonRetriableException(Exception e) {
+    Throwable t =
+        getExceptionForClass(e, StateMachineException.class);
+    return t == null ? false : true;
+  }
+
+  /**
+   * Checks if the underlying exception if of type non retriable. Used by scm
+   * clients.
+   */
+  public static boolean checkNonRetriableException(Exception e) {
     Throwable t = unwrapException(e);
     return NonRetriableException.class.isInstance(t);
   }
@@ -219,7 +233,6 @@ public final class SCMHAUtils {
   // the exception to see if it matches with expected exception
   // list , returns true otherwise will return false.
   public static boolean isRetriableWithNoFailoverException(Exception e) {
-
     Throwable t = unwrapException(e);
     while (t != null) {
       for (Class<? extends Exception> clazz :
@@ -231,6 +244,15 @@ public final class SCMHAUtils {
       t = t.getCause();
     }
     return false;
+  }
+
+  /**
+   * Checks if the underlying exception if of type retriable with no failover.
+   * Used by scm clients.
+   */
+  public static boolean checkRetriableWithNoFailoverException(Exception e) {
+    Throwable t = unwrapException(e);
+    return RetriableWithNoFailoverException.class.isInstance(t);
   }
 
   public static Throwable getNotLeaderException(Exception e) {
@@ -266,14 +288,14 @@ public final class SCMHAUtils {
 
   public static RetryPolicy.RetryAction getRetryAction(int failovers, int retry,
       Exception e, int maxRetryCount, long retryInterval) {
-    if (SCMHAUtils.isRetriableWithNoFailoverException(e)) {
+    if (SCMHAUtils.checkRetriableWithNoFailoverException(e)) {
       if (retry < maxRetryCount) {
         return new RetryPolicy.RetryAction(
             RetryPolicy.RetryAction.RetryDecision.RETRY, retryInterval);
       } else {
         return RetryPolicy.RetryAction.FAIL;
       }
-    } else if (SCMHAUtils.isNonRetriableException(e)) {
+    } else if (SCMHAUtils.checkNonRetriableException(e)) {
       return RetryPolicy.RetryAction.FAIL;
     } else {
       if (failovers < maxRetryCount) {

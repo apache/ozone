@@ -456,14 +456,6 @@ public final class HddsServerUtil {
             UserGroupInformation.getCurrentUser()));
   }
 
-  public static SCMSecurityProtocolClientSideTranslatorPB
-      getScmSecurityClientWithFixedDuration(OzoneConfiguration conf)
-      throws IOException {
-    return new SCMSecurityProtocolClientSideTranslatorPB(
-        new SCMSecurityProtocolFailoverProxyProvider(conf,
-            UserGroupInformation.getCurrentUser()));
-  }
-
   /**
    * Create a scm block client, used by putKey() and getKey().
    *
