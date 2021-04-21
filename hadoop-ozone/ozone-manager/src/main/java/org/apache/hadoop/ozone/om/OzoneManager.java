@@ -1458,7 +1458,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         omDetailsProtoBuilder.build();
     LOG.info("OzoneManager ports added:{}", omDetailsProto.getPortsList());
     SCMSecurityProtocolClientSideTranslatorPB secureScmClient =
-        HddsServerUtil.getScmSecurityClient(config);
+        HddsServerUtil.getScmSecurityClientWithFixedDuration(config);
 
     SCMGetCertResponseProto response = secureScmClient.
         getOMCertChain(omDetailsProto, getEncodedString(csr));
