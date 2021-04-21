@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.s3;
 
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
@@ -128,7 +129,7 @@ public class TestOzoneClientProducer {
       producer.createClient();
       fail("testGetClientFailure");
     } catch (Exception ex) {
-      Assert.assertTrue(ex instanceof OS3Exception);
+      Assert.assertTrue(ex instanceof WebApplicationException);
     }
   }
 
