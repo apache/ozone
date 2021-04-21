@@ -75,8 +75,6 @@ jobs:
     steps:
       - name: Checkout project
         uses: actions/checkout@v2
-        with:
-          path: ozone
       - name: Download compiled Ozone binaries
         uses: actions/download-artifact@v2
         with:
