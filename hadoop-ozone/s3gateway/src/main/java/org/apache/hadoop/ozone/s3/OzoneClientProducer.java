@@ -77,7 +77,8 @@ public class OzoneClientProducer {
   private ContainerRequestContext context;
 
   @Produces
-  public OzoneClient createClient() throws WebApplicationException, IOException {
+  public OzoneClient createClient() throws WebApplicationException,
+      IOException {
     client = getClient(ozoneConfiguration);
     return client;
   }
