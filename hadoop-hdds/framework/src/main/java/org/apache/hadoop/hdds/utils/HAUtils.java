@@ -62,10 +62,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
-
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURATION;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURATION_DEFAULT;
 import static org.apache.hadoop.hdds.server.ServerUtils.getOzoneMetaDirPath;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
@@ -83,20 +79,6 @@ public final class HAUtils {
       throws IOException {
     OzoneConfiguration configuration = new OzoneConfiguration(conf);
     try {
-      long duration = conf.getTimeDuration(OZONE_SCM_INFO_WAIT_DURATION,
-          OZONE_SCM_INFO_WAIT_DURATION_DEFAULT, TimeUnit.SECONDS);
-      SCMClientConfig scmClientConfig =
-          configuration.getObject(SCMClientConfig.class);
-      int retryCount =
-          (int) (duration / (scmClientConfig.getRetryInterval()/1000));
-
-      // If duration is set to lesser value, fall back to actual default
-      // retry count.
-      if (retryCount > scmClientConfig.getRetryCount()) {
-        scmClientConfig.setRetryCount(retryCount);
-        configuration.setFromObject(scmClientConfig);
-      }
-
       return getScmBlockClient(configuration).getScmInfo();
     } catch (IOException e) {
       throw e;

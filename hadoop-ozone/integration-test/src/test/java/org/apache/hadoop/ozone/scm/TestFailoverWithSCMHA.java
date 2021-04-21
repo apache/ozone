@@ -94,8 +94,10 @@ public class TestFailoverWithSCMHA {
   public void testFailover() throws Exception {
     SCMClientConfig scmClientConfig =
         conf.getObject(SCMClientConfig.class);
-    scmClientConfig.setRetryCount(5);
+    scmClientConfig.setRetryCount(1);
     scmClientConfig.setRetryInterval(100);
+    scmClientConfig.setMaxRetryTimeout(1500);
+    Assert.assertEquals(scmClientConfig.getRetryCount(), 15);
     conf.setFromObject(scmClientConfig);
     StorageContainerManager scm = getLeader(cluster);
     Assert.assertNotNull(scm);
