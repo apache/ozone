@@ -160,6 +160,10 @@ public final class OmKeyInfo extends WithObjectID {
    * This will be called when the key is being committed to OzoneManager.
    *
    * @param locationInfoList list of locationInfo
+   * @param isMpu a true represents multi part key, false otherwise
+   * @param skipBlockIDCheck a true represents that the blockId verification
+   *                         check should be skipped, false represents that
+   *                         the blockId verification will be required
    */
   public void updateLocationInfoList(List<OmKeyLocationInfo> locationInfoList,
       boolean isMpu, boolean skipBlockIDCheck) {
