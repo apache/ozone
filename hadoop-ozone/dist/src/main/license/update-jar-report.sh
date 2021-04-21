@@ -28,5 +28,6 @@ DIST_DIR="$SCRIPTDIR/../../../target/ozone-$OZONE_VERSION"
 
 cd "$OZONE_DIST_DIR"
 
-#sed expression removes the version. Usually license is not changed vith versions
-find . -type f -name "*.jar" | sed -r 's/-[0-9]+(.[0-9]+)*(-SNAPSHOT)?+//g' | sort > "$SCRIPTDIR"/$REPORT_NAME
+#sed expression removes the version. Usually license is not changed with version bumps
+#jacoco and test dependencies are excluded
+find . -type f -name "*.jar" | sed -r 's/-[0-9]+(.[0-9]+)*(-SNAPSHOT)?+//g' | grep -v jacoco | grep -v hadoop-hdds-test-utils | sort > "$SCRIPTDIR"/$REPORT_NAME

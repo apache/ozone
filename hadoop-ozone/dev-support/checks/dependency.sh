@@ -25,6 +25,9 @@ REPORT_FILE="$REPORT_DIR/summary.txt"
 
 hadoop-ozone/dist/src/main/license/update-jar-report.sh current.txt
 
+cp hadoop-ozone/dist/src/main/license/jar-report.txt "$REPORT_DIR"
+cp hadoop-ozone/dist/src/main/license/current.txt "$REPORT_DIR"
+
 (diff hadoop-ozone/dist/src/main/license/jar-report.txt hadoop-ozone/dist/src/main/license/current.txt || true ) > "$REPORT_FILE"
 
 
