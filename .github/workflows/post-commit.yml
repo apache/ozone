@@ -82,7 +82,7 @@ jobs:
       - name: Untar binaries
         run: |
           mkdir dist
-          tar --strip-components=1 xzf hadoop-ozone*.tar.gz -C dist
+          tar  -C dist --strip-components 1 -xzf hadoop-ozone*.tar.gz
       - name: Execute tests
         run: |
           export OZONE_DIST_DIR=`pwd`/dist
