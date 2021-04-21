@@ -40,9 +40,6 @@ import org.apache.hadoop.ozone.container.common.interfaces.ContainerPacker;
 
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
-import org.apache.commons.compress.compressors.CompressorException;
-import org.apache.commons.compress.compressors.CompressorInputStream;
-import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.test.LambdaTestUtils;
@@ -137,7 +134,7 @@ public class TestTarContainerPacker {
   }
 
   @Test
-  public void pack() throws IOException, CompressorException {
+  public void pack() throws IOException {
 
     //GIVEN
     OzoneConfiguration conf = new OzoneConfiguration();
