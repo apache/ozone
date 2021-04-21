@@ -72,6 +72,8 @@
 ./share/ozone/lib/hadoop-ozone-csi.jar
 ./share/ozone/lib/hadoop-ozone-datanode.jar
 ./share/ozone/lib/hadoop-ozone-filesystem-common.jar
+./share/ozone/lib/hadoop-ozone-filesystem-hadoop2.jar
+./share/ozone/lib/hadoop-ozone-filesystem-hadoop3.jar
 ./share/ozone/lib/hadoop-ozone-filesystem.jar
 ./share/ozone/lib/hadoop-ozone-insight.jar
 ./share/ozone/lib/hadoop-ozone-interface-client.jar
