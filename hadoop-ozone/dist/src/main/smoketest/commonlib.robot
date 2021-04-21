@@ -32,6 +32,6 @@ Kinit HTTP user
 
 Kinit test user
     [arguments]                      ${user}       ${keytab}
-    ${hostname} =       Execute                    hostname
+    ${hostname} =       Execute                    hostname | sed 's/.org//' | sed 's/[0-9]//'
     Set Suite Variable  ${TEST_USER}               ${user}/${hostname}@EXAMPLE.COM
     Wait Until Keyword Succeeds      2min       10sec      Execute            kinit -k ${user}/${hostname}@EXAMPLE.COM -t /etc/security/keytabs/${keytab}

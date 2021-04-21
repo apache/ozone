@@ -35,10 +35,9 @@ services:
     volumes:
       - ./keytabs:/etc/security/keytabs
       - ./krb5.conf:/etc/krb5.conf
+      - ../../libexec/transformation.py:/opt/transformation.py
     environment:
       HADOOP_CONF_DIR: /opt/hadoop/etc/hadoop
-    volumes:
-      - ../../libexec/transformation.py:/opt/transformation.py
     command: ["hadoop", "kms"]
     networks:
       ozone_net:
@@ -254,6 +253,8 @@ services:
     hostname: scm3.org
     volumes:
       - ../..:/opt/hadoop
+      - ./keytabs:/etc/security/keytabs
+      - ./krb5.conf:/etc/krb5.conf
     ports:
       - 9998:9876
       - 10002:9860
@@ -261,7 +262,6 @@ services:
       - docker-config
     environment:
       WAITFOR: scm2.org:9865
-      KERBEROS_KEYTABS: scm HTTP testuser testuser2
       ENSURE_SCM_BOOTSTRAPPED: /data/metadata/scm/current/VERSION
       OZONE-SITE.XML_hdds.scm.safemode.min.datanode: "${OZONE_SAFEMODE_MIN_DATANODES:-3}"
       OZONE_OPTS:
