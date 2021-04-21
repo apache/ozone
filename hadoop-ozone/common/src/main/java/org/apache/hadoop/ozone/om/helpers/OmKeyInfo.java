@@ -27,6 +27,7 @@ import java.util.Objects;
 
 import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
@@ -197,19 +198,17 @@ public final class OmKeyInfo extends WithObjectID {
         keyLocationInfoGroup.getBlocksLatestVersionOnly();
     List<OmKeyLocationInfo> updatedBlockLocations = new ArrayList<>();
 
+    List<ContainerBlockID> existingBlockIDs = new ArrayList<>();
+    for (OmKeyLocationInfo existingLocationInfo : allocatedBlockLocations) {
+      BlockID existingBlockID = existingLocationInfo.getBlockID();
+      existingBlockIDs.add(existingBlockID.getContainerBlockID());
+    }
+
     for (OmKeyLocationInfo modifiedLocationInfo : locationInfoList) {
-      boolean unKnownBlockID = true;
       BlockID modifiedBlockID = modifiedLocationInfo.getBlockID();
-      for (OmKeyLocationInfo existingLocationInfo : allocatedBlockLocations) {
-        BlockID existingBlockID = existingLocationInfo.getBlockID();
-        if (modifiedBlockID.getContainerBlockID()
-            .equals(existingBlockID.getContainerBlockID())) {
-          updatedBlockLocations.add(modifiedLocationInfo);
-          unKnownBlockID = false;
-          break;
-        }
-      }
-      if (unKnownBlockID) {
+      if (existingBlockIDs.contains(modifiedBlockID.getContainerBlockID())) {
+        updatedBlockLocations.add(modifiedLocationInfo);
+      } else {
         LOG.warn("Unknown BlockLocation:{}, where the blockID of given "
             + "location doesn't match with the stored/allocated block of"
             + " keyName:{}", modifiedLocationInfo, keyName);
