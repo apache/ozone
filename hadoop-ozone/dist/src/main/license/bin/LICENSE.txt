@@ -233,7 +233,6 @@ CDDL
    com.sun.jersey:jersey-json
    com.sun.jersey:jersey-server
    com.sun.jersey:jersey-servlet
-   com.sun.xml.bind:jaxb-core
    javax.activation:activation
    javax.servlet.jsp:jsp-api
    javax.ws.rs:jsr311-api
