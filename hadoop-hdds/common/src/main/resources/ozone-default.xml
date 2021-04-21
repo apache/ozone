@@ -2770,4 +2770,13 @@
       during OzoneManager init/SCM bootstrap.
     </description>
   </property>
+
+  <property>
+    <name>ozone.client.key.provider.cache.expiry</name>
+    <tag>OZONE, CLIENT, SECURITY</tag>
+    <value>10d</value>
+    <description>Ozone client security key provider cache expiration time.
+    </description>
+  </property>
+
 </configuration>

@@ -24,8 +24,10 @@ import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.Before;
@@ -58,8 +60,8 @@ public class TestNodeDecommissionManager {
         TestDeadNodeHandler.class.getSimpleName() + UUID.randomUUID());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, storageDir);
     nodeManager = createNodeManager(conf);
-    decom = new NodeDecommissionManager(
-        conf, nodeManager, null, null, null);
+    decom = new NodeDecommissionManager(conf, nodeManager, null,
+        SCMContext.emptyContext(), new EventQueue(), null);
   }
 
   @Test
@@ -248,6 +250,34 @@ public class TestNodeDecommissionManager {
         nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
     assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
         nodeManager.getNodeStatus(dns.get(2)).getOperationalState());
+  }
+
+  @Test
+  public void testNodeDecommissionManagerOnBecomeLeader() throws Exception {
+    List<DatanodeDetails> dns = generateDatanodes();
+
+    long maintenanceEnd =
+        (System.currentTimeMillis() / 1000L) + (100 * 60L * 60L);
+
+    // Put 1 node into entering_maintenance, 1 node into decommissioning
+    // and 1 node into in_maintenance.
+    nodeManager.setNodeOperationalState(dns.get(1),
+        HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE, maintenanceEnd);
+    nodeManager.setNodeOperationalState(dns.get(2),
+        HddsProtos.NodeOperationalState.DECOMMISSIONING, 0);
+    nodeManager.setNodeOperationalState(dns.get(3),
+        HddsProtos.NodeOperationalState.IN_MAINTENANCE, maintenanceEnd);
+
+    // trackedNodes should be empty now.
+    assertEquals(decom.getMonitor().getTrackedNodes().size(), 0);
+
+    // all nodes with decommissioning, entering_maintenance and in_maintenance
+    // should be added to trackedNodes
+    decom.onBecomeLeader();
+    decom.getMonitor().run();
+
+    // so size of trackedNodes will be 3.
+    assertEquals(decom.getMonitor().getTrackedNodes().size(), 3);
   }
 
   private SCMNodeManager createNodeManager(OzoneConfiguration config)

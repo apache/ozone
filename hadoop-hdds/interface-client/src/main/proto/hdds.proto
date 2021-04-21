@@ -323,6 +323,7 @@ message BlockID {
 message CRLInfoProto {
     required string x509CRL = 1;
     required uint64 creationTimestamp = 2;
+    required int64 crlSequenceID = 3;
 }
 
 /**

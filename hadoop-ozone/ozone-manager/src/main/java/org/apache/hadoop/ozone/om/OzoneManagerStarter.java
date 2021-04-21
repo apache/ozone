@@ -31,8 +31,6 @@ import picocli.CommandLine.Command;
 
 import java.io.IOException;
 
-import static org.apache.hadoop.hdds.utils.HAUtils.checkSecurityAndSCMHAEnabled;
-
 /**
  * This class provides a command line interface to start the OM
  * using Picocli.
@@ -124,7 +122,6 @@ public class OzoneManagerStarter extends GenericCli {
     @Override
     public void start(OzoneConfiguration conf) throws IOException,
         AuthenticationException {
-      checkSecurityAndSCMHAEnabled(conf);
       OzoneManager om = OzoneManager.createOm(conf);
       om.start();
       om.join();
@@ -133,7 +130,6 @@ public class OzoneManagerStarter extends GenericCli {
     @Override
     public boolean init(OzoneConfiguration conf) throws IOException,
         AuthenticationException {
-      checkSecurityAndSCMHAEnabled(conf);
       return OzoneManager.omInit(conf);
     }
   }
