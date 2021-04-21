@@ -115,6 +115,33 @@ public final class TestOMRequestUtils {
    * @param replicationType
    * @param replicationFactor
    * @param omMetadataManager
+   * @param locationList
+   * @throws Exception
+   */
+  @SuppressWarnings("parameterNumber")
+  public static void addKeyToTable(boolean openKeyTable, String volumeName,
+      String bucketName, String keyName, long clientID,
+      HddsProtos.ReplicationType replicationType,
+      HddsProtos.ReplicationFactor replicationFactor,
+      OMMetadataManager omMetadataManager,
+      List<OmKeyLocationInfo> locationList) throws Exception {
+    addKeyToTable(openKeyTable, false, volumeName, bucketName, keyName,
+        clientID, replicationType, replicationFactor, 0L, omMetadataManager,
+        locationList);
+  }
+
+
+  /**
+   * Add key entry to KeyTable. if openKeyTable flag is true, add's entries
+   * to openKeyTable, else add's it to keyTable.
+   * @param openKeyTable
+   * @param volumeName
+   * @param bucketName
+   * @param keyName
+   * @param clientID
+   * @param replicationType
+   * @param replicationFactor
+   * @param omMetadataManager
    * @throws Exception
    */
   @SuppressWarnings("parameterNumber")
@@ -137,14 +164,34 @@ public final class TestOMRequestUtils {
       String volumeName, String bucketName, String keyName, long clientID,
       HddsProtos.ReplicationType replicationType,
       HddsProtos.ReplicationFactor replicationFactor, long trxnLogIndex,
+      OMMetadataManager omMetadataManager,
+      List<OmKeyLocationInfo> locationList) throws Exception {
+
+    OmKeyInfo omKeyInfo = createOmKeyInfo(volumeName, bucketName, keyName,
+        replicationType, replicationFactor, trxnLogIndex);
+    omKeyInfo.appendNewBlocks(locationList, false);
+
+    addKeyToTable(openKeyTable, addToCache, omKeyInfo, clientID, trxnLogIndex,
+            omMetadataManager);
+  }
+
+  /**
+   * Add key entry to KeyTable. if openKeyTable flag is true, add's entries
+   * to openKeyTable, else add's it to keyTable.
+   * @throws Exception
+   */
+  @SuppressWarnings("parameternumber")
+  public static void addKeyToTable(boolean openKeyTable, boolean addToCache,
+      String volumeName, String bucketName, String keyName, long clientID,
+      HddsProtos.ReplicationType replicationType,
+      HddsProtos.ReplicationFactor replicationFactor, long trxnLogIndex,
       OMMetadataManager omMetadataManager) throws Exception {
 
     OmKeyInfo omKeyInfo = createOmKeyInfo(volumeName, bucketName, keyName,
         replicationType, replicationFactor, trxnLogIndex);
 
     addKeyToTable(openKeyTable, addToCache, omKeyInfo, clientID, trxnLogIndex,
-            omMetadataManager);
-
+        omMetadataManager);
   }
 
   /**

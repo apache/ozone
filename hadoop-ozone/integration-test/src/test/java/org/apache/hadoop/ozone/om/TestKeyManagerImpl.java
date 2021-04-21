@@ -760,9 +760,13 @@ public class TestKeyManagerImpl {
     Pipeline pipeline = scm.getPipelineManager().createPipeline(
         ReplicationType.RATIS, ReplicationFactor.THREE, nodeList);
     List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
+    List<OmKeyLocationInfo> locationList =
+        keySession.getKeyInfo().getLatestVersionLocations().getLocationList();
+    Assert.assertEquals(1, locationList.size());
     locationInfoList.add(
         new OmKeyLocationInfo.Builder().setPipeline(pipeline)
-            .setBlockID(new BlockID(1L, 1L)).build());
+            .setBlockID(new BlockID(locationList.get(0).getContainerID(),
+                locationList.get(0).getLocalID())).build());
     keyArgs.setLocationInfoList(locationInfoList);
 
     keyManager.commitKey(keyArgs, keySession.getId());
