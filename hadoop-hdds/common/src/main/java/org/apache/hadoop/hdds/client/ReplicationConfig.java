@@ -52,16 +52,14 @@ public interface ReplicationConfig {
    * <p>
    * This uses either the old type/factor or the new ecConfig depends on the
    * type.
-   * <p>
-   * Note: It will support all the available replication types (including EC).
-   * <p>
-   * Separated to remain be synced with the EC feature branch, as later it
-   * will have different signature.
    */
   static ReplicationConfig fromProto(
       HddsProtos.ReplicationType type,
-      HddsProtos.ReplicationFactor factor) {
+      HddsProtos.ReplicationFactor factor,
+      HddsProtos.ECReplicationConfig ecConfig) {
     switch (type) {
+    case EC:
+      return new ECReplicationConfig(ecConfig);
     case RATIS:
     case STAND_ALONE:
       return fromTypeAndFactor(type, factor);

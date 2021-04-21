@@ -260,6 +260,11 @@ enum ReplicationFactor {
     THREE = 3;
 }
 
+message ECReplicationConfig {
+    required int32 data = 1;
+    required int32 parity = 2;
+}
+
 enum ScmOps {
     allocateBlock = 1;
     keyBlocksInfoList = 2;
