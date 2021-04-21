@@ -54,7 +54,9 @@ jobs:
         with:
           java-version: ${{ matrix.java }}
       - name: Run a full build
-        run: hadoop-ozone/dev-support/checks/build.sh -Pcoverage -Pdist
+        run: |
+          sort --help
+          hadoop-ozone/dev-support/checks/build.sh -Pcoverage -Pdist
       - name: Store binaries for tests
         uses: actions/upload-artifact@v2
         if: matrix.java == '8'
