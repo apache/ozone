@@ -41,6 +41,9 @@ Class to add  a new layout feature being brought in. Layout version is typically
     org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager
 Every component carries an instance of this interface, which provides APIs to get runtime layout version, and if a feature is allowed based on that or not.
 
+The LayoutVersionManager interface carries an API that can be used to check if a feature is allowed in the current layout version.
+     org.apache.hadoop.ozone.upgrade.LayoutVersionManager#isAllowed(org.apache.hadoop.ozone.upgrade.LayoutFeature)
+
 ## @DisallowedUntilLayoutVersion Annotation
 Method level annotation used to "disallow" an API if current layout version does not include the associated layout feature. Currently it is added only to the OM module, but can easily be moved down to a common module based on need on the HDDS layer.
 
