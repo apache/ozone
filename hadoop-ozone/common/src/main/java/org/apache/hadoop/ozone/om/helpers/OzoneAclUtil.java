@@ -79,7 +79,7 @@ public final class OzoneAclUtil {
   public static List<OzoneAcl> filterAclList(String identityName,
       IAccessAuthorizer.ACLIdentityType type, List<OzoneAcl> aclList) {
 
-    if (aclList == null && aclList.isEmpty()) {
+    if (aclList == null || aclList.isEmpty()) {
       return new ArrayList<>();
     }
 
