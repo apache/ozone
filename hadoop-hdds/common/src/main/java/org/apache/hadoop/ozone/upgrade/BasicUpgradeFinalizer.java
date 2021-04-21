@@ -94,7 +94,7 @@ public abstract class BasicUpgradeFinalizer
 
   protected void preFinalizeUpgrade(T service) throws IOException {
     // No Op by default.
-  };
+  }
 
   protected void postFinalizeUpgrade(T service) throws IOException {
     // No Op by default.
@@ -131,10 +131,9 @@ public abstract class BasicUpgradeFinalizer
       }
     }
     if (!success) {
-      LOG.error("Unable to finalize after waiting for {} seconds",
-          maxTimeToWaitInSeconds);
-    } else {
-      updateLayoutVersionInDB(versionManager, service);
+      throw new IOException(
+          String.format("Unable to finalize after waiting for %d seconds",
+          maxTimeToWaitInSeconds));
     }
   }
 
@@ -460,9 +459,5 @@ public abstract class BasicUpgradeFinalizer
   public void setFinalizationExecutor(DefaultUpgradeFinalizationExecutor
                                             executor) {
     finalizationExecutor = executor;
-  }
-
-  protected void updateLayoutVersionInDB(V vm, T comp) throws IOException {
-    // No-Op by default.
   }
 }

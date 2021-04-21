@@ -86,8 +86,7 @@ public class InjectedUpgradeFinalizationExecutor<T> extends
       finalizer.markFinalizationDone();
       return null;
     } catch (Exception e) {
-      LOG.warn("Upgrade Finalization failed with following Exception:");
-      e.printStackTrace();
+      LOG.warn("Upgrade Finalization failed with following Exception.", e);
       if (finalizer.getVersionManager().needsFinalization()) {
         finalizer.getVersionManager()
             .setUpgradeState(FINALIZATION_REQUIRED);

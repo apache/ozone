@@ -93,9 +93,9 @@ public class TestHDDSLayoutVersionManager {
   @Test
   public void testHDDSLayoutFeaturesHaveIncreasingLayoutVersion() {
     HDDSLayoutFeature[] values = HDDSLayoutFeature.values();
-    int currVersion = Integer.MIN_VALUE;
+    int currVersion = -1;
     for (HDDSLayoutFeature lf : values) {
-      assertTrue(currVersion < lf.layoutVersion());
+      assertEquals(currVersion + 1, lf.layoutVersion());
       currVersion = lf.layoutVersion();
     }
   }

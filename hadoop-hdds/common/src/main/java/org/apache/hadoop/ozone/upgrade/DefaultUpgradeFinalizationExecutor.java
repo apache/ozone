@@ -54,7 +54,7 @@ public class DefaultUpgradeFinalizationExecutor<T> {
       finalizer.emitFinishedMsg();
       return null;
     } catch (Exception e) {
-      LOG.warn("Upgrade Finalization failed with following Exception:");
+      LOG.warn("Upgrade Finalization failed with following Exception. ", e);
       if (finalizer.getVersionManager().needsFinalization()) {
         finalizer.getVersionManager()
             .setUpgradeState(FINALIZATION_REQUIRED);
