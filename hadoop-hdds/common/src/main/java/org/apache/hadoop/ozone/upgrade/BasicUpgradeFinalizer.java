@@ -291,7 +291,8 @@ public abstract class BasicUpgradeFinalizer
                                      Storage storage) throws IOException {
     try {
       int versionOnDisk = storage.getFirstUpgradeActionLayoutVersion();
-      if (f.layoutVersion() > versionOnDisk) {
+      if (versionOnDisk != LayoutFeature.INVALID_LAYOUT_VERSION &&
+          f.layoutVersion() > versionOnDisk) {
         LOG.info("Executing first upgrade start action {}", action.name());
         action.execute(component);
       } else {
