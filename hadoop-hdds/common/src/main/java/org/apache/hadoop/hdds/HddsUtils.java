@@ -27,6 +27,7 @@ import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.file.Path;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -37,6 +38,7 @@ import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
@@ -95,21 +97,38 @@ public final class HddsUtils {
    *
    * @return Target {@code InetSocketAddress} for the SCM client endpoint.
    */
-  public static InetSocketAddress getScmAddressForClients(
+  public static Collection<InetSocketAddress> getScmAddressForClients(
       ConfigurationSource conf) {
-    Optional<String> host = getHostNameFromConfigKeys(conf,
-        ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY);
 
-    if (!host.isPresent()) {
-      // Fallback to Ozone SCM name
-      host = Optional.of(getSingleSCMAddress(conf).getHostName());
+    if (SCMHAUtils.getScmServiceId(conf) != null) {
+      List<SCMNodeInfo> scmNodeInfoList = SCMNodeInfo.buildNodeInfo(conf);
+      Collection<InetSocketAddress> scmAddressList =
+          new HashSet<>(scmNodeInfoList.size());
+      for (SCMNodeInfo scmNodeInfo : scmNodeInfoList) {
+        if (scmNodeInfo.getScmClientAddress() == null) {
+          throw new ConfigurationException("Ozone scm client address is not " +
+              "set for SCM service-id " + scmNodeInfo.getServiceId() +
+              "node-id" + scmNodeInfo.getNodeId());
+        }
+        scmAddressList.add(
+            NetUtils.createSocketAddr(scmNodeInfo.getScmClientAddress()));
+      }
+      return scmAddressList;
+    } else {
+      Optional< String > host = getHostNameFromConfigKeys(conf,
+          ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY);
+
+      if (!host.isPresent()) {
+        throw new ConfigurationException("Ozone scm client address is not set");
+      }
+
+      final int port = getPortNumberFromConfigKeys(conf,
+          ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY)
+          .orElse(ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT);
+
+      return Collections.singletonList(
+          NetUtils.createSocketAddr(host.get() + ":" + port));
     }
-
-    final int port = getPortNumberFromConfigKeys(conf,
-        ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY)
-        .orElse(ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT);
-
-    return NetUtils.createSocketAddr(host.get() + ":" + port);
   }
 
   /**
