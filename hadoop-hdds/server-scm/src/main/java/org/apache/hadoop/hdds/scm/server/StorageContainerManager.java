@@ -943,16 +943,13 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       }
     } else {
       clusterId = scmStorageConfig.getClusterID();
-      if (!scmStorageConfig.checkPrimarySCMIdInitialized()) {
-        scmStorageConfig.setPrimaryScmNodeId(scmStorageConfig.getScmId());
-        scmStorageConfig.forceInitialize();
-      }
       final boolean isSCMHAEnabled = scmStorageConfig.isSCMHAEnabled();
       if (SCMHAUtils.isSCMHAEnabled(conf) && !isSCMHAEnabled) {
         SCMRatisServerImpl.initialize(scmStorageConfig.getClusterID(),
             scmStorageConfig.getScmId(), haDetails.getLocalNodeDetails(),
             conf);
         scmStorageConfig.setSCMHAFlag(true);
+        scmStorageConfig.setPrimaryScmNodeId(scmStorageConfig.getScmId());
         scmStorageConfig.forceInitialize();
         LOG.debug("Enabled SCM HA");
       }
