@@ -2654,17 +2654,21 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     services.add(omServiceInfoBuilder.build());
 
     // For client we have to return SCM with container protocol port,
-    // not block protocol.
-    InetSocketAddress scmAddr = getScmAddressForClients(
+    // not block protocol. This is information is being not used by
+    // RpcClient, but for compatibility leaving as it is and also making sure
+    // that this works for SCM HA.
+    Collection<InetSocketAddress> scmAddresses = getScmAddressForClients(
         configuration);
-    ServiceInfo.Builder scmServiceInfoBuilder = ServiceInfo.newBuilder()
-        .setNodeType(HddsProtos.NodeType.SCM)
-        .setHostname(scmAddr.getHostName())
-        .addServicePort(ServicePort.newBuilder()
-            .setType(ServicePort.Type.RPC)
-            .setValue(scmAddr.getPort()).build());
-    services.add(scmServiceInfoBuilder.build());
 
+    for (InetSocketAddress scmAddr : scmAddresses) {
+      ServiceInfo.Builder scmServiceInfoBuilder = ServiceInfo.newBuilder()
+          .setNodeType(HddsProtos.NodeType.SCM)
+          .setHostname(scmAddr.getHostName())
+          .addServicePort(ServicePort.newBuilder()
+              .setType(ServicePort.Type.RPC)
+              .setValue(scmAddr.getPort()).build());
+      services.add(scmServiceInfoBuilder.build());
+    }
     metrics.incNumGetServiceLists();
     // For now there is no exception that can can happen in this call,
     // so failure metrics is not handled. In future if there is any need to
