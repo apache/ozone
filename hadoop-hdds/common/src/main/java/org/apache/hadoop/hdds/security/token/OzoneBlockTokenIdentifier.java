@@ -86,9 +86,7 @@ public class OzoneBlockTokenIdentifier extends ShortLivedTokenIdentifier {
 
   @Override
   public String toString() {
-    return "block_token_identifier (expiryDate=" + getExpiryDate()
-        + ", ownerId=" + getOwnerId()
-        + ", omCertSerialId=" + getCertSerialId()
+    return "block_token_identifier (" + super.toString()
         + ", blockId=" + blockId + ", access modes=" + modes
         + ", maxLength=" + maxLength
         + ")";

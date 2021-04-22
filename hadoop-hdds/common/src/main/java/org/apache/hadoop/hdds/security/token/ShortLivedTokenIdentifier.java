@@ -22,6 +22,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.TokenIdentifier;
 
 import java.time.Instant;
+import java.util.Objects;
 
 /**
  * Base class for short-lived tokens (block, container).
@@ -78,5 +79,32 @@ public abstract class ShortLivedTokenIdentifier extends TokenIdentifier {
 
   public String getOwnerId() {
     return ownerId;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+
+    ShortLivedTokenIdentifier that = (ShortLivedTokenIdentifier) o;
+    return Objects.equals(ownerId, that.ownerId) &&
+        Objects.equals(expiry, that.expiry) &&
+        Objects.equals(certSerialId, that.certSerialId);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(ownerId, expiry, certSerialId);
+  }
+
+  @Override
+  public String toString() {
+    return "ownerId=" + ownerId +
+        ", expiry=" + expiry +
+        ", certSerialId=" + certSerialId;
   }
 }
