@@ -27,7 +27,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.Ac
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
-import org.apache.hadoop.hdds.security.token.BlockTokenVerifier;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -192,7 +191,6 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     String value = "sample value";
-    BlockTokenVerifier.setTestStub(true);
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
@@ -215,7 +213,6 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
               " with GRPC XceiverServer with Ozone block token.",
           () -> bucket.readKey(keyName));
     }
-    BlockTokenVerifier.setTestStub(false);
   }
 
   private boolean verifyRatisReplication(String volumeName, String bucketName,

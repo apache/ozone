@@ -54,6 +54,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
+import org.apache.hadoop.hdds.security.token.OzoneContainerTokenSecretManager;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
@@ -66,6 +67,7 @@ import org.apache.hadoop.ozone.audit.AuditLoggerType;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.audit.Auditor;
 import org.apache.hadoop.ozone.audit.SCMAction;
+import org.apache.hadoop.security.token.Token;
 import org.apache.ratis.thirdparty.com.google.common.base.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -772,6 +774,19 @@ public class SCMClientProtocolServer implements
         .map(DatanodeUsageInfo::toProto)
         .limit(count)
         .collect(Collectors.toList());
+  }
+
+  @Override
+  public Token<?> getContainerToken(ContainerID containerID)
+      throws IOException {
+    String remoteUser = getRemoteUserName();
+    getScm().checkAdminAccess(remoteUser);
+
+    OzoneContainerTokenSecretManager secretManager =
+        scm.getContainerTokenSecretManager();
+
+    return secretManager.generateToken(
+        secretManager.createIdentifier(remoteUser, containerID));
   }
 
   /**

@@ -330,6 +330,9 @@ public class SecurityConfig {
     return this.maxCertDuration;
   }
 
+  /**
+   * Whether to require short-lived tokens for block and container operations.
+   */
   public boolean isBlockTokenEnabled() {
     return this.blockTokenEnabled;
   }

@@ -412,6 +412,19 @@ public final class HddsUtils {
     }
   }
 
+  public static boolean requireContainerToken(
+      ContainerProtos.Type cmdType) {
+    switch (cmdType) {
+    case CloseContainer:
+    case CreateContainer:
+    case DeleteContainer:
+    case UpdateContainer:
+      return true;
+    default:
+      return false;
+    }
+  }
+
   /**
    * Return the block ID of container commands that are related to blocks.
    * @param msg container command

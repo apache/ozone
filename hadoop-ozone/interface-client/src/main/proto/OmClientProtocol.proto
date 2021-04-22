@@ -977,13 +977,6 @@ message OMTokenProto {
     optional string omServiceId    = 15;
 }
 
-message SecretKeyProto {
-    required uint32 keyId = 1;
-    required uint64 expiryDate = 2;
-    required bytes privateKeyBytes = 3;
-    required bytes publicKeyBytes = 4;
-}
-
 message ListKeysRequest {
     required string volumeName = 1;
     required string bucketName = 2;
