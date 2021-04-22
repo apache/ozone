@@ -157,10 +157,10 @@ public final class OMFileRequest {
    * @param bucketName        bucket name
    * @param keyName           key name
    * @param keyPath           path
-   * @return OMPathInfoWithFSOB path info object
+   * @return OMPathInfoWithFSO path info object
    * @throws IOException on DB failure
    */
-  public static OMPathInfoWithFSOB verifyDirectoryKeysInPath(
+  public static OMPathInfoWithFSO verifyDirectoryKeysInPath(
           @Nonnull OMMetadataManager omMetadataManager,
           @Nonnull String volumeName,
           @Nonnull String bucketName, @Nonnull String keyName,
@@ -246,7 +246,7 @@ public final class OMFileRequest {
 
     if (result == OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH || result ==
             OMDirectoryResult.FILE_EXISTS) {
-      return new OMPathInfoWithFSOB(leafNodeName, lastKnownParentId, missing,
+      return new OMPathInfoWithFSO(leafNodeName, lastKnownParentId, missing,
               result, inheritAcls, fullKeyPath.toString());
     }
 
@@ -255,7 +255,7 @@ public final class OMFileRequest {
     LOG.trace("Acls inherited from parent " + dbDirKeyName + " are : "
             + inheritAcls);
 
-    return new OMPathInfoWithFSOB(leafNodeName, lastKnownParentId, missing,
+    return new OMPathInfoWithFSO(leafNodeName, lastKnownParentId, missing,
             result, inheritAcls);
   }
 
@@ -264,13 +264,13 @@ public final class OMFileRequest {
    * Includes the list of missing intermediate directories and
    * the directory search result code.
    */
-  public static class OMPathInfoWithFSOB extends OMPathInfo{
+  public static class OMPathInfoWithFSO extends OMPathInfo{
     private String leafNodeName;
     private long lastKnownParentId;
     private long leafNodeObjectId;
     private String fileExistsInPath;
 
-    public OMPathInfoWithFSOB(String leafNodeName, long lastKnownParentId,
+    public OMPathInfoWithFSO(String leafNodeName, long lastKnownParentId,
                         List missingParents, OMDirectoryResult result,
                         List<OzoneAcl> aclList, String fileExistsInPath) {
       super(missingParents, result, aclList);
@@ -279,7 +279,7 @@ public final class OMFileRequest {
       this.fileExistsInPath = fileExistsInPath;
     }
 
-    public OMPathInfoWithFSOB(String leafNodeName, long lastKnownParentId,
+    public OMPathInfoWithFSO(String leafNodeName, long lastKnownParentId,
                         List missingParents, OMDirectoryResult result,
                         List<OzoneAcl> aclList) {
       this(leafNodeName, lastKnownParentId, missingParents, result, aclList,

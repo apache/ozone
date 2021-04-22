@@ -158,7 +158,7 @@ public class TrashOzoneFileSystem extends FileSystem {
     OmBucketInfo bucket = ozoneManager.getBucketInfo(srcPath.getVolumeName(),
         srcPath.getBucketName());
     if (OzoneFSUtils.isFSOptimizedBucket(bucket.getMetadata())) {
-      return renameFSOB(srcPath, dstPath);
+      return renameFSO(srcPath, dstPath);
     }
     Preconditions.checkArgument(srcPath.getBucketName().
         equals(dstPath.getBucketName()));
@@ -169,7 +169,7 @@ public class TrashOzoneFileSystem extends FileSystem {
     return true;
   }
 
-  private boolean renameFSOB(OFSPath srcPath, OFSPath dstPath) {
+  private boolean renameFSO(OFSPath srcPath, OFSPath dstPath) {
     ozoneManager.getMetrics().incNumTrashAtomicDirRenames();
     OzoneManagerProtocolProtos.OMRequest omRequest =
         getRenameKeyRequest(srcPath, dstPath);
@@ -192,14 +192,14 @@ public class TrashOzoneFileSystem extends FileSystem {
     OmBucketInfo bucket = ozoneManager.getBucketInfo(srcPath.getVolumeName(),
         srcPath.getBucketName());
     if (OzoneFSUtils.isFSOptimizedBucket(bucket.getMetadata())) {
-      return deleteFSOB(srcPath);
+      return deleteFSO(srcPath);
     }
     DeleteIterator iterator = new DeleteIterator(path, true);
     iterator.iterate();
     return true;
   }
 
-  private boolean deleteFSOB(OFSPath srcPath) {
+  private boolean deleteFSO(OFSPath srcPath) {
     ozoneManager.getMetrics().incNumTrashAtomicDirDeletes();
     OzoneManagerProtocolProtos.OMRequest omRequest =
         getDeleteKeyRequest(srcPath);

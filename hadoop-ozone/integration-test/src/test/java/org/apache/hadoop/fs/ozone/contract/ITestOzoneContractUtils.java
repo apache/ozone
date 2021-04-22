@@ -35,8 +35,8 @@ public final class ITestOzoneContractUtils {
       // non-FSO bucket will created.
       // If the cluster is configured with PREFIX metadata layout,
       // FSO bucket will be created.
-      // Presently, OzoneClient checks bucketMetadata then invokes FSOB or
-      // non-FSOB specific code and it makes no sense to add client side
+      // Presently, OzoneClient checks bucketMetadata then invokes FSO or
+      // non-FSO specific code and it makes no sense to add client side
       // configs now. Once the specific client API to set FSO or non-FSO
       // bucket is provided the contract test can be refactored to include
       // another parameter (fsoClient) which sets/unsets the client side
