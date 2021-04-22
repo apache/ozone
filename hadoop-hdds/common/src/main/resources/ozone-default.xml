@@ -1949,6 +1949,8 @@
       optional config, if being set will cause scm --init to only take effect on
       the specific node and ignore scm --bootstrap cmd.
       Similarly, scm --init will be ignored on the non-primordial scm nodes.
+      The config can either be set equal to the hostname or the node id of any
+      of the scm nodes.
       With the config set, applications/admins can safely execute init and
       bootstrap commands safely on all scm instances.
 
