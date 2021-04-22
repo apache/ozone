@@ -84,7 +84,7 @@ public class SCMUpgradeFinalizer extends
       throws UpgradeException {
     for (HDDSLayoutFeature f : versionManager.unfinalizedFeatures()) {
       Optional<? extends UpgradeAction> action = f.scmAction(ON_FINALIZE);
-      finalizeFeature(f, storageConfig, action);
+      runFinalizationAction(f, storageConfig, action);
       updateLayoutVersionInVersionFile(f, storageConfig);
       versionManager.finalized(f);
     }

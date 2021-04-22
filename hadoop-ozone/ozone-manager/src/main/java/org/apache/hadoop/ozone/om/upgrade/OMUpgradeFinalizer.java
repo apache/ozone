@@ -83,7 +83,7 @@ public class OMUpgradeFinalizer extends BasicUpgradeFinalizer<OzoneManager,
       throws UpgradeException {
     for (OMLayoutFeature f : versionManager.unfinalizedFeatures()) {
       Optional<? extends UpgradeAction> action = f.action(ON_FINALIZE);
-      finalizeFeature(f, storageConfig, action);
+      runFinalizationAction(f, storageConfig, action);
       updateLayoutVersionInVersionFile(f, storageConfig);
       versionManager.finalized(f);
     }
