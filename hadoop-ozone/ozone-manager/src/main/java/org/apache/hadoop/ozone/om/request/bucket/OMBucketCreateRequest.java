@@ -158,7 +158,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
         getOmRequest());
     OmBucketInfo omBucketInfo = OmBucketInfo.getFromProtobuf(bucketInfo);
 
-    // Add layout version V1 to bucket info
+    // Add metadata layout to bucket info
     addFSOptimizedBucketDetails(ozoneManager, omBucketInfo);
 
     AuditLogger auditLogger = ozoneManager.getAuditLogger();

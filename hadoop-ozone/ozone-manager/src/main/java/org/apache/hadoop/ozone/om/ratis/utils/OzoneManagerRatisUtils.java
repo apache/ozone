@@ -32,41 +32,41 @@ import org.apache.hadoop.ozone.om.request.bucket.acl.OMBucketAddAclRequest;
 import org.apache.hadoop.ozone.om.request.bucket.acl.OMBucketRemoveAclRequest;
 import org.apache.hadoop.ozone.om.request.bucket.acl.OMBucketSetAclRequest;
 import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequest;
-import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequestV1;
+import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequestWithFSOB;
 import org.apache.hadoop.ozone.om.request.file.OMFileCreateRequest;
-import org.apache.hadoop.ozone.om.request.file.OMFileCreateRequestV1;
+import org.apache.hadoop.ozone.om.request.file.OMFileCreateRequestWithFSOB;
 import org.apache.hadoop.ozone.om.request.key.OMKeysDeleteRequest;
 import org.apache.hadoop.ozone.om.request.key.OMAllocateBlockRequest;
-import org.apache.hadoop.ozone.om.request.key.OMAllocateBlockRequestV1;
+import org.apache.hadoop.ozone.om.request.key.OMAllocateBlockRequestWithFSOB;
 import org.apache.hadoop.ozone.om.request.key.OMKeyCommitRequest;
-import org.apache.hadoop.ozone.om.request.key.OMKeyCommitRequestV1;
+import org.apache.hadoop.ozone.om.request.key.OMKeyCommitRequestWithFSOB;
 import org.apache.hadoop.ozone.om.request.key.OMKeyCreateRequest;
-import org.apache.hadoop.ozone.om.request.key.OMKeyCreateRequestV1;
+import org.apache.hadoop.ozone.om.request.key.OMKeyCreateRequestWithFSOB;
 import org.apache.hadoop.ozone.om.request.key.OMKeyDeleteRequest;
-import org.apache.hadoop.ozone.om.request.key.OMKeyDeleteRequestV1;
+import org.apache.hadoop.ozone.om.request.key.OMKeyDeleteRequestWithFSOB;
 import org.apache.hadoop.ozone.om.request.key.OMKeyPurgeRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRenameRequest;
-import org.apache.hadoop.ozone.om.request.key.OMKeyRenameRequestV1;
+import org.apache.hadoop.ozone.om.request.key.OMKeyRenameRequestWithFSOB;
 import org.apache.hadoop.ozone.om.request.key.OMKeysRenameRequest;
-import org.apache.hadoop.ozone.om.request.key.OMPathsPurgeRequestV1;
+import org.apache.hadoop.ozone.om.request.key.OMPathsPurgeRequestWithFSOB;
 import org.apache.hadoop.ozone.om.request.key.OMTrashRecoverRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeyAddAclRequest;
-import org.apache.hadoop.ozone.om.request.key.acl.OMKeyAddAclRequestV1;
+import org.apache.hadoop.ozone.om.request.key.acl.OMKeyAddAclRequestWithFSOB;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeyRemoveAclRequest;
-import org.apache.hadoop.ozone.om.request.key.acl.OMKeyRemoveAclRequestV1;
+import org.apache.hadoop.ozone.om.request.key.acl.OMKeyRemoveAclRequestWithFSOB;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeySetAclRequest;
-import org.apache.hadoop.ozone.om.request.key.acl.OMKeySetAclRequestV1;
+import org.apache.hadoop.ozone.om.request.key.acl.OMKeySetAclRequestWithFSOB;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixAddAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixRemoveAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixSetAclRequest;
 import org.apache.hadoop.ozone.om.request.s3.multipart.S3InitiateMultipartUploadRequest;
-import org.apache.hadoop.ozone.om.request.s3.multipart.S3InitiateMultipartUploadRequestV1;
+import org.apache.hadoop.ozone.om.request.s3.multipart.S3InitiateMultipartUploadRequestWithFSOB;
 import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadAbortRequest;
-import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadAbortRequestV1;
+import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadAbortRequestWithFSOB;
 import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadCommitPartRequest;
-import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadCommitPartRequestV1;
+import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadCommitPartRequestWithFSOB;
 import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadCompleteRequest;
-import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadCompleteRequestV1;
+import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadCompleteRequestWithFSOB;
 import org.apache.hadoop.ozone.om.request.s3.security.S3GetSecretRequest;
 import org.apache.hadoop.ozone.om.request.security.OMCancelDelegationTokenRequest;
 import org.apache.hadoop.ozone.om.request.security.OMGetDelegationTokenRequest;
@@ -146,65 +146,65 @@ public final class OzoneManagerRatisUtils {
       return new OMBucketSetPropertyRequest(omRequest);
     case AllocateBlock:
       if (isBucketFSOptimized()) {
-        return new OMAllocateBlockRequestV1(omRequest);
+        return new OMAllocateBlockRequestWithFSOB(omRequest);
       }
       return new OMAllocateBlockRequest(omRequest);
     case CreateKey:
       if (isBucketFSOptimized()) {
-        return new OMKeyCreateRequestV1(omRequest);
+        return new OMKeyCreateRequestWithFSOB(omRequest);
       }
       return new OMKeyCreateRequest(omRequest);
     case CommitKey:
       if (isBucketFSOptimized()) {
-        return new OMKeyCommitRequestV1(omRequest);
+        return new OMKeyCommitRequestWithFSOB(omRequest);
       }
       return new OMKeyCommitRequest(omRequest);
     case DeleteKey:
       if (isBucketFSOptimized()) {
-        return new OMKeyDeleteRequestV1(omRequest);
+        return new OMKeyDeleteRequestWithFSOB(omRequest);
       }
       return new OMKeyDeleteRequest(omRequest);
     case DeleteKeys:
       return new OMKeysDeleteRequest(omRequest);
     case RenameKey:
       if (isBucketFSOptimized()) {
-        return new OMKeyRenameRequestV1(omRequest);
+        return new OMKeyRenameRequestWithFSOB(omRequest);
       }
       return new OMKeyRenameRequest(omRequest);
     case RenameKeys:
       return new OMKeysRenameRequest(omRequest);
     case CreateDirectory:
       if (isBucketFSOptimized()) {
-        return new OMDirectoryCreateRequestV1(omRequest);
+        return new OMDirectoryCreateRequestWithFSOB(omRequest);
       }
       return new OMDirectoryCreateRequest(omRequest);
     case CreateFile:
       if (isBucketFSOptimized()) {
-        return new OMFileCreateRequestV1(omRequest);
+        return new OMFileCreateRequestWithFSOB(omRequest);
       }
       return new OMFileCreateRequest(omRequest);
     case PurgeKeys:
       return new OMKeyPurgeRequest(omRequest);
     case PurgePaths:
-      return new OMPathsPurgeRequestV1(omRequest);
+      return new OMPathsPurgeRequestWithFSOB(omRequest);
     case InitiateMultiPartUpload:
       if (isBucketFSOptimized()) {
-        return new S3InitiateMultipartUploadRequestV1(omRequest);
+        return new S3InitiateMultipartUploadRequestWithFSOB(omRequest);
       }
       return new S3InitiateMultipartUploadRequest(omRequest);
     case CommitMultiPartUpload:
       if (isBucketFSOptimized()) {
-        return new S3MultipartUploadCommitPartRequestV1(omRequest);
+        return new S3MultipartUploadCommitPartRequestWithFSOB(omRequest);
       }
       return new S3MultipartUploadCommitPartRequest(omRequest);
     case AbortMultiPartUpload:
       if (isBucketFSOptimized()) {
-        return new S3MultipartUploadAbortRequestV1(omRequest);
+        return new S3MultipartUploadAbortRequestWithFSOB(omRequest);
       }
       return new S3MultipartUploadAbortRequest(omRequest);
     case CompleteMultiPartUpload:
       if (isBucketFSOptimized()) {
-        return new S3MultipartUploadCompleteRequestV1(omRequest);
+        return new S3MultipartUploadCompleteRequestWithFSOB(omRequest);
       }
       return new S3MultipartUploadCompleteRequest(omRequest);
     case AddAcl:
@@ -237,7 +237,7 @@ public final class OzoneManagerRatisUtils {
         return new OMBucketAddAclRequest(omRequest);
       } else if (ObjectType.KEY == type) {
         if (isBucketFSOptimized()){
-          return new OMKeyAddAclRequestV1(omRequest);
+          return new OMKeyAddAclRequestWithFSOB(omRequest);
         }
         return new OMKeyAddAclRequest(omRequest);
       } else {
@@ -251,7 +251,7 @@ public final class OzoneManagerRatisUtils {
         return new OMBucketRemoveAclRequest(omRequest);
       } else if (ObjectType.KEY == type) {
         if (isBucketFSOptimized()){
-          return new OMKeyRemoveAclRequestV1(omRequest);
+          return new OMKeyRemoveAclRequestWithFSOB(omRequest);
         }
         return new OMKeyRemoveAclRequest(omRequest);
       } else {
@@ -265,7 +265,7 @@ public final class OzoneManagerRatisUtils {
         return new OMBucketSetAclRequest(omRequest);
       } else if (ObjectType.KEY == type) {
         if (isBucketFSOptimized()){
-          return new OMKeySetAclRequestV1(omRequest);
+          return new OMKeySetAclRequestWithFSOB(omRequest);
         }
         return new OMKeySetAclRequest(omRequest);
       } else {

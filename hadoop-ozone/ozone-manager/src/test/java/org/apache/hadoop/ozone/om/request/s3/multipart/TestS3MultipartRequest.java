@@ -225,17 +225,18 @@ public class TestS3MultipartRequest {
    * @param keyName
    * @return OMRequest - returned from preExecute.
    */
-  protected OMRequest doPreExecuteInitiateMPUV1(
+  protected OMRequest doPreExecuteInitiateMPUWithFSOB(
       String volumeName, String bucketName, String keyName) throws Exception {
     OMRequest omRequest =
             TestOMRequestUtils.createInitiateMPURequest(volumeName, bucketName,
                     keyName);
 
-    S3InitiateMultipartUploadRequestV1 s3InitiateMultipartUploadRequestV1 =
-            new S3InitiateMultipartUploadRequestV1(omRequest);
+    S3InitiateMultipartUploadRequestWithFSOB
+        s3InitiateMultipartUploadRequestWithFSOB =
+            new S3InitiateMultipartUploadRequestWithFSOB(omRequest);
 
     OMRequest modifiedRequest =
-            s3InitiateMultipartUploadRequestV1.preExecute(ozoneManager);
+            s3InitiateMultipartUploadRequestWithFSOB.preExecute(ozoneManager);
 
     Assert.assertNotEquals(omRequest, modifiedRequest);
     Assert.assertTrue(modifiedRequest.hasInitiateMultiPartUploadRequest());
