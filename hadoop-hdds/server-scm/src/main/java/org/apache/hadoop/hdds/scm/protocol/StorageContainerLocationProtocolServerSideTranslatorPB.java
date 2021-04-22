@@ -40,6 +40,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ForceExitSafeModeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerTokenRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerTokenResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerWithPipelineBatchRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerWithPipelineBatchResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerWithPipelineRequestProto;
@@ -76,9 +78,11 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopReplicationManagerResponseProto;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.protocolPB.OzonePBHelper;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
@@ -167,6 +171,13 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setStatus(Status.OK)
             .setGetContainerResponse(
                 getContainer(request.getGetContainerRequest()))
+            .build();
+      case GetContainerToken:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setContainerTokenResponse(
+                getContainerToken(request.getContainerTokenRequest()))
             .build();
       case GetContainerWithPipeline:
         return ScmContainerLocationResponse.newBuilder()
@@ -350,6 +361,17 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     ContainerInfo container = impl.getContainer(request.getContainerID());
     return GetContainerResponseProto.newBuilder()
         .setContainerInfo(container.getProtobuf())
+        .build();
+  }
+
+  public GetContainerTokenResponseProto getContainerToken(
+      GetContainerTokenRequestProto request) throws IOException {
+    ContainerID containerID = ContainerID.getFromProtobuf(
+        request.getContainerID());
+    HddsProtos.TokenProto token = OzonePBHelper.protoFromToken(
+        impl.getContainerToken(containerID));
+    return GetContainerTokenResponseProto.newBuilder()
+        .setToken(token)
         .build();
   }
 
