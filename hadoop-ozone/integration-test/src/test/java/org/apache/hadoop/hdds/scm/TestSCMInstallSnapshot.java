@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm;
 
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
@@ -49,7 +50,6 @@ import java.util.Map;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
 
 /**
  * Class to test install snapshot feature for SCM HA.
@@ -93,11 +93,11 @@ public class TestSCMInstallSnapshot {
     PipelineManager pipelineManager = scm.getPipelineManager();
     Pipeline ratisPipeline1 = pipelineManager.getPipeline(
         containerManager.allocateContainer(
-            RATIS, THREE, "Owner1").getPipelineID());
+            new RatisReplicationConfig(THREE), "Owner1").getPipelineID());
     pipelineManager.openPipeline(ratisPipeline1.getId());
     Pipeline ratisPipeline2 = pipelineManager.getPipeline(
         containerManager.allocateContainer(
-            RATIS, ONE, "Owner2").getPipelineID());
+            new RatisReplicationConfig(ONE), "Owner2").getPipelineID());
     pipelineManager.openPipeline(ratisPipeline2.getId());
     SCMNodeDetails scmNodeDetails = new SCMNodeDetails.Builder()
         .setRpcAddress(new InetSocketAddress("0.0.0.0", 0)).setSCMNodeId("scm1")

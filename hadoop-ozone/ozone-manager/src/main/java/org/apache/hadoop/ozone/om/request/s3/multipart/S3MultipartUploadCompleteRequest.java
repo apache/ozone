@@ -285,7 +285,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
           // But now as versioning is not supported, just following the commit
           // key approach. When versioning support comes, then we can uncomment
           // below code keyInfo.addNewVersion(locations);
-          omKeyInfo.updateLocationInfoList(partLocationInfos, true);
+          omKeyInfo.updateLocationInfoList(partLocationInfos, true, true);
           omKeyInfo.setModificationTime(keyArgs.getModificationTime());
           omKeyInfo.setDataSize(dataSize);
         }

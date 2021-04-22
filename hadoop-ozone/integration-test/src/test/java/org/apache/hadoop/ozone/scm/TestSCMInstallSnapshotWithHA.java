@@ -24,8 +24,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.ha.SCMHAConfiguration;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerImpl;
@@ -319,8 +320,8 @@ public class TestSCMInstallSnapshotWithHA {
         .getLastAppliedTermIndex().getIndex();
     while (logIndex < targetLogIndex) {
       containers.add(scm.getContainerManager()
-          .allocateContainer(HddsProtos.ReplicationType.RATIS,
-              HddsProtos.ReplicationFactor.THREE,
+          .allocateContainer(
+              new RatisReplicationConfig(ReplicationFactor.THREE),
               TestSCMInstallSnapshotWithHA.class.getName()));
       Thread.sleep(100);
       logIndex = stateMachine.getLastAppliedTermIndex().getIndex();

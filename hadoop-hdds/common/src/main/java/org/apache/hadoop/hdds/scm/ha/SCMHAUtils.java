@@ -74,10 +74,10 @@ public final class SCMHAUtils {
   }
 
   public static boolean isPrimordialSCM(ConfigurationSource conf,
-      String selfNodeId) {
+      String selfNodeId, String hostName) {
     String primordialNode = getPrimordialSCM(conf);
-    return isSCMHAEnabled(conf) && primordialNode != null && primordialNode
-        .equals(selfNodeId);
+    return isSCMHAEnabled(conf) && primordialNode != null && (primordialNode
+        .equals(selfNodeId) || primordialNode.equals(hostName));
   }
   /**
    * Get a collection of all scmNodeIds for the given scmServiceId.

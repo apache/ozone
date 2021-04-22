@@ -223,7 +223,7 @@ public class SCMSecurityProtocolFailoverProxyProvider implements
           }
         }
 
-        // For AccessControl Exception where Client is not authentica
+        // For AccessControl Exception where Client is not authenticated.
         if (HAUtils.isAccessControlException(exception)) {
           return RetryAction.FAIL;
         }

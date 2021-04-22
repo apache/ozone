@@ -228,12 +228,11 @@ BSD
 CDDL
 =====================
 
+   com.sun.istack:istack-commons-runtime
    com.sun.jersey:jersey-core
    com.sun.jersey:jersey-json
    com.sun.jersey:jersey-server
    com.sun.jersey:jersey-servlet
-   com.sun.xml.bind:jaxb-core
-   com.sun.xml.bind:jaxb-impl
    javax.activation:activation
    javax.servlet.jsp:jsp-api
    javax.ws.rs:jsr311-api
@@ -246,6 +245,9 @@ CDDL
    org.glassfish.hk2:hk2-locator
    org.glassfish.hk2:hk2-utils
    org.glassfish.hk2:osgi-resource-locator
+   org.glassfish.jaxb:jaxb-runtime
+   org.glassfish.jaxb:jaxb-core
+   org.glassfish.jaxb:txw2
    org.glassfish.jersey.containers:jersey-container-servlet
    org.glassfish.jersey.containers:jersey-container-servlet-core
    org.glassfish.jersey.core:jersey-client
@@ -256,7 +258,7 @@ CDDL
    org.glassfish.jersey.inject:jersey-hk2
    org.glassfish.jersey.media:jersey-media-jaxb
    org.glassfish.jersey.media:jersey-media-json-jackson
-
+   org.jvnet.staxex:stax-ex
 
 Apache License
 =====================
@@ -281,6 +283,7 @@ Apache License
    com.nimbusds:nimbus-jose-jwt
    com.squareup.okhttp3:okhttp
    com.squareup.okio:okio
+   com.sun.xml.fastinfoset:FastInfoset
    info.picocli:picocli
    io.dropwizard.metrics:metrics-core
    io.grpc:grpc-context
@@ -371,7 +374,6 @@ Public Domain
 =====================
 
    aopalliance:aopalliance
-   org.tukaani:xz
 
 
 BSD 3-Clause

@@ -244,6 +244,11 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
     return true;
   }
 
+  @Test
+  @Override
+  // Restart DN doesn't work with security enabled.
+  public void testZReadKeyWithUnhealthyContainerReplia() throws Exception {
+  }
   /**
    * Close OzoneClient and shutdown MiniOzoneCluster.
    */
