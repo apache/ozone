@@ -132,36 +132,6 @@ public final class HddsUtils {
   }
 
   /**
-   * Retrieve the socket address that should be used by clients to connect
-   * to the SCM for block service. If
-   * {@link ScmConfigKeys#OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY} is not defined
-   * then {@link ScmConfigKeys#OZONE_SCM_CLIENT_ADDRESS_KEY} is used. If neither
-   * is defined then {@link ScmConfigKeys#OZONE_SCM_NAMES} is used.
-   *
-   * @return Target {@code InetSocketAddress} for the SCM block client endpoint.
-   * @throws IllegalArgumentException if configuration is not defined.
-   */
-  public static InetSocketAddress getScmAddressForBlockClients(
-      ConfigurationSource conf) {
-    Optional<String> host = getHostNameFromConfigKeys(conf,
-        ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY,
-        ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY);
-
-    if (!host.isPresent()) {
-      // Fallback to Ozone SCM name
-      host = Optional.of(getSingleSCMAddress(conf).getHostName());
-    }
-
-    final int port = getPortNumberFromConfigKeys(conf,
-        ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY)
-        .orElse(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT);
-
-    return NetUtils.createSocketAddr(host.get() + ":" + port);
-  }
-
-
-
-  /**
    * Retrieve the hostname, trying the supplied config keys in order.
    * Each config value may be absent, or if present in the format
    * host:port (the :port part is optional).
@@ -250,7 +220,7 @@ public final class HddsUtils {
    * @return A collection of SCM addresses
    * @throws IllegalArgumentException If the configuration is invalid
    */
-  public static Collection<InetSocketAddress> getSCMAddresses(
+  public static Collection<InetSocketAddress> getSCMAddressForDatanodes(
       ConfigurationSource conf) {
 
     // First check HA style config, if not defined fall back to OZONE_SCM_NAMES
@@ -317,22 +287,6 @@ public final class HddsUtils {
     }
     int port = getHostPort(name).orElse(OZONE_RECON_DATANODE_PORT_DEFAULT);
     return NetUtils.createSocketAddr(hostname.get(), port);
-  }
-
-  /**
-   * Retrieve the address of the only SCM (as currently multiple ones are not
-   * supported).
-   *
-   * @return SCM address
-   * @throws IllegalArgumentException if {@code conf} has more than one SCM
-   *         address or it has none
-   */
-  public static InetSocketAddress getSingleSCMAddress(
-      ConfigurationSource conf) {
-    Collection<InetSocketAddress> singleton = getSCMAddresses(conf);
-   // Preconditions.checkArgument(singleton.size() == 1,
-    //    MULTIPLE_SCM_NOT_YET_SUPPORTED);
-    return singleton.iterator().next();
   }
 
   /**

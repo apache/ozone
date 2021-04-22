@@ -29,6 +29,8 @@ import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
+import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
+import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.ha.ConfUtils;
@@ -41,7 +43,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PO
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_KEY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
@@ -169,8 +170,8 @@ public class TestHddsClientUtils {
     final String scmHost = "host123";
     final OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, scmHost);
-    final InetSocketAddress address = HddsUtils.getScmAddressForBlockClients(
-        conf);
+    final InetSocketAddress address = NetUtils.createSocketAddr(
+        SCMNodeInfo.buildNodeInfo(conf).get(0).getBlockClientAddress());
     assertEquals(scmHost, address.getHostName());
     assertEquals(OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT, address.getPort());
   }
@@ -186,38 +187,8 @@ public class TestHddsClientUtils {
     final String scmHost = "host123:100";
     final OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, scmHost);
-    final InetSocketAddress address =HddsUtils.getScmAddressForBlockClients(
-        conf);
-    assertEquals(scmHost.split(":")[0], address.getHostName());
-    assertEquals(OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT, address.getPort());
-  }
-
-  @Test
-  public void testBlockClientFallbackToScmNamesNoPort() {
-    // When OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY and OZONE_SCM_CLIENT_ADDRESS_KEY
-    // are undefined it should fallback to OZONE_SCM_NAMES.
-    final String scmHost = "host456";
-    final OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(OZONE_SCM_NAMES, scmHost);
-    final InetSocketAddress address = HddsUtils.getScmAddressForBlockClients(
-        conf);
-    assertEquals(scmHost, address.getHostName());
-    assertEquals(OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT, address.getPort());
-  }
-
-  @Test
-  @SuppressWarnings("StringSplitter")
-  public void testBlockClientFallbackToScmNamesWithPort() {
-    // When OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY and OZONE_SCM_CLIENT_ADDRESS_KEY
-    // are undefined it should fallback to OZONE_SCM_NAMES.
-    //
-    // Verify that the OZONE_SCM_NAMES port number is ignored, if present.
-    // Instead we should use OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT.
-    final String scmHost = "host456:200";
-    final OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(OZONE_SCM_NAMES, scmHost);
-    final InetSocketAddress address = HddsUtils.getScmAddressForBlockClients(
-        conf);
+    final InetSocketAddress address = NetUtils.createSocketAddr(
+        SCMNodeInfo.buildNodeInfo(conf).get(0).getBlockClientAddress());
     assertEquals(scmHost.split(":")[0], address.getHostName());
     assertEquals(OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT, address.getPort());
   }
