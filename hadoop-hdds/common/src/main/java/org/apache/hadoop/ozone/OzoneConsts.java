@@ -39,6 +39,7 @@ public final class OzoneConsts {
 
   public static final String STORAGE_DIR = "scm";
   public static final String SCM_ID = "scmUuid";
+  public static final String SCM_HA = "scmHA";
   public static final String CLUSTER_ID_PREFIX = "CID-";
   public static final String SCM_CERT_SERIAL_ID = "scmCertSerialId";
   public static final String PRIMARY_SCM_NODE_ID = "primaryScmNodeId";
