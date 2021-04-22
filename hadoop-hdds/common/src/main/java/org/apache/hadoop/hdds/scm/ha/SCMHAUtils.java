@@ -233,7 +233,7 @@ public final class SCMHAUtils {
   // the exception to see if it matches with expected exception
   // list , returns true otherwise will return false.
   public static boolean isRetriableWithNoFailoverException(Exception e) {
-    Throwable t = unwrapException(e);
+    Throwable t = e;
     while (t != null) {
       for (Class<? extends Exception> clazz :
           getRetriableWithNoFailoverExceptionList()) {

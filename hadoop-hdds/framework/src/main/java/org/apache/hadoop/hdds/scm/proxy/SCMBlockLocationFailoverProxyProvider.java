@@ -103,7 +103,7 @@ public class SCMBlockLocationFailoverProxyProvider implements
     this.retryInterval = config.getRetryInterval();
   }
 
-  private void loadConfigs() {
+  private synchronized void loadConfigs() {
 
     scmNodeIds = new ArrayList<>();
     List<SCMNodeInfo> scmNodeInfoList = SCMNodeInfo.buildNodeInfo(conf);
@@ -156,7 +156,7 @@ public class SCMBlockLocationFailoverProxyProvider implements
     LOG.debug("Failing over to next proxy. {}", getCurrentProxySCMNodeId());
   }
 
-  public void performFailoverToAssignedLeader(String newLeader,
+  public synchronized void performFailoverToAssignedLeader(String newLeader,
       Exception e) {
     ServerNotLeaderException snle =
         (ServerNotLeaderException) SCMHAUtils.getServerNotLeaderException(e);
@@ -200,7 +200,7 @@ public class SCMBlockLocationFailoverProxyProvider implements
     return retryInterval;
   }
 
-  private int nextProxyIndex() {
+  private synchronized int nextProxyIndex() {
     lastAttemptedLeader = currentProxySCMNodeId;
 
     // round robin the next proxy
@@ -209,7 +209,7 @@ public class SCMBlockLocationFailoverProxyProvider implements
     return currentProxyIndex;
   }
 
-  private boolean assignLeaderToNode(String newLeaderNodeId) {
+  private synchronized boolean assignLeaderToNode(String newLeaderNodeId) {
     if (!currentProxySCMNodeId.equals(newLeaderNodeId)) {
       if (scmProxies.containsKey(newLeaderNodeId)) {
         lastAttemptedLeader = currentProxySCMNodeId;

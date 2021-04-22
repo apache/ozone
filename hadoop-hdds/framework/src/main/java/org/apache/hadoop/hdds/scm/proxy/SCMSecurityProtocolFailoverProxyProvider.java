@@ -100,7 +100,7 @@ public class SCMSecurityProtocolFailoverProxyProvider implements
     this.retryInterval = scmClientConfig.getRetryInterval();
   }
 
-  protected void loadConfigs() {
+  protected synchronized void loadConfigs() {
     List<SCMNodeInfo> scmNodeInfoList = SCMNodeInfo.buildNodeInfo(conf);
     scmNodeIds = new ArrayList<>();
 
@@ -182,7 +182,8 @@ public class SCMSecurityProtocolFailoverProxyProvider implements
     }
   }
 
-  public void performFailoverToAssignedLeader(String newLeader, Exception e) {
+  public synchronized void performFailoverToAssignedLeader(String newLeader,
+      Exception e) {
     ServerNotLeaderException snle =
         (ServerNotLeaderException) SCMHAUtils.getServerNotLeaderException(e);
     if (snle != null && snle.getSuggestedLeader() != null) {
@@ -205,7 +206,7 @@ public class SCMSecurityProtocolFailoverProxyProvider implements
     }
   }
 
-  private boolean assignLeaderToNode(String newLeaderNodeId) {
+  private synchronized boolean assignLeaderToNode(String newLeaderNodeId) {
     if (!currentProxySCMNodeId.equals(newLeaderNodeId)
         && scmProxies.containsKey(newLeaderNodeId)) {
       currentProxySCMNodeId = newLeaderNodeId;
@@ -220,7 +221,7 @@ public class SCMSecurityProtocolFailoverProxyProvider implements
   /**
    * Performs fail-over to the next proxy.
    */
-  public void performFailoverToNextProxy() {
+  public synchronized void performFailoverToNextProxy() {
     int newProxyIndex = incrementProxyIndex();
     if (LOG.isDebugEnabled()) {
       LOG.debug("Incrementing SCM Security proxy index to {}, nodeId: {}",
@@ -232,7 +233,7 @@ public class SCMSecurityProtocolFailoverProxyProvider implements
    * Update the proxy index to the next proxy in the list.
    * @return the new proxy index
    */
-  private int incrementProxyIndex() {
+  private synchronized int incrementProxyIndex() {
     currentProxyIndex = (currentProxyIndex + 1) % scmProxyInfoMap.size();
     currentProxySCMNodeId = scmNodeIds.get(currentProxyIndex);
     return currentProxyIndex;
@@ -293,7 +294,7 @@ public class SCMSecurityProtocolFailoverProxyProvider implements
     }
   }
 
-  public String getCurrentProxySCMNodeId() {
+  public synchronized String getCurrentProxySCMNodeId() {
     return currentProxySCMNodeId;
   }
 

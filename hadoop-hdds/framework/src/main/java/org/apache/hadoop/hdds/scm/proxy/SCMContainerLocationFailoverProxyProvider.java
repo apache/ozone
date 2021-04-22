@@ -100,7 +100,7 @@ public class SCMContainerLocationFailoverProxyProvider implements
   }
 
   @VisibleForTesting
-  protected void loadConfigs() {
+  protected synchronized void loadConfigs() {
     List<SCMNodeInfo> scmNodeInfoList = SCMNodeInfo.buildNodeInfo(conf);
 
     scmNodeIds = new ArrayList<>();
@@ -133,7 +133,7 @@ public class SCMContainerLocationFailoverProxyProvider implements
   }
 
   @VisibleForTesting
-  public void changeCurrentProxy(String nodeId) {
+  public synchronized void changeCurrentProxy(String nodeId) {
     currentProxyIndex = scmNodeIds.indexOf(nodeId);
     currentProxySCMNodeId = nodeId;
     nextProxyIndex();
@@ -156,13 +156,14 @@ public class SCMContainerLocationFailoverProxyProvider implements
   }
 
   @Override
-  public synchronized void performFailover(
+  public void performFailover(
       StorageContainerLocationProtocolPB newLeader) {
     // Should do nothing here.
     LOG.debug("Failing over to next proxy. {}", getCurrentProxySCMNodeId());
   }
 
-  public void performFailoverToAssignedLeader(String newLeader, Exception e) {
+  public synchronized void performFailoverToAssignedLeader(String newLeader,
+      Exception e) {
     ServerNotLeaderException snle =
         (ServerNotLeaderException) SCMHAUtils.getServerNotLeaderException(e);
     if (snle != null && snle.getSuggestedLeader() != null) {
@@ -207,14 +208,14 @@ public class SCMContainerLocationFailoverProxyProvider implements
     return retryInterval;
   }
 
-  private int nextProxyIndex() {
+  private synchronized int nextProxyIndex() {
     // round robin the next proxy
     currentProxyIndex = (currentProxyIndex + 1) % scmProxies.size();
     currentProxySCMNodeId =  scmNodeIds.get(currentProxyIndex);
     return currentProxyIndex;
   }
 
-  private boolean assignLeaderToNode(String newLeaderNodeId) {
+  private synchronized boolean assignLeaderToNode(String newLeaderNodeId) {
     if (!currentProxySCMNodeId.equals(newLeaderNodeId)
         && scmProxies.containsKey(newLeaderNodeId)) {
       currentProxySCMNodeId = newLeaderNodeId;
