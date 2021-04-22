@@ -559,6 +559,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         if (versionManager.getMetadataLayoutVersion() < layoutVersionInDB) {
           throw new IOException("Unable to finalize OM to the desired layout " +
               "version " + layoutVersionInDB + " present in the snapshot DB.");
+        } else {
+          updateLayoutVersionInDB(versionManager, metadataManager);
         }
       }
     }
@@ -3891,5 +3893,19 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @VisibleForTesting
   public void setMinMultipartUploadPartSize(int partSizeForTest) {
     this.minMultipartUploadPartSize = partSizeForTest;
+  }
+
+
+  /**
+   * Write down Layout version of a finalized feature to DB on finalization.
+   * @param lvm OMLayoutVersionManager
+   * @param omMetadataManager omMetadataManager instance
+   * @throws IOException on Error.
+   */
+  private void updateLayoutVersionInDB(OMLayoutVersionManager lvm,
+                                       OMMetadataManager omMetadataManager)
+      throws IOException {
+    omMetadataManager.getMetaTable().put(LAYOUT_VERSION_KEY,
+        String.valueOf(lvm.getMetadataLayoutVersion()));
   }
 }

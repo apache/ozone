@@ -21,7 +21,8 @@ package org.apache.hadoop.ozone.upgrade;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_IN_PROGRESS;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_REQUIRED;
 
-import org.apache.hadoop.ozone.common.Storage;
+import java.io.IOException;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,49 +31,36 @@ import org.slf4j.LoggerFactory;
  * Unit/Integration tests can override this to provide error injected version
  * of this class.
  */
-
-@SuppressWarnings("checkstyle:VisibilityModifier")
-public class DefaultUpgradeFinalizationExecutor {
+public class DefaultUpgradeFinalizationExecutor<T> {
   static final Logger LOG =
       LoggerFactory.getLogger(DefaultUpgradeFinalizationExecutor.class);
 
   public DefaultUpgradeFinalizationExecutor() {
   }
 
-  public Void execute(Storage storageConfig,
-                      BasicUpgradeFinalizer basicUpgradeFinalizer)
-      throws Exception {
+  public void execute(T component, BasicUpgradeFinalizer finalizer)
+      throws IOException {
     try {
-      basicUpgradeFinalizer.emitStartingMsg();
-      basicUpgradeFinalizer.getVersionManager()
+      finalizer.emitStartingMsg();
+      finalizer.getVersionManager()
           .setUpgradeState(FINALIZATION_IN_PROGRESS);
 
-      /*
-       * Before we can call finalize the feature, we need to make sure that
-       * all existing pipelines are closed and pipeline Manger would freeze
-       * all new pipeline creation.
-       */
-      if(!basicUpgradeFinalizer.preFinalizeUpgrade()) {
-        return null;
-      }
+      finalizer.preFinalizeUpgrade(component);
 
-      basicUpgradeFinalizer.finalizeUpgrade(storageConfig);
+      finalizer.finalizeUpgrade(component);
 
-      basicUpgradeFinalizer.postFinalizeUpgrade();
+      finalizer.postFinalizeUpgrade(component);
 
-      basicUpgradeFinalizer.emitFinishedMsg();
-      return null;
+      finalizer.emitFinishedMsg();
     } catch (Exception e) {
-      LOG.warn("Upgrade Finalization failed with following Exception:");
-      e.printStackTrace();
-      if (basicUpgradeFinalizer.getVersionManager().needsFinalization()) {
-        basicUpgradeFinalizer.getVersionManager()
+      LOG.warn("Upgrade Finalization failed with following Exception. ", e);
+      if (finalizer.getVersionManager().needsFinalization()) {
+        finalizer.getVersionManager()
             .setUpgradeState(FINALIZATION_REQUIRED);
         throw (e);
       }
     } finally {
-      basicUpgradeFinalizer.markFinalizationDone();
+      finalizer.markFinalizationDone();
     }
-    return null;
   }
 }

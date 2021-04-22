@@ -130,7 +130,13 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
   void reinitialize(Table<PipelineID, Pipeline> pipelineStore)
       throws IOException;
 
+  /**
+   * Ask pipeline manager to not create any new pipelines.
+   */
   void freezePipelineCreation();
 
+  /**
+   * Ask pipeline manager to resume creating new pipelines.
+   */
   void resumePipelineCreation();
 }

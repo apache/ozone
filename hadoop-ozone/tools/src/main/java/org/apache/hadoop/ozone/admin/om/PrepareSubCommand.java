@@ -27,6 +27,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
@@ -146,12 +147,22 @@ public class PrepareSubCommand implements Callable<Void> {
         Thread.sleep(pInterval.toMillis());
       }
     }
-    if (currentNumPreparedOms < expectedNumPreparedOms) {
-      throw new Exception("OM Preparation failed since all OMs are not " +
-          "prepared yet.");
+    if (currentNumPreparedOms < (expectedNumPreparedOms + 1) / 2) {
+      throw new Exception("OM Preparation failed since a majority OMs are not" +
+          " prepared yet.");
     } else {
       System.out.println();
       System.out.println("OM Preparation successful! ");
+      if (currentNumPreparedOms == expectedNumPreparedOms) {
+        System.out.println("All OMs are prepared");
+      } else {
+        System.out.println("A majority of OMs are prepared. OMs that are not " +
+            "prepared : " +
+            omPreparedStatusMap.entrySet().stream()
+                .filter(e -> !e.getValue())
+                .map(e -> e.getKey())
+                .collect(Collectors.joining()));
+      }
       System.out.println("No new write requests will be allowed until " +
           "preparation is cancelled or upgrade/downgrade is done.");
     }

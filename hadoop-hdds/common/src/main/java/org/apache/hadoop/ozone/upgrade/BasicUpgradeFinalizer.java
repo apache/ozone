@@ -18,13 +18,14 @@
 
 package org.apache.hadoop.ozone.upgrade;
 
+import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON_FINALIZE;
 import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON_FIRST_UPGRADE_START;
-import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.UNFINALIZED_STATE_VALIDATION;
+import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.VALIDATE_IN_PREFINALIZE;
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.FIRST_UPGRADE_START_ACTION_FAILED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.LAYOUT_FEATURE_FINALIZATION_FAILED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.PERSIST_UPGRADE_TO_LAYOUT_VERSION_FAILED;
-import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.PREFINALIZE_STATE_VALIDATION_FAILED;
+import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.PREFINALIZE_ACTION_VALIDATION_FAILED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.REMOVE_UPGRADE_TO_LAYOUT_VERSION_FAILED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.UPDATE_LAYOUT_VERSION_FAILED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_DONE;
@@ -39,6 +40,7 @@ import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Function;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeAction;
@@ -50,108 +52,39 @@ import com.google.common.annotations.VisibleForTesting;
 /**
  * UpgradeFinalizer implementation for the Storage Container Manager service.
  */
-@SuppressWarnings("checkstyle:VisibilityModifier")
 public abstract class BasicUpgradeFinalizer
     <T, V extends AbstractLayoutVersionManager> implements UpgradeFinalizer<T> {
 
-  protected V versionManager;
-  protected String clientID;
-  protected T component;
-  protected DefaultUpgradeFinalizationExecutor finalizationExecutor;
+  private V versionManager;
+  private String clientID;
+  private T component;
+  private DefaultUpgradeFinalizationExecutor<T> finalizationExecutor;
 
   private Queue<String> msgs = new ConcurrentLinkedQueue<>();
-  protected boolean isDone = false;
+  private boolean isDone = false;
 
   public BasicUpgradeFinalizer(V versionManager) {
     this.versionManager = versionManager;
-    this.finalizationExecutor =
-        new DefaultUpgradeFinalizationExecutor();
+    this.finalizationExecutor = new DefaultUpgradeFinalizationExecutor<>();
   }
 
-  /**
-   * Sets the Finalization Executor driver.
-   * @param executor FinalizationExecutor.
-   */
-
-  public void setFinalizationExecutor(DefaultUpgradeFinalizationExecutor
-                                          executor) {
-    finalizationExecutor = executor;
-  }
-
-  @Override
-  public DefaultUpgradeFinalizationExecutor getFinalizationExecutor() {
-    return finalizationExecutor;
-  }
-
-  public boolean isFinalizationDone() {
-    return isDone;
-  }
-
-  public void markFinalizationDone() {
-    isDone = true;
-  }
-
-  public V getVersionManager() {
-    return versionManager;
-  }
-
-  public synchronized StatusAndMessages preFinalize(String upgradeClientID,
-                                                    T id)
-      throws UpgradeException {
-    switch (versionManager.getUpgradeState()) {
-    case STARTING_FINALIZATION:
-      return STARTING_MSG;
-    case FINALIZATION_IN_PROGRESS:
-      return FINALIZATION_IN_PROGRESS_MSG;
-    case FINALIZATION_DONE:
-    case ALREADY_FINALIZED:
-      if (versionManager.needsFinalization()) {
-        throw new UpgradeException("Upgrade found in inconsistent state. " +
-            "Upgrade state is FINALIZATION Complete while MLV has not been " +
-            "upgraded to SLV.", INVALID_REQUEST);
-      }
-      return FINALIZED_MSG;
-    default:
-      if (!versionManager.needsFinalization()) {
-        throw new UpgradeException("Upgrade found in inconsistent state. " +
-            "Upgrade state is FINALIZATION_REQUIRED while MLV has been " +
-            "upgraded to SLV.", INVALID_REQUEST);
-      }
-      versionManager.setUpgradeState(STARTING_FINALIZATION);
-
-      clientID = upgradeClientID;
-      this.component = id;
-      return FINALIZATION_REQUIRED_MSG;
-    }
-  }
-
-  /*
-   * This method must be overriden by the component implementing the
-   * finalization logic.
-   */
-  public StatusAndMessages finalize(String upgradeClientID, T id)
+  public StatusAndMessages finalize(String upgradeClientID, T service)
       throws IOException {
-    StatusAndMessages response = preFinalize(upgradeClientID, id);
+    StatusAndMessages response = initFinalize(upgradeClientID, service);
     if (response.status() != FINALIZATION_REQUIRED) {
       return response;
     }
-
-    /**
-     * Overriding class should schedule actual finalization logic
-     * in a separate thread here.
-     */
+    finalizationExecutor.execute(service, this);
     return STARTING_MSG;
   }
 
-  @Override
   public synchronized StatusAndMessages reportStatus(
-      String upgradeClientID, boolean takeover
-  ) throws UpgradeException {
+      String upgradeClientID, boolean takeover) throws UpgradeException {
     if (takeover) {
       clientID = upgradeClientID;
     }
     assertClientId(upgradeClientID);
-    List<String> returningMsgs = new ArrayList<>(msgs.size()+10);
+    List<String> returningMsgs = new ArrayList<>(msgs.size() + 10);
     Status status = versionManager.getUpgradeState();
     while (msgs.size() > 0) {
       returningMsgs.add(msgs.poll());
@@ -159,17 +92,19 @@ public abstract class BasicUpgradeFinalizer
     return new StatusAndMessages(status, returningMsgs);
   }
 
-  private void assertClientId(String id) throws UpgradeException {
-    if (this.clientID == null || !this.clientID.equals(id)) {
-      throw new UpgradeException("Unknown client tries to get finalization " +
-          "status.\n The requestor is not the initiating client of the " +
-          "finalization, if you want to take over, and get unsent status " +
-          "messages, check -takeover option.", INVALID_REQUEST);
-    }
+  protected void preFinalizeUpgrade(T service) throws IOException {
+    // No Op by default.
   }
 
-  public void finalizeAndWaitForCompletion(String upgradeClientID, T service,
-                                           long maxTimeToWaitInSeconds)
+  protected void postFinalizeUpgrade(T service) throws IOException {
+    // No Op by default.
+  }
+
+  public abstract void finalizeUpgrade(T service) throws UpgradeException;
+
+  @Override
+  public void finalizeAndWaitForCompletion(
+      String upgradeClientID, T service, long maxTimeToWaitInSeconds)
       throws IOException {
 
     StatusAndMessages response = finalize(upgradeClientID, service);
@@ -196,16 +131,78 @@ public abstract class BasicUpgradeFinalizer
       }
     }
     if (!success) {
-      LOG.error("Unable to finalize after waiting for {} seconds",
-          maxTimeToWaitInSeconds);
-    } else {
-      updateLayoutVersionInDB(versionManager, component);
+      throw new IOException(
+          String.format("Unable to finalize after waiting for %d seconds",
+          maxTimeToWaitInSeconds));
     }
   }
 
-  private static boolean isFinalized(UpgradeFinalizer.Status status) {
-    return status.equals(UpgradeFinalizer.Status.ALREADY_FINALIZED)
+  public boolean isFinalizationDone() {
+    return isDone;
+  }
+
+  public void markFinalizationDone() {
+    isDone = true;
+  }
+
+  public V getVersionManager() {
+    return versionManager;
+  }
+
+  private synchronized StatusAndMessages initFinalize(
+      String upgradeClientID, T id) throws UpgradeException {
+    switch (versionManager.getUpgradeState()) {
+    case STARTING_FINALIZATION:
+      return STARTING_MSG;
+    case FINALIZATION_IN_PROGRESS:
+      return FINALIZATION_IN_PROGRESS_MSG;
+    case FINALIZATION_DONE:
+    case ALREADY_FINALIZED:
+      if (versionManager.needsFinalization()) {
+        throw new UpgradeException("Upgrade found in inconsistent state. " +
+            "Upgrade state is FINALIZATION Complete while MLV has not been " +
+            "upgraded to SLV.", INVALID_REQUEST);
+      }
+      return FINALIZED_MSG;
+    default:
+      if (!versionManager.needsFinalization()) {
+        throw new UpgradeException("Upgrade found in inconsistent state. " +
+            "Upgrade state is FINALIZATION_REQUIRED while MLV has been " +
+            "upgraded to SLV.", INVALID_REQUEST);
+      }
+      versionManager.setUpgradeState(STARTING_FINALIZATION);
+
+      this.clientID = upgradeClientID;
+      this.component = id;
+      return FINALIZATION_REQUIRED_MSG;
+    }
+  }
+
+  private void assertClientId(String id) throws UpgradeException {
+    if (this.clientID == null || !this.clientID.equals(id)) {
+      throw new UpgradeException("Unknown client tries to get finalization " +
+          "status.\n The requestor is not the initiating client of the " +
+          "finalization, if you want to take over, and get unsent status " +
+          "messages, check -takeover option.", INVALID_REQUEST);
+    }
+  }
+
+  private static boolean isFinalized(Status status) {
+    return status.equals(Status.ALREADY_FINALIZED)
         || status.equals(FINALIZATION_DONE);
+  }
+
+  protected void finalizeUpgrade(Supplier<Storage> storageSuppplier)
+      throws UpgradeException {
+    for (Object obj : versionManager.unfinalizedFeatures()) {
+      LayoutFeature lf = (LayoutFeature) obj;
+      Storage layoutStorage = storageSuppplier.get();
+      Optional<? extends UpgradeAction> action = lf.action(ON_FINALIZE);
+      finalizeFeature(lf, layoutStorage, action);
+      updateLayoutVersionInVersionFile(lf, layoutStorage);
+      versionManager.finalized(lf);
+    }
+    versionManager.completeFinalization();
   }
 
   protected void finalizeFeature(LayoutFeature feature, Storage config,
@@ -253,7 +250,7 @@ public abstract class BasicUpgradeFinalizer
       Function<UpgradeActionType, Optional<? extends UpgradeAction>> function =
           aFunction.apply(lf);
       Optional<? extends UpgradeAction> action =
-          function.apply(UNFINALIZED_STATE_VALIDATION);
+          function.apply(VALIDATE_IN_PREFINALIZE);
       if (action.isPresent()) {
         runValidationAction(lf, action.get());
       }
@@ -283,7 +280,7 @@ public abstract class BasicUpgradeFinalizer
       LOG.error(String.format(msg, f.name()));
       throw new UpgradeException(
           String.format(msg, f.name()), ex,
-          PREFINALIZE_STATE_VALIDATION_FAILED);
+          PREFINALIZE_ACTION_VALIDATION_FAILED);
     }
   }
 
@@ -458,14 +455,9 @@ public abstract class BasicUpgradeFinalizer
     throw new UpgradeException(msg, e, resultCode);
   }
 
-  protected void updateLayoutVersionInDB(V vm, T comp) throws IOException {
-    throw new UnsupportedOperationException();
+  @VisibleForTesting
+  public void setFinalizationExecutor(DefaultUpgradeFinalizationExecutor
+                                            executor) {
+    finalizationExecutor = executor;
   }
-
-  protected abstract void postFinalizeUpgrade() throws IOException;
-
-  protected abstract void finalizeUpgrade(Storage storageConfig)
-      throws UpgradeException;
-
-  protected abstract boolean preFinalizeUpgrade() throws IOException;
 }

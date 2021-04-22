@@ -18,18 +18,18 @@
 
 package org.apache.hadoop.hdds.scm.server.upgrade;
 
-import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON_FINALIZE;
-import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_REQUIRED;
+import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.CLOSED;
 
 import java.io.IOException;
-import java.util.Optional;
 
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
-import org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeAction;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
 
 /**
@@ -38,32 +38,16 @@ import org.apache.hadoop.ozone.upgrade.UpgradeException;
 public class SCMUpgradeFinalizer extends
     BasicUpgradeFinalizer<StorageContainerManager, HDDSLayoutVersionManager> {
 
-  private StorageContainerManager storageContainerManager;
-
   public SCMUpgradeFinalizer(HDDSLayoutVersionManager versionManager) {
     super(versionManager);
   }
 
+  // This should be called in the context of a separate finalize upgrade thread.
+  // This function can block indefinitely till the conditions are met to safely
+  // finalize Upgrade.
   @Override
-  public StatusAndMessages finalize(String upgradeClientID,
-                                    StorageContainerManager scm)
+  public void preFinalizeUpgrade(StorageContainerManager scm)
       throws IOException {
-    storageContainerManager = scm;
-    StatusAndMessages response = preFinalize(upgradeClientID, scm);
-    if (response.status() != FINALIZATION_REQUIRED) {
-      return response;
-    }
-    try {
-      getFinalizationExecutor().execute(scm.getScmStorageConfig(), this);
-    } catch (Exception e) {
-      e.printStackTrace();
-      throw new IOException(e.getMessage());
-    }
-    return STARTING_MSG;
-  }
-
-  @Override
-  public boolean preFinalizeUpgrade() throws IOException {
     /*
      * Before we can call finalize the feature, we need to make sure that
      * all existing pipelines are closed and pipeline Manger would freeze
@@ -74,25 +58,65 @@ public class SCMUpgradeFinalizer extends
     msg += "\n  New pipelines creation will remain frozen until Upgrade " +
         "is finalized.";
 
-    storageContainerManager.preFinalizeUpgrade();
+    PipelineManager pipelineManager = scm.getPipelineManager();
+
+    // Pipeline creation will remain frozen until postFinalizeUpgrade()
+    pipelineManager.freezePipelineCreation();
+
+    waitForAllPipelinesToDestroy(pipelineManager);
+
+
+    // We can not yet move all the existing data nodes to HEALTHY-READONLY
+    // state since the next heartbeat will move them back to HEALTHY state.
+    // This has to wait till postFinalizeUpgrade, when SCM MLV version is
+    // already upgraded as part of finalize processing.
+    // While in this state, it should be safe to do finalize processing for
+    // all new features. This will also update ondisk mlv version. Any
+    // disrupting upgrade can add a hook here to make sure that SCM is in a
+    // consistent state while finalizing the upgrade.
+
     logAndEmit(msg);
-    return true;
   }
 
   @Override
-  protected void finalizeUpgrade(Storage storageConfig)
+  public void finalizeUpgrade(StorageContainerManager scm)
       throws UpgradeException {
-    for (HDDSLayoutFeature f : versionManager.unfinalizedFeatures()) {
-      Optional<? extends UpgradeAction> action = f.scmAction(ON_FINALIZE);
-      finalizeFeature(f, storageConfig, action);
-      updateLayoutVersionInVersionFile(f, storageConfig);
-      versionManager.finalized(f);
-    }
-    versionManager.completeFinalization();
+    super.finalizeUpgrade(scm::getScmStorageConfig);
   }
 
-  public void postFinalizeUpgrade() throws IOException {
-    storageContainerManager.postFinalizeUpgrade();
+  public void postFinalizeUpgrade(StorageContainerManager scm)
+      throws IOException {
+
+
+    // Don 't wait for next heartbeat from datanodes in order to move them to
+    // Healthy - Readonly state. Force them to Healthy ReadOnly state so that
+    // we can resume pipeline creation right away.
+    scm.getScmNodeManager().forceNodesToHealthyReadOnly();
+
+    PipelineManager pipelineManager = scm.getPipelineManager();
+
+    pipelineManager.resumePipelineCreation();
+
+    // Wait for at least one pipeline to be created before finishing
+    // finalization, so clients can write.
+    boolean hasPipeline = false;
+    while (!hasPipeline) {
+      int pipelineCount = pipelineManager.getPipelines(
+          HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.THREE,
+          Pipeline.PipelineState.OPEN).size();
+
+      hasPipeline = (pipelineCount >= 1);
+      if (!hasPipeline) {
+        LOG.info("Waiting for at least one pipeline after SCM finalization.");
+        try {
+          Thread.sleep(5000);
+        } catch (InterruptedException e) {
+          // Try again on next loop iteration.
+        }
+      } else {
+        LOG.info("Pipeline found after SCM finalization");
+      }
+    }
     emitFinishedMsg();
   }
 
@@ -100,7 +124,33 @@ public class SCMUpgradeFinalizer extends
   public void runPrefinalizeStateActions(Storage storage,
                                          StorageContainerManager scm)
       throws IOException {
-    super.runPrefinalizeStateActions(
+    runPrefinalizeStateActions(
         lf -> ((HDDSLayoutFeature) lf)::scmAction, storage, scm);
+  }
+
+  /**
+   * Ask all the existing data nodes to close any open containers and
+   * destroy existing pipelines.
+   */
+  private void waitForAllPipelinesToDestroy(PipelineManager pipelineManager)
+      throws IOException {
+    boolean pipelineFound = true;
+    while (pipelineFound) {
+      pipelineFound = false;
+      for (Pipeline pipeline : pipelineManager.getPipelines()) {
+        if (pipeline.getPipelineState() != CLOSED) {
+          pipelineFound = true;
+          pipelineManager.closePipeline(pipeline, false);
+        }
+      }
+      try {
+        if (pipelineFound) {
+          LOG.info("Waiting for all pipelines to close.");
+          Thread.sleep(5000);
+        }
+      } catch (InterruptedException e) {
+        continue;
+      }
+    }
   }
 }

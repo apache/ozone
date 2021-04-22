@@ -25,9 +25,9 @@ import static org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecuto
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_IN_PROGRESS;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_REQUIRED;
 
+import java.io.IOException;
 import java.util.concurrent.Callable;
 
-import org.apache.hadoop.ozone.common.Storage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,9 +35,8 @@ import org.slf4j.LoggerFactory;
  * Failure injected extension of DefaultUpgradeFinalizationExecutor that
  * can be used by Unit/Integration Tests.
  */
-@SuppressWarnings("checkstyle:VisibilityModifier")
-public class InjectedUpgradeFinalizationExecutor extends
-    DefaultUpgradeFinalizationExecutor {
+public class InjectedUpgradeFinalizationExecutor<T> extends
+    DefaultUpgradeFinalizationExecutor<T> {
   static final Logger LOG =
       LoggerFactory.getLogger(InjectedUpgradeFinalizationExecutor.class);
 
@@ -66,40 +65,33 @@ public class InjectedUpgradeFinalizationExecutor extends
   }
 
   @Override
-  public Void execute(Storage storageConfig,
-                      BasicUpgradeFinalizer basicUpgradeFinalizer)
-      throws Exception {
+  public void execute(T component, BasicUpgradeFinalizer finalizer)
+      throws IOException {
     try {
       injectTestFunctionAtThisPoint(BEFORE_PRE_FINALIZE_UPGRADE);
-      basicUpgradeFinalizer.emitStartingMsg();
-      basicUpgradeFinalizer.getVersionManager()
+      finalizer.emitStartingMsg();
+      finalizer.getVersionManager()
           .setUpgradeState(FINALIZATION_IN_PROGRESS);
 
-      if(!basicUpgradeFinalizer.preFinalizeUpgrade()) {
-        return null;
-      }
+      finalizer.preFinalizeUpgrade(component);
       injectTestFunctionAtThisPoint(AFTER_PRE_FINALIZE_UPGRADE);
 
-      basicUpgradeFinalizer.finalizeUpgrade(storageConfig);
-
+      finalizer.finalizeUpgrade(component);
       injectTestFunctionAtThisPoint(AFTER_COMPLETE_FINALIZATION);
 
-      basicUpgradeFinalizer.postFinalizeUpgrade();
+      finalizer.postFinalizeUpgrade(component);
       injectTestFunctionAtThisPoint(AFTER_POST_FINALIZE_UPGRADE);
 
-      basicUpgradeFinalizer.emitFinishedMsg();
-      return null;
+      finalizer.emitFinishedMsg();
     } catch (Exception e) {
-      LOG.warn("Upgrade Finalization failed with following Exception:");
-      e.printStackTrace();
-      if (basicUpgradeFinalizer.getVersionManager().needsFinalization()) {
-        basicUpgradeFinalizer.getVersionManager()
+      LOG.warn("Upgrade Finalization failed with following Exception.", e);
+      if (finalizer.getVersionManager().needsFinalization()) {
+        finalizer.getVersionManager()
             .setUpgradeState(FINALIZATION_REQUIRED);
       }
     } finally {
-      basicUpgradeFinalizer.markFinalizationDone();
+      finalizer.markFinalizationDone();
     }
-    return null;
   }
 
   /**
