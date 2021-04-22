@@ -38,7 +38,7 @@ public class DefaultUpgradeFinalizationExecutor<T> {
   public DefaultUpgradeFinalizationExecutor() {
   }
 
-  public Void execute(T component, BasicUpgradeFinalizer finalizer)
+  public void execute(T component, BasicUpgradeFinalizer finalizer)
       throws IOException {
     try {
       finalizer.emitStartingMsg();
@@ -52,7 +52,6 @@ public class DefaultUpgradeFinalizationExecutor<T> {
       finalizer.postFinalizeUpgrade(component);
 
       finalizer.emitFinishedMsg();
-      return null;
     } catch (Exception e) {
       LOG.warn("Upgrade Finalization failed with following Exception. ", e);
       if (finalizer.getVersionManager().needsFinalization()) {
@@ -63,6 +62,5 @@ public class DefaultUpgradeFinalizationExecutor<T> {
     } finally {
       finalizer.markFinalizationDone();
     }
-    return null;
   }
 }

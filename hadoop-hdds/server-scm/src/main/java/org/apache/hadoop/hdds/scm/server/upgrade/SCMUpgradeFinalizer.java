@@ -31,8 +31,6 @@ import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * UpgradeFinalizer for the Storage Container Manager service.
@@ -40,18 +38,8 @@ import org.slf4j.LoggerFactory;
 public class SCMUpgradeFinalizer extends
     BasicUpgradeFinalizer<StorageContainerManager, HDDSLayoutVersionManager> {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(SCMUpgradeFinalizer.class);
-
   public SCMUpgradeFinalizer(HDDSLayoutVersionManager versionManager) {
     super(versionManager);
-  }
-
-  @Override
-  public StatusAndMessages finalize(String upgradeClientID,
-                                    StorageContainerManager scm)
-      throws IOException {
-    return super.finalize(upgradeClientID, scm);
   }
 
   // This should be called in the context of a separate finalize upgrade thread.
@@ -71,28 +59,21 @@ public class SCMUpgradeFinalizer extends
         "is finalized.";
 
     PipelineManager pipelineManager = scm.getPipelineManager();
-    /**
-     * Ask pipeline manager to not create any new pipelines. Pipeline
-     * creation will remain frozen until postFinalizeUpgrade().
-     */
+
+    // Pipeline creation will remain frozen until postFinalizeUpgrade()
     pipelineManager.freezePipelineCreation();
 
-    /**
-     * Ask all the existing data nodes to close any open containers and
-     * destroy existing pipelines
-     */
     waitForAllPipelinesToDestroy(pipelineManager);
 
-    /**
-     * We can not yet move all the existing data nodes to HEALTHY-READONLY
-     * state since the next heartbeat will move them back to HEALTHY state.
-     * This has to wait till postFinalizeUpgrade, when SCM MLV version is
-     * already upgraded as part of finalize processing.
-     * While in this state, it should be safe to do finalize processing for
-     * all new features. This will also update ondisk mlv version. Any
-     * disrupting upgrade can add a hook here to make sure that SCM is in a
-     * consistent state while finalizing the upgrade.
-     */
+
+    // We can not yet move all the existing data nodes to HEALTHY-READONLY
+    // state since the next heartbeat will move them back to HEALTHY state.
+    // This has to wait till postFinalizeUpgrade, when SCM MLV version is
+    // already upgraded as part of finalize processing.
+    // While in this state, it should be safe to do finalize processing for
+    // all new features. This will also update ondisk mlv version. Any
+    // disrupting upgrade can add a hook here to make sure that SCM is in a
+    // consistent state while finalizing the upgrade.
 
     logAndEmit(msg);
   }
@@ -105,19 +86,14 @@ public class SCMUpgradeFinalizer extends
 
   public void postFinalizeUpgrade(StorageContainerManager scm)
       throws IOException {
-    /**
-     * Don't wait for next heartbeat from datanodes in order to move them to
-     * Healthy-Readonly state. Force them to Healthy-ReadOnly state so that
-     * we can resume pipeline creation right away.
-     */
+
+
+    // Don 't wait for next heartbeat from datanodes in order to move them to
+    // Healthy - Readonly state. Force them to Healthy ReadOnly state so that
+    // we can resume pipeline creation right away.
     scm.getScmNodeManager().forceNodesToHealthyReadOnly();
 
-    /**
-     * Allow pipeline manager to create any new pipelines if it can
-     * find enough Healthy data nodes.
-     */
-    PipelineManager pipelineManager =
-        scm.getPipelineManager();
+    PipelineManager pipelineManager = scm.getPipelineManager();
 
     pipelineManager.resumePipelineCreation();
 
@@ -152,6 +128,10 @@ public class SCMUpgradeFinalizer extends
         lf -> ((HDDSLayoutFeature) lf)::scmAction, storage, scm);
   }
 
+  /**
+   * Ask all the existing data nodes to close any open containers and
+   * destroy existing pipelines.
+   */
   private void waitForAllPipelinesToDestroy(PipelineManager pipelineManager)
       throws IOException {
     boolean pipelineFound = true;

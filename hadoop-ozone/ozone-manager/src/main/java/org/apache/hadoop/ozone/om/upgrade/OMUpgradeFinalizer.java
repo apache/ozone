@@ -37,12 +37,6 @@ public class OMUpgradeFinalizer extends BasicUpgradeFinalizer<OzoneManager,
   }
 
   @Override
-  public StatusAndMessages finalize(String upgradeClientID, OzoneManager om)
-      throws IOException {
-    return super.finalize(upgradeClientID, om);
-  }
-
-  @Override
   public void finalizeUpgrade(OzoneManager om)
       throws UpgradeException {
     super.finalizeUpgrade(om::getOmStorage);

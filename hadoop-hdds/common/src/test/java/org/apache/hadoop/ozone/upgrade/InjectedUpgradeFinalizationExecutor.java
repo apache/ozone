@@ -65,7 +65,7 @@ public class InjectedUpgradeFinalizationExecutor<T> extends
   }
 
   @Override
-  public Void execute(T component, BasicUpgradeFinalizer finalizer)
+  public void execute(T component, BasicUpgradeFinalizer finalizer)
       throws IOException {
     try {
       injectTestFunctionAtThisPoint(BEFORE_PRE_FINALIZE_UPGRADE);
@@ -83,8 +83,6 @@ public class InjectedUpgradeFinalizationExecutor<T> extends
       injectTestFunctionAtThisPoint(AFTER_POST_FINALIZE_UPGRADE);
 
       finalizer.emitFinishedMsg();
-      finalizer.markFinalizationDone();
-      return null;
     } catch (Exception e) {
       LOG.warn("Upgrade Finalization failed with following Exception.", e);
       if (finalizer.getVersionManager().needsFinalization()) {
@@ -94,7 +92,6 @@ public class InjectedUpgradeFinalizationExecutor<T> extends
     } finally {
       finalizer.markFinalizationDone();
     }
-    return null;
   }
 
   /**

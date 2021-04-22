@@ -32,26 +32,15 @@ import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * UpgradeFinalizer for the DataNode.
  */
 public class DataNodeUpgradeFinalizer extends
     BasicUpgradeFinalizer<DatanodeStateMachine, HDDSLayoutVersionManager> {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(DataNodeUpgradeFinalizer.class);
 
   public DataNodeUpgradeFinalizer(HDDSLayoutVersionManager versionManager) {
     super(versionManager);
-  }
-
-  @Override
-  public StatusAndMessages finalize(String upgradeClientID,
-                                    DatanodeStateMachine dsm)
-      throws IOException {
-    return super.finalize(upgradeClientID, dsm);
   }
 
   @Override
