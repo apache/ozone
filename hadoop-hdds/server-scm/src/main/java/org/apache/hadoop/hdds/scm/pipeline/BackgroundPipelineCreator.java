@@ -107,7 +107,7 @@ class BackgroundPipelineCreator {
       // For STAND_ALONE Replication Type, Replication Factor 3 should not be
       // used.
       return ((StandaloneReplicationConfig) replicationConfig)
-          .getReplicationFactor() == HddsProtos.ReplicationFactor.THREE;
+          .getReplicationFactor() == ReplicationFactor.ONE;
     }
     return true;
   }
