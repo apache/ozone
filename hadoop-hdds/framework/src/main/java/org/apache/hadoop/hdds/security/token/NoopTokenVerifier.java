@@ -28,4 +28,10 @@ public class NoopTokenVerifier implements TokenVerifier {
       ContainerCommandRequestProto cmd) {
     // no-op
   }
+
+  @Override // to avoid "failed to find token"
+  public void verify(String user, String encodedToken,
+      ContainerCommandRequestProto cmd) {
+    // no-op
+  }
 }
