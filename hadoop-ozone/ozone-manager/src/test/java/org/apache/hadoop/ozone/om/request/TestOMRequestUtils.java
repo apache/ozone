@@ -27,6 +27,7 @@ import java.util.UUID;
 
 import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -263,8 +264,8 @@ public final class TestOMRequestUtils {
     Pipeline pipeline = Pipeline.newBuilder()
         .setState(Pipeline.PipelineState.OPEN)
         .setId(PipelineID.randomId())
-        .setType(keyInfo.getType())
-        .setFactor(keyInfo.getFactor())
+        .setReplicationConfig(ReplicationConfig
+            .fromTypeAndFactor(keyInfo.getType(), keyInfo.getFactor()))
         .setNodes(new ArrayList<>())
         .build();
 
