@@ -374,7 +374,6 @@ Public Domain
 =====================
 
    aopalliance:aopalliance
-   org.tukaani:xz
 
 
 BSD 3-Clause
