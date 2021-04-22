@@ -33,11 +33,14 @@ cp hadoop-ozone/dist/src/main/license/current.txt "$REPORT_DIR"
 
 
 if [ -s "$REPORT_FILE" ]; then
+  echo ""
    echo "Jar files are added/removed to/from the binary package."
    echo ""
-   echo "Please update the hadoop-ozone/dist/src/main/license/bin/LICENSE.txt file with the modification AND execute hadoop-ozone/dist/src/main/license/update-jar-report.sh if you are ready."
+   echo "Please update the hadoop-ozone/dist/src/main/license/bin/LICENSE.txt file with the modification AND execute hadoop-ozone/dist/src/main/license/update-jar-report.sh when you are ready."
    echo ""
    echo "Generated hadoop-ozone/dist/src/main/license/jar-report.txt file should be added to your pull-request. It will be used as the base of future comparison."
+   echo ""
+   echo "Changed jars:"
    echo ""
    cat $REPORT_FILE
    exit 1
