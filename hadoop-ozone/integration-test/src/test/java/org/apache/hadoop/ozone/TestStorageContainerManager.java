@@ -485,6 +485,7 @@ public class TestStorageContainerManager {
     StorageContainerManager.scmInit(conf, testClusterId);
     Assert.assertEquals(NodeType.SCM, scmStore.getNodeType());
     Assert.assertEquals(testClusterId, scmStore.getClusterID());
+    Assert.assertFalse(scmStore.isSCMHAEnabled());
   }
 
   @Test
@@ -499,6 +500,8 @@ public class TestStorageContainerManager {
     final UUID clusterId = UUID.randomUUID();
     // This will initialize SCM
     StorageContainerManager.scmInit(conf, clusterId.toString());
+    SCMStorageConfig scmStore = new SCMStorageConfig(conf);
+    Assert.assertTrue(scmStore.isSCMHAEnabled());
     validateRatisGroupExists(conf, clusterId.toString());
   }
 
@@ -519,6 +522,7 @@ public class TestStorageContainerManager {
       StorageContainerManager.scmInit(conf, clusterId.toString());
       SCMStorageConfig scmStore = new SCMStorageConfig(conf);
       Assert.assertNotEquals(clusterId.toString(), scmStore.getClusterID());
+      Assert.assertFalse(scmStore.isSCMHAEnabled());
     } finally {
       cluster.shutdown();
     }
@@ -591,6 +595,8 @@ public class TestStorageContainerManager {
       StorageContainerManager.scmInit(conf, clusterId);
       // Ratis group with cluster id exists now
       validateRatisGroupExists(conf, clusterId);
+      SCMStorageConfig scmStore = new SCMStorageConfig(conf);
+      Assert.assertTrue(scmStore.isSCMHAEnabled());
     } finally {
       cluster.shutdown();
     }
