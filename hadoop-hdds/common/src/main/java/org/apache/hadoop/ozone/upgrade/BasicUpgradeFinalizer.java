@@ -198,17 +198,15 @@ public abstract class BasicUpgradeFinalizer
       LayoutFeature lf = (LayoutFeature) obj;
       Storage layoutStorage = storageSuppplier.get();
       Optional<? extends UpgradeAction> action = lf.action(ON_FINALIZE);
-      finalizeFeature(lf, layoutStorage, action);
+      runFinalizationAction(lf, action);
       updateLayoutVersionInVersionFile(lf, layoutStorage);
       versionManager.finalized(lf);
     }
     versionManager.completeFinalization();
   }
 
-  // TODO: Refactor after HDDS-5108 is merged.
-  protected void runFinalizationAction(LayoutFeature feature, Storage config,
-                                       Optional<? extends UpgradeAction<T>> action)
-      throws UpgradeException {
+  protected void runFinalizationAction(LayoutFeature feature,
+      Optional<?extends UpgradeAction> action) throws UpgradeException {
 
     if (!action.isPresent()) {
       emitNOOPMsg(feature.name());
