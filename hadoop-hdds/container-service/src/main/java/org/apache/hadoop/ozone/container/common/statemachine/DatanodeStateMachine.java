@@ -18,7 +18,6 @@ package org.apache.hadoop.ozone.container.common.statemachine;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.util.Iterator;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -30,7 +29,6 @@ import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
@@ -40,7 +38,6 @@ import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.ozone.HddsDatanodeStopService;
 import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
-import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.report.ReportManager;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.CloseContainerCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ClosePipelineCommandHandler;
@@ -133,8 +130,7 @@ public class DatanodeStateMachine implements Closeable {
 
     layoutVersionManager = new HDDSLayoutVersionManager(
         layoutStorage.getLayoutVersion());
-    upgradeFinalizer = new DataNodeUpgradeFinalizer(layoutVersionManager,
-        datanodeDetails.getUuidString());
+    upgradeFinalizer = new DataNodeUpgradeFinalizer(layoutVersionManager);
     DatanodeMetadataFeatures.initialize(layoutVersionManager);
 
     executorService = Executors.newFixedThreadPool(
@@ -603,39 +599,6 @@ public class DatanodeStateMachine implements Closeable {
     return layoutStorage;
   }
 
-  private boolean canFinalizeDataNode() {
-    // Lets be sure that we do not have any open container before we return
-    // from here. This function should be called in its own finalizer thread
-    // context.
-    Iterator<Container<?>> containerIt =
-        getContainer().getController().getContainers();
-    while (containerIt.hasNext()) {
-      Container ctr = containerIt.next();
-      State state = ctr.getContainerState();
-      switch (state) {
-      case OPEN:
-      case CLOSING:
-      case UNHEALTHY:
-        LOG.warn("FinalizeUpgrade : Waiting for container to close, current " +
-            "state is: {}", state);
-        return false;
-      default:
-        continue;
-      }
-    }
-    return true;
-  }
-
-  @VisibleForTesting
-  public boolean preFinalizeUpgrade() {
-    return canFinalizeDataNode();
-  }
-
-
-  @VisibleForTesting
-  public void postFinalizeUpgrade() {
-  }
-
   public StatusAndMessages finalizeUpgrade()
       throws IOException{
     return upgradeFinalizer.finalize(datanodeDetails.getUuidString(), this);
@@ -644,7 +607,7 @@ public class DatanodeStateMachine implements Closeable {
   public StatusAndMessages queryUpgradeStatus()
       throws IOException{
     return upgradeFinalizer.reportStatus(datanodeDetails.getUuidString(),
-        false);
+        true);
   }
   public UpgradeFinalizer<DatanodeStateMachine> getUpgradeFinalizer() {
     return upgradeFinalizer;

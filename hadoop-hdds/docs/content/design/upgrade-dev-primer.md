@@ -41,6 +41,9 @@ Class to add  a new layout feature being brought in. Layout version is typically
     org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager
 Every component carries an instance of this interface, which provides APIs to get runtime layout version, and if a feature is allowed based on that or not.
 
+The LayoutVersionManager interface carries an API that can be used to check if a feature is allowed in the current layout version.
+     org.apache.hadoop.ozone.upgrade.LayoutVersionManager#isAllowed(org.apache.hadoop.ozone.upgrade.LayoutFeature)
+
 ## @DisallowedUntilLayoutVersion Annotation
 Method level annotation used to "disallow" an API if current layout version does not include the associated layout feature. Currently it is added only to the OM module, but can easily be moved down to a common module based on need on the HDDS layer.
 
@@ -56,7 +59,7 @@ A typical use case during upgrade is to have multiple versions of a class / meth
 ## Upgrade Action (UpgradeActionOm & UpgradeActionHdds)
 Annotation to specify upgrade action run during specific upgrade phases. Each layout feature can optionally define an upgrade action for every supported phase. These are the supported phases of action callbacks.
 
-#### UNFINALIZED_STATE_VALIDATION
+#### VALIDATE_IN_PREFINALIZE
 A ‘validation’ action run every time a component is started up with this layout feature being unfinalized.
 
 #### ON_FIRST_UPGRADE_START

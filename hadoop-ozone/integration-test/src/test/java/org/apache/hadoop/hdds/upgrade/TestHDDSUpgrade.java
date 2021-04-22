@@ -286,6 +286,7 @@ public class TestHDDSUpgrade {
               return false;
             }
           } catch (IOException e) {
+            LOG.error("Exception. ", e);
             return false;
           }
         }
@@ -627,7 +628,7 @@ public class TestHDDSUpgrade {
         () -> {
           return this.injectSCMFailureDuringSCMUpgrade();
         });
-    testFinalizationWithFailuerInjectionHelper(null);
+    testFinalizationWithFailureInjectionHelper(null);
     Assert.assertTrue(testPassed.get());
   }
 
@@ -652,7 +653,7 @@ public class TestHDDSUpgrade {
         () -> {
           return this.injectSCMFailureDuringSCMUpgrade();
         });
-    testFinalizationWithFailuerInjectionHelper(null);
+    testFinalizationWithFailureInjectionHelper(null);
     Assert.assertTrue(testPassed.get());
   }
 
@@ -677,7 +678,7 @@ public class TestHDDSUpgrade {
         () -> {
           return this.injectSCMFailureDuringSCMUpgrade();
         });
-    testFinalizationWithFailuerInjectionHelper(null);
+    testFinalizationWithFailureInjectionHelper(null);
     Assert.assertTrue(testPassed.get());
   }
 
@@ -702,7 +703,7 @@ public class TestHDDSUpgrade {
         () -> {
           return this.injectSCMFailureDuringSCMUpgrade();
         });
-    testFinalizationWithFailuerInjectionHelper(null);
+    testFinalizationWithFailureInjectionHelper(null);
     Assert.assertTrue(testPassed.get());
   }
 
@@ -727,7 +728,7 @@ public class TestHDDSUpgrade {
         () -> {
           return injectDataNodeFailureDuringSCMUpgrade();
         });
-    testFinalizationWithFailuerInjectionHelper(null);
+    testFinalizationWithFailureInjectionHelper(null);
     Assert.assertTrue(testPassed.get());
   }
 
@@ -752,7 +753,7 @@ public class TestHDDSUpgrade {
         () -> {
           return injectDataNodeFailureDuringSCMUpgrade();
         });
-    testFinalizationWithFailuerInjectionHelper(null);
+    testFinalizationWithFailureInjectionHelper(null);
     Assert.assertTrue(testPassed.get());
   }
 
@@ -777,7 +778,7 @@ public class TestHDDSUpgrade {
         () -> {
           return injectDataNodeFailureDuringSCMUpgrade();
         });
-    testFinalizationWithFailuerInjectionHelper(null);
+    testFinalizationWithFailureInjectionHelper(null);
     Assert.assertTrue(testPassed.get());
   }
 
@@ -802,7 +803,7 @@ public class TestHDDSUpgrade {
         () -> {
           return injectDataNodeFailureDuringSCMUpgrade();
         });
-    testFinalizationWithFailuerInjectionHelper(null);
+    testFinalizationWithFailureInjectionHelper(null);
     Assert.assertTrue(testPassed.get());
   }
 
@@ -838,7 +839,7 @@ public class TestHDDSUpgrade {
       ((BasicUpgradeFinalizer)ds.getDatanodeStateMachine()
           .getUpgradeFinalizer())
           .setFinalizationExecutor(dataNodeFinalizationExecutor);
-      testFinalizationWithFailuerInjectionHelper(failureInjectionThread);
+      testFinalizationWithFailureInjectionHelper(failureInjectionThread);
       Assert.assertTrue(testPassed.get());
       synchronized (cluster) {
         shutdown();
@@ -895,7 +896,7 @@ public class TestHDDSUpgrade {
         ((BasicUpgradeFinalizer)ds.getDatanodeStateMachine()
             .getUpgradeFinalizer())
             .setFinalizationExecutor(dataNodeFinalizationExecutor);
-        testFinalizationWithFailuerInjectionHelper(
+        testFinalizationWithFailureInjectionHelper(
             dataNodefailureInjectionThread);
         Assert.assertTrue(testPassed.get());
         synchronized (cluster) {
@@ -938,7 +939,7 @@ public class TestHDDSUpgrade {
           });
       ((BasicUpgradeFinalizer)scm.getUpgradeFinalizer())
           .setFinalizationExecutor(scmFinalizationExecutor);
-      testFinalizationWithFailuerInjectionHelper(helpingFailureInjectionThread);
+      testFinalizationWithFailureInjectionHelper(helpingFailureInjectionThread);
       Assert.assertTrue(testPassed.get());
       synchronized (cluster) {
         shutdown();
@@ -979,7 +980,7 @@ public class TestHDDSUpgrade {
       ((BasicUpgradeFinalizer)ds.getDatanodeStateMachine()
           .getUpgradeFinalizer())
           .setFinalizationExecutor(dataNodeFinalizationExecutor);
-      testFinalizationWithFailuerInjectionHelper(helpingFailureInjectionThread);
+      testFinalizationWithFailureInjectionHelper(helpingFailureInjectionThread);
       Assert.assertTrue(testPassed.get());
       synchronized (cluster) {
         shutdown();
@@ -990,7 +991,7 @@ public class TestHDDSUpgrade {
     }
   }
 
-  public void testFinalizationWithFailuerInjectionHelper(
+  public void testFinalizationWithFailureInjectionHelper(
       Thread failureInjectionThread) throws Exception {
 
     waitForPipelineCreated();

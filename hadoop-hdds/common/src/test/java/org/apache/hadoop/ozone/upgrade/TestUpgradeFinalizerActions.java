@@ -20,9 +20,9 @@ package org.apache.hadoop.ozone.upgrade;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.SCM;
 import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON_FIRST_UPGRADE_START;
-import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.UNFINALIZED_STATE_VALIDATION;
-import static org.apache.hadoop.ozone.upgrade.TestUpgradeFinalizer.MockLayoutFeature.VERSION_2;
-import static org.apache.hadoop.ozone.upgrade.TestUpgradeFinalizer.MockLayoutFeature.VERSION_3;
+import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.VALIDATE_IN_PREFINALIZE;
+import static org.apache.hadoop.ozone.upgrade.TestUpgradeFinalizerActions.MockLayoutFeature.VERSION_2;
+import static org.apache.hadoop.ozone.upgrade.TestUpgradeFinalizerActions.MockLayoutFeature.VERSION_3;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -48,7 +48,7 @@ import org.junit.rules.TemporaryFolder;
 /**
  * Class to test upgrade related actions.
  */
-public class TestUpgradeFinalizer {
+public class TestUpgradeFinalizerActions {
 
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();
@@ -56,7 +56,7 @@ public class TestUpgradeFinalizer {
   @Test
   public void testRunPrefinalizeStateActions() throws IOException {
 
-    VERSION_2.addAction(UNFINALIZED_STATE_VALIDATION,
+    VERSION_2.addAction(VALIDATE_IN_PREFINALIZE,
         new MockScmUpgradeAction());
     VERSION_3.addAction(ON_FIRST_UPGRADE_START, new MockDnUpgradeAction());
     MockLayoutVersionManager lvm = new MockLayoutVersionManager(1);
@@ -89,7 +89,7 @@ public class TestUpgradeFinalizer {
 
   @Test
   public void testValidationFailureWorks() throws Exception {
-    VERSION_2.addAction(UNFINALIZED_STATE_VALIDATION,
+    VERSION_2.addAction(VALIDATE_IN_PREFINALIZE,
         new MockFailingUpgradeAction());
     MockLayoutVersionManager lvm = new MockLayoutVersionManager(1);
     MockUpgradeFinalizer uF = new MockUpgradeFinalizer(lvm);
@@ -130,19 +130,18 @@ public class TestUpgradeFinalizer {
     }
 
     @Override
-    protected void postFinalizeUpgrade() throws IOException {
+    public void postFinalizeUpgrade(MockComponent c) {
       return;
     }
 
     @Override
-    protected void finalizeUpgrade(Storage storageConfig)
-        throws UpgradeException {
+    public void finalizeUpgrade(MockComponent c) {
       return;
     }
 
     @Override
-    protected boolean preFinalizeUpgrade() throws IOException {
-      return false;
+    public void preFinalizeUpgrade(MockComponent c) {
+      return;
     }
 
     @Override
