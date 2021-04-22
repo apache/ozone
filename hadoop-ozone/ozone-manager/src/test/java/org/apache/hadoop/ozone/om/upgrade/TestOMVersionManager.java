@@ -23,7 +23,7 @@ import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.INITIAL_VERSION
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager.OM_REQUEST_CLASS_PACKAGE;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager.OM_UPGRADE_CLASS_PACKAGE;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager.getRequestClasses;
-import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.UNFINALIZED_STATE_VALIDATION;
+import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.VALIDATE_IN_PREFINALIZE;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -78,7 +78,8 @@ public class TestOMVersionManager {
   }
 
   @Test
-  public void testOMLayoutFeatureCatalog() throws Exception {
+  public void testOMLayoutFeaturesHaveIncreasingLayoutVersion()
+      throws Exception {
     OMLayoutFeature[] values = OMLayoutFeature.values();
     int currVersion = Integer.MIN_VALUE;
     OMLayoutFeature lastFeature = null;
@@ -138,7 +139,7 @@ public class TestOMVersionManager {
 
     // INITIAL_VERSION is finalized, hence should not register.
     Optional<OmUpgradeAction> action =
-        INITIAL_VERSION.action(UNFINALIZED_STATE_VALIDATION);
+        INITIAL_VERSION.action(VALIDATE_IN_PREFINALIZE);
     assertFalse(action.isPresent());
 
     lvm = mock(OMLayoutVersionManager.class);
@@ -146,7 +147,7 @@ public class TestOMVersionManager {
     doCallRealMethod().when(lvm).registerUpgradeActions(anyString());
     lvm.registerUpgradeActions(OM_UPGRADE_CLASS_PACKAGE);
 
-    action = INITIAL_VERSION.action(UNFINALIZED_STATE_VALIDATION);
+    action = INITIAL_VERSION.action(VALIDATE_IN_PREFINALIZE);
     Assert.assertTrue(action.isPresent());
     Assert.assertEquals(MockOmUpgradeAction.class, action.get().getClass());
     OzoneManager omMock = mock(OzoneManager.class);
@@ -154,7 +155,7 @@ public class TestOMVersionManager {
     verify(omMock, times(1)).getVersion();
   }
 
-  @UpgradeActionOm(type = UNFINALIZED_STATE_VALIDATION, feature =
+  @UpgradeActionOm(type = VALIDATE_IN_PREFINALIZE, feature =
       INITIAL_VERSION)
   public static class MockOmUpgradeAction implements OmUpgradeAction {
 

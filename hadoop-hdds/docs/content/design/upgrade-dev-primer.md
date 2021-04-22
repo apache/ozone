@@ -59,7 +59,7 @@ A typical use case during upgrade is to have multiple versions of a class / meth
 ## Upgrade Action (UpgradeActionOm & UpgradeActionHdds)
 Annotation to specify upgrade action run during specific upgrade phases. Each layout feature can optionally define an upgrade action for every supported phase. These are the supported phases of action callbacks.
 
-#### UNFINALIZED_STATE_VALIDATION
+#### VALIDATE_IN_PREFINALIZE
 A ‘validation’ action run every time a component is started up with this layout feature being unfinalized.
 
 #### ON_FIRST_UPGRADE_START

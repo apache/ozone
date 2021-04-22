@@ -187,8 +187,4 @@ public interface UpgradeFinalizer<T> {
   void runPrefinalizeStateActions(Storage storage, T service)
       throws IOException;
 
-  /**
-   * get the Finalization Executor driver.
-   */
-  DefaultUpgradeFinalizationExecutor getFinalizationExecutor();
 }
