@@ -31,7 +31,7 @@ import org.junit.Assert;
 import java.util.ArrayList;
 
 /**
- * Tests OMKeyCreateResponseV1.
+ * Tests OMKeyCreateResponseWithFSO.
  */
 public class TestOMKeyCreateResponseWithFSO extends TestOMKeyCreateResponse {
 
@@ -39,7 +39,7 @@ public class TestOMKeyCreateResponseWithFSO extends TestOMKeyCreateResponse {
   @Override
   protected OzoneConfiguration getOzoneConfiguration() {
     OzoneConfiguration config = super.getOzoneConfiguration();
-    // omLayoutVersionV1 flag will be set while invoking OzoneManager#start()
+    // Metadata layout prefix will be set while invoking OzoneManager#start()
     // and its not invoked in this test. Hence it is explicitly setting
     // this configuration to populate prefix tables.
     OzoneManagerRatisUtils.setBucketFSOptimized(true);
