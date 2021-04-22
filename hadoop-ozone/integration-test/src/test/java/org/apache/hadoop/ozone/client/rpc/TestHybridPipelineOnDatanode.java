@@ -152,7 +152,7 @@ public class TestHybridPipelineOnDatanode {
     Pipeline pipeline2 =
         cluster.getStorageContainerManager().getPipelineManager()
             .getPipeline(pipelineID2);
-    Assert.assertFalse(pipeline1.getFactor().equals(pipeline2.getFactor()));
+    Assert.assertNotEquals(pipeline1, pipeline2);
     Assert.assertTrue(pipeline1.getType() == HddsProtos.ReplicationType.RATIS);
     Assert.assertTrue(pipeline1.getType() == pipeline2.getType());
     // assert that the pipeline Id1 and pipelineId2 are on the same node
