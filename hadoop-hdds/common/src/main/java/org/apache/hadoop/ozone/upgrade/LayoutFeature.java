@@ -71,8 +71,7 @@ public interface LayoutFeature {
     // NOTE 2 : This needs to be a backward compatible action until a DOWNGRADE
     //  hook is provided!
     //  Even if the action fails partway through, all on disk structures should
-    //  still be in
-    //  a backwards compatible state.
+    //  still be in a backwards compatible state.
     // NOTE 3 : These actions are not submitted through RATIS (TODO)
     ON_FIRST_UPGRADE_START,
 
