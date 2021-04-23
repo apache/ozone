@@ -327,7 +327,7 @@ public class BasicOzoneFileSystem extends FileSystem {
     }
 
     if (adapter.isFSOptimizedBucket()) {
-      return renameV1(srcPath, dstPath);
+      return renameFSO(srcPath, dstPath);
     }
 
     // Check if the source exists
@@ -410,7 +410,8 @@ public class BasicOzoneFileSystem extends FileSystem {
     return result;
   }
 
-  private boolean renameV1(String srcPath, String dstPath) throws IOException {
+  private boolean renameFSO(String srcPath, String dstPath)
+      throws IOException {
     try {
       adapter.renameKey(srcPath, dstPath);
     } catch (OMException ome) {

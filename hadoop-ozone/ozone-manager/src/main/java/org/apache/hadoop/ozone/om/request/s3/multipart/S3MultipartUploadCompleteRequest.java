@@ -329,7 +329,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
 
   protected void updatePrefixFSOInfo(OmKeyInfo dbOpenKeyInfo,
       OmKeyInfo.Builder builder) {
-    // FSOBucket is disabled. Do nothing.
+    // FSO is disabled. Do nothing.
   }
 
   protected OmKeyInfo getOmKeyInfoFromKeyTable(String dbOzoneKey,

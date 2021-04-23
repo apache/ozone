@@ -156,7 +156,7 @@ public class TestS3MultipartResponse {
             .setFactor(HddsProtos.ReplicationFactor.ONE).build()).build();
   }
 
-  public PartKeyInfo createPartKeyInfoV1(
+  public PartKeyInfo createPartKeyInfoFSO(
       String volumeName, String bucketName, long parentID, String fileName,
       int partNumber) {
     return PartKeyInfo.newBuilder()
@@ -175,7 +175,7 @@ public class TestS3MultipartResponse {
             .setFactor(HddsProtos.ReplicationFactor.ONE).build()).build();
   }
 
-  public S3InitiateMultipartUploadResponse createS3InitiateMPUResponseV1(
+  public S3InitiateMultipartUploadResponse createS3InitiateMPUResponseFSO(
       String volumeName, String bucketName, long parentID, String keyName,
       String multipartUploadID, List<OmDirectoryInfo> parentDirInfos) {
     OmMultipartKeyInfo multipartKeyInfo = new OmMultipartKeyInfo.Builder()
@@ -212,12 +212,12 @@ public class TestS3MultipartResponse {
                             .setKeyName(keyName)
                             .setMultipartUploadID(multipartUploadID)).build();
 
-    return new S3InitiateMultipartUploadResponseV1(omResponse, multipartKeyInfo,
-            omKeyInfo, parentDirInfos);
+    return new S3InitiateMultipartUploadResponseWithFSO(omResponse,
+        multipartKeyInfo, omKeyInfo, parentDirInfos);
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
-  public S3MultipartUploadCommitPartResponse createS3CommitMPUResponseV1(
+  public S3MultipartUploadCommitPartResponse createS3CommitMPUResponseFSO(
           String volumeName, String bucketName, long parentID, String keyName,
           String multipartUploadID,
           OzoneManagerProtocolProtos.PartKeyInfo oldPartKeyInfo,
@@ -262,13 +262,13 @@ public class TestS3MultipartResponse {
                     OzoneManagerProtocolProtos.MultipartCommitUploadPartResponse
                             .newBuilder().setPartName(volumeName)).build();
 
-    return new S3MultipartUploadCommitPartResponseV1(omResponse, multipartKey,
-            openKey, multipartKeyInfo, oldPartKeyInfo,
-            openPartKeyInfoToBeDeleted, isRatisEnabled, omBucketInfo);
+    return new S3MultipartUploadCommitPartResponseWithFSO(omResponse,
+        multipartKey, openKey, multipartKeyInfo, oldPartKeyInfo,
+        openPartKeyInfoToBeDeleted, isRatisEnabled, omBucketInfo);
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
-  public S3MultipartUploadCompleteResponse createS3CompleteMPUResponseV1(
+  public S3MultipartUploadCompleteResponse createS3CompleteMPUResponseFSO(
           String volumeName, String bucketName, long parentID, String keyName,
           String multipartUploadID, OmKeyInfo omKeyInfo,
           OzoneManagerProtocolProtos.Status status,
@@ -284,8 +284,8 @@ public class TestS3MultipartResponse {
                             .newBuilder().setBucket(bucketName)
                             .setVolume(volumeName).setKey(keyName)).build();
 
-    return new S3MultipartUploadCompleteResponseV1(omResponse, multipartKey,
-            omKeyInfo, unUsedParts);
+    return new S3MultipartUploadCompleteResponseWithFSO(omResponse,
+        multipartKey, omKeyInfo, unUsedParts);
   }
 
   private String getMultipartKey(long parentID, String keyName,

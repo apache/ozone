@@ -660,7 +660,7 @@ public class KeyManagerImpl implements KeyManager {
     OmKeyInfo value = null;
     try {
       if (OzoneManagerRatisUtils.isBucketFSOptimized()) {
-        value = getOmKeyInfoV1(volumeName, bucketName, keyName);
+        value = getOmKeyInfoFSO(volumeName, bucketName, keyName);
       } else {
         value = getOmKeyInfo(volumeName, bucketName, keyName);
       }
@@ -711,7 +711,7 @@ public class KeyManagerImpl implements KeyManager {
    * Look up will return only closed fileInfo. This will return null if the
    * keyName is a directory or if the keyName is still open for writing.
    */
-  private OmKeyInfo getOmKeyInfoV1(String volumeName, String bucketName,
+  private OmKeyInfo getOmKeyInfoFSO(String volumeName, String bucketName,
                                    String keyName) throws IOException {
     OzoneFileStatus fileStatus =
             OMFileRequest.getOMKeyInfoIfExists(metadataManager,
@@ -1711,7 +1711,7 @@ public class KeyManagerImpl implements KeyManager {
       OMFileRequest.validateBucket(metadataManager, volume, bucket);
       String objectKey = metadataManager.getOzoneKey(volume, bucket, keyName);
       if (OzoneManagerRatisUtils.isBucketFSOptimized()) {
-        keyInfo = getOmKeyInfoV1(volume, bucket, keyName);
+        keyInfo = getOmKeyInfoFSO(volume, bucket, keyName);
       } else {
         keyInfo = getOmKeyInfo(volume, bucket, keyName);
       }
@@ -1924,7 +1924,7 @@ public class KeyManagerImpl implements KeyManager {
     String keyName = args.getKeyName();
 
     if (OzoneManagerRatisUtils.isBucketFSOptimized()) {
-      return getOzoneFileStatusV1(volumeName, bucketName, keyName,
+      return getOzoneFileStatusFSO(volumeName, bucketName, keyName,
               args.getSortDatanodes(), clientAddress, false);
     }
     return getOzoneFileStatus(volumeName, bucketName, keyName,
@@ -1992,7 +1992,7 @@ public class KeyManagerImpl implements KeyManager {
   }
 
 
-  private OzoneFileStatus getOzoneFileStatusV1(String volumeName,
+  private OzoneFileStatus getOzoneFileStatusFSO(String volumeName,
       String bucketName, String keyName, boolean sortDatanodes,
       String clientAddress, boolean skipFileNotFoundError) throws IOException {
     OzoneFileStatus fileStatus = null;
@@ -2194,7 +2194,7 @@ public class KeyManagerImpl implements KeyManager {
     String keyName = args.getKeyName();
     OzoneFileStatus fileStatus;
     if (OzoneManagerRatisUtils.isBucketFSOptimized()) {
-      fileStatus = getOzoneFileStatusV1(volumeName, bucketName, keyName,
+      fileStatus = getOzoneFileStatusFSO(volumeName, bucketName, keyName,
               args.getSortDatanodes(), clientAddress, false);
     } else {
       fileStatus = getOzoneFileStatus(volumeName, bucketName,
@@ -2302,7 +2302,8 @@ public class KeyManagerImpl implements KeyManager {
     }
 
     if (OzoneManagerRatisUtils.isBucketFSOptimized()) {
-      return listStatusV1(args, recursive, startKey, numEntries, clientAddress);
+      return listStatusFSO(args, recursive, startKey, numEntries,
+          clientAddress);
     }
 
     String volumeName = args.getVolumeName();
@@ -2441,7 +2442,7 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   @SuppressWarnings("methodlength")
-  public List<OzoneFileStatus> listStatusV1(OmKeyArgs args, boolean recursive,
+  public List<OzoneFileStatus> listStatusFSO(OmKeyArgs args, boolean recursive,
       String startKey, long numEntries, String clientAddress)
           throws IOException {
     Preconditions.checkNotNull(args, "Key args can not be null");
@@ -2555,7 +2556,7 @@ public class KeyManagerImpl implements KeyManager {
           prefixPath = OzoneFSUtils.getParentDir(startKey);
         }
 
-        OzoneFileStatus fileStatusInfo = getOzoneFileStatusV1(volumeName,
+        OzoneFileStatus fileStatusInfo = getOzoneFileStatusFSO(volumeName,
                 bucketName, startKey, false, null, true);
 
         if (fileStatusInfo != null) {
