@@ -27,7 +27,6 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -43,7 +42,6 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.utils.HAUtils;
-import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 
 import org.slf4j.Logger;
@@ -51,6 +49,9 @@ import org.slf4j.LoggerFactory;
 
 
 import com.google.common.annotations.VisibleForTesting;
+
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
@@ -67,7 +68,7 @@ public class ContainerOperationClient implements ScmClient {
   private final HddsProtos.ReplicationType replicationType;
   private final StorageContainerLocationProtocol
       storageContainerLocationClient;
-  private final SCMSecurityProtocol securityProtocol;
+  private final boolean blockTokenEnabled;
 
   public XceiverClientManager getXceiverClientManager() {
     return xceiverClientManager;
@@ -77,7 +78,6 @@ public class ContainerOperationClient implements ScmClient {
 
   public ContainerOperationClient(OzoneConfiguration conf) throws IOException {
     storageContainerLocationClient = newContainerRpcClient(conf);
-    securityProtocol = HddsServerUtil.getScmSecurityClient(conf);
     this.xceiverClientManager = newXCeiverClientManager(conf);
     containerSizeB = (int) conf.getStorageSize(OZONE_SCM_CONTAINER_SIZE,
         OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
@@ -91,6 +91,8 @@ public class ContainerOperationClient implements ScmClient {
       replicationFactor = HddsProtos.ReplicationFactor.ONE;
       replicationType = HddsProtos.ReplicationType.STAND_ALONE;
     }
+    blockTokenEnabled = conf.getBoolean(HDDS_BLOCK_TOKEN_ENABLED,
+        HDDS_BLOCK_TOKEN_ENABLED_DEFAULT);
   }
 
   @VisibleForTesting
@@ -168,6 +170,9 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   private String getEncodedContainerToken(long containerId) throws IOException {
+    if (!blockTokenEnabled) {
+      return "";
+    }
     ContainerID containerID = ContainerID.valueOf(containerId);
     return storageContainerLocationClient.getContainerToken(containerID)
         .encodeToUrlString();
