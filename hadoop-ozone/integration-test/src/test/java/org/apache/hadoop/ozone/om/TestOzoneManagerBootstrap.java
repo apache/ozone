@@ -61,10 +61,10 @@ public class TestOzoneManagerBootstrap {
   private OzoneConfiguration conf;
   private final String clusterId = UUID.randomUUID().toString();
   private final String scmId = UUID.randomUUID().toString();
-  private final String omServiceId = "om-bootstrap";
 
   private static final int NUM_INITIAL_OMS = 3;
 
+  private static final String OM_SERVICE_ID = "om-bootstrap";
   private static final String VOLUME_NAME;
   private static final String BUCKET_NAME;
 
@@ -85,11 +85,11 @@ public class TestOzoneManagerBootstrap {
         .setClusterId(clusterId)
         .setScmId(scmId)
         .setSCMServiceId(SCM_DUMMY_SERVICE_ID)
-        .setOMServiceId(omServiceId)
+        .setOMServiceId(OM_SERVICE_ID)
         .setNumOfOzoneManagers(numInitialOMs)
         .build();
     cluster.waitForClusterToBeReady();
-    objectStore = OzoneClientFactory.getRpcClient(omServiceId, conf)
+    objectStore = OzoneClientFactory.getRpcClient(OM_SERVICE_ID, conf)
         .getObjectStore();
 
     // Perform some transactions
@@ -201,7 +201,7 @@ public class TestOzoneManagerBootstrap {
         "other OMs are down", newOMNodeIds.contains(omLeader.getOMNodeId()));
 
     // Perform some read and write operations with new OM leader
-    objectStore = OzoneClientFactory.getRpcClient(omServiceId, conf)
+    objectStore = OzoneClientFactory.getRpcClient(OM_SERVICE_ID, conf)
         .getObjectStore();
     OzoneVolume volume = objectStore.getVolume(VOLUME_NAME);
     OzoneBucket bucket = volume.getBucket(BUCKET_NAME);

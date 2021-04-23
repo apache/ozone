@@ -100,6 +100,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
     }
   }
 
+  @SuppressWarnings("parameternumber")
   public MiniOzoneChaosCluster(OzoneConfiguration conf,
       List<OzoneManager> ozoneManagers, List<StorageContainerManager> scms,
       List<HddsDatanodeService> hddsDatanodes, String omServiceID,

@@ -40,7 +40,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Protocol implementation for Inter OM communication
+ * Protocol implementation for Inter OM communication.
  */
 public class OMInterServiceProtocolClientSideImpl implements
     OMInterServiceProtocol {

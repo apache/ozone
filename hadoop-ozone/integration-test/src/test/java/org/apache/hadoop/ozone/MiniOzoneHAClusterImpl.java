@@ -725,12 +725,6 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
         }
         if (e instanceof BindException ||
             e.getCause() instanceof BindException) {
-          if (om != null) {
-            om.stop();
-            om.join();
-            LOG.info("Stopping OzoneManager server at {}",
-                om.getOmRpcServerAddr());
-          }
           ++retryCount;
           LOG.info("MiniOzoneHACluster port conflicts, retried {} times",
               retryCount);
@@ -852,7 +846,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     private List<Type> inactiveServices;
 
     // Function to extract the Id from service
-    Function<Type, String> serviceIdProvider;
+    private Function<Type, String> serviceIdProvider;
 
     MiniOzoneHAService(String name, List<Type> activeList,
                        List<Type> inactiveList, String serviceId,
