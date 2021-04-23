@@ -208,18 +208,18 @@ public class BlockManagerImpl implements BlockManager {
 
     KeyValueContainerData containerData = (KeyValueContainerData) container
         .getContainerData();
+    long containerBCSId = containerData.getBlockCommitSequenceId();
+    if (containerBCSId < bcsId) {
+      throw new StorageContainerException(
+          "Unable to find the block with bcsID " + bcsId + " .Container "
+              + container.getContainerData().getContainerID() + " bcsId is "
+              + containerBCSId + ".", UNKNOWN_BCSID);
+    }
+
     try(ReferenceCountedDB db = BlockUtils.getDB(containerData, config)) {
       // This is a post condition that acts as a hint to the user.
       // Should never fail.
       Preconditions.checkNotNull(db, DB_NULL_ERR_MSG);
-
-      long containerBCSId = containerData.getBlockCommitSequenceId();
-      if (containerBCSId < bcsId) {
-        throw new StorageContainerException(
-            "Unable to find the block with bcsID " + bcsId + " .Container "
-                + container.getContainerData().getContainerID() + " bcsId is "
-                + containerBCSId + ".", UNKNOWN_BCSID);
-      }
       BlockData blockData = getBlockByID(db, blockID);
       long id = blockData.getBlockID().getBlockCommitSequenceId();
       if (id < bcsId) {

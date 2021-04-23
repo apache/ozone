@@ -30,6 +30,8 @@ import java.util.function.Function;
 import org.apache.hadoop.fs.CanUnbuffer;
 import org.apache.hadoop.fs.Seekable;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetBlockResponseProto;
@@ -196,7 +198,10 @@ public class BlockInputStream extends InputStream
     // protocol.
     if (pipeline.getType() != HddsProtos.ReplicationType.STAND_ALONE) {
       pipeline = Pipeline.newBuilder(pipeline)
-          .setType(HddsProtos.ReplicationType.STAND_ALONE).build();
+          .setReplicationConfig(new StandaloneReplicationConfig(
+              ReplicationConfig
+                  .getLegacyFactor(pipeline.getReplicationConfig())))
+          .build();
     }
     acquireClient();
     boolean success = false;

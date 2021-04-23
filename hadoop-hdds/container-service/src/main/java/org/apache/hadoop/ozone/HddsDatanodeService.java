@@ -342,7 +342,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       PKCS10CertificationRequest csr = getCSR(config);
       // TODO: For SCM CA we should fetch certificate from multiple SCMs.
       SCMSecurityProtocolClientSideTranslatorPB secureScmClient =
-          HddsServerUtil.getScmSecurityClient(config);
+          HddsServerUtil.getScmSecurityClientWithMaxRetry(config);
       SCMGetCertResponseProto response = secureScmClient.
           getDataNodeCertificateChain(
               datanodeDetails.getProtoBufMessage(),

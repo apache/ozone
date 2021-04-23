@@ -210,4 +210,8 @@ public final class SCMNodeDetails extends NodeDetails {
   public String getDatanodeAddressKey() {
     return datanodeAddressKey;
   }
+
+  public int getGrpcPort() {
+    return grpcPort;
+  }
 }

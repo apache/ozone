@@ -19,7 +19,6 @@
 package org.apache.hadoop.hdds.scm.node;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
 
 import java.io.File;
@@ -32,6 +31,7 @@ import java.util.stream.Collectors;
 
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
@@ -164,9 +164,8 @@ public class TestDeadNodeHandler {
 
     LambdaTestUtils.await(120000, 1000,
         () -> {
-          System.out.println(pipelineManager.getPipelines(RATIS, THREE).size());
-          System.out.println(pipelineManager.getPipelines(RATIS, ONE).size());
-          return pipelineManager.getPipelines(RATIS, THREE).size() > 3;
+          return pipelineManager.getPipelines(new RatisReplicationConfig(THREE))
+              .size() > 3;
         });
     TestUtils.openAllRatisPipelines(pipelineManager);
 

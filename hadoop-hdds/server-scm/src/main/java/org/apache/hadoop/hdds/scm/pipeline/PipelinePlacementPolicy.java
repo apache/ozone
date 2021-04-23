@@ -20,9 +20,11 @@ package org.apache.hadoop.hdds.scm.pipeline;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
@@ -98,12 +100,16 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
         continue;
       }
       if (pipeline != null &&
-            // single node pipeline are not accounted for while determining
-            // the pipeline limit for dn
-            pipeline.getType() == HddsProtos.ReplicationType.RATIS &&
-            (pipeline.getFactor() == HddsProtos.ReplicationFactor.ONE ||
-          pipeline.getFactor().getNumber() == nodesRequired &&
-          pipeline.getPipelineState() == Pipeline.PipelineState.CLOSED)) {
+          // single node pipeline are not accounted for while determining
+          // the pipeline limit for dn
+          pipeline.getType() == HddsProtos.ReplicationType.RATIS &&
+          (RatisReplicationConfig
+              .hasFactor(pipeline.getReplicationConfig(), ReplicationFactor.ONE)
+              ||
+              pipeline.getReplicationConfig().getRequiredNodes()
+                  == nodesRequired &&
+                  pipeline.getPipelineState()
+                      == Pipeline.PipelineState.CLOSED)) {
         pipelineNumDeductable++;
       }
     }
