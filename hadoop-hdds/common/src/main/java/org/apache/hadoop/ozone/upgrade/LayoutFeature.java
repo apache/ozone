@@ -57,16 +57,14 @@ public interface LayoutFeature {
   enum UpgradeActionType {
 
     // Run every time an un-finalized component is started up.
-    // NOTE 1 : This needs to be a backward compatible action until a DOWNGRADE
-    //  hook is provided!
-    //  Even if the action fails partway through, metadata should still be in
-    //  a backwards compatible state.
     VALIDATE_IN_PREFINALIZE,
 
     // Run once when an upgraded cluster is started with this new
     // layout version.
-    // If finalization fails the action may be run again when the cluster is
+    // If the action fails, it will be run again when the component is
     // restarted.
+    // If updating the VERSION file fails, the action may be run again when the
+    // component is restarted, even if it finished successfully.
     // NOTE 1 : This will not be run in a NEW cluster!
     // NOTE 2 : This needs to be a backward compatible action until a DOWNGRADE
     //  hook is provided!
@@ -76,8 +74,9 @@ public interface LayoutFeature {
     ON_FIRST_UPGRADE_START,
 
     // Run once during finalization of the layout feature.
-    // If finalization fails the action may be run again when finalization is
-    // retried.
+    // If the action fails, it will be run again when finalization is retried.
+    // If updating the VERSION file fails, the action may be run again when
+    // finalization is retried, even if it finished successfully.
     ON_FINALIZE
   }
 }

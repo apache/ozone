@@ -65,9 +65,6 @@ public class StorageInfo {
    */
   private static final String LAYOUT_VERSION = "layoutVersion";
 
-  private static final String UPGRADING_TO_LAYOUT_VERSION =
-      "upgradingToLayoutVersion";
-
   private static final String FIRST_UPGRADE_ACTION_LAYOUT_VERSION =
       "firstUpgradeActionLayoutVersion";
 
