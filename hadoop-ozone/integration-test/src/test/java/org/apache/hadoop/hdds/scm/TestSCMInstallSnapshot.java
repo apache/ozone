@@ -100,7 +100,9 @@ public class TestSCMInstallSnapshot {
             new RatisReplicationConfig(ONE), "Owner2").getPipelineID());
     pipelineManager.openPipeline(ratisPipeline2.getId());
     SCMNodeDetails scmNodeDetails = new SCMNodeDetails.Builder()
-        .setRpcAddress(new InetSocketAddress("0.0.0.0", 0)).setSCMNodeId("scm1")
+        .setRpcAddress(new InetSocketAddress("0.0.0.0", 0))
+        .setGrpcPort(ScmConfigKeys.OZONE_SCM_GRPC_PORT_DEFAULT)
+        .setSCMNodeId("scm1")
         .build();
     Map<String, SCMNodeDetails> peerMap = new HashMap<>();
     peerMap.put(scmNodeDetails.getNodeId(), scmNodeDetails);
