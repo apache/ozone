@@ -22,7 +22,6 @@ import static org.apache.hadoop.ozone.common.Storage.STORAGE_FILE_VERSION;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
-import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -67,6 +66,8 @@ public class StorageInfo {
 
   private static final String FIRST_UPGRADE_ACTION_LAYOUT_VERSION =
       "firstUpgradeActionLayoutVersion";
+
+  private static final int INVALID_LAYOUT_VERSION = -1;
 
   /**
    * Constructs StorageInfo instance.
@@ -126,8 +127,7 @@ public class StorageInfo {
     String layout = getProperty(LAYOUT_VERSION);
     if (layout == null) {
       LOG.warn("Found " + STORAGE_FILE_VERSION + " file without any layout " +
-          "version. Defaulting to 0. This should happen only if a cluster is " +
-          "being upgraded from 0.5.0.");
+          "version. Defaulting to 0.");
       setProperty(LAYOUT_VERSION, "0");
     }
   }
@@ -138,7 +138,7 @@ public class StorageInfo {
     if (upgradingTo != null) {
       return Integer.parseInt(upgradingTo);
     }
-    return LayoutFeature.INVALID_LAYOUT_VERSION;
+    return INVALID_LAYOUT_VERSION;
   }
 
   public void setFirstUpgradeActionLayoutVersion(int layoutVersion) {

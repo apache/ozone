@@ -24,9 +24,6 @@ import java.util.Optional;
  * Generic Layout feature interface for Ozone.
  */
 public interface LayoutFeature {
-
-  int INVALID_LAYOUT_VERSION = -1;
-
   String name();
 
   int layoutVersion();
