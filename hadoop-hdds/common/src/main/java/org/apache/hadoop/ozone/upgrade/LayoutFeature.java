@@ -57,17 +57,28 @@ public interface LayoutFeature {
   enum UpgradeActionType {
 
     // Run every time an un-finalized component is started up.
+    // NOTE 1 : This needs to be a backward compatible action until a DOWNGRADE
+    //  hook is provided!
+    //  Even if the action fails partway through, metadata should still be in
+    //  a backwards compatible state.
     VALIDATE_IN_PREFINALIZE,
 
-    // Run exactly once when an upgraded cluster is detected with this new
+    // Run once when an upgraded cluster is started with this new
     // layout version.
+    // If finalization fails the action may be run again when the cluster is
+    // restarted.
     // NOTE 1 : This will not be run in a NEW cluster!
     // NOTE 2 : This needs to be a backward compatible action until a DOWNGRADE
-    // hook is provided!
+    //  hook is provided!
+    //  Even if the action fails partway through, all on disk structures should
+    //  still be in
+    //  a backwards compatible state.
     // NOTE 3 : These actions are not submitted through RATIS (TODO)
     ON_FIRST_UPGRADE_START,
 
-    // Run exactly once during finalization of layout feature.
+    // Run once during finalization of the layout feature.
+    // If finalization fails the action may be run again when finalization is
+    // retried.
     ON_FINALIZE
   }
 }
