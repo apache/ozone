@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.pipeline;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.junit.Assert;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -47,5 +48,23 @@ public class TestPipeline {
     for (HddsProtos.DatanodeDetailsProto dn : protoV1.getMembersList()) {
       assertPorts(dn, ALL_PORTS);
     }
+  }
+
+  @Test
+  public void getProtobufMessageEC() throws IOException {
+    Pipeline subject = MockPipeline.createPipeline(3);
+
+    //when EC config is empty
+    HddsProtos.Pipeline protobufMessage = subject.getProtobufMessage(1);
+    Assert.assertNull(protobufMessage);
+
+    subject = MockPipeline.createEcPipeline();
+
+    //when EC config is empty
+    protobufMessage = subject.getProtobufMessage(1);
+    Assert.assertEquals(3, protobufMessage.getEcReplicationConfig().getData());
+    Assert
+        .assertEquals(2, protobufMessage.getEcReplicationConfig().getParity());
+
   }
 }

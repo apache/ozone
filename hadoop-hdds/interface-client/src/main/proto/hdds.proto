@@ -114,6 +114,7 @@ message Pipeline {
     optional uint64 creationTimeStamp = 8;
     optional UUID suggestedLeaderID = 9;
     repeated uint32 memberReplicaIndexes = 10;
+    optional ECReplicationConfig ecReplicationConfig = 11;
     // TODO(runzhiwang): when leaderID is gone, specify 6 as the index of leaderID128
     optional UUID leaderID128 = 100;
 }
