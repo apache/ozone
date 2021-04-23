@@ -55,8 +55,6 @@ public class SCMSnapshotProvider {
 
   private final ConfigurationSource conf;
 
-  private SCMSnapshotDownloader client;
-
   private Map<String, SCMNodeDetails> peerNodesMap;
 
   public SCMSnapshotProvider(ConfigurationSource conf,
@@ -81,13 +79,13 @@ public class SCMSnapshotProvider {
         this.peerNodesMap.put(peerNode.getNodeId(), peerNode);
       }
     }
-    this.client = null;
   }
 
   @VisibleForTesting
   public void setPeerNodesMap(Map<String, SCMNodeDetails> peerNodesMap) {
     this.peerNodesMap = peerNodesMap;
   }
+
   /**
    * Download the latest checkpoint from SCM Leader .
    * @param leaderSCMNodeID leader SCM Node ID.
@@ -103,18 +101,19 @@ public class SCMSnapshotProvider {
             .getAbsolutePath();
     File targetFile = new File(snapshotFilePath + ".tar.gz");
 
-    // the client instance will be initialized only when first install snapshot
-    // notification from ratis leader will be received.
-    if (client == null) {
-      client = new InterSCMGrpcClient(
-          peerNodesMap.get(leaderSCMNodeID).getInetAddress().getHostAddress(),
-          conf);
-    }
+    // the downloadClient instance will be created as and when install snapshot
+    // request is received. No caching of the client as it should be a very rare
+    int port = peerNodesMap.get(leaderSCMNodeID).getGrpcPort();
+    SCMSnapshotDownloader downloadClient = new InterSCMGrpcClient(
+        peerNodesMap.get(leaderSCMNodeID).getInetAddress().getHostAddress(),
+        port, conf);
     try {
-      client.download(targetFile.toPath()).get();
-    } catch (InterruptedException | ExecutionException e) {
+      downloadClient.download(targetFile.toPath()).get();
+    } catch (ExecutionException | InterruptedException e) {
       LOG.error("Rocks DB checkpoint downloading failed", e);
       throw new IOException(e);
+    } finally {
+      downloadClient.close();
     }
 
 
@@ -136,9 +135,4 @@ public class SCMSnapshotProvider {
     return scmSnapshotDir;
   }
 
-  public void stop() throws Exception {
-    if (client != null) {
-      client.close();
-    }
-  }
 }

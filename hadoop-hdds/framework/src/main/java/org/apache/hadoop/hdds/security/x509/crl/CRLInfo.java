@@ -38,10 +38,12 @@ public class CRLInfo implements Comparator<CRLInfo>,
 
   private X509CRL x509CRL;
   private long creationTimestamp;
+  private long crlSequenceID;
 
-  private CRLInfo(X509CRL x509CRL, long creationTimestamp) {
+  private CRLInfo(X509CRL x509CRL, long creationTimestamp, long crlSequenceID) {
     this.x509CRL = x509CRL;
     this.creationTimestamp = creationTimestamp;
+    this.crlSequenceID = crlSequenceID;
   }
 
   /**
@@ -56,6 +58,7 @@ public class CRLInfo implements Comparator<CRLInfo>,
     return builder
         .setX509CRL(CRLCodec.getX509CRL(info.getX509CRL()))
         .setCreationTimestamp(info.getCreationTimestamp())
+        .setCrlSequenceID(info.getCrlSequenceID())
         .build();
   }
 
@@ -65,6 +68,7 @@ public class CRLInfo implements Comparator<CRLInfo>,
 
     return builder.setX509CRL(CRLCodec.getPEMEncodedString(getX509CRL()))
         .setCreationTimestamp(getCreationTimestamp())
+        .setCrlSequenceID(getCrlSequenceID())
         .build();
   }
 
@@ -74,6 +78,10 @@ public class CRLInfo implements Comparator<CRLInfo>,
 
   public long getCreationTimestamp() {
     return creationTimestamp;
+  }
+
+  public long getCrlSequenceID() {
+    return crlSequenceID;
   }
 
   /**
@@ -126,7 +134,8 @@ public class CRLInfo implements Comparator<CRLInfo>,
 
     CRLInfo that = (CRLInfo) o;
 
-    return this.getX509CRL().equals(that.x509CRL) &&
+    return this.crlSequenceID == that.crlSequenceID &&
+        this.getX509CRL().equals(that.x509CRL) &&
         this.creationTimestamp == that.creationTimestamp;
   }
 
@@ -138,7 +147,8 @@ public class CRLInfo implements Comparator<CRLInfo>,
   @Override
   public String toString() {
     return "CRLInfo{" +
-        "x509CRL=" + x509CRL.toString() +
+        "crlSequenceID=" + crlSequenceID +
+        ", x509CRL=" + x509CRL.toString() +
         ", creationTimestamp=" + creationTimestamp +
         '}';
   }
@@ -150,6 +160,7 @@ public class CRLInfo implements Comparator<CRLInfo>,
   public static class Builder {
     private X509CRL x509CRL;
     private long creationTimestamp;
+    private long crlSequenceID;
 
     public Builder setX509CRL(X509CRL x509CRL) {
       this.x509CRL = x509CRL;
@@ -161,8 +172,13 @@ public class CRLInfo implements Comparator<CRLInfo>,
       return this;
     }
 
+    public Builder setCrlSequenceID(long crlSequenceID) {
+      this.crlSequenceID = crlSequenceID;
+      return this;
+    }
+
     public CRLInfo build() {
-      return new CRLInfo(x509CRL, creationTimestamp);
+      return new CRLInfo(x509CRL, creationTimestamp, crlSequenceID);
     }
   }
 }

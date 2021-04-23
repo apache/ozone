@@ -100,6 +100,8 @@ public class TestStorageContainerManagerHttpServer {
     conf.set(OzoneConfigKeys.OZONE_HTTP_POLICY_KEY, policy.name());
     conf.set(ScmConfigKeys.OZONE_SCM_HTTP_ADDRESS_KEY, "localhost:0");
     conf.set(ScmConfigKeys.OZONE_SCM_HTTPS_ADDRESS_KEY, "localhost:0");
+    conf.set(ScmConfigKeys.OZONE_SCM_HTTP_BIND_HOST_KEY, "localhost");
+    conf.set(ScmConfigKeys.OZONE_SCM_HTTPS_BIND_HOST_KEY, "localhost");
 
     StorageContainerManagerHttpServer server = null;
     try {

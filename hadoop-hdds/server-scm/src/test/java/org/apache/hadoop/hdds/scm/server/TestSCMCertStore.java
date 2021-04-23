@@ -162,7 +162,6 @@ public class TestSCMCertStore {
     List<CRLInfo> crls = scmCertStore.getCrls(Arrays.asList(crlId));
     assertEquals(1, crls.size());
 
-
     // CRL Info table should have a CRL with sequence id
     assertNotNull(scmMetadataStore.getCRLInfoTable()
         .get(sequenceId.get()));
@@ -172,6 +171,8 @@ public class TestSCMCertStore {
         scmMetadataStore.getCRLSequenceIdTable().get(CRL_SEQUENCE_ID_KEY));
 
     CRLInfo crlInfo = crls.get(0);
+
+    assertEquals(crlInfo.getCrlSequenceID(), sequenceId.get().longValue());
 
     Set<? extends X509CRLEntry> revokedCertificates =
         crlInfo.getX509CRL().getRevokedCertificates();
@@ -228,6 +229,8 @@ public class TestSCMCertStore {
             c.getSerialNumber().equals(newSerialIDs.get(1)))
             .findAny());
 
+    assertEquals(newCrlInfo.getCrlSequenceID(), sequenceId.get().longValue());
+
     // Valid certs table should have 1 cert
     assertEquals(1L,
         getTableSize(scmMetadataStore.getValidCertsTable().iterator()));
@@ -248,7 +251,6 @@ public class TestSCMCertStore {
     Date now = new Date();
     // Set revocation time in the future
     Date revocationTime = new Date(now.getTime()+500);
-
 
     X509CertificateHolder caCertificateHolder =
         new X509CertificateHolder(generateX509Cert().getEncoded());

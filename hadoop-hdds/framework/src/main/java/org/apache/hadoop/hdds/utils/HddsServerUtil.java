@@ -49,6 +49,7 @@ import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslator
 import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
+import org.apache.hadoop.hdds.scm.proxy.SCMClientConfig;
 import org.apache.hadoop.hdds.scm.proxy.SCMSecurityProtocolFailoverProxyProvider;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
@@ -80,6 +81,8 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_R
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_RETRY_COUNT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_RETRY_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_RETRY_INTERVAL_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURATION;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURATION_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdds.server.ServerUtils.sanitizeUserArgs;
@@ -437,36 +440,50 @@ public final class HddsServerUtil {
             UserGroupInformation.getCurrentUser()));
   }
 
+  public static SCMSecurityProtocolClientSideTranslatorPB
+      getScmSecurityClientWithMaxRetry(OzoneConfiguration conf)
+      throws IOException {
+    // Certificate from SCM is required for DN startup to succeed, so retry
+    // for ever. In this way DN start up is resilient to SCM service running
+    // status.
+    OzoneConfiguration configuration = new OzoneConfiguration(conf);
+    SCMClientConfig scmClientConfig =
+        conf.getObject(SCMClientConfig.class);
+    int retryCount = Integer.MAX_VALUE;
+    scmClientConfig.setRetryCount(retryCount);
+    configuration.setFromObject(scmClientConfig);
 
-  /**
-   * Retrieve the socket address that should be used by clients to connect
-   * to the SCM for
-   * {@link org.apache.hadoop.hdds.protocol.SCMSecurityProtocol}. If
-   * {@link ScmConfigKeys#OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY} is not defined
-   * then {@link ScmConfigKeys#OZONE_SCM_CLIENT_ADDRESS_KEY} is used. If neither
-   * is defined then {@link ScmConfigKeys#OZONE_SCM_NAMES} is used.
-   *
-   * @param conf
-   * @return Target {@code InetSocketAddress} for the SCM block client endpoint.
-   * @throws IllegalArgumentException if configuration is not defined or invalid
-   */
-  public static InetSocketAddress getScmAddressForSecurityProtocol(
-      ConfigurationSource conf) {
-    Optional<String> host = getHostNameFromConfigKeys(conf,
-        ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY,
-        ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY);
+    return new SCMSecurityProtocolClientSideTranslatorPB(
+        new SCMSecurityProtocolFailoverProxyProvider(configuration,
+            UserGroupInformation.getCurrentUser()));
+  }
 
-    if (!host.isPresent()) {
-      // Fallback to Ozone SCM name
-      host = Optional.of(getSingleSCMAddress(conf).getHostName());
+  public static SCMSecurityProtocolClientSideTranslatorPB
+      getScmSecurityClientWithFixedDuration(OzoneConfiguration conf)
+      throws IOException {
+    // As for OM during init, we need to wait for specific duration so that
+    // we can give response to user performed operation init in a definite
+    // period, instead of stuck for ever.
+    OzoneConfiguration configuration = new OzoneConfiguration(conf);
+    long duration = conf.getTimeDuration(OZONE_SCM_INFO_WAIT_DURATION,
+        OZONE_SCM_INFO_WAIT_DURATION_DEFAULT, TimeUnit.SECONDS);
+    SCMClientConfig scmClientConfig =
+        conf.getObject(SCMClientConfig.class);
+    int retryCount =
+        (int) (duration / (scmClientConfig.getRetryInterval()/1000));
+
+    // If duration is set to lesser value, fall back to actual default
+    // retry count.
+    if (retryCount > scmClientConfig.getRetryCount()) {
+      scmClientConfig.setRetryCount(retryCount);
+      configuration.setFromObject(scmClientConfig);
     }
 
-    final int port = getPortNumberFromConfigKeys(conf,
-        ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_KEY)
-        .orElse(ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_DEFAULT);
-
-    return NetUtils.createSocketAddr(host.get() + ":" + port);
+    return new SCMSecurityProtocolClientSideTranslatorPB(
+        new SCMSecurityProtocolFailoverProxyProvider(configuration,
+            UserGroupInformation.getCurrentUser()));
   }
+
   /**
    * Create a scm block client, used by putKey() and getKey().
    *

@@ -37,8 +37,10 @@ import org.junit.rules.TemporaryFolder;
 import org.mockito.Mockito;
 
 import org.apache.hadoop.hdds.client.ContainerBlockID;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -134,8 +136,8 @@ public class TestOMKeyRequest {
     Pipeline pipeline = Pipeline.newBuilder()
         .setState(Pipeline.PipelineState.OPEN)
         .setId(PipelineID.randomId())
-        .setType(HddsProtos.ReplicationType.STAND_ALONE)
-        .setFactor(HddsProtos.ReplicationFactor.ONE)
+        .setReplicationConfig(
+            new StandaloneReplicationConfig(ReplicationFactor.ONE))
         .setNodes(new ArrayList<>())
         .build();
 

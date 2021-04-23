@@ -24,8 +24,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.ha.SCMHAConfiguration;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerImpl;
@@ -50,7 +51,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
-import org.junit.jupiter.api.Disabled;
 import org.slf4j.Logger;
 import org.slf4j.event.Level;
 
@@ -70,7 +70,7 @@ public class TestSCMInstallSnapshotWithHA {
   private int numOfSCMs = 3;
 
   private static final long SNAPSHOT_THRESHOLD = 5;
- // private static final int LOG_PURGE_GAP = 5;
+  private static final int LOG_PURGE_GAP = 5;
 
   /**
    * Create a MiniOzoneCluster for testing.
@@ -86,8 +86,8 @@ public class TestSCMInstallSnapshotWithHA {
     scmServiceId = "scm-service-test1";
     SCMHAConfiguration scmhaConfiguration =
         conf.getObject(SCMHAConfiguration.class);
-  //  scmhaConfiguration.setRaftLogPurgeEnabled(true);
-  //  scmhaConfiguration.setRaftLogPurgeGap(LOG_PURGE_GAP);
+    scmhaConfiguration.setRaftLogPurgeEnabled(true);
+    scmhaConfiguration.setRaftLogPurgeGap(LOG_PURGE_GAP);
     scmhaConfiguration.setRatisSnapshotThreshold(SNAPSHOT_THRESHOLD);
     conf.setFromObject(scmhaConfiguration);
 
@@ -113,22 +113,10 @@ public class TestSCMInstallSnapshotWithHA {
     }
   }
 
-  /**
-   * This test is disabled for now as there seems to be an issue with
-   * Ratis install Snapshot code. In ratis while a new node gets added,
-   * unless and until the node gets added to the voter list, the follower state
-   * is not updated with leader info. So, while an install snapshot notification
-   * is received in the leader, the leader info is not set and hence, out of
-   * ratis transfer using the same leader info doesn't work.
-   *
-   * TODO: Fix this
-   * */
   @Test
-  @Disabled
   public void testInstallSnapshot() throws Exception {
     // Get the leader SCM
     StorageContainerManager leaderSCM = getLeader(cluster);
-    String leaderNodeId = leaderSCM.getScmNodeDetails().getNodeId();
     Assert.assertNotNull(leaderSCM);
     // Find the inactive SCM
     String followerId = getInactiveSCM(cluster).getScmId();
@@ -137,20 +125,9 @@ public class TestSCMInstallSnapshotWithHA {
     // Do some transactions so that the log index increases
     List<ContainerInfo> containers = writeToIncreaseLogIndex(leaderSCM, 200);
 
-    // Get the latest db checkpoint from the leader SCM.
-    TransactionInfo transactionInfo =
-        leaderSCM.getScmHAManager().asSCMHADBTransactionBuffer()
-            .getLatestTrxInfo();
-    TermIndex leaderTermIndex =
-        TermIndex.valueOf(transactionInfo.getTerm(),
-            transactionInfo.getTransactionIndex());
-    long leaderSnaphsotIndex = leaderTermIndex.getIndex();
-    long leaderSnapshotTermIndex = leaderTermIndex.getTerm();
-
-    DBCheckpoint leaderDbCheckpoint =
-        leaderSCM.getScmMetadataStore().getStore().getCheckpoint(false);
-
-    // Start the inactive
+    // Start the inactive SCM. Install Snapshot will happen as part
+    // of setConfiguration() call to ratis leader and the follower will catch
+    // up
     cluster.startInactiveSCM(followerId);
 
     // The recently started  should be lagging behind the leader .
@@ -158,23 +135,7 @@ public class TestSCMInstallSnapshotWithHA {
         follower.getScmHAManager().getRatisServer().getSCMStateMachine()
             .getLastAppliedTermIndex().getIndex();
     assertTrue(
-        followerLastAppliedIndex < leaderSnaphsotIndex);
-
-    SCMHAManagerImpl scmhaManager =
-        (SCMHAManagerImpl) (follower.getScmHAManager());
-    // Install leader 's db checkpoint on the lagging .
-    scmhaManager.installCheckpoint(leaderNodeId, leaderDbCheckpoint);
-
-    SCMStateMachine followerStateMachine =
-        follower.getScmHAManager().getRatisServer().getSCMStateMachine();
-    // After the new checkpoint is installed, the follower
-    // lastAppliedIndex must >= the snapshot index of the checkpoint. It
-    // could be great than snapshot index if there is any conf entry from ratis.
-    followerLastAppliedIndex = followerStateMachine
-            .getLastAppliedTermIndex().getIndex();
-    assertTrue(followerLastAppliedIndex >= leaderSnaphsotIndex);
-    assertTrue(followerStateMachine
-        .getLastAppliedTermIndex().getTerm() >= leaderSnapshotTermIndex);
+        followerLastAppliedIndex >= 200);
 
     // Verify that the follower 's DB contains the transactions which were
     // made while it was inactive.
@@ -317,10 +278,10 @@ public class TestSCMInstallSnapshotWithHA {
         scm.getScmHAManager().getRatisServer().getSCMStateMachine();
     long logIndex = scm.getScmHAManager().getRatisServer().getSCMStateMachine()
         .getLastAppliedTermIndex().getIndex();
-    while (logIndex < targetLogIndex) {
+    while (logIndex <= targetLogIndex) {
       containers.add(scm.getContainerManager()
-          .allocateContainer(HddsProtos.ReplicationType.RATIS,
-              HddsProtos.ReplicationFactor.THREE,
+          .allocateContainer(
+              new RatisReplicationConfig(ReplicationFactor.THREE),
               TestSCMInstallSnapshotWithHA.class.getName()));
       Thread.sleep(100);
       logIndex = stateMachine.getLastAppliedTermIndex().getIndex();

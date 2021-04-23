@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
@@ -98,8 +99,9 @@ public class NodeEndpoint {
           String leaderNode = pipeline.getLeaderNode().getHostName();
           DatanodePipeline datanodePipeline = new DatanodePipeline(
               pipelineID.getId(),
-              pipeline.getType().toString(),
-              pipeline.getFactor().getNumber(),
+              pipeline.getReplicationConfig().getReplicationType().toString(),
+              ReplicationConfig.getLegacyFactor(pipeline.getReplicationConfig())
+                  .getNumber(),
               leaderNode
           );
           pipelines.add(datanodePipeline);

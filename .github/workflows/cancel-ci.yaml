@@ -30,5 +30,12 @@ jobs:
           cancelFutureDuplicates: true
           token: ${{ secrets.GITHUB_TOKEN }}
           sourceRunId: ${{ github.event.workflow_run.id }}
-          notifyPRCancel: true
           skipEventTypes: '["push", "schedule"]'
+      - uses: potiuk/cancel-workflow-runs@a81b3c4d59c61e27484cfacdc13897dd908419c9
+        name: "Cancel failing PR builds"
+        with:
+          cancelMode: failedJobs
+          token: ${{ secrets.GITHUB_TOKEN }}
+          skipEventTypes: '["push", "schedule"]'
+          jobNameRegexps: '["^.*$"]'
+          workflowFileName: post-commit.yml

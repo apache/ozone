@@ -22,13 +22,11 @@ import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import java.util.Iterator;
 import java.util.Collection;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
-
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -125,34 +123,6 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   @Override
   public GrpcTlsConfig getGrpcTlsConfig() {
     return grpcTlsConfig;
-  }
-
-  public static void reinitialize(String clusterId, String scmId,
-      SCMNodeDetails details, OzoneConfiguration conf) throws IOException {
-    RaftServer server = null;
-    try {
-      server = newRaftServer(scmId, conf).build();
-      RaftGroup group = null;
-      Iterator<RaftGroup> iter = server.getGroups().iterator();
-      if (iter.hasNext()) {
-        group = iter.next();
-      }
-      if (group != null && group.getGroupId()
-          .equals(buildRaftGroupId(clusterId))) {
-        LOG.info("Ratis group with group Id {} already exists.",
-            group.getGroupId());
-        return;
-      } else {
-        // close the server instance so that pending locks on raft storage
-        // directory gets released if any and further initiliaze can succeed.
-        server.close();
-        initialize(clusterId, scmId, details, conf);
-      }
-    } finally {
-      if (server != null) {
-        server.close();
-      }
-    }
   }
 
   private static void waitForLeaderToBeReady(RaftServer server,

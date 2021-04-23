@@ -69,6 +69,7 @@ import static org.apache.hadoop.hdds.security.x509.exceptions.CertificateExcepti
 import static org.apache.hadoop.hdds.security.x509.exceptions.CertificateException.ErrorCode.CRYPTO_SIGN_ERROR;
 import static org.apache.hadoop.hdds.security.x509.exceptions.CertificateException.ErrorCode.CSR_ERROR;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClient;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClientWithMaxRetry;
 
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.slf4j.Logger;
@@ -325,7 +326,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
         certId);
     try {
       SCMSecurityProtocol scmSecurityProtocolClient =
-          getScmSecurityClient(
+          getScmSecurityClientWithMaxRetry(
           (OzoneConfiguration) securityConfig.getConfiguration());
       String pemEncodedCert =
           scmSecurityProtocolClient.getCertificate(certId);
@@ -928,7 +929,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     lock.lock();
     try {
       SCMSecurityProtocol scmSecurityProtocolClient =
-          getScmSecurityClient(securityConfig.getConfiguration());
+          getScmSecurityClientWithMaxRetry(
+              (OzoneConfiguration) securityConfig.getConfiguration());
       pemEncodedCACerts =
           scmSecurityProtocolClient.listCACertificate();
       return pemEncodedCACerts;

@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
@@ -52,6 +53,7 @@ public class NodeDecommissionManager {
 
   private NodeManager nodeManager;
   //private ContainerManagerV2 containerManager;
+  private SCMContext scmContext;
   private EventPublisher eventQueue;
   private ReplicationManager replicationManager;
   private OzoneConfiguration conf;
@@ -171,11 +173,12 @@ public class NodeDecommissionManager {
   }
 
   public NodeDecommissionManager(OzoneConfiguration config, NodeManager nm,
-      ContainerManagerV2 containerManager,
+      ContainerManagerV2 containerManager, SCMContext scmContext,
       EventPublisher eventQueue, ReplicationManager rm) {
     this.nodeManager = nm;
     conf = config;
     //this.containerManager = containerManager;
+    this.scmContext = scmContext;
     this.eventQueue = eventQueue;
     this.replicationManager = rm;
 
@@ -248,10 +251,15 @@ public class NodeDecommissionManager {
    */
   public synchronized void continueAdminForNode(DatanodeDetails dn)
       throws NodeNotFoundException {
+    if (!scmContext.isLeader()) {
+      LOG.info("follower SCM ignored continue admin for datanode {}", dn);
+      return;
+    }
     NodeOperationalState opState = getNodeStatus(dn).getOperationalState();
     if (opState == NodeOperationalState.DECOMMISSIONING
         || opState == NodeOperationalState.ENTERING_MAINTENANCE
         || opState == NodeOperationalState.IN_MAINTENANCE) {
+      LOG.info("Continue admin for datanode {}", dn);
       monitor.startMonitoring(dn);
     }
   }
@@ -375,4 +383,20 @@ public class NodeDecommissionManager {
     return nodeManager.getNodeStatus(dn);
   }
 
+  /**
+   * Called in SCMStateMachine#notifyLeaderChanged when current SCM becomes
+   *  leader.
+   */
+  public void onBecomeLeader() {
+    nodeManager.getAllNodes().forEach(datanodeDetails -> {
+      try {
+        continueAdminForNode(datanodeDetails);
+      } catch (NodeNotFoundException e) {
+        // Should not happen, as the node has just registered to call this event
+        // handler.
+        LOG.warn("NodeNotFound when adding the node to the decommissionManager",
+            e);
+      }
+    });
+  }
 }
