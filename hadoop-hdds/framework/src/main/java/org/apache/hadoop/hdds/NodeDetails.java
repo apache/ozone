@@ -45,8 +45,10 @@ public abstract class NodeDetails {
     this.serviceId = serviceId;
     this.nodeId = nodeId;
     this.rpcAddress = rpcAddress;
-    this.hostAddress = rpcAddress.getHostName();
-    this.rpcPort = rpcAddress.getPort();
+    if (rpcAddress != null) {
+      this.hostAddress = rpcAddress.getHostName();
+      this.rpcPort = rpcAddress.getPort();
+    }
     this.ratisPort = ratisPort;
     this.httpAddress = httpAddress;
     this.httpsAddress = httpsAddress;
