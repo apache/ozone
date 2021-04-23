@@ -592,7 +592,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
           @Nullable FileEncryptionInfo encInfo,
           @Nonnull PrefixManager prefixManager,
           @Nullable OmBucketInfo omBucketInfo,
-          OMFileRequest.OMPathInfoV1 omPathInfo,
+          OMFileRequest.OMPathInfoWithFSO omPathInfo,
           long transactionLogIndex, long objectID,
           boolean isRatisEnabled)
           throws IOException {
@@ -636,7 +636,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       @Nullable FileEncryptionInfo encInfo,
       @Nonnull PrefixManager prefixManager,
       @Nullable OmBucketInfo omBucketInfo,
-      OMFileRequest.OMPathInfoV1 omPathInfo,
+      OMFileRequest.OMPathInfoWithFSO omPathInfo,
       long transactionLogIndex, long objectID) {
 
     OmKeyInfo.Builder builder = new OmKeyInfo.Builder();
@@ -678,7 +678,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
           @Nonnull List<OmKeyLocationInfo> locations,
           FileEncryptionInfo encInfo,  @Nonnull PrefixManager prefixManager,
           @Nullable OmBucketInfo omBucketInfo,
-          OMFileRequest.OMPathInfoV1 omPathInfo,
+          OMFileRequest.OMPathInfoWithFSO omPathInfo,
           @Nonnull long transactionLogIndex, long objectID)
           throws IOException {
     HddsProtos.ReplicationFactor factor;

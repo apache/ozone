@@ -432,7 +432,7 @@ public final class TestOMRequestUtils {
         .setClientId(UUID.randomUUID().toString()).build();
   }
 
-  public static OzoneManagerProtocolProtos.OMRequest createBucketRequestV1(
+  public static OzoneManagerProtocolProtos.OMRequest createBucketReqFSO(
           String bucketName, String volumeName, boolean isVersionEnabled,
           OzoneManagerProtocolProtos.StorageTypeProto storageTypeProto) {
     OzoneManagerProtocolProtos.BucketInfo bucketInfo =
@@ -441,7 +441,7 @@ public final class TestOMRequestUtils {
                     .setVolumeName(volumeName)
                     .setIsVersionEnabled(isVersionEnabled)
                     .setStorageType(storageTypeProto)
-                    .addAllMetadata(getMetadataListV1()).build();
+                    .addAllMetadata(getMetadataListFSO()).build();
     OzoneManagerProtocolProtos.CreateBucketRequest.Builder req =
             OzoneManagerProtocolProtos.CreateBucketRequest.newBuilder();
     req.setBucketInfo(bucketInfo);
@@ -460,7 +460,7 @@ public final class TestOMRequestUtils {
     return metadataList;
   }
 
-  public static List< HddsProtos.KeyValue> getMetadataListV1() {
+  public static List< HddsProtos.KeyValue> getMetadataListFSO() {
     List<HddsProtos.KeyValue> metadataList = new ArrayList<>();
     metadataList.add(HddsProtos.KeyValue.newBuilder().setKey("key1").setValue(
             "value1").build());

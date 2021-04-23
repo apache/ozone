@@ -553,7 +553,7 @@ public class OzoneBucket extends WithMetadata {
       String prevKey) throws IOException {
 
     if(OzoneFSUtils.isFSOptimizedBucket(getMetadata())){
-      return new KeyIteratorV1(keyPrefix, prevKey);
+      return new KeyIteratorWithFSO(keyPrefix, prevKey);
     }
     return new KeyIterator(keyPrefix, prevKey);
   }
@@ -882,7 +882,7 @@ public class OzoneBucket extends WithMetadata {
    *
    * Note: Does not guarantee to return the list of keys in a sorted order.
    */
-  private class KeyIteratorV1 extends KeyIterator{
+  private class KeyIteratorWithFSO extends KeyIterator{
 
     private Stack<String> stack;
     private List<OzoneKey> pendingItemsToBeBatched;
@@ -896,7 +896,7 @@ public class OzoneBucket extends WithMetadata {
      * @param keyPrefix
      * @param prevKey
      */
-    KeyIteratorV1(String keyPrefix, String prevKey) throws IOException {
+    KeyIteratorWithFSO(String keyPrefix, String prevKey) throws IOException {
       super(keyPrefix, prevKey);
     }
 

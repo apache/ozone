@@ -736,7 +736,7 @@ public class TestOzoneFileSystem {
   @Test
   public void testAllocateMoreThanOneBlock() throws IOException {
     Path file = new Path("/file");
-    String str = "TestOzoneFileSystemV1.testSeekOnFileLength";
+    String str = "TestOzoneFileSystem.testAllocateMoreThanOneBlock";
     byte[] strBytes = str.getBytes(StandardCharsets.UTF_8);
     long numBlockAllocationsOrg =
             cluster.getOzoneManager().getMetrics().getNumBlockAllocates();

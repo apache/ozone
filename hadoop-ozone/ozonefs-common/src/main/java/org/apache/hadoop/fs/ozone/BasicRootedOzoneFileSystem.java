@@ -310,7 +310,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     }
     OzoneBucket bucket = adapterImpl.getBucket(ofsSrc, false);
     if (OzoneFSUtils.isFSOptimizedBucket(bucket.getMetadata())) {
-      return renameV1(bucket, ofsSrc, ofsDst);
+      return renameFSO(bucket, ofsSrc, ofsDst);
     }
 
     // Cannot rename a directory to its own subdirectory
@@ -389,7 +389,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     return result;
   }
 
-  private boolean renameV1(OzoneBucket bucket,
+  private boolean renameFSO(OzoneBucket bucket,
       OFSPath srcPath, OFSPath dstPath) throws IOException {
     // construct src and dst key paths
     String srcKeyPath = srcPath.getNonKeyPathNoPrefixDelim() +
