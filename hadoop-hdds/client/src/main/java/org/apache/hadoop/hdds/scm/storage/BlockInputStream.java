@@ -21,12 +21,14 @@ package org.apache.hadoop.hdds.scm.storage;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
+import org.apache.hadoop.fs.ByteBufferReadable;
 import org.apache.hadoop.fs.CanUnbuffer;
 import org.apache.hadoop.fs.Seekable;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -55,7 +57,7 @@ import org.slf4j.LoggerFactory;
  * through the sequence of chunks through {@link ChunkInputStream}.
  */
 public class BlockInputStream extends InputStream
-    implements Seekable, CanUnbuffer {
+    implements Seekable, CanUnbuffer, ByteBufferReadable {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(BlockInputStream.class);
@@ -506,5 +508,74 @@ public class BlockInputStream extends InputStream
   @VisibleForTesting
   public synchronized List<ChunkInputStream> getChunkStreams() {
     return chunkStreams;
+  }
+
+  @Override
+  public int read(ByteBuffer byteBuffer) throws IOException {
+    if (byteBuffer == null) {
+      throw new NullPointerException();
+    }
+    int bufferLen = byteBuffer.remaining();
+    if (bufferLen == 0) {
+      return 0;
+    }
+
+    if (!initialized) {
+      initialize();
+    }
+
+    checkOpen();
+    int totalReadLen = 0;
+    int bufferLimit = byteBuffer.limit();
+    while (bufferLen > 0) {
+      // if we are at the last chunk and have read the entire chunk, return
+      if (chunkStreams.size() == 0 ||
+          (chunkStreams.size() - 1 <= chunkIndex &&
+              chunkStreams.get(chunkIndex)
+                  .getRemaining() == 0)) {
+        return totalReadLen == 0 ? EOF : totalReadLen;
+      }
+
+      // Get the current chunkStream and read data from it
+      ChunkInputStream current = chunkStreams.get(chunkIndex);
+      int numBytesToRead = Math.min(bufferLen, (int)current.getRemaining());
+      // change buffer limit
+      if (numBytesToRead < bufferLen) {
+        byteBuffer.limit(byteBuffer.position() + numBytesToRead);
+      }
+      int numBytesRead;
+      try {
+        numBytesRead = current.read(byteBuffer);
+        retries = 0; // reset retries after successful read
+      } catch (StorageContainerException e) {
+        if (shouldRetryRead(e)) {
+          handleReadError(e);
+          continue;
+        } else {
+          throw e;
+        }
+      }
+
+      // restore buffer limit
+      if (numBytesToRead < bufferLen) {
+        byteBuffer.limit(bufferLimit);
+      }
+      if (numBytesRead != numBytesToRead) {
+        // This implies that there is either data loss or corruption in the
+        // chunk entries. Even EOF in the current stream would be covered in
+        // this case.
+        throw new IOException(String.format(
+            "Inconsistent read for chunkName=%s length=%d numBytesToRead= %d " +
+                "numBytesRead=%d", current.getChunkName(), current.getLength(),
+            numBytesToRead, numBytesRead));
+      }
+      totalReadLen += numBytesRead;
+      bufferLen -= numBytesRead;
+      if (current.getRemaining() <= 0 &&
+          ((chunkIndex + 1) < chunkStreams.size())) {
+        chunkIndex += 1;
+      }
+    }
+    return totalReadLen;
   }
 }
