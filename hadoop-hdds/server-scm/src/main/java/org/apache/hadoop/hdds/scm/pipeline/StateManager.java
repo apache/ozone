@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -59,40 +60,41 @@ public interface StateManager {
    * @throws IOException
    */
   @Replicate
-  void updatePipelineState(HddsProtos.PipelineID pipelineIDProto,
-                           HddsProtos.PipelineState newState)
+  void updatePipelineState(
+      HddsProtos.PipelineID pipelineIDProto,
+      HddsProtos.PipelineState newState
+  )
       throws IOException;
 
-  void addContainerToPipeline(PipelineID pipelineID,
-                              ContainerID containerID) throws IOException;
+  void addContainerToPipeline(
+      PipelineID pipelineID,
+      ContainerID containerID
+  ) throws IOException;
 
   Pipeline getPipeline(PipelineID pipelineID) throws PipelineNotFoundException;
 
   List<Pipeline> getPipelines();
 
-  List<Pipeline> getPipelines(HddsProtos.ReplicationType type);
+  List<Pipeline> getPipelines(
+      ReplicationConfig replicationConfig
+  );
 
-  List<Pipeline> getPipelines(HddsProtos.ReplicationType type,
-                              HddsProtos.ReplicationFactor factor);
+  List<Pipeline> getPipelines(
+      ReplicationConfig replicationConfig,
+      Pipeline.PipelineState state
+  );
 
-  List<Pipeline> getPipelines(HddsProtos.ReplicationType type,
-                              HddsProtos.ReplicationFactor factor,
-                              Pipeline.PipelineState state);
-
-  List<Pipeline> getPipelines(HddsProtos.ReplicationType type,
-                              HddsProtos.ReplicationFactor factor,
-                              Pipeline.PipelineState state,
-                              Collection<DatanodeDetails> excludeDns,
-                              Collection<PipelineID> excludePipelines);
-
-  List<Pipeline> getPipelines(HddsProtos.ReplicationType type,
-                              Pipeline.PipelineState... states);
+  List<Pipeline> getPipelines(
+      ReplicationConfig replicationConfig,
+      Pipeline.PipelineState state,
+      Collection<DatanodeDetails> excludeDns,
+      Collection<PipelineID> excludePipelines
+  );
 
   NavigableSet<ContainerID> getContainers(PipelineID pipelineID)
       throws IOException;
 
   int getNumberOfContainers(PipelineID pipelineID) throws IOException;
-
 
   void removeContainerFromPipeline(PipelineID pipelineID,
                                    ContainerID containerID) throws IOException;

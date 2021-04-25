@@ -33,7 +33,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
@@ -53,8 +56,6 @@ import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.util.Time;
-
-import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -260,9 +261,10 @@ public class SCMPipelineManager implements
   }
 
   @Override
-  public Pipeline createPipeline(ReplicationType type,
-      ReplicationFactor factor) throws IOException {
-    if (!isPipelineCreationAllowed() && factor != ReplicationFactor.ONE) {
+  public Pipeline createPipeline(ReplicationConfig replicationConfig)
+      throws IOException {
+    if (!isPipelineCreationAllowed()
+        && replicationConfig.getRequiredNodes() != 1) {
       LOG.debug("Pipeline creation is not allowed until safe mode prechecks " +
           "complete");
       throw new IOException("Pipeline creation is not allowed as safe mode " +
@@ -270,7 +272,7 @@ public class SCMPipelineManager implements
     }
     lock.writeLock().lock();
     try {
-      Pipeline pipeline = pipelineFactory.create(type, factor);
+      Pipeline pipeline = pipelineFactory.create(replicationConfig);
       if (pipelineStore != null) {
         pipelineStore.put(pipeline.getId(), pipeline);
       }
@@ -282,11 +284,11 @@ public class SCMPipelineManager implements
       if (ex instanceof SCMException &&
           ((SCMException) ex).getResult() == FAILED_TO_FIND_SUITABLE_NODE) {
         // Avoid spam SCM log with errors when SCM has enough open pipelines
-        LOG.debug("Can't create more pipelines of type {} and factor {}. " +
-            "Reason: {}", type, factor, ex.getMessage());
+        LOG.debug("Can't create more pipelines of replicationConfig: {}. " +
+            "Reason: {}", replicationConfig, ex.getMessage());
       } else {
-        LOG.error("Failed to create pipeline of type {} and factor {}. " +
-            "Exception: {}", type, factor, ex.getMessage());
+        LOG.error("Failed to create pipeline of replicationConfig: {}. " +
+            "Exception: {}", replicationConfig, ex.getMessage());
       }
       metrics.incNumPipelineCreationFailed();
       throw ex;
@@ -296,13 +298,13 @@ public class SCMPipelineManager implements
   }
 
   @Override
-  public Pipeline createPipeline(ReplicationType type, ReplicationFactor factor,
+  public Pipeline createPipeline(ReplicationConfig replicationConfig,
       List<DatanodeDetails> nodes) {
     // This will mostly be used to create dummy pipeline for SimplePipelines.
     // We don't update the metrics for SimplePipelines.
     lock.writeLock().lock();
     try {
-      return pipelineFactory.create(type, factor, nodes);
+      return pipelineFactory.create(replicationConfig, nodes);
     } finally {
       lock.writeLock().unlock();
     }
@@ -343,57 +345,35 @@ public class SCMPipelineManager implements
   }
 
   @Override
-  public List<Pipeline> getPipelines(ReplicationType type) {
+  public List<Pipeline> getPipelines(ReplicationConfig replicationConfig) {
     lock.readLock().lock();
     try {
-      return stateManager.getPipelines(type);
+      return stateManager.getPipelines(replicationConfig);
     } finally {
       lock.readLock().unlock();
     }
   }
 
   @Override
-  public List<Pipeline> getPipelines(ReplicationType type,
-      ReplicationFactor factor) {
-    lock.readLock().lock();
-    try {
-      return stateManager.getPipelines(type, factor);
-    } finally {
-      lock.readLock().unlock();
-    }
-  }
-
-  @Override
-  public List<Pipeline> getPipelines(ReplicationType type,
+  public List<Pipeline> getPipelines(ReplicationConfig replicationConfig,
       Pipeline.PipelineState state) {
     lock.readLock().lock();
     try {
-      return stateManager.getPipelines(type, state);
+      return stateManager.getPipelines(replicationConfig, state);
     } finally {
       lock.readLock().unlock();
     }
   }
 
   @Override
-  public List<Pipeline> getPipelines(ReplicationType type,
-      ReplicationFactor factor, Pipeline.PipelineState state) {
-    lock.readLock().lock();
-    try {
-      return stateManager.getPipelines(type, factor, state);
-    } finally {
-      lock.readLock().unlock();
-    }
-  }
-
-  @Override
-  public List<Pipeline> getPipelines(ReplicationType type,
-      ReplicationFactor factor, Pipeline.PipelineState state,
+  public List<Pipeline> getPipelines(ReplicationConfig replicationConfig,
+      Pipeline.PipelineState state,
       Collection<DatanodeDetails> excludeDns,
       Collection<PipelineID> excludePipelines) {
     lock.readLock().lock();
     try {
       return stateManager
-          .getPipelines(type, factor, state, excludeDns, excludePipelines);
+          .getPipelines(replicationConfig, state, excludeDns, excludePipelines);
     } finally {
       lock.readLock().unlock();
     }
@@ -513,14 +493,12 @@ public class SCMPipelineManager implements
 
   /**
    * Scrub pipelines.
-   * @param type Pipeline type
-   * @param factor Pipeline factor
-   * @throws IOException
    */
   @Override
-  public void scrubPipeline(ReplicationType type, ReplicationFactor factor)
-      throws IOException{
-    if (type != ReplicationType.RATIS || factor != ReplicationFactor.THREE) {
+  public void scrubPipeline(ReplicationConfig replicationConfig)
+      throws IOException {
+    if (!RatisReplicationConfig.hasFactor(replicationConfig,
+        ReplicationFactor.THREE)) {
       // Only srub pipeline for RATIS THREE pipeline
       return;
     }
@@ -530,7 +508,7 @@ public class SCMPipelineManager implements
         ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT_DEFAULT,
         TimeUnit.MILLISECONDS);
 
-    List<Pipeline> candidates = stateManager.getPipelines(type, factor);
+    List<Pipeline> candidates = stateManager.getPipelines(replicationConfig);
 
     for (Pipeline p : candidates) {
       // scrub pipelines who stay ALLOCATED for too long.

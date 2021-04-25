@@ -24,7 +24,11 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto.ResponseCode;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertificateRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCrlsRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCrlsResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetDataNodeCertRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetLatestCrlIdRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetLatestCrlIdResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetOMCertRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetSCMCertRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMListCertificateRequestProto;
@@ -33,14 +37,18 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecuri
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityResponse;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.Status;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolPB;
+import org.apache.hadoop.hdds.scm.ha.RetriableWithNoFailoverException;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
+import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 
 import com.google.protobuf.ProtocolMessageEnum;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -90,10 +98,11 @@ public class SCMSecurityProtocolServerSideTranslatorPB
         request.getCmdType(), request.getTraceID());
   }
 
-  public SCMSecurityResponse processRequest(SCMSecurityRequest request) {
+  public SCMSecurityResponse processRequest(SCMSecurityRequest request)
+      throws ServiceException {
     SCMSecurityResponse.Builder scmSecurityResponse =
         SCMSecurityResponse.newBuilder().setCmdType(request.getCmdType())
-        .setStatus(Status.OK);
+            .setStatus(Status.OK);
     try {
       switch (request.getCmdType()) {
       case GetCertificate:
@@ -123,11 +132,27 @@ public class SCMSecurityProtocolServerSideTranslatorPB
       case ListCACertificate:
         return scmSecurityResponse.setListCertificateResponseProto(
             listCACertificate()).build();
+      case GetCrls:
+        return SCMSecurityResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setGetCrlsResponseProto(getCrls(request.getGetCrlsRequest()))
+            .build();
+      case GetLatestCrlId:
+        return SCMSecurityResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setGetLatestCrlIdResponseProto(getLatestCrlId(
+                request.getGetLatestCrlIdRequest()))
+            .build();
       default:
         throw new IllegalArgumentException(
             "Unknown request type: " + request.getCmdType());
       }
     } catch (IOException e) {
+      if (SCMHAUtils.isRetriableWithNoFailoverException(e)) {
+        throw new ServiceException(new RetriableWithNoFailoverException(e));
+      } else if (e instanceof NotLeaderException) {
+        throw new ServiceException(e);
+      }
       scmSecurityResponse.setSuccess(false);
       scmSecurityResponse.setStatus(exceptionToResponseStatus(e));
       // If actual cause is set in SCMSecurityException, set message with
@@ -176,8 +201,8 @@ public class SCMSecurityProtocolServerSideTranslatorPB
             .newBuilder()
             .setResponseCode(ResponseCode.success)
             .setX509Certificate(certificate)
-            .setX509CACertificate(impl.getCACertificate())
-            .setX509RootCACertificate(impl.getRootCACertificate());
+            .setX509CACertificate(impl.getCACertificate());
+    setRootCAIfNeeded(builder);
 
     return builder.build();
 
@@ -194,6 +219,9 @@ public class SCMSecurityProtocolServerSideTranslatorPB
       SCMGetSCMCertRequestProto request)
       throws IOException {
 
+    if (!scm.getScmStorageConfig().checkPrimarySCMIdInitialized()) {
+      throw createNotHAException();
+    }
     String certificate = impl.getSCMCertificate(request.getScmDetails(),
         request.getCSR());
     SCMGetCertResponseProto.Builder builder =
@@ -224,8 +252,8 @@ public class SCMSecurityProtocolServerSideTranslatorPB
             .newBuilder()
             .setResponseCode(ResponseCode.success)
             .setX509Certificate(certificate)
-            .setX509CACertificate(impl.getCACertificate())
-            .setX509RootCACertificate(impl.getRootCACertificate());
+            .setX509CACertificate(impl.getCACertificate());
+    setRootCAIfNeeded(builder);
     return builder.build();
 
   }
@@ -253,8 +281,8 @@ public class SCMSecurityProtocolServerSideTranslatorPB
             .newBuilder()
             .setResponseCode(ResponseCode.success)
             .setX509Certificate(certificate)
-            .setX509CACertificate(certificate)
-            .setX509RootCACertificate(impl.getRootCACertificate());
+            .setX509CACertificate(certificate);
+    setRootCAIfNeeded(builder);
     return builder.build();
 
   }
@@ -272,11 +300,38 @@ public class SCMSecurityProtocolServerSideTranslatorPB
             .addAllCertificates(certs);
     return builder.build();
 
+  }
 
+  public SCMGetCrlsResponseProto getCrls(
+      SCMGetCrlsRequestProto request) throws IOException {
+    List<CRLInfo> crls = impl.getCrls(request.getCrlIdList());
+    SCMGetCrlsResponseProto.Builder builder =
+        SCMGetCrlsResponseProto.newBuilder();
+    for (CRLInfo crl : crls) {
+      try {
+        builder.addCrlInfos(crl.getProtobuf());
+      } catch (SCMSecurityException e) {
+        LOG.error("Fail in parsing CRL info", e);
+        throw new SCMSecurityException("Fail in parsing CRL info", e);
+      }
+    }
+    return builder.build();
+  }
+
+  public SCMGetLatestCrlIdResponseProto getLatestCrlId(
+      SCMGetLatestCrlIdRequestProto request) throws IOException {
+    SCMGetLatestCrlIdResponseProto.Builder builder =
+        SCMGetLatestCrlIdResponseProto
+            .newBuilder().
+            setCrlId(impl.getLatestCrlId());
+    return builder.build();
   }
 
 
   public SCMGetCertResponseProto getRootCACertificate() throws IOException {
+    if (scm.getScmStorageConfig().checkPrimarySCMIdInitialized()) {
+      throw createNotHAException();
+    }
     String rootCACertificate = impl.getRootCACertificate();
     SCMGetCertResponseProto.Builder builder =
         SCMGetCertResponseProto
@@ -302,5 +357,16 @@ public class SCMSecurityProtocolServerSideTranslatorPB
 
   }
 
+  private SCMSecurityException createNotHAException() {
+    return new SCMSecurityException("SCM is not Ratis enabled. Enable ozone" +
+        ".scm.ratis.enable config");
+  }
+
+  private void setRootCAIfNeeded(SCMGetCertResponseProto.Builder builder)
+      throws IOException {
+    if (scm.getScmStorageConfig().checkPrimarySCMIdInitialized()) {
+      builder.setX509RootCACertificate(impl.getRootCACertificate());
+    }
+  }
 
 }

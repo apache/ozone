@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
@@ -32,6 +33,7 @@ import org.jetbrains.annotations.NotNull;
 import org.junit.Assert;
 
 import java.io.IOException;
+import java.util.List;
 
 /**
  * Class tests OMKeyCommitRequest with prefix layout.
@@ -59,7 +61,8 @@ public class TestOMKeyCommitRequestWithFSO extends TestOMKeyCommitRequest {
   }
 
   @Override
-  protected String addKeyToOpenKeyTable() throws Exception {
+  protected String addKeyToOpenKeyTable(List<OmKeyLocationInfo> locationList)
+      throws Exception {
     // need to initialize parentID
     if (getParentDir() == null) {
       parentID = getBucketID();
@@ -74,6 +77,7 @@ public class TestOMKeyCommitRequestWithFSO extends TestOMKeyCommitRequest {
                     HddsProtos.ReplicationType.RATIS,
                     HddsProtos.ReplicationFactor.ONE, objectId, parentID, 100,
                     Time.now());
+    omKeyInfoFSO.appendNewBlocks(locationList, false);
 
     String fileName = OzoneFSUtils.getFileName(keyName);
     TestOMRequestUtils.addFileToKeyTable(true, false,

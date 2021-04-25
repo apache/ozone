@@ -27,6 +27,8 @@ import com.google.protobuf.BlockingService;
 import com.google.protobuf.ProtocolMessageEnum;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -190,7 +192,9 @@ public class SCMClientProtocolServer implements
     getScm().checkAdminAccess(getRpcRemoteUsername());
 
     final ContainerInfo container = scm.getContainerManager()
-        .allocateContainer(replicationType, factor, owner);
+        .allocateContainer(
+            ReplicationConfig.fromTypeAndFactor(replicationType, factor),
+            owner);
     final Pipeline pipeline = scm.getPipelineManager()
         .getPipeline(container.getPipelineID());
     return new ContainerWithPipeline(container, pipeline);
@@ -249,8 +253,7 @@ public class SCMClientProtocolServer implements
 
     if (pipeline == null) {
       pipeline = scm.getPipelineManager().createPipeline(
-          HddsProtos.ReplicationType.STAND_ALONE,
-          container.getReplicationFactor(),
+          new StandaloneReplicationConfig(container.getReplicationFactor()),
           scm.getContainerManager()
               .getContainerReplicas(cid).stream()
               .map(ContainerReplica::getDatanodeDetails)
@@ -506,7 +509,8 @@ public class SCMClientProtocolServer implements
   public Pipeline createReplicationPipeline(HddsProtos.ReplicationType type,
       HddsProtos.ReplicationFactor factor, HddsProtos.NodePool nodePool)
       throws IOException {
-    Pipeline result = scm.getPipelineManager().createPipeline(type, factor);
+    Pipeline result = scm.getPipelineManager()
+        .createPipeline(ReplicationConfig.fromTypeAndFactor(type, factor));
     AUDIT.logWriteSuccess(
         buildAuditMessageForSuccess(SCMAction.CREATE_PIPELINE, null));
     return result;

@@ -31,6 +31,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -52,6 +53,8 @@ import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.keys.KeyHandler;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine.Command;
+
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 
 /**
  * Class that gives chunk location given a specific key.
@@ -117,7 +120,7 @@ public class ChunkKeyHandler extends KeyHandler implements
       Pipeline pipeline = keyLocation.getPipeline();
       if (pipeline.getType() != HddsProtos.ReplicationType.STAND_ALONE) {
         pipeline = Pipeline.newBuilder(pipeline)
-                .setType(HddsProtos.ReplicationType.STAND_ALONE).build();
+            .setReplicationConfig(new StandaloneReplicationConfig(ONE)).build();
       }
       xceiverClient = xceiverClientManager
               .acquireClientForReadData(pipeline);
