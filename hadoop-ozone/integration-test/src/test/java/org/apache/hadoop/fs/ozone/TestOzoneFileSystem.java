@@ -211,10 +211,6 @@ public class TestOzoneFileSystem {
     return fs;
   }
 
-  public static boolean isEnabledFileSystemPaths() {
-    return enabledFileSystemPaths;
-  }
-
   public static void setIsBucketFSOptimized(boolean isBucketFSO) {
     isBucketFSOptimized = isBucketFSO;
   }
