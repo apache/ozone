@@ -25,8 +25,10 @@ import java.util.UUID;
 
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
@@ -147,16 +149,16 @@ public class TestHealthyPipelineSafeModeRule {
 
       // Create 3 pipelines
       Pipeline pipeline1 =
-          pipelineManager.createPipeline(HddsProtos.ReplicationType.RATIS,
-              HddsProtos.ReplicationFactor.THREE);
+          pipelineManager.createPipeline(new RatisReplicationConfig(
+              ReplicationFactor.THREE));
       pipelineManager.openPipeline(pipeline1.getId());
       Pipeline pipeline2 =
-          pipelineManager.createPipeline(HddsProtos.ReplicationType.RATIS,
-              HddsProtos.ReplicationFactor.THREE);
+          pipelineManager.createPipeline(new RatisReplicationConfig(
+              ReplicationFactor.THREE));
       pipelineManager.openPipeline(pipeline2.getId());
       Pipeline pipeline3 =
-          pipelineManager.createPipeline(HddsProtos.ReplicationType.RATIS,
-              HddsProtos.ReplicationFactor.THREE);
+          pipelineManager.createPipeline(new RatisReplicationConfig(
+              ReplicationFactor.THREE));
       pipelineManager.openPipeline(pipeline3.getId());
 
       // Mark pipeline healthy
@@ -245,16 +247,16 @@ public class TestHealthyPipelineSafeModeRule {
 
       // Create 3 pipelines
       Pipeline pipeline1 =
-          pipelineManager.createPipeline(HddsProtos.ReplicationType.RATIS,
-              HddsProtos.ReplicationFactor.ONE);
+          pipelineManager.createPipeline(new RatisReplicationConfig(
+              ReplicationFactor.ONE));
       pipelineManager.openPipeline(pipeline1.getId());
       Pipeline pipeline2 =
-          pipelineManager.createPipeline(HddsProtos.ReplicationType.RATIS,
-              HddsProtos.ReplicationFactor.THREE);
+          pipelineManager.createPipeline(new RatisReplicationConfig(
+              ReplicationFactor.THREE));
       pipelineManager.openPipeline(pipeline2.getId());
       Pipeline pipeline3 =
-          pipelineManager.createPipeline(HddsProtos.ReplicationType.RATIS,
-              HddsProtos.ReplicationFactor.THREE);
+          pipelineManager.createPipeline(new RatisReplicationConfig(
+              ReplicationFactor.THREE));
       pipelineManager.openPipeline(pipeline3.getId());
 
       // Mark pipeline healthy

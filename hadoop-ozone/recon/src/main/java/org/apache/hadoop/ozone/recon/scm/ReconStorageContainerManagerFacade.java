@@ -39,7 +39,6 @@ import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPla
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
-import org.apache.hadoop.hdds.scm.ha.SCMHANodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
@@ -57,6 +56,7 @@ import org.apache.hadoop.hdds.scm.safemode.SafeModeManager;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.io.IOUtils;
@@ -89,7 +89,7 @@ public class ReconStorageContainerManagerFacade
   private final SCMContext scmContext;
   private final SCMStorageConfig scmStorageConfig;
   private final DBStore dbStore;
-  private final SCMHANodeDetails scmHANodeDetails;
+  private final SCMNodeDetails reconNodeDetails;
   private final SCMHAManager scmhaManager;
   private final SequenceIdGenerator sequenceIdGen;
 
@@ -109,7 +109,7 @@ public class ReconStorageContainerManagerFacade
       ContainerHealthSchemaManager containerHealthSchemaManager,
       ContainerDBServiceProvider containerDBServiceProvider)
       throws IOException {
-    scmHANodeDetails = SCMHANodeDetails.loadSCMHAConfig(conf);
+    reconNodeDetails = getReconNodeDetails(conf);
     this.eventQueue = new EventQueue();
     eventQueue.setSilent(true);
     this.scmContext = SCMContext.emptyContext();
@@ -220,6 +220,13 @@ public class ReconStorageContainerManagerFacade
     return reconScmConfiguration;
   }
 
+  private SCMNodeDetails getReconNodeDetails(OzoneConfiguration conf) {
+    SCMNodeDetails.Builder builder = new SCMNodeDetails.Builder();
+    builder.setDatanodeProtocolServerAddress(
+        HddsServerUtil.getReconDataNodeBindAddress(conf));
+    return builder.build();
+  }
+
   /**
    * Start the Recon SCM subsystems.
    */
@@ -320,7 +327,7 @@ public class ReconStorageContainerManagerFacade
 
   @Override
   public SCMNodeDetails getScmNodeDetails() {
-    return scmHANodeDetails.getLocalNodeDetails();
+    return reconNodeDetails;
   }
 
   public EventQueue getEventQueue() {

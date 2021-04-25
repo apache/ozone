@@ -51,6 +51,8 @@ message SCMSecurityRequest {
     optional SCMListCertificateRequestProto listCertificateRequest = 7;
     optional SCMGetSCMCertRequestProto getSCMCertificateRequest = 8;
     optional SCMListCACertificateRequestProto listCACertificateRequestProto = 9;
+    optional SCMGetCrlsRequestProto getCrlsRequest = 10;
+    optional SCMGetLatestCrlIdRequestProto getLatestCrlIdRequest = 11;
 
 }
 
@@ -71,6 +73,10 @@ message SCMSecurityResponse {
 
     optional SCMListCertificateResponseProto listCertificateResponseProto = 7;
 
+    optional SCMGetCrlsResponseProto getCrlsResponseProto = 8;
+
+    optional SCMGetLatestCrlIdResponseProto getLatestCrlIdResponseProto = 9;
+
 }
 
 enum Type {
@@ -82,6 +88,8 @@ enum Type {
     GetSCMCertificate = 6;
     GetRootCACertificate = 7;
     ListCACertificate = 8;
+    GetCrls = 9;
+    GetLatestCrlId = 10;
 }
 
 enum Status {
@@ -180,6 +188,27 @@ message SCMGetRootCACertificateRequestProto {
 }
 
 message SCMListCACertificateRequestProto {
+}
+
+/**
+* Proto request to get CRL.
+*/
+message SCMGetCrlsRequestProto {
+    repeated int64 crlId = 1;
+}
+
+message SCMGetCrlsResponseProto {
+    repeated CRLInfoProto crlInfos = 1;
+}
+
+/**
+* Proto request to get latest CRL id.
+*/
+message SCMGetLatestCrlIdRequestProto {
+}
+
+message SCMGetLatestCrlIdResponseProto {
+    optional int64 crlId = 1;
 }
 
 service SCMSecurityProtocolService {

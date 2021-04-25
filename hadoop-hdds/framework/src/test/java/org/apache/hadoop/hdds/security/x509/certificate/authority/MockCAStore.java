@@ -19,6 +19,8 @@
 
 package org.apache.hadoop.hdds.security.x509.certificate.authority;
 
+import org.apache.hadoop.hdds.security.x509.certificate.CertInfo;
+import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
@@ -75,6 +77,12 @@ public class MockCAStore implements CertificateStore {
   }
 
   @Override
+  public CertInfo getRevokedCertificateInfoByID(BigInteger serialID)
+      throws IOException {
+    return null;
+  }
+
+  @Override
   public List<X509Certificate> listCertificate(NodeType role,
       BigInteger startSerialID, int count, CertType certType)
       throws IOException {
@@ -83,4 +91,14 @@ public class MockCAStore implements CertificateStore {
 
   @Override
   public void reinitialize(SCMMetadataStore metadataStore) {}
+
+  @Override
+  public List<CRLInfo> getCrls(List<Long> crlIds) throws IOException {
+    return Collections.emptyList();
+  }
+
+  @Override
+  public long getLatestCrlId() {
+    return 0;
+  }
 }

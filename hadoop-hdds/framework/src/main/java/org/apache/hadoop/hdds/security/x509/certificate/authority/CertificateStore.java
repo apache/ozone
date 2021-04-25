@@ -20,6 +20,8 @@
 package org.apache.hadoop.hdds.security.x509.certificate.authority;
 
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
+import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
+import org.apache.hadoop.hdds.security.x509.certificate.CertInfo;
 import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
@@ -85,6 +87,7 @@ public interface CertificateStore {
    * Otherwise, returns the newly generated CRL sequence ID.
    * @throws IOException - on failure.
    */
+  @Replicate
   Optional<Long> revokeCertificates(List<BigInteger> serialIDs,
                                     X509CertificateHolder caCertificateHolder,
                                     CRLReason reason,
@@ -111,6 +114,17 @@ public interface CertificateStore {
       throws IOException;
 
   /**
+   * Retrieves a {@link CertInfo} for a revoked certificate based on the Serial
+   * number of that certificate. This API can be used to get more information
+   * like the timestamp when the certificate was persisted in the DB.
+   * @param serialID - ID of the certificate.
+   * @return CertInfo
+   * @throws IOException - on failure.
+   */
+  CertInfo getRevokedCertificateInfoByID(BigInteger serialID)
+      throws IOException;
+
+  /**
    *
    * @param role - role of the certificate owner (OM/DN).
    * @param startSerialID - start cert serial id.
@@ -128,6 +142,20 @@ public interface CertificateStore {
    * @param metadataStore SCMMetaStore.
    */
   void reinitialize(SCMMetadataStore metadataStore);
+
+  /**
+   * Get the CRLInfo based on the CRL Ids.
+   * @param crlIds - list of crl ids
+   * @return CRLInfo
+   * @throws IOException
+   */
+  List<CRLInfo> getCrls(List<Long> crlIds) throws IOException;
+
+  /**
+   * Get the latest CRL id.
+   * @return latest CRL id.
+   */
+  long getLatestCrlId();
 
   /**
    * Different kind of Certificate stores.
