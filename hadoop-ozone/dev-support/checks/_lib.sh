@@ -87,6 +87,34 @@ _install_flekszible() {
   chmod +x bin/flekszible
 }
 
+install_hugo() {
+  _install_tool hugo bin
+}
+
+_install_hugo() {
+  : ${HUGO_VERSION:=0.81.0}
+
+  local os=$(uname -s)
+  local arch=$(uname -m)
+
+  mkdir bin
+
+  case "${os}" in
+    Darwin)
+      os=macOS
+      ;;
+  esac
+
+  case "${arch}" in
+    x86_64)
+      arch=64bit
+      ;;
+  esac
+
+  curl -LSs "https://github.com/gohugoio/hugo/releases/download/v${HUGO_VERSION}/hugo_${HUGO_VERSION}_${os}-${arch}.tar.gz" | tar -xz -f - -C bin hugo
+  chmod +x bin/hugo
+}
+
 install_virtualenv() {
   _install_tool virtualenv
 }

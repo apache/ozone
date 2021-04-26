@@ -36,7 +36,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
@@ -126,7 +125,7 @@ public class DatanodeChunkGenerator extends BaseFreonGenerator implements
       if (!arePipelinesOrDatanodesProvided()) {
         //default behaviour if no arguments provided
         firstPipeline = pipelinesFromSCM.stream()
-              .filter(p -> p.getFactor() == ReplicationFactor.THREE)
+              .filter(p -> p.getReplicationConfig().getRequiredNodes() == 3)
               .findFirst()
               .orElseThrow(() -> new IllegalArgumentException(
                   "Pipeline ID is NOT defined, and no pipeline " +
