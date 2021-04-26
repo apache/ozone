@@ -124,7 +124,7 @@ public class TestOMStartupWithLayout {
     verifyBucketLayout(bucket3, OZONE_OM_METADATA_LAYOUT_PREFIX, true);
 
     // case-5) Configured cluster layout as SIMPLE. Bucket exists with PREFIX
-    // layout format. OM startup should be successful.
+    // layout format. OM startup should fail.
     conf.set(OZONE_OM_METADATA_LAYOUT, OZONE_OM_METADATA_LAYOUT_DEFAULT);
     cluster.getOzoneManager().stop();
     verifyOMStartupFailure(OZONE_OM_METADATA_LAYOUT_DEFAULT);

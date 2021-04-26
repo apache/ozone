@@ -3866,7 +3866,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       StringBuilder msg = new StringBuilder();
       msg.append("Failed to start OM in ");
       msg.append(clusterLevelMetaLayout);
-      msg.append(" layout format, as existing bucket has a different layout ");
+      msg.append(" layout format as existing bucket has a different layout ");
       msg.append(bucketMetaLayout);
       msg.append(" metadata format");
 
