@@ -37,7 +37,7 @@ public class SCMClientConfig {
   public static final String SCM_CLIENT_RPC_TIME_OUT = "rpc.timeout";
   public static final String SCM_CLIENT_FAILOVER_MAX_RETRY =
       "failover.max.retry";
-  public static final String SCM_CLIENT_MAX_RETRY_TIMEOUT=
+  public static final String SCM_CLIENT_MAX_RETRY_TIMEOUT =
       "max.retry.timeout";
   public static final String SCM_CLIENT_RETRY_INTERVAL =
       "failover.retry.interval";
