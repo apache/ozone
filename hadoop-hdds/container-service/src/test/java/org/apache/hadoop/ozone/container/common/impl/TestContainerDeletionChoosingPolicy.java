@@ -97,7 +97,6 @@ public class TestContainerDeletionChoosingPolicy {
     containerSet = new ContainerSet();
 
     int numContainers = 10;
-    Random random = new Random();
     for (int i = 0; i < numContainers; i++) {
       KeyValueContainerData data = new KeyValueContainerData(i,
           layout,
