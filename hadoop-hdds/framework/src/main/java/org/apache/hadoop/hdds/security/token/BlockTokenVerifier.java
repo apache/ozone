@@ -18,7 +18,10 @@
 
 package org.apache.hadoop.hdds.security.token;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
@@ -41,6 +44,14 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretP
 public class BlockTokenVerifier extends
     ShortLivedTokenVerifier<OzoneBlockTokenIdentifier> {
 
+  public static String getTokenService(BlockID blockID) {
+    return getTokenService(blockID.getContainerBlockID());
+  }
+
+  public static String getTokenService(ContainerBlockID blockID) {
+    return String.valueOf(blockID);
+  }
+
   public BlockTokenVerifier(SecurityConfig conf, CertificateClient caClient) {
     super(conf, caClient);
   }
@@ -57,9 +68,13 @@ public class BlockTokenVerifier extends
 
   @Override
   protected Object getService(ContainerCommandRequestProto cmd) {
-    return HddsUtils.getBlockID(cmd).getContainerBlockID();
+    BlockID blockID = HddsUtils.getBlockID(cmd);
+    Preconditions.checkNotNull(blockID,
+        "no blockID in %s command", cmd.getCmdType());
+    return getTokenService(blockID);
   }
 
+  @Override
   protected void verify(OzoneBlockTokenIdentifier tokenId,
       ContainerCommandRequestProto cmd) throws SCMSecurityException {
 

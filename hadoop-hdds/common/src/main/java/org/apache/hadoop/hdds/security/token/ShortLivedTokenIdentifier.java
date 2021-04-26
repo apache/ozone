@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.security.token;
 
 import com.google.common.base.Strings;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.TokenIdentifier;
 
@@ -27,6 +28,7 @@ import java.util.Objects;
 /**
  * Base class for short-lived tokens (block, container).
  */
+@InterfaceAudience.Private
 public abstract class ShortLivedTokenIdentifier extends TokenIdentifier {
 
   private String ownerId;

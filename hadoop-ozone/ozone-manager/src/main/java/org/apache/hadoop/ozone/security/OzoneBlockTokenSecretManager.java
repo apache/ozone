@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.security;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto;
 import org.apache.hadoop.hdds.security.token.ShortLivedTokenSecretManager;
@@ -43,7 +44,7 @@ public class OzoneBlockTokenSecretManager extends
     ShortLivedTokenSecretManager<OzoneBlockTokenIdentifier> {
 
   private static final Logger LOG = LoggerFactory
-      .getLogger(OzoneBlockTokenSecretManager.class);;
+      .getLogger(OzoneBlockTokenSecretManager.class);
 
   public OzoneBlockTokenSecretManager(SecurityConfig conf,
       long tokenLifetime, String omCertSerialId) {
@@ -57,8 +58,8 @@ public class OzoneBlockTokenSecretManager extends
   }
 
   public OzoneBlockTokenIdentifier createIdentifier(String owner,
-      String blockId, Set<AccessModeProto> modes, long maxLength) {
-    return new OzoneBlockTokenIdentifier(owner, blockId, modes,
+      BlockID blockID, Set<AccessModeProto> modes, long maxLength) {
+    return new OzoneBlockTokenIdentifier(owner, blockID, modes,
         getTokenExpiryTime().toEpochMilli(), getCertSerialId(), maxLength);
   }
 
@@ -67,7 +68,7 @@ public class OzoneBlockTokenSecretManager extends
    * token is set to blockId.
    */
   public Token<OzoneBlockTokenIdentifier> generateToken(String user,
-      String blockId, Set<AccessModeProto> modes, long maxLength) {
+      BlockID blockId, Set<AccessModeProto> modes, long maxLength) {
     OzoneBlockTokenIdentifier tokenIdentifier = createIdentifier(user,
         blockId, modes, maxLength);
     if (LOG.isDebugEnabled()) {
@@ -75,16 +76,15 @@ public class OzoneBlockTokenSecretManager extends
       LOG.info("Issued delegation token -> expiryTime:{}, tokenId:{}",
           Instant.ofEpochMilli(expiryTime), tokenIdentifier);
     }
-    // Pass blockId as service.
     return new Token<>(tokenIdentifier.getBytes(),
         createPassword(tokenIdentifier), tokenIdentifier.getKind(),
-        new Text(blockId));
+        new Text(tokenIdentifier.getService()));
   }
 
   /**
    * Generate an block token for current user.
    */
-  public Token<OzoneBlockTokenIdentifier> generateToken(String blockId,
+  public Token<OzoneBlockTokenIdentifier> generateToken(BlockID blockId,
       Set<AccessModeProto> modes, long maxLength) throws IOException {
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
     String userID = (ugi == null ? null : ugi.getShortUserName());

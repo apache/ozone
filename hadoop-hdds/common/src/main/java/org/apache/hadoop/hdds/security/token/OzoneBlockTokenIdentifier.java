@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.security.token;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto;
 import org.apache.hadoop.io.Text;
@@ -45,11 +46,23 @@ import java.util.Set;
 public class OzoneBlockTokenIdentifier extends ShortLivedTokenIdentifier {
 
   static final Text KIND_NAME = new Text("HDDS_BLOCK_TOKEN");
+
   private String blockId;
   private EnumSet<AccessModeProto> modes;
   private long maxLength;
 
+  public static String getTokenService(BlockID blockID) {
+    return String.valueOf(blockID.getContainerBlockID());
+  }
+
   public OzoneBlockTokenIdentifier() {
+  }
+
+  public OzoneBlockTokenIdentifier(String ownerId, BlockID blockId,
+      Set<AccessModeProto> modes, long expiryDate, String omCertSerialId,
+      long maxLength) {
+    this(ownerId, getTokenService(blockId), modes, expiryDate, omCertSerialId,
+        maxLength);
   }
 
   public OzoneBlockTokenIdentifier(String ownerId, String blockId,

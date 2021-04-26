@@ -259,8 +259,7 @@ public class TestSecureContainerServer {
 
       // Test 2: Test putBlock succeeded with valid block token.
       Token<OzoneBlockTokenIdentifier> token =
-          blockTokenSecretManager.generateToken(
-          blockID.getContainerBlockID().toString(),
+          blockTokenSecretManager.generateToken(blockID,
           EnumSet.allOf(AccessModeProto.class), RandomUtils.nextLong());
 
       ContainerCommandRequestProto writeChunkRequest = getWriteChunkRequest(

@@ -19,9 +19,15 @@
 package org.apache.hadoop.ozone.security;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto;
+import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.security.token.BlockTokenVerifier;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
+import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.OMCertificateClient;
@@ -44,17 +50,22 @@ import java.security.cert.X509Certificate;
 import java.util.EnumSet;
 import java.util.concurrent.TimeUnit;
 
+import static org.apache.hadoop.ozone.container.ContainerTestHelper.getPutBlockRequest;
+import static org.apache.hadoop.ozone.container.ContainerTestHelper.getWriteChunkRequest;
+
 /**
  * Test class for {@link OzoneBlockTokenSecretManager}.
  */
 public class TestOzoneBlockTokenSecretManager {
 
-  private OzoneBlockTokenSecretManager secretManager;
-  private String omCertSerialId;
-  private CertificateClient client;
   private static final String BASEDIR = GenericTestUtils
       .getTempPath(TestOzoneBlockTokenSecretManager.class.getSimpleName());
   private static final String ALGORITHM = "SHA256withRSA";
+
+  private OzoneBlockTokenSecretManager secretManager;
+  private String omCertSerialId;
+  private CertificateClient client;
+  private SecurityConfig securityConfig;
 
   @Before
   public void setUp() throws Exception {
@@ -64,7 +75,7 @@ public class TestOzoneBlockTokenSecretManager {
     // Create Ozone Master key pair.
     KeyPair keyPair = KeyStoreTestUtil.generateKeyPair("RSA");
     // Create Ozone Master certificate (SCM CA issued cert) and key store.
-    SecurityConfig securityConfig = new SecurityConfig(conf);
+    securityConfig = new SecurityConfig(conf);
     X509Certificate x509Certificate = KeyStoreTestUtil
         .generateCertificate("CN=OzoneMaster", keyPair, 30, ALGORITHM);
     omCertSerialId = x509Certificate.getSerialNumber().toString();
@@ -93,13 +104,16 @@ public class TestOzoneBlockTokenSecretManager {
 
   @Test
   public void testGenerateToken() throws Exception {
+    BlockID blockID = new BlockID(101, 0);
+
     Token<OzoneBlockTokenIdentifier> token = secretManager.generateToken(
-        "101", EnumSet.allOf(AccessModeProto.class), 100);
+        blockID, EnumSet.allOf(AccessModeProto.class), 100);
     OzoneBlockTokenIdentifier identifier =
         OzoneBlockTokenIdentifier.readFieldsProtobuf(new DataInputStream(
             new ByteArrayInputStream(token.getIdentifier())));
     // Check basic details.
-    Assert.assertEquals("101", identifier.getService());
+    Assert.assertEquals(OzoneBlockTokenIdentifier.getTokenService(blockID),
+        identifier.getService());
     Assert.assertEquals(EnumSet.allOf(AccessModeProto.class),
         identifier.getAccessModes());
     Assert.assertEquals(omCertSerialId, identifier.getCertSerialId());
@@ -109,18 +123,54 @@ public class TestOzoneBlockTokenSecretManager {
 
   @Test
   public void testCreateIdentifierSuccess() throws Exception {
+    BlockID blockID = new BlockID(101, 0);
     OzoneBlockTokenIdentifier btIdentifier = secretManager.createIdentifier(
-        "testUser", "101", EnumSet.allOf(AccessModeProto.class), 100);
+        "testUser", blockID, EnumSet.allOf(AccessModeProto.class), 100);
 
     // Check basic details.
     Assert.assertEquals("testUser", btIdentifier.getOwnerId());
-    Assert.assertEquals("101", btIdentifier.getService());
+    Assert.assertEquals(BlockTokenVerifier.getTokenService(blockID),
+        btIdentifier.getService());
     Assert.assertEquals(EnumSet.allOf(AccessModeProto.class),
         btIdentifier.getAccessModes());
     Assert.assertEquals(omCertSerialId, btIdentifier.getCertSerialId());
 
     byte[] hash = secretManager.createPassword(btIdentifier);
     validateHash(hash, btIdentifier.getBytes());
+  }
+
+  @Test
+  public void tokenCanBeUsedForSpecificBlock() throws Exception {
+    // GIVEN
+    TokenVerifier tokenVerifier =
+        new BlockTokenVerifier(securityConfig, client);
+    Pipeline pipeline = MockPipeline.createPipeline(3);
+    BlockID blockID = new BlockID(101, 0);
+
+    // WHEN
+    Token<OzoneBlockTokenIdentifier> token =
+        secretManager.generateToken("testUser", blockID,
+            EnumSet.allOf(AccessModeProto.class), 100);
+    String encodedToken = token.encodeToUrlString();
+    ContainerCommandRequestProto writeChunkRequest = getWriteChunkRequest(
+        pipeline, blockID, 100, encodedToken);
+    ContainerCommandRequestProto putBlockCommand = getPutBlockRequest(
+        pipeline, encodedToken, writeChunkRequest.getWriteChunk());
+
+    // THEN
+    tokenVerifier.verify("testUser", token, putBlockCommand);
+  }
+
+  @Test
+  public void tokenCannotBeUsedForOtherBlock() throws Exception {
+    /*
+    String otherBlock = "NotAllowedBlockID";
+    LambdaTestUtils.intercept(BlockTokenException.class,
+        "Token for block ID: " + tokenBlockID +
+        " can't be used to access block: " + notAllledBlockID,
+        () -> tokenVerifier.verify("testUser", token.encodeToUrlString(),
+            cmdForOtherBlock));
+     */
   }
 
   /**
@@ -168,7 +218,7 @@ public class TestOzoneBlockTokenSecretManager {
   @SuppressWarnings("java:S2699")
   public void testVerifySignatureFailure() throws Exception {
     OzoneBlockTokenIdentifier id = new OzoneBlockTokenIdentifier(
-        "testUser", "4234", EnumSet.allOf(AccessModeProto.class),
+        "testUser", "123", EnumSet.allOf(AccessModeProto.class),
         Time.now() + 60 * 60 * 24, "123444", 1024);
     LambdaTestUtils.intercept(UnsupportedOperationException.class, "operation" +
             " is not supported for block tokens",
