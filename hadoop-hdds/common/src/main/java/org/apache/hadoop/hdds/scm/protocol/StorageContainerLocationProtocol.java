@@ -300,5 +300,9 @@ public interface StorageContainerLocationProtocol extends Closeable {
   List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
       boolean mostUsed, int count) throws IOException;
 
+  /**
+   * Obtain a token which can be used to let datanodes verify authentication of
+   * commands operating on {@code containerID}.
+   */
   Token<?> getContainerToken(ContainerID containerID) throws IOException;
 }
