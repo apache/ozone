@@ -40,7 +40,11 @@ public class RatisReplicationConfig
     try {
       factor = ReplicationFactor.valueOf(Integer.parseInt(factorString));
     } catch (NumberFormatException ex) {
-      factor = ReplicationFactor.valueOf(factorString);
+      try {
+        factor = ReplicationFactor.valueOf(factorString);
+      } catch (IllegalArgumentException x) {
+        throw new IllegalArgumentException("Invalid RatisReplicationFactor '" + factorString + "'. Please use ONE or THREE!");
+      }
     }
     this.replicationFactor = factor;
   }

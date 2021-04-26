@@ -133,8 +133,7 @@ public class StorageInfo {
   }
 
   private void verifyNodeType(NodeType type)
-      throws
-      InconsistentStorageStateException {
+      throws InconsistentStorageStateException {
     NodeType nodeType = getNodeType();
     Preconditions.checkNotNull(nodeType);
     if(type != nodeType) {
