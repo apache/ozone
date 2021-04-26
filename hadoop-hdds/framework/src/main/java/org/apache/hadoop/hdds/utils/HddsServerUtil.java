@@ -459,7 +459,7 @@ public final class HddsServerUtil {
   }
 
   public static SCMSecurityProtocolClientSideTranslatorPB
-  getScmSecurityClientWithFixedDuration(OzoneConfiguration conf)
+      getScmSecurityClientWithFixedDuration(OzoneConfiguration conf)
       throws IOException {
     // As for OM during init, we need to wait for specific duration so that
     // we can give response to user performed operation init in a definite
