@@ -58,6 +58,9 @@ import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_HOST_NAME_
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
@@ -115,19 +118,37 @@ public final class HddsUtils {
       }
       return scmAddressList;
     } else {
-      Optional< String > host = getHostNameFromConfigKeys(conf,
-          ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY);
+      String address = conf.getTrimmed(OZONE_SCM_CLIENT_ADDRESS_KEY);
+      int port = -1;
 
-      if (!host.isPresent()) {
-        throw new ConfigurationException("Ozone scm client address is not set");
+      if (address == null) {
+        // fall back to ozone.scm.names for non-ha
+        Collection<String> scmAddresses =
+            conf.getTrimmedStringCollection(OZONE_SCM_NAMES);
+
+        if (scmAddresses.isEmpty()) {
+          throw new ConfigurationException("Ozone scm client address is not " +
+              "set. Configure one of these config " +
+              OZONE_SCM_CLIENT_ADDRESS_KEY + ", " + OZONE_SCM_NAMES);
+        }
+
+        if (scmAddresses.size() > 1) {
+          throw new ConfigurationException("For non-HA SCM " + OZONE_SCM_NAMES
+              + " should be set with single address");
+        }
+
+        address = scmAddresses.iterator().next();
+
+        port = conf.getInt(OZONE_SCM_CLIENT_PORT_KEY,
+            OZONE_SCM_CLIENT_PORT_DEFAULT);
+      } else {
+        port = getHostPort(address)
+            .orElse(conf.getInt(OZONE_SCM_CLIENT_PORT_KEY,
+                OZONE_SCM_CLIENT_PORT_DEFAULT));
       }
 
-      final int port = getPortNumberFromConfigKeys(conf,
-          ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY)
-          .orElse(ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT);
-
       return Collections.singletonList(
-          NetUtils.createSocketAddr(host.get() + ":" + port));
+          NetUtils.createSocketAddr(getHostName(address).get() + ":" + port));
     }
   }
 

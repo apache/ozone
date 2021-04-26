@@ -43,6 +43,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PO
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
@@ -134,7 +135,7 @@ public class TestHddsClientUtils {
         HddsUtils.getScmAddressForClients(conf).iterator();
     Assert.assertTrue(scmAddrIterator.hasNext());
     InetSocketAddress scmAddr = scmAddrIterator.next();
-    assertThat(scmAddr.getHostString(), is("1.2.3.4"));
+    assertThat(scmAddr.getHostString(), is(address));
     assertThat(scmAddr.getPort(), is(port));
   }
 
@@ -174,6 +175,41 @@ public class TestHddsClientUtils {
         SCMNodeInfo.buildNodeInfo(conf).get(0).getBlockClientAddress());
     assertEquals(scmHost, address.getHostName());
     assertEquals(OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT, address.getPort());
+  }
+
+  @Test
+  public void testClientFallbackToScmNamesNoPort() {
+    // When OZONE_SCM_CLIENT_ADDRESS_KEY is undefined, it should fallback
+    // to OZONE_SCM_NAMES.
+    final String scmHost = "host456";
+    final OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_SCM_NAMES, scmHost);
+    final Collection<InetSocketAddress> address =
+        HddsUtils.getScmAddressForClients(conf);
+    Assert.assertTrue(address.iterator().hasNext());
+    InetSocketAddress socketAddress = address.iterator().next();
+    assertEquals(scmHost, socketAddress.getHostName());
+    assertEquals(OZONE_SCM_CLIENT_PORT_DEFAULT, socketAddress.getPort());
+  }
+
+  @Test
+  @SuppressWarnings("StringSplitter")
+  public void testClientFallbackToScmNamesWithPort() {
+    // When OZONE_SCM_CLIENT_ADDRESS_KEY is undefined, it should fallback
+    // to OZONE_SCM_NAMES.
+    //
+    // Verify that the OZONE_SCM_NAMES port number is ignored, if present.
+    // Instead we should use OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT.
+    final String scmHost = "host456:300";
+    final OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_SCM_NAMES, scmHost);
+    final Collection<InetSocketAddress> address =
+        HddsUtils.getScmAddressForClients(conf);
+    Assert.assertTrue(address.iterator().hasNext());
+    InetSocketAddress socketAddress = address.iterator().next();
+    assertEquals(scmHost.split(":")[0],
+        socketAddress.getHostName());
+    assertEquals(OZONE_SCM_CLIENT_PORT_DEFAULT, socketAddress.getPort());
   }
 
   @Test
