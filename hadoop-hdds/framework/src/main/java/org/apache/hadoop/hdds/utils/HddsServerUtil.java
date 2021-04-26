@@ -467,10 +467,9 @@ public final class HddsServerUtil {
     OzoneConfiguration configuration = new OzoneConfiguration(conf);
     long duration = conf.getTimeDuration(OZONE_SCM_INFO_WAIT_DURATION,
         OZONE_SCM_INFO_WAIT_DURATION_DEFAULT, TimeUnit.SECONDS);
-    SCMClientConfig scmClientConfig =
-        conf.getObject(SCMClientConfig.class);
+    SCMClientConfig scmClientConfig = conf.getObject(SCMClientConfig.class);
     int retryCount =
-        (int) (duration / (scmClientConfig.getRetryInterval()/1000));
+        (int) (duration / (scmClientConfig.getRetryInterval() / 1000));
 
     // If duration is set to lesser value, fall back to actual default
     // retry count.
