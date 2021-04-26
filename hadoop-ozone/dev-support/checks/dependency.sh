@@ -41,7 +41,7 @@ if [ -s "$REPORT_FILE" ]; then
    echo ""
    echo "Generated hadoop-ozone/dist/src/main/license/jar-report.txt file should be added to your pull-request. It will be used as the base of future comparison."
    echo ""
-   echo "This check may also report positive for PRs if the source is not up-to-date with the base branch (eg. `master`).  In this case please merge the base branch into your source branch."
+   echo "This check may also report positive for PRs if the source is not up-to-date with the base branch (eg. \`master\`).  In this case please merge the base branch into your source branch."
    echo ""
    echo "Changed jars:"
    echo ""
