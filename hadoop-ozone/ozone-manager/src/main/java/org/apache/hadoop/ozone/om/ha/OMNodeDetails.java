@@ -20,9 +20,8 @@ package org.apache.hadoop.ozone.om.ha;
 import org.apache.commons.lang3.StringUtils;
 
 import org.apache.hadoop.hdds.server.http.HttpConfig;
-import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.hdds.NodeDetails;
 
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
@@ -31,14 +30,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_DB_CHECKPOINT_HTTP_EN
 /**
  * This class stores OM node details.
  */
-public final class OMNodeDetails {
-  private String omServiceId;
-  private String omNodeId;
-  private InetSocketAddress rpcAddress;
+public final class OMNodeDetails extends NodeDetails {
   private int rpcPort;
-  private int ratisPort;
-  private String httpAddress;
-  private String httpsAddress;
 
   /**
    * Constructs OMNodeDetails object.
@@ -46,26 +39,25 @@ public final class OMNodeDetails {
   private OMNodeDetails(String serviceId, String nodeId,
       InetSocketAddress rpcAddr, int rpcPort, int ratisPort,
       String httpAddress, String httpsAddress) {
-    this.omServiceId = serviceId;
-    this.omNodeId = nodeId;
-    this.rpcAddress = rpcAddr;
+    super(serviceId, nodeId, rpcAddr, ratisPort, httpAddress, httpsAddress);
     this.rpcPort = rpcPort;
-    this.ratisPort = ratisPort;
-    this.httpAddress = httpAddress;
-    this.httpsAddress = httpsAddress;
   }
 
   @Override
   public String toString() {
     return "OMNodeDetails["
-        + "omServiceId=" + omServiceId +
-        ", omNodeId=" + omNodeId +
-        ", rpcAddress=" + rpcAddress +
-        ", rpcPort=" + rpcPort +
-        ", ratisPort=" + ratisPort +
-        ", httpAddress=" + httpAddress +
-        ", httpsAddress=" + httpsAddress +
+        + "omServiceId=" + getServiceId() +
+        ", omNodeId=" + getNodeId() +
+        ", rpcAddress=" + getRpcAddressString() +
+        ", rpcPort=" + getRpcPort() +
+        ", ratisPort=" + getRatisPort() +
+        ", httpAddress=" + getHttpAddress() +
+        ", httpsAddress=" + getHttpsAddress() +
         "]";
+  }
+
+  public int getRpcPort() {
+    return rpcPort;
   }
 
   /**
@@ -117,60 +109,18 @@ public final class OMNodeDetails {
     }
   }
 
-  public String getOMServiceId() {
-    return omServiceId;
-  }
-
-  public String getOMNodeId() {
-    return omNodeId;
-  }
-
-  public InetSocketAddress getRpcAddress() {
-    return rpcAddress;
-  }
-
-  public boolean isHostUnresolved() {
-    return rpcAddress.isUnresolved();
-  }
-
-  public InetAddress getInetAddress() {
-    return rpcAddress.getAddress();
-  }
-
-  public String getHostName() {
-    return rpcAddress.getHostName();
-  }
-
-  public String getRatisHostPortStr() {
-    StringBuilder hostPort = new StringBuilder();
-    hostPort.append(getHostName())
-        .append(":")
-        .append(ratisPort);
-    return hostPort.toString();
-  }
-
-  public int getRatisPort() {
-    return ratisPort;
-  }
-
-  public int getRpcPort() {
-    return rpcPort;
-  }
-
-  public String getRpcAddressString() {
-    return NetUtils.getHostPortString(rpcAddress);
-  }
-
   public String getOMDBCheckpointEnpointUrl(HttpConfig.Policy httpPolicy) {
     if (httpPolicy.isHttpEnabled()) {
-      if (StringUtils.isNotEmpty(httpAddress)) {
-        return "http://" + httpAddress + OZONE_OM_DB_CHECKPOINT_HTTP_ENDPOINT
-            + "?" + OZONE_DB_CHECKPOINT_REQUEST_FLUSH + "=true";
+      if (StringUtils.isNotEmpty(getHttpAddress())) {
+        return "http://" + getHttpAddress() +
+            OZONE_OM_DB_CHECKPOINT_HTTP_ENDPOINT +
+            "?" + OZONE_DB_CHECKPOINT_REQUEST_FLUSH + "=true";
       }
     } else {
-      if (StringUtils.isNotEmpty(httpsAddress)) {
-        return "https://" + httpsAddress + OZONE_OM_DB_CHECKPOINT_HTTP_ENDPOINT
-            + "?" + OZONE_DB_CHECKPOINT_REQUEST_FLUSH + "=true";
+      if (StringUtils.isNotEmpty(getHttpsAddress())) {
+        return "https://" + getHttpsAddress() +
+            OZONE_OM_DB_CHECKPOINT_HTTP_ENDPOINT +
+            "?" + OZONE_DB_CHECKPOINT_REQUEST_FLUSH + "=true";
       }
     }
     return null;

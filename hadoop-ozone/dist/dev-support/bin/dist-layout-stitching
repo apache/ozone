@@ -68,9 +68,6 @@ run cp -pr "${ROOT}/hadoop-ozone/dist/src/main/license/bin/licenses" "licenses"
 run cp -p "${ROOT}/hadoop-ozone/recon/src/main/resources/webapps/recon/ozone-recon-web/LICENSE" "licenses/LICENSE-ozone-recon.txt"
 run cp -p "${ROOT}/README.md" .
 
-run mkdir -p ./share/hadoop/ozone
-run mkdir -p ./share/hadoop/hdds
-
 run mkdir -p ./share/ozone/web
 run mkdir -p ./bin
 run mkdir -p ./sbin

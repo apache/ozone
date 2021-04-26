@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.scm.block;
 
 import java.io.IOException;
-import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.Set;
@@ -39,9 +38,9 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.command.CommandStatusReportHandler.DeleteBlockStatus;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
-import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.server.events.EventHandler;
@@ -76,7 +75,7 @@ public class DeletedBlockLogImpl
       DeletedBlocksTransaction.newBuilder().setContainerID(1).setCount(1);
 
   private final int maxRetry;
-  private final ContainerManager containerManager;
+  private final ContainerManagerV2 containerManager;
   private final SCMMetadataStore scmMetadataStore;
   private final Lock lock;
   // Maps txId to set of DNs which are successful in committing the transaction
@@ -90,7 +89,7 @@ public class DeletedBlockLogImpl
 
 
   public DeletedBlockLogImpl(ConfigurationSource conf,
-                             ContainerManager containerManager,
+                             ContainerManagerV2 containerManager,
                              SCMMetadataStore scmMetadataStore)
       throws IOException {
     maxRetry = conf.getInt(OZONE_SCM_BLOCK_DELETION_MAX_RETRY,
@@ -258,7 +257,7 @@ public class DeletedBlockLogImpl
           long txID = transactionResult.getTxID();
           // set of dns which have successfully committed transaction txId.
           dnsWithCommittedTxn = transactionToDNsCommitMap.get(txID);
-          final ContainerID containerId = ContainerID.valueof(
+          final ContainerID containerId = ContainerID.valueOf(
               transactionResult.getContainerID());
           if (dnsWithCommittedTxn == null) {
             // Mostly likely it's a retried delete command response.
@@ -322,20 +321,6 @@ public class DeletedBlockLogImpl
     return false;
   }
 
-  /**
-   * {@inheritDoc}
-   *
-   * @param containerID - container ID.
-   * @param blocks      - blocks that belong to the same container.
-   * @throws IOException
-   */
-  @Override
-  public void addTransaction(long containerID, List<Long> blocks)
-      throws IOException {
-    Map<Long, List<Long>> map = Collections.singletonMap(containerID, blocks);
-    addTransactions(map);
-  }
-
   @Override
   public int getNumOfValidTransactions() throws IOException {
     lock.lock();
@@ -355,6 +340,12 @@ public class DeletedBlockLogImpl
     } finally {
       lock.unlock();
     }
+  }
+
+  @Override
+  public void reinitialize(
+      Table<Long, DeletedBlocksTransaction> deletedBlocksTXTable) {
+    throw new RuntimeException("Not supported operation.");
   }
 
   /**
@@ -394,7 +385,7 @@ public class DeletedBlockLogImpl
       DatanodeDeletedBlockTransactions transactions) {
     try {
       Set<ContainerReplica> replicas = containerManager
-          .getContainerReplicas(ContainerID.valueof(tx.getContainerID()));
+          .getContainerReplicas(ContainerID.valueOf(tx.getContainerID()));
       for (ContainerReplica replica : replicas) {
         UUID dnID = replica.getDatanodeDetails().getUuid();
         Set<UUID> dnsWithTransactionCommitted =
@@ -427,7 +418,7 @@ public class DeletedBlockLogImpl
         while (iter.hasNext() && numBlocksAdded < blockDeletionLimit) {
           Table.KeyValue<Long, DeletedBlocksTransaction> keyValue = iter.next();
           DeletedBlocksTransaction txn = keyValue.getValue();
-          final ContainerID id = ContainerID.valueof(txn.getContainerID());
+          final ContainerID id = ContainerID.valueOf(txn.getContainerID());
           try {
             if (txn.getCount() > -1 && txn.getCount() <= maxRetry
                 && !containerManager.getContainer(id).isOpen()) {

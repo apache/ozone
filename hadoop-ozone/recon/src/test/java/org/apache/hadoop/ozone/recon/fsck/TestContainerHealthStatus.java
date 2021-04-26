@@ -52,7 +52,7 @@ public class TestContainerHealthStatus {
     container = mock(ContainerInfo.class);
     when(container.getReplicationFactor())
         .thenReturn(HddsProtos.ReplicationFactor.THREE);
-    when(container.containerID()).thenReturn(new ContainerID(123456));
+    when(container.containerID()).thenReturn(ContainerID.valueOf(123456));
     when(container.getContainerID()).thenReturn((long)123456);
     when(placementPolicy.validateContainerPlacement(
         Mockito.anyList(), Mockito.anyInt()))

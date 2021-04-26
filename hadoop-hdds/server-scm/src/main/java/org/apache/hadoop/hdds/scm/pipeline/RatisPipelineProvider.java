@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState;
@@ -38,6 +39,7 @@ import org.apache.hadoop.ozone.protocol.commands.ClosePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.CreatePipelineCommand;
 
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.apache.ratis.thirdparty.com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,14 +58,18 @@ public class RatisPipelineProvider extends PipelineProvider {
   private int pipelineNumberLimit;
   private int maxPipelinePerDatanode;
   private final LeaderChoosePolicy leaderChoosePolicy;
+  private final SCMContext scmContext;
 
   @VisibleForTesting
   public RatisPipelineProvider(NodeManager nodeManager,
-      PipelineStateManager stateManager, ConfigurationSource conf,
-      EventPublisher eventPublisher) {
+                               StateManager stateManager,
+                               ConfigurationSource conf,
+                               EventPublisher eventPublisher,
+                               SCMContext scmContext) {
     super(nodeManager, stateManager);
     this.conf = conf;
     this.eventPublisher = eventPublisher;
+    this.scmContext = scmContext;
     this.placementPolicy =
         new PipelinePlacementPolicy(nodeManager, stateManager, conf);
     this.pipelineNumberLimit = conf.getInt(
@@ -157,6 +163,8 @@ public class RatisPipelineProvider extends PipelineProvider {
         new CreatePipelineCommand(pipeline.getId(), pipeline.getType(),
             factor, dns);
 
+    createCommand.setTerm(scmContext.getTermOfLeader());
+
     dns.forEach(node -> {
       LOG.info("Sending CreatePipelineCommand for pipeline:{} to datanode:{}",
           pipeline.getId(), node.getUuidString());
@@ -187,15 +195,16 @@ public class RatisPipelineProvider extends PipelineProvider {
    * Removes pipeline from SCM. Sends command to destroy pipeline on all
    * the datanodes.
    *
-   * @param pipeline        - Pipeline to be destroyed
-   * @throws IOException
+   * @param pipeline            - Pipeline to be destroyed
+   * @throws NotLeaderException - Send datanode command while not leader
    */
   @Override
-  public void close(Pipeline pipeline) {
+  public void close(Pipeline pipeline) throws NotLeaderException {
     final ClosePipelineCommand closeCommand =
         new ClosePipelineCommand(pipeline.getId());
-    pipeline.getNodes().stream().forEach(node -> {
-      final CommandForDatanode datanodeCommand =
+    closeCommand.setTerm(scmContext.getTermOfLeader());
+    pipeline.getNodes().forEach(node -> {
+      final CommandForDatanode<?> datanodeCommand =
           new CommandForDatanode<>(node.getUuid(), closeCommand);
       LOG.info("Send pipeline:{} close command to datanode {}",
           pipeline.getId(), datanodeCommand.getDatanodeId());

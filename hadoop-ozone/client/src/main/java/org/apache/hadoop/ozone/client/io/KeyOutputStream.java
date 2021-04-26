@@ -330,7 +330,7 @@ public class KeyOutputStream extends OutputStream {
     // if the container needs to be excluded , add the container to the
     // exclusion list , otherwise add the pipeline to the exclusion list
     if (containerExclusionException) {
-      excludeList.addConatinerId(ContainerID.valueof(containerId));
+      excludeList.addConatinerId(ContainerID.valueOf(containerId));
     } else {
       excludeList.addPipeline(pipelineId);
     }

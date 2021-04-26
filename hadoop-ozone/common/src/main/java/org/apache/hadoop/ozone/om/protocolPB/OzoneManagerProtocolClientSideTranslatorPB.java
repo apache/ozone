@@ -1122,7 +1122,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         resp.getServiceInfoList().stream()
             .map(ServiceInfo::getFromProtobuf)
             .collect(Collectors.toList()),
-        resp.getCaCertificate());
+        resp.getCaCertificate(), resp.getCaCertsList());
   }
 
   /**

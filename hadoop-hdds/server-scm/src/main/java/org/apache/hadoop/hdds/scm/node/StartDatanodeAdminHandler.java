@@ -58,7 +58,7 @@ public class StartDatanodeAdminHandler
     for (PipelineID pipelineID : pipelineIds) {
       try {
         Pipeline pipeline = pipelineManager.getPipeline(pipelineID);
-        pipelineManager.finalizeAndDestroyPipeline(pipeline, false);
+        pipelineManager.closePipeline(pipeline, false);
       } catch (IOException e) {
         LOG.info("Could not finalize pipeline={} for dn={}", pipelineID,
             datanodeDetails);

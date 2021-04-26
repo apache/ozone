@@ -35,6 +35,9 @@ RpcClient bucket acls
 RpcClient key acls
     Test Key Acls         o3://            om:9862     ${prefix}-rpcwoport2
 
+RpcClient prefix acls
+    Test Prefix Acls      o3://            om:9862     ${prefix}-rpcwoport2
+
 RpcClient without host
     Test ozone shell      o3://            ${EMPTY}    ${prefix}-rpcwport
 

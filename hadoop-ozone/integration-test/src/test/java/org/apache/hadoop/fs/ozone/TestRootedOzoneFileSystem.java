@@ -111,7 +111,7 @@ public class TestRootedOzoneFileSystem {
   }
 
   @Rule
-  public Timeout globalTimeout = new Timeout(300_000);
+  public Timeout globalTimeout = Timeout.seconds(300);;
 
   private static boolean enabledFileSystemPaths;
   private static boolean omRatisEnabled;

@@ -108,7 +108,7 @@ public final class TestDelegationToken {
       .getLogger(TestDelegationToken.class);
 
   @Rule
-  public Timeout timeout = new Timeout(80_000);
+  public Timeout timeout = Timeout.seconds(80);
 
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();
@@ -391,7 +391,6 @@ public final class TestDelegationToken {
   private void setupOm(OzoneConfiguration config) throws Exception {
     OMStorage omStore = new OMStorage(config);
     omStore.setClusterId("testClusterId");
-    omStore.setScmId("testScmId");
     omStore.setOmCertSerialId(OM_CERT_SERIAL_ID);
     // writes the version file properties
     omStore.initialize();

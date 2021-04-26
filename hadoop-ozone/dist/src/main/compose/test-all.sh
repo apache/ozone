@@ -36,17 +36,8 @@ fi
 tests=$(find_tests)
 cd "$SCRIPT_DIR"
 
-RESULT=0
-# shellcheck disable=SC2044
-for t in ${tests}; do
-  d="$(dirname "${t}")"
-
-  if ! run_test_script "${d}"; then
-    RESULT=1
-  fi
-
-  copy_results "${d}" "${ALL_RESULT_DIR}"
-done
+run_test_scripts ${tests}
+RESULT=$?
 
 rebot --nostatusrc -N acceptance -d "$ALL_RESULT_DIR" "$ALL_RESULT_DIR"/*.xml
 

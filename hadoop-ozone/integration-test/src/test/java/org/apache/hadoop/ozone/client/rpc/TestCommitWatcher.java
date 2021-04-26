@@ -76,7 +76,7 @@ public class TestCommitWatcher {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = new Timeout(300000);
+  public Timeout timeout = Timeout.seconds(300);
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf = new OzoneConfiguration();
   private OzoneClient client;

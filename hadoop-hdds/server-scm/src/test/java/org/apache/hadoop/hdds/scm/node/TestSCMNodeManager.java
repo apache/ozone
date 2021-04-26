@@ -38,7 +38,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.NodeReportFromDatanode;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
-import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
@@ -142,7 +141,7 @@ public class TestSCMNodeManager {
 
   SCMNodeManager createNodeManager(OzoneConfiguration config)
       throws IOException, AuthenticationException {
-    scm = HddsTestUtils.getScm(config);
+    scm = TestUtils.getScm(config);
     return (SCMNodeManager) scm.getScmNodeManager();
   }
 
@@ -317,6 +316,7 @@ public class TestSCMNodeManager {
    * @throws TimeoutException
    */
   @Test
+  @Ignore("HDDS-5098")
   public void testScmDetectStaleAndDeadNode()
       throws IOException, InterruptedException, AuthenticationException {
     final int interval = 100;

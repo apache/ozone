@@ -52,7 +52,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
   static final Logger LOG =
       LoggerFactory.getLogger(PipelinePlacementPolicy.class);
   private final NodeManager nodeManager;
-  private final PipelineStateManager stateManager;
+  private final StateManager stateManager;
   private final ConfigurationSource conf;
   private final int heavyNodeCriteria;
   private static final int REQUIRED_RACKS = 2;
@@ -71,7 +71,8 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
    * @param conf        Configuration
    */
   public PipelinePlacementPolicy(final NodeManager nodeManager,
-      final PipelineStateManager stateManager, final ConfigurationSource conf) {
+                                 final StateManager stateManager,
+                                 final ConfigurationSource conf) {
     super(nodeManager, conf);
     this.nodeManager = nodeManager;
     this.conf = conf;
@@ -237,8 +238,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
 
   // Fall back logic for node pick up.
   DatanodeDetails fallBackPickNodes(
-      List<DatanodeDetails> nodeSet, List<DatanodeDetails> excludedNodes)
-      throws SCMException{
+      List<DatanodeDetails> nodeSet, List<DatanodeDetails> excludedNodes) {
     DatanodeDetails node;
     if (excludedNodes == null || excludedNodes.isEmpty()) {
       node = chooseNode(nodeSet);
@@ -246,14 +246,6 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
       List<DatanodeDetails> inputNodes = nodeSet.stream()
           .filter(p -> !excludedNodes.contains(p)).collect(Collectors.toList());
       node = chooseNode(inputNodes);
-    }
-
-    if (node == null) {
-      String msg = String.format("Unable to find fall back node in" +
-          " pipeline allocation. nodeSet size: {}", nodeSet.size());
-      LOG.warn(msg);
-      throw new SCMException(msg,
-          SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
     }
     return node;
   }
@@ -336,6 +328,13 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
         results.add(pick);
         exclude.add(pick);
         LOG.debug("Remaining node chosen: {}", pick);
+      } else {
+        String msg = String.format("Unable to find suitable node in " +
+            "pipeline allocation. healthyNodes size: %d, " +
+            "excludeNodes size: %d", healthyNodes.size(), exclude.size());
+        LOG.warn(msg);
+        throw new SCMException(msg,
+            SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
       }
     }
 

@@ -48,7 +48,7 @@ public abstract class Handler {
   protected final ConfigurationSource conf;
   protected final ContainerSet containerSet;
   protected final VolumeSet volumeSet;
-  protected String scmID;
+  protected String clusterId;
   protected final ContainerMetrics metrics;
   protected String datanodeId;
   private Consumer<ContainerReplicaProto> icrSender;
@@ -186,8 +186,8 @@ public abstract class Handler {
   public abstract void deleteBlock(Container container, BlockData blockData)
       throws IOException;
 
-  public void setScmID(String scmId) {
-    this.scmID = scmId;
+  public void setClusterID(String clusterID) {
+    this.clusterId = clusterID;
   }
 
 }

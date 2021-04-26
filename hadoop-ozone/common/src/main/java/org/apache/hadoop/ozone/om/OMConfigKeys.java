@@ -235,6 +235,16 @@ public final class OMConfigKeys {
 
   public static final String OZONE_OM_HA_PREFIX = "ozone.om.ha";
 
+  public static final String OZONE_FS_TRASH_INTERVAL_KEY =
+      "ozone.fs.trash.interval";
+
+  public static final long  OZONE_FS_TRASH_INTERVAL_DEFAULT = 0;
+
+  public static final String OZONE_FS_TRASH_CHECKPOINT_INTERVAL_KEY =
+      "ozone.fs.trash.checkpoint.interval";
+
+  public static final long  OZONE_FS_TRASH_CHECKPOINT_INTERVAL_DEFAULT = 0;
+
   public static final String OZONE_RANGER_OM_IGNORE_SERVER_CERT =
       "ozone.om.ranger.ignore.cert";
   public static final boolean OZONE_RANGER_OM_IGNORE_SERVER_CERT_DEFAULT =

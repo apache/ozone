@@ -28,6 +28,8 @@ if [[ -n "${OM_SERVICE_ID}" ]] && [[ "${OM_SERVICE_ID}" != "om" ]]; then
   OM_HA_PARAM="--om-service-id=${OM_SERVICE_ID}"
 fi
 
+: ${SCM:=scm}
+
 ## @description create results directory, purging any prior data
 create_results_dir() {
   #delete previous results
@@ -40,11 +42,11 @@ create_results_dir() {
 ## @description find all the test.sh scripts in the immediate child dirs
 find_tests(){
   if [[ -n "${OZONE_ACCEPTANCE_SUITE}" ]]; then
-     tests=$(find . -mindepth 2 -maxdepth 2 -name test.sh | xargs grep -l "^#suite:${OZONE_ACCEPTANCE_SUITE}$" | sort)
+     tests=$(find . -mindepth 2 -maxdepth 2 -name test.sh | cut -c3- | xargs grep -l "^#suite:${OZONE_ACCEPTANCE_SUITE}$" | sort)
 
      # 'misc' is default suite, add untagged tests, too
     if [[ "misc" == "${OZONE_ACCEPTANCE_SUITE}" ]]; then
-       untagged="$(find . -mindepth 2 -maxdepth 2 -name test.sh | xargs grep -L "^#suite:")"
+       untagged="$(find . -mindepth 2 -maxdepth 2 -name test.sh | cut -c3- | xargs grep -L "^#suite:")"
        if [[ -n "${untagged}" ]]; then
          tests=$(echo ${tests} ${untagged} | xargs -n1 | sort)
        fi
@@ -55,7 +57,7 @@ find_tests(){
        exit 1
   fi
   else
-    tests=$(find . -mindepth 2 -maxdepth 2 -name test.sh | grep "${OZONE_TEST_SELECTOR:-""}" | sort)
+    tests=$(find . -mindepth 2 -maxdepth 2 -name test.sh | cut -c3- | grep "${OZONE_TEST_SELECTOR:-""}" | sort)
   fi
   echo $tests
 }
@@ -74,9 +76,9 @@ wait_for_safemode_exit(){
      #This line checks the safemode status in scm
      local command="${OZONE_SAFEMODE_STATUS_COMMAND}"
      if [[ "${SECURITY_ENABLED}" == 'true' ]]; then
-         status=$(docker-compose exec -T scm bash -c "kinit -k HTTP/scm@EXAMPLE.COM -t /etc/security/keytabs/HTTP.keytab && $command" || true)
+         status=$(docker-compose exec -T ${SCM} bash -c "kinit -k HTTP/${SCM}@EXAMPLE.COM -t /etc/security/keytabs/HTTP.keytab && $command" || true)
      else
-         status=$(docker-compose exec -T scm bash -c "$command")
+         status=$(docker-compose exec -T ${SCM} bash -c "$command")
      fi
 
      echo "SECONDS: $SECONDS"
@@ -110,9 +112,9 @@ wait_for_om_leader() {
   while [[ $SECONDS -lt 120 ]]; do
     local command="ozone admin om roles --service-id '${OM_SERVICE_ID}'"
     if [[ "${SECURITY_ENABLED}" == 'true' ]]; then
-      status=$(docker-compose exec -T scm bash -c "kinit -k scm/scm@EXAMPLE.COM -t /etc/security/keytabs/scm.keytab && $command" | grep LEADER)
+      status=$(docker-compose exec -T ${SCM} bash -c "kinit -k scm/${SCM}@EXAMPLE.COM -t /etc/security/keytabs/scm.keytab && $command" | grep LEADER)
     else
-      status=$(docker-compose exec -T scm bash -c "$command" | grep LEADER)
+      status=$(docker-compose exec -T ${SCM} bash -c "$command" | grep LEADER)
     fi
     if [[ -n "${status}" ]]; then
       echo "Found OM leader for service ${OM_SERVICE_ID}: $status"
@@ -136,6 +138,8 @@ start_docker_env(){
 
   create_results_dir
   export OZONE_SAFEMODE_MIN_DATANODES="${datanode_count}"
+
+  export OZONE_SCM_RATIS_ENABLE=${2:-false}
   docker-compose --no-ansi down
   if ! { docker-compose --no-ansi up -d --scale datanode="${datanode_count}" \
       && wait_for_safemode_exit \
@@ -180,6 +184,7 @@ execute_robot_test(){
       -v OM_SERVICE_ID:"${OM_SERVICE_ID:-om}" \
       -v OZONE_DIR:"${OZONE_DIR}" \
       -v SECURITY_ENABLED:"${SECURITY_ENABLED}" \
+      -v SCM:"${SCM}" \
       ${ARGUMENTS[@]} --log NONE --report NONE "${OZONE_ROBOT_OPTS[@]}" --output "$OUTPUT_PATH" \
       "$SMOKETEST_DIR_INSIDE/$TEST"
   local -i rc=$?
@@ -251,7 +256,7 @@ wait_for_port(){
 
   while [[ $SECONDS -lt $timeout ]]; do
      set +e
-     docker-compose exec -T scm /bin/bash -c "nc -z $host $port"
+     docker-compose exec -T ${SCM} /bin/bash -c "nc -z $host $port"
      status=$?
      set -e
      if [ $status -eq 0 ] ; then
@@ -327,6 +332,26 @@ run_test_script() {
   fi
 
   cd - > /dev/null
+
+  return ${ret}
+}
+
+run_test_scripts() {
+  ret=0
+
+  for t in "$@"; do
+    d="$(dirname "${t}")"
+
+    if ! run_test_script "${d}"; then
+      ret=1
+    fi
+
+    copy_results "${d}" "${ALL_RESULT_DIR}"
+
+    if [[ "${ret}" == "1" ]] && [[ "${FAIL_FAST:-}" == "true" ]]; then
+      break
+    fi
+  done
 
   return ${ret}
 }

@@ -62,7 +62,7 @@ public class TestOzoneManagerRestart {
   private static String omId;
 
   @Rule
-  public Timeout timeout = new Timeout(240000);
+  public Timeout timeout = Timeout.seconds(240);
 
   /**
    * Create a MiniDFSCluster for testing.

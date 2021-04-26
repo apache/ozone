@@ -30,14 +30,16 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdds.cli.GenericCli;
+import org.apache.hadoop.hdds.cli.OzoneAdmin;
 import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.fs.ozone.OzoneFsShell;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
-import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.MiniOzoneOMHAClusterImpl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.test.GenericTestUtils;
@@ -83,13 +85,14 @@ public class TestOzoneShellHA {
    * Set the timeout for every test.
    */
   @Rule
-  public Timeout testTimeout = new Timeout(300000);
+  public Timeout testTimeout = Timeout.seconds(300);
 
   private static File baseDir;
   private static File testFile;
   private static OzoneConfiguration conf = null;
   private static MiniOzoneCluster cluster = null;
   private static OzoneShell ozoneShell = null;
+  private static OzoneAdmin ozoneAdminShell = null;
 
   private final ByteArrayOutputStream out = new ByteArrayOutputStream();
   private final ByteArrayOutputStream err = new ByteArrayOutputStream();
@@ -121,13 +124,14 @@ public class TestOzoneShellHA {
     testFile.createNewFile();
 
     ozoneShell = new OzoneShell();
+    ozoneAdminShell = new OzoneAdmin();
 
     // Init HA cluster
     omServiceId = "om-service-test1";
     numOfOMs = 3;
     clusterId = UUID.randomUUID().toString();
     scmId = UUID.randomUUID().toString();
-    cluster = MiniOzoneCluster.newHABuilder(conf)
+    cluster = MiniOzoneCluster.newOMHABuilder(conf)
         .setClusterId(clusterId)
         .setScmId(scmId)
         .setOMServiceId(omServiceId)
@@ -168,7 +172,7 @@ public class TestOzoneShellHA {
     System.setErr(OLD_ERR);
   }
 
-  private void execute(Shell shell, String[] args) {
+  private void execute(GenericCli shell, String[] args) {
     LOG.info("Executing OzoneShell command with args {}", Arrays.asList(args));
     CommandLine cmd = shell.getCmd();
 
@@ -228,7 +232,7 @@ public class TestOzoneShellHA {
    * @return the leader OM's Node ID in the MiniOzoneHACluster.
    */
   private String getLeaderOMNodeId() {
-    MiniOzoneHAClusterImpl haCluster = (MiniOzoneHAClusterImpl) cluster;
+    MiniOzoneOMHAClusterImpl haCluster = (MiniOzoneOMHAClusterImpl) cluster;
     OzoneManager omLeader = haCluster.getOMLeader();
     Assert.assertNotNull("There should be a leader OM at this point.",
         omLeader);
@@ -260,7 +264,7 @@ public class TestOzoneShellHA {
     res[indexOmServiceIds] = getSetConfStringFromConf(
         OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY);
 
-    String omNodesKey = OmUtils.addKeySuffixes(
+    String omNodesKey = ConfUtils.addKeySuffixes(
         OMConfigKeys.OZONE_OM_NODES_KEY, omServiceId);
     String omNodesVal = conf.get(omNodesKey);
     res[indexOmNodes] = generateSetConfString(omNodesKey, omNodesVal);
@@ -270,7 +274,7 @@ public class TestOzoneShellHA {
     assert(omNodesArr.length == numOfOMs);
     for (int i = 0; i < numOfOMs; i++) {
       res[indexOmAddressStart + i] =
-          getSetConfStringFromConf(OmUtils.addKeySuffixes(
+          getSetConfStringFromConf(ConfUtils.addKeySuffixes(
               OMConfigKeys.OZONE_OM_ADDRESS_KEY, omServiceId, omNodesArr[i]));
     }
 
@@ -358,7 +362,7 @@ public class TestOzoneShellHA {
 
     // Get leader OM node RPC address from ozone.om.address.omServiceId.omNode
     String omLeaderNodeId = getLeaderOMNodeId();
-    String omLeaderNodeAddrKey = OmUtils.addKeySuffixes(
+    String omLeaderNodeAddrKey = ConfUtils.addKeySuffixes(
         OMConfigKeys.OZONE_OM_ADDRESS_KEY, omServiceId, omLeaderNodeId);
     String omLeaderNodeAddr = conf.get(omLeaderNodeAddrKey);
     String omLeaderNodeAddrWithoutPort = omLeaderNodeAddr.split(":")[0];
@@ -452,6 +456,28 @@ public class TestOzoneShellHA {
     execute(ozoneShell, args);
     Assert.assertEquals(0, out.size());
     Assert.assertEquals(0, getNumOfBuckets("bucket"));
+  }
+
+  /**
+   * Test ozone admin list command.
+   */
+  @Test
+  public void testOzoneAdminCmdList() throws UnsupportedEncodingException {
+    // Part of listing keys test.
+    generateKeys("/volume6", "/bucket");
+    // Test case 1: list OPEN container
+    String state = "--state=OPEN";
+    String[] args = new String[] {"container", "list", "--scm",
+        "localhost:" + cluster.getStorageContainerManager().getClientRpcPort(),
+        state};
+    execute(ozoneAdminShell, args);
+
+    // Test case 2: list CLOSED container
+    state = "--state=CLOSED";
+    args = new String[] {"container", "list", "--scm",
+        "localhost:" + cluster.getStorageContainerManager().getClientRpcPort(),
+        state};
+    execute(ozoneAdminShell, args);
   }
 
   /**

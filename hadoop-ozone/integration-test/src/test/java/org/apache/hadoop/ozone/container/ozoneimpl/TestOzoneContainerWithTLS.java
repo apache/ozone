@@ -52,6 +52,7 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -74,7 +75,7 @@ public class TestOzoneContainerWithTLS {
    * Set the timeout for every test.
    */
   @Rule
-  public Timeout testTimeout = new Timeout(300000);
+  public Timeout testTimeout = Timeout.seconds(300);
 
   @Rule
   public TemporaryFolder tempFolder = new TemporaryFolder();
@@ -151,7 +152,7 @@ public class TestOzoneContainerWithTLS {
       container.start(UUID.randomUUID().toString());
 
       XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf,
-          caClient.getCACertificate());
+          Collections.singletonList(caClient.getCACertificate()));
 
       if (blockTokenEnabled) {
         secretManager.start(caClient);
