@@ -25,7 +25,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
@@ -84,9 +83,11 @@ public class BlockDeletingServiceTestImpl
     @Override
     public synchronized void run() {
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Running background service : {}", "BlockDeletingServiceTestImpl");
+        LOG.debug("Running background service : {}",
+                "BlockDeletingServiceTestImpl");
       }
-      long serviceTimeoutInNanos = TimeDuration.valueOf(SERVICE_TIMEOUT_IN_MILLISECONDS, TimeUnit.MILLISECONDS)
+      long serviceTimeoutInNanos = TimeDuration.valueOf(
+              SERVICE_TIMEOUT_IN_MILLISECONDS, TimeUnit.MILLISECONDS)
               .toLong(TimeUnit.NANOSECONDS);
       BackgroundTaskQueue tasks = getTasks();
       if (tasks.isEmpty()) {
@@ -115,17 +116,19 @@ public class BlockDeletingServiceTestImpl
             long endTime = System.nanoTime();
             if (endTime - startTime > serviceTimeoutInNanos) {
               LOG.warn("{} Background task execution took {}ns > {}ns(timeout)",
-                      "BlockDeletingServiceTestImpl", endTime - startTime, serviceTimeoutInNanos);
+                      "BlockDeletingServiceTestImpl", endTime - startTime,
+                      serviceTimeoutInNanos);
             }
           }
-        }, getExecutorService()) );
+        }, getExecutorService()));
       }
       try {
         CompletableFuture
-                .allOf(futureList.toArray(new CompletableFuture[futureList.size()]))
+                .allOf(futureList.toArray(
+                        new CompletableFuture[futureList.size()]))
                 .get();
       } catch (Exception e) {
-        Assert.fail("testAllocateBlockInParallel failed");
+        Assert.fail("BlockDeletingServiceTestImpl failed");
       }
     }
   }
@@ -133,7 +136,7 @@ public class BlockDeletingServiceTestImpl
   // Override the implementation to start a single on-call control thread.
   @Override
   public void start() {
-    PeriodicalTask svc = new PeriodicalTaskTestImpl();
+    PeriodicalTask svc = new PeriodicalTask(); //new PeriodicalTaskTestImpl();
     // In test mode, relies on a latch countdown to runDeletingTasks tasks.
     Runnable r = () -> {
       while (true) {
