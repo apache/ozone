@@ -25,11 +25,17 @@ import org.apache.hadoop.fs.contract.AbstractContractSeekTest;
 import org.apache.hadoop.fs.contract.AbstractFSContract;
 
 import org.junit.AfterClass;
+import org.junit.BeforeClass;
 
 /**
  * Ozone contract tests covering file seek.
  */
 public class ITestOzoneContractSeek extends AbstractContractSeekTest {
+
+  @BeforeClass
+  public static void createCluster() throws IOException {
+    OzoneContract.createCluster();
+  }
 
   @AfterClass
   public static void teardownCluster() throws IOException {

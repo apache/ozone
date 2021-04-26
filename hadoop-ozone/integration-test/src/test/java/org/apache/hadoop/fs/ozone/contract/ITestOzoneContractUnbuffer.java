@@ -21,6 +21,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.contract.AbstractContractUnbufferTest;
 import org.apache.hadoop.fs.contract.AbstractFSContract;
 import org.junit.AfterClass;
+import org.junit.BeforeClass;
 
 import java.io.IOException;
 
@@ -28,6 +29,11 @@ import java.io.IOException;
  * Ozone contract tests for {@link org.apache.hadoop.fs.CanUnbuffer#unbuffer}.
  */
 public class ITestOzoneContractUnbuffer extends AbstractContractUnbufferTest {
+
+  @BeforeClass
+  public static void createCluster() throws IOException {
+    OzoneContract.createCluster();
+  }
 
   @AfterClass
   public static void teardownCluster() throws IOException {
