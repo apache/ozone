@@ -53,7 +53,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.ScmInfo;
-import org.apache.hadoop.hdds.security.token.OzoneContainerTokenSecretManager;
+import org.apache.hadoop.hdds.security.token.ContainerTokenSecretManager;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.DefaultCAProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.DefaultProfile;
@@ -226,7 +226,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
   private SCMSafeModeManager scmSafeModeManager;
   private SCMCertificateClient scmCertificateClient;
-  private OzoneContainerTokenSecretManager containerTokenMgr;
+  private ContainerTokenSecretManager containerTokenMgr;
 
   private JvmPauseMonitor jvmPauseMonitor;
   private final OzoneConfiguration configuration;
@@ -697,7 +697,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     return scmCertificateClient;
   }
 
-  private OzoneContainerTokenSecretManager createContainerTokenSecretManager(
+  private ContainerTokenSecretManager createContainerTokenSecretManager(
       OzoneConfiguration conf) {
 
     long expiryTime = conf.getTimeDuration(
@@ -706,7 +706,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         TimeUnit.MILLISECONDS);
     String certId = scmCertificateClient.getCertificate().getSerialNumber()
         .toString();
-    return new OzoneContainerTokenSecretManager(securityConfig,
+    return new ContainerTokenSecretManager(securityConfig,
         expiryTime, certId);
   }
 
@@ -1692,7 +1692,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
   }
 
-  OzoneContainerTokenSecretManager getContainerTokenSecretManager() {
+  ContainerTokenSecretManager getContainerTokenSecretManager() {
     return containerTokenMgr;
   }
 

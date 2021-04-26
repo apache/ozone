@@ -29,20 +29,20 @@ import org.slf4j.LoggerFactory;
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
-public class OzoneContainerTokenSecretManager
-    extends ShortLivedTokenSecretManager<OzoneContainerTokenIdentifier> {
+public class ContainerTokenSecretManager
+    extends ShortLivedTokenSecretManager<ContainerTokenIdentifier> {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(OzoneContainerTokenSecretManager.class);
+      LoggerFactory.getLogger(ContainerTokenSecretManager.class);
 
-  public OzoneContainerTokenSecretManager(SecurityConfig conf,
+  public ContainerTokenSecretManager(SecurityConfig conf,
       long tokenLifetime, String certSerialId) {
     super(conf, tokenLifetime, certSerialId, LOG);
   }
 
-  public OzoneContainerTokenIdentifier createIdentifier(String user,
+  public ContainerTokenIdentifier createIdentifier(String user,
       ContainerID containerID) {
-    return new OzoneContainerTokenIdentifier(user, containerID,
+    return new ContainerTokenIdentifier(user, containerID,
         getCertSerialId(), getTokenExpiryTime());
   }
 }

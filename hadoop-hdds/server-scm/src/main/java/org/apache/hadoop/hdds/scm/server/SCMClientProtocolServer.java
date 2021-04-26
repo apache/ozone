@@ -54,7 +54,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
-import org.apache.hadoop.hdds.security.token.OzoneContainerTokenSecretManager;
+import org.apache.hadoop.hdds.security.token.ContainerTokenSecretManager;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
@@ -789,7 +789,7 @@ public class SCMClientProtocolServer implements
       return new Token<>();
     }
 
-    OzoneContainerTokenSecretManager secretManager =
+    ContainerTokenSecretManager secretManager =
         scm.getContainerTokenSecretManager();
 
     return secretManager.generateToken(

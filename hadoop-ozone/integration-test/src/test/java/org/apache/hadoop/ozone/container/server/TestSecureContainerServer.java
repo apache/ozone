@@ -46,7 +46,7 @@ import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
-import org.apache.hadoop.hdds.security.token.OzoneContainerTokenSecretManager;
+import org.apache.hadoop.hdds.security.token.ContainerTokenSecretManager;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -109,7 +109,7 @@ public class TestSecureContainerServer {
   private static final OzoneConfiguration CONF = new OzoneConfiguration();
   private static CertificateClientTestImpl caClient;
   private static OzoneBlockTokenSecretManager blockTokenSecretManager;
-  private static OzoneContainerTokenSecretManager containerTokenSecretManager;
+  private static ContainerTokenSecretManager containerTokenSecretManager;
 
   @BeforeClass
   public static void setup() throws Exception {
@@ -128,7 +128,7 @@ public class TestSecureContainerServer {
         secConf, tokenLifetime, certSerialId);
     blockTokenSecretManager.start(caClient);
 
-    containerTokenSecretManager = new OzoneContainerTokenSecretManager(
+    containerTokenSecretManager = new ContainerTokenSecretManager(
         secConf, tokenLifetime, certSerialId);
     containerTokenSecretManager.start(caClient);
   }

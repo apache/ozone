@@ -36,7 +36,7 @@ import static org.apache.hadoop.ozone.container.ContainerTestHelper.getWriteChun
  * Tests for {@link ContainerTokenVerifier}.
  */
 public class TestContainerTokenVerifier
-    extends TokenVerifierTests<OzoneContainerTokenIdentifier> {
+    extends TokenVerifierTests<ContainerTokenIdentifier> {
 
   private static final AtomicLong CONTAINER_ID = new AtomicLong();
 
@@ -55,14 +55,14 @@ public class TestContainerTokenVerifier
 
   @Override
   protected ContainerCommandRequestProto verifiedRequest(
-      OzoneContainerTokenIdentifier tokenId) throws IOException {
+      ContainerTokenIdentifier tokenId) throws IOException {
     Pipeline pipeline = MockPipeline.createPipeline(1);
     return getCreateContainerRequest(CONTAINER_ID.get(), pipeline);
   }
 
   @Override
-  protected OzoneContainerTokenIdentifier newTokenId() {
-    return new OzoneContainerTokenIdentifier("any user",
+  protected ContainerTokenIdentifier newTokenId() {
+    return new ContainerTokenIdentifier("any user",
         ContainerID.valueOf(CONTAINER_ID.incrementAndGet()), "123",
         Instant.now().plusSeconds(3600));
   }

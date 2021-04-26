@@ -27,8 +27,8 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
-import org.apache.hadoop.hdds.security.token.OzoneContainerTokenIdentifier;
-import org.apache.hadoop.hdds.security.token.OzoneContainerTokenSecretManager;
+import org.apache.hadoop.hdds.security.token.ContainerTokenIdentifier;
+import org.apache.hadoop.hdds.security.token.ContainerTokenSecretManager;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -92,7 +92,7 @@ public class TestSecureOzoneContainer {
   private final boolean hasToken;
   private final boolean tokenExpired;
   private CertificateClientTestImpl caClient;
-  private OzoneContainerTokenSecretManager secretManager;
+  private ContainerTokenSecretManager secretManager;
 
   public TestSecureOzoneContainer(Boolean requireToken,
       Boolean hasToken, Boolean tokenExpired) {
@@ -120,7 +120,7 @@ public class TestSecureOzoneContainer {
     conf.set(OZONE_METADATA_DIRS, ozoneMetaPath);
     secConfig = new SecurityConfig(conf);
     caClient = new CertificateClientTestImpl(conf);
-    secretManager = new OzoneContainerTokenSecretManager(
+    secretManager = new ContainerTokenSecretManager(
         new SecurityConfig(conf),
         TimeUnit.DAYS.toMillis(1),
         caClient.getCertificate().getSerialNumber().toString());
@@ -170,8 +170,8 @@ public class TestSecureOzoneContainer {
             Instant expiryDate = tokenExpired
                 ? Instant.now().minusSeconds(3600)
                 : Instant.now().plusSeconds(3600);
-            OzoneContainerTokenIdentifier tokenIdentifier =
-                new OzoneContainerTokenIdentifier(user, containerID,
+            ContainerTokenIdentifier tokenIdentifier =
+                new ContainerTokenIdentifier(user, containerID,
                     caClient.getCertificate().getSerialNumber().toString(),
                     expiryDate);
             token = secretManager.generateToken(tokenIdentifier);

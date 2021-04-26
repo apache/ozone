@@ -33,16 +33,16 @@ import java.util.Objects;
  * Token identifier for container operations, similar to block token.
  */
 @InterfaceAudience.Private
-public class OzoneContainerTokenIdentifier extends ShortLivedTokenIdentifier {
+public class ContainerTokenIdentifier extends ShortLivedTokenIdentifier {
 
   public static final Text KIND = new Text("HDDS_CONTAINER_TOKEN");
 
   private ContainerID containerID;
 
-  public OzoneContainerTokenIdentifier() {
+  public ContainerTokenIdentifier() {
   }
 
-  public OzoneContainerTokenIdentifier(String ownerId, ContainerID containerID,
+  public ContainerTokenIdentifier(String ownerId, ContainerID containerID,
       String certSerialId, Instant expiryDate) {
     super(ownerId, expiryDate, certSerialId);
     this.containerID = containerID;
@@ -86,7 +86,7 @@ public class OzoneContainerTokenIdentifier extends ShortLivedTokenIdentifier {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    OzoneContainerTokenIdentifier that = (OzoneContainerTokenIdentifier) o;
+    ContainerTokenIdentifier that = (ContainerTokenIdentifier) o;
     return super.equals(that) &&
         containerID == that.containerID;
   }

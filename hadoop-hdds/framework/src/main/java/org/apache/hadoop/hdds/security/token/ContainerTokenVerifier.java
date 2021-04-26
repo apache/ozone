@@ -26,7 +26,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient
 
 /** Verifier for container tokens. */
 public class ContainerTokenVerifier extends
-    ShortLivedTokenVerifier<OzoneContainerTokenIdentifier> {
+    ShortLivedTokenVerifier<ContainerTokenIdentifier> {
 
   public ContainerTokenVerifier(SecurityConfig conf,
       CertificateClient caClient) {
@@ -39,8 +39,8 @@ public class ContainerTokenVerifier extends
   }
 
   @Override
-  protected OzoneContainerTokenIdentifier createTokenIdentifier() {
-    return new OzoneContainerTokenIdentifier();
+  protected ContainerTokenIdentifier createTokenIdentifier() {
+    return new ContainerTokenIdentifier();
   }
 
   @Override
