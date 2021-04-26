@@ -519,6 +519,11 @@ public final class ScmConfigKeys {
   public static final boolean HDDS_DATANODE_UPGRADE_LAYOUT_INLINE_DEFAULT =
       true;
 
+  public static final String OZONE_SCM_INFO_WAIT_DURATION =
+      "ozone.scm.info.wait.duration";
+  public static final long OZONE_SCM_INFO_WAIT_DURATION_DEFAULT =
+      10 * 60;
+
   /**
    * Never constructed.
    */
