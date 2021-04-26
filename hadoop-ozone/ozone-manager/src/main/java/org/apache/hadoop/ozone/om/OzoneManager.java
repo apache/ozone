@@ -3812,7 +3812,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     this.minMultipartUploadPartSize = partSizeForTest;
   }
 
-  private void initFSOLayout() throws IOException {
+  private void initFSOLayout() {
     // TODO: Temporary workaround for OM upgrade path and will be replaced once
     //  upgrade HDDS-3698 story reaches consensus. Instead of cluster level
     //  configuration, OM needs to check this property on every bucket level.
@@ -3820,8 +3820,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     boolean omMetadataLayoutPrefix = StringUtils.equalsIgnoreCase(metaLayout,
         OZONE_OM_METADATA_LAYOUT_PREFIX);
 
-    boolean enableFSPaths = getEnableFileSystemPaths();
-    if (omMetadataLayoutPrefix && !enableFSPaths) {
+    if (omMetadataLayoutPrefix && !getEnableFileSystemPaths()) {
       StringBuilder msg = new StringBuilder();
       msg.append("Invalid Configuration. Failed to start OM in ");
       msg.append(OZONE_OM_METADATA_LAYOUT_PREFIX);
@@ -3830,12 +3829,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       msg.append("' is false!");
 
       LOG.error(msg.toString());
-      throw new IOException(msg.toString());
+      throw new IllegalArgumentException(msg.toString());
     }
 
-    boolean isBucketFSOptimized = omMetadataLayoutPrefix;
-    OzoneManagerRatisUtils.setBucketFSOptimized(isBucketFSOptimized);
-    String status = isBucketFSOptimized ? "enabled" : "disabled";
+    OzoneManagerRatisUtils.setBucketFSOptimized(omMetadataLayoutPrefix);
+    String status = omMetadataLayoutPrefix ? "enabled" : "disabled";
     LOG.info("Configured {}={} and {} optimized OM FS operations",
         OZONE_OM_METADATA_LAYOUT, metaLayout, status);
   }
@@ -3859,10 +3857,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       // Defaulting to SIMPLE
       bucketMetaLayout = OZONE_OM_METADATA_LAYOUT_DEFAULT;
     }
-    boolean metadataLayoutEnabled =
+    boolean supportedMetadataLayout =
         StringUtils.equalsIgnoreCase(clusterLevelMetaLayout, bucketMetaLayout);
 
-    if (!metadataLayoutEnabled) {
+    if (!supportedMetadataLayout) {
       StringBuilder msg = new StringBuilder();
       msg.append("Failed to start OM in ");
       msg.append(clusterLevelMetaLayout);

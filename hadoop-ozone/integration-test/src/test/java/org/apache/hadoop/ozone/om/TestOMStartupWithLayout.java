@@ -112,8 +112,8 @@ public class TestOMStartupWithLayout {
     cluster.getOzoneManager().stop();
     conf.set(OZONE_OM_METADATA_LAYOUT, OZONE_OM_METADATA_LAYOUT_PREFIX);
     conf.setBoolean(OZONE_OM_ENABLE_FILESYSTEM_PATHS, false);
-    verifyOMStartupFailure(OZONE_OM_METADATA_LAYOUT_PREFIX);
-    verifyOMRestartFailure(OZONE_OM_METADATA_LAYOUT_PREFIX);
+    verifyOmStartWithInvalidConfig(OZONE_OM_METADATA_LAYOUT_PREFIX);
+    verifyOmRestartWithInvalidConfig(OZONE_OM_METADATA_LAYOUT_PREFIX);
 
     // case-4) Configured cluster layout as PREFIX and ENABLE_FSPATH=true.
     // No buckets. OM startup should be successful.
@@ -161,6 +161,30 @@ public class TestOMStartupWithLayout {
       GenericTestUtils.assertExceptionContains(
           "Failed to start OM in " + clusterLayout + " layout format",
           ioe);
+    }
+    cluster.getOzoneManager().stop();
+  }
+
+  private void verifyOmStartWithInvalidConfig(String clusterLayout)
+      throws IOException {
+    try {
+      cluster.getOzoneManager().start();
+      Assert.fail("Should fail OM startup in " + clusterLayout + " layout");
+    } catch (IllegalArgumentException iae) {
+      GenericTestUtils.assertExceptionContains(
+          "Failed to start OM in " + clusterLayout + " layout format", iae);
+    }
+    cluster.getOzoneManager().stop();
+  }
+
+  private void verifyOmRestartWithInvalidConfig(String clusterLayout)
+      throws IOException {
+    try {
+      cluster.getOzoneManager().restart();
+      Assert.fail("Should fail OM startup in " + clusterLayout + " layout");
+    } catch (IllegalArgumentException iae) {
+      GenericTestUtils.assertExceptionContains(
+          "Failed to start OM in " + clusterLayout + " layout format", iae);
     }
     cluster.getOzoneManager().stop();
   }
