@@ -53,15 +53,24 @@ public abstract class TokenVerifierTests<T extends ShortLivedTokenIdentifier> {
   private static final Logger LOG =
       LoggerFactory.getLogger(TokenVerifierTests.class);
 
-  protected static final Token<?> NO_TOKEN = new Token<>();
   protected static final String CERT_ID = "123";
 
+  /**
+   * Create the specific kind of TokenVerifier.
+   */
   protected abstract TokenVerifier newTestSubject(
       SecurityConfig secConf, CertificateClient caClient);
 
+  /**
+   * Create a request for which the verifier being tested does not require
+   * tokens (eg. reading blocks does not require container token and vice versa)
+   */
   protected abstract ContainerCommandRequestProto unverifiedRequest()
       throws IOException;
 
+  /**
+   * Create a request for which token should be required.
+   */
   protected abstract ContainerCommandRequestProto verifiedRequest(T tokenId)
       throws IOException;
 
@@ -74,7 +83,7 @@ public abstract class TokenVerifierTests<T extends ShortLivedTokenIdentifier> {
     TokenVerifier subject = newTestSubject(tokenDisabled(), caClient);
 
     // WHEN
-    subject.verify("anyUser", NO_TOKEN, null);
+    subject.verify("anyUser", null, null);
 
     // THEN
     verify(caClient, never()).getCertificate(any());
@@ -88,7 +97,7 @@ public abstract class TokenVerifierTests<T extends ShortLivedTokenIdentifier> {
     ContainerCommandRequestProto cmd = unverifiedRequest();
 
     // WHEN
-    subject.verify("anyUser", NO_TOKEN, cmd);
+    subject.verify("anyUser", null, cmd);
 
     // THEN
     verify(caClient, never()).getCertificate(any());
@@ -115,7 +124,7 @@ public abstract class TokenVerifierTests<T extends ShortLivedTokenIdentifier> {
 
     // WHEN+THEN
     assertThrows(BlockTokenException.class, () ->
-        subject.verify("anyUser", NO_TOKEN, cmd));
+        subject.verify("anyUser", new Token<>(), cmd));
   }
 
   @Test
@@ -129,7 +138,7 @@ public abstract class TokenVerifierTests<T extends ShortLivedTokenIdentifier> {
 
     // WHEN+THEN
     assertThrows(BlockTokenException.class, () ->
-        subject.verify("anyUser", NO_TOKEN, cmd));
+        subject.verify("anyUser", new Token<>(), cmd));
   }
 
   @Test
@@ -207,6 +216,9 @@ public abstract class TokenVerifierTests<T extends ShortLivedTokenIdentifier> {
     return new SecurityConfig(conf);
   }
 
+  /**
+   * Mock secret manager for test.  No private key etc.
+   */
   private class MockTokenManager extends ShortLivedTokenSecretManager<T> {
 
     MockTokenManager(SecurityConfig conf) {

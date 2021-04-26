@@ -428,8 +428,8 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
 
     if (tokenVerifier != null) {
       tokenVerifier.verify(
-          UserGroupInformation.getCurrentUser().getShortUserName(),
-          msg.getEncodedToken(), msg
+          msg, UserGroupInformation.getCurrentUser().getShortUserName(),
+          msg.getEncodedToken()
       );
     }
   }

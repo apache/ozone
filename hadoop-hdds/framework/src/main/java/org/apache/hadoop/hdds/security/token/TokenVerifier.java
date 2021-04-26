@@ -52,8 +52,8 @@ public interface TokenVerifier {
 
   /** Same as {@link #verify(String, Token, ContainerCommandRequestProto)}, but
    * with encoded token. */
-  default void verify(String user, String encodedToken,
-      ContainerCommandRequestProto cmd) throws SCMSecurityException {
+  default void verify(ContainerCommandRequestProto cmd, String user,
+      String encodedToken) throws SCMSecurityException {
 
     if (Strings.isNullOrEmpty(encodedToken)) {
       throw new BlockTokenException("Failed to find any token (empty or " +
