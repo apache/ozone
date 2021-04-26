@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.container.metrics;
 
 import org.apache.commons.lang3.RandomUtils;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -89,8 +90,8 @@ public class TestSCMContainerManagerMetrics {
         "NumSuccessfulCreateContainers", metrics);
 
     ContainerInfo containerInfo = containerManager.allocateContainer(
-        HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.ONE, OzoneConsts.OZONE);
+        new RatisReplicationConfig(
+            HddsProtos.ReplicationFactor.ONE), OzoneConsts.OZONE);
 
     metrics = getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
     Assert.assertEquals(getLongCounter("NumSuccessfulCreateContainers",
@@ -98,8 +99,8 @@ public class TestSCMContainerManagerMetrics {
 
     try {
       containerManager.allocateContainer(
-          HddsProtos.ReplicationType.RATIS,
-          HddsProtos.ReplicationFactor.THREE, OzoneConsts.OZONE);
+          new RatisReplicationConfig(
+              HddsProtos.ReplicationFactor.THREE), OzoneConsts.OZONE);
       fail("testContainerOpsMetrics failed");
     } catch (IOException ex) {
       // Here it should fail, so it should have the old metric value.

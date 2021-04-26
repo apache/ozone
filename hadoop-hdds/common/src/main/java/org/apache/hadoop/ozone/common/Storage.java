@@ -251,6 +251,18 @@ public abstract class Storage {
   }
 
   /**
+   * Creates the Version file even if it exists.
+   * @throws IOException
+   */
+  public void forceInitialize() throws IOException {
+    if (state != StorageState.INITIALIZED) {
+      initialize();
+    } else {
+      storageInfo.writeTo(getVersionFile());
+    }
+  }
+
+  /**
    * Persists current StorageInfo to file system..
    * @throws IOException
    */

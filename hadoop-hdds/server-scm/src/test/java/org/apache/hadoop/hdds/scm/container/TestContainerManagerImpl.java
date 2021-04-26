@@ -22,8 +22,10 @@ import java.util.UUID;
 
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
@@ -64,8 +66,8 @@ public class TestContainerManagerImpl {
     sequenceIdGen = new SequenceIdGenerator(
         conf, scmhaManager, SCMDBDefinition.SEQUENCE_ID.getTable(dbStore));
     final PipelineManager pipelineManager = MockPipelineManager.getInstance();
-    pipelineManager.createPipeline(HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.THREE);
+    pipelineManager.createPipeline(new RatisReplicationConfig(
+        ReplicationFactor.THREE));
     containerManager = new ContainerManagerImpl(conf,
         scmhaManager, sequenceIdGen, pipelineManager,
         SCMDBDefinition.CONTAINERS.getTable(dbStore));
@@ -89,8 +91,8 @@ public class TestContainerManagerImpl {
     Assert.assertTrue(
         containerManager.getContainers().isEmpty());
     final ContainerInfo container = containerManager.allocateContainer(
-        HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.THREE, "admin");
+        new RatisReplicationConfig(
+            ReplicationFactor.THREE), "admin");
     Assert.assertEquals(1, containerManager.getContainers().size());
     Assert.assertNotNull(containerManager.getContainer(
         container.containerID()));
@@ -99,8 +101,8 @@ public class TestContainerManagerImpl {
   @Test
   public void testUpdateContainerState() throws Exception {
     final ContainerInfo container = containerManager.allocateContainer(
-        HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.THREE, "admin");
+        new RatisReplicationConfig(
+            ReplicationFactor.THREE), "admin");
     final ContainerID cid = container.containerID();
     Assert.assertEquals(HddsProtos.LifeCycleState.OPEN,
         containerManager.getContainer(cid).getState());
@@ -126,8 +128,8 @@ public class TestContainerManagerImpl {
     ContainerID[] cidArray = new ContainerID[10];
     for(int i = 0; i < 10; i++){
       ContainerInfo container = containerManager.allocateContainer(
-          HddsProtos.ReplicationType.RATIS,
-          HddsProtos.ReplicationFactor.THREE, "admin");
+          new RatisReplicationConfig(
+              ReplicationFactor.THREE), "admin");
       cidArray[i] = container.containerID();
     }
 

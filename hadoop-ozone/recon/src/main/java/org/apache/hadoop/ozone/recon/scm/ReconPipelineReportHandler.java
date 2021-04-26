@@ -82,7 +82,7 @@ public class ReconPipelineReportHandler extends PipelineReportHandler {
     setPipelineLeaderId(report, pipeline, dn);
 
     if (pipeline.getPipelineState() == Pipeline.PipelineState.ALLOCATED) {
-      LOG.info("Pipeline {} {} reported by {}", pipeline.getFactor(),
+      LOG.info("Pipeline {} {} reported by {}", pipeline.getReplicationConfig(),
           pipeline.getId(), dn);
       if (pipeline.isHealthy()) {
         reconPipelineManager.openPipeline(pipelineID);

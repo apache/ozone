@@ -22,8 +22,9 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.ozone.HddsDatanodeService;
@@ -77,8 +78,8 @@ public class TestRatisPipelineLeader {
   @Test(timeout = 120000)
   public void testLeaderIdUsedOnFirstCall() throws Exception {
     List<Pipeline> pipelines = cluster.getStorageContainerManager()
-        .getPipelineManager().getPipelines(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE);
+        .getPipelineManager().getPipelines(new RatisReplicationConfig(
+            ReplicationFactor.THREE));
     Assert.assertFalse(pipelines.isEmpty());
     Pipeline ratisPipeline = pipelines.iterator().next();
     Assert.assertTrue(ratisPipeline.isHealthy());
@@ -109,8 +110,8 @@ public class TestRatisPipelineLeader {
   @Test(timeout = 120000)
   public void testLeaderIdAfterLeaderChange() throws Exception {
     List<Pipeline> pipelines = cluster.getStorageContainerManager()
-        .getPipelineManager().getPipelines(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE);
+        .getPipelineManager().getPipelines(new RatisReplicationConfig(
+            ReplicationFactor.THREE));
     Assert.assertFalse(pipelines.isEmpty());
     Pipeline ratisPipeline = pipelines.iterator().next();
     Assert.assertTrue(ratisPipeline.isHealthy());
