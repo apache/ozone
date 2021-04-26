@@ -3833,7 +3833,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throw new IOException(msg.toString());
     }
 
-    boolean isBucketFSOptimized = omMetadataLayoutPrefix && enableFSPaths;
+    boolean isBucketFSOptimized = omMetadataLayoutPrefix;
     OzoneManagerRatisUtils.setBucketFSOptimized(isBucketFSOptimized);
     String status = isBucketFSOptimized ? "enabled" : "disabled";
     LOG.info("Configured {}={} and {} optimized OM FS operations",
