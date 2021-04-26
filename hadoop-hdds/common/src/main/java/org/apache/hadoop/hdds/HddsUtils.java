@@ -418,6 +418,8 @@ public final class HddsUtils {
     case CloseContainer:
     case CreateContainer:
     case DeleteContainer:
+    case ListContainer:
+    case ReadContainer:
     case UpdateContainer:
       return true;
     default:
