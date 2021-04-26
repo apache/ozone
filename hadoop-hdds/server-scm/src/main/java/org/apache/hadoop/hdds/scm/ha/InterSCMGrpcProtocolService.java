@@ -69,6 +69,7 @@ public class InterSCMGrpcProtocolService {
       LOG.info("Ignore. already started.");
       return;
     } else {
+      LOG.info("Starting SCM Grpc Service at port {}", port);
       server.start();
     }
   }

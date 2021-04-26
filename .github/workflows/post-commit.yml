@@ -24,6 +24,7 @@ env:
 jobs:
   compile:
     runs-on: ubuntu-18.04
+    timeout-minutes: 30
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     strategy:
       matrix:
@@ -45,8 +46,10 @@ jobs:
         uses: actions/cache@v2
         with:
           path: ~/.m2/repository
-          key: maven-repo-${{ hashFiles('**/pom.xml') }}
-          restore-keys: maven-repo-
+          key: maven-repo-${{ hashFiles('**/pom.xml') }}-${{ matrix.java }}
+          restore-keys: |
+            maven-repo-${{ hashFiles('**/pom.xml') }}
+            maven-repo-
       - name: Setup java
         uses: actions/setup-java@v1
         with:
@@ -66,131 +69,56 @@ jobs:
           rm -rf ~/.m2/repository/org/apache/hadoop/hadoop-hdds*
           rm -rf ~/.m2/repository/org/apache/hadoop/hadoop-ozone*
         if: always()
-  bats:
+  basic:
     runs-on: ubuntu-18.04
+    timeout-minutes: 40
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    strategy:
+      matrix:
+        check:
+          - author
+          - bats
+          - checkstyle
+          - docs
+          - findbugs
+          - rat
+          - unit
+      fail-fast: ${{ github.event_name == 'pull_request' }}
     steps:
       - name: Checkout project
         uses: actions/checkout@v2
-      - name: Install bats
+      - name: Cache for maven dependencies
+        uses: actions/cache@v2
+        with:
+          path: ~/.m2/repository
+          key: maven-repo-${{ hashFiles('**/pom.xml') }}-8-${{ matrix.check }}
+          restore-keys: |
+            maven-repo-${{ hashFiles('**/pom.xml') }}-8
+            maven-repo-${{ hashFiles('**/pom.xml') }}
+            maven-repo-
+        if: ${{ !contains('author,bats,docs', matrix.check) }}
+      - name: Execute tests
+        run: hadoop-ozone/dev-support/checks/${{ matrix.check }}.sh
+      - name: Summary of failures
+        run: cat target/${{ matrix.check }}/summary.txt
+        if: ${{ !cancelled() }}
+      - name: Archive build results
+        uses: actions/upload-artifact@v2
+        if: ${{ !cancelled() }}
+        with:
+          name: ${{ matrix.check }}
+          path: target/${{ matrix.check }}
+        continue-on-error: true
+      - name: Delete temporary build artifacts before caching
         run: |
-          cd /tmp
-          curl -LSs https://github.com/bats-core/bats-core/archive/v1.2.1.tar.gz | tar xzf -
-          cd bats-core-1.2.1
-          sudo ./install.sh /usr/local
-      - name: Execute tests
-        run: ./hadoop-ozone/dev-support/checks/${{ github.job }}.sh
-      - name: Summary of failures
-        run: cat target/${{ github.job }}/summary.txt
+          #Never cache local artifacts
+          rm -rf ~/.m2/repository/org/apache/hadoop/hadoop-hdds*
+          rm -rf ~/.m2/repository/org/apache/hadoop/hadoop-ozone*
         if: always()
-      - name: Archive build results
-        uses: actions/upload-artifact@v2
-        if: always()
-        with:
-          name: ${{ github.job }}
-          path: target/${{ github.job }}
-        continue-on-error: true
-  rat:
-    runs-on: ubuntu-18.04
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
-    steps:
-      - name: Checkout project
-        uses: actions/checkout@v2
-      - name: Execute tests
-        uses: ./.github/buildenv
-        with:
-          args: ./hadoop-ozone/dev-support/checks/rat.sh
-      - name: Summary of failures
-        run: cat target/${{ github.job }}/summary.txt
-        if: always()
-      - name: Archive build results
-        uses: actions/upload-artifact@v2
-        if: always()
-        with:
-          name: rat
-          path: target/rat
-        continue-on-error: true
-  author:
-    runs-on: ubuntu-18.04
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
-    steps:
-      - name: Checkout project
-        uses: actions/checkout@v2
-      - name: Execute tests
-        run: hadoop-ozone/dev-support/checks/author.sh
-      - name: Summary of failures
-        run: cat target/${{ github.job }}/summary.txt
-        if: always()
-      - name: Archive build results
-        uses: actions/upload-artifact@v2
-        if: always()
-        with:
-          name: author
-          path: target/author
-        continue-on-error: true
-  unit:
-    runs-on: ubuntu-18.04
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
-    steps:
-      - name: Checkout project
-        uses: actions/checkout@v2
-      - name: Execute tests
-        uses: ./.github/buildenv
-        with:
-          args: ./hadoop-ozone/dev-support/checks/unit.sh
-      - name: Summary of failures
-        run: cat target/${{ github.job }}/summary.txt
-        if: always()
-      - name: Archive build results
-        uses: actions/upload-artifact@v2
-        if: always()
-        with:
-          name: unit
-          path: target/unit
-        continue-on-error: true
-  checkstyle:
-    runs-on: ubuntu-18.04
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
-    steps:
-      - name: Checkout project
-        uses: actions/checkout@v2
-      - name: Execute tests
-        uses: ./.github/buildenv
-        with:
-          args: ./hadoop-ozone/dev-support/checks/checkstyle.sh
-      - name: Summary of failures
-        run: cat target/${{ github.job }}/summary.txt
-        if: always()
-      - name: Archive build results
-        uses: actions/upload-artifact@v2
-        if: always()
-        with:
-          name: checkstyle
-          path: target/checkstyle
-        continue-on-error: true
-  findbugs:
-    runs-on: ubuntu-18.04
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
-    steps:
-      - name: Checkout project
-        uses: actions/checkout@v2
-      - name: Execute tests
-        uses: ./.github/buildenv
-        with:
-          args: ./hadoop-ozone/dev-support/checks/findbugs.sh
-      - name: Summary of failures
-        run: cat target/${{ github.job }}/summary.txt
-        if: always()
-      - name: Archive build results
-        uses: actions/upload-artifact@v2
-        if: always()
-        with:
-          name: findbugs
-          path: target/findbugs
-        continue-on-error: true
   acceptance:
     needs: compile
     runs-on: ubuntu-18.04
+    timeout-minutes: 120
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     strategy:
       matrix:
@@ -217,8 +145,6 @@ jobs:
           mkdir -p /mnt/ozone/hadoop-ozone/dist/target
           tar xzvf hadoop-ozone*.tar.gz -C /mnt/ozone/hadoop-ozone/dist/target
           sudo chmod -R a+rwX /mnt/ozone/hadoop-ozone/dist/target
-      - name: Install robotframework
-        run: sudo pip install robotframework
       - name: Execute tests
         run: |
           cd /mnt/ozone/hadoop-ozone/dist/target/ozone-* && sudo mkdir .aws && sudo chmod 777 .aws && sudo chown 1000 .aws
@@ -237,6 +163,7 @@ jobs:
         continue-on-error: true
   integration:
     runs-on: ubuntu-18.04
+    timeout-minutes: 100
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     strategy:
       matrix:
@@ -268,14 +195,24 @@ jobs:
         continue-on-error: true
   coverage:
     runs-on: ubuntu-18.04
+    timeout-minutes: 30
     if: github.repository == 'apache/ozone' && github.event_name != 'pull_request'
     needs:
       - acceptance
+      - basic
       - integration
-      - unit
     steps:
       - name: Checkout project
         uses: actions/checkout@v2
+      - name: Cache for maven dependencies
+        uses: actions/cache@v2
+        with:
+          path: ~/.m2/repository
+          key: maven-repo-${{ hashFiles('**/pom.xml') }}-8-${{ matrix.check }}
+          restore-keys: |
+            maven-repo-${{ hashFiles('**/pom.xml') }}-8
+            maven-repo-${{ hashFiles('**/pom.xml') }}
+            maven-repo-
       - name: Download artifacts
         uses: actions/download-artifact@v2
         with:
@@ -304,6 +241,7 @@ jobs:
   kubernetes:
     needs: compile
     runs-on: ubuntu-18.04
+    timeout-minutes: 60
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     steps:
       - name: Checkout project
@@ -322,21 +260,6 @@ jobs:
         run: |
           mkdir -p /mnt/ozone/hadoop-ozone/dist/target
           tar xzvf hadoop-ozone*.tar.gz -C /mnt/ozone/hadoop-ozone/dist/target
-      - name: Install robotframework
-        run: sudo pip install robotframework
-      - name: Install k3s
-        run: curl -sfL https://get.k3s.io | sh -
-      - name: Copy Kubernetes config file
-        run: |
-          sudo mkdir ~/.kube
-          sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
-          sudo chown $(id -u) ~/.kube/config
-      - name: Install flekszible
-        run: |
-          cd /tmp
-          wget https://github.com/elek/flekszible/releases/download/v1.8.1/flekszible_1.8.1_Linux_x86_64.tar.gz -O - | tar -zx
-          chmod +x flekszible
-          sudo mv flekszible /usr/bin/flekszible
       - name: Execute tests
         run: |
           cd /mnt/ozone/hadoop-ozone/dist/target/ozone-* && sudo mkdir .aws && sudo chmod 777 .aws && sudo chown 1000 .aws

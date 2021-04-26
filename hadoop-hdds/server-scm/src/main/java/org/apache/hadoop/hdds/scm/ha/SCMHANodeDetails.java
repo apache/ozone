@@ -23,7 +23,6 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.ozone.OzoneIllegalArgumentException;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -305,6 +304,6 @@ public class SCMHANodeDetails {
       throws IllegalArgumentException {
     String exceptionMsg = String.format(message, arguments);
     LOG.error(exceptionMsg);
-    throw new OzoneIllegalArgumentException(exceptionMsg);
+    throw new IllegalArgumentException(exceptionMsg);
   }
 }

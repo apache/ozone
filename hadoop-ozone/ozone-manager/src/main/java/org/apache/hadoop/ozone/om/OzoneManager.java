@@ -159,7 +159,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType;
 import org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
-import org.apache.hadoop.ozone.util.ExitManager;
+import org.apache.hadoop.hdds.ExitManager;
 import org.apache.hadoop.ozone.util.OzoneVersionInfo;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -1458,7 +1458,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         omDetailsProtoBuilder.build();
     LOG.info("OzoneManager ports added:{}", omDetailsProto.getPortsList());
     SCMSecurityProtocolClientSideTranslatorPB secureScmClient =
-        HddsServerUtil.getScmSecurityClient(config);
+        HddsServerUtil.getScmSecurityClientWithFixedDuration(config);
 
     SCMGetCertResponseProto response = secureScmClient.
         getOMCertChain(omDetailsProto, getEncodedString(csr));

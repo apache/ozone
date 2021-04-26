@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.om.ha;
 import org.apache.commons.lang3.StringUtils;
 
 import org.apache.hadoop.hdds.server.http.HttpConfig;
-import org.apache.hadoop.ozone.ha.NodeDetails;
+import org.apache.hadoop.hdds.NodeDetails;
 
 import java.net.InetSocketAddress;
 

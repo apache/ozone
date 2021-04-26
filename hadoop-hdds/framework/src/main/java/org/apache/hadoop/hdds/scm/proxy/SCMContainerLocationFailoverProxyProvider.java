@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
@@ -180,14 +181,22 @@ public class SCMContainerLocationFailoverProxyProvider implements
     }
   }
 
-  public synchronized RetryPolicy.RetryAction getRetryAction(int failovers) {
-    if (failovers >= maxRetryCount) {
+  public RetryPolicy.RetryAction getRetryAction(int failovers, int retry,
+      Exception e) {
+    if (SCMHAUtils.isRetriableWithNoFailoverException(e)) {
+      if (retry < maxRetryCount) {
+        return new RetryPolicy.RetryAction(
+            RetryPolicy.RetryAction.RetryDecision.RETRY, getRetryInterval());
+      } else {
+        return RetryPolicy.RetryAction.FAIL;
+      }
+    } else if (failovers < maxRetryCount) {
+      return new RetryPolicy.RetryAction(
+          RetryPolicy.RetryAction.RetryDecision.FAILOVER_AND_RETRY,
+          getRetryInterval());
+    } else {
       return RetryPolicy.RetryAction.FAIL;
     }
-
-    return new RetryPolicy.RetryAction(
-        RetryPolicy.RetryAction.RetryDecision.FAILOVER_AND_RETRY,
-        getRetryInterval());
   }
 
   private long getRetryInterval() {
@@ -262,8 +271,11 @@ public class SCMContainerLocationFailoverProxyProvider implements
       @Override
       public RetryAction shouldRetry(Exception e, int retry,
                                      int failover, boolean b) {
-        performFailoverToAssignedLeader(null);
-        return getRetryAction(failover);
+        if (!SCMHAUtils.isRetriableWithNoFailoverException(e)) {
+          performFailoverToAssignedLeader(null);
+        }
+        return SCMHAUtils.getRetryAction(failover, retry, e, maxRetryCount,
+            getRetryInterval());
       }
     };
   }
