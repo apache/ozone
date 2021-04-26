@@ -37,6 +37,7 @@ OZONE-SITE.XML_hdds.scm.replication.thread.interval=6s
 OZONE-SITE.XML_hdds.scm.replication.event.timeout=10s
 OZONE-SITE.XML_dfs.ratis.server.failure.duration=35s
 OZONE-SITE.XML_hdds.scm.safemode.min.datanode=3
+OZONE-SITE.XML_hdds.scmclient.max.retry.timeout=30s
 
 HDFS-SITE.XML_rpc.metrics.quantile.enable=true
 HDFS-SITE.XML_rpc.metrics.percentiles.intervals=60,300

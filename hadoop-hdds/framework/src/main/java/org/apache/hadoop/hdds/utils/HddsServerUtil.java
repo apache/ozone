@@ -80,10 +80,10 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_R
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_RETRY_COUNT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_RETRY_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_RETRY_INTERVAL_DEFAULT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURATION;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURATION_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURATION;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURATION_DEFAULT;
 import static org.apache.hadoop.hdds.server.ServerUtils.sanitizeUserArgs;
 
 import org.rocksdb.RocksDBException;
@@ -435,10 +435,9 @@ public final class HddsServerUtil {
     OzoneConfiguration configuration = new OzoneConfiguration(conf);
     long duration = conf.getTimeDuration(OZONE_SCM_INFO_WAIT_DURATION,
         OZONE_SCM_INFO_WAIT_DURATION_DEFAULT, TimeUnit.SECONDS);
-    SCMClientConfig scmClientConfig =
-        conf.getObject(SCMClientConfig.class);
+    SCMClientConfig scmClientConfig = conf.getObject(SCMClientConfig.class);
     int retryCount =
-        (int) (duration / (scmClientConfig.getRetryInterval()/1000));
+        (int) (duration / (scmClientConfig.getRetryInterval() / 1000));
 
     // If duration is set to lesser value, fall back to actual default
     // retry count.

@@ -54,6 +54,7 @@ import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.apache.ratis.protocol.SetConfigurationRequest;
 import org.apache.ratis.server.RaftServer;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -246,8 +247,15 @@ public class SCMRatisServerImpl implements SCMRatisServer {
    */
   @Override
   public NotLeaderException triggerNotLeaderException() {
-    return new NotLeaderException(
-        division.getMemberId(), null, division.getGroup().getPeers());
+    ByteString leaderId =
+        division.getInfo().getRoleInfoProto().getFollowerInfo().getLeaderInfo()
+            .getId().getId();
+    RaftPeer suggestedLeader = leaderId.isEmpty() ?
+        null :
+        division.getRaftConf().getPeer(RaftPeerId.valueOf(leaderId));
+    return new NotLeaderException(division.getMemberId(),
+        suggestedLeader,
+        division.getGroup().getPeers());
   }
 
   @Override
@@ -289,7 +297,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
       String scmId, String clusterId) {
     Preconditions.checkNotNull(scmId);
     final RaftGroupId groupId = buildRaftGroupId(clusterId);
-    RaftPeerId selfPeerId = RaftPeerId.getRaftPeerId(scmId);
+    RaftPeerId selfPeerId = getSelfPeerId(scmId);
 
     RaftPeer localRaftPeer = RaftPeer.newBuilder().setId(selfPeerId)
         // TODO : Should we use IP instead of hostname??
@@ -301,6 +309,10 @@ public class SCMRatisServerImpl implements SCMRatisServer {
     final RaftGroup group =
         RaftGroup.valueOf(groupId, raftPeers);
     return group;
+  }
+
+  public static RaftPeerId getSelfPeerId(String scmId) {
+    return RaftPeerId.getRaftPeerId(scmId);
   }
 
   @VisibleForTesting

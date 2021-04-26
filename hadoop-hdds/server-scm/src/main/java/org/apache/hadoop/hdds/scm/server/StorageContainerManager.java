@@ -1098,6 +1098,16 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     return addr == null ? "0" : Integer.toString(addr.getPort());
   }
 
+  public String getBlockProtocolRpcPort() {
+    InetSocketAddress addr = getBlockProtocolServer().getBlockRpcAddress();
+    return addr == null ? "0" : Integer.toString(addr.getPort());
+  }
+
+  public String getSecurityProtocolRpcPort() {
+    InetSocketAddress addr = getSecurityProtocolServer().getRpcAddress();
+    return addr == null ? "0" : Integer.toString(addr.getPort());
+  }
+
   /**
    * Returns listening address of StorageDatanode Protocol RPC server.
    *
