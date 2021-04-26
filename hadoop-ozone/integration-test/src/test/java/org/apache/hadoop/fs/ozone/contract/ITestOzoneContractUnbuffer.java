@@ -21,32 +21,13 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.contract.AbstractContractUnbufferTest;
 import org.apache.hadoop.fs.contract.AbstractFSContract;
 import org.junit.AfterClass;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
 
 import java.io.IOException;
-import java.util.Collection;
 
 /**
  * Ozone contract tests for {@link org.apache.hadoop.fs.CanUnbuffer#unbuffer}.
  */
-@RunWith(Parameterized.class)
 public class ITestOzoneContractUnbuffer extends AbstractContractUnbufferTest {
-
-  private static boolean fsOptimizedServer;
-
-  public ITestOzoneContractUnbuffer(boolean fsoServer)
-      throws IOException {
-    if (fsOptimizedServer != fsoServer) {
-      setFsOptimizedServer(fsoServer);
-      ITestOzoneContractUtils.restartCluster(
-          fsOptimizedServer);
-    }
-  }
-
-  public static void setFsOptimizedServer(boolean fsOptimizedServer) {
-    ITestOzoneContractUnbuffer.fsOptimizedServer = fsOptimizedServer;
-  }
 
   @AfterClass
   public static void teardownCluster() throws IOException {
@@ -56,10 +37,5 @@ public class ITestOzoneContractUnbuffer extends AbstractContractUnbufferTest {
   @Override
   protected AbstractFSContract createContract(Configuration conf) {
     return new OzoneContract(conf);
-  }
-
-  @Parameterized.Parameters
-  public static Collection data() {
-    return ITestOzoneContractUtils.getFsoCombinations();
   }
 }
