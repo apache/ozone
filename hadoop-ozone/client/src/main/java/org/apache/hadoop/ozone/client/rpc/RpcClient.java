@@ -860,15 +860,13 @@ public class RpcClient implements ClientProtocol {
 
     List<OzoneKeyLocation> ozoneKeyLocations = new ArrayList<>();
     long lastKeyOffset = 0L;
-    long lastLength = 0L;
     List<OmKeyLocationInfo> omKeyLocationInfos = keyInfo
         .getLatestVersionLocations().getBlocksLatestVersionOnly();
     for (OmKeyLocationInfo info: omKeyLocationInfos) {
       ozoneKeyLocations.add(new OzoneKeyLocation(info.getContainerID(),
           info.getLocalID(), info.getLength(), info.getOffset(),
-          lastKeyOffset + lastLength));
-      lastKeyOffset = lastLength + lastKeyOffset;
-      lastLength = info.getLength();
+          lastKeyOffset));
+      lastKeyOffset += info.getLength();
     }
     return new OzoneKeyDetails(keyInfo.getVolumeName(), keyInfo.getBucketName(),
         keyInfo.getKeyName(), keyInfo.getDataSize(), keyInfo.getCreationTime(),
