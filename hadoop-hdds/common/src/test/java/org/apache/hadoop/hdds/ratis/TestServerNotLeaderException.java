@@ -22,8 +22,6 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.Assert;
 import org.junit.Test;
 
-import java.io.IOException;
-
 /** Class to test {@link ServerNotLeaderException} parsing. **/
 
 @SuppressFBWarnings("NM_CLASS_NOT_EXCEPTION")
