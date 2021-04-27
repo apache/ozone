@@ -177,8 +177,6 @@ public class BlockDeletingService extends BackgroundService {
             .filter(e -> isDeletionAllowed(e.getValue().getContainerData(),
                 deletionPolicy)).collect(Collectors
             .toMap(Map.Entry::getKey, e -> e.getValue().getContainerData()));
-    System.out.println("size " + containerDataMap.size());
-    System.out.println("blockLimit " + blockLimit);
     return deletionPolicy
         .chooseContainerForBlockDeletion(blockLimit, containerDataMap);
   }
