@@ -61,7 +61,8 @@ public class ServerNotLeaderException extends IOException {
       Matcher suggestedLeaderMatcher =
           SUGGESTED_LEADER_PATTERN.matcher(message);
       if (suggestedLeaderMatcher.matches()) {
-        this.leader = suggestedLeaderMatcher.group(1)  + suggestedLeaderMatcher.group(2);
+        this.leader = suggestedLeaderMatcher.group(1) +
+            suggestedLeaderMatcher.group(2);
       } else {
         this.leader = null;
       }

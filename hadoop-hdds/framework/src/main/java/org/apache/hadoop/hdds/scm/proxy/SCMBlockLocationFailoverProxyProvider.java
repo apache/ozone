@@ -165,8 +165,8 @@ public class SCMBlockLocationFailoverProxyProvider implements
     if (snle != null && snle.getSuggestedLeader() != null) {
       Optional<SCMProxyInfo> matchedProxyInfo =
           scmProxyInfoMap.values().stream().filter(
-          proxyInfo -> NetUtils.getHostPortString(proxyInfo.getAddress())
-              .equals(snle.getSuggestedLeader())).findFirst();
+              proxyInfo -> NetUtils.getHostPortString(proxyInfo.getAddress())
+                  .equals(snle.getSuggestedLeader())).findFirst();
       if (matchedProxyInfo.isPresent()) {
         newLeader = matchedProxyInfo.get().getNodeId();
         LOG.debug("Performing failover to suggested leader {}, nodeId {}",
