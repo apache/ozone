@@ -25,7 +25,6 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.ratis.thirdparty.io.grpc.Server;
@@ -73,8 +72,8 @@ public class InterSCMGrpcProtocolService {
             sslServerContextBuilder, securityConfig.getGrpcSslProvider());
         nettyServerBuilder.sslContext(sslContextBuilder.build());
       } catch (Exception ex) {
-        LOG.error("Unable to setup TLS for secure InterSCMGrpcProtocolService " +
-            "GRPC endpoint.", ex);
+        LOG.error("Unable to setup TLS for secure " +
+            "InterSCMGrpcProtocolService GRPC endpoint.", ex);
         throw new RuntimeException("Unable to setup TLS for secure " +
             "InterSCMGrpcProtocolService GRPC endpoint.");
       }

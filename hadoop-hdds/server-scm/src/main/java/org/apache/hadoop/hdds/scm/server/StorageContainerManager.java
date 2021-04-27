@@ -413,7 +413,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   }
 
   private void initializeCertificateClient() {
-    if (scmStorageConfig.checkPrimarySCMIdInitialized()) {
+    if (OzoneSecurityUtil.isSecurityEnabled(configuration) &&
+        scmStorageConfig.checkPrimarySCMIdInitialized()) {
       scmCertificateClient = new SCMCertificateClient(
           new SecurityConfig(configuration),
           scmStorageConfig.getScmCertSerialId());
