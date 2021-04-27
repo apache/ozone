@@ -167,9 +167,16 @@ public final class KeyValueContainerUtil {
 
     long containerID = kvContainerData.getContainerID();
     File metadataPath = new File(kvContainerData.getMetadataPath());
+    File chunksPath = new File(kvContainerData.getChunksPath());
 
     // Verify Checksum
     ContainerUtils.verifyChecksum(kvContainerData);
+    if (!chunksPath.exists()) {
+      LOG.error("Container chunks file is missing for ContainerID {}. " +
+          "Skipping loading of this container.", containerID);
+      // Don't further process this container, as it is missing db file.
+      return;
+    }
 
     File dbFile = KeyValueContainerLocationUtil.getContainerDBFile(
         metadataPath, containerID);
