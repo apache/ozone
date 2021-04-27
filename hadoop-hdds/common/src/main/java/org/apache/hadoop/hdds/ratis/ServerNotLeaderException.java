@@ -60,11 +60,10 @@ public class ServerNotLeaderException extends IOException {
 
       Matcher suggestedLeaderMatcher =
           SUGGESTED_LEADER_PATTERN.matcher(message);
-      // TODO: If message contains only port or multiple ":" this will return
-      // suggested leader which will not be a valid host.
       if (suggestedLeaderMatcher.matches()) {
         if (suggestedLeaderMatcher.groupCount() == 2) {
-          if (suggestedLeaderMatcher.group(1).equals("")) {
+          if (suggestedLeaderMatcher.group(1).isEmpty()
+              || suggestedLeaderMatcher.group(2).isEmpty()) {
             this.leader = null;
           } else {
             this.leader = suggestedLeaderMatcher.group(1) +
