@@ -18,14 +18,18 @@
 
 package org.apache.hadoop.hdds.ratis;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.Assert;
 import org.junit.Test;
 
 import java.io.IOException;
 
+/** Class to test {@link ServerNotLeaderException} parsing. **/
+
+@SuppressFBWarnings("NM_CLASS_NOT_EXCEPTION")
 public class TestServerNotLeaderException {
   @Test
-  public void testServerNotLeaderException() throws IOException {
+  public void testServerNotLeaderException() {
 
     // Test hostname with "."
     final String msg =
