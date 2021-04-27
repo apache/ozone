@@ -45,6 +45,7 @@ import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.ratis.server.protocol.TermIndex;
 
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertFalse;
 
 import org.junit.Assert;
 import org.junit.jupiter.api.AfterEach;
@@ -121,7 +122,7 @@ public class TestSCMInstallSnapshotWithHA {
     // Find the inactive SCM
     String followerId = getInactiveSCM(cluster).getScmId();
 
-    StorageContainerManager follower = cluster.getSCM(followerId);
+    StorageContainerManager followerSCM = cluster.getSCM(followerId);
     // Do some transactions so that the log index increases
     List<ContainerInfo> containers = writeToIncreaseLogIndex(leaderSCM, 200);
 
@@ -131,15 +132,16 @@ public class TestSCMInstallSnapshotWithHA {
     cluster.startInactiveSCM(followerId);
 
     // The recently started  should be lagging behind the leader .
+    SCMStateMachine followerSM =
+        followerSCM.getScmHAManager().getRatisServer().getSCMStateMachine();
     long followerLastAppliedIndex =
-        follower.getScmHAManager().getRatisServer().getSCMStateMachine()
-            .getLastAppliedTermIndex().getIndex();
-    assertTrue(
-        followerLastAppliedIndex >= 200);
+        followerSM.getLastAppliedTermIndex().getIndex();
+    assertTrue(followerLastAppliedIndex >= 200);
+    assertFalse(followerSM.getLifeCycleState().isPausingOrPaused());
 
     // Verify that the follower 's DB contains the transactions which were
     // made while it was inactive.
-    SCMMetadataStore followerMetaStore = follower.getScmMetadataStore();
+    SCMMetadataStore followerMetaStore = followerSCM.getScmMetadataStore();
     for (ContainerInfo containerInfo : containers) {
       Assert.assertNotNull(followerMetaStore.getContainerTable()
           .get(containerInfo.containerID()));
@@ -154,9 +156,9 @@ public class TestSCMInstallSnapshotWithHA {
     String followerId = getInactiveSCM(cluster).getScmId();
     // Find the inactive SCM
 
-    StorageContainerManager follower = cluster.getSCM(followerId);
+    StorageContainerManager followerSCM = cluster.getSCM(followerId);
     cluster.startInactiveSCM(followerId);
-    follower.exitSafeMode();
+    followerSCM.exitSafeMode();
     DBCheckpoint leaderDbCheckpoint = leaderSCM.getScmMetadataStore().getStore()
         .getCheckpoint(false);
 
@@ -165,8 +167,8 @@ public class TestSCMInstallSnapshotWithHA {
     TermIndex lastTermIndex = leaderSM.getLastAppliedTermIndex();
 
     SCMStateMachine followerSM =
-        follower.getScmHAManager().getRatisServer().getSCMStateMachine();
-    follower.getScmMetadataStore().getTransactionInfoTable().
+        followerSCM.getScmHAManager().getRatisServer().getSCMStateMachine();
+    followerSCM.getScmMetadataStore().getTransactionInfoTable().
         put(OzoneConsts.TRANSACTION_INFO_KEY, TransactionInfo.builder()
         .setCurrentTerm(lastTermIndex.getTerm())
             .setTransactionIndex(lastTermIndex.getIndex() + 100).build());
@@ -183,7 +185,7 @@ public class TestSCMInstallSnapshotWithHA {
     // state should be reloaded.
     TermIndex followerTermIndex = followerSM.getLastAppliedTermIndex();
     SCMHAManagerImpl scmhaManager =
-        (SCMHAManagerImpl) (follower.getScmHAManager());
+        (SCMHAManagerImpl) (followerSCM.getScmHAManager());
     TermIndex newTermIndex =
         scmhaManager.installCheckpoint(leaderNodeId, leaderDbCheckpoint);
 
