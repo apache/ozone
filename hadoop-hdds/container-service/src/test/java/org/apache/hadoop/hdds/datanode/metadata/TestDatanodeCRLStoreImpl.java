@@ -114,6 +114,7 @@ public class TestDatanodeCRLStoreImpl {
     dnCRLStore = new DatanodeCRLStoreImpl(conf);
     assertEquals(5L, (long) dnCRLStore.getLatestCRLSequenceID());
     assertEquals(1L, dnCRLStore.getPendingCRLs().size());
+    dnCRLStore.stop();
   }
 
   private X509Certificate generateX509Cert() throws Exception {
