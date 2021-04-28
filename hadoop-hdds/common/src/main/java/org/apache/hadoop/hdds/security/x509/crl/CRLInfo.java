@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.security.x509.crl;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
-import org.apache.hadoop.hdds.security.x509.certificate.utils.CRLCodec;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
