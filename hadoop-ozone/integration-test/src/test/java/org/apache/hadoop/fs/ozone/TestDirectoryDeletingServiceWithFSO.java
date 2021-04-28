@@ -51,9 +51,11 @@ import org.slf4j.LoggerFactory;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
 import static org.junit.Assert.fail;
 
@@ -83,8 +85,10 @@ public class TestDirectoryDeletingServiceWithFSO {
   @BeforeClass
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setInt(OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL, 3);
+    conf.setInt(OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL, 1);
     conf.setInt(OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK, 5);
+    conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 100,
+        TimeUnit.MILLISECONDS);
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     if (isBucketFSOptimized) {
@@ -319,7 +323,7 @@ public class TestDirectoryDeletingServiceWithFSO {
   }
 
   @Test
-  public void testDeleteSubFiles() throws Exception {
+  public void testDeleteFilesAndSubFiles() throws Exception {
 
     Table<String, OmKeyInfo> deletedDirTable =
         cluster.getOzoneManager().getMetadataManager().getDeletedDirTable();
@@ -335,7 +339,7 @@ public class TestDirectoryDeletingServiceWithFSO {
     fs.mkdirs(root);
 
     // Added 10 sub files inside root dir
-    for (int i = 0; i<10; i++) {
+    for (int i = 0; i < 5; i++) {
       Path path = new Path(root, "testKey" + i);
       try (FSDataOutputStream stream = fs.create(path)) {
         stream.write(1);
@@ -348,66 +352,12 @@ public class TestDirectoryDeletingServiceWithFSO {
 
     // Before delete
     assertTableRowCount(deletedDirTable, 0);
-    assertTableRowCount(keyTable, 10);
+    assertTableRowCount(keyTable, 5);
     assertTableRowCount(dirTable, 1);
     long prevDeletedKeyCount = keyDeletingService.getDeletedKeyCount().get();
 
-    fs.delete(root, true);
-
-    DirectoryDeletingService dirDeletingService =
-        (DirectoryDeletingService) cluster.getOzoneManager().getKeyManager()
-            .getDirDeletingService();
-
-    // After delete
-    assertTableRowCount(keyTable, 0);
-    assertTableRowCount(dirTable, 0);
-
-    // Eventually keys would get cleaned up from deletedTables too
-    assertTableRowCount(deletedDirTable, 0);
-    assertTableRowCount(deletedKeyTable, 0);
-
-    assertSubPathsCount(dirDeletingService.getMovedFilesCount(), 10);
-    assertSubPathsCount(dirDeletingService.getDeletedDirsCount(), 1);
-    // verify whether KeyDeletingService has purged the keys
-    long currentDeletedKeyCount = keyDeletingService.getDeletedKeyCount().get();
-    Assert.assertEquals(currentDeletedKeyCount, prevDeletedKeyCount + 10);
-  }
-
-  @Test
-  public void testDeleteFiles() throws Exception {
-
-    Table<String, OmKeyInfo> deletedDirTable =
-        cluster.getOzoneManager().getMetadataManager().getDeletedDirTable();
-    Table<String, OmKeyInfo> keyTable =
-        cluster.getOzoneManager().getMetadataManager().getKeyTable();
-    Table<String, OmDirectoryInfo> dirTable =
-        cluster.getOzoneManager().getMetadataManager().getDirectoryTable();
-    Table<String, RepeatedOmKeyInfo> deletedKeyTable =
-        cluster.getOzoneManager().getMetadataManager().getDeletedTable();
-
-    Path root = new Path("/rootDir2");
-    // Create  parent dir from root.
-    fs.mkdirs(root);
-
-    // Added 10 sub files inside root dir
-    for (int i = 0; i<10; i++) {
-      Path path = new Path(root, "testKey" + i);
-      try (FSDataOutputStream stream = fs.create(path)) {
-        stream.write(1);
-      }
-    }
-
-    KeyDeletingService keyDeletingService =
-        (KeyDeletingService) cluster.getOzoneManager().getKeyManager()
-            .getDeletingService();
-
-    // Before delete
-    assertTableRowCount(deletedDirTable, 0);
-    assertTableRowCount(keyTable, 10);
-    assertTableRowCount(dirTable, 1);
-    long prevDeletedKeyCount = keyDeletingService.getDeletedKeyCount().get();
-
-    for (int i = 0; i<10; i++) {
+    // Case-1) Delete 3 Files directly.
+    for (int i = 0; i < 3; i++) {
       Path path = new Path(root, "testKey" + i);
       fs.delete(path, true);
     }
@@ -417,8 +367,8 @@ public class TestDirectoryDeletingServiceWithFSO {
             .getDirDeletingService();
 
 
-    // After delete
-    assertTableRowCount(keyTable, 0);
+    // After delete. 2 more files left out under the root dir
+    assertTableRowCount(keyTable, 2);
     assertTableRowCount(dirTable, 1);
 
     // Eventually keys would get cleaned up from deletedTables too
@@ -429,6 +379,24 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertSubPathsCount(dirDeletingService.getDeletedDirsCount(), 0);
     // verify whether KeyDeletingService has purged the keys
     long currentDeletedKeyCount = keyDeletingService.getDeletedKeyCount().get();
-    Assert.assertEquals(currentDeletedKeyCount, prevDeletedKeyCount + 10);
+    Assert.assertEquals(prevDeletedKeyCount + 3, currentDeletedKeyCount);
+
+
+    // Case-2) Delete dir, this will cleanup sub-files under the deleted dir.
+    fs.delete(root, true);
+
+    // After delete. 2 sub files to be deleted.
+    assertTableRowCount(keyTable, 0);
+    assertTableRowCount(dirTable, 0);
+
+    // Eventually keys would get cleaned up from deletedTables too
+    assertTableRowCount(deletedDirTable, 0);
+    assertTableRowCount(deletedKeyTable, 0);
+
+    assertSubPathsCount(dirDeletingService.getMovedFilesCount(), 2);
+    assertSubPathsCount(dirDeletingService.getDeletedDirsCount(), 1);
+    // verify whether KeyDeletingService has purged the keys
+    currentDeletedKeyCount = keyDeletingService.getDeletedKeyCount().get();
+    Assert.assertEquals(prevDeletedKeyCount + 5, currentDeletedKeyCount);
   }
 }

@@ -80,6 +80,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_CHECKPOINT_INTERVAL_KEY;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
 import static org.apache.hadoop.fs.FileSystem.TRASH_PREFIX;
 import static org.apache.hadoop.fs.ozone.Constants.LISTING_PAGE_SIZE;
@@ -152,7 +153,10 @@ public class TestRootedOzoneFileSystem {
   @BeforeClass
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
-    conf.setInt(FS_TRASH_INTERVAL_KEY, 1);
+    conf.setFloat(OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY, (float) 0.15);
+    // Trash with 9 second deletes and 6 seconds checkpoints
+    conf.setFloat(FS_TRASH_INTERVAL_KEY, (float) 0.15); // 9 seconds
+    conf.setFloat(FS_TRASH_CHECKPOINT_INTERVAL_KEY, (float) 0.1); // 6 seconds
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
     if (isBucketFSOptimized) {
       TestOMRequestUtils.configureFSOptimizedPaths(conf,

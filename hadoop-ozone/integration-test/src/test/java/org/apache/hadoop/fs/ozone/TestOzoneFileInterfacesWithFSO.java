@@ -27,6 +27,10 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.Collection;
+
 /**
  * Test OzoneFileSystem Interfaces - prefix layout.
  *
@@ -35,6 +39,11 @@ import org.junit.runners.Parameterized;
  */
 @RunWith(Parameterized.class)
 public class TestOzoneFileInterfacesWithFSO extends TestOzoneFileInterfaces {
+
+  @Parameterized.Parameters
+  public static Collection<Object[]> data() {
+    return Arrays.asList(new Object[][] {{false, true, true}});
+  }
 
   public TestOzoneFileInterfacesWithFSO(boolean setDefaultFs,
       boolean useAbsolutePath, boolean enabledFileSystemPaths) {
@@ -48,6 +57,27 @@ public class TestOzoneFileInterfacesWithFSO extends TestOzoneFileInterfaces {
     TestOMRequestUtils.configureFSOptimizedPaths(conf, enableFileSystemPaths,
         OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX);
     return conf;
+  }
+
+  @Override
+  @Test
+  @Ignore("HDDS-2939")
+  public void testReplication() throws IOException {
+    // ignore as this is not relevant to PREFIX layout changes
+  }
+
+  @Override
+  @Test
+  @Ignore("HDDS-2939")
+  public void testPathToKey() throws Exception {
+    // ignore as this is not relevant to PREFIX layout changes
+  }
+
+  @Override
+  @Test
+  @Ignore("HDDS-2939")
+  public void testFileSystemInit() throws IOException {
+    // ignore as this is not relevant to PREFIX layout changes
   }
 
   @Override

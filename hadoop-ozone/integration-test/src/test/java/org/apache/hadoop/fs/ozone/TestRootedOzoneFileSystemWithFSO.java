@@ -44,9 +44,7 @@ public class TestRootedOzoneFileSystemWithFSO
   public static Collection<Object[]> data() {
     return Arrays.asList(
         new Object[]{true, true},
-        new Object[]{true, false},
-        new Object[]{false, true},
-        new Object[]{false, false});
+        new Object[]{true, false});
   }
 
   public TestRootedOzoneFileSystemWithFSO(boolean setDefaultFs,
@@ -58,6 +56,48 @@ public class TestRootedOzoneFileSystemWithFSO
   public static void init() throws Exception {
     setIsBucketFSOptimized(true);
     TestRootedOzoneFileSystem.init();
+  }
+
+  @Override
+  @Test
+  @Ignore("HDDS-2939")
+  public void testTempMount() {
+    // ignore as this is not relevant to PREFIX layout changes
+  }
+
+  @Override
+  @Test
+  @Ignore("HDDS-2939")
+  public void testOzoneFsServiceLoader() {
+    // ignore as this is not relevant to PREFIX layout changes
+  }
+
+  @Override
+  @Test
+  @Ignore("HDDS-2939")
+  public void testCreateWithInvalidPaths() {
+    // ignore as this is not relevant to PREFIX layout changes
+  }
+
+  @Override
+  @Test
+  @Ignore("HDDS-2939")
+  public void testDeleteEmptyVolume() {
+    // ignore as this is not relevant to PREFIX layout changes
+  }
+
+  @Override
+  @Test
+  @Ignore("HDDS-2939")
+  public void testMkdirNonExistentVolumeBucket() {
+    // ignore as this is not relevant to PREFIX layout changes
+  }
+
+  @Override
+  @Test
+  @Ignore("HDDS-2939")
+  public void testMkdirNonExistentVolume() {
+    // ignore as this is not relevant to PREFIX layout changes
   }
 
   /**

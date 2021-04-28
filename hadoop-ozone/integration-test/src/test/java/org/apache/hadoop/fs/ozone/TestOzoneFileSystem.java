@@ -62,6 +62,7 @@ import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.commons.io.IOUtils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_CHECKPOINT_INTERVAL_KEY;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
 import static org.apache.hadoop.fs.FileSystem.TRASH_PREFIX;
 import static org.apache.hadoop.fs.ozone.Constants.LISTING_PAGE_SIZE;
@@ -144,8 +145,11 @@ public class TestOzoneFileSystem {
 
   private void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setInt(FS_TRASH_INTERVAL_KEY, 2);
-    conf.setInt(OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY, 1);
+    conf.setFloat(OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY, (float) 0.15);
+    // Trash with 9 second deletes and 6 seconds checkpoints
+    conf.setFloat(FS_TRASH_INTERVAL_KEY, (float) 0.15); // 9 seconds
+    conf.setFloat(FS_TRASH_CHECKPOINT_INTERVAL_KEY, (float) 0.1); // 6 seconds
+
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     if (isBucketFSOptimized) {
@@ -197,6 +201,10 @@ public class TestOzoneFileSystem {
     } catch (IOException ex){
       fail("Failed to cleanup files.");
     }
+  }
+
+  public static MiniOzoneCluster getCluster() {
+    return cluster;
   }
 
   public static FileSystem getFs() {
@@ -1233,8 +1241,8 @@ public class TestOzoneFileSystem {
     Assert.assertTrue(trash.getConf().getClass(
         "fs.trash.classname", TrashPolicy.class).
         isAssignableFrom(TrashPolicyOzone.class));
-    Assert.assertEquals(1, trash.getConf().
-        getInt(OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY, 0));
+    Assert.assertEquals((float) 0.15, trash.getConf().
+        getFloat(OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY, 0), 0);
     // Call moveToTrash. We can't call protected fs.rename() directly
     trash.moveToTrash(path);
 

@@ -344,6 +344,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   private Thread emptier;
 
+  private static final int MSECS_PER_MINUTE = 60 * 1000;
+
   @SuppressWarnings("methodlength")
   private OzoneManager(OzoneConfiguration conf) throws IOException,
       AuthenticationException {
@@ -1231,13 +1233,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * @throws IOException
    */
   private void startTrashEmptier(Configuration conf) throws IOException {
-    long hadoopTrashInterval =
-        conf.getLong(FS_TRASH_INTERVAL_KEY, FS_TRASH_INTERVAL_DEFAULT);
+    float hadoopTrashInterval =
+        conf.getFloat(FS_TRASH_INTERVAL_KEY, FS_TRASH_INTERVAL_DEFAULT);
     // check whether user has configured ozone specific trash-interval
     // if not fall back to hadoop configuration
     long trashInterval =
-            conf.getLong(OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY,
-                hadoopTrashInterval);
+        (long)(conf.getFloat(
+            OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY, hadoopTrashInterval)
+            * MSECS_PER_MINUTE);
     if (trashInterval == 0) {
       LOG.info("Trash Interval set to 0. Files deleted will not move to trash");
       return;

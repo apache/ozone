@@ -31,8 +31,8 @@ import org.apache.hadoop.ozone.debug.PrefixParser;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
-import org.junit.After;
-import org.junit.Before;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.Assert;
 
@@ -44,18 +44,21 @@ import java.net.URI;
  */
 public class TestOzoneFileSystemPrefixParser {
 
-  private MiniOzoneCluster cluster = null;
+  private static MiniOzoneCluster cluster = null;
 
-  private FileSystem fs;
+  private static FileSystem fs;
 
-  private String volumeName;
+  private static String volumeName;
 
-  private String bucketName;
+  private static String bucketName;
 
-  private OzoneConfiguration configuration;
+  private static OzoneConfiguration configuration;
 
-  @Before
-  public void init() throws Exception {
+  private static Path dir;
+  private static Path file;
+
+  @BeforeClass
+  public static void init() throws Exception {
     volumeName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
     bucketName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
 
@@ -76,50 +79,35 @@ public class TestOzoneFileSystemPrefixParser {
         .format("%s://%s.%s/", OzoneConsts.OZONE_URI_SCHEME, bucketName,
             volumeName);
     fs = FileSystem.get(new URI(rootPath + "/test.txt"), configuration);
+
+    dir = new Path("/a/b/c/d/e");
+    fs.mkdirs(dir);
+    file = new Path("/a/b/c/file1");
+    FSDataOutputStream os = fs.create(file);
+    os.close();
   }
 
-  @After
-  public void teardown() throws IOException {
+  @AfterClass
+  public static void teardown() throws IOException {
     if (cluster != null) {
       cluster.shutdown();
     }
     IOUtils.closeQuietly(fs);
   }
 
-  @Test
-  public void testPrefixParseDir() throws Exception {
-    Path dir = new Path("/a/b/c/d/e");
-    fs.mkdirs(dir);
-    Path file = new Path("/a/b/c/file1");
-    FSDataOutputStream os = fs.create(file);
-    os.close();
+  @Test(timeout = 120000)
+  public void testPrefixParsePath() throws Exception {
 
     cluster.stop();
-    PrefixParser parser = new PrefixParser();
 
-    parser.parse(volumeName, bucketName,
-        OMStorage.getOmDbDir(configuration).getPath(),
-        dir.getParent().getParent().toString());
+    // Directory Path
+    verifyPrefixParsePath(dir.getParent(), 4, 0, 0, 1);
 
-    assertPrefixStats(parser, 1, 1, 3, 0, 1, 1);
-  }
+    // File Path
+    verifyPrefixParsePath(file, 3, 1, 1, 1);
 
-  @Test
-  public void testPrefixParseFile() throws Exception {
-    Path dir = new Path("/a/b/c/d/e");
-    fs.mkdirs(dir);
-    Path file = new Path("/a/b/file1");
-    FSDataOutputStream os = fs.create(file);
-    os.close();
-
-    cluster.stop();
-    PrefixParser parser = new PrefixParser();
-
-    parser.parse(volumeName, bucketName,
-        OMStorage.getOmDbDir(configuration).getPath(),
-        file.toString());
-
-    assertPrefixStats(parser, 1, 1, 2, 1, 1, 1);
+    // Verify invalid path
+    testPrefixParseWithInvalidPaths();
   }
 
   private void assertPrefixStats(PrefixParser parser, int volumeCount,
@@ -139,16 +127,7 @@ public class TestOzoneFileSystemPrefixParser {
         parser.getParserStats(PrefixParser.Types.DIRECTORY));
   }
 
-  @Test
-  public void testPrefixParseWithInvalidPaths() throws Exception {
-    Path dir = new Path("/a/b/c/d/e");
-    fs.mkdirs(dir);
-    Path file = new Path("/a/b/file1");
-    FSDataOutputStream os = fs.create(file);
-    os.close();
-
-    cluster.stop();
-
+  private void testPrefixParseWithInvalidPaths() throws Exception {
     PrefixParser invalidVolumeParser = new PrefixParser();
     String invalidVolumeName =
         RandomStringUtils.randomAlphabetic(10).toLowerCase();
@@ -172,9 +151,18 @@ public class TestOzoneFileSystemPrefixParser {
         OMStorage.getOmDbDir(configuration).getPath(),
         invalidIntermediateDir.toString());
 
-    assertPrefixStats(invalidIntermediateDirParser, 1, 1, 2, 1, 1, 1);
+    assertPrefixStats(invalidIntermediateDirParser, 1, 1, 3, 1, 1, 1);
 
   }
 
+  private void verifyPrefixParsePath(Path parent, int intermediateDirCount,
+      int nonExistentDirCount, int fileCount, int dirCount) throws Exception {
+    PrefixParser parser = new PrefixParser();
 
+    parser.parse(volumeName, bucketName,
+        OMStorage.getOmDbDir(configuration).getPath(), parent.toString());
+
+    assertPrefixStats(parser, 1, 1, intermediateDirCount, nonExistentDirCount,
+        fileCount, dirCount);
+  }
 }
