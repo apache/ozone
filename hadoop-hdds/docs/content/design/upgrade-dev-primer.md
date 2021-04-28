@@ -62,11 +62,23 @@ Annotation to specify upgrade action run during specific upgrade phases. Each la
 #### VALIDATE_IN_PREFINALIZE
 A ‘validation’ action run every time a component is started up with this layout feature being unfinalized.
 
+- Example: Stopping a component if a new configuration is used prior to it being finalized.
+
+- Example: Cleaning up from a failed ON_FINALIZE action that may have left on disk data in an inoperable state.
+    - Note that because the ON_FINALIZE action failed, the feature remains pre-finalized.
+
 #### ON_FIRST_UPGRADE_START
-A backward compatible action run exactly once when an upgraded cluster is detected with this new  layout version.
+A backward compatible action run once when an upgraded cluster is detected with this new layout version. This differs from VALIDATE_IN_PREFINALIZE because it will not be run again once it completes successfully.
+This action will be run again if it fails partway through, and may be run again if another error occurs during the upgrade. The action must always leave on disk data in a backwards compatible state, even if it fails partway through, since it is being executed before finalization.
+
+- Example: The new version expects data in a different location even when it is pre-finalized. The action creates a symlink in the new location pointing to the old location.
 
 #### ON_FINALIZE
-An action run exactly once during finalization of layout version (feature).
+An action run once during finalization of layout version (feature). This action will be run again if it fails partway through, and may be run again if another error occurs during the upgrade. This is the only action permitted to make backwards incompatible changes to on disk structures, since finalization has been initiated by the time it is run. If a failure partway through could leave the component in an inoperable state, a cleanup action should be used in VALIDATE_IN_PREFINALIZE, which will be run when the component is restarted after a failure.
+
+- Example: Adding a new RocksDB column family.
+
+- Example: Logging a message saying a feature is being finalized.
 
 ## ‘Prepare’ the Ozone Manager
 Used to flush all transactions to disk, take a DB snapshot, and purge the logs, leaving Ratis in a clean state without unapplied log entries. This prepares the OM for upgrades/downgrades so that no request in the log is applied to the database in the old version of the code in one OM, and the new version of the code in another OM.

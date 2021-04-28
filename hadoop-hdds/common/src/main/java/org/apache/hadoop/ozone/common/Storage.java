@@ -135,14 +135,6 @@ public abstract class Storage {
     storageInfo.setLayoutVersion(version);
   }
 
-  public void setUpgradeToLayoutVersion(int version) {
-    storageInfo.setUpgradingToLayoutVersion(version);
-  }
-
-  public void unsetUpgradeToLayoutVersion() {
-    storageInfo.unsetUpgradingToLayoutVersion();
-  }
-
   public void setFirstUpgradeActionLayoutVersion(int version) {
     storageInfo.setFirstUpgradeActionLayoutVersion(version);
   }

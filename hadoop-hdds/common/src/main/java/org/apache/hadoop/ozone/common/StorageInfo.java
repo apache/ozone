@@ -64,9 +64,6 @@ public class StorageInfo {
    */
   private static final String LAYOUT_VERSION = "layoutVersion";
 
-  private static final String UPGRADING_TO_LAYOUT_VERSION =
-      "upgradingToLayoutVersion";
-
   private static final String FIRST_UPGRADE_ACTION_LAYOUT_VERSION =
       "firstUpgradeActionLayoutVersion";
 
@@ -100,7 +97,6 @@ public class StorageInfo {
     verifyClusterId();
     verifyCreationTime();
     verifyLayoutVersion();
-    verifyUpgradingToLayoutVersion();
   }
 
   public NodeType getNodeType() {
@@ -127,20 +123,11 @@ public class StorageInfo {
     return 0;
   }
 
-  public int getUpgradingToLayoutVersion() {
-    String upgradingTo = properties.getProperty(UPGRADING_TO_LAYOUT_VERSION);
-    if (upgradingTo != null) {
-      return Integer.parseInt(upgradingTo);
-    }
-    return INVALID_LAYOUT_VERSION;
-  }
-
   private void verifyLayoutVersion() {
     String layout = getProperty(LAYOUT_VERSION);
     if (layout == null) {
       LOG.warn("Found " + STORAGE_FILE_VERSION + " file without any layout " +
-          "version. Defaulting to 0. This should happen only if a cluster is " +
-          "being upgraded from 0.5.0.");
+          "version. Defaulting to 0.");
       setProperty(LAYOUT_VERSION, "0");
     }
   }
@@ -175,17 +162,6 @@ public class StorageInfo {
     properties.setProperty(LAYOUT_VERSION, Integer.toString(version));
   }
 
-  public void setUpgradingToLayoutVersion(int layoutVersion) {
-    //TODO: do we need to check consecutiveness of versions here?
-    // if so, then change  setLayoutVersion to incLayoutVersion in APIs!
-    properties.setProperty(
-        UPGRADING_TO_LAYOUT_VERSION, Integer.toString(layoutVersion));
-  }
-
-  public void unsetUpgradingToLayoutVersion() {
-    properties.remove(UPGRADING_TO_LAYOUT_VERSION);
-  }
-
   private void verifyNodeType(NodeType type)
       throws InconsistentStorageStateException {
     NodeType nodeType = getNodeType();
@@ -202,16 +178,6 @@ public class StorageInfo {
     Preconditions.checkNotNull(clusterId);
     if(clusterId.isEmpty()) {
       throw new InconsistentStorageStateException("Cluster ID not found");
-    }
-  }
-
-  private void verifyUpgradingToLayoutVersion()
-      throws InconsistentStorageStateException {
-    int upgradeMark = getUpgradingToLayoutVersion();
-    if (upgradeMark != INVALID_LAYOUT_VERSION) {
-      throw new InconsistentStorageStateException("Ozone Manager died during "
-          + "a LayoutFeature upgrade.");
-      //TODO add recovery steps here, or point to a recovery doc.
     }
   }
 
