@@ -431,6 +431,7 @@ message FinalizeScmUpgradeResponseProto {
 message QueryUpgradeFinalizationProgressRequestProto {
   required string upgradeClientId = 1;
   optional bool takeover = 2;
+  optional bool readonly = 3;
 }
 message QueryUpgradeFinalizationProgressResponseProto {
   required hadoop.hdds.UpgradeFinalizationStatus status = 1;

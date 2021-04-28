@@ -137,6 +137,7 @@ import java.net.InetSocketAddress;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -1646,8 +1647,12 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   }
 
   public StatusAndMessages queryUpgradeFinalizationProgress(
-      String upgradeClientID, boolean takeover
+      String upgradeClientID, boolean takeover, boolean readonly
   ) throws IOException {
+    if (readonly) {
+      return new StatusAndMessages(upgradeFinalizer.getStatus(),
+          Collections.emptyList());
+    }
     return upgradeFinalizer.reportStatus(upgradeClientID, takeover);
   }
 

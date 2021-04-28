@@ -668,8 +668,10 @@ public class SCMClientProtocolServer implements
 
   @Override
   public StatusAndMessages queryUpgradeFinalizationProgress(
-      String upgradeClientID, boolean force) throws  IOException {
-    return scm.queryUpgradeFinalizationProgress(upgradeClientID, force);
+      String upgradeClientID, boolean force, boolean readonly)
+      throws  IOException {
+    return scm.queryUpgradeFinalizationProgress(upgradeClientID, force,
+        readonly);
   }
 
   /**

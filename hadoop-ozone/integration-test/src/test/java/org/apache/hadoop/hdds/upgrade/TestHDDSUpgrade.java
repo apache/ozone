@@ -410,7 +410,7 @@ public class TestHDDSUpgrade {
 
     // Wait for the Finalization to complete on the SCM.
     while (status.status() != FINALIZATION_DONE) {
-      status = scm.queryUpgradeFinalizationProgress("xyz", false);
+      status = scm.queryUpgradeFinalizationProgress("xyz", false, false);
     }
 
     Set<PipelineID> postUpgradeOpenPipelines =
@@ -1018,7 +1018,7 @@ public class TestHDDSUpgrade {
     while ((status.status() != FINALIZATION_DONE) &&
         (status.status() != ALREADY_FINALIZED)) {
       loadSCMState();
-      status = scm.queryUpgradeFinalizationProgress("xyz", true);
+      status = scm.queryUpgradeFinalizationProgress("xyz", true, false);
       if (status.status() == FINALIZATION_REQUIRED) {
         status = scm.finalizeUpgrade("xyz");
       }

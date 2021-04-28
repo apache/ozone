@@ -340,5 +340,6 @@ public interface ScmClient extends Closeable {
       throws IOException;
 
   StatusAndMessages queryUpgradeFinalizationProgress(
-      String upgradeClientID, boolean force) throws IOException;
+      String upgradeClientID, boolean force, boolean readonly)
+      throws IOException;
 }

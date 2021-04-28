@@ -56,7 +56,8 @@ import java.util.Collection;
         FinalizeUpgradeSubCommand.class,
         GetServiceRolesSubcommand.class,
         PrepareSubCommand.class,
-        CancelPrepareSubCommand.class
+        CancelPrepareSubCommand.class,
+        FinalizationStatusSubCommand.class
     })
 @MetaInfServices(SubcommandWithParent.class)
 public class OMAdmin extends GenericCli implements SubcommandWithParent {

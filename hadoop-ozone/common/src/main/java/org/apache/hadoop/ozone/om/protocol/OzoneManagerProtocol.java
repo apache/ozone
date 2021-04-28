@@ -330,7 +330,8 @@ public interface OzoneManagerProtocol
    *
    * The leader Ozone Manager initiates finalization of the followers via
    * the Raft protocol in other Ozone Managers, and reports progress to the
-   * client via the {@link #queryUpgradeFinalizationProgress(String, boolean)}
+   * client via the
+   * {@link #queryUpgradeFinalizationProgress(String, boolean, boolean)}
    * call.
    *
    * The follower Ozone Managers reject this request and directs the client to
@@ -366,6 +367,7 @@ public interface OzoneManagerProtocol
    *    client takes over the old client and the old client should exit.
    *
    * @param takeover set force takeover of output monitoring
+   * @param readonly set readonly of output
    * @param upgradeClientID String identifier of the upgrade finalizer client
    * @return the finalization status and status messages.
    * @throws IOException
@@ -374,7 +376,7 @@ public interface OzoneManagerProtocol
    *            if finalization is needed but not yet started
    */
   StatusAndMessages queryUpgradeFinalizationProgress(
-      String upgradeClientID, boolean takeover
+      String upgradeClientID, boolean takeover, boolean readonly
   ) throws IOException;
 
   /*
