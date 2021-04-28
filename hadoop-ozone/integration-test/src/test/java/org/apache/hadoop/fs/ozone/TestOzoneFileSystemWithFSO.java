@@ -24,6 +24,12 @@ import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.After;
 import org.junit.BeforeClass;
@@ -56,9 +62,7 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
   public static Collection<Object[]> data() {
     return Arrays.asList(
             new Object[]{true, true},
-            new Object[]{true, false},
-            new Object[]{false, true},
-            new Object[]{false, false});
+            new Object[]{true, false});
   }
 
   @BeforeClass
@@ -85,6 +89,27 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOzoneFileSystemWithFSO.class);
+
+  @Override
+  @Test
+  @Ignore("HDDS-2939")
+  public void testGetDirectoryModificationTime() {
+    // ignore as this is not relevant to PREFIX layout changes
+  }
+
+  @Override
+  @Test
+  @Ignore("HDDS-2939")
+  public void testOzoneFsServiceLoader() {
+    // ignore as this is not relevant to PREFIX layout changes
+  }
+
+  @Override
+  @Test
+  @Ignore("HDDS-2939")
+  public void testCreateWithInvalidPaths() {
+    // ignore as this is not relevant to PREFIX layout changes
+  }
 
   @Test
   public void testListStatusWithoutRecursiveSearch() throws Exception {
@@ -282,11 +307,6 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
    */
   @Test
   public void testRenameDirToItsOwnSubDir() throws Exception {
-    // Skip as this will run only in new layout
-    if (!isEnabledFileSystemPaths()) {
-      return;
-    }
-
     final String root = "/root";
     final String dir1 = root + "/dir1";
     final Path dir1Path = new Path(getFs().getUri().toString() + dir1);
@@ -342,5 +362,123 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
   @Test
   @Ignore("TODO:HDDS-5012")
   public void testListStatusOnLargeDirectory() throws Exception {
+  }
+
+  @Test
+  public void testMultiLevelDirs() throws Exception {
+    // reset metrics
+    long numKeys = getCluster().getOzoneManager().getMetrics().getNumKeys();
+    getCluster().getOzoneManager().getMetrics().decNumKeys(numKeys);
+    Assert.assertEquals(0,
+        getCluster().getOzoneManager().getMetrics().getNumKeys());
+
+    // Op 1. create dir -> /d1/d2/d3/d4/
+    // Op 2. create dir -> /d1/d2/d3/d4/d5
+    // Op 3. create dir -> /d1/d2/d3/d4/d6
+    Path parent = new Path("/d1/d2/d3/d4/");
+    getFs().mkdirs(parent);
+
+    OMMetadataManager omMgr =
+        getCluster().getOzoneManager().getMetadataManager();
+    OmBucketInfo omBucketInfo = omMgr.getBucketTable()
+        .get(omMgr.getBucketKey(getVolumeName(), getBucketName()));
+    Assert.assertNotNull("Failed to find bucketInfo", omBucketInfo);
+
+    ArrayList<String> dirKeys = new ArrayList<>();
+    long d1ObjectID =
+        verifyDirKey(omBucketInfo.getObjectID(), "d1", "/d1", dirKeys, omMgr);
+    long d2ObjectID = verifyDirKey(d1ObjectID, "d2", "/d1/d2", dirKeys, omMgr);
+    long d3ObjectID =
+        verifyDirKey(d2ObjectID, "d3", "/d1/d2/d3", dirKeys, omMgr);
+    long d4ObjectID =
+        verifyDirKey(d3ObjectID, "d4", "/d1/d2/d3/d4", dirKeys, omMgr);
+
+    Assert.assertEquals("Wrong OM numKeys metrics", 4,
+        getCluster().getOzoneManager().getMetrics().getNumKeys());
+
+    // create sub-dirs under same parent
+    Path subDir5 = new Path("/d1/d2/d3/d4/d5");
+    getFs().mkdirs(subDir5);
+    Path subDir6 = new Path("/d1/d2/d3/d4/d6");
+    getFs().mkdirs(subDir6);
+    long d5ObjectID =
+        verifyDirKey(d4ObjectID, "d5", "/d1/d2/d3/d4/d5", dirKeys, omMgr);
+    long d6ObjectID =
+        verifyDirKey(d4ObjectID, "d6", "/d1/d2/d3/d4/d6", dirKeys, omMgr);
+    Assert.assertTrue(
+        "Wrong objectIds for sub-dirs[" + d5ObjectID + "/d5, " + d6ObjectID
+            + "/d6] of same parent!", d5ObjectID != d6ObjectID);
+
+    Assert.assertEquals("Wrong OM numKeys metrics", 6,
+        getCluster().getOzoneManager().getMetrics().getNumKeys());
+  }
+
+  @Test
+  public void testCreateFile() throws Exception {
+    // Op 1. create dir -> /d1/d2/d3/d4/
+    Path parent = new Path("/d1/d2/");
+    Path file = new Path(parent, "file1");
+    FSDataOutputStream outputStream = getFs().create(file);
+    String openFileKey = "";
+
+    OMMetadataManager omMgr =
+        getCluster().getOzoneManager().getMetadataManager();
+    OmBucketInfo omBucketInfo = omMgr.getBucketTable()
+        .get(omMgr.getBucketKey(getVolumeName(), getBucketName()));
+    Assert.assertNotNull("Failed to find bucketInfo", omBucketInfo);
+
+    ArrayList<String> dirKeys = new ArrayList<>();
+    long d1ObjectID =
+        verifyDirKey(omBucketInfo.getObjectID(), "d1", "/d1", dirKeys, omMgr);
+    long d2ObjectID = verifyDirKey(d1ObjectID, "d2", "/d1/d2", dirKeys, omMgr);
+    openFileKey = d2ObjectID + OzoneConsts.OM_KEY_PREFIX + file.getName();
+
+    // trigger CommitKeyRequest
+    outputStream.close();
+
+    OmKeyInfo omKeyInfo = omMgr.getKeyTable().get(openFileKey);
+    Assert.assertNotNull("Invalid Key!", omKeyInfo);
+    verifyOMFileInfoFormat(omKeyInfo, file.getName(), d2ObjectID);
+
+    // wait for DB updates
+    GenericTestUtils.waitFor(() -> {
+      try {
+        return omMgr.getOpenKeyTable().isEmpty();
+      } catch (IOException e) {
+        LOG.error("DB failure!", e);
+        Assert.fail("DB failure!");
+        return false;
+      }
+    }, 1000, 120000);
+  }
+
+  private void verifyOMFileInfoFormat(OmKeyInfo omKeyInfo, String fileName,
+      long parentID) {
+    Assert.assertEquals("Wrong keyName", fileName, omKeyInfo.getKeyName());
+    Assert.assertEquals("Wrong parentID", parentID,
+        omKeyInfo.getParentObjectID());
+    String dbKey = parentID + OzoneConsts.OM_KEY_PREFIX + fileName;
+    Assert.assertEquals("Wrong path format", dbKey, omKeyInfo.getPath());
+  }
+
+  long verifyDirKey(long parentId, String dirKey, String absolutePath,
+      ArrayList<String> dirKeys, OMMetadataManager omMgr)
+      throws Exception {
+    String dbKey = parentId + "/" + dirKey;
+    dirKeys.add(dbKey);
+    OmDirectoryInfo dirInfo = omMgr.getDirectoryTable().get(dbKey);
+    Assert.assertNotNull("Failed to find " + absolutePath +
+        " using dbKey: " + dbKey, dirInfo);
+    Assert.assertEquals("Parent Id mismatches", parentId,
+        dirInfo.getParentObjectID());
+    Assert.assertEquals("Mismatches directory name", dirKey,
+        dirInfo.getName());
+    Assert.assertTrue("Mismatches directory creation time param",
+        dirInfo.getCreationTime() > 0);
+    Assert.assertEquals("Mismatches directory modification time param",
+        dirInfo.getCreationTime(), dirInfo.getModificationTime());
+    Assert.assertEquals("Wrong representation!",
+        dbKey + ":" + dirInfo.getObjectID(), dirInfo.toString());
+    return dirInfo.getObjectID();
   }
 }
