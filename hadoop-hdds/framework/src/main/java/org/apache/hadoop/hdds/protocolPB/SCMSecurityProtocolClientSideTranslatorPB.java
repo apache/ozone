@@ -363,11 +363,9 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
   public long revokeCertificates(List<Long> certIds, int reason,
       long revocationTime) throws IOException {
     SCMRevokeCertificatesRequestProto req = SCMRevokeCertificatesRequestProto
-        .newBuilder().addAllCertIds(certIds.stream().map(
-            id -> id.longValue()).collect(Collectors.toList()))
+        .newBuilder().addAllCertIds(certIds)
         .setReason(Reason.valueOf(reason))
         .setRevokeTime(revocationTime).build();
-    // TODO: set reason
     return submitRequest(Type.RevokeCertificates,
         builder->builder.setRevokeCertificatesRequest(req))
         .getRevokeCertificatesResponseProto().getCrlId();
