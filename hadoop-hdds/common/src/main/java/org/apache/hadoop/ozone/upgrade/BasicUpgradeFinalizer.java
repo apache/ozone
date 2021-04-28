@@ -24,9 +24,7 @@ import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.VA
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.FIRST_UPGRADE_START_ACTION_FAILED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.LAYOUT_FEATURE_FINALIZATION_FAILED;
-import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.PERSIST_UPGRADE_TO_LAYOUT_VERSION_FAILED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.PREFINALIZE_ACTION_VALIDATION_FAILED;
-import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.REMOVE_UPGRADE_TO_LAYOUT_VERSION_FAILED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.UPDATE_LAYOUT_VERSION_FAILED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_DONE;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_REQUIRED;
@@ -203,39 +201,24 @@ public abstract class BasicUpgradeFinalizer
       LayoutFeature lf = (LayoutFeature) obj;
       Storage layoutStorage = storageSuppplier.get();
       Optional<? extends UpgradeAction> action = lf.action(ON_FINALIZE);
-      finalizeFeature(lf, layoutStorage, action);
+      runFinalizationAction(lf, action);
       updateLayoutVersionInVersionFile(lf, layoutStorage);
       versionManager.finalized(lf);
     }
     versionManager.completeFinalization();
   }
 
-  protected void finalizeFeature(LayoutFeature feature, Storage config,
-                                 Optional<? extends UpgradeAction> action)
-      throws UpgradeException {
+  protected void runFinalizationAction(LayoutFeature feature,
+      Optional<?extends UpgradeAction> action) throws UpgradeException {
 
     if (!action.isPresent()) {
       emitNOOPMsg(feature.name());
-      return;
-    }
-
-    putFinalizationMarkIntoVersionFile(feature, config);
-
-    emitStartingFinalizationActionMsg(feature.name());
-
-    runOnFinalizeAction(feature, action.get());
-
-    emitFinishFinalizationActionMsg(feature.name());
-
-    removeFinalizationMarkFromVersionFile(feature, config);
-  }
-
-  private void runOnFinalizeAction(LayoutFeature feature, UpgradeAction action)
-      throws UpgradeException {
-    try {
-      action.execute(component);
-    } catch (Exception e) {
-      logFinalizationFailureAndThrow(e, feature.name());
+    } else {
+      try {
+        action.get().execute(component);
+      } catch (Exception e) {
+        logFinalizationFailureAndThrow(e, feature.name());
+      }
     }
   }
 
@@ -325,44 +308,6 @@ public abstract class BasicUpgradeFinalizer
     }
   }
 
-  protected void putFinalizationMarkIntoVersionFile(LayoutFeature feature,
-                                                  Storage config)
-      throws UpgradeException {
-    try {
-      emitUpgradeToLayoutVersionPersistingMsg(feature.name());
-
-      setUpgradeToLayoutVersionInStorage(feature.layoutVersion(), config);
-      persistStorage(config);
-
-      emitUpgradeToLayoutVersionPersistedMsg();
-    } catch (IOException e) {
-      logUpgradeToLayoutVersionPersistingFailureAndThrow(feature.name(), e);
-    }
-  }
-
-  protected void removeFinalizationMarkFromVersionFile(
-      LayoutFeature feature, Storage config) throws UpgradeException {
-    try {
-      emitRemovingUpgradeToLayoutVersionMsg(feature.name());
-
-      unsetUpgradeToLayoutVersionInStorage(config);
-      persistStorage(config);
-
-      emitRemovedUpgradeToLayoutVersionMsg();
-    } catch (IOException e) {
-      logUpgradeToLayoutVersionRemovalFailureAndThrow(feature.name(), e);
-    }
-  }
-
-  private void setUpgradeToLayoutVersionInStorage(int version,
-                                                  Storage config) {
-    config.setUpgradeToLayoutVersion(version);
-  }
-
-  private void unsetUpgradeToLayoutVersionInStorage(Storage config) {
-    config.unsetUpgradeToLayoutVersion();
-  }
-
   private int currentStoredLayoutVersion(Storage config) {
     return config.getLayoutVersion();
   }
@@ -391,37 +336,6 @@ public abstract class BasicUpgradeFinalizer
     logAndEmit(msg);
   }
 
-  protected void emitStartingFinalizationActionMsg(String feature) {
-    String msg = "Executing onFinalize action of feature: " + feature + ".";
-    logAndEmit(msg);
-  }
-
-  protected void emitFinishFinalizationActionMsg(String feature) {
-    String msg = "The feature " + feature + " is finalized.";
-    logAndEmit(msg);
-  }
-
-  private void emitUpgradeToLayoutVersionPersistingMsg(String feature) {
-    String msg = "Mark finalization of " + feature + " in VERSION file.";
-    logAndEmit(msg);
-  }
-
-  private void emitUpgradeToLayoutVersionPersistedMsg() {
-    String msg = "Finalization mark placed.";
-    logAndEmit(msg);
-  }
-
-  private void emitRemovingUpgradeToLayoutVersionMsg(String feature) {
-    String msg = "Remove finalization mark of " + feature
-        + " feature from VERSION file.";
-    logAndEmit(msg);
-  }
-
-  private void emitRemovedUpgradeToLayoutVersionMsg() {
-    String msg = "Finalization mark removed.";
-    logAndEmit(msg);
-  }
-
   protected void logAndEmit(String msg) {
     LOG.info(msg);
     msgs.offer(msg);
@@ -437,21 +351,6 @@ public abstract class BasicUpgradeFinalizer
       throws UpgradeException {
     String msg = "Updating the LayoutVersion in the VERSION file failed.";
     logAndThrow(e, msg, UPDATE_LAYOUT_VERSION_FAILED);
-  }
-
-  private void logUpgradeToLayoutVersionPersistingFailureAndThrow(
-      String feature, IOException e
-  ) throws UpgradeException {
-    String msg = "Failed to update VERSION file with the upgrading feature: "
-        + feature + ".";
-    logAndThrow(e, msg, PERSIST_UPGRADE_TO_LAYOUT_VERSION_FAILED);
-  }
-
-  private void logUpgradeToLayoutVersionRemovalFailureAndThrow(
-      String feature, IOException e) throws UpgradeException {
-    String msg =
-        "Failed to unmark finalization of " + feature + " LayoutFeature.";
-    logAndThrow(e, msg, REMOVE_UPGRADE_TO_LAYOUT_VERSION_FAILED);
   }
 
   private void logAndThrow(Exception e, String msg, ResultCodes resultCode)

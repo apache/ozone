@@ -163,25 +163,17 @@ public class TestOMUpgradeFinalizer {
     OMUpgradeFinalizer finalizer = new OMUpgradeFinalizer(versionManager);
     finalizer.finalize(CLIENT_ID, om);
 
-
     Iterator<OMLayoutFeature> it = lfs.iterator();
     OMLayoutFeature f = it.next();
 
-    // the first feature has an upgrade action, it calls the setUpgradeToLV
-    // method, and the action execution is checked by verifying on om.getVersion
-    verify(om.getOmStorage(), once())
-        .setUpgradeToLayoutVersion(f.layoutVersion());
+    // the first feature has an upgrade action, and the action execution is
+    // checked by verifying on om.getVersion
     verify(om.getOmStorage(), once())
         .setLayoutVersion(f.layoutVersion());
-    verify(om.getOmStorage(), once())
-        .unsetUpgradeToLayoutVersion();
     verify(om, once()).getVersion();
 
-    // the second feature has a NOOP it should not call the setUpgradeToLV
-    // method, but should update the LV.
+    // The second feature has a NOOP, but should update the layout version.
     f = it.next();
-    verify(om.getOmStorage(), never())
-        .setUpgradeToLayoutVersion(f.layoutVersion());
     verify(om.getOmStorage(), once())
         .setLayoutVersion(f.layoutVersion());
 
@@ -222,22 +214,14 @@ public class TestOMUpgradeFinalizer {
       when(versionManager.getUpgradeState()).thenReturn(FINALIZATION_DONE);
     }
 
-    // Verify that we have never removed the upgradeToLV from the storage
-    // as finalization of the first feature in the list fails.
-    // Also verify that we have never updated the LV.
+    // Verify that we have never updated the layout version.
     Iterator<OMLayoutFeature> it = lfs.iterator();
     OMLayoutFeature f = it.next();
-    verify(om.getOmStorage(), once())
-        .setUpgradeToLayoutVersion(f.layoutVersion());
     verify(om.getOmStorage(), never())
         .setLayoutVersion(f.layoutVersion());
-    verify(om.getOmStorage(), never())
-        .unsetUpgradeToLayoutVersion();
 
     // Verify that we never got to the second feature.
     f = it.next();
-    verify(om.getOmStorage(), never())
-        .setUpgradeToLayoutVersion(f.layoutVersion());
     verify(om.getOmStorage(), never())
         .setLayoutVersion(f.layoutVersion());
 
