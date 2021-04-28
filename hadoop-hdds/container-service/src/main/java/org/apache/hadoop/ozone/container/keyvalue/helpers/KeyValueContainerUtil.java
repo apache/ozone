@@ -174,7 +174,7 @@ public final class KeyValueContainerUtil {
     if (!chunksPath.exists()) {
       LOG.error("Container chunks file is missing for ContainerID {}. " +
           "Skipping loading of this container.", containerID);
-      // Don't further process this container, as it is missing db file.
+      // Don't further process this container, as it is missing chunks file.
       return;
     }
 
