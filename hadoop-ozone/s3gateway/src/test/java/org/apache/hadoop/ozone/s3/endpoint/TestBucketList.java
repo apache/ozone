@@ -33,7 +33,7 @@ import org.junit.Test;
 /**
  * Testing basic object list browsing.
  */
-public class TestBucketGet {
+public class TestBucketList {
 
   @Test
   public void listRoot() throws OS3Exception, IOException {
@@ -45,8 +45,8 @@ public class TestBucketGet {
     getBucket.setClient(client);
 
     ListObjectResponse getBucketResponse =
-        (ListObjectResponse) getBucket
-            .list("b1", "/", null, null, 100, "", null, null, null, null, null)
+        (ListObjectResponse) getBucket.get("b1", "/", null, null, 100, "",
+            null, null, null, null, null, null)
             .getEntity();
 
     Assert.assertEquals(1, getBucketResponse.getCommonPrefixes().size());
@@ -69,8 +69,8 @@ public class TestBucketGet {
     getBucket.setClient(client);
 
     ListObjectResponse getBucketResponse =
-        (ListObjectResponse) getBucket.list("b1", "/", null, null, 100,
-            "dir1", null, null, null, null, null).getEntity();
+        (ListObjectResponse) getBucket.get("b1", "/", null, null, 100,
+            "dir1", null, null, null, null, null, null).getEntity();
 
     Assert.assertEquals(1, getBucketResponse.getCommonPrefixes().size());
     Assert.assertEquals("dir1/",
@@ -93,8 +93,8 @@ public class TestBucketGet {
 
     ListObjectResponse getBucketResponse =
         (ListObjectResponse) getBucket
-            .list("b1", "/", null, null, 100, "dir1/", null, null,
-                null, null, null)
+            .get("b1", "/", null, null, 100, "dir1/", null, null,
+                null, null, null, null)
             .getEntity();
 
     Assert.assertEquals(1, getBucketResponse.getCommonPrefixes().size());
@@ -120,8 +120,8 @@ public class TestBucketGet {
     getBucket.setClient(ozoneClient);
 
     ListObjectResponse getBucketResponse =
-        (ListObjectResponse) getBucket.list("b1", "/", null, null, 100,
-            "dir1", null, null, null, null, null).getEntity();
+        (ListObjectResponse) getBucket.get("b1", "/", null, null, 100,
+            "dir1", null, null, null, null, null, null).getEntity();
 
     Assert.assertEquals(3, getBucketResponse.getCommonPrefixes().size());
 
@@ -139,8 +139,8 @@ public class TestBucketGet {
     getBucket.setClient(ozoneClient);
 
     ListObjectResponse getBucketResponse =
-        (ListObjectResponse) getBucket.list("b1", "/", null, null, 100,
-            "", null, null, null, null, null).getEntity();
+        (ListObjectResponse) getBucket.get("b1", "/", null, null, 100,
+            "", null, null, null, null, null, null).getEntity();
 
     Assert.assertEquals(3, getBucketResponse.getCommonPrefixes().size());
     Assert.assertEquals("file2", getBucketResponse.getContents().get(0)
@@ -160,8 +160,8 @@ public class TestBucketGet {
     getBucket.setClient(ozoneClient);
 
     ListObjectResponse getBucketResponse =
-        (ListObjectResponse) getBucket.list("b1", "/", null, null, 100,
-            "dir1bh", null, null, "dir1/dir2/file2", null, null).getEntity();
+        (ListObjectResponse) getBucket.get("b1", "/", null, null, 100, "dir1bh",
+            null, null, "dir1/dir2/file2", null, null, null).getEntity();
 
     Assert.assertEquals(2, getBucketResponse.getCommonPrefixes().size());
 
@@ -183,8 +183,8 @@ public class TestBucketGet {
 
     // First time
     ListObjectResponse getBucketResponse =
-        (ListObjectResponse) getBucket.list("b1", null, null, null, maxKeys,
-            "", null, null, null, null, null).getEntity();
+        (ListObjectResponse) getBucket.get("b1", null, null, null, maxKeys,
+            "", null, null, null, null, null, null).getEntity();
 
     Assert.assertTrue(getBucketResponse.isTruncated());
     Assert.assertEquals(2, getBucketResponse.getContents().size());
@@ -192,8 +192,8 @@ public class TestBucketGet {
     // 2nd time
     String continueToken = getBucketResponse.getNextToken();
     getBucketResponse =
-        (ListObjectResponse) getBucket.list("b1", null, null, null, maxKeys,
-            "", null, continueToken, null, null, null).getEntity();
+        (ListObjectResponse) getBucket.get("b1", null, null, null, maxKeys,
+            "", null, continueToken, null, null, null, null).getEntity();
     Assert.assertTrue(getBucketResponse.isTruncated());
     Assert.assertEquals(2, getBucketResponse.getContents().size());
 
@@ -202,8 +202,8 @@ public class TestBucketGet {
 
     //3rd time
     getBucketResponse =
-        (ListObjectResponse) getBucket.list("b1", null, null, null, maxKeys,
-            "", null, continueToken, null, null, null).getEntity();
+        (ListObjectResponse) getBucket.get("b1", null, null, null, maxKeys,
+            "", null, continueToken, null, null, null, null).getEntity();
 
     Assert.assertFalse(getBucketResponse.isTruncated());
     Assert.assertEquals(1, getBucketResponse.getContents().size());
@@ -234,8 +234,8 @@ public class TestBucketGet {
     ListObjectResponse getBucketResponse;
 
     getBucketResponse =
-        (ListObjectResponse) getBucket.list("b1", "/", null, null, maxKeys,
-            "test/", null, null, null, null, null).getEntity();
+        (ListObjectResponse) getBucket.get("b1", "/", null, null, maxKeys,
+            "test/", null, null, null, null, null, null).getEntity();
 
     Assert.assertEquals(0, getBucketResponse.getContents().size());
     Assert.assertEquals(2, getBucketResponse.getCommonPrefixes().size());
@@ -245,9 +245,9 @@ public class TestBucketGet {
         getBucketResponse.getCommonPrefixes().get(1).getPrefix());
 
     getBucketResponse =
-        (ListObjectResponse) getBucket.list("b1", "/", null, null, maxKeys,
-            "test/", null, getBucketResponse.getNextToken(), null, null, null)
-            .getEntity();
+        (ListObjectResponse) getBucket.get("b1", "/", null, null, maxKeys,
+            "test/", null, getBucketResponse.getNextToken(), null, null, null,
+            null).getEntity();
     Assert.assertEquals(1, getBucketResponse.getContents().size());
     Assert.assertEquals(1, getBucketResponse.getCommonPrefixes().size());
     Assert.assertEquals("test/dir3/",
@@ -277,8 +277,8 @@ public class TestBucketGet {
 
     // First time
     ListObjectResponse getBucketResponse =
-        (ListObjectResponse) getBucket.list("b1", "/", null, null, maxKeys,
-            "dir", null, null, null, null, null).getEntity();
+        (ListObjectResponse) getBucket.get("b1", "/", null, null, maxKeys,
+            "dir", null, null, null, null, null, null).getEntity();
 
     Assert.assertTrue(getBucketResponse.isTruncated());
     Assert.assertEquals(2, getBucketResponse.getCommonPrefixes().size());
@@ -286,16 +286,16 @@ public class TestBucketGet {
     // 2nd time
     String continueToken = getBucketResponse.getNextToken();
     getBucketResponse =
-        (ListObjectResponse) getBucket.list("b1", "/", null, null, maxKeys,
-            "dir", null, continueToken, null, null, null).getEntity();
+        (ListObjectResponse) getBucket.get("b1", "/", null, null, maxKeys,
+            "dir", null, continueToken, null, null, null, null).getEntity();
     Assert.assertTrue(getBucketResponse.isTruncated());
     Assert.assertEquals(2, getBucketResponse.getCommonPrefixes().size());
 
     //3rd time
     continueToken = getBucketResponse.getNextToken();
     getBucketResponse =
-        (ListObjectResponse) getBucket.list("b1", "/", null, null, maxKeys,
-            "dir", null, continueToken, null, null, null).getEntity();
+        (ListObjectResponse) getBucket.get("b1", "/", null, null, maxKeys,
+            "dir", null, continueToken, null, null, null, null).getEntity();
 
     Assert.assertFalse(getBucketResponse.isTruncated());
     Assert.assertEquals(1, getBucketResponse.getCommonPrefixes().size());
@@ -314,8 +314,8 @@ public class TestBucketGet {
     getBucket.setClient(ozoneClient);
 
     try {
-      getBucket.list("b1", "/", null, null, 2, "dir", null, "random", null,
-          null, null).getEntity();
+      getBucket.get("b1", "/", null, null, 2, "dir", null, "random", null,
+          null, null, null).getEntity();
       fail("listWithContinuationTokenFail");
     } catch (OS3Exception ex) {
       Assert.assertEquals("random", ex.getResource());
@@ -336,8 +336,8 @@ public class TestBucketGet {
     getBucket.setClient(ozoneClient);
 
     ListObjectResponse getBucketResponse =
-        (ListObjectResponse) getBucket.list("b1", null, null, null, 1000,
-            null, null, null, null, null, null).getEntity();
+        (ListObjectResponse) getBucket.get("b1", null, null, null, 1000,
+            null, null, null, null, null, null, null).getEntity();
 
     Assert.assertFalse(getBucketResponse.isTruncated());
     Assert.assertEquals(5, getBucketResponse.getContents().size());
@@ -347,15 +347,15 @@ public class TestBucketGet {
     String startAfter = "dir0/file1";
 
     getBucketResponse =
-        (ListObjectResponse) getBucket.list("b1", null, null, null,
-            1000, null, null, null, startAfter, null, null).getEntity();
+        (ListObjectResponse) getBucket.get("b1", null, null, null,
+            1000, null, null, null, startAfter, null, null, null).getEntity();
 
     Assert.assertFalse(getBucketResponse.isTruncated());
     Assert.assertEquals(4, getBucketResponse.getContents().size());
 
     getBucketResponse =
-        (ListObjectResponse) getBucket.list("b1", null, null, null,
-            1000, null, null, null, "random", null, null).getEntity();
+        (ListObjectResponse) getBucket.get("b1", null, null, null,
+            1000, null, null, null, "random", null, null, null).getEntity();
 
     Assert.assertFalse(getBucketResponse.isTruncated());
     Assert.assertEquals(0, getBucketResponse.getContents().size());
