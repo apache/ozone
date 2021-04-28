@@ -78,7 +78,8 @@ public class SCMHAManagerImpl implements SCMHAManager {
       this.ratisServer = new SCMRatisServerImpl(conf, scm,
           (SCMHADBTransactionBuffer) transactionBuffer);
       this.scmSnapshotProvider = new SCMSnapshotProvider(conf,
-          scm.getSCMHANodeDetails().getPeerNodeDetails());
+          scm.getSCMHANodeDetails().getPeerNodeDetails(),
+          scm.getScmCertificateClient());
       grpcServer = new InterSCMGrpcProtocolService(conf, scm);
     } else {
       this.transactionBuffer = new SCMDBTransactionBufferImpl();
