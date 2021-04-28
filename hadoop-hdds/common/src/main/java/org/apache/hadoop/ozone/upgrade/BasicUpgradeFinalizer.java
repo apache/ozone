@@ -92,6 +92,11 @@ public abstract class BasicUpgradeFinalizer
     return new StatusAndMessages(status, returningMsgs);
   }
 
+  @Override
+  public synchronized Status getStatus() {
+    return versionManager.getUpgradeState();
+  }
+
   protected void preFinalizeUpgrade(T service) throws IOException {
     // No Op by default.
   }

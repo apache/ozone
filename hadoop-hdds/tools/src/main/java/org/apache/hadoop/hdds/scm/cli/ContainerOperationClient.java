@@ -560,8 +560,9 @@ public class ContainerOperationClient implements ScmClient {
 
   @Override
   public StatusAndMessages queryUpgradeFinalizationProgress(
-      String upgradeClientID, boolean force) throws IOException {
+      String upgradeClientID, boolean force, boolean readonly)
+      throws IOException {
     return storageContainerLocationClient.queryUpgradeFinalizationProgress(
-        upgradeClientID, force);
+        upgradeClientID, force, readonly);
   }
 }

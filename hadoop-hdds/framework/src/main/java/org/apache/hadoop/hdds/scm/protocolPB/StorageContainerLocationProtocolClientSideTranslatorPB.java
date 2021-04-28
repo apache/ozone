@@ -746,12 +746,14 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
   @Override
   public StatusAndMessages queryUpgradeFinalizationProgress(
-      String upgradeClientID, boolean force) throws IOException {
+      String upgradeClientID, boolean force, boolean readonly)
+      throws IOException {
     QueryUpgradeFinalizationProgressRequestProto req =
         QueryUpgradeFinalizationProgressRequestProto.
             newBuilder()
             .setUpgradeClientId(upgradeClientID)
             .setTakeover(force)
+            .setReadonly(readonly)
             .build();
 
     QueryUpgradeFinalizationProgressResponseProto response =

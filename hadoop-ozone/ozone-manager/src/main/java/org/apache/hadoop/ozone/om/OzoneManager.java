@@ -37,6 +37,7 @@ import java.security.cert.CertificateException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -2745,8 +2746,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   @Override
   public StatusAndMessages queryUpgradeFinalizationProgress(
-      String upgradeClientID, boolean takeover
+      String upgradeClientID, boolean takeover, boolean readonly
   ) throws IOException {
+    if (readonly) {
+      return new StatusAndMessages(upgradeFinalizer.getStatus(),
+          Collections.emptyList());
+    }
     return upgradeFinalizer.reportStatus(upgradeClientID, takeover);
   }
 

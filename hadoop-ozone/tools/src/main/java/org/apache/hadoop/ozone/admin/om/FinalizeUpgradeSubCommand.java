@@ -148,7 +148,8 @@ public class FinalizeUpgradeSubCommand implements Callable<Void> {
         // do not check for exceptions, if one happens during monitoring we
         // should report it and exit.
         UpgradeFinalizer.StatusAndMessages progress =
-            client.queryUpgradeFinalizationProgress(upgradeClientID, force);
+            client.queryUpgradeFinalizationProgress(upgradeClientID, force,
+                false);
         // this can happen after trying to takeover the request after the fact
         // when there is already nothing to take over.
         if (isFinalized(progress.status())) {

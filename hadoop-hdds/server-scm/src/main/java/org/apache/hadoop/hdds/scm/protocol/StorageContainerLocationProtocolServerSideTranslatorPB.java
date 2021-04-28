@@ -578,7 +578,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       throws IOException {
     StatusAndMessages progress =
         impl.queryUpgradeFinalizationProgress(request.getUpgradeClientId(),
-            request.getTakeover());
+            request.getTakeover(), request.getReadonly());
 
     UpgradeFinalizationStatus.Status protoStatus =
         UpgradeFinalizationStatus.Status.valueOf(progress.status().name());
