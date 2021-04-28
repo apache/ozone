@@ -23,6 +23,7 @@ import java.security.cert.CertificateException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
@@ -41,6 +42,8 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetDat
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMListCACertificateRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetLatestCrlIdRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMListCertificateRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMRevokeCertificatesRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMRevokeCertificatesRequestProto.Reason;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityRequest;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityRequest.Builder;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityResponse;
@@ -354,6 +357,20 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
     return submitRequest(Type.GetLatestCrlId,
         builder -> builder.setGetLatestCrlIdRequest(protoIns))
         .getGetLatestCrlIdResponseProto().getCrlId();
+  }
+
+  @Override
+  public long revokeCertificates(List<Long> certIds, int reason,
+      long revocationTime) throws IOException {
+    SCMRevokeCertificatesRequestProto req = SCMRevokeCertificatesRequestProto
+        .newBuilder().addAllCertIds(certIds.stream().map(
+            id -> id.longValue()).collect(Collectors.toList()))
+        .setReason(Reason.valueOf(reason))
+        .setRevokeTime(revocationTime).build();
+    // TODO: set reason
+    return submitRequest(Type.RevokeCertificates,
+        builder->builder.setRevokeCertificatesRequest(req))
+        .getRevokeCertificatesResponseProto().getCrlId();
   }
 
   /**
