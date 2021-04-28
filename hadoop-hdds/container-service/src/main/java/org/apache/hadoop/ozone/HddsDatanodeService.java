@@ -40,6 +40,8 @@ import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.datanode.metadata.DatanodeCRLStore;
+import org.apache.hadoop.hdds.datanode.metadata.DatanodeCRLStoreImpl;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
@@ -104,6 +106,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   private DNMXBeanImpl serviceRuntimeInfo =
       new DNMXBeanImpl(HddsVersionInfo.HDDS_VERSION_INFO) {};
   private ObjectName dnInfoBeanName;
+  private DatanodeCRLStore dnCRLStore;
 
   //Constructor for DataNode PluginService
   public HddsDatanodeService(){}
@@ -242,6 +245,10 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
         }
         LOG.info("Hdds Datanode login successful.");
       }
+
+      // initialize datanode CRL store
+      dnCRLStore = new DatanodeCRLStoreImpl(conf);
+
       if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
         initializeCertificateClient(conf);
       }
@@ -523,6 +530,11 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     return datanodeStateMachine;
   }
 
+  @VisibleForTesting
+  public DatanodeCRLStore getCRLStore() {
+    return dnCRLStore;
+  }
+
   public void join() {
     if (datanodeStateMachine != null) {
       try {
@@ -538,7 +550,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     stop();
     terminate(1);
   }
-
 
   @Override
   public void stop() {
@@ -564,6 +575,12 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
         }
       }
       unregisterMXBean();
+      // stop dn crl store
+      try {
+        dnCRLStore.stop();
+      } catch (Exception ex) {
+        LOG.error("Datanode CRL store stop failed", ex);
+      }
     }
   }
 
