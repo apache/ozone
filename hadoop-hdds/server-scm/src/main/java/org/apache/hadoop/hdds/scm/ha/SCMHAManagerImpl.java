@@ -78,7 +78,8 @@ public class SCMHAManagerImpl implements SCMHAManager {
       this.ratisServer = new SCMRatisServerImpl(conf, scm,
           (SCMHADBTransactionBuffer) transactionBuffer);
       this.scmSnapshotProvider = new SCMSnapshotProvider(conf,
-          scm.getSCMHANodeDetails().getPeerNodeDetails());
+          scm.getSCMHANodeDetails().getPeerNodeDetails(),
+          scm.getScmCertificateClient());
       grpcServer = new InterSCMGrpcProtocolService(conf, scm);
     } else {
       this.transactionBuffer = new SCMDBTransactionBufferImpl();
@@ -101,14 +102,19 @@ public class SCMHAManagerImpl implements SCMHAManager {
     if (ratisServer.getDivision().getGroup().getPeers().isEmpty()) {
       // this is a bootstrapped node
       // It will first try to add itself to existing ring
-      boolean success = HAUtils.addSCM(OzoneConfiguration.of(conf),
+      final SCMNodeDetails nodeDetails =
+          scm.getSCMHANodeDetails().getLocalNodeDetails();
+      final boolean success = HAUtils.addSCM(OzoneConfiguration.of(conf),
           new AddSCMRequest.Builder().setClusterId(scm.getClusterId())
               .setScmId(scm.getScmId())
-              .setRatisAddr(scm.getSCMHANodeDetails().getLocalNodeDetails()
+              .setRatisAddr(nodeDetails
                   // TODO : Should we use IP instead of hostname??
                   .getRatisHostPortStr()).build(), scm.getSCMNodeId());
       if (!success) {
         throw new IOException("Adding SCM to existing HA group failed");
+      } else {
+        LOG.info("Successfully added SCM {} to group {}",
+            nodeDetails.getNodeId(), ratisServer.getDivision().getGroup());
       }
     } else {
       LOG.info(" scm role is {} peers {}",
@@ -354,6 +360,11 @@ public class SCMHAManagerImpl implements SCMHAManager {
   @VisibleForTesting
   public void setExitManagerForTesting(ExitManager exitManagerForTesting) {
     this.exitManager = exitManagerForTesting;
+  }
+
+  @VisibleForTesting
+  public void stopGrpcService() {
+    grpcServer.stop();
   }
 
   @VisibleForTesting

@@ -39,7 +39,7 @@ import org.apache.hadoop.ozone.container.common.states.DatanodeState;
 
 import com.google.common.base.Strings;
 import static org.apache.hadoop.hdds.HddsUtils.getReconAddresses;
-import static org.apache.hadoop.hdds.HddsUtils.getSCMAddresses;
+import static org.apache.hadoop.hdds.HddsUtils.getSCMAddressForDatanodes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -79,7 +79,7 @@ public class InitDatanodeState implements DatanodeState,
   public DatanodeStateMachine.DatanodeStates call() throws Exception {
     Collection<InetSocketAddress> addresses = null;
     try {
-      addresses = getSCMAddresses(conf);
+      addresses = getSCMAddressForDatanodes(conf);
     } catch (IllegalArgumentException e) {
       if(!Strings.isNullOrEmpty(e.getMessage())) {
         LOG.error("Failed to get SCM addresses: {}", e.getMessage());

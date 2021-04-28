@@ -50,6 +50,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.scm.proxy.SCMClientConfig;
 import org.apache.hadoop.hdds.scm.proxy.SCMContainerLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.scm.safemode.HealthyPipelineSafeModeRule;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
@@ -675,6 +676,10 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
               pipelineNumLimit : DEFAULT_PIPELIME_LIMIT);
       conf.setTimeDuration(OMConfigKeys.OZONE_OM_RATIS_MINIMUM_TIMEOUT_KEY,
           DEFAULT_RATIS_RPC_TIMEOUT_SEC, TimeUnit.SECONDS);
+      SCMClientConfig scmClientConfig = conf.getObject(SCMClientConfig.class);
+      // default max retry timeout set to 30s
+      scmClientConfig.setMaxRetryTimeout(30 * 1000);
+      conf.setFromObject(scmClientConfig);
       configureTrace();
     }
 

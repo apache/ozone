@@ -40,6 +40,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_KEY
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NODES_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_DEFAULT;
@@ -141,7 +142,7 @@ public class SCMNodeInfo {
       String scmDatanodeAddress =
           getHostNameFromConfigKeys(conf,
               OZONE_SCM_DATANODE_ADDRESS_KEY,
-              OZONE_SCM_CLIENT_ADDRESS_KEY).orElse(null);
+              OZONE_SCM_CLIENT_ADDRESS_KEY, OZONE_SCM_NAMES).orElse(null);
 
       int scmBlockClientPort = getPortNumberFromConfigKeys(conf,
           OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY)
@@ -199,7 +200,7 @@ public class SCMNodeInfo {
       return port.getAsInt();
     } else {
       return conf.getInt(ConfUtils.addKeySuffixes(portKey, scmServiceId,
-          scmNodeId), defaultPort);
+          scmNodeId), conf.getInt(portKey, defaultPort));
     }
   }
 

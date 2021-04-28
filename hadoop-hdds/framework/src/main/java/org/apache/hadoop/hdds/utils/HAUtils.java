@@ -79,8 +79,7 @@ public final class HAUtils {
   private HAUtils() {
   }
 
-  public static ScmInfo getScmInfo(OzoneConfiguration conf)
-      throws IOException {
+  public static ScmInfo getScmInfo(OzoneConfiguration conf) throws IOException {
     OzoneConfiguration configuration = new OzoneConfiguration(conf);
     try {
       long duration = conf.getTimeDuration(OZONE_SCM_INFO_WAIT_DURATION,
@@ -88,15 +87,13 @@ public final class HAUtils {
       SCMClientConfig scmClientConfig =
           configuration.getObject(SCMClientConfig.class);
       int retryCount =
-          (int) (duration / (scmClientConfig.getRetryInterval()/1000));
-
+          (int) (duration / (scmClientConfig.getRetryInterval() / 1000));
       // If duration is set to lesser value, fall back to actual default
       // retry count.
       if (retryCount > scmClientConfig.getRetryCount()) {
         scmClientConfig.setRetryCount(retryCount);
         configuration.setFromObject(scmClientConfig);
       }
-
       return getScmBlockClient(configuration).getScmInfo();
     } catch (IOException e) {
       throw e;
