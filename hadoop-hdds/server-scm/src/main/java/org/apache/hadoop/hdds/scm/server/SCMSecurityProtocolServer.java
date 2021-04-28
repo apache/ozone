@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.hdds.scm.server;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.BlockingService;
 
 import java.io.IOException;
@@ -54,8 +55,10 @@ import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
+import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.security.KerberosInfo;
 
+import org.apache.hadoop.security.UserGroupInformation;
 import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.slf4j.Logger;
@@ -342,6 +345,8 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
   @Override
   public long revokeCertificates(List<Long> certIds, int reason,
       long revocationTime) throws IOException {
+    storageContainerManager.checkAdminAccess(getRpcRemoteUser());
+
     Future<Optional<Long>> revoked = scmCertificateServer.revokeCertificates(
         certIds.stream().map(id -> BigInteger.valueOf(id))
             .collect(Collectors.toList()),
@@ -353,6 +358,11 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
       throw new SCMException("Fail to revoke certs",
           SCMException.ResultCodes.FAILED_TO_REVOKE_CERTIFICATES);
     }
+  }
+
+  @VisibleForTesting
+  public UserGroupInformation getRpcRemoteUser() {
+    return Server.getRemoteUser();
   }
 
   public RPC.Server getRpcServer() {
