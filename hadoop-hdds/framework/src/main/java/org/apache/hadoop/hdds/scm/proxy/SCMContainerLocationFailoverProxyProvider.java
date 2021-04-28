@@ -41,9 +41,11 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -167,11 +169,19 @@ public class SCMContainerLocationFailoverProxyProvider implements
     ServerNotLeaderException snle =
         (ServerNotLeaderException) SCMHAUtils.getServerNotLeaderException(e);
     if (snle != null && snle.getSuggestedLeader() != null) {
-      newLeader = scmProxyInfoMap.values().stream().filter(
-          proxyInfo -> NetUtils.getHostPortString(proxyInfo.getAddress())
-              .equals(snle.getSuggestedLeader())).findFirst().get().getNodeId();
-      LOG.debug("Performing failover to suggested leader {}, nodeId {}",
-          snle.getSuggestedLeader(), newLeader);
+      Optional<SCMProxyInfo> matchedProxyInfo =
+          scmProxyInfoMap.values().stream().filter(
+              proxyInfo -> NetUtils.getHostPortString(proxyInfo.getAddress())
+                  .equals(snle.getSuggestedLeader())).findFirst();
+      if (matchedProxyInfo.isPresent()) {
+        newLeader = matchedProxyInfo.get().getNodeId();
+        LOG.debug("Performing failover to suggested leader {}, nodeId {}",
+            snle.getSuggestedLeader(), newLeader);
+      } else {
+        LOG.debug("Suggested leader {} does not match with any of the " +
+                "proxyInfo adress {}", snle.getSuggestedLeader(),
+            Arrays.toString(scmProxyInfoMap.values().toArray()));
+      }
     }
     if (newLeader == null) {
       // If newLeader is not assigned, it will fail over to next proxy.
