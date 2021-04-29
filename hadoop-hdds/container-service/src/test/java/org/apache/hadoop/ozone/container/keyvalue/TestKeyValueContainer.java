@@ -61,6 +61,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.List;
@@ -235,6 +236,53 @@ public class TestKeyValueContainer {
       File directory =
           new File(container.getContainerData().getContainerPath());
       assertFalse(directory.exists());
+    }
+  }
+
+  @Test
+  public void testContainerMissingFileImportExport() throws Exception {
+    long containerId = keyValueContainer.getContainerData().getContainerID();
+    createContainer();
+    long numberOfKeysToWrite = 12;
+    closeContainer();
+    populate(numberOfKeysToWrite);
+
+    //destination path
+    File folderToExport = folder.newFile("exported.tar.gz");
+    TarContainerPacker packer = new TarContainerPacker();
+
+    //if missing chunksfile
+    Files.delete(new File(keyValueContainer.getContainerData().getChunksPath()).toPath());
+    Assert.assertFalse(new File(keyValueContainer.getContainerData().getChunksPath()).exists());
+    //export the container
+    try (FileOutputStream fos = new FileOutputStream(folderToExport)) {
+      keyValueContainer
+          .exportContainerData(fos, packer);
+    }
+
+    //delete the original one
+    keyValueContainer.delete();
+
+    //create a new one
+    KeyValueContainerData containerData =
+        new KeyValueContainerData(containerId,
+            keyValueContainerData.getLayOutVersion(),
+            keyValueContainerData.getMaxSize(), UUID.randomUUID().toString(),
+            datanodeId.toString());
+    KeyValueContainer container = new KeyValueContainer(containerData, CONF);
+
+    HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(volumeSet
+        .getVolumesList(), 1);
+    String hddsVolumeDir = containerVolume.getHddsRootDir().toString();
+
+    container.populatePathFields(scmId, containerVolume, hddsVolumeDir);
+    long bytes = Files.size(folderToExport.toPath());
+    Assert.assertTrue(bytes <= 45);
+
+    try (FileInputStream fis = new FileInputStream(folderToExport)) {
+      container.importContainerData(fis, packer);
+    } catch (Exception ex) {
+      assertTrue(ex instanceof NullPointerException);
     }
   }
 
