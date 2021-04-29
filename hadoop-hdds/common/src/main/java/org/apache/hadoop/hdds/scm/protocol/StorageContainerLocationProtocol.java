@@ -103,6 +103,16 @@ public interface StorageContainerLocationProtocol extends Closeable {
       List<Long> containerIDs) throws IOException;
 
   /**
+   * Ask SCM which containers of the given list exist.
+   *
+   * @param containerIDs - IDs of a batch of containers.
+   * @return List of ContainerWithPipeline that exist in SCM
+   * - the container info with the pipeline.
+   */
+  List<ContainerWithPipeline> getExistContainerWithPipelinesInBatch(
+      List<Long> containerIDs);
+
+  /**
    * Ask SCM a list of containers with a range of container names
    * and the limit of count.
    * Search container names between start name(exclusive), and

@@ -77,7 +77,7 @@ public class ReconIncrementalContainerReportHandler
         try {
           containerManager.checkAndAddNewContainer(id, replicaProto.getState(),
               report.getDatanodeDetails());
-        } catch (IOException ioEx) {
+        } catch (Exception ioEx) {
           LOG.error("Exception while checking and adding new container.", ioEx);
           return;
         }
