@@ -115,7 +115,13 @@ public class TestOMStartupWithLayout {
     verifyOmStartWithInvalidConfig(OZONE_OM_METADATA_LAYOUT_PREFIX);
     verifyOmRestartWithInvalidConfig(OZONE_OM_METADATA_LAYOUT_PREFIX);
 
-    // case-4) Configured cluster layout as PREFIX and ENABLE_FSPATH=true.
+    // case-4) Configured cluster layout as INVALID.
+    // OM startup should fail as this is INVALID config.
+    conf.set(OZONE_OM_METADATA_LAYOUT, "INVALID");
+    verifyOmStartWithInvalidConfig("INVALID");
+    verifyOmRestartWithInvalidConfig("INVALID");
+
+    // case-5) Configured cluster layout as PREFIX and ENABLE_FSPATH=true.
     // No buckets. OM startup should be successful.
     conf.set(OZONE_OM_METADATA_LAYOUT, OZONE_OM_METADATA_LAYOUT_PREFIX);
     conf.setBoolean(OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
@@ -123,7 +129,7 @@ public class TestOMStartupWithLayout {
     OzoneBucket bucket3 = TestDataUtil.createVolumeAndBucket(cluster);
     verifyBucketLayout(bucket3, OZONE_OM_METADATA_LAYOUT_PREFIX, true);
 
-    // case-5) Configured cluster layout as SIMPLE. Bucket exists with PREFIX
+    // case-6) Configured cluster layout as SIMPLE. Bucket exists with PREFIX
     // layout format. OM startup should fail.
     conf.set(OZONE_OM_METADATA_LAYOUT, OZONE_OM_METADATA_LAYOUT_DEFAULT);
     cluster.getOzoneManager().stop();

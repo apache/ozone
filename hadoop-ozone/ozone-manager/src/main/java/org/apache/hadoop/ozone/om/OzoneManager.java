@@ -3820,6 +3820,20 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     boolean omMetadataLayoutPrefix = StringUtils.equalsIgnoreCase(metaLayout,
         OZONE_OM_METADATA_LAYOUT_PREFIX);
 
+    boolean omMetadataLayoutSimple = StringUtils.equalsIgnoreCase(metaLayout,
+        OZONE_OM_METADATA_LAYOUT_DEFAULT);
+
+    if (!(omMetadataLayoutPrefix || omMetadataLayoutSimple)) {
+      StringBuilder msg = new StringBuilder();
+      msg.append("Invalid Configuration. Failed to start OM in ");
+      msg.append(metaLayout);
+      msg.append(
+          " layout format. Supported values are either SIMPLE or PREFIX");
+
+      LOG.error(msg.toString());
+      throw new IllegalArgumentException(msg.toString());
+    }
+
     if (omMetadataLayoutPrefix && !getEnableFileSystemPaths()) {
       StringBuilder msg = new StringBuilder();
       msg.append("Invalid Configuration. Failed to start OM in ");
