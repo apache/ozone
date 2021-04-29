@@ -295,6 +295,14 @@ public class SCMStateMachine extends BaseStateMachine {
   }
 
   @Override
+  public void reinitialize() {
+    if (getLifeCycleState() == LifeCycle.State.PAUSED) {
+      getLifeCycle().transition(LifeCycle.State.STARTING);
+      getLifeCycle().transition(LifeCycle.State.RUNNING);
+    }
+  }
+
+  @Override
   public void close() throws IOException {
     if (!isInitialized) {
       return;

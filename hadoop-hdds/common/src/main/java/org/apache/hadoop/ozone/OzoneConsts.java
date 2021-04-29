@@ -126,7 +126,10 @@ public final class OzoneConsts {
    */
   public static final String CONTAINER_DB_SUFFIX = "container.db";
   public static final String PIPELINE_DB_SUFFIX = "pipeline.db";
+  public static final String CRL_DB_SUFFIX = "crl.db";
   public static final String DN_CONTAINER_DB = "-dn-"+ CONTAINER_DB_SUFFIX;
+  public static final String DN_CRL_DB = "dn-"+ CRL_DB_SUFFIX;
+  public static final String CRL_DB_DIRECTORY_NAME = "crl";
   public static final String OM_DB_NAME = "om.db";
   public static final String SCM_DB_NAME = "scm.db";
   public static final String OM_DB_BACKUP_PREFIX = "om.db.backup.";
