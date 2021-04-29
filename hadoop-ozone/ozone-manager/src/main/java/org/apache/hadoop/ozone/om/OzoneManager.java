@@ -215,6 +215,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HANDLER_COUNT_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METRICS_SAVE_INTERVAL;
@@ -291,6 +292,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final Runnable shutdownHook;
   private final File omMetaDir;
   private final boolean isAclEnabled;
+  private final boolean isSpnegoEnabled;
   private IAccessAuthorizer accessAuthorizer;
   private JvmPauseMonitor jvmPauseMonitor;
   private final SecurityConfig secConfig;
@@ -377,6 +379,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     omMetaDir = OMStorage.getOmDbDir(configuration);
     this.isAclEnabled = conf.getBoolean(OZONE_ACL_ENABLED,
         OZONE_ACL_ENABLED_DEFAULT);
+    this.isSpnegoEnabled = conf.get(OZONE_OM_HTTP_AUTH_TYPE, "simple")
+        .equals("kerberos");
     this.scmBlockSize = (long) conf.getStorageSize(OZONE_SCM_BLOCK_SIZE,
         OZONE_SCM_BLOCK_SIZE_DEFAULT, StorageUnit.BYTES);
     this.preallocateBlocksMax = conf.getInt(
@@ -1792,6 +1796,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public boolean getAclsEnabled() {
     return isAclEnabled;
+  }
+
+  /**
+   * Return true if SPNEGO auth is enabled for OM HTTP server, otherwise false.
+   *
+   * @return boolean
+   */
+  public boolean isSpnegoEnabled() {
+    return isSpnegoEnabled;
   }
 
   /**

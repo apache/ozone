@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -32,6 +32,7 @@ import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.Principal;
 import java.util.UUID;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -42,14 +43,21 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.security.UserGroupInformation;
 
 import org.apache.commons.io.FileUtils;
+
+import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_HTTP_SECURITY_ENABLED_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
 import static org.apache.hadoop.ozone.om.OMDBCheckpointServlet.writeDBCheckpointToStream;
+
+import org.eclipse.jetty.server.Response;
 import org.junit.AfterClass;
 import org.junit.Assert;
+
 import static org.junit.Assert.assertNotNull;
 import org.junit.BeforeClass;
 import org.junit.Rule;
@@ -57,9 +65,12 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.junit.rules.Timeout;
 import org.mockito.Matchers;
+
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -67,11 +78,9 @@ import static org.mockito.Mockito.when;
  */
 public class TestOMDbCheckpointServlet {
   private static MiniOzoneCluster cluster = null;
-  private static OMMetrics omMetrics;
   private static OzoneConfiguration conf;
-  private static String clusterId;
-  private static String scmId;
-  private static String omId;
+  private static File tempFile;
+  private static ServletOutputStream servletOutputStream;
 
   @Rule
   public Timeout timeout = Timeout.seconds(240);
@@ -88,109 +97,179 @@ public class TestOMDbCheckpointServlet {
   @BeforeClass
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
-    clusterId = UUID.randomUUID().toString();
-    scmId = UUID.randomUUID().toString();
-    omId = UUID.randomUUID().toString();
-    conf.setBoolean(OZONE_ACL_ENABLED, false);
-    conf.set(OZONE_ADMINISTRATORS, OZONE_ADMINISTRATORS_WILDCARD);
-    conf.setInt(OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS, 2);
-    cluster = MiniOzoneCluster.newBuilder(conf)
-        .setClusterId(clusterId)
-        .setScmId(scmId)
-        .setOmId(omId)
-        .setNumDatanodes(1)
-        .build();
-    cluster.waitForClusterToBeReady();
-    omMetrics = cluster.getOzoneManager().getMetrics();
+
+    tempFile = File.createTempFile("testDoGet_" + System
+        .currentTimeMillis(), ".tar.gz");
+
+    FileOutputStream fileOutputStream = new FileOutputStream(tempFile);
+
+    servletOutputStream = new ServletOutputStream() {
+      @Override
+      public boolean isReady() {
+        return true;
+      }
+
+      @Override
+      public void setWriteListener(WriteListener writeListener) {
+      }
+
+      @Override
+      public void write(int b) throws IOException {
+        fileOutputStream.write(b);
+      }
+    };
   }
 
   /**
    * Shutdown MiniDFSCluster.
    */
   @AfterClass
-  public static void shutdown() {
+  public static void shutdown() throws InterruptedException {
     if (cluster != null) {
       cluster.shutdown();
     }
+    FileUtils.deleteQuietly(tempFile);
   }
 
   @Test
-  public void testDoGet() throws ServletException, IOException {
-    File tempFile = null;
-    try {
-      OMDBCheckpointServlet omDbCheckpointServletMock =
-          mock(OMDBCheckpointServlet.class);
+  public void testDoGet() throws Exception {
+    conf.setBoolean(OZONE_ACL_ENABLED, false);
+    conf.set(OZONE_ADMINISTRATORS, OZONE_ADMINISTRATORS_WILDCARD);
+    conf.setInt(OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS, 2);
+    cluster = MiniOzoneCluster.newBuilder(conf)
+        .setNumDatanodes(1)
+        .build();
+    cluster.waitForClusterToBeReady();
+    OMMetrics omMetrics = cluster.getOzoneManager().getMetrics();
 
-      final OzoneManager om = cluster.getOzoneManager();
+    OMDBCheckpointServlet omDbCheckpointServletMock =
+        mock(OMDBCheckpointServlet.class);
 
-      doCallRealMethod().when(omDbCheckpointServletMock).init();
-      doCallRealMethod().when(omDbCheckpointServletMock).initialize(
-          om.getMetadataManager().getStore(),
-          om.getMetrics().getDBCheckpointMetrics(),
-          om.getAclsEnabled(),
-          om.getOzoneAdmins(om.getConfiguration()));
+    final OzoneManager om = cluster.getOzoneManager();
 
-      HttpServletRequest requestMock = mock(HttpServletRequest.class);
-      // Return current user short name when asked
-      when(requestMock.getRemoteUser())
-          .thenReturn(UserGroupInformation.getCurrentUser().getShortUserName());
-      HttpServletResponse responseMock = mock(HttpServletResponse.class);
+    doCallRealMethod().when(omDbCheckpointServletMock).init();
+    doCallRealMethod().when(omDbCheckpointServletMock).initialize(
+        om.getMetadataManager().getStore(),
+        om.getMetrics().getDBCheckpointMetrics(),
+        om.getAclsEnabled(),
+        om.getOzoneAdmins(om.getConfiguration()),
+        om.isSpnegoEnabled(),
+        om.getConfiguration());
 
-      ServletContext servletContextMock = mock(ServletContext.class);
-      when(omDbCheckpointServletMock.getServletContext())
-          .thenReturn(servletContextMock);
+    HttpServletRequest requestMock = mock(HttpServletRequest.class);
+    // Return current user short name when asked
+    when(requestMock.getRemoteUser())
+        .thenReturn(UserGroupInformation.getCurrentUser().getShortUserName());
+    HttpServletResponse responseMock = mock(HttpServletResponse.class);
 
-      when(servletContextMock.getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE))
-          .thenReturn(cluster.getOzoneManager());
-      when(requestMock.getParameter(OZONE_DB_CHECKPOINT_REQUEST_FLUSH))
-          .thenReturn("true");
-      doNothing().when(responseMock).setContentType("application/x-tgz");
-      doNothing().when(responseMock).setHeader(Matchers.anyString(),
-          Matchers.anyString());
+    ServletContext servletContextMock = mock(ServletContext.class);
+    when(omDbCheckpointServletMock.getServletContext())
+        .thenReturn(servletContextMock);
 
-      tempFile = File.createTempFile("testDoGet_" + System
-          .currentTimeMillis(), ".tar.gz");
+    when(servletContextMock.getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE))
+        .thenReturn(cluster.getOzoneManager());
+    when(requestMock.getParameter(OZONE_DB_CHECKPOINT_REQUEST_FLUSH))
+        .thenReturn("true");
+    doNothing().when(responseMock).setContentType("application/x-tgz");
+    doNothing().when(responseMock).setHeader(Matchers.anyString(),
+        Matchers.anyString());
 
-      FileOutputStream fileOutputStream = new FileOutputStream(tempFile);
-      when(responseMock.getOutputStream()).thenReturn(
-          new ServletOutputStream() {
-            @Override
-            public boolean isReady() {
-              return true;
-            }
+    when(responseMock.getOutputStream()).thenReturn(servletOutputStream);
 
-            @Override
-            public void setWriteListener(WriteListener writeListener) {
-            }
+    doCallRealMethod().when(omDbCheckpointServletMock).doGet(requestMock,
+        responseMock);
 
-            @Override
-            public void write(int b) throws IOException {
-              fileOutputStream.write(b);
-            }
-          });
+    omDbCheckpointServletMock.init();
+    long initialCheckpointCount =
+        omMetrics.getDBCheckpointMetrics().getNumCheckpoints();
 
-      doCallRealMethod().when(omDbCheckpointServletMock).doGet(requestMock,
-          responseMock);
+    omDbCheckpointServletMock.doGet(requestMock, responseMock);
 
-      omDbCheckpointServletMock.init();
-      long initialCheckpointCount =
-          omMetrics.getDBCheckpointMetrics().getNumCheckpoints();
+    Assert.assertTrue(tempFile.length() > 0);
+    Assert.assertTrue(
+        omMetrics.getDBCheckpointMetrics().
+            getLastCheckpointCreationTimeTaken() > 0);
+    Assert.assertTrue(
+        omMetrics.getDBCheckpointMetrics().
+            getLastCheckpointStreamingTimeTaken() > 0);
+    Assert.assertTrue(omMetrics.getDBCheckpointMetrics().
+        getNumCheckpoints() > initialCheckpointCount);
+  }
 
-      omDbCheckpointServletMock.doGet(requestMock, responseMock);
+  @Test
+  public void testSpnegoEnabled() throws Exception {
+    cluster.shutdown();
+    conf.setBoolean(OZONE_ACL_ENABLED, true);
+    conf.set(OZONE_ADMINISTRATORS, "");
+    conf.set(OZONE_OM_HTTP_AUTH_TYPE, "kerberos");
+    conf.set(OZONE_RECON_KERBEROS_PRINCIPAL_KEY, "recon/host1@REALM");
+    cluster = MiniOzoneCluster.newBuilder(conf)
+        .setNumDatanodes(1)
+        .build();
+    cluster.waitForClusterToBeReady();
 
-      Assert.assertTrue(tempFile.length() > 0);
-      Assert.assertTrue(
-          omMetrics.getDBCheckpointMetrics().
-              getLastCheckpointCreationTimeTaken() > 0);
-      Assert.assertTrue(
-          omMetrics.getDBCheckpointMetrics().
-              getLastCheckpointStreamingTimeTaken() > 0);
-      Assert.assertTrue(omMetrics.getDBCheckpointMetrics().
-          getNumCheckpoints() > initialCheckpointCount);
-    } finally {
-      FileUtils.deleteQuietly(tempFile);
-    }
+    OMDBCheckpointServlet omDbCheckpointServletMock =
+        mock(OMDBCheckpointServlet.class);
 
+    final OzoneManager om = cluster.getOzoneManager();
+
+    doCallRealMethod().when(omDbCheckpointServletMock).init();
+    doCallRealMethod().when(omDbCheckpointServletMock).initialize(
+        om.getMetadataManager().getStore(),
+        om.getMetrics().getDBCheckpointMetrics(),
+        om.getAclsEnabled(),
+        om.getOzoneAdmins(om.getConfiguration()),
+        om.isSpnegoEnabled(),
+        om.getConfiguration());
+
+    HttpServletRequest requestMock = mock(HttpServletRequest.class);
+    // Return current user short name when asked
+    when(requestMock.getRemoteUser())
+        .thenReturn(UserGroupInformation.getCurrentUser().getShortUserName());
+    HttpServletResponse responseMock = mock(Response.class);
+
+    ServletContext servletContextMock = mock(ServletContext.class);
+    when(omDbCheckpointServletMock.getServletContext())
+        .thenReturn(servletContextMock);
+
+    when(servletContextMock.getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE))
+        .thenReturn(cluster.getOzoneManager());
+    when(requestMock.getParameter(OZONE_DB_CHECKPOINT_REQUEST_FLUSH))
+        .thenReturn("true");
+
+    doCallRealMethod().when(omDbCheckpointServletMock).doGet(requestMock,
+        responseMock);
+
+    omDbCheckpointServletMock.init();
+    omDbCheckpointServletMock.doGet(requestMock, responseMock);
+
+    // Response status should be set to 403 Forbidden since there was no user
+    // principal set in the request
+    verify(responseMock, times(1)).setStatus(HttpServletResponse.SC_FORBIDDEN);
+
+    // Set the principal to DN in request
+    // This should also get denied since only OM and recon
+    // users should be granted access to the servlet
+    Principal userPrincipalMock = mock(Principal.class);
+    when(userPrincipalMock.getName()).thenReturn("dn/localhost@REALM");
+    when(requestMock.getUserPrincipal()).thenReturn(userPrincipalMock);
+
+    omDbCheckpointServletMock.doGet(requestMock, responseMock);
+
+    // Verify that the Response status is set to 403 again for DN user.
+    verify(responseMock, times(2)).setStatus(HttpServletResponse.SC_FORBIDDEN);
+
+    // Now, set the principal to recon in request
+    when(userPrincipalMock.getName()).thenReturn("recon/localhost@REALM");
+
+    when(requestMock.getUserPrincipal()).thenReturn(userPrincipalMock);
+    when(responseMock.getOutputStream()).thenReturn(servletOutputStream);
+
+    omDbCheckpointServletMock.doGet(requestMock, responseMock);
+
+    // Recon user should be able to access the servlet and download the
+    // snapshot
+    Assert.assertTrue(tempFile.length() > 0);
   }
 
   @Test
