@@ -43,6 +43,8 @@ import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.compressors.CompressorException;
 import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.apache.commons.io.IOUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.util.stream.Collectors.toList;
 
@@ -51,6 +53,9 @@ import static java.util.stream.Collectors.toList;
  */
 public class TarContainerPacker
     implements ContainerPacker<KeyValueContainerData> {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TarContainerPacker.class);
 
   static final String CHUNKS_DIR_NAME = OzoneConsts.STORAGE_DIR_CHUNKS;
 
@@ -152,14 +157,30 @@ public class TarContainerPacker
     try (OutputStream compressed = compress(output);
          ArchiveOutputStream archiveOutput = tar(compressed)) {
 
-      includePath(containerData.getDbFile().toPath(), DB_DIR_NAME,
-          archiveOutput);
+      if (containerData.getDbFile().exists()) {
+        includePath(containerData.getDbFile().toPath(), DB_DIR_NAME,
+            archiveOutput);
+      } else {
+        LOG.warn("DBfile {} not exist",
+            containerData.getDbFile().toPath().toString());
+        return;
+      }
 
-      includePath(Paths.get(containerData.getChunksPath()), CHUNKS_DIR_NAME,
-          archiveOutput);
+      if (new File(containerData.getChunksPath()).exists()) {
+        includePath(Paths.get(containerData.getChunksPath()), CHUNKS_DIR_NAME,
+            archiveOutput);
+      } else {
+        LOG.warn("Chunkfile {} not exist", containerData.getChunksPath());
+        return;
+      }
 
-      includeFile(container.getContainerFile(), CONTAINER_FILE_NAME,
-          archiveOutput);
+      if (container.getContainerFile().exists()) {
+        includeFile(container.getContainerFile(), CONTAINER_FILE_NAME,
+            archiveOutput);
+      } else {
+        LOG.warn("Containerfile {} not exist",
+            container.getContainerFile().toPath().toString());
+      }
     } catch (CompressorException e) {
       throw new IOException(
           "Can't compress the container: " + containerData.getContainerID(),
