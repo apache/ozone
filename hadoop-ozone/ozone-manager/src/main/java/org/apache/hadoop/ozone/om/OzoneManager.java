@@ -3827,8 +3827,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       StringBuilder msg = new StringBuilder();
       msg.append("Invalid Configuration. Failed to start OM in ");
       msg.append(metaLayout);
-      msg.append(
-          " layout format. Supported values are either SIMPLE or PREFIX");
+      msg.append(" layout format. Supported values are either ");
+      msg.append(OZONE_OM_METADATA_LAYOUT_DEFAULT);
+      msg.append(" or ");
+      msg.append(OZONE_OM_METADATA_LAYOUT_PREFIX);
 
       LOG.error(msg.toString());
       throw new IllegalArgumentException(msg.toString());
