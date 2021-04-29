@@ -413,7 +413,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   }
 
   private void initializeCertificateClient() {
-    if (scmStorageConfig.checkPrimarySCMIdInitialized()) {
+    if (OzoneSecurityUtil.isSecurityEnabled(configuration) &&
+        scmStorageConfig.checkPrimarySCMIdInitialized()) {
       scmCertificateClient = new SCMCertificateClient(
           new SecurityConfig(configuration),
           scmStorageConfig.getScmCertSerialId());
@@ -1095,6 +1096,16 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   @Override
   public String getClientRpcPort() {
     InetSocketAddress addr = getClientRpcAddress();
+    return addr == null ? "0" : Integer.toString(addr.getPort());
+  }
+
+  public String getBlockProtocolRpcPort() {
+    InetSocketAddress addr = getBlockProtocolServer().getBlockRpcAddress();
+    return addr == null ? "0" : Integer.toString(addr.getPort());
+  }
+
+  public String getSecurityProtocolRpcPort() {
+    InetSocketAddress addr = getSecurityProtocolServer().getRpcAddress();
     return addr == null ? "0" : Integer.toString(addr.getPort());
   }
 

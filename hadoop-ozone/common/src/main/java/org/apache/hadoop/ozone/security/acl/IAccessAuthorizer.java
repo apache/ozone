@@ -145,7 +145,6 @@ public interface IAccessAuthorizer {
         throw new IllegalArgumentException("ACL right is not recognized");
       }
     }
-
   }
 
   /**

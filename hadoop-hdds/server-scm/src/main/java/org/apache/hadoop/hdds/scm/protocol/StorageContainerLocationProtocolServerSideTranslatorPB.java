@@ -78,6 +78,7 @@ import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdds.scm.ha.RatisUtil;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -140,9 +141,9 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     // not leader or not belong to admin command.
     if (!scm.getScmContext().isLeader()
         && !ADMIN_COMMAND_TYPE.contains(request.getCmdType())) {
-      throw new ServiceException(scm.getScmHAManager()
-                                    .getRatisServer()
-                                    .triggerNotLeaderException());
+      RatisUtil.checkRatisException(
+          scm.getScmHAManager().getRatisServer().triggerNotLeaderException(),
+          scm.getClientRpcPort(), scm.getScmId());
     }
     return dispatcher
         .processRequest(request, this::processRequest, request.getCmdType(),
@@ -329,6 +330,8 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             "Unknown command type: " + request.getCmdType());
       }
     } catch (IOException e) {
+      RatisUtil
+          .checkRatisException(e, scm.getClientRpcPort(), scm.getScmId());
       throw new ServiceException(e);
     }
   }

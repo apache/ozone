@@ -22,10 +22,14 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.scm.proto.InterSCMProtocolProtos;
 import org.apache.hadoop.hdds.protocol.scm.proto.InterSCMProtocolProtos.CopyDBCheckpointResponseProto;
 import org.apache.hadoop.hdds.protocol.scm.proto.InterSCMProtocolServiceGrpc;
+import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.x509.certificate.client.SCMCertificateClient;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.ratis.thirdparty.io.grpc.ManagedChannel;
+import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
 import org.apache.ratis.thirdparty.io.grpc.netty.NettyChannelBuilder;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
+import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslContextBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,15 +54,31 @@ public class InterSCMGrpcClient implements SCMSnapshotDownloader{
 
   private final InterSCMProtocolServiceGrpc.InterSCMProtocolServiceStub
       client;
+  private final long timeout;
 
-  public InterSCMGrpcClient(final String host, final int leaderPort,
-      final ConfigurationSource conf) {
-    final int port = leaderPort;
-    final long  timeout =
+  public InterSCMGrpcClient(final String host,
+      int port, final ConfigurationSource conf,
+      SCMCertificateClient scmCertificateClient) throws IOException {
+    Preconditions.checkNotNull(conf);
+    timeout =
         conf.getObject(SCMHAConfiguration.class).getGrpcDeadlineInterval();
     NettyChannelBuilder channelBuilder =
         NettyChannelBuilder.forAddress(host, port).usePlaintext()
             .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE);
+    SecurityConfig securityConfig = new SecurityConfig(conf);
+    if (securityConfig.isSecurityEnabled()
+        && securityConfig.isGrpcTlsEnabled()) {
+      SslContextBuilder sslClientContextBuilder = SslContextBuilder.forClient();
+      sslClientContextBuilder.keyManager(scmCertificateClient.getPrivateKey(),
+          scmCertificateClient.getCertificate());
+      sslClientContextBuilder.trustManager(
+          scmCertificateClient.getCACertificate());
+      SslContextBuilder sslContextBuilder = GrpcSslContexts.configure(
+          sslClientContextBuilder, securityConfig.getGrpcSslProvider());
+      channelBuilder.sslContext(sslContextBuilder.build())
+          .useTransportSecurity();
+    }
+
     channel = channelBuilder.build();
     client = InterSCMProtocolServiceGrpc.newStub(channel).
         withDeadlineAfter(timeout, TimeUnit.SECONDS);
