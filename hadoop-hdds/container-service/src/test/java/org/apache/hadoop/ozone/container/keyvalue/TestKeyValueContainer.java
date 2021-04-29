@@ -252,8 +252,10 @@ public class TestKeyValueContainer {
     TarContainerPacker packer = new TarContainerPacker();
 
     //if missing chunksfile
-    Files.delete(new File(keyValueContainer.getContainerData().getChunksPath()).toPath());
-    Assert.assertFalse(new File(keyValueContainer.getContainerData().getChunksPath()).exists());
+    File chunkfile = new File(keyValueContainer.
+        getContainerData().getChunksPath());
+    Files.delete(chunkfile.toPath());
+    Assert.assertFalse(chunkfile.exists());
     //export the container
     try (FileOutputStream fos = new FileOutputStream(folderToExport)) {
       keyValueContainer

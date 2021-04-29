@@ -125,7 +125,8 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
         if (bytes <= 45) {
           task.setStatus(Status.FAILED);
           LOG.warn("Container {} is downloaded with size {}, " +
-              "if size less than 45 bytes the tar file is null", containerID, bytes);
+              "if size less than 45 bytes the tar file is null",
+              containerID, bytes);
         } else {
           importContainer(containerID, path);
           LOG.info("Container {} is replicated successfully", containerID);

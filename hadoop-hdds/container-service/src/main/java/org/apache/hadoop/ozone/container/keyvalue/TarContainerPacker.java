@@ -157,13 +157,16 @@ public class TarContainerPacker
          ArchiveOutputStream archiveOutput = tar(compressed)) {
 
       if (!containerData.getDbFile().exists()) {
-        LOG.warn("DBfile {} not exist", containerData.getDbFile().toPath().toString());
+        LOG.warn("DBfile {} not exist",
+            containerData.getDbFile().toPath().toString());
         return;
       } else if (!new File(containerData.getChunksPath()).exists()) {
-        LOG.warn("Chunkfile {} not exist", containerData.getDbFile().toPath().toString());
+        LOG.warn("Chunkfile {} not exist",
+            containerData.getDbFile().toPath().toString());
         return;
       } else if (!container.getContainerFile().exists()) {
-        LOG.warn("Containerfile {} not exist", containerData.getDbFile().toPath().toString());
+        LOG.warn("Containerfile {} not exist",
+            containerData.getDbFile().toPath().toString());
         return;
       }
 
