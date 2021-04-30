@@ -294,18 +294,11 @@ public class NodeStateManager implements Runnable, Closeable {
    */
   public void addNode(DatanodeDetails datanodeDetails,
       LayoutVersionProto layoutInfo) throws NodeAlreadyExistsException {
-    NodeStatus newNodeStatus = newNodeStatus(datanodeDetails);
+    NodeStatus newNodeStatus = newNodeStatus(datanodeDetails, layoutInfo);
     nodeStateMap.addNode(datanodeDetails, newNodeStatus, layoutInfo);
     UUID dnID = datanodeDetails.getUuid();
     try {
       updateLastKnownLayoutVersion(datanodeDetails, layoutInfo);
-      DatanodeInfo dnInfo = nodeStateMap.getNodeInfo(dnID);
-      NodeStatus status = nodeStateMap.getNodeStatus(dnID);
-
-      // State machine starts nodes as HEALTHY. If there is a layout
-      // mismatch, this node should be moved to HEALTHY_READONLY.
-      updateNodeLayoutVersionState(dnInfo, layoutMisMatchCondition, status,
-          NodeLifeCycleEvent.LAYOUT_MISMATCH);
     } catch (NodeNotFoundException ex) {
       LOG.error("Inconsistent NodeStateMap! Datanode with ID {} was " +
           "added but not found in  map: {}", dnID, nodeStateMap);
@@ -320,17 +313,24 @@ public class NodeStateManager implements Runnable, Closeable {
    * updated to reflect the datanode state.
    * @param dn DatanodeDetails reported by the datanode
    */
-  private NodeStatus newNodeStatus(DatanodeDetails dn) {
+  private NodeStatus newNodeStatus(DatanodeDetails dn,
+      LayoutVersionProto layoutInfo) {
     HddsProtos.NodeOperationalState dnOpState = dn.getPersistedOpState();
+    NodeState state = HEALTHY;
+
+    if (layoutMisMatchCondition.test(layoutInfo)) {
+      state = HEALTHY_READONLY;
+    }
+
     if (dnOpState != NodeOperationalState.IN_SERVICE) {
       LOG.info("Updating nodeOperationalState on registration as the " +
               "datanode has a persisted state of {} and expiry of {}",
           dnOpState, dn.getPersistedOpStateExpiryEpochSec());
-      return new NodeStatus(dnOpState, nodeHealthSM.getInitialState(),
+      return new NodeStatus(dnOpState, state,
           dn.getPersistedOpStateExpiryEpochSec());
     } else {
       return new NodeStatus(
-          NodeOperationalState.IN_SERVICE, nodeHealthSM.getInitialState());
+          NodeOperationalState.IN_SERVICE, state);
     }
   }
 
