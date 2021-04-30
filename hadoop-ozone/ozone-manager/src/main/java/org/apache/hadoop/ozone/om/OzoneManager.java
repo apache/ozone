@@ -84,6 +84,8 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBUpdatesWrapper;
 import org.apache.hadoop.hdds.utils.db.SequenceNumberNotFoundException;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.io.Text;
@@ -1103,23 +1105,23 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * Start service.
    */
   public void start() throws IOException {
+    initFSOLayout();
+
     omClientProtocolMetrics.register();
     HddsServerUtil.initializeMetrics(configuration, "OzoneManager");
 
     LOG.info(buildRpcServerStartMessage("OzoneManager RPC server",
         omRpcAddress));
 
+    metadataManager.start(configuration);
+
+    validatesBucketLayoutMismatches();
+
     // Start Ratis services
     if (omRatisServer != null) {
       omRatisServer.start();
     }
 
-    // TODO: Temporary workaround for OM upgrade path and will be replaced once
-    //  upgrade HDDS-3698 story reaches consensus. Instead of cluster level
-    //  configuration, OM needs to check this property on every bucket level.
-    getOMMetadataLayout();
-
-    metadataManager.start(configuration);
     startSecretManagerIfNecessary();
 
 
@@ -1173,12 +1175,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * Restarts the service. This method re-initializes the rpc server.
    */
   public void restart() throws IOException {
+    initFSOLayout();
+
     LOG.info(buildRpcServerStartMessage("OzoneManager RPC server",
         omRpcAddress));
 
     HddsServerUtil.initializeMetrics(configuration, "OzoneManager");
 
     instantiateServices();
+
+    validatesBucketLayoutMismatches();
 
     startSecretManagerIfNecessary();
 
@@ -3696,18 +3702,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   public String getOMMetadataLayout() {
-    String version = configuration.getTrimmed(OZONE_OM_METADATA_LAYOUT,
-        OZONE_OM_METADATA_LAYOUT_DEFAULT);
-    boolean omMetadataLayoutPrefix = StringUtils.equalsIgnoreCase(version,
-        OZONE_OM_METADATA_LAYOUT_PREFIX);
-    LOG.info("Configured {}={} and enabled:{} optimized OM FS operations",
-        OZONE_OM_METADATA_LAYOUT, version, omMetadataLayoutPrefix);
-
-    boolean isBucketFSOptimized =
-            omMetadataLayoutPrefix && getEnableFileSystemPaths();
-    OzoneManagerRatisUtils.setBucketFSOptimized(isBucketFSOptimized);
-
-    return version;
+    return configuration
+        .getTrimmed(OZONE_OM_METADATA_LAYOUT, OZONE_OM_METADATA_LAYOUT_DEFAULT);
   }
 
   /**
@@ -3814,6 +3810,83 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @VisibleForTesting
   public void setMinMultipartUploadPartSize(int partSizeForTest) {
     this.minMultipartUploadPartSize = partSizeForTest;
+  }
+
+  private void initFSOLayout() {
+    // TODO: Temporary workaround for OM upgrade path and will be replaced once
+    //  upgrade HDDS-3698 story reaches consensus. Instead of cluster level
+    //  configuration, OM needs to check this property on every bucket level.
+    String metaLayout = getOMMetadataLayout();
+    boolean omMetadataLayoutPrefix = StringUtils.equalsIgnoreCase(metaLayout,
+        OZONE_OM_METADATA_LAYOUT_PREFIX);
+
+    boolean omMetadataLayoutSimple = StringUtils.equalsIgnoreCase(metaLayout,
+        OZONE_OM_METADATA_LAYOUT_DEFAULT);
+
+    if (!(omMetadataLayoutPrefix || omMetadataLayoutSimple)) {
+      StringBuilder msg = new StringBuilder();
+      msg.append("Invalid Configuration. Failed to start OM in ");
+      msg.append(metaLayout);
+      msg.append(" layout format. Supported values are either ");
+      msg.append(OZONE_OM_METADATA_LAYOUT_DEFAULT);
+      msg.append(" or ");
+      msg.append(OZONE_OM_METADATA_LAYOUT_PREFIX);
+
+      LOG.error(msg.toString());
+      throw new IllegalArgumentException(msg.toString());
+    }
+
+    if (omMetadataLayoutPrefix && !getEnableFileSystemPaths()) {
+      StringBuilder msg = new StringBuilder();
+      msg.append("Invalid Configuration. Failed to start OM in ");
+      msg.append(OZONE_OM_METADATA_LAYOUT_PREFIX);
+      msg.append(" layout format as '");
+      msg.append(OZONE_OM_ENABLE_FILESYSTEM_PATHS);
+      msg.append("' is false!");
+
+      LOG.error(msg.toString());
+      throw new IllegalArgumentException(msg.toString());
+    }
+
+    OzoneManagerRatisUtils.setBucketFSOptimized(omMetadataLayoutPrefix);
+    String status = omMetadataLayoutPrefix ? "enabled" : "disabled";
+    LOG.info("Configured {}={} and {} optimized OM FS operations",
+        OZONE_OM_METADATA_LAYOUT, metaLayout, status);
+  }
+
+  private void validatesBucketLayoutMismatches() throws IOException {
+    String clusterLevelMetaLayout = getOMMetadataLayout();
+
+    TableIterator<String, ? extends Table.KeyValue<String, OmBucketInfo>>
+        iterator = metadataManager.getBucketTable().iterator();
+
+    while (iterator.hasNext()) {
+      Map<String, String> bucketMeta = iterator.next().getValue().getMetadata();
+      verifyBucketMetaLayout(clusterLevelMetaLayout, bucketMeta);
+    }
+  }
+
+  private void verifyBucketMetaLayout(String clusterLevelMetaLayout,
+      Map<String, String> bucketMetadata) throws IOException {
+    String bucketMetaLayout = bucketMetadata.get(OZONE_OM_METADATA_LAYOUT);
+    if (StringUtils.isBlank(bucketMetaLayout)) {
+      // Defaulting to SIMPLE
+      bucketMetaLayout = OZONE_OM_METADATA_LAYOUT_DEFAULT;
+    }
+    boolean supportedMetadataLayout =
+        StringUtils.equalsIgnoreCase(clusterLevelMetaLayout, bucketMetaLayout);
+
+    if (!supportedMetadataLayout) {
+      StringBuilder msg = new StringBuilder();
+      msg.append("Failed to start OM in ");
+      msg.append(clusterLevelMetaLayout);
+      msg.append(" layout format as existing bucket has a different layout ");
+      msg.append(bucketMetaLayout);
+      msg.append(" metadata format");
+
+      LOG.error(msg.toString());
+      throw new IOException(msg.toString());
+    }
   }
 
 }
