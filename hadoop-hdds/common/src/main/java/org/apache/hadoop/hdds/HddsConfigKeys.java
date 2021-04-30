@@ -258,4 +258,9 @@ public final class HddsConfigKeys {
       "hdds.datanode.ratis.server.request.timeout";
   public static final String
       HDDS_DATANODE_RATIS_SERVER_REQUEST_TIMEOUT_DEFAULT = "2m";
+
+  public static final String HDDS_DATANODE_REPORT_MAX_LIMIT =
+      "hdds.datanode.report.max.limit";
+  public static final int HDDS_DATANODE_REPORT_MAX_LIMIT_DEFAULT =
+      Integer.MAX_VALUE;
 }

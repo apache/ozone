@@ -65,6 +65,7 @@ import static java.lang.Math.min;
 import org.apache.commons.collections.CollectionUtils;
 
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getLogWarnInterval;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getReportMaxLimit;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmHeartbeatInterval;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -313,7 +314,7 @@ public class StateContext {
    */
   public List<GeneratedMessage> getAllAvailableReports(
       InetSocketAddress endpoint) {
-    return getReports(endpoint, Integer.MAX_VALUE);
+    return getReports(endpoint, getReportMaxLimit(conf));
   }
 
   List<GeneratedMessage> getIncrementalReports(

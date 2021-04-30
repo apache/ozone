@@ -65,6 +65,8 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.security.UserGroupInformation;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_REPORT_MAX_LIMIT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_REPORT_MAX_LIMIT_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
@@ -244,6 +246,16 @@ public final class HddsServerUtil {
   public static long getScmHeartbeatInterval(ConfigurationSource conf) {
     return conf.getTimeDuration(HDDS_HEARTBEAT_INTERVAL,
         HDDS_HEARTBEAT_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
+  }
+
+  /**
+   * Get the max limit when get all available reports
+   * @param conf
+   * @return max limit
+   */
+  public static int getReportMaxLimit(ConfigurationSource conf) {
+    return conf.getInt(HDDS_DATANODE_REPORT_MAX_LIMIT,
+        HDDS_DATANODE_REPORT_MAX_LIMIT_DEFAULT);
   }
 
   /**
