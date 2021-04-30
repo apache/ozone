@@ -328,11 +328,6 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
    */
   @Test
   public void testRenameDestinationParentDoesntExist() throws Exception {
-    // Skip as this will run only in new layout
-    if (!isEnabledFileSystemPaths()) {
-      return;
-    }
-
     final String root = "/root_dir";
     final String dir1 = root + "/dir1";
     final String dir2 = dir1 + "/dir2";
