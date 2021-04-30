@@ -64,8 +64,9 @@ import com.google.protobuf.GeneratedMessage;
 import static java.lang.Math.min;
 import org.apache.commons.collections.CollectionUtils;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_REPORT_MAX_LIMIT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_REPORT_MAX_LIMIT_DEFAULT;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getLogWarnInterval;
-import static org.apache.hadoop.hdds.utils.HddsServerUtil.getReportMaxLimit;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmHeartbeatInterval;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -117,7 +118,7 @@ public class StateContext {
   private boolean shutdownOnError = false;
   private boolean shutdownGracefully = false;
   private final AtomicLong threadPoolNotAvailableCount;
-
+  private int reportMaxLimit;
   /**
    * term of latest leader SCM, extract from SCMCommand.
    *
@@ -162,6 +163,8 @@ public class StateContext {
     lock = new ReentrantLock();
     stateExecutionCount = new AtomicLong(0);
     threadPoolNotAvailableCount = new AtomicLong(0);
+    reportMaxLimit = conf.getInt(HDDS_DATANODE_REPORT_MAX_LIMIT,
+        HDDS_DATANODE_REPORT_MAX_LIMIT_DEFAULT);
   }
 
   /**
@@ -314,7 +317,7 @@ public class StateContext {
    */
   public List<GeneratedMessage> getAllAvailableReports(
       InetSocketAddress endpoint) {
-    return getReports(endpoint, getReportMaxLimit(conf));
+    return getReports(endpoint, reportMaxLimit);
   }
 
   List<GeneratedMessage> getIncrementalReports(
