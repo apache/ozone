@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -71,6 +71,7 @@ public class DBCheckpointServlet extends HttpServlet {
   private Collection<String> ozAdmins;
   private String reconSPN;
 
+  @SuppressWarnings("checkstyle:hiddenfield")
   public void initialize(DBStore store, DBCheckpointMetrics metrics,
                          boolean omAclEnabled, Collection<String> ozoneAdmins,
                          boolean isSpnegoEnabled, OzoneConfiguration conf)
