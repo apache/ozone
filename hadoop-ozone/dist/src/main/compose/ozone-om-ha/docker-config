@@ -33,6 +33,7 @@ OZONE-SITE.XML_ozone.replication=1
 OZONE-SITE.XML_ozone.client.failover.max.attempts=6
 OZONE-SITE.XML_hdds.datanode.dir=/data/hdds
 OZONE-SITE.XML_hdds.profiler.endpoint.enabled=true
+OZONE-SITE.XML_hdds.scmclient.max.retry.timeout=30s
 HDFS-SITE.XML_rpc.metrics.quantile.enable=true
 HDFS-SITE.XML_rpc.metrics.percentiles.intervals=60,300
 ASYNC_PROFILER_HOME=/opt/profiler

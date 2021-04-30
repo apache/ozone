@@ -1949,6 +1949,8 @@
       optional config, if being set will cause scm --init to only take effect on
       the specific node and ignore scm --bootstrap cmd.
       Similarly, scm --init will be ignored on the non-primordial scm nodes.
+      The config can either be set equal to the hostname or the node id of any
+      of the scm nodes.
       With the config set, applications/admins can safely execute init and
       bootstrap commands safely on all scm instances.
 
@@ -2763,11 +2765,20 @@
   </property>
 
   <property>
+    <name>ozone.client.key.provider.cache.expiry</name>
+    <tag>OZONE, CLIENT, SECURITY</tag>
+    <value>10d</value>
+    <description>Ozone client security key provider cache expiration time.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.scm.info.wait.duration</name>
     <tag>OZONE, SCM, OM</tag>
     <value>10m</value>
-    <description> Maximum amount of duration OM/SCM waits to get Scm Info
-      during OzoneManager init/SCM bootstrap.
+    <description> Maximum amount of duration OM/SCM waits to get Scm Info/Scm
+      signed cert during OzoneManager init/SCM bootstrap.
     </description>
   </property>
+
 </configuration>

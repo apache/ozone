@@ -24,9 +24,9 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.block.BlockManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
@@ -87,7 +87,8 @@ public class BenchMarkSCM {
         // prepare SCM
         PipelineManager pipelineManager = scm.getPipelineManager();
         for (Pipeline pipeline : pipelineManager
-            .getPipelines(ReplicationType.RATIS, ReplicationFactor.THREE)) {
+            .getPipelines(
+                new RatisReplicationConfig(ReplicationFactor.THREE))) {
           pipelineManager.openPipeline(pipeline.getId());
         }
         scm.getEventQueue().fireEvent(SCMEvents.SAFE_MODE_STATUS,
@@ -119,7 +120,7 @@ public class BenchMarkSCM {
   public void allocateBlockBenchMark(BenchMarkSCM state,
       Blackhole bh) throws IOException {
     BenchMarkSCM.blockManager
-        .allocateBlock(50, ReplicationType.RATIS, ReplicationFactor.THREE,
+        .allocateBlock(50, new RatisReplicationConfig(ReplicationFactor.THREE),
             "Genesis", new ExcludeList());
   }
 }

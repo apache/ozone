@@ -69,7 +69,6 @@ import com.google.common.base.Preconditions;
 import com.sun.jmx.mbeanserver.Introspector;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec.getX509Certificate;
 import static org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest.getEncodedString;
-import static org.apache.hadoop.hdds.utils.HAUtils.checkSecurityAndSCMHAEnabled;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_PLUGINS_KEY;
 import static org.apache.hadoop.util.ExitUtil.terminate;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
@@ -188,7 +187,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
 
   public void start(OzoneConfiguration configuration) {
     setConfiguration(configuration);
-    checkSecurityAndSCMHAEnabled(conf);
     start();
   }
 
@@ -344,7 +342,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       PKCS10CertificationRequest csr = getCSR(config);
       // TODO: For SCM CA we should fetch certificate from multiple SCMs.
       SCMSecurityProtocolClientSideTranslatorPB secureScmClient =
-          HddsServerUtil.getScmSecurityClient(config);
+          HddsServerUtil.getScmSecurityClientWithMaxRetry(config);
       SCMGetCertResponseProto response = secureScmClient.
           getDataNodeCertificateChain(
               datanodeDetails.getProtoBufMessage(),

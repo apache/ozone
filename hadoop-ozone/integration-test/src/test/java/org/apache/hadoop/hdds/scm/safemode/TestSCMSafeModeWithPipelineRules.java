@@ -19,9 +19,10 @@
 package org.apache.hadoop.hdds.scm.safemode;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -98,8 +99,8 @@ public class TestSCMSafeModeWithPipelineRules {
 
     pipelineManager = cluster.getStorageContainerManager().getPipelineManager();
     List<Pipeline> pipelineList =
-        pipelineManager.getPipelines(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE);
+        pipelineManager.getPipelines(new RatisReplicationConfig(
+            ReplicationFactor.THREE));
 
 
     pipelineList.get(0).getNodes().forEach(datanodeDetails -> {
@@ -192,16 +193,16 @@ public class TestSCMSafeModeWithPipelineRules {
   private void waitForRatis3NodePipelines(int numPipelines)
       throws TimeoutException, InterruptedException {
     GenericTestUtils.waitFor(() -> pipelineManager
-        .getPipelines(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, Pipeline.PipelineState.OPEN)
+        .getPipelines(new RatisReplicationConfig(ReplicationFactor.THREE),
+            Pipeline.PipelineState.OPEN)
         .size() == numPipelines, 100, 60000);
   }
 
   private void waitForRatis1NodePipelines(int numPipelines)
       throws TimeoutException, InterruptedException {
     GenericTestUtils.waitFor(() -> pipelineManager
-        .getPipelines(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.ONE, Pipeline.PipelineState.OPEN)
+        .getPipelines(new RatisReplicationConfig(ReplicationFactor.ONE),
+            Pipeline.PipelineState.OPEN)
         .size() == numPipelines, 100, 60000);
   }
 }

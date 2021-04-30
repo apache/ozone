@@ -18,18 +18,22 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import com.google.common.base.Strings;
+import com.google.protobuf.ServiceException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.ratis.RaftConfigKeys;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.grpc.GrpcConfigKeys;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.server.RaftServerConfigKeys;
 import org.apache.ratis.util.SizeInBytes;
 import org.apache.ratis.util.TimeDuration;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 
@@ -174,4 +178,18 @@ public final class RatisUtil {
         conf.getRatisSnapshotThreshold());
   }
 
+  public static void checkRatisException(IOException e, String port,
+      String scmId) throws ServiceException {
+    if (SCMHAUtils.isNonRetriableException(e)) {
+      throw new ServiceException(new NonRetriableException(e));
+    } else if (SCMHAUtils.isRetriableWithNoFailoverException(e)) {
+      throw new ServiceException(new RetriableWithNoFailoverException(e));
+    } else if (SCMHAUtils.getNotLeaderException(e) != null) {
+      NotLeaderException nle =
+          (NotLeaderException) SCMHAUtils.getNotLeaderException(e);
+      throw new ServiceException(ServerNotLeaderException
+          .convertToNotLeaderException(nle,
+              SCMRatisServerImpl.getSelfPeerId(scmId), port));
+    }
+  }
 }

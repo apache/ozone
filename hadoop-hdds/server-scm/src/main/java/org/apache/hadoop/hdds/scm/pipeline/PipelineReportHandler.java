@@ -20,10 +20,11 @@ package org.apache.hadoop.hdds.scm.pipeline;
 
 import java.io.IOException;
 
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.PipelineReport;
 import org.apache.hadoop.hdds.protocol.proto
@@ -114,8 +115,10 @@ public class PipelineReportHandler implements
 
     if (pipeline.getPipelineState() == Pipeline.PipelineState.ALLOCATED) {
       if (LOGGER.isDebugEnabled()) {
-        LOGGER.debug("Pipeline {} {} reported by {}", pipeline.getFactor(),
-            pipeline.getId(), dn);
+        LOGGER.debug("Pipeline {} {} reported by {}",
+            pipeline.getReplicationConfig(),
+            pipeline.getId(),
+            dn);
       }
       if (pipeline.isHealthy()) {
         pipelineManager.openPipeline(pipelineID);
@@ -139,7 +142,8 @@ public class PipelineReportHandler implements
                                      DatanodeDetails dn) {
     // ONE replica pipeline doesn't have leader flag
     if (report.getIsLeader() ||
-        pipeline.getFactor() == HddsProtos.ReplicationFactor.ONE) {
+        RatisReplicationConfig.hasFactor(pipeline.getReplicationConfig(),
+            ReplicationFactor.ONE)) {
       pipeline.setLeaderId(dn.getUuid());
       metrics.incNumPipelineBytesWritten(pipeline, report.getBytesWritten());
     }
