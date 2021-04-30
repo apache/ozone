@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.scm.node.states.NodeAlreadyExistsException;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.server.events.Event;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.util.Time;
 import org.junit.After;
@@ -221,7 +222,7 @@ public class TestNodeStateManager {
   public void testNodeOpStateCanBeSet()
       throws NodeAlreadyExistsException, NodeNotFoundException {
     DatanodeDetails dn = generateDatanode();
-    nsm.addNode(dn, null);
+    nsm.addNode(dn, UpgradeUtils.defaultLayoutVersionProto());
 
     nsm.setNodeOperationalState(dn,
         HddsProtos.NodeOperationalState.DECOMMISSIONED);
@@ -229,8 +230,7 @@ public class TestNodeStateManager {
     NodeStatus newStatus = nsm.getNodeStatus(dn);
     assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONED,
         newStatus.getOperationalState());
-    assertEquals(NodeState.HEALTHY_READONLY,
-        newStatus.getHealth());
+    assertEquals(NodeState.HEALTHY, newStatus.getHealth());
   }
 
   @Test
