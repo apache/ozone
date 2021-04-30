@@ -87,6 +87,34 @@ _install_flekszible() {
   chmod +x bin/flekszible
 }
 
+install_hugo() {
+  _install_tool hugo bin
+}
+
+_install_hugo() {
+  : ${HUGO_VERSION:=0.81.0}
+
+  local os=$(uname -s)
+  local arch=$(uname -m)
+
+  mkdir bin
+
+  case "${os}" in
+    Darwin)
+      os=macOS
+      ;;
+  esac
+
+  case "${arch}" in
+    x86_64)
+      arch=64bit
+      ;;
+  esac
+
+  curl -LSs "https://github.com/gohugoio/hugo/releases/download/v${HUGO_VERSION}/hugo_${HUGO_VERSION}_${os}-${arch}.tar.gz" | tar -xz -f - -C bin hugo
+  chmod +x bin/hugo
+}
+
 install_virtualenv() {
   _install_tool virtualenv
 }
@@ -103,4 +131,12 @@ _install_robot() {
   virtualenv venv
   source venv/bin/activate
   pip install robotframework
+}
+
+install_spotbugs() {
+  _install_tool spotbugs spotbugs-3.1.12/bin
+}
+
+_install_spotbugs() {
+  curl -LSs https://repo.maven.apache.org/maven2/com/github/spotbugs/spotbugs/3.1.12/spotbugs-3.1.12.tgz | tar -xz -f -
 }

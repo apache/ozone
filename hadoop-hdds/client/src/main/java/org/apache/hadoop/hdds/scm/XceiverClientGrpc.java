@@ -382,6 +382,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       } catch (IOException e) {
         ioException = e;
         responseProto = null;
+        LOG.debug("Failed to execute command {} on datanode {}",
+            request, dn, e);
       } catch (ExecutionException e) {
         LOG.debug("Failed to execute command {} on datanode {}",
             request, dn, e);
@@ -571,5 +573,10 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   @Override
   public HddsProtos.ReplicationType getPipelineType() {
     return HddsProtos.ReplicationType.STAND_ALONE;
+  }
+
+  @VisibleForTesting
+  public static Logger getLogger() {
+    return LOG;
   }
 }

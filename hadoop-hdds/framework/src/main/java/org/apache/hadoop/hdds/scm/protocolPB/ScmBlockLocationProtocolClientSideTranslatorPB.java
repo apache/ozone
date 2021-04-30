@@ -24,9 +24,11 @@ import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.SCMBlockLocationRequest;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.SCMBlockLocationResponse;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.Type;
@@ -116,11 +118,6 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
     try {
       SCMBlockLocationResponse response =
           rpcProxy.send(NULL_RPC_CONTROLLER, req);
-      if (response.getStatus() ==
-          ScmBlockLocationProtocolProtos.Status.SCM_NOT_LEADER) {
-        failoverProxyProvider
-            .performFailoverToAssignedLeader(response.getLeaderSCMNodeId());
-      }
       return response;
     } catch (ServiceException e) {
       throw ProtobufHelper.getRemoteException(e);
@@ -139,29 +136,47 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
   /**
    * Asks SCM where a block should be allocated. SCM responds with the
    * set of datanodes that should be used creating this block.
-   * @param size - size of the block.
-   * @param num - number of blocks.
-   * @param type - replication type of the blocks.
-   * @param factor - replication factor of the blocks.
-   * @param excludeList - exclude list while allocating blocks.
+   *
+   * @param size              - size of the block.
+   * @param num               - number of blocks.
+   * @param replicationConfig - replication configuration of the blocks.
+   * @param excludeList       - exclude list while allocating blocks.
    * @return allocated block accessing info (key, pipeline).
    * @throws IOException
    */
   @Override
-  public List<AllocatedBlock> allocateBlock(long size, int num,
-      HddsProtos.ReplicationType type, HddsProtos.ReplicationFactor factor,
-      String owner, ExcludeList excludeList) throws IOException {
+  public List<AllocatedBlock> allocateBlock(
+      long size, int num,
+      ReplicationConfig replicationConfig,
+      String owner, ExcludeList excludeList
+  ) throws IOException {
     Preconditions.checkArgument(size > 0, "block size must be greater than 0");
 
-    AllocateScmBlockRequestProto request =
+    final AllocateScmBlockRequestProto.Builder requestBuilder =
         AllocateScmBlockRequestProto.newBuilder()
             .setSize(size)
             .setNumBlocks(num)
-            .setType(type)
-            .setFactor(factor)
+            .setType(replicationConfig.getReplicationType())
             .setOwner(owner)
-            .setExcludeList(excludeList.getProtoBuf())
-            .build();
+            .setExcludeList(excludeList.getProtoBuf());
+
+    switch (replicationConfig.getReplicationType()) {
+    case STAND_ALONE:
+      requestBuilder.setFactor(
+          ((StandaloneReplicationConfig) replicationConfig)
+              .getReplicationFactor());
+      break;
+    case RATIS:
+      requestBuilder.setFactor(
+          ((RatisReplicationConfig) replicationConfig).getReplicationFactor());
+      break;
+    default:
+      throw new IllegalArgumentException(
+          "Unsupported replication type " + replicationConfig
+              .getReplicationType());
+    }
+
+    AllocateScmBlockRequestProto request = requestBuilder.build();
 
     SCMBlockLocationRequest wrapper = createSCMBlockRequest(
         Type.AllocateScmBlock)
