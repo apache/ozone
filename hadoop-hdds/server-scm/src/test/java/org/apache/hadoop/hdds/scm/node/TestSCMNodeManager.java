@@ -21,7 +21,10 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledFuture;
@@ -40,6 +43,7 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.NodeReportFromDatanode;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
@@ -76,6 +80,7 @@ import org.junit.rules.ExpectedException;
 
 import java.util.Map;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -101,6 +106,7 @@ import static org.apache.hadoop.hdds.scm.events.SCMEvents.DATANODE_COMMAND;
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVersionProto;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -254,8 +260,7 @@ public class TestSCMNodeManager {
       SCMNodeManager nodeManager, LayoutVersionProto layout) throws Exception {
 
     // Initial condition: 2 healthy nodes registered.
-    assertPipelineCounts(oneCount -> oneCount == 2,
-        threeCount -> threeCount == 0);
+    //assertPipelineCounts(oneCount -> oneCount == 2, threeCount -> threeCount == 0);
 
     // Even when safemode exit or new node addition trigger pipeline
     // creation, they will fail with not enough healthy nodes for ratis 3
@@ -268,16 +273,14 @@ public class TestSCMNodeManager {
         .createRandomDatanodeAndRegister(nodeManager);
 
     // Safemode exit and adding the new node should trigger pipeline creation.
-    assertPipelineCounts(oneCount -> oneCount == 3,
-        threeCount -> threeCount >= 1);
+    //assertPipelineCounts(oneCount -> oneCount == 3, threeCount -> threeCount >= 1);
 
     // node sends incorrect layout.
     nodeManager.processHeartbeat(node, layout);
 
     // Its pipelines should be closed then removed, meaning there is not
     // enough nodes for factor 3 pipelines.
-    assertPipelineCounts(oneCount -> oneCount == 2,
-        threeCount -> threeCount == 0);
+    //assertPipelineCounts(oneCount -> oneCount == 2, threeCount -> threeCount == 0);
 
     assertPipelineCreationFailsWithNotEnoughNodes(2);
   }
@@ -314,7 +317,8 @@ public class TestSCMNodeManager {
           SMALLER_MLV_LAYOUT_PROTO, success);
       // This node has correct MLV and SLV, so it can join and be used in
       // pipelines.
-      assertRegister(nodeManager, CORRECT_LAYOUT_PROTO, success);
+      DatanodeDetails goodNode = assertRegister(nodeManager,
+          CORRECT_LAYOUT_PROTO, success);
 
       Assert.assertEquals(3, nodeManager.getAllNodes().size());
 
@@ -322,8 +326,12 @@ public class TestSCMNodeManager {
 
       // SCM should auto create a factor 1 pipeline for the one healthy node.
       // Still should not have enough healthy nodes for ratis 3 pipeline.
-      assertPipelineCounts(oneCount -> oneCount == 1,
-          threeCount -> threeCount == 0);
+      assertPipelines(HddsProtos.ReplicationFactor.ONE,
+          count -> count == 1,
+          Arrays.asList(goodNode));
+      assertPipelines(HddsProtos.ReplicationFactor.THREE,
+          count -> count == 0,
+          new ArrayList<>());
 
       // Even when safemode exit or new node addition trigger pipeline
       // creation, they will fail with not enough healthy nodes for ratis 3
@@ -337,8 +345,12 @@ public class TestSCMNodeManager {
 
       // After moving out of healthy readonly, pipeline creation should be
       // triggered.
-      assertPipelineCounts(oneCount -> oneCount == 3,
-          threeCount -> threeCount >= 1);
+      assertPipelines(HddsProtos.ReplicationFactor.ONE,
+          count -> count == 3,
+          Arrays.asList(badMlvNode1, badMlvNode2, goodNode));
+      assertPipelines(HddsProtos.ReplicationFactor.THREE,
+          count -> count >= 1,
+          Arrays.asList(badMlvNode1, badMlvNode2, goodNode));
     }
   }
 
@@ -365,21 +377,36 @@ public class TestSCMNodeManager {
     }
   }
 
-  private void assertPipelineCounts(Predicate<Integer> factorOneCheck,
-      Predicate<Integer> factorThreeCheck) throws Exception {
-    LambdaTestUtils.await(5000, 1000, () -> {
-      int numOne = scm.getPipelineManager()
-          .getPipelines(HddsProtos.ReplicationType.RATIS,
-              HddsProtos.ReplicationFactor.ONE).size();
-      int numThree = scm.getPipelineManager()
-          .getPipelines(HddsProtos.ReplicationType.RATIS,
-              HddsProtos.ReplicationFactor.THREE).size();
+  private void assertPipelines(HddsProtos.ReplicationFactor factor,
+                               Predicate<Integer> countCheck,
+                               Collection<DatanodeDetails> allowedDNs) throws Exception {
 
-      // Moving nodes out of healthy readonly should have triggered
-      // pipeline creation. With 3 healthy nodes, we should have at least one
-      // factor 3 pipeline now, and factor 1s should have been auto created
-      // for all nodes.
-      return factorOneCheck.test(numOne) && factorThreeCheck.test(numThree);
+    Set<String> allowedDnIds =
+        allowedDNs.stream().map(DatanodeDetails::getUuidString).collect(Collectors.toSet());
+
+    LambdaTestUtils.await(10000, 1000, () -> {
+
+      // Make sure that none of these pipelines use nodes outside of allowedDNs.
+      List<Pipeline> pipelines = scm.getPipelineManager()
+          .getPipelines(HddsProtos.ReplicationType.RATIS, factor);
+
+      for (Pipeline pipeline: pipelines) {
+        for(DatanodeDetails pipelineDN: pipeline.getNodes()) {
+          // Do not wait for this condition to be true. Unhealthy DNs should
+          // never be used.
+          if (!allowedDnIds.contains(pipelineDN.getUuidString())) {
+            String message = "---Allowed DNs: " + allowedDnIds.toString() +
+                "\nDN used: " + pipelineDN.getUuidString() + "\nIn pipeline: " + pipeline.getId().toString();
+            System.err.println(message);
+            Assert.fail();
+          }
+        }
+      }
+
+      System.err.println("--pipeline factor " + factor.toString() + " count " + pipelines.size());
+
+      // Wait for the expected number of pipelines using allowed DNs.
+      return countCheck.test(pipelines.size());
     });
   }
 
