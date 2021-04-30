@@ -313,7 +313,8 @@ public class TestKeyValueContainer {
   /**
    * Add some keys to the container.
    */
-  private void populate(long numberOfKeysToWrite, boolean writeChunks) throws IOException {
+  private void populate(long numberOfKeysToWrite, boolean writeChunks)
+      throws IOException {
     try (ReferenceCountedDB metadataStore =
         BlockUtils.getDB(keyValueContainer.getContainerData(), CONF)) {
       Table<String, BlockData> blockDataTable =
@@ -329,12 +330,14 @@ public class TestKeyValueContainer {
               .put(OzoneConsts.BLOCK_COUNT, numberOfKeysToWrite);
       if (writeChunks) {
         ChunkManager chunkManager;
-        BlockID blockID = ContainerTestHelper.getTestBlockID(keyValueContainer.getContainerData().getContainerID());
+        BlockID blockID = ContainerTestHelper.getTestBlockID(keyValueContainer
+            .getContainerData().getContainerID());
         BlockData kd = new BlockData(blockID);
         List<ContainerProtos.ChunkInfo> chunks = Lists.newArrayList();
         byte[] arr = randomAlphanumeric(1048576).getBytes(UTF_8);
         ChunkBuffer buffer = ChunkBuffer.wrap(ByteBuffer.wrap(arr));
-        if (keyValueContainer.getContainerData().getLayOutVersion() == FILE_PER_CHUNK) {
+        if (keyValueContainer.getContainerData().getLayOutVersion()
+            == FILE_PER_CHUNK) {
           chunkManager = new FilePerChunkStrategy(true, null);
           putChunksInBlock(1, 0, chunks, buffer, chunkManager,
               keyValueContainer, blockID);
@@ -354,8 +357,11 @@ public class TestKeyValueContainer {
   }
 
   private void putChunksInBlock(int numOfChunksPerBlock, int i,
-                                List<ContainerProtos.ChunkInfo> chunks, ChunkBuffer buffer,
-                                ChunkManager chunkManager, KeyValueContainer container, BlockID blockID) {
+                                List<ContainerProtos.ChunkInfo> chunks,
+                                ChunkBuffer buffer,
+                                ChunkManager chunkManager,
+                                KeyValueContainer container,
+                                BlockID blockID) {
     long chunkLength = 100;
     try {
       for (int k = 0; k < numOfChunksPerBlock; k++) {
