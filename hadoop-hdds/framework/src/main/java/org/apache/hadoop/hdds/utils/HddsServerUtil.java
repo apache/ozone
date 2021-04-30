@@ -249,7 +249,7 @@ public final class HddsServerUtil {
   }
 
   /**
-   * Get the max limit when get all available reports
+   * Get the max limit when get all available reports.
    * @param conf
    * @return max limit
    */
