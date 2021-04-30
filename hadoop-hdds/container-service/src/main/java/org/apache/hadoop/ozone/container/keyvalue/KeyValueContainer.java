@@ -484,7 +484,6 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
           (KeyValueContainerData) ContainerDataYaml
               .readContainer(descriptorContent);
 
-
       containerData.setState(originalContainerData.getState());
       containerData
           .setContainerDBType(originalContainerData.getContainerDBType());

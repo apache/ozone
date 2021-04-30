@@ -18,28 +18,40 @@
 
 package org.apache.hadoop.ozone.container.keyvalue;
 
+import com.google.common.collect.Lists;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers
     .StorageContainerException;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.DBProfile;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.common.Checksum;
+import org.apache.hadoop.ozone.common.ChunkBuffer;
+import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
+import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume
     .RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.apache.hadoop.ozone.container.keyvalue.impl.FilePerBlockStrategy;
+import org.apache.hadoop.ozone.container.keyvalue.impl.FilePerChunkStrategy;
+import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.apache.hadoop.ozone.container.metadata.AbstractDatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.DiskChecker;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
@@ -61,6 +73,9 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
+import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.List;
@@ -69,7 +84,11 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.commons.lang3.RandomStringUtils.randomAlphanumeric;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
+import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.FILE_PER_CHUNK;
+import static org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointTask.LOG;
 import static org.apache.ratis.util.Preconditions.assertTrue;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -101,6 +120,14 @@ public class TestKeyValueContainer {
   // This preserves the column family options in the container options
   // cache for testContainersShareColumnFamilyOptions.
   private static final OzoneConfiguration CONF = new OzoneConfiguration();
+
+  private static final DispatcherContext WRITE_STAGE =
+      new DispatcherContext.Builder()
+          .setStage(DispatcherContext.WriteChunkStage.WRITE_DATA).build();
+
+  private static final DispatcherContext COMMIT_STAGE =
+      new DispatcherContext.Builder()
+          .setStage(DispatcherContext.WriteChunkStage.COMMIT_DATA).build();
 
   public TestKeyValueContainer(ChunkLayOutVersion layout) {
     this.layout = layout;
@@ -149,16 +176,15 @@ public class TestKeyValueContainer {
   }
 
   @Test
-  public void testContainerImportExport() throws Exception {
+  public void testFillingKeyCountIfChunkfileMissing() throws Exception {
     long containerId = keyValueContainer.getContainerData().getContainerID();
     createContainer();
-    long numberOfKeysToWrite = 12;
+    long numberOfKeysToWrite = 0;
     closeContainer();
-    populate(numberOfKeysToWrite);
+    populate(numberOfKeysToWrite, false);
 
     //destination path
     File folderToExport = folder.newFile("exported.tar.gz");
-
     TarContainerPacker packer = new TarContainerPacker();
 
     //export the container
@@ -166,7 +192,47 @@ public class TestKeyValueContainer {
       keyValueContainer
           .exportContainerData(fos, packer);
     }
+    //delete the original one
+    keyValueContainer.delete();
 
+    //create a new one
+    KeyValueContainerData containerData =
+        new KeyValueContainerData(containerId,
+            keyValueContainerData.getLayOutVersion(),
+            keyValueContainerData.getMaxSize(), UUID.randomUUID().toString(),
+            datanodeId.toString());
+    KeyValueContainer container = new KeyValueContainer(containerData, CONF);
+
+    HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(volumeSet
+        .getVolumesList(), 1);
+    String hddsVolumeDir = containerVolume.getHddsRootDir().toString();
+
+    container.populatePathFields(scmId, containerVolume, hddsVolumeDir);
+    try (FileInputStream fis = new FileInputStream(folderToExport)) {
+      container.importContainerData(fis, packer);
+    }
+
+    assertEquals(numberOfKeysToWrite,
+        containerData.getKeyCount());
+  }
+
+  @Test
+  public void testContainerImportExport() throws Exception {
+    long containerId = keyValueContainer.getContainerData().getContainerID();
+    createContainer();
+    long numberOfKeysToWrite = 12;
+    closeContainer();
+    populate(numberOfKeysToWrite, true);
+
+    //destination path
+    File folderToExport = folder.newFile("exported.tar.gz");
+    TarContainerPacker packer = new TarContainerPacker();
+
+    //export the container
+    try (FileOutputStream fos = new FileOutputStream(folderToExport)) {
+      keyValueContainer
+          .exportContainerData(fos, packer);
+    }
     //delete the original one
     keyValueContainer.delete();
 
@@ -198,8 +264,6 @@ public class TestKeyValueContainer {
         containerData.getLayOutVersion());
     assertEquals(keyValueContainerData.getMaxSize(),
         containerData.getMaxSize());
-    assertEquals(keyValueContainerData.getBytesUsed(),
-        containerData.getBytesUsed());
 
     //Can't overwrite existing container
     try {
@@ -249,7 +313,7 @@ public class TestKeyValueContainer {
   /**
    * Add some keys to the container.
    */
-  private void populate(long numberOfKeysToWrite) throws IOException {
+  private void populate(long numberOfKeysToWrite, boolean writeChunks) throws IOException {
     try (ReferenceCountedDB metadataStore =
         BlockUtils.getDB(keyValueContainer.getContainerData(), CONF)) {
       Table<String, BlockData> blockDataTable =
@@ -263,11 +327,56 @@ public class TestKeyValueContainer {
       // As for test, we are doing manually so adding key count to DB.
       metadataStore.getStore().getMetadataTable()
               .put(OzoneConsts.BLOCK_COUNT, numberOfKeysToWrite);
+      if (writeChunks) {
+        ChunkManager chunkManager;
+        BlockID blockID = ContainerTestHelper.getTestBlockID(keyValueContainer.getContainerData().getContainerID());
+        BlockData kd = new BlockData(blockID);
+        List<ContainerProtos.ChunkInfo> chunks = Lists.newArrayList();
+        byte[] arr = randomAlphanumeric(1048576).getBytes(UTF_8);
+        ChunkBuffer buffer = ChunkBuffer.wrap(ByteBuffer.wrap(arr));
+        if (keyValueContainer.getContainerData().getLayOutVersion() == FILE_PER_CHUNK) {
+          chunkManager = new FilePerChunkStrategy(true, null);
+          putChunksInBlock(1, 0, chunks, buffer, chunkManager,
+              keyValueContainer, blockID);
+          kd.setChunks(chunks);
+        } else {
+          chunkManager = new FilePerBlockStrategy(true, null);
+          putChunksInBlock(1, 0, chunks, buffer, chunkManager,
+              keyValueContainer, blockID);
+          kd.setChunks(chunks);
+        }
+      }
     }
 
     Map<String, String> metadata = new HashMap<>();
     metadata.put("key1", "value1");
     keyValueContainer.update(metadata, true);
+  }
+
+  private void putChunksInBlock(int numOfChunksPerBlock, int i,
+                                List<ContainerProtos.ChunkInfo> chunks, ChunkBuffer buffer,
+                                ChunkManager chunkManager, KeyValueContainer container, BlockID blockID) {
+    long chunkLength = 100;
+    try {
+      for (int k = 0; k < numOfChunksPerBlock; k++) {
+        final String chunkName = String.format("block.%d.chunk.%d", i, k);
+        final long offset = 100;
+        ContainerProtos.ChunkInfo info =
+            ContainerProtos.ChunkInfo.newBuilder().setChunkName(chunkName)
+                .setLen(chunkLength).setOffset(offset)
+                .setChecksumData(Checksum.getNoChecksumDataProto()).build();
+        chunks.add(info);
+        ChunkInfo chunkInfo = new ChunkInfo(chunkName, offset, chunkLength);
+        ChunkBuffer chunkData = buffer.duplicate(0, (int) chunkLength);
+        chunkManager
+            .writeChunk(container, blockID, chunkInfo, chunkData, WRITE_STAGE);
+        chunkManager
+            .writeChunk(container, blockID, chunkInfo, chunkData, COMMIT_STAGE);
+      }
+    } catch (IOException ex) {
+      LOG.warn("Putting chunks in blocks was not successful for BlockID: "
+          + blockID);
+    }
   }
 
   /**
@@ -281,7 +390,7 @@ public class TestKeyValueContainer {
   @Test
   public void concurrentExport() throws Exception {
     createContainer();
-    populate(100);
+    populate(100, false);
     closeContainer();
 
     AtomicReference<String> failed = new AtomicReference<>();
