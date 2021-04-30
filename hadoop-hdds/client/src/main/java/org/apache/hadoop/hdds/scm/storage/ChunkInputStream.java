@@ -193,7 +193,7 @@ public class ChunkInputStream extends InputStream
   }
 
   @Override
-  public int read(ByteBuffer byteBuffer) throws IOException {
+  public synchronized int read(ByteBuffer byteBuffer) throws IOException {
     if (byteBuffer == null) {
       throw new NullPointerException();
     }

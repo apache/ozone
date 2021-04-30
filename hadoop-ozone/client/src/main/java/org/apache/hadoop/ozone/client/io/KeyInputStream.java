@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.client.io;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -28,6 +29,7 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import org.apache.hadoop.fs.ByteBufferReadable;
 import org.apache.hadoop.fs.CanUnbuffer;
 import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.fs.Seekable;
@@ -47,7 +49,7 @@ import org.slf4j.LoggerFactory;
  * Maintaining a list of BlockInputStream. Read based on offset.
  */
 public class KeyInputStream extends InputStream
-    implements Seekable, CanUnbuffer {
+    implements Seekable, CanUnbuffer, ByteBufferReadable {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(KeyInputStream.class);
@@ -260,6 +262,48 @@ public class KeyInputStream extends InputStream
     return totalReadLen;
   }
 
+  @Override
+  public synchronized int read(ByteBuffer byteBuffer) throws IOException {
+    checkOpen();
+    if (byteBuffer == null) {
+      throw new NullPointerException();
+    }
+    int buffLen = byteBuffer.remaining();
+    if (buffLen == 0) {
+      return 0;
+    }
+    int totalReadLen = 0;
+    while (buffLen > 0) {
+      // if we are at the last block and have read the entire block, return
+      if (blockStreams.size() == 0 ||
+          (blockStreams.size() - 1 <= blockIndex &&
+              blockStreams.get(blockIndex)
+                  .getRemaining() == 0)) {
+        return totalReadLen == 0 ? EOF : totalReadLen;
+      }
+
+      // Get the current blockStream and read data from it
+      BlockInputStream current = blockStreams.get(blockIndex);
+      int numBytesToRead = Math.min(buffLen, (int)current.getRemaining());
+      int numBytesRead = current.read(byteBuffer);
+      if (numBytesRead != numBytesToRead) {
+        // This implies that there is either data loss or corruption in the
+        // chunk entries. Even EOF in the current stream would be covered in
+        // this case.
+        throw new IOException(String.format("Inconsistent read for blockID=%s "
+                + "length=%d numBytesToRead=%d numBytesRead=%d",
+            current.getBlockID(), current.getLength(), numBytesToRead,
+            numBytesRead));
+      }
+      totalReadLen += numBytesRead;
+      buffLen -= numBytesRead;
+      if (current.getRemaining() <= 0 &&
+          ((blockIndex + 1) < blockStreams.size())) {
+        blockIndex += 1;
+      }
+    }
+    return totalReadLen;
+  }
   /**
    * Seeks the KeyInputStream to the specified position. This involves 2 steps:
    *    1. Updating the blockIndex to the blockStream corresponding to the

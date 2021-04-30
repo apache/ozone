@@ -511,7 +511,7 @@ public class BlockInputStream extends InputStream
   }
 
   @Override
-  public int read(ByteBuffer byteBuffer) throws IOException {
+  public synchronized int read(ByteBuffer byteBuffer) throws IOException {
     if (byteBuffer == null) {
       throw new NullPointerException();
     }
@@ -554,11 +554,11 @@ public class BlockInputStream extends InputStream
         } else {
           throw e;
         }
-      }
-
-      // restore buffer limit
-      if (numBytesToRead < bufferLen) {
-        byteBuffer.limit(bufferLimit);
+      } finally {
+        // restore buffer limit
+        if (numBytesToRead < bufferLen) {
+          byteBuffer.limit(bufferLimit);
+        }
       }
       if (numBytesRead != numBytesToRead) {
         // This implies that there is either data loss or corruption in the

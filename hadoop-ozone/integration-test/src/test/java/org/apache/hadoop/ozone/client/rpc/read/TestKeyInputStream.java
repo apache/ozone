@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.client.rpc.read;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 
 import java.util.List;
@@ -200,6 +201,8 @@ public class TestKeyInputStream extends TestInputStreamBase {
       for (int bufferSize : bufferSizeList) {
         assertReadFully(data, keyInputStream, bufferSize, 0);
         keyInputStream.seek(0);
+        assertReadFullyUseByteBuffer(data, keyInputStream, bufferSize, 0);
+        keyInputStream.seek(0);
       }
     }
   }
@@ -297,18 +300,26 @@ public class TestKeyInputStream extends TestInputStreamBase {
 
     // read chunk data
     try (KeyInputStream keyInputStream = getKeyInputStream(keyName)) {
-
       int b = keyInputStream.read();
       Assert.assertNotEquals(-1, b);
-
       if (doUnbuffer) {
         keyInputStream.unbuffer();
       }
-
       getCluster().shutdownHddsDatanode(pipelineNodes.get(0));
-
       // check that we can still read it
       assertReadFully(data, keyInputStream, dataLength - 1, 1);
+    }
+
+    // read chunk data with ByteBuffer
+    try (KeyInputStream keyInputStream = getKeyInputStream(keyName)) {
+      int b = keyInputStream.read();
+      Assert.assertNotEquals(-1, b);
+      if (doUnbuffer) {
+        keyInputStream.unbuffer();
+      }
+      getCluster().shutdownHddsDatanode(pipelineNodes.get(0));
+      // check that we can still read it
+      assertReadFullyUseByteBuffer(data, keyInputStream, dataLength - 1, 1);
     }
   }
 
@@ -348,6 +359,27 @@ public class TestKeyInputStream extends TestInputStreamBase {
           Arrays.copyOfRange(buffer, 0, numBytesRead);
       Assert.assertArrayEquals(tmp1, tmp2);
       totalRead += numBytesRead;
+    }
+    Assert.assertEquals(data.length, totalRead);
+  }
+
+  private void assertReadFullyUseByteBuffer(byte[] data, KeyInputStream in,
+      int bufferSize, int totalRead) throws IOException {
+
+    ByteBuffer buffer = ByteBuffer.allocateDirect(bufferSize);
+    while (totalRead < data.length) {
+      int numBytesRead = in.read(buffer);
+      if (numBytesRead == -1 || numBytesRead == 0) {
+        break;
+      }
+      byte[] tmp1 =
+          Arrays.copyOfRange(data, totalRead, totalRead + numBytesRead);
+      byte[] tmp2 = new byte[numBytesRead];
+      buffer.flip();
+      buffer.get(tmp2, 0, numBytesRead);
+      Assert.assertArrayEquals(tmp1, tmp2);
+      totalRead += numBytesRead;
+      buffer.clear();
     }
     Assert.assertEquals(data.length, totalRead);
   }
