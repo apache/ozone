@@ -240,27 +240,36 @@ public class TestSCMNodeManager {
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
       // Register 2 nodes correctly.
       // These will be used with a faulty node to test pipeline creation.
-      TestUtils.createRandomDatanodeAndRegister(nodeManager);
-      TestUtils.createRandomDatanodeAndRegister(nodeManager);
+      DatanodeDetails goodNode1 =
+          TestUtils.createRandomDatanodeAndRegister(nodeManager);
+      DatanodeDetails goodNode2 =
+          TestUtils.createRandomDatanodeAndRegister(nodeManager);
 
       scm.exitSafeMode();
 
-      assertPipelineClosedAfterLayoutHeartbeat(nodeManager,
-          SMALLER_MLV_LAYOUT_PROTO);
-      assertPipelineClosedAfterLayoutHeartbeat(nodeManager,
-          LARGER_MLV_SLV_LAYOUT_PROTO);
-      assertPipelineClosedAfterLayoutHeartbeat(nodeManager,
-          SMALLER_MLV_SLV_LAYOUT_PROTO);
-      assertPipelineClosedAfterLayoutHeartbeat(nodeManager,
-          LARGER_SLV_LAYOUT_PROTO);
+      assertPipelineClosedAfterLayoutHeartbeat(goodNode1, goodNode2,
+          nodeManager, SMALLER_MLV_LAYOUT_PROTO);
+      assertPipelineClosedAfterLayoutHeartbeat(goodNode1, goodNode2,
+          nodeManager, LARGER_MLV_SLV_LAYOUT_PROTO);
+      assertPipelineClosedAfterLayoutHeartbeat(goodNode1, goodNode2,
+          nodeManager, SMALLER_MLV_SLV_LAYOUT_PROTO);
+      assertPipelineClosedAfterLayoutHeartbeat(goodNode1, goodNode2,
+          nodeManager, LARGER_SLV_LAYOUT_PROTO);
     }
   }
 
   private void assertPipelineClosedAfterLayoutHeartbeat(
+      DatanodeDetails originalNode1, DatanodeDetails originalNode2,
       SCMNodeManager nodeManager, LayoutVersionProto layout) throws Exception {
 
+    List<DatanodeDetails>  originalNodes =
+        Arrays.asList(originalNode1, originalNode2);
+
     // Initial condition: 2 healthy nodes registered.
-    //assertPipelineCounts(oneCount -> oneCount == 2, threeCount -> threeCount == 0);
+    assertPipelines(HddsProtos.ReplicationFactor.ONE, count -> count == 2,
+        originalNodes);
+    assertPipelines(HddsProtos.ReplicationFactor.THREE,
+        count -> count == 0, new ArrayList<>());
 
     // Even when safemode exit or new node addition trigger pipeline
     // creation, they will fail with not enough healthy nodes for ratis 3
@@ -272,15 +281,24 @@ public class TestSCMNodeManager {
     DatanodeDetails node = TestUtils
         .createRandomDatanodeAndRegister(nodeManager);
 
+    List<DatanodeDetails> allNodes = new ArrayList<>(originalNodes);
+    allNodes.add(node);
+
     // Safemode exit and adding the new node should trigger pipeline creation.
-    //assertPipelineCounts(oneCount -> oneCount == 3, threeCount -> threeCount >= 1);
+    assertPipelines(HddsProtos.ReplicationFactor.ONE, count -> count == 3,
+        allNodes);
+    assertPipelines(HddsProtos.ReplicationFactor.THREE, count -> count >= 1,
+        allNodes);
 
     // node sends incorrect layout.
     nodeManager.processHeartbeat(node, layout);
 
     // Its pipelines should be closed then removed, meaning there is not
     // enough nodes for factor 3 pipelines.
-    //assertPipelineCounts(oneCount -> oneCount == 2, threeCount -> threeCount == 0);
+    assertPipelines(HddsProtos.ReplicationFactor.ONE, count -> count == 2,
+        originalNodes);
+    assertPipelines(HddsProtos.ReplicationFactor.THREE,
+        count -> count == 0, new ArrayList<>());
 
     assertPipelineCreationFailsWithNotEnoughNodes(2);
   }
@@ -328,7 +346,7 @@ public class TestSCMNodeManager {
       // Still should not have enough healthy nodes for ratis 3 pipeline.
       assertPipelines(HddsProtos.ReplicationFactor.ONE,
           count -> count == 1,
-          Arrays.asList(goodNode));
+          Collections.singletonList(goodNode));
       assertPipelines(HddsProtos.ReplicationFactor.THREE,
           count -> count == 0,
           new ArrayList<>());
@@ -378,11 +396,12 @@ public class TestSCMNodeManager {
   }
 
   private void assertPipelines(HddsProtos.ReplicationFactor factor,
-                               Predicate<Integer> countCheck,
-                               Collection<DatanodeDetails> allowedDNs) throws Exception {
+      Predicate<Integer> countCheck, Collection<DatanodeDetails> allowedDNs)
+      throws Exception {
 
-    Set<String> allowedDnIds =
-        allowedDNs.stream().map(DatanodeDetails::getUuidString).collect(Collectors.toSet());
+    Set<String> allowedDnIds = allowedDNs.stream()
+        .map(DatanodeDetails::getUuidString)
+        .collect(Collectors.toSet());
 
     LambdaTestUtils.await(10000, 1000, () -> {
 
@@ -395,15 +414,15 @@ public class TestSCMNodeManager {
           // Do not wait for this condition to be true. Unhealthy DNs should
           // never be used.
           if (!allowedDnIds.contains(pipelineDN.getUuidString())) {
-            String message = "---Allowed DNs: " + allowedDnIds.toString() +
-                "\nDN used: " + pipelineDN.getUuidString() + "\nIn pipeline: " + pipeline.getId().toString();
-            System.err.println(message);
-            Assert.fail();
+            String message = String.format("Pipeline %s used datanode %s " +
+                "which is not in the set of allowed datanodes: %s",
+                pipeline.getId().toString(), pipelineDN.getUuidString(),
+                allowedDnIds.toString());
+
+            Assert.fail(message);
           }
         }
       }
-
-      System.err.println("--pipeline factor " + factor.toString() + " count " + pipelines.size());
 
       // Wait for the expected number of pipelines using allowed DNs.
       return countCheck.test(pipelines.size());
