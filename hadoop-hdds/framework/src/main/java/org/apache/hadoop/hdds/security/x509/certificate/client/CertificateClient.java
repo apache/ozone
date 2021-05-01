@@ -281,7 +281,7 @@ public interface CertificateClient {
    */
   long getLatestCrlId() throws IOException;
 
-  default void assertKeyPair() throws OzoneSecurityException {
+  default void assertValidKeysAndCertificate() throws OzoneSecurityException {
     try {
       Objects.requireNonNull(getPublicKey());
       Objects.requireNonNull(getPrivateKey());

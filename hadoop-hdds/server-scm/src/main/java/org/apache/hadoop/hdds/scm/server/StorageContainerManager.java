@@ -1677,7 +1677,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
   private void startSecretManager() {
     try {
-      scmCertificateClient.assertKeyPair();
+      scmCertificateClient.assertValidKeysAndCertificate();
     } catch (OzoneSecurityException e) {
       LOG.error("Unable to read key pair.", e);
       throw new UncheckedIOException(e);

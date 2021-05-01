@@ -746,7 +746,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @VisibleForTesting
   public void startSecretManager() {
     try {
-      certClient.assertKeyPair();
+      certClient.assertValidKeysAndCertificate();
     } catch (OzoneSecurityException e) {
       LOG.error("Unable to read key pair for OM.", e);
       throw new UncheckedIOException(e);
