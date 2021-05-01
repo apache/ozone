@@ -425,13 +425,10 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
 
   private void validateToken(
       ContainerCommandRequestProto msg) throws IOException {
-
-    if (tokenVerifier != null) {
-      tokenVerifier.verify(
-          msg, UserGroupInformation.getCurrentUser().getShortUserName(),
-          msg.getEncodedToken()
-      );
-    }
+    tokenVerifier.verify(
+        msg, UserGroupInformation.getCurrentUser().getShortUserName(),
+        msg.getEncodedToken()
+    );
   }
 
   /**
