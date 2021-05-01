@@ -652,7 +652,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         scmCertificateClient != null ?
             scmCertificateClient.getCACertificate() : null, this);
 
-    if (securityConfig.isBlockTokenEnabled()) {
+    if (securityConfig.isContainerTokenEnabled()) {
       containerTokenMgr = createContainerTokenSecretManager(configuration);
     }
   }
@@ -1665,7 +1665,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
   private void startSecretManagerIfNecessary() {
     boolean shouldRun = securityConfig.isSecurityEnabled()
-        && securityConfig.isBlockTokenEnabled()
+        && securityConfig.isContainerTokenEnabled()
         && containerTokenMgr != null;
     if (shouldRun) {
       boolean running = containerTokenMgr.isRunning();

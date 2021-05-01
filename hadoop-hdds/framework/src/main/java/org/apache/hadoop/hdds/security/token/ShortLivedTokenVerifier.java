@@ -70,10 +70,6 @@ public abstract class
   public void verify(String user, Token<?> token,
       ContainerCommandRequestProto cmd) throws SCMSecurityException {
 
-    if (!conf.isBlockTokenEnabled()) {
-      return;
-    }
-
     if (!isTokenRequired(cmd.getCmdType())) {
       return;
     }
@@ -130,6 +126,9 @@ public abstract class
     }
 
     verify(tokenId, cmd);
+  }
 
+  protected SecurityConfig getConf() {
+    return conf;
   }
 }

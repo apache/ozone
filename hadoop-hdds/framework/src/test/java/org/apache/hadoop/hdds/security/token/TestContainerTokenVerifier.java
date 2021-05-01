@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.security.token;
 
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -39,6 +40,11 @@ public class TestContainerTokenVerifier
     extends TokenVerifierTests<ContainerTokenIdentifier> {
 
   private static final AtomicLong CONTAINER_ID = new AtomicLong();
+
+  @Override
+  protected String tokenEnabledConfigKey() {
+    return HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED;
+  }
 
   @Override
   protected TokenVerifier newTestSubject(SecurityConfig secConf,

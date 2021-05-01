@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.security.token;
 
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto;
@@ -37,6 +38,11 @@ import static org.apache.hadoop.ozone.container.ContainerTestHelper.getWriteChun
  */
 public class TestBlockTokenVerifier
     extends TokenVerifierTests<OzoneBlockTokenIdentifier> {
+
+  @Override
+  protected String tokenEnabledConfigKey() {
+    return HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
+  }
 
   @Override
   protected TokenVerifier newTestSubject(SecurityConfig secConf,

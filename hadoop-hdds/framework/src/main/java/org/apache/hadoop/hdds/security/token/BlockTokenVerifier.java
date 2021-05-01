@@ -58,7 +58,8 @@ public class BlockTokenVerifier extends
 
   @Override
   protected boolean isTokenRequired(ContainerProtos.Type cmdType) {
-    return HddsUtils.requireBlockToken(cmdType);
+    return getConf().isBlockTokenEnabled() &&
+        HddsUtils.requireBlockToken(cmdType);
   }
 
   @Override

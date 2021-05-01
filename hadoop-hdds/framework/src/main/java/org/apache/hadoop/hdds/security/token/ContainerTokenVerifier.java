@@ -35,7 +35,8 @@ public class ContainerTokenVerifier extends
 
   @Override
   protected boolean isTokenRequired(ContainerProtos.Type cmdType) {
-    return HddsUtils.requireContainerToken(cmdType);
+    return getConf().isContainerTokenEnabled() &&
+        HddsUtils.requireContainerToken(cmdType);
   }
 
   @Override

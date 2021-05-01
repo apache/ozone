@@ -17,10 +17,8 @@
  */
 package org.apache.hadoop.hdds.security.token;
 
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
-import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.security.token.Token;
@@ -62,6 +60,11 @@ public abstract class TokenVerifierTests<T extends ShortLivedTokenIdentifier> {
       SecurityConfig secConf, CertificateClient caClient);
 
   /**
+   * @return the config key to enable/disable the specific kind of tokens
+   */
+  protected abstract String tokenEnabledConfigKey();
+
+  /**
    * Create a request for which the verifier being tested does not require
    * tokens (eg. reading blocks does not require container token and vice versa)
    */
@@ -77,13 +80,13 @@ public abstract class TokenVerifierTests<T extends ShortLivedTokenIdentifier> {
   protected abstract T newTokenId();
 
   @Test
-  public void skipsVerificationIfDisabled() throws SCMSecurityException {
+  public void skipsVerificationIfDisabled() throws IOException {
     // GIVEN
     CertificateClient caClient = mock(CertificateClient.class);
     TokenVerifier subject = newTestSubject(tokenDisabled(), caClient);
 
     // WHEN
-    subject.verify("anyUser", null, null);
+    subject.verify("anyUser", anyToken(), verifiedRequest(newTokenId()));
 
     // THEN
     verify(caClient, never()).getCertificate(any());
@@ -94,10 +97,9 @@ public abstract class TokenVerifierTests<T extends ShortLivedTokenIdentifier> {
     // GIVEN
     CertificateClient caClient = mock(CertificateClient.class);
     TokenVerifier subject = newTestSubject(tokenEnabled(), caClient);
-    ContainerCommandRequestProto cmd = unverifiedRequest();
 
     // WHEN
-    subject.verify("anyUser", null, cmd);
+    subject.verify("anyUser", anyToken(), unverifiedRequest());
 
     // THEN
     verify(caClient, never()).getCertificate(any());
@@ -124,7 +126,7 @@ public abstract class TokenVerifierTests<T extends ShortLivedTokenIdentifier> {
 
     // WHEN+THEN
     assertThrows(BlockTokenException.class, () ->
-        subject.verify("anyUser", new Token<>(), cmd));
+        subject.verify("anyUser", anyToken(), cmd));
   }
 
   @Test
@@ -132,13 +134,14 @@ public abstract class TokenVerifierTests<T extends ShortLivedTokenIdentifier> {
     // GIVEN
     CertificateClient caClient = mock(CertificateClient.class);
     when(caClient.getCertificate(CERT_ID)).thenReturn(validCertificate());
+    Token<?> invalidToken = new Token<>();
     validSignature(caClient, false);
     ContainerCommandRequestProto cmd = verifiedRequest(newTokenId());
     TokenVerifier subject = newTestSubject(tokenEnabled(), caClient);
 
     // WHEN+THEN
     assertThrows(BlockTokenException.class, () ->
-        subject.verify("anyUser", new Token<>(), cmd));
+        subject.verify("anyUser", invalidToken, cmd));
   }
 
   @Test
@@ -204,16 +207,22 @@ public abstract class TokenVerifierTests<T extends ShortLivedTokenIdentifier> {
     return mock(X509Certificate.class);
   }
 
-  protected static SecurityConfig tokenDisabled() {
+  protected SecurityConfig tokenDisabled() {
+    return getSecurityConfig(false);
+  }
+
+  protected SecurityConfig tokenEnabled() {
+    return getSecurityConfig(true);
+  }
+
+  private SecurityConfig getSecurityConfig(boolean tokenEnabled) {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean(HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED, false);
+    conf.setBoolean(tokenEnabledConfigKey(), tokenEnabled);
     return new SecurityConfig(conf);
   }
 
-  protected static SecurityConfig tokenEnabled() {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean(HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED, true);
-    return new SecurityConfig(conf);
+  private static Token<?> anyToken() {
+    return new Token<>();
   }
 
   /**

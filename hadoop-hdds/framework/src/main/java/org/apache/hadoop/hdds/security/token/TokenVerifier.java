@@ -74,7 +74,7 @@ public interface TokenVerifier {
   static TokenVerifier create(SecurityConfig conf,
       CertificateClient certClient) {
 
-    if (!conf.isBlockTokenEnabled()) {
+    if (!conf.isBlockTokenEnabled() && !conf.isContainerTokenEnabled()) {
       return new NoopTokenVerifier();
     }
 

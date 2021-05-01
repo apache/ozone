@@ -132,6 +132,7 @@ public class TestSecureOzoneContainer {
         "blockTokenExpired: {}.", requireToken, hasToken,
         tokenExpired);
     conf.setBoolean(HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED, requireToken);
+    conf.setBoolean(HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED, requireToken);
 
     ContainerID containerID = ContainerID.valueOf(getTestContainerID());
     OzoneContainer container = null;
