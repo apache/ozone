@@ -3620,8 +3620,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
-  public Collection<String> getOzoneAdmins() {
-    return omAdminUsernames;
+  public boolean isAdmin(String username) {
+    if (isAclEnabled) {
+      return omAdminUsernames.contains(OZONE_ADMINISTRATORS_WILDCARD)
+          || omAdminUsernames.contains(username);
+    } else {
+      return true;
+    }
   }
 
   /**

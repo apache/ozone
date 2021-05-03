@@ -68,8 +68,7 @@ public class OMFinalizeUpgradeRequest extends OMClientRequest {
 
     try {
       String username = getOmRequest().getUserInfo().getUserName();
-      Collection<String> admins = ozoneManager.getOzoneAdmins();
-      if (ozoneManager.getAclsEnabled() && !admins.contains(username)) {
+      if (!ozoneManager.isAdmin(username)) {
         throw new OMException("Access denied for user " + username + ". " +
             "Superuser privilege is required to finalize upgrade.",
             OMException.ResultCodes.ACCESS_DENIED);
