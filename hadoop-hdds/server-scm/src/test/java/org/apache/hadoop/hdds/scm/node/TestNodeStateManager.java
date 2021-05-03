@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.scm.node.states.NodeAlreadyExistsException;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.server.events.Event;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.util.Time;
 import org.junit.After;
@@ -95,11 +96,11 @@ public class TestNodeStateManager {
       throws NodeAlreadyExistsException, NodeNotFoundException {
     // Create a datanode, then add and retrieve it
     DatanodeDetails dn = generateDatanode();
-    nsm.addNode(dn, null);
+    nsm.addNode(dn, UpgradeUtils.defaultLayoutVersionProto());
     assertEquals(dn.getUuid(), nsm.getNode(dn).getUuid());
     // Now get the status of the newly added node and it should be
     // IN_SERVICE and HEALTHY
-    NodeStatus expectedState = NodeStatus.inServiceHealthyReadOnly();
+    NodeStatus expectedState = NodeStatus.inServiceHealthy();
     assertEquals(expectedState, nsm.getNodeStatus(dn));
   }
 
@@ -107,9 +108,9 @@ public class TestNodeStateManager {
   public void testGetAllNodesReturnsCorrectly()
       throws NodeAlreadyExistsException {
     DatanodeDetails dn = generateDatanode();
-    nsm.addNode(dn, null);
+    nsm.addNode(dn, UpgradeUtils.defaultLayoutVersionProto());
     dn = generateDatanode();
-    nsm.addNode(dn, null);
+    nsm.addNode(dn, UpgradeUtils.defaultLayoutVersionProto());
     assertEquals(2, nsm.getAllNodes().size());
     assertEquals(2, nsm.getTotalNodeCount());
   }
@@ -118,17 +119,17 @@ public class TestNodeStateManager {
   public void testGetNodeCountReturnsCorrectly()
       throws NodeAlreadyExistsException {
     DatanodeDetails dn = generateDatanode();
-    nsm.addNode(dn, null);
-    assertEquals(1, nsm.getNodes(NodeStatus.inServiceHealthyReadOnly()).size());
+    nsm.addNode(dn, UpgradeUtils.defaultLayoutVersionProto());
+    assertEquals(1, nsm.getNodes(NodeStatus.inServiceHealthy()).size());
     assertEquals(0, nsm.getNodes(NodeStatus.inServiceStale()).size());
   }
 
   @Test
   public void testGetNodeCount() throws NodeAlreadyExistsException {
     DatanodeDetails dn = generateDatanode();
-    nsm.addNode(dn, null);
+    nsm.addNode(dn, UpgradeUtils.defaultLayoutVersionProto());
     assertEquals(1, nsm.getNodeCount(
-        NodeStatus.inServiceHealthyReadOnly()));
+        NodeStatus.inServiceHealthy()));
     assertEquals(0, nsm.getNodeCount(NodeStatus.inServiceStale()));
   }
 
@@ -221,7 +222,7 @@ public class TestNodeStateManager {
   public void testNodeOpStateCanBeSet()
       throws NodeAlreadyExistsException, NodeNotFoundException {
     DatanodeDetails dn = generateDatanode();
-    nsm.addNode(dn, null);
+    nsm.addNode(dn, UpgradeUtils.defaultLayoutVersionProto());
 
     nsm.setNodeOperationalState(dn,
         HddsProtos.NodeOperationalState.DECOMMISSIONED);
@@ -229,25 +230,24 @@ public class TestNodeStateManager {
     NodeStatus newStatus = nsm.getNodeStatus(dn);
     assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONED,
         newStatus.getOperationalState());
-    assertEquals(NodeState.HEALTHY_READONLY,
-        newStatus.getHealth());
+    assertEquals(NodeState.HEALTHY, newStatus.getHealth());
   }
 
   @Test
   public void testHealthEventsFiredWhenOpStateChanged()
       throws NodeAlreadyExistsException, NodeNotFoundException {
     DatanodeDetails dn = generateDatanode();
-    nsm.addNode(dn, null);
+    nsm.addNode(dn, UpgradeUtils.defaultLayoutVersionProto());
 
     // First set the node to decommissioned, then run through all op states in
-    // order and ensure the non_healthy_to_healthy event gets fired
+    // order and ensure the healthy_to_healthy_readonly event gets fired
     nsm.setNodeOperationalState(dn,
         HddsProtos.NodeOperationalState.DECOMMISSIONED);
     for (HddsProtos.NodeOperationalState s :
         HddsProtos.NodeOperationalState.values()) {
       eventPublisher.clearEvents();
       nsm.setNodeOperationalState(dn, s);
-      assertEquals(SCMEvents.HEALTHY_READONLY_NODE,
+      assertEquals(SCMEvents.HEALTHY_READONLY_TO_HEALTHY_NODE,
           eventPublisher.getLastEvent());
     }
 
