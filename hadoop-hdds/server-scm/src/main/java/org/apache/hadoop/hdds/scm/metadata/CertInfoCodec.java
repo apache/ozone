@@ -20,39 +20,39 @@ package org.apache.hadoop.hdds.scm.metadata;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
+import org.apache.hadoop.hdds.security.x509.certificate.CertInfo;
 import org.apache.hadoop.hdds.utils.db.Codec;
 
 import java.io.IOException;
-import java.security.cert.CRLException;
 import java.security.cert.CertificateException;
 
 /**
- * Codec to serialize / deserialize CRLInfo.
+ * Codec to serialize / deserialize CertInfo.
  */
-public class CRLInfoCodec implements Codec<CRLInfo> {
+public class CertInfoCodec implements Codec<CertInfo> {
+
 
   @Override
-  public byte[] toPersistedFormat(CRLInfo crlInfo) throws IOException {
-    return crlInfo.getProtobuf().toByteArray();
+  public byte[] toPersistedFormat(CertInfo certInfo) throws IOException {
+    return certInfo.getProtobuf().toByteArray();
   }
 
   @Override
-  public CRLInfo fromPersistedFormat(byte[] rawData) throws IOException {
+  public CertInfo fromPersistedFormat(byte[] rawData) throws IOException {
 
     Preconditions.checkNotNull(rawData,
         "Null byte array can't be converted to real object.");
     try {
-      return CRLInfo.fromProtobuf(
-          HddsProtos.CRLInfoProto.PARSER.parseFrom(rawData));
-    } catch (CertificateException|CRLException e) {
+      return CertInfo.fromProtobuf(
+          HddsProtos.CertInfoProto.PARSER.parseFrom(rawData));
+    } catch (CertificateException e) {
       throw new IllegalArgumentException(
           "Can't encode the the raw data from the byte array", e);
     }
   }
 
   @Override
-  public CRLInfo copyObject(CRLInfo object) {
+  public CertInfo copyObject(CertInfo object) {
     throw new UnsupportedOperationException();
   }
 }

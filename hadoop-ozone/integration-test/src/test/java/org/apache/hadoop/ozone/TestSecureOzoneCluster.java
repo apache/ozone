@@ -341,7 +341,7 @@ public final class TestSecureOzoneCluster {
     SCMStorageConfig scmStore = new SCMStorageConfig(conf);
     scmStore.setClusterId(clusterId);
     scmStore.setScmId(scmId);
-    HASecurityUtils.initializeSecurity(scmStore, scmId, conf,
+    HASecurityUtils.initializeSecurity(scmStore, conf,
         NetUtils.createSocketAddr(InetAddress.getLocalHost().getHostName(),
             OZONE_SCM_CLIENT_PORT_DEFAULT), true);
     scmStore.setPrimaryScmNodeId(scmId);
@@ -571,7 +571,6 @@ public final class TestSecureOzoneCluster {
   private void setupOm(OzoneConfiguration config) throws Exception {
     OMStorage omStore = new OMStorage(config);
     omStore.setClusterId("testClusterId");
-    omStore.setScmId("testScmId");
     omStore.setOmCertSerialId(OM_CERT_SERIAL_ID);
     // writes the version file properties
     omStore.initialize();
@@ -772,11 +771,10 @@ public final class TestSecureOzoneCluster {
       return;
     }
     omStorage.setClusterId(clusterId);
-    omStorage.setScmId(scmId);
     omStorage.setOmId(omId);
     // Initialize ozone certificate client if security is enabled.
     if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
-      OzoneManager.initializeSecurity(conf, omStorage);
+      OzoneManager.initializeSecurity(conf, omStorage, scmId);
     }
     omStorage.initialize();
   }

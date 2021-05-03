@@ -23,9 +23,11 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
@@ -166,8 +168,8 @@ public class TestOneReplicaPipelineSafeModeRule {
             LoggerFactory.getLogger(SCMSafeModeManager.class));
 
     List<Pipeline> pipelines =
-        pipelineManager.getPipelines(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.ONE);
+        pipelineManager.getPipelines(new RatisReplicationConfig(
+            ReplicationFactor.ONE));
     firePipelineEvent(pipelines);
     GenericTestUtils.waitFor(() -> logCapturer.getOutput().contains(
         "reported count is 0"), 1000, 5000);
@@ -176,8 +178,9 @@ public class TestOneReplicaPipelineSafeModeRule {
     Assert.assertFalse(rule.validate());
 
     pipelines =
-        pipelineManager.getPipelines(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE);
+        pipelineManager.getPipelines(
+            new RatisReplicationConfig(ReplicationFactor.THREE));
+
     firePipelineEvent(pipelines.subList(0, pipelineCountThree -1));
 
     GenericTestUtils.waitFor(() -> logCapturer.getOutput().contains(
@@ -194,7 +197,7 @@ public class TestOneReplicaPipelineSafeModeRule {
       HddsProtos.ReplicationFactor factor) throws Exception {
     for (int i = 0; i < count; i++) {
       Pipeline pipeline = pipelineManager.createPipeline(
-              HddsProtos.ReplicationType.RATIS, factor);
+              new RatisReplicationConfig(factor));
       pipelineManager.openPipeline(pipeline.getId());
 
     }

@@ -68,6 +68,7 @@ import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslator
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
+import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
@@ -163,7 +164,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
-import org.apache.hadoop.ozone.util.ExitManager;
+import org.apache.hadoop.hdds.ExitManager;
 import org.apache.hadoop.ozone.util.OzoneVersionInfo;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -191,11 +192,11 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERV
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT;
-import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForBlockClients;
 import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForClients;
 import static org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest.getEncodedString;
 import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
+import static org.apache.hadoop.hdds.utils.HAUtils.getScmInfo;
 import static org.apache.hadoop.ozone.OmUtils.MAX_TRXN_ID;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_ENABLED_DEFAULT;
@@ -420,9 +421,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // For testing purpose only, not hit scm from om as Hadoop UGI can't login
     // two principals in the same JVM.
     if (!testSecureOmFlag) {
-      ScmInfo scmInfo = HAUtils.getScmInfo(configuration);
-      if (!(scmInfo.getClusterId().equals(omStorage.getClusterID()) && scmInfo
-          .getScmId().equals(omStorage.getScmId()))) {
+      ScmInfo scmInfo = getScmInfo(configuration);
+      if (!scmInfo.getClusterId().equals(omStorage.getClusterID())) {
         logVersionMismatch(conf, scmInfo);
         throw new OMException("SCM version info mismatch.",
             ResultCodes.SCM_VERSION_MISMATCH_ERROR);
@@ -512,17 +512,21 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   private void logVersionMismatch(OzoneConfiguration conf, ScmInfo scmInfo) {
-    InetSocketAddress scmBlockAddress =
-        getScmAddressForBlockClients(conf);
+    List<SCMNodeInfo> scmNodeInfoList = SCMNodeInfo.buildNodeInfo(conf);
+    StringBuilder scmBlockAddressBuilder = new StringBuilder("");
+    for (SCMNodeInfo scmNodeInfo : scmNodeInfoList) {
+      scmBlockAddressBuilder.append(scmNodeInfo.getBlockClientAddress())
+          .append(",");
+    }
+    String scmBlockAddress = scmBlockAddressBuilder.toString();
+    if (!StringUtils.isBlank(scmBlockAddress)) {
+      scmBlockAddress = scmBlockAddress.substring(0,
+          scmBlockAddress.lastIndexOf(","));
+    }
     if (!scmInfo.getClusterId().equals(omStorage.getClusterID())) {
       LOG.error("clusterId from {} is {}, but is {} in {}",
           scmBlockAddress, scmInfo.getClusterId(),
           omStorage.getClusterID(), omStorage.getVersionFile());
-    }
-    if (!scmInfo.getScmId().equals(omStorage.getScmId())) {
-      LOG.error("scmId from {} is {}, but is {} in {}",
-          scmBlockAddress, scmInfo.getScmId(),
-          omStorage.getScmId(), omStorage.getVersionFile());
     }
   }
 
@@ -971,7 +975,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     StorageState state = omStorage.getState();
     if (state != StorageState.INITIALIZED) {
       try {
-        ScmInfo scmInfo = HAUtils.getScmInfo(conf);
+        ScmInfo scmInfo = getScmInfo(conf);
         String clusterId = scmInfo.getClusterId();
         String scmId = scmInfo.getScmId();
         if (clusterId == null || clusterId.isEmpty()) {
@@ -981,9 +985,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           throw new IOException("Invalid SCM ID");
         }
         omStorage.setClusterId(clusterId);
-        omStorage.setScmId(scmId);
         if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
-          initializeSecurity(conf, omStorage);
+          initializeSecurity(conf, omStorage, scmId);
         }
         omStorage.initialize();
         System.out.println(
@@ -1000,8 +1003,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     } else {
       if (OzoneSecurityUtil.isSecurityEnabled(conf) &&
           omStorage.getOmCertSerialId() == null) {
+        ScmInfo scmInfo = HAUtils.getScmInfo(conf);
+        String scmId = scmInfo.getScmId();
+        if (scmId == null || scmId.isEmpty()) {
+          throw new IOException("Invalid SCM ID");
+        }
         LOG.info("OM storage is already initialized. Initializing security");
-        initializeSecurity(conf, omStorage);
+        initializeSecurity(conf, omStorage, scmId);
         omStorage.persistCurrentState();
       }
       System.out.println(
@@ -1018,7 +1026,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   @VisibleForTesting
   public static void initializeSecurity(OzoneConfiguration conf,
-      OMStorage omStore)
+      OMStorage omStore, String scmId)
       throws IOException {
     LOG.info("Initializing secure OzoneManager.");
 
@@ -1032,7 +1040,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       LOG.info("Initialization successful.");
       break;
     case GETCERT:
-      getSCMSignedCert(certClient, conf, omStore);
+      getSCMSignedCert(certClient, conf, omStore, scmId);
       LOG.info("Successfully stored SCM signed certificate.");
       break;
     case FAILURE:
@@ -1066,11 +1074,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @VisibleForTesting
   public KeyManager getKeyManager() {
     return keyManager;
-  }
-
-  @VisibleForTesting
-  public ScmInfo getScmInfo() throws IOException {
-    return scmBlockClient.getScmInfo();
   }
 
   @VisibleForTesting
@@ -1460,7 +1463,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * Get SCM signed certificate and store it using certificate client.
    */
   private static void getSCMSignedCert(CertificateClient client,
-      OzoneConfiguration config, OMStorage omStore) throws IOException {
+      OzoneConfiguration config, OMStorage omStore, String scmId)
+      throws IOException {
     CertificateSignRequest.Builder builder = client.getCSRBuilder();
     KeyPair keyPair = new KeyPair(client.getPublicKey(),
         client.getPrivateKey());
@@ -1488,7 +1492,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     builder.setCA(false)
         .setKey(keyPair)
         .setConfiguration(config)
-        .setScmID(omStore.getScmId())
+        .setScmID(scmId)
         .setClusterID(omStore.getClusterID())
         .setSubject(subject);
 
@@ -1500,8 +1504,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     LOG.info("Creating csr for OM->dns:{},ip:{},scmId:{},clusterId:{}," +
-            "subject:{}", hostname, ip,
-        omStore.getScmId(), omStore.getClusterID(), subject);
+            "subject:{}", hostname, ip, scmId, omStore.getClusterID(), subject);
 
     HddsProtos.OzoneManagerDetailsProto.Builder omDetailsProtoBuilder =
         HddsProtos.OzoneManagerDetailsProto.newBuilder()
@@ -1518,7 +1521,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         omDetailsProtoBuilder.build();
     LOG.info("OzoneManager ports added:{}", omDetailsProto.getPortsList());
     SCMSecurityProtocolClientSideTranslatorPB secureScmClient =
-        HddsServerUtil.getScmSecurityClient(config);
+        HddsServerUtil.getScmSecurityClientWithFixedDuration(config);
 
     SCMGetCertResponseProto response = secureScmClient.
         getOMCertChain(omDetailsProto, getEncodedString(csr));
@@ -2714,17 +2717,21 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     services.add(omServiceInfoBuilder.build());
 
     // For client we have to return SCM with container protocol port,
-    // not block protocol.
-    InetSocketAddress scmAddr = getScmAddressForClients(
+    // not block protocol. This is information is being not used by
+    // RpcClient, but for compatibility leaving as it is and also making sure
+    // that this works for SCM HA.
+    Collection<InetSocketAddress> scmAddresses = getScmAddressForClients(
         configuration);
-    ServiceInfo.Builder scmServiceInfoBuilder = ServiceInfo.newBuilder()
-        .setNodeType(HddsProtos.NodeType.SCM)
-        .setHostname(scmAddr.getHostName())
-        .addServicePort(ServicePort.newBuilder()
-            .setType(ServicePort.Type.RPC)
-            .setValue(scmAddr.getPort()).build());
-    services.add(scmServiceInfoBuilder.build());
 
+    for (InetSocketAddress scmAddr : scmAddresses) {
+      ServiceInfo.Builder scmServiceInfoBuilder = ServiceInfo.newBuilder()
+          .setNodeType(HddsProtos.NodeType.SCM)
+          .setHostname(scmAddr.getHostName())
+          .addServicePort(ServicePort.newBuilder()
+              .setType(ServicePort.Type.RPC)
+              .setValue(scmAddr.getPort()).build());
+      services.add(scmServiceInfoBuilder.build());
+    }
     metrics.incNumGetServiceLists();
     // For now there is no exception that can can happen in this call,
     // so failure metrics is not handled. In future if there is any need to

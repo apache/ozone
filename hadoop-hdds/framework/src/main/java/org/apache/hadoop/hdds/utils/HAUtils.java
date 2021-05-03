@@ -24,10 +24,8 @@ import org.apache.hadoop.hdds.function.SupplierWithIOException;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
-import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolClientSideTranslatorPB;
@@ -81,8 +79,7 @@ public final class HAUtils {
   private HAUtils() {
   }
 
-  public static ScmInfo getScmInfo(OzoneConfiguration conf)
-      throws IOException {
+  public static ScmInfo getScmInfo(OzoneConfiguration conf) throws IOException {
     OzoneConfiguration configuration = new OzoneConfiguration(conf);
     try {
       long duration = conf.getTimeDuration(OZONE_SCM_INFO_WAIT_DURATION,
@@ -90,15 +87,13 @@ public final class HAUtils {
       SCMClientConfig scmClientConfig =
           configuration.getObject(SCMClientConfig.class);
       int retryCount =
-          (int) (duration / (scmClientConfig.getRetryInterval()/1000));
-
+          (int) (duration / (scmClientConfig.getRetryInterval() / 1000));
       // If duration is set to lesser value, fall back to actual default
       // retry count.
       if (retryCount > scmClientConfig.getRetryCount()) {
         scmClientConfig.setRetryCount(retryCount);
         configuration.setFromObject(scmClientConfig);
       }
-
       return getScmBlockClient(configuration).getScmInfo();
     } catch (IOException e) {
       throw e;
@@ -357,20 +352,6 @@ public final class HAUtils {
     return false;
   }
 
-  public static void checkSecurityAndSCMHAEnabled(OzoneConfiguration conf) {
-    boolean enable =
-        conf.getBoolean(ScmConfigKeys.OZONE_SCM_HA_SECURITY_SUPPORTED,
-            ScmConfigKeys.OZONE_SCM_HA_SECURITY_SUPPORTED_DEFAULT);
-    if (OzoneSecurityUtil.isSecurityEnabled(conf) && !enable) {
-      List<SCMNodeInfo> scmNodeInfo = SCMNodeInfo.buildNodeInfo(conf);
-      if (scmNodeInfo.size() > 1) {
-        System.err.println("Ozone Services cannot be started on a secure SCM " +
-            "HA enabled cluster");
-        System.exit(1);
-      }
-    }
-  }
-
   /**
    * Build CA list which need to be passed to client.
    *
@@ -461,7 +442,7 @@ public final class HAUtils {
       if (!caListUpToDate) {
         LOG.info("Expected CA list size {}, where as received CA List size " +
             "{}. Retry to fetch CA List after {} seconds", expectedCount,
-            caCertPemList.size(), waitTime/1000);
+            caCertPemList.size(), retryTime);
         try {
           Thread.sleep(retryTime);
         } catch (InterruptedException ex) {

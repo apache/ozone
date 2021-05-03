@@ -111,7 +111,7 @@ public class DefaultApprover extends BaseApprover {
     String csrClusterId = x500Name.getRDNs(BCStyle.O)[0].getFirst().getValue().
         toASN1Primitive().toString();
 
-    if (!scmId.equals(csrScmId) || !clusterId.equals(csrClusterId)) {
+    if (!clusterId.equals(csrClusterId)) {
       if (csrScmId.equalsIgnoreCase("null") &&
           csrClusterId.equalsIgnoreCase("null")) {
         // Special case to handle DN certificate generation as DN might not know

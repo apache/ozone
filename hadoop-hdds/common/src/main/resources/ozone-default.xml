@@ -434,7 +434,7 @@
   </property>
   <property>
     <name>ozone.om.service.ids</name>
-    <value></value>
+    <value/>
     <tag>OM, HA</tag>
     <description>
       Comma-separated list of OM service Ids. This property allows the client
@@ -443,7 +443,7 @@
   </property>
   <property>
     <name>ozone.om.internal.service.id</name>
-    <value></value>
+    <value/>
     <tag>OM, HA</tag>
     <description>
       Service ID of the Ozone Manager. If this is not set fall back to
@@ -452,7 +452,7 @@
   </property>
   <property>
     <name>ozone.om.nodes.EXAMPLEOMSERVICEID</name>
-    <value></value>
+    <value/>
     <tag>OM, HA</tag>
     <description>
       Comma-separated list of OM node Ids for a given OM service ID (eg.
@@ -470,7 +470,7 @@
   </property>
   <property>
     <name>ozone.om.node.id</name>
-    <value></value>
+    <value/>
     <tag>OM, HA</tag>
     <description>
       The ID of this OM node. If the OM node ID is not configured it
@@ -1262,7 +1262,7 @@
 
   <property>
     <name>hdds.datanode.plugins</name>
-    <value></value>
+    <value/>
     <description>
       Comma-separated list of HDDS datanode plug-ins to be activated when
       HDDS service starts as part of datanode.
@@ -1455,6 +1455,37 @@
   </property>
 
   <property>
+    <name>hdds.scm.kerberos.keytab.file</name>
+    <value>/etc/security/keytabs/SCM.keytab</value>
+    <tag>SCM, SECURITY, KERBEROS</tag>
+    <description> The keytab file used by SCM daemon to login as its service principal.
+    </description>
+  </property>
+  <property>
+    <name>hdds.scm.kerberos.principal</name>
+    <value>SCM/_HOST@REALM</value>
+    <tag>SCM, SECURITY, KERBEROS</tag>
+    <description>The SCM service principal. e.g. scm/_HOST@REALM.COM</description>
+  </property>
+  <property>
+    <name>hdds.scm.http.auth.kerberos.principal</name>
+    <value>HTTP/_HOST@REALM</value>
+    <tag>SCM, SECURITY, KERBEROS</tag>
+    <description>
+      SCM http server service principal if SPNEGO is enabled for SCM http server.
+    </description>
+  </property>
+  <property>
+    <name>hdds.scm.http.auth.kerberos.keytab</name>
+    <value>/etc/security/keytabs/HTTP.keytab</value>
+    <tag>SCM, SECURITY, KERBEROS</tag>
+    <description>
+      The keytab file used by SCM http server to login as its service
+      principal if SPNEGO is enabled for SCM http server.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.s3g.volume.name</name>
     <value>s3v</value>
     <tag>OZONE, S3GATEWAY</tag>
@@ -1519,8 +1550,8 @@
 
   <property>
     <name>ozone.s3g.http.auth.kerberos.principal</name>
-    <value/>
-    <tag>OZONE, S3GATEWAY</tag>
+    <value>HTTP/_HOST@REALM</value>
+    <tag>OZONE, S3GATEWAY, SECURITY, KERBEROS</tag>
     <description>The server principal used by Ozone S3Gateway server. This is
       typically set to
       HTTP/_HOST@REALM.TLD The SPNEGO server principal begins with the prefix
@@ -1529,8 +1560,8 @@
 
   <property>
     <name>ozone.s3g.http.auth.kerberos.keytab</name>
-    <value/>
-    <tag>OZONE, S3GATEWAY</tag>
+    <value>/etc/security/keytabs/HTTP.keytab</value>
+    <tag>OZONE, S3GATEWAY, SECURITY, KERBEROS</tag>
     <description>The keytab file used by the S3Gateway server to login as its
       service principal. </description>
   </property>
@@ -1547,7 +1578,7 @@
   <property>
     <name>ozone.security.enabled</name>
     <value>false</value>
-    <tag>OZONE, SECURITY</tag>
+    <tag>OZONE, SECURITY, KERBEROS</tag>
     <description>True if security is enabled for ozone. When this property is
      true, hadoop.security.authentication should be Kerberos.
     </description>
@@ -1555,11 +1586,21 @@
   <property>
     <name>ozone.security.http.kerberos.enabled</name>
     <value>false</value>
-    <tag>OZONE, SECURITY</tag>
+    <tag>OZONE, SECURITY, KERBEROS</tag>
     <description>True if Kerberos authentication for Ozone HTTP web consoles
       is enabled using the SPNEGO protocol. When this property is
       true, hadoop.security.authentication should be Kerberos and
       ozone.security.enabled should be set to true.
+    </description>
+  </property>
+  <property>
+    <name>ozone.http.filter.initializers</name>
+    <value/>
+    <tag>OZONE, SECURITY, KERBEROS</tag>
+    <description>Set to org.apache.hadoop.security.AuthenticationFilterInitializer
+      to enable Kerberos authentication for Ozone HTTP web consoles
+      is enabled using the SPNEGO protocol. When this property is
+      set, ozone.security.http.kerberos.enabled should be set to true.
     </description>
   </property>
 
@@ -1760,8 +1801,8 @@
   </property>
   <property>
     <name>ozone.om.kerberos.keytab.file</name>
-    <value></value>
-    <tag> OZONE, SECURITY</tag>
+    <value>/etc/security/keytabs/OM.keytab</value>
+    <tag>OZONE, SECURITY, KERBEROS</tag>
     <description> The keytab file used by OzoneManager daemon to login as its
       service principal. The principal name is configured with
       ozone.om.kerberos.principal.
@@ -1769,22 +1810,25 @@
   </property>
   <property>
     <name>ozone.om.kerberos.principal</name>
-    <value></value>
-    <tag> OZONE, SECURITY</tag>
+    <value>OM/_HOST@REALM</value>
+    <tag>OZONE, SECURITY, KERBEROS</tag>
     <description>The OzoneManager service principal. Ex om/_HOST@REALM.COM</description>
   </property>
   <property>
     <name>ozone.om.http.auth.kerberos.principal</name>
-    <value>HTTP/_HOST@EXAMPLE.COM</value>
+    <value>HTTP/_HOST@REALM</value>
+    <tag>OZONE, SECURITY, KERBEROS</tag>
     <description>
-      OzoneManager http server kerberos principal.
+      Ozone Manager http server service principal if SPNEGO is enabled for om http server.
     </description>
   </property>
   <property>
     <name>ozone.om.http.auth.kerberos.keytab</name>
     <value>/etc/security/keytabs/HTTP.keytab</value>
+    <tag>OZONE, SECURITY, KERBEROS</tag>
     <description>
-      OzoneManager http server kerberos keytab.
+      The keytab file used by OM http server to login as its service
+      principal if SPNEGO is enabled for om http server.
     </description>
   </property>
   <property>
@@ -1858,8 +1902,9 @@
     <value>P1865D</value>
     <tag>OZONE, HDDS, SECURITY</tag>
     <description>Max time for which certificate issued by SCM CA are valid.
-      . The formats accepted are based on the ISO-8601 duration format
-      PnDTnHnMn.nS</description>
+      This duration is used for self-signed root cert and scm sub-ca certs
+      issued by root ca. The formats accepted are based on the ISO-8601
+      duration format PnDTnHnMn.nS</description>
   </property>
   <property>
     <name>hdds.x509.signature.algorithm</name>
@@ -1948,6 +1993,8 @@
       optional config, if being set will cause scm --init to only take effect on
       the specific node and ignore scm --bootstrap cmd.
       Similarly, scm --init will be ignored on the non-primordial scm nodes.
+      The config can either be set equal to the hostname or the node id of any
+      of the scm nodes.
       With the config set, applications/admins can safely execute init and
       bootstrap commands safely on all scm instances.
 
@@ -2230,7 +2277,7 @@
   </property>
   <property>
     <name>ozone.freon.http.auth.kerberos.principal</name>
-    <value>HTTP/_HOST@EXAMPLE.COM</value>
+    <value>HTTP/_HOST@REALM</value>
     <tag>SECURITY</tag>
     <description>
      Security principal used by freon.
@@ -2292,8 +2339,8 @@
 
   <property>
     <name>hdds.datanode.http.auth.kerberos.principal</name>
-    <value>HTTP/_HOST@EXAMPLE.COM</value>
-    <tag>HDDS, SECURITY, MANAGEMENT</tag>
+    <value>HTTP/_HOST@REALM</value>
+    <tag>HDDS, SECURITY, MANAGEMENT, KERBEROS</tag>
     <description>
       The kerberos principal for the datanode http server.
     </description>
@@ -2301,7 +2348,7 @@
   <property>
     <name>hdds.datanode.http.auth.kerberos.keytab</name>
     <value>/etc/security/keytabs/HTTP.keytab</value>
-    <tag>HDDS, SECURITY, MANAGEMENT</tag>
+    <tag>HDDS, SECURITY, MANAGEMENT, KERBEROS</tag>
     <description>
       The kerberos keytab file for datanode http server
     </description>
@@ -2426,31 +2473,31 @@
   </property>
   <property>
     <name>ozone.recon.http.auth.kerberos.keytab</name>
-    <value/>
-    <tag>RECON, SECURITY</tag>
+    <value>/etc/security/keytabs/HTTP.keytab</value>
+    <tag>RECON, SECURITY, KERBEROS</tag>
     <description>
       The keytab file for HTTP Kerberos authentication in Recon.
     </description>
   </property>
   <property>
     <name>ozone.recon.http.auth.kerberos.principal</name>
-    <value/>
-    <tag>RECON</tag>
+    <value>HTTP/_HOST@REALM</value>
+    <tag>RECON, SECURITY, KERBEROS</tag>
     <description>The server principal used by Ozone Recon server. This is
       typically set to HTTP/_HOST@REALM.TLD The SPNEGO server principal
       begins with the prefix HTTP/ by convention.
     </description>
   </property>
   <property>
-    <name>hdds.datanode.http.auth.type </name>
+    <name>hdds.datanode.http.auth.type</name>
     <value>simple</value>
-    <tag>DATANODE, SECURITY</tag>
+    <tag>DATANODE, SECURITY, KERBEROS</tag>
     <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
       will be used for http authentication.
     </description>
   </property>
   <property>
-    <name>ozone.freon.http.auth.type </name>
+    <name>ozone.freon.http.auth.type</name>
     <value>simple</value>
     <tag>FREON, SECURITY</tag>
     <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
@@ -2458,25 +2505,33 @@
     </description>
   </property>
   <property>
-    <name>ozone.om.http.auth.type </name>
+    <name>ozone.om.http.auth.type</name>
     <value>simple</value>
-    <tag>OM, SECURITY</tag>
+    <tag>OM, SECURITY, KERBEROS</tag>
     <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
       will be used for http authentication.
     </description>
   </property>
   <property>
-    <name>ozone.recon.http.auth.type </name>
+    <name>hdds.scm.http.auth.type</name>
     <value>simple</value>
-    <tag>RECON, SECURITY</tag>
+    <tag>OM, SECURITY, KERBEROS</tag>
     <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
       will be used for http authentication.
     </description>
   </property>
   <property>
-    <name>ozone.s3g.http.auth.type </name>
+    <name>ozone.recon.http.auth.type</name>
     <value>simple</value>
-    <tag>S3G, SECURITY</tag>
+    <tag>RECON, SECURITY, KERBEROS</tag>
+    <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
+      will be used for http authentication.
+    </description>
+  </property>
+  <property>
+    <name>ozone.s3g.http.auth.type</name>
+    <value>simple</value>
+    <tag>S3G, SECURITY, KERBEROS</tag>
     <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
       will be used for http authentication.
     </description>
@@ -2630,7 +2685,7 @@
   </property>
   <property>
     <name>ozone.http.basedir</name>
-    <value></value>
+    <value/>
     <tag>OZONE, OM, SCM, MANAGEMENT</tag>
     <description>
       The base dir for HTTP Jetty server to extract contents. If this property
@@ -2691,14 +2746,14 @@
   <property>
     <name>ssl.server.keystore.keypassword</name>
     <tag>OZONE, SECURITY, MANAGEMENT</tag>
-    <value></value>
+    <value/>
     <description>Keystore key password for HTTPS SSL configuration
     </description>
   </property>
   <property>
     <name>ssl.server.keystore.location</name>
     <tag>OZONE, SECURITY, MANAGEMENT</tag>
-    <value></value>
+    <value/>
     <description>
       Keystore location for HTTPS SSL configuration
     </description>
@@ -2706,7 +2761,7 @@
   <property>
     <name>ssl.server.keystore.password</name>
     <tag>OZONE, SECURITY, MANAGEMENT</tag>
-    <value></value>
+    <value/>
     <description>
       Keystore password for HTTPS SSL configuration
     </description>
@@ -2714,7 +2769,7 @@
   <property>
     <name>ssl.server.truststore.location</name>
     <tag>OZONE, SECURITY, MANAGEMENT</tag>
-    <value></value>
+    <value/>
     <description>
       Truststore location for HTTPS SSL configuration
     </description>
@@ -2722,7 +2777,7 @@
   <property>
     <name>ssl.server.truststore.password</name>
     <tag>OZONE, SECURITY, MANAGEMENT</tag>
-    <value></value>
+    <value/>
     <description>
       Truststore password for HTTPS SSL configuration
     </description>
@@ -2762,11 +2817,20 @@
   </property>
 
   <property>
+    <name>ozone.client.key.provider.cache.expiry</name>
+    <tag>OZONE, CLIENT, SECURITY</tag>
+    <value>10d</value>
+    <description>Ozone client security key provider cache expiration time.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.scm.info.wait.duration</name>
     <tag>OZONE, SCM, OM</tag>
     <value>10m</value>
-    <description> Maximum amount of duration OM/SCM waits to get Scm Info
-      during OzoneManager init/SCM bootstrap.
+    <description> Maximum amount of duration OM/SCM waits to get Scm Info/Scm
+      signed cert during OzoneManager init/SCM bootstrap.
     </description>
   </property>
+
 </configuration>

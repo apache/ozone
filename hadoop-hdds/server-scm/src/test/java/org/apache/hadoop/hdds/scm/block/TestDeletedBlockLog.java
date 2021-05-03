@@ -19,6 +19,8 @@ package org.apache.hadoop.hdds.scm.block;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
@@ -36,7 +38,6 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.protocol.proto
@@ -408,9 +409,9 @@ public class TestDeletedBlockLog {
       throws IOException {
     List<DatanodeDetails> dns = Collections.singletonList(dd);
     Pipeline pipeline = Pipeline.newBuilder()
-            .setType(ReplicationType.STAND_ALONE)
-            .setFactor(ReplicationFactor.ONE)
-            .setState(Pipeline.PipelineState.OPEN)
+        .setReplicationConfig(
+            new StandaloneReplicationConfig(ReplicationFactor.ONE))
+        .setState(Pipeline.PipelineState.OPEN)
             .setId(PipelineID.randomId())
             .setNodes(dns)
             .build();
@@ -419,7 +420,8 @@ public class TestDeletedBlockLog {
     builder.setContainerID(containerID)
         .setPipelineID(pipeline.getId())
         .setReplicationType(pipeline.getType())
-        .setReplicationFactor(pipeline.getFactor());
+        .setReplicationFactor(
+            ReplicationConfig.getLegacyFactor(pipeline.getReplicationConfig()));
 
     ContainerInfo containerInfo = builder.build();
     Mockito.doReturn(containerInfo).when(containerManager)

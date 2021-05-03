@@ -20,7 +20,9 @@ package org.apache.hadoop.ozone.scm;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
@@ -150,9 +152,10 @@ public class TestSCMMXBean {
 
     List<ContainerInfo> containerInfoList = new ArrayList<>();
     for (int i=0; i < 10; i++) {
-      containerInfoList.add(scmContainerManager.allocateContainer(HddsProtos
-          .ReplicationType.STAND_ALONE, HddsProtos.ReplicationFactor.ONE,
-          UUID.randomUUID().toString()));
+      containerInfoList.add(
+          scmContainerManager.allocateContainer(new StandaloneReplicationConfig(
+                  ReplicationFactor.ONE),
+              UUID.randomUUID().toString()));
     }
     long containerID;
     for (int i=0; i < 10; i++) {

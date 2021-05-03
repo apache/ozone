@@ -19,7 +19,8 @@
 package org.apache.hadoop.ozone.genesis;
 
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -57,73 +58,20 @@ public class BenchMarkContainerStateMap {
   private AtomicInteger runCount;
   private static int errorFrequency = 100;
 
-  @Setup(Level.Trial)
-  public void initialize() throws IOException {
-    stateMap = new ContainerStateMap();
-    runCount = new AtomicInteger(0);
-    Pipeline pipeline = createSingleNodePipeline(UUID.randomUUID().toString());
-    Preconditions.checkNotNull(pipeline, "Pipeline cannot be null.");
-    int currentCount = 1;
-    for (int x = 1; x < 1000; x++) {
-      try {
-        ContainerInfo containerInfo = new ContainerInfo.Builder()
-            .setState(CLOSED)
-            .setPipelineID(pipeline.getId())
-            .setReplicationType(pipeline.getType())
-            .setReplicationFactor(pipeline.getFactor())
-            .setUsedBytes(0)
-            .setNumberOfKeys(0)
-            .setStateEnterTime(Time.now())
-            .setOwner(OzoneConsts.OZONE)
-            .setContainerID(x)
-            .setDeleteTransactionId(0)
-            .build();
-        stateMap.addContainer(containerInfo);
-        currentCount++;
-      } catch (SCMException e) {
-        e.printStackTrace();
-      }
-    }
-    for (int y = currentCount; y < 50000; y++) {
-      try {
-        ContainerInfo containerInfo = new ContainerInfo.Builder()
-            .setState(OPEN)
-            .setPipelineID(pipeline.getId())
-            .setReplicationType(pipeline.getType())
-            .setReplicationFactor(pipeline.getFactor())
-            .setUsedBytes(0)
-            .setNumberOfKeys(0)
-            .setStateEnterTime(Time.now())
-            .setOwner(OzoneConsts.OZONE)
-            .setContainerID(y)
-            .setDeleteTransactionId(0)
-            .build();
-        stateMap.addContainer(containerInfo);
-        currentCount++;
-      } catch (SCMException e) {
-        e.printStackTrace();
-      }
-    }
-    try {
-      ContainerInfo containerInfo = new ContainerInfo.Builder()
-          .setState(OPEN)
-          .setPipelineID(pipeline.getId())
-          .setReplicationType(pipeline.getType())
-          .setReplicationFactor(pipeline.getFactor())
-          .setUsedBytes(0)
-          .setNumberOfKeys(0)
-          .setStateEnterTime(Time.now())
-          .setOwner(OzoneConsts.OZONE)
-          .setContainerID(currentCount++)
-          .setDeleteTransactionId(0)
-          .build();
-      stateMap.addContainer(containerInfo);
-    } catch (SCMException e) {
-      e.printStackTrace();
-    }
-
-    containerID = new AtomicInteger(currentCount++);
-
+  public static Pipeline createPipeline(String containerName,
+      Iterable<DatanodeDetails> ids) throws IOException {
+    Objects.requireNonNull(ids, "ids == null");
+    Preconditions.checkArgument(ids.iterator().hasNext());
+    List<DatanodeDetails> dns = new ArrayList<>();
+    ids.forEach(dns::add);
+    final Pipeline pipeline = Pipeline.newBuilder()
+        .setState(Pipeline.PipelineState.OPEN)
+        .setId(PipelineID.randomId())
+        .setReplicationConfig(
+            new StandaloneReplicationConfig(ReplicationFactor.ONE))
+        .setNodes(dns)
+        .build();
+    return pipeline;
   }
 
   public static Pipeline createSingleNodePipeline(String containerName)
@@ -147,20 +95,76 @@ public class BenchMarkContainerStateMap {
     return createPipeline(containerName, ids);
   }
 
-  public static Pipeline createPipeline(String containerName,
-      Iterable<DatanodeDetails> ids) throws IOException {
-    Objects.requireNonNull(ids, "ids == null");
-    Preconditions.checkArgument(ids.iterator().hasNext());
-    List<DatanodeDetails> dns = new ArrayList<>();
-    ids.forEach(dns::add);
-    final Pipeline pipeline = Pipeline.newBuilder()
-        .setState(Pipeline.PipelineState.OPEN)
-        .setId(PipelineID.randomId())
-        .setType(HddsProtos.ReplicationType.STAND_ALONE)
-        .setFactor(HddsProtos.ReplicationFactor.ONE)
-        .setNodes(dns)
-        .build();
-    return pipeline;
+  @Setup(Level.Trial)
+  public void initialize() throws IOException {
+    stateMap = new ContainerStateMap();
+    runCount = new AtomicInteger(0);
+    Pipeline pipeline = createSingleNodePipeline(UUID.randomUUID().toString());
+    Preconditions.checkNotNull(pipeline, "Pipeline cannot be null.");
+    int currentCount = 1;
+    for (int x = 1; x < 1000; x++) {
+      try {
+        ContainerInfo containerInfo = new ContainerInfo.Builder()
+            .setState(CLOSED)
+            .setPipelineID(pipeline.getId())
+            .setReplicationType(pipeline.getType())
+            .setReplicationFactor(ReplicationConfig
+                .getLegacyFactor(pipeline.getReplicationConfig()))
+            .setUsedBytes(0)
+            .setNumberOfKeys(0)
+            .setStateEnterTime(Time.now())
+            .setOwner(OzoneConsts.OZONE)
+            .setContainerID(x)
+            .setDeleteTransactionId(0)
+            .build();
+        stateMap.addContainer(containerInfo);
+        currentCount++;
+      } catch (SCMException e) {
+        e.printStackTrace();
+      }
+    }
+    for (int y = currentCount; y < 50000; y++) {
+      try {
+        ContainerInfo containerInfo = new ContainerInfo.Builder()
+            .setState(OPEN)
+            .setPipelineID(pipeline.getId())
+            .setReplicationType(pipeline.getType())
+            .setReplicationFactor(ReplicationConfig
+                .getLegacyFactor(pipeline.getReplicationConfig()))
+            .setUsedBytes(0)
+            .setNumberOfKeys(0)
+            .setStateEnterTime(Time.now())
+            .setOwner(OzoneConsts.OZONE)
+            .setContainerID(y)
+            .setDeleteTransactionId(0)
+            .build();
+        stateMap.addContainer(containerInfo);
+        currentCount++;
+      } catch (SCMException e) {
+        e.printStackTrace();
+      }
+    }
+    try {
+      ContainerInfo containerInfo = new ContainerInfo.Builder()
+          .setState(OPEN)
+          .setPipelineID(pipeline.getId())
+          .setReplicationType(pipeline.getType())
+          .setReplicationFactor(ReplicationConfig
+              .getLegacyFactor(pipeline.getReplicationConfig()))
+          .setUsedBytes(0)
+          .setNumberOfKeys(0)
+          .setStateEnterTime(Time.now())
+          .setOwner(OzoneConsts.OZONE)
+          .setContainerID(currentCount++)
+          .setDeleteTransactionId(0)
+          .build();
+      stateMap.addContainer(containerInfo);
+    } catch (SCMException e) {
+      e.printStackTrace();
+    }
+
+    containerID = new AtomicInteger(currentCount++);
+
   }
 
   @Benchmark
@@ -177,8 +181,10 @@ public class BenchMarkContainerStateMap {
     return new ContainerInfo.Builder()
         .setState(CLOSED)
         .setPipelineID(pipeline.getId())
-        .setReplicationType(pipeline.getType())
-        .setReplicationFactor(pipeline.getFactor())
+        .setReplicationType(
+            pipeline.getReplicationConfig().getReplicationType())
+        .setReplicationFactor(
+            ReplicationConfig.getLegacyFactor(pipeline.getReplicationConfig()))
         .setUsedBytes(0)
         .setNumberOfKeys(0)
         .setStateEnterTime(Time.now())

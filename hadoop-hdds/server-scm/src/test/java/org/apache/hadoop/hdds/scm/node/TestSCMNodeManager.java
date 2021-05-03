@@ -542,12 +542,13 @@ public class TestSCMNodeManager {
   }
 
   /**
-   * Ensure that a change to the operationalState of a node fires a datanode
-   * event of type SetNodeOperationalStateCommand.
+   * For leader SCM, ensure that a change to the operationalState of a node
+   * fires a SCMCommand of type SetNodeOperationalStateCommand.
+   *
+   * For follower SCM, no SetNodeOperationalStateCommand should be fired, yet
+   * operationalState of the node will be updated according to the heartbeat.
    */
   @Test
-  @Ignore // TODO - this test is no longer valid as the heartbeat processing
-  //        now generates the command message.
   public void testSetNodeOpStateAndCommandFired()
       throws IOException, NodeNotFoundException, AuthenticationException {
     final int interval = 100;
@@ -562,11 +563,27 @@ public class TestSCMNodeManager {
       long expiry = System.currentTimeMillis() / 1000 + 1000;
       nodeManager.setNodeOperationalState(dn,
           HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE, expiry);
-      List<SCMCommand> commands = nodeManager.getCommandQueue(dn.getUuid());
+
+      // If found mismatch, leader SCM fires a SetNodeOperationalStateCommand
+      // to update the opState persisted in Datanode.
+      scm.getScmContext().updateLeaderAndTerm(true, 1);
+      List<SCMCommand> commands = nodeManager.processHeartbeat(dn);
 
       Assert.assertTrue(commands.get(0).getClass().equals(
           SetNodeOperationalStateCommand.class));
       assertEquals(1, commands.size());
+
+      // If found mismatch, follower SCM update its own opState according
+      // to the heartbeat, and no SCMCommand will be fired.
+      scm.getScmContext().updateLeaderAndTerm(false, 2);
+      commands = nodeManager.processHeartbeat(dn);
+
+      assertEquals(0, commands.size());
+
+      NodeStatus scmStatus = nodeManager.getNodeStatus(dn);
+      assertTrue(scmStatus.getOperationalState() == dn.getPersistedOpState()
+          && scmStatus.getOpStateExpiryEpochSeconds()
+          == dn.getPersistedOpStateExpiryEpochSec());
     }
   }
 
@@ -579,6 +596,7 @@ public class TestSCMNodeManager {
    * @throws TimeoutException
    */
   @Test
+  @Ignore("HDDS-5098")
   public void testScmDetectStaleAndDeadNode()
       throws IOException, InterruptedException, AuthenticationException {
     final int interval = 100;

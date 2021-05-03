@@ -20,11 +20,14 @@ package org.apache.hadoop.hdds.scm.pipeline;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
@@ -144,9 +147,10 @@ public class PipelineManagerV2Impl implements PipelineManager {
   }
 
   @Override
-  public Pipeline createPipeline(ReplicationType type,
-                                 ReplicationFactor factor) throws IOException {
-    if (!isPipelineCreationAllowed() && factor != ReplicationFactor.ONE) {
+  public Pipeline createPipeline(
+      ReplicationConfig replicationConfig
+  ) throws IOException {
+    if (!isPipelineCreationAllowed() && !factorOne(replicationConfig)) {
       LOG.debug("Pipeline creation is not allowed until safe mode prechecks " +
           "complete");
       throw new IOException("Pipeline creation is not allowed as safe mode " +
@@ -162,14 +166,14 @@ public class PipelineManagerV2Impl implements PipelineManager {
 
     lock.lock();
     try {
-      Pipeline pipeline = pipelineFactory.create(type, factor);
+      Pipeline pipeline = pipelineFactory.create(replicationConfig);
       stateManager.addPipeline(pipeline.getProtobufMessage(
           ClientVersions.CURRENT_VERSION));
       recordMetricsForPipeline(pipeline);
       return pipeline;
     } catch (IOException ex) {
-      LOG.debug("Failed to create pipeline of type {} and factor {}. " +
-          "Exception: {}", type, factor, ex.getMessage());
+      LOG.debug("Failed to create pipeline with replicationConfig {}.",
+          replicationConfig, ex);
       metrics.incNumPipelineCreationFailed();
       throw ex;
     } finally {
@@ -177,12 +181,28 @@ public class PipelineManagerV2Impl implements PipelineManager {
     }
   }
 
+  private boolean factorOne(ReplicationConfig replicationConfig) {
+    if (replicationConfig.getReplicationType() == ReplicationType.RATIS) {
+      return ((RatisReplicationConfig) replicationConfig).getReplicationFactor()
+          == ReplicationFactor.ONE;
+
+    } else if (replicationConfig.getReplicationType()
+        == ReplicationType.STAND_ALONE) {
+      return ((StandaloneReplicationConfig) replicationConfig)
+          .getReplicationFactor()
+          == ReplicationFactor.ONE;
+    }
+    return false;
+  }
+
   @Override
-  public Pipeline createPipeline(ReplicationType type, ReplicationFactor factor,
-                                 List<DatanodeDetails> nodes) {
+  public Pipeline createPipeline(
+      ReplicationConfig replicationConfig,
+      List<DatanodeDetails> nodes
+  ) {
     // This will mostly be used to create dummy pipeline for SimplePipelines.
     // We don't update the metrics for SimplePipelines.
-    return pipelineFactory.create(type, factor, nodes);
+    return pipelineFactory.create(replicationConfig, nodes);
   }
 
   @Override
@@ -207,36 +227,23 @@ public class PipelineManagerV2Impl implements PipelineManager {
   }
 
   @Override
-  public List<Pipeline> getPipelines(ReplicationType type) {
-    return stateManager.getPipelines(type);
+  public List<Pipeline> getPipelines(ReplicationConfig replicationConfig) {
+    return stateManager.getPipelines(replicationConfig);
   }
 
   @Override
-  public List<Pipeline> getPipelines(ReplicationType type,
-                                     ReplicationFactor factor) {
-    return stateManager.getPipelines(type, factor);
-  }
-
-  @Override
-  public List<Pipeline> getPipelines(ReplicationType type,
-                                     Pipeline.PipelineState state) {
-    return stateManager.getPipelines(type, state);
-  }
-
-  @Override
-  public List<Pipeline> getPipelines(ReplicationType type,
-                                     ReplicationFactor factor,
-                                     Pipeline.PipelineState state) {
-    return stateManager.getPipelines(type, factor, state);
+  public List<Pipeline> getPipelines(ReplicationConfig config,
+      Pipeline.PipelineState state) {
+    return stateManager.getPipelines(config, state);
   }
 
   @Override
   public List<Pipeline> getPipelines(
-      ReplicationType type, ReplicationFactor factor,
+      ReplicationConfig replicationConfig,
       Pipeline.PipelineState state, Collection<DatanodeDetails> excludeDns,
       Collection<PipelineID> excludePipelines) {
     return stateManager
-        .getPipelines(type, factor, state, excludeDns, excludePipelines);
+        .getPipelines(replicationConfig, state, excludeDns, excludePipelines);
   }
 
   @Override
@@ -349,12 +356,9 @@ public class PipelineManagerV2Impl implements PipelineManager {
 
   /**
    * Scrub pipelines.
-   * @param type Pipeline type
-   * @param factor Pipeline factor
-   * @throws IOException
    */
   @Override
-  public void scrubPipeline(ReplicationType type, ReplicationFactor factor)
+  public void scrubPipeline(ReplicationConfig config)
       throws IOException {
     Instant currentTime = Instant.now();
     Long pipelineScrubTimeoutInMills = conf.getTimeDuration(
@@ -362,7 +366,7 @@ public class PipelineManagerV2Impl implements PipelineManager {
         ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT_DEFAULT,
         TimeUnit.MILLISECONDS);
 
-    List<Pipeline> candidates = stateManager.getPipelines(type, factor);
+    List<Pipeline> candidates = stateManager.getPipelines(config);
 
     for (Pipeline p : candidates) {
       // scrub pipelines who stay ALLOCATED for too long.

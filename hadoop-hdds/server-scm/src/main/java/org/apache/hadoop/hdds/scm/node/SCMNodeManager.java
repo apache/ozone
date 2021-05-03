@@ -455,13 +455,19 @@ public class SCMNodeManager implements NodeManager {
   }
 
   /**
-   * If the operational state or expiry reported in the datanode heartbeat do
-   * not match those store in SCM, queue a command to update the state persisted
-   * on the datanode. Additionally, ensure the datanodeDetails stored in SCM
-   * match those reported in the heartbeat.
-   * This method should only be called when processing the
-   * heartbeat, and for a registered node, the information stored in SCM is the
-   * source of truth.
+   * This method should only be called when processing the heartbeat.
+   *
+   * On leader SCM, for a registered node, the information stored in SCM is
+   * the source of truth. If the operational state or expiry reported in the
+   * datanode heartbeat do not match those store in SCM, queue a command to
+   * update the state persisted on the datanode. Additionally, ensure the
+   * datanodeDetails stored in SCM match those reported in the heartbeat.
+   *
+   * On follower SCM, datanode notifies follower SCM its latest operational
+   * state or expiry via heartbeat. If the operational state or expiry
+   * reported in the datanode heartbeat do not match those stored in SCM,
+   * just update the state in follower SCM accordingly.
+   *
    * @param reportedDn The DatanodeDetails taken from the node heartbeat.
    * @throws NodeNotFoundException
    */
@@ -469,24 +475,36 @@ public class SCMNodeManager implements NodeManager {
       throws NodeNotFoundException {
     NodeStatus scmStatus = getNodeStatus(reportedDn);
     if (opStateDiffers(reportedDn, scmStatus)) {
-      LOG.info("Scheduling a command to update the operationalState " +
-              "persisted on {} as the reported value does not " +
-              "match the value stored in SCM ({}, {})",
-          reportedDn,
-          scmStatus.getOperationalState(),
-          scmStatus.getOpStateExpiryEpochSeconds());
-
-      try {
-        SCMCommand<?> command = new SetNodeOperationalStateCommand(
-            Time.monotonicNow(),
+      if (scmContext.isLeader()) {
+        LOG.info("Scheduling a command to update the operationalState " +
+                "persisted on {} as the reported value does not " +
+                "match the value stored in SCM ({}, {})",
+            reportedDn,
             scmStatus.getOperationalState(),
             scmStatus.getOpStateExpiryEpochSeconds());
-        command.setTerm(scmContext.getTermOfLeader());
-        addDatanodeCommand(reportedDn.getUuid(), command);
-      } catch (NotLeaderException nle) {
-        LOG.warn("Skip sending SetNodeOperationalStateCommand,"
-            + " since current SCM is not leader.", nle);
-        return;
+
+        try {
+          SCMCommand<?> command = new SetNodeOperationalStateCommand(
+              Time.monotonicNow(),
+              scmStatus.getOperationalState(),
+              scmStatus.getOpStateExpiryEpochSeconds());
+          command.setTerm(scmContext.getTermOfLeader());
+          addDatanodeCommand(reportedDn.getUuid(), command);
+        } catch (NotLeaderException nle) {
+          LOG.warn("Skip sending SetNodeOperationalStateCommand,"
+              + " since current SCM is not leader.", nle);
+          return;
+        }
+      } else {
+        LOG.info("Update the operationalState saved in follower SCM " +
+                "for {} as the reported value does not " +
+                "match the value stored in SCM ({}, {})",
+            reportedDn,
+            scmStatus.getOperationalState(),
+            scmStatus.getOpStateExpiryEpochSeconds());
+
+        setNodeOperationalState(reportedDn, reportedDn.getPersistedOpState(),
+            reportedDn.getPersistedOpStateExpiryEpochSec());
       }
     }
     DatanodeDetails scmDnd = nodeStateManager.getNode(reportedDn);

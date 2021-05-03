@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.x509.certificate.CertInfo;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CRLApprover;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.DefaultCRLApprover;
@@ -46,6 +47,7 @@ import java.security.KeyPair;
 import java.security.cert.X509CRLEntry;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
@@ -147,9 +149,18 @@ public class TestSCMCertStore {
         scmCertStore.getCertificateByID(serialID,
             VALID_CERTS));
 
-    assertNotNull(
-        scmCertStore.getCertificateByID(serialID,
-            CertificateStore.CertType.REVOKED_CERTS));
+    CertInfo certInfo = scmCertStore.getRevokedCertificateInfoByID(serialID);
+
+    assertNotNull(certInfo);
+    assertNotNull(certInfo.getX509Certificate());
+    assertTrue("Timestamp should be greater than 0",
+        certInfo.getTimestamp() > 0L);
+
+    long crlId = scmCertStore.getLatestCrlId();
+    assertEquals(sequenceId.get().longValue(), crlId);
+
+    List<CRLInfo> crls = scmCertStore.getCrls(Arrays.asList(crlId));
+    assertEquals(1, crls.size());
 
     // CRL Info table should have a CRL with sequence id
     assertNotNull(scmMetadataStore.getCRLInfoTable()
@@ -159,8 +170,9 @@ public class TestSCMCertStore {
     assertEquals(INITIAL_SEQUENCE_ID + 1L, (long)
         scmMetadataStore.getCRLSequenceIdTable().get(CRL_SEQUENCE_ID_KEY));
 
-    CRLInfo crlInfo =
-        scmMetadataStore.getCRLInfoTable().get(sequenceId.get());
+    CRLInfo crlInfo = crls.get(0);
+
+    assertEquals(crlInfo.getCrlSequenceID(), sequenceId.get().longValue());
 
     Set<? extends X509CRLEntry> revokedCertificates =
         crlInfo.getX509CRL().getRevokedCertificates();
@@ -195,14 +207,16 @@ public class TestSCMCertStore {
     // This should create a CRL with sequence id INITIAL_SEQUENCE_ID + 2
     // And contain 2 certificates in it
     assertTrue(sequenceId.isPresent());
+    assertEquals(sequenceId.get().longValue(),
+        scmCertStore.getLatestCrlId());
     assertEquals(INITIAL_SEQUENCE_ID + 2L, (long) sequenceId.get());
 
     // Check the sequence ID table for latest sequence id
     assertEquals(INITIAL_SEQUENCE_ID + 2L, (long)
         scmMetadataStore.getCRLSequenceIdTable().get(CRL_SEQUENCE_ID_KEY));
 
-    CRLInfo newCrlInfo = scmMetadataStore.getCRLInfoTable()
-        .get(sequenceId.get());
+    CRLInfo newCrlInfo = scmCertStore.getCrls(Arrays.asList(
+        INITIAL_SEQUENCE_ID + 2)).get(0);
     revokedCertificates = newCrlInfo.getX509CRL().getRevokedCertificates();
     assertEquals(2L, revokedCertificates.size());
     assertNotNull(
@@ -215,6 +229,8 @@ public class TestSCMCertStore {
             c.getSerialNumber().equals(newSerialIDs.get(1)))
             .findAny());
 
+    assertEquals(newCrlInfo.getCrlSequenceID(), sequenceId.get().longValue());
+
     // Valid certs table should have 1 cert
     assertEquals(1L,
         getTableSize(scmMetadataStore.getValidCertsTable().iterator()));
@@ -225,7 +241,7 @@ public class TestSCMCertStore {
 
     // Revoked certs table should have 3 certs
     assertEquals(3L,
-        getTableSize(scmMetadataStore.getRevokedCertsTable().iterator()));
+        getTableSize(scmMetadataStore.getRevokedCertsV2Table().iterator()));
   }
 
   @Test
@@ -235,7 +251,6 @@ public class TestSCMCertStore {
     Date now = new Date();
     // Set revocation time in the future
     Date revocationTime = new Date(now.getTime()+500);
-
 
     X509CertificateHolder caCertificateHolder =
         new X509CertificateHolder(generateX509Cert().getEncoded());
@@ -254,8 +269,7 @@ public class TestSCMCertStore {
             VALID_CERTS));
 
     assertNull(
-        scmCertStore.getCertificateByID(serialID,
-            CertificateStore.CertType.REVOKED_CERTS));
+        scmCertStore.getRevokedCertificateInfoByID(serialID));
   }
 
   private X509Certificate generateX509Cert() throws Exception {
