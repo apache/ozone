@@ -94,7 +94,7 @@ These scripts are executed by the CI servers, so it's always good to run them lo
 
 We use github pull requests instead of uploading patches to JIRA. The main contribution workflow is as follows:
 
-  1. Fork `apache/hadoop-ozone` github repository (first time)
+  1. Fork `apache/ozone` github repository (first time)
   2. Create a new Jira in HDDS project (eg. HDDS-1234)
   3. Create a local branch for your contribution (eg. `git checkout -b HDDS-1234`)
   4. Create your commits and push your branches to your personal fork.
