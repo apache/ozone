@@ -678,15 +678,18 @@ public class SCMClientProtocolServer implements
   public StatusAndMessages queryUpgradeFinalizationProgress(
       String upgradeClientID, boolean force, boolean readonly)
       throws IOException {
-    // check admin authorization
-    String remoteUser = getRpcRemoteUsername();
-    try {
-      getScm().checkAdminAccess(remoteUser);
-    } catch (IOException e) {
-      LOG.error("Authorisation failed for query scm upgrade finalization " +
-          "progress", e);
-      throw e;
+    if (!readonly) {
+      // check admin authorization
+      String remoteUser = getRpcRemoteUsername();
+      try {
+        getScm().checkAdminAccess(remoteUser);
+      } catch (IOException e) {
+        LOG.error("Authorisation failed for query scm upgrade finalization " +
+            "progress", e);
+        throw e;
+      }
     }
+
     return scm.queryUpgradeFinalizationProgress(upgradeClientID, force,
         readonly);
   }
