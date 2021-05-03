@@ -44,6 +44,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
+import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -86,6 +87,14 @@ public class OMPrepareRequest extends OMClientRequest {
         Duration.of(args.getTxnApplyCheckIntervalSeconds(), ChronoUnit.SECONDS);
 
     try {
+      String username = getOmRequest().getUserInfo().getUserName();
+      Collection<String> admins = ozoneManager.getOzoneAdmins();
+      if (ozoneManager.getAclsEnabled() && !admins.contains(username)) {
+        throw new OMException("Access denied for user " + username + ". " +
+            "Superuser privilege is required to prepare ozone managers.",
+            OMException.ResultCodes.ACCESS_DENIED);
+      }
+
       // Create response.
       // DB snapshot for prepare will include the transaction to commit it,
       // making the prepare index one more than this txn's log index.

@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -40,6 +41,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.Collection;
 
 import com.google.common.base.Optional;
 
@@ -65,6 +67,14 @@ public class OMFinalizeUpgradeRequest extends OMClientRequest {
     OMClientResponse response = null;
 
     try {
+      String username = getOmRequest().getUserInfo().getUserName();
+      Collection<String> admins = ozoneManager.getOzoneAdmins();
+      if (ozoneManager.getAclsEnabled() && !admins.contains(username)) {
+        throw new OMException("Access denied for user " + username + ". " +
+            "Superuser privilege is required to finalize upgrade.",
+            OMException.ResultCodes.ACCESS_DENIED);
+      }
+
       FinalizeUpgradeRequest request =
           getOmRequest().getFinalizeUpgradeRequest();
 

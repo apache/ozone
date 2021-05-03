@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.request.upgrade;
 
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -34,6 +35,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.Collection;
 
 public class OMCancelPrepareRequest extends OMClientRequest {
   private static final Logger LOG =
@@ -58,6 +60,15 @@ public class OMCancelPrepareRequest extends OMClientRequest {
     OMClientResponse response = null;
 
     try {
+      String username = getOmRequest().getUserInfo().getUserName();
+      Collection<String> admins = ozoneManager.getOzoneAdmins();
+      if (ozoneManager.getAclsEnabled() && !admins.contains(username)) {
+        throw new OMException("Access denied for user " + username + ". " +
+            "Superuser privilege is required to cancel ozone manager " +
+            "preparation.",
+            OMException.ResultCodes.ACCESS_DENIED);
+      }
+
       // Create response.
       CancelPrepareResponse omResponse = CancelPrepareResponse.newBuilder()
           .build();
