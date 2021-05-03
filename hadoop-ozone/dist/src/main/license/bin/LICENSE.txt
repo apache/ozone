@@ -218,6 +218,8 @@ EPL
    org.eclipse.jetty:jetty-util-ajax
    org.eclipse.jetty:jetty-webapp
    org.eclipse.jetty:jetty-xml
+   org.aspectj:aspectjrt
+   org.aspectj:aspectjweaver
 
 
 BSD
@@ -392,6 +394,12 @@ BSD 2-Clause
 =====================
 
    dnsjava:dnsjava
+
+
+WTFPL
+=====================
+
+   org.reflections:reflections
 
 
 --------------------------------------------------------------------------------
