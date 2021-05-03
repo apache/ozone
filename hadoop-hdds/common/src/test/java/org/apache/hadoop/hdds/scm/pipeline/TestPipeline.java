@@ -54,13 +54,14 @@ public class TestPipeline {
   public void getProtobufMessageEC() throws IOException {
     Pipeline subject = MockPipeline.createPipeline(3);
 
-    //when EC config is empty
+    //when EC config is empty/null
     HddsProtos.Pipeline protobufMessage = subject.getProtobufMessage(1);
-    Assert.assertNull(protobufMessage);
+    Assert.assertEquals(0, protobufMessage.getEcReplicationConfig().getData());
 
+
+    //when EC config is NOT empty
     subject = MockPipeline.createEcPipeline();
 
-    //when EC config is empty
     protobufMessage = subject.getProtobufMessage(1);
     Assert.assertEquals(3, protobufMessage.getEcReplicationConfig().getData());
     Assert

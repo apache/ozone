@@ -92,11 +92,4 @@ public class ECReplicationConfig implements ReplicationConfig {
     return Objects.hash(data, parity);
   }
 
-  public static HddsProtos.ECReplicationConfig getProtoOrNull(
-      ReplicationConfig replicationConfig) {
-    if (replicationConfig instanceof ECReplicationConfig) {
-      return ((ECReplicationConfig) replicationConfig).toProto();
-    }
-    return null;
-  }
 }
