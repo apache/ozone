@@ -66,6 +66,11 @@ public final class GenerateOzoneRequiredConfigurations extends GenericCli {
       "template, update Kerberos principal and keytab file before use.")
   private boolean genSecurityConf;
 
+  @Option(names = "--meta-directory", description = "Generates config " +
+      "template with all metadata directories for production environment, " +
+      "update the metadata directories before use.")
+  private boolean genMetaDirectoryConf;
+
   /**
    * Entry point for using genconf tool.
    *
@@ -78,7 +83,7 @@ public final class GenerateOzoneRequiredConfigurations extends GenericCli {
 
   @Override
   public Void call() throws Exception {
-    generateConfigurations(path, genSecurityConf);
+    generateConfigurations(path, genSecurityConf, genMetaDirectoryConf);
     return null;
   }
 
@@ -90,7 +95,7 @@ public final class GenerateOzoneRequiredConfigurations extends GenericCli {
    */
   public static void generateConfigurations(String path) throws
       PicocliException, JAXBException, IOException {
-    generateConfigurations(path, false);
+    generateConfigurations(path, false, false);
   }
 
   /**
@@ -101,7 +106,7 @@ public final class GenerateOzoneRequiredConfigurations extends GenericCli {
    * @throws JAXBException
    */
   public static void generateConfigurations(String path,
-      boolean genSecurityConf) throws
+      boolean genSecurityConf, boolean genMetaDirectoryConf) throws
       PicocliException, JAXBException, IOException {
 
     if (!isValidPath(path)) {
@@ -127,7 +132,8 @@ public final class GenerateOzoneRequiredConfigurations extends GenericCli {
 
     for (OzoneConfiguration.Property p : allProperties) {
       if (p.getTag() != null && (p.getTag().contains("REQUIRED") ||
-          (genSecurityConf && p.getTag().contains("KERBEROS")))) {
+          (genSecurityConf && p.getTag().contains("KERBEROS")) ||
+          (genMetaDirectoryConf && p.getTag().contains("META_DIR")))) {
         // Set default value for common required configs
         if (p.getName().equalsIgnoreCase(
             OzoneConfigKeys.OZONE_METADATA_DIRS)) {

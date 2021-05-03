@@ -232,6 +232,51 @@ public class TestGenerateOzoneRequiredConfigurations {
   }
 
   /**
+   * Tests a valid path and generates ozone-site.xml with meta directories by
+   * calling {@code GenerateOzoneRequiredConfigurations#generateConfigurations}.
+   * Further verifies that all properties have a default value.
+   *
+   * @throws Exception
+   */
+  @Test
+  public void testGenerateMetaDirectoryConfigurations() throws Exception {
+    int ozoneConfigurationCount, ozoneMetaDirectoryConfigurationCount;
+
+    // Generate default Ozone Configuration
+    File tempPath = getRandomTempDir();
+    String[] args = new String[]{tempPath.getAbsolutePath()};
+    execute(args, "ozone-site.xml has been generated at " +
+        tempPath.getAbsolutePath());
+
+    URL url = new File(tempPath.getAbsolutePath() + "/ozone-site.xml")
+        .toURI().toURL();
+    OzoneConfiguration oc = new OzoneConfiguration();
+    List<OzoneConfiguration.Property> allProperties =
+        oc.readPropertyFromXml(url);
+
+    for (OzoneConfiguration.Property p : allProperties) {
+      Assert.assertTrue(
+          p.getValue() != null && p.getValue().length() > 0);
+    }
+    ozoneConfigurationCount = allProperties.size();
+
+    // Generate secure Ozone Configuration
+    tempPath = getRandomTempDir();
+    args = new String[]{"--meta-directory", tempPath.getAbsolutePath()};
+    execute(args, "ozone-site.xml has been generated at " +
+        tempPath.getAbsolutePath());
+
+    url = new File(tempPath.getAbsolutePath() + "/ozone-site.xml")
+        .toURI().toURL();
+    oc = new OzoneConfiguration();
+    allProperties = oc.readPropertyFromXml(url);
+
+    ozoneMetaDirectoryConfigurationCount = allProperties.size();
+
+    Assert.assertNotEquals(ozoneConfigurationCount,
+        ozoneMetaDirectoryConfigurationCount);
+  }
+  /**
    * Generates ozone-site.xml at specified path.
    * Verify that it does not overwrite if file already exists in path.
    *

@@ -125,7 +125,7 @@
   <property>
     <name>dfs.container.ratis.datanode.storage.dir</name>
     <value/>
-    <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT, RATIS</tag>
+    <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT, RATIS, META_DIR</tag>
     <description>This directory is used for storing Ratis metadata like logs. If
       this is
       not set then default metadata dirs is used. A warning will be logged if
@@ -595,7 +595,7 @@
   <property>
     <name>ozone.om.db.dirs</name>
     <value/>
-    <tag>OZONE, OM, STORAGE, PERFORMANCE</tag>
+    <tag>OZONE, OM, STORAGE, PERFORMANCE, META_DIR</tag>
     <description>
       Directory where the OzoneManager stores its metadata. This should
       be specified as a single directory. If the directory does not
@@ -637,7 +637,7 @@
   <property>
     <name>ozone.scm.db.dirs</name>
     <value/>
-    <tag>OZONE, SCM, STORAGE, PERFORMANCE</tag>
+    <tag>OZONE, SCM, STORAGE, PERFORMANCE, META_DIR</tag>
     <description>
       Directory where the StorageContainerManager stores its metadata.
       This should be specified as a single directory. If the directory
@@ -917,7 +917,7 @@
   <property>
     <name>ozone.scm.datanode.id.dir</name>
     <value/>
-    <tag>OZONE, MANAGEMENT</tag>
+    <tag>OZONE, MANAGEMENT, META_DIR</tag>
     <description>The path that datanodes will use to store the datanode ID.
       If this value is not set, then datanode ID is created under the
       metadata directory.
@@ -1655,7 +1655,7 @@
   <property>
     <name>ozone.om.ratis.storage.dir</name>
     <value/>
-    <tag>OZONE, OM, STORAGE, MANAGEMENT, RATIS</tag>
+    <tag>OZONE, OM, STORAGE, MANAGEMENT, RATIS, META_DIR</tag>
     <description>This directory is used for storing OM's Ratis metadata like
       logs. If this is not set then default metadata dirs is used. A warning
       will be logged if this not set. Ideally, this should be mapped to a
@@ -1750,7 +1750,7 @@
   <property>
     <name>ozone.om.ratis.snapshot.dir</name>
     <value/>
-    <tag>OZONE, OM, STORAGE, MANAGEMENT, RATIS</tag>
+    <tag>OZONE, OM, STORAGE, MANAGEMENT, RATIS, META_DIR</tag>
     <description>This directory is used for storing OM's snapshot
       related files like the ratisSnapshotIndex and DB checkpoint from leader
       OM.
@@ -2051,7 +2051,7 @@
   <property>
     <name>ozone.scm.ratis.storage.dir</name>
     <value/>
-    <tag>OZONE, SCM, HA, RATIS, STORAGE</tag>
+    <tag>OZONE, SCM, HA, RATIS, STORAGE, META_DIR</tag>
     <description>This directory is used for storing SCM's Ratis metadata like
       logs. If this is not set then default metadata dirs is used. A warning
       will be logged if this not set. Ideally, this should be mapped to a
@@ -2554,7 +2554,7 @@
   <property>
     <name>ozone.recon.db.dir</name>
     <value/>
-    <tag>OZONE, RECON, STORAGE, PERFORMANCE</tag>
+    <tag>OZONE, RECON, STORAGE, PERFORMANCE, META_DIR</tag>
     <description>
       Directory where the Recon Server stores its metadata. This should
       be specified as a single directory. If the directory does not
@@ -2585,18 +2585,32 @@
   </property>
   <property>
     <name>ozone.recon.om.db.dir</name>
-  <value/>
-  <tag>OZONE, RECON, STORAGE</tag>
-  <description>
-    Directory where the Recon Server stores its OM snapshot DB. This should
-    be specified as a single directory. If the directory does not
-    exist then the Recon will attempt to create it.
+    <value/>
+    <tag>OZONE, RECON, STORAGE, META_DIR</tag>
+    <description>
+      Directory where the Recon Server stores its OM snapshot DB. This should
+      be specified as a single directory. If the directory does not
+      exist then the Recon will attempt to create it.
 
-    If undefined, then the Recon will log a warning and fallback to
-    ozone.metadata.dirs. This fallback approach is not recommended for
-    production environments.
-  </description>
-</property>
+      If undefined, then the Recon will log a warning and fallback to
+      ozone.metadata.dirs. This fallback approach is not recommended for
+      production environments.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.scm.db.dirs</name>
+    <value/>
+    <tag>OZONE, RECON, STORAGE, META_DIR</tag>
+    <description>
+      Directory where the Recon Server stores its SCM snapshot DB. This should
+      be specified as a single directory. If the directory does not
+      exist then the Recon will attempt to create it.
+
+      If undefined, then the Recon will log a warning and fallback to
+      ozone.metadata.dirs. This fallback approach is not recommended for
+      production environments.
+    </description>
+  </property>
   <property>
     <name>ozone.recon.om.connection.request.timeout</name>
     <value>5000</value>
