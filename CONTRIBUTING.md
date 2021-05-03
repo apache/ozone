@@ -15,7 +15,7 @@ We welcome contributions of:
  * **Documentation Improvements**: You can submit improvements to either:
      * Ozone website. Instructions are here: [Modifying the Ozone Website](https://cwiki.apache.org/confluence/display/HADOOP/Modifying+the+Ozone+Website)
      * Developer docs. These are markdown files [checked into the Apache Ozone Source tree](https://github.com/apache/ozone/tree/master/hadoop-hdds/docs/content).
- * The [wiki pages](https://cwiki.apache.org/confluence/display/HADOOP/Ozone+Contributor+Guide): Please contact us at ozone-dev@hadoop.apache.org and we can provide you write access to the wiki.
+ * The [wiki pages](https://cwiki.apache.org/confluence/display/OZONE/Contributing+to+Ozone): Please contact us at ozone-dev@hadoop.apache.org and we can provide you write access to the wiki.
  * **Testing**: We always need help to improve our testing
       * Unit Tests (JUnit / Java)
       * Acceptance Tests (docker + robot framework)
