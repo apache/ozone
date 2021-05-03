@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
 
+import com.amazonaws.services.s3.model.DeleteObjectsRequest;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 
 import com.amazonaws.auth.EnvironmentVariableCredentialsProvider;
@@ -92,6 +93,12 @@ public class S3KeyGenerator extends BaseFreonGenerator
   private String content;
 
   private AmazonS3 s3;
+
+  private List<String> generatedKeys;
+
+  public S3KeyGenerator() {
+    this.generatedKeys = new ArrayList<>();
+  }
 
   @Override
   public Void call() throws Exception {
@@ -169,5 +176,27 @@ public class S3KeyGenerator extends BaseFreonGenerator
 
       return null;
     });
+  }
+
+  @Override
+  public String generateObjectName(long counter) {
+    String objectName = super.generateObjectName(counter);
+    generatedKeys.add(objectName);
+    return objectName;
+  }
+
+  @Override
+  protected void doCleanUp() {
+    // Clean Keys
+    DeleteObjectsRequest deleteObjectsRequest =
+        new DeleteObjectsRequest(bucketName);
+    String[] keys = generatedKeys.toArray(new String[0]);
+    deleteObjectsRequest.withKeys(keys);
+    s3.deleteObjects(deleteObjectsRequest);
+
+    // Clean bucket
+    if (bucketCreated) {
+      s3.deleteBucket(bucketName);
+    }
   }
 }

@@ -16,14 +16,19 @@
  */
 package org.apache.hadoop.ozone.freon;
 
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.concurrent.LinkedBlockingQueue;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.om.helpers.OmDeleteKeys;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs.Builder;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
@@ -77,6 +82,12 @@ public class OmKeyGenerator extends BaseFreonGenerator
 
   private Timer timer;
 
+  private List<String> keyList;
+
+  public OmKeyGenerator() {
+    this.keyList = Collections.synchronizedList(new ArrayList<String>());
+  }
+
   @Override
   public Void call() throws Exception {
     init();
@@ -115,6 +126,7 @@ public class OmKeyGenerator extends BaseFreonGenerator
             ALL, ALL))
         .build();
 
+    keyList.add(keyArgs.getKeyName());
     timer.time(() -> {
       OpenKeySession openKeySession = ozoneManagerClient.openKey(keyArgs);
 
@@ -123,4 +135,19 @@ public class OmKeyGenerator extends BaseFreonGenerator
     });
   }
 
+  @Override
+  protected void doCleanUp() {
+    OmDeleteKeys omDeleteKeys = new OmDeleteKeys(volumeName, bucketName, keyList);
+    try {
+      ozoneManagerClient.deleteKeys(omDeleteKeys);
+      if (bucketCreated) {
+        ozoneManagerClient.deleteBucket(volumeName, bucketName);
+      }
+      if (volumeCreated) {
+        ozoneManagerClient.deleteVolume(volumeName);
+      }
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+  }
 }

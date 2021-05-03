@@ -101,6 +101,10 @@ public class BaseFreonGenerator {
       defaultValue = "")
   private String prefix = "";
 
+  @Option(names = {"--clean-up"},
+      description = "Clean all the generated objects.")
+  private boolean cleanUp;
+
   private MetricRegistry metrics = new MetricRegistry();
 
   private AtomicLong successCounter;
@@ -114,6 +118,9 @@ public class BaseFreonGenerator {
   private ExecutorService executor;
   private ProgressBar progressBar;
 
+  protected boolean volumeCreated;
+  protected boolean bucketCreated;
+
   /**
    * The main logic to execute a test generator.
    *
@@ -124,6 +131,7 @@ public class BaseFreonGenerator {
     startTaskRunners(provider);
     waitForCompletion();
     shutdown();
+    cleanUp();
     reportAnyFailure();
   }
 
@@ -218,6 +226,20 @@ public class BaseFreonGenerator {
     } catch (Exception ex) {
       ex.printStackTrace();
     }
+  }
+
+  /**
+   * Provides a way to clean up the generated objects.
+   */
+  protected void doCleanUp() {
+    // no-op
+  }
+
+  private void cleanUp() {
+    if (!cleanUp) {
+      return;
+    }
+    doCleanUp();
   }
 
   /**
@@ -388,6 +410,7 @@ public class BaseFreonGenerator {
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
         volume.createBucket(bucketName);
+        bucketCreated = true;
       } else {
         throw ex;
       }
@@ -406,6 +429,7 @@ public class BaseFreonGenerator {
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.VOLUME_NOT_FOUND) {
         rpcClient.getObjectStore().createVolume(volumeName);
+        volumeCreated = true;
       } else {
         throw ex;
       }

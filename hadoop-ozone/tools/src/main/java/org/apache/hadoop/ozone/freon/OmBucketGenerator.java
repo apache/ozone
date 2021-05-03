@@ -16,6 +16,10 @@
  */
 package org.apache.hadoop.ozone.freon;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.Callable;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
@@ -57,6 +61,12 @@ public class OmBucketGenerator extends BaseFreonGenerator
 
   private Timer bucketCreationTimer;
 
+  private List<String> bucketList;
+
+  public OmBucketGenerator() {
+    this.bucketList = Collections.synchronizedList(new ArrayList<String>());
+  }
+
   @Override
   public Void call() throws Exception {
 
@@ -91,10 +101,24 @@ public class OmBucketGenerator extends BaseFreonGenerator
         .setStorageType(StorageType.DISK)
         .build();
 
+    bucketList.add(bucketInfo.getBucketName());
     bucketCreationTimer.time(() -> {
       ozoneManagerClient.createBucket(bucketInfo);
       return null;
     });
   }
 
+  @Override
+  protected void doCleanUp() {
+    try {
+      for (String bucket : bucketList) {
+        ozoneManagerClient.deleteBucket(volumeName, bucket);
+      }
+      if (volumeCreated) {
+        ozoneManagerClient.deleteVolume(volumeName);
+      }
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+  }
 }
