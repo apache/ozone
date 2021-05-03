@@ -29,7 +29,6 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.SCMBlockLocationRequest;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.SCMBlockLocationResponse;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.Type;
@@ -119,11 +118,6 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
     try {
       SCMBlockLocationResponse response =
           rpcProxy.send(NULL_RPC_CONTROLLER, req);
-      if (response.getStatus() ==
-          ScmBlockLocationProtocolProtos.Status.SCM_NOT_LEADER) {
-        failoverProxyProvider
-            .performFailoverToAssignedLeader(response.getLeaderSCMNodeId());
-      }
       return response;
     } catch (ServiceException e) {
       throw ProtobufHelper.getRemoteException(e);

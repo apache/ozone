@@ -2765,19 +2765,19 @@
   </property>
 
   <property>
+    <name>ozone.client.key.provider.cache.expiry</name>
+    <tag>OZONE, CLIENT, SECURITY</tag>
+    <value>10d</value>
+    <description>Ozone client security key provider cache expiration time.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.scm.info.wait.duration</name>
     <tag>OZONE, SCM, OM</tag>
     <value>10m</value>
     <description> Maximum amount of duration OM/SCM waits to get Scm Info/Scm
       signed cert during OzoneManager init/SCM bootstrap.
-    </description>
-  </property>
-
-  <property>
-    <name>ozone.client.key.provider.cache.expiry</name>
-    <tag>OZONE, CLIENT, SECURITY</tag>
-    <value>10d</value>
-    <description>Ozone client security key provider cache expiration time.
     </description>
   </property>
 

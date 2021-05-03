@@ -37,6 +37,8 @@ public class SCMClientConfig {
   public static final String SCM_CLIENT_RPC_TIME_OUT = "rpc.timeout";
   public static final String SCM_CLIENT_FAILOVER_MAX_RETRY =
       "failover.max.retry";
+  public static final String SCM_CLIENT_MAX_RETRY_TIMEOUT =
+      "max.retry.timeout";
   public static final String SCM_CLIENT_RETRY_INTERVAL =
       "failover.retry.interval";
 
@@ -53,6 +55,16 @@ public class SCMClientConfig {
           "ipc.ping.interval."
   )
   private long rpcTimeOut = 15 * 60 * 1000;
+
+  @Config(key = SCM_CLIENT_MAX_RETRY_TIMEOUT,
+      defaultValue = "10m",
+      type = ConfigType.TIME,
+      timeUnit = TimeUnit.MILLISECONDS,
+      tags = {OZONE, SCM, CLIENT},
+      description = "Max retry timeout for SCM Client"
+  )
+
+  private long maxRetryTimeout = 10 * 60 * 1000;
 
   @Config(key = SCM_CLIENT_FAILOVER_MAX_RETRY,
       defaultValue = "15",
@@ -86,7 +98,16 @@ public class SCMClientConfig {
   }
 
   public int getRetryCount() {
-    return retryCount;
+    long duration = getMaxRetryTimeout();
+    int retryCountFromMaxTimeOut = (int) (duration / getRetryInterval());
+    // If duration is set to lesser value, fall back to actual default
+    // retry count.
+    return retryCountFromMaxTimeOut > retryCount ?
+        retryCountFromMaxTimeOut : retryCount;
+  }
+
+  public long getMaxRetryTimeout() {
+    return maxRetryTimeout;
   }
 
   public void setRetryCount(int retryCount) {
@@ -99,5 +120,9 @@ public class SCMClientConfig {
 
   public void setRetryInterval(long retryInterval) {
     this.retryInterval = retryInterval;
+  }
+
+  public void setMaxRetryTimeout(long timeout) {
+    this.maxRetryTimeout = timeout;
   }
 }
