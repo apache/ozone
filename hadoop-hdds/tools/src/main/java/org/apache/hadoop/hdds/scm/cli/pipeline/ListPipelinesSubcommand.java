@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.cli.pipeline;
 
 import com.google.common.base.Strings;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -53,7 +54,8 @@ public class ListPipelinesSubcommand extends ScmSubcommand {
     Stream<Pipeline> stream = scmClient.listPipelines().stream();
     if (!Strings.isNullOrEmpty(factor)) {
       stream = stream.filter(
-          p -> p.getFactor().toString().compareToIgnoreCase(factor) == 0);
+          p -> ReplicationConfig.getLegacyFactor(p.getReplicationConfig())
+              .toString().compareToIgnoreCase(factor) == 0);
     }
     if (!Strings.isNullOrEmpty(state)) {
       stream = stream.filter(p -> p.getPipelineState().toString()

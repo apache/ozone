@@ -27,10 +27,10 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -99,7 +99,8 @@ public class BenchMarkOzoneManager {
         // prepare SCM
         PipelineManager pipelineManager = scm.getPipelineManager();
         for (Pipeline pipeline : pipelineManager
-            .getPipelines(ReplicationType.RATIS, ReplicationFactor.THREE)) {
+            .getPipelines(
+                new RatisReplicationConfig(ReplicationFactor.THREE))) {
           pipelineManager.openPipeline(pipeline.getId());
         }
         scm.getEventQueue().fireEvent(SCMEvents.SAFE_MODE_STATUS,

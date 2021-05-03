@@ -23,8 +23,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.ha.MockSCMHADBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
@@ -105,20 +106,21 @@ public class TestReconPipelineManager {
 
     // Valid pipeline in Allocated state.
     Pipeline validPipeline = Pipeline.newBuilder()
-        .setFactor(HddsProtos.ReplicationFactor.ONE)
+        .setReplicationConfig(
+            new StandaloneReplicationConfig(ReplicationFactor.ONE))
         .setId(pipelinesFromScm.get(0).getId())
         .setNodes(pipelinesFromScm.get(0).getNodes())
         .setState(Pipeline.PipelineState.ALLOCATED)
-        .setType(ReplicationType.STAND_ALONE)
+
         .build();
 
     // Invalid pipeline.
     Pipeline invalidPipeline = Pipeline.newBuilder()
-        .setFactor(HddsProtos.ReplicationFactor.ONE)
+        .setReplicationConfig(
+            new StandaloneReplicationConfig(ReplicationFactor.ONE))
         .setId(PipelineID.randomId())
         .setNodes(Collections.singletonList(randomDatanodeDetails()))
         .setState(Pipeline.PipelineState.CLOSED)
-        .setType(HddsProtos.ReplicationType.STAND_ALONE)
         .build();
 
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);

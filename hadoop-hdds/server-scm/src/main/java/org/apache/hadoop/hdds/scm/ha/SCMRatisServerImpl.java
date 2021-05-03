@@ -22,13 +22,11 @@ import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import java.util.Iterator;
 import java.util.Collection;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
-
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -56,6 +54,7 @@ import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.apache.ratis.protocol.SetConfigurationRequest;
 import org.apache.ratis.server.RaftServer;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -125,34 +124,6 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   @Override
   public GrpcTlsConfig getGrpcTlsConfig() {
     return grpcTlsConfig;
-  }
-
-  public static void reinitialize(String clusterId, String scmId,
-      SCMNodeDetails details, OzoneConfiguration conf) throws IOException {
-    RaftServer server = null;
-    try {
-      server = newRaftServer(scmId, conf).build();
-      RaftGroup group = null;
-      Iterator<RaftGroup> iter = server.getGroups().iterator();
-      if (iter.hasNext()) {
-        group = iter.next();
-      }
-      if (group != null && group.getGroupId()
-          .equals(buildRaftGroupId(clusterId))) {
-        LOG.info("Ratis group with group Id {} already exists.",
-            group.getGroupId());
-        return;
-      } else {
-        // close the server instance so that pending locks on raft storage
-        // directory gets released if any and further initiliaze can succeed.
-        server.close();
-        initialize(clusterId, scmId, details, conf);
-      }
-    } finally {
-      if (server != null) {
-        server.close();
-      }
-    }
   }
 
   private static void waitForLeaderToBeReady(RaftServer server,
@@ -276,8 +247,15 @@ public class SCMRatisServerImpl implements SCMRatisServer {
    */
   @Override
   public NotLeaderException triggerNotLeaderException() {
-    return new NotLeaderException(
-        division.getMemberId(), null, division.getGroup().getPeers());
+    ByteString leaderId =
+        division.getInfo().getRoleInfoProto().getFollowerInfo().getLeaderInfo()
+            .getId().getId();
+    RaftPeer suggestedLeader = leaderId.isEmpty() ?
+        null :
+        division.getRaftConf().getPeer(RaftPeerId.valueOf(leaderId));
+    return new NotLeaderException(division.getMemberId(),
+        suggestedLeader,
+        division.getGroup().getPeers());
   }
 
   @Override
@@ -319,7 +297,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
       String scmId, String clusterId) {
     Preconditions.checkNotNull(scmId);
     final RaftGroupId groupId = buildRaftGroupId(clusterId);
-    RaftPeerId selfPeerId = RaftPeerId.getRaftPeerId(scmId);
+    RaftPeerId selfPeerId = getSelfPeerId(scmId);
 
     RaftPeer localRaftPeer = RaftPeer.newBuilder().setId(selfPeerId)
         // TODO : Should we use IP instead of hostname??
@@ -331,6 +309,10 @@ public class SCMRatisServerImpl implements SCMRatisServer {
     final RaftGroup group =
         RaftGroup.valueOf(groupId, raftPeers);
     return group;
+  }
+
+  public static RaftPeerId getSelfPeerId(String scmId) {
+    return RaftPeerId.getRaftPeerId(scmId);
   }
 
   @VisibleForTesting

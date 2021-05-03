@@ -26,6 +26,7 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 import picocli.CommandLine.PicocliException;
 
@@ -61,6 +62,10 @@ public final class GenerateOzoneRequiredConfigurations extends GenericCli {
       description = "Directory path where ozone-site file should be generated.")
   private String path;
 
+  @Option(names = "--security", description = "Generates security config " +
+      "template, update Kerberos principal and keytab file before use.")
+  private boolean genSecurityConf;
+
   /**
    * Entry point for using genconf tool.
    *
@@ -73,7 +78,7 @@ public final class GenerateOzoneRequiredConfigurations extends GenericCli {
 
   @Override
   public Void call() throws Exception {
-    generateConfigurations(path);
+    generateConfigurations(path, genSecurityConf);
     return null;
   }
 
@@ -84,6 +89,19 @@ public final class GenerateOzoneRequiredConfigurations extends GenericCli {
    * @throws JAXBException
    */
   public static void generateConfigurations(String path) throws
+      PicocliException, JAXBException, IOException {
+    generateConfigurations(path, false);
+  }
+
+  /**
+   * Generate ozone-site.xml at specified path.
+   * @param path
+   * @param genSecurityConf
+   * @throws PicocliException
+   * @throws JAXBException
+   */
+  public static void generateConfigurations(String path,
+      boolean genSecurityConf) throws
       PicocliException, JAXBException, IOException {
 
     if (!isValidPath(path)) {
@@ -108,7 +126,9 @@ public final class GenerateOzoneRequiredConfigurations extends GenericCli {
     List<OzoneConfiguration.Property> requiredProperties = new ArrayList<>();
 
     for (OzoneConfiguration.Property p : allProperties) {
-      if (p.getTag() != null && p.getTag().contains("REQUIRED")) {
+      if (p.getTag() != null && (p.getTag().contains("REQUIRED") ||
+          (genSecurityConf && p.getTag().contains("KERBEROS")))) {
+        // Set default value for common required configs
         if (p.getName().equalsIgnoreCase(
             OzoneConfigKeys.OZONE_METADATA_DIRS)) {
           p.setValue(System.getProperty(OzoneConsts.JAVA_TMP_DIR));
@@ -120,13 +140,27 @@ public final class GenerateOzoneRequiredConfigurations extends GenericCli {
           p.setValue(OzoneConsts.LOCALHOST);
         }
 
+        // Set default value for KERBEROS configs
+        if (p.getName().equalsIgnoreCase(
+            OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY)) {
+          p.setValue(OzoneConsts.OZONE_SECURITY_ENABLED_SECURE);
+        } else if (p.getName().equalsIgnoreCase(
+            OzoneConfigKeys.OZONE_HTTP_SECURITY_ENABLED_KEY)) {
+          p.setValue(OzoneConsts.OZONE_HTTP_SECURITY_ENABLED_SECURE);
+        } else if (p.getName().equalsIgnoreCase(
+            OzoneConfigKeys.OZONE_HTTP_FILTER_INITIALIZERS_KEY)) {
+          p.setValue(OzoneConsts.OZONE_HTTP_FILTER_INITIALIZERS_SECURE);
+        } else if (p.getName().endsWith(OzoneConsts.HTTP_AUTH_TYPE_SUFFIX)) {
+          p.setValue(OzoneConsts.KERBEROS_CONFIG_VALUE);
+        }
+
         requiredProperties.add(p);
       }
     }
 
-    OzoneConfiguration.XMLConfiguration requiredConfig =
+    OzoneConfiguration.XMLConfiguration generatedConfig =
         new OzoneConfiguration.XMLConfiguration();
-    requiredConfig.setProperties(requiredProperties);
+    generatedConfig.setProperties(requiredProperties);
 
     File output = new File(path, "ozone-site.xml");
     if(output.createNewFile()){
@@ -134,7 +168,7 @@ public final class GenerateOzoneRequiredConfigurations extends GenericCli {
           JAXBContext.newInstance(OzoneConfiguration.XMLConfiguration.class);
       Marshaller m = context.createMarshaller();
       m.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.TRUE);
-      m.marshal(requiredConfig, output);
+      m.marshal(generatedConfig, output);
 
       System.out.println("ozone-site.xml has been generated at " + path);
     } else {

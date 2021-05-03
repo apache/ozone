@@ -29,7 +29,6 @@ import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 
-import static org.apache.hadoop.ozone.OzoneConsts.SCM_ID;
 import static org.apache.hadoop.ozone.om.OmGenericConfig.ConfigStrings.OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION;
 
 /**
@@ -52,14 +51,6 @@ public class OMStorage extends Storage {
             OMLayoutVersionManager::maxLayoutVersion));
   }
 
-  public void setScmId(String scmId) throws IOException {
-    if (getState() == StorageState.INITIALIZED) {
-      throw new IOException("OM is already initialized.");
-    } else {
-      getStorageInfo().setProperty(SCM_ID, scmId);
-    }
-  }
-
   public void setOmCertSerialId(String certSerialId) throws IOException {
     getStorageInfo().setProperty(OM_CERT_SERIAL_ID, certSerialId);
   }
@@ -70,14 +61,6 @@ public class OMStorage extends Storage {
     } else {
       getStorageInfo().setProperty(OM_ID, omId);
     }
-  }
-
-  /**
-   * Retrieves the SCM ID from the version file.
-   * @return SCM_ID
-   */
-  public String getScmId() {
-    return getStorageInfo().getProperty(SCM_ID);
   }
 
   /**

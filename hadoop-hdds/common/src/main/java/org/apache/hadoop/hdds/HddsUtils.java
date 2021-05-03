@@ -27,6 +27,7 @@ import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.file.Path;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -37,6 +38,7 @@ import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
@@ -56,6 +58,9 @@ import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_HOST_NAME_
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
@@ -95,52 +100,57 @@ public final class HddsUtils {
    *
    * @return Target {@code InetSocketAddress} for the SCM client endpoint.
    */
-  public static InetSocketAddress getScmAddressForClients(
+  public static Collection<InetSocketAddress> getScmAddressForClients(
       ConfigurationSource conf) {
-    Optional<String> host = getHostNameFromConfigKeys(conf,
-        ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY);
 
-    if (!host.isPresent()) {
-      // Fallback to Ozone SCM name
-      host = Optional.of(getSingleSCMAddress(conf).getHostName());
+    if (SCMHAUtils.getScmServiceId(conf) != null) {
+      List<SCMNodeInfo> scmNodeInfoList = SCMNodeInfo.buildNodeInfo(conf);
+      Collection<InetSocketAddress> scmAddressList =
+          new HashSet<>(scmNodeInfoList.size());
+      for (SCMNodeInfo scmNodeInfo : scmNodeInfoList) {
+        if (scmNodeInfo.getScmClientAddress() == null) {
+          throw new ConfigurationException("Ozone scm client address is not " +
+              "set for SCM service-id " + scmNodeInfo.getServiceId() +
+              "node-id" + scmNodeInfo.getNodeId());
+        }
+        scmAddressList.add(
+            NetUtils.createSocketAddr(scmNodeInfo.getScmClientAddress()));
+      }
+      return scmAddressList;
+    } else {
+      String address = conf.getTrimmed(OZONE_SCM_CLIENT_ADDRESS_KEY);
+      int port = -1;
+
+      if (address == null) {
+        // fall back to ozone.scm.names for non-ha
+        Collection<String> scmAddresses =
+            conf.getTrimmedStringCollection(OZONE_SCM_NAMES);
+
+        if (scmAddresses.isEmpty()) {
+          throw new ConfigurationException("Ozone scm client address is not " +
+              "set. Configure one of these config " +
+              OZONE_SCM_CLIENT_ADDRESS_KEY + ", " + OZONE_SCM_NAMES);
+        }
+
+        if (scmAddresses.size() > 1) {
+          throw new ConfigurationException("For non-HA SCM " + OZONE_SCM_NAMES
+              + " should be set with single address");
+        }
+
+        address = scmAddresses.iterator().next();
+
+        port = conf.getInt(OZONE_SCM_CLIENT_PORT_KEY,
+            OZONE_SCM_CLIENT_PORT_DEFAULT);
+      } else {
+        port = getHostPort(address)
+            .orElse(conf.getInt(OZONE_SCM_CLIENT_PORT_KEY,
+                OZONE_SCM_CLIENT_PORT_DEFAULT));
+      }
+
+      return Collections.singletonList(
+          NetUtils.createSocketAddr(getHostName(address).get() + ":" + port));
     }
-
-    final int port = getPortNumberFromConfigKeys(conf,
-        ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY)
-        .orElse(ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT);
-
-    return NetUtils.createSocketAddr(host.get() + ":" + port);
   }
-
-  /**
-   * Retrieve the socket address that should be used by clients to connect
-   * to the SCM for block service. If
-   * {@link ScmConfigKeys#OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY} is not defined
-   * then {@link ScmConfigKeys#OZONE_SCM_CLIENT_ADDRESS_KEY} is used. If neither
-   * is defined then {@link ScmConfigKeys#OZONE_SCM_NAMES} is used.
-   *
-   * @return Target {@code InetSocketAddress} for the SCM block client endpoint.
-   * @throws IllegalArgumentException if configuration is not defined.
-   */
-  public static InetSocketAddress getScmAddressForBlockClients(
-      ConfigurationSource conf) {
-    Optional<String> host = getHostNameFromConfigKeys(conf,
-        ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY,
-        ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY);
-
-    if (!host.isPresent()) {
-      // Fallback to Ozone SCM name
-      host = Optional.of(getSingleSCMAddress(conf).getHostName());
-    }
-
-    final int port = getPortNumberFromConfigKeys(conf,
-        ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY)
-        .orElse(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT);
-
-    return NetUtils.createSocketAddr(host.get() + ":" + port);
-  }
-
-
 
   /**
    * Retrieve the hostname, trying the supplied config keys in order.
@@ -231,7 +241,7 @@ public final class HddsUtils {
    * @return A collection of SCM addresses
    * @throws IllegalArgumentException If the configuration is invalid
    */
-  public static Collection<InetSocketAddress> getSCMAddresses(
+  public static Collection<InetSocketAddress> getSCMAddressForDatanodes(
       ConfigurationSource conf) {
 
     // First check HA style config, if not defined fall back to OZONE_SCM_NAMES
@@ -298,22 +308,6 @@ public final class HddsUtils {
     }
     int port = getHostPort(name).orElse(OZONE_RECON_DATANODE_PORT_DEFAULT);
     return NetUtils.createSocketAddr(hostname.get(), port);
-  }
-
-  /**
-   * Retrieve the address of the only SCM (as currently multiple ones are not
-   * supported).
-   *
-   * @return SCM address
-   * @throws IllegalArgumentException if {@code conf} has more than one SCM
-   *         address or it has none
-   */
-  public static InetSocketAddress getSingleSCMAddress(
-      ConfigurationSource conf) {
-    Collection<InetSocketAddress> singleton = getSCMAddresses(conf);
-   // Preconditions.checkArgument(singleton.size() == 1,
-    //    MULTIPLE_SCM_NOT_YET_SUPPORTED);
-    return singleton.iterator().next();
   }
 
   /**

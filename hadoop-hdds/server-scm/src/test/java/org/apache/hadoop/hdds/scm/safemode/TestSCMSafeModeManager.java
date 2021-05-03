@@ -28,9 +28,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -351,8 +353,8 @@ public class TestSCMSafeModeManager {
     for (int i = 0; i < pipelineCount; i++) {
       // Create pipeline
       Pipeline pipeline = pipelineManager.createPipeline(
-          HddsProtos.ReplicationType.RATIS,
-          HddsProtos.ReplicationFactor.THREE);
+          new RatisReplicationConfig(
+              ReplicationFactor.THREE));
 
       pipelineManager.openPipeline(pipeline.getId());
       // Mark pipeline healthy
@@ -600,8 +602,8 @@ public class TestSCMSafeModeManager {
           mockRatisProvider);
 
       Pipeline pipeline = pipelineManager.createPipeline(
-          HddsProtos.ReplicationType.RATIS,
-          HddsProtos.ReplicationFactor.THREE);
+          new RatisReplicationConfig(
+              ReplicationFactor.THREE));
 
       pipeline = pipelineManager.getPipeline(pipeline.getId());
       MockRatisPipelineProvider.markPipelineHealthy(pipeline);
@@ -699,12 +701,12 @@ public class TestSCMSafeModeManager {
     Pipeline pipeline;
     try {
       pipeline = pipelineManager.createPipeline(
-          HddsProtos.ReplicationType.RATIS,
-          HddsProtos.ReplicationFactor.THREE);
+          new RatisReplicationConfig(
+              ReplicationFactor.THREE));
     } catch (SCMException ex) {
       pipeline = pipelineManager.getPipelines(
-          HddsProtos.ReplicationType.RATIS,
-          HddsProtos.ReplicationFactor.THREE).get(0);
+          new RatisReplicationConfig(
+              ReplicationFactor.THREE)).get(0);
     }
 
     // Mark pipeline healthy

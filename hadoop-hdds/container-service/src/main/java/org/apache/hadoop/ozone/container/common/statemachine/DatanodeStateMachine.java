@@ -198,7 +198,7 @@ public class DatanodeStateMachine implements Closeable {
     int totalServerCount = reconServerCount;
 
     try {
-      totalServerCount += HddsUtils.getSCMAddresses(conf).size();
+      totalServerCount += HddsUtils.getSCMAddressForDatanodes(conf).size();
     } catch (Exception e) {
       LOG.error("Fail to get scm addresses", e);
     }

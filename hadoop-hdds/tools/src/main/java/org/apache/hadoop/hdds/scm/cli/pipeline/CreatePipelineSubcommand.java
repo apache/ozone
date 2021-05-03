@@ -66,8 +66,7 @@ public class CreatePipelineSubcommand extends ScmSubcommand {
 
     if (pipeline != null) {
       System.out.println(pipeline.getId().toString() +
-          " is created. Factor: " + pipeline.getFactor() +
-          ", Type: " + pipeline.getType());
+          " is created. " + pipeline.toString());
     }
   }
 }

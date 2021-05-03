@@ -39,6 +39,7 @@ public final class OzoneConsts {
 
   public static final String STORAGE_DIR = "scm";
   public static final String SCM_ID = "scmUuid";
+  public static final String SCM_HA = "scmHA";
   public static final String CLUSTER_ID_PREFIX = "CID-";
   public static final String SCM_CERT_SERIAL_ID = "scmCertSerialId";
   public static final String PRIMARY_SCM_NODE_ID = "primaryScmNodeId";
@@ -126,7 +127,10 @@ public final class OzoneConsts {
    */
   public static final String CONTAINER_DB_SUFFIX = "container.db";
   public static final String PIPELINE_DB_SUFFIX = "pipeline.db";
+  public static final String CRL_DB_SUFFIX = "crl.db";
   public static final String DN_CONTAINER_DB = "-dn-"+ CONTAINER_DB_SUFFIX;
+  public static final String DN_CRL_DB = "dn-"+ CRL_DB_SUFFIX;
+  public static final String CRL_DB_DIRECTORY_NAME = "crl";
   public static final String OM_DB_NAME = "om.db";
   public static final String SCM_DB_NAME = "scm.db";
   public static final String OM_DB_BACKUP_PREFIX = "om.db.backup.";
@@ -437,4 +441,12 @@ public final class OzoneConsts {
 
   // Layout Version written into Meta Table ONLY during finalization.
   public static final String LAYOUT_VERSION_KEY = "#LAYOUTVERSION";
+
+  // Kerberos constants
+  public static final String KERBEROS_CONFIG_VALUE = "kerberos";
+  public static final String HTTP_AUTH_TYPE_SUFFIX = "http.auth.type";
+  public static final String OZONE_SECURITY_ENABLED_SECURE = "true";
+  public static final String OZONE_HTTP_SECURITY_ENABLED_SECURE = "true";
+  public static final String OZONE_HTTP_FILTER_INITIALIZERS_SECURE =
+      "org.apache.hadoop.security.AuthenticationFilterInitializer";
 }

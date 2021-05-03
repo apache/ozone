@@ -38,6 +38,7 @@ import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -49,6 +50,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.scm.proxy.SCMClientConfig;
 import org.apache.hadoop.hdds.scm.proxy.SCMContainerLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.scm.safemode.HealthyPipelineSafeModeRule;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
@@ -245,8 +247,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       TimeoutException, InterruptedException {
     GenericTestUtils.waitFor(() -> {
       int openPipelineCount = scm.getPipelineManager().
-          getPipelines(HddsProtos.ReplicationType.RATIS,
-              factor, Pipeline.PipelineState.OPEN).size();
+          getPipelines(new RatisReplicationConfig(factor),
+              Pipeline.PipelineState.OPEN).size();
       return openPipelineCount >= 1;
     }, 1000, timeoutInMs);
   }
@@ -677,6 +679,10 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
               pipelineNumLimit : DEFAULT_PIPELIME_LIMIT);
       conf.setTimeDuration(OMConfigKeys.OZONE_OM_RATIS_MINIMUM_TIMEOUT_KEY,
           DEFAULT_RATIS_RPC_TIMEOUT_SEC, TimeUnit.SECONDS);
+      SCMClientConfig scmClientConfig = conf.getObject(SCMClientConfig.class);
+      // default max retry timeout set to 30s
+      scmClientConfig.setMaxRetryTimeout(30 * 1000);
+      conf.setFromObject(scmClientConfig);
       configureTrace();
     }
 
@@ -735,13 +741,10 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         return;
       }
       omStorage.setClusterId(clusterId);
-      if (scmId.isPresent()) {
-        omStorage.setScmId(scmId.get());
-      }
       omStorage.setOmId(omId.orElse(UUID.randomUUID().toString()));
       // Initialize ozone certificate client if security is enabled.
       if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
-        OzoneManager.initializeSecurity(conf, omStorage);
+        OzoneManager.initializeSecurity(conf, omStorage, scmId.get());
       }
       omStorage.initialize();
     }

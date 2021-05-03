@@ -30,12 +30,11 @@ import java.util.UUID;
 
 import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
+import static org.apache.hadoop.ozone.OzoneConsts.SCM_HA;
+import static org.apache.hadoop.ozone.OzoneConsts.STORAGE_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.PRIMARY_SCM_NODE_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_CERT_SERIAL_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_ID;
-import static org.apache.hadoop.ozone.OzoneConsts.STORAGE_DIR;
-
-
 /**
  * SCMStorageConfig is responsible for management of the
  * StorageDirectories used by the SCM.
@@ -65,12 +64,26 @@ public class SCMStorageConfig extends Storage {
     }
   }
 
+  public void setSCMHAFlag(boolean flag) {
+    if (!isSCMHAEnabled()) {
+      getStorageInfo().setProperty(SCM_HA, Boolean.toString(flag));
+    }
+  }
+
   /**
    * Retrieves the SCM ID from the version file.
    * @return SCM_ID
    */
   public String getScmId() {
     return getStorageInfo().getProperty(SCM_ID);
+  }
+
+  /**
+   * Retrieves the SCM HA flag from the version file.
+   * @return SCM_ID
+   */
+  public boolean isSCMHAEnabled() {
+    return Boolean.valueOf(getStorageInfo().getProperty(SCM_HA));
   }
 
   @Override
