@@ -724,8 +724,9 @@ public class TestBlockDeletingService {
       // in all the containers are deleted)).
       deleteAndWait(service, 2);
 
+      long totalContainerBlocks = blocksPerContainer*containerCount;
       GenericTestUtils.waitFor(() ->
-              blocksPerContainer*containerCount*blockSpace ==
+              totalContainerBlocks*blockSpace ==
                       (totalContainerSpace-
                               currentBlockSpace(containerData, containerCount)),
               100, 3000);
