@@ -78,7 +78,6 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         OMConfigKeys.OZONE_FS_TRASH_CHECKPOINT_INTERVAL_KEY,
         OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE,
         OzoneConfigKeys.OZONE_S3_AUTHINFO_MAX_LIFETIME_KEY,
-        ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR,
         ReconServerConfigKeys.OZONE_RECON_METRICS_HTTP_CONNECTION_TIMEOUT,
         ReconServerConfigKeys
             .OZONE_RECON_METRICS_HTTP_CONNECTION_REQUEST_TIMEOUT,
