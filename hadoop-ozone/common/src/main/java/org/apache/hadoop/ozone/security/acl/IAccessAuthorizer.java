@@ -20,7 +20,6 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.security.UserGroupInformation;
 
 import java.util.BitSet;
 
