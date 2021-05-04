@@ -28,6 +28,9 @@ import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.amazonaws.AmazonServiceException;
+import com.amazonaws.services.s3.AmazonS3;
+import com.amazonaws.services.s3.model.HeadBucketRequest;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
@@ -437,6 +440,23 @@ public class BaseFreonGenerator {
   }
 
   /**
+   * Create missing target bucket for S3KeyGenerator.
+   */
+  public void ensureBucketExist(AmazonS3 s3, String bucketName) {
+    HeadBucketRequest headBucketRequest = new HeadBucketRequest(bucketName);
+    try {
+      s3.headBucket(headBucketRequest);
+    } catch (AmazonServiceException ex) {
+      if (ex.getErrorCode().equals("NoSuchBucket")) {
+        s3.createBucket(bucketName);
+        setBucketCreated();
+      } else {
+        throw ex;
+      }
+    }
+  }
+
+  /**
    * Calculate checksum of a byte array.
    */
   public static byte[] getDigest(byte[] content) {
@@ -509,5 +529,9 @@ public class BaseFreonGenerator {
 
   protected boolean isBucketCreated() {
     return bucketCreated;
+  }
+
+  protected void setBucketCreated() {
+    this.bucketCreated = true;
   }
 }
