@@ -447,6 +447,8 @@ public class TestBlockDeletingService {
       // An interval will delete 1 * 2 blocks
       deleteAndWait(svc, 1);
 
+      GenericTestUtils.waitFor(() ->
+              containerData.get(0).getBytesUsed() < 3, 100, 3000);
       // After first interval 2 blocks will be deleted. Hence, current space
       // used by the container should be less than the space used by the
       // container initially(before running deletion services).
@@ -456,8 +458,8 @@ public class TestBlockDeletingService {
 
       // After deletion of all 3 blocks, space used by the containers
       // should be zero.
-      containerSpace = containerData.get(0).getBytesUsed();
-      Assert.assertTrue(containerSpace == 0);
+      GenericTestUtils.waitFor(() ->
+              containerData.get(0).getBytesUsed() == 0, 100, 3000);
 
       // Check finally DB counters.
       // Not checking bytes used, as handler is a mock call.
@@ -629,8 +631,11 @@ public class TestBlockDeletingService {
       // Hence, space used by the container of whose block has been
       // deleted should be zero.
       deleteAndWait(service, 1);
-      Assert.assertTrue((containerData.get(0).getBytesUsed() == 0)
-          || containerData.get(1).getBytesUsed() == 0);
+
+      GenericTestUtils.waitFor(() ->
+              (containerData.get(0).getBytesUsed() == 0 ||
+                      containerData.get(1).getBytesUsed() == 0),
+              100, 3000);
 
       Assert.assertFalse((containerData.get(0).getBytesUsed() == 0) && (
           containerData.get(1).getBytesUsed() == 0));
@@ -639,8 +644,10 @@ public class TestBlockDeletingService {
       // containers should be zero.
       deleteAndWait(service, 2);
 
-      Assert.assertTrue((containerData.get(0).getBytesUsed() == 0) && (
-          containerData.get(1).getBytesUsed() == 0));
+      GenericTestUtils.waitFor(() ->
+              (containerData.get(0).getBytesUsed() ==
+                      0 && containerData.get(1).getBytesUsed() == 0),
+              100, 3000);
     } finally {
       service.shutdown();
     }
@@ -702,9 +709,12 @@ public class TestBlockDeletingService {
       // Deleted space of 10 blocks should be equal to (initial total space
       // of container - current total space of container).
       deleteAndWait(service, 1);
-      Assert.assertEquals(blockLimitPerInterval * blockSpace,
-          (totalContainerSpace - currentBlockSpace(containerData,
-              containerCount)));
+
+      GenericTestUtils.waitFor(() ->
+              blockLimitPerInterval*blockSpace ==
+                      (totalContainerSpace-
+                              currentBlockSpace(containerData, containerCount)),
+              100, 3000);
 
       // There is only 5 blocks left to runDeletingTasks
 
@@ -713,9 +723,13 @@ public class TestBlockDeletingService {
       // - current total space of container(it will be zero as all blocks
       // in all the containers are deleted)).
       deleteAndWait(service, 2);
-      Assert.assertEquals(blocksPerContainer * containerCount * blockSpace,
-          (totalContainerSpace - currentBlockSpace(containerData,
-              containerCount)));
+
+      GenericTestUtils.waitFor(() ->
+              blocksPerContainer*containerCount*blockSpace ==
+                      (totalContainerSpace-
+                              currentBlockSpace(containerData, containerCount)),
+              100, 3000);
+
     } finally {
       service.shutdown();
     }
