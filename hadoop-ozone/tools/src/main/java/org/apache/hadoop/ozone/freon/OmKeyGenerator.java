@@ -37,6 +37,8 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 
 import com.codahale.metrics.Timer;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -53,6 +55,8 @@ import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL
     showDefaultValues = true)
 public class OmKeyGenerator extends BaseFreonGenerator
     implements Callable<Void> {
+  private static final Logger LOG =
+      LoggerFactory.getLogger(OmKeyGenerator.class);
 
   @Option(names = {"-v", "--volume"},
       description = "Name of the bucket which contains the test data. Will be"
@@ -137,7 +141,9 @@ public class OmKeyGenerator extends BaseFreonGenerator
 
   @Override
   protected void doCleanUp() {
-    OmDeleteKeys omDeleteKeys = new OmDeleteKeys(volumeName, bucketName, keyList);
+    LOG.info("Cleaning up generated objects.");
+    OmDeleteKeys omDeleteKeys =
+        new OmDeleteKeys(volumeName, bucketName, keyList);
     try {
       ozoneManagerClient.deleteKeys(omDeleteKeys);
       if (bucketCreated) {

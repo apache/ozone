@@ -30,6 +30,8 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 
 import com.codahale.metrics.Timer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -44,6 +46,8 @@ import picocli.CommandLine.Option;
     showDefaultValues = true)
 public class OmBucketGenerator extends BaseFreonGenerator
     implements Callable<Void> {
+  private static final Logger LOG =
+      LoggerFactory.getLogger(OmBucketGenerator.class);
 
   @Option(names = {"-v", "--volume"},
       description = "Name of the bucket which contains the test data. Will be"
@@ -110,6 +114,7 @@ public class OmBucketGenerator extends BaseFreonGenerator
 
   @Override
   protected void doCleanUp() {
+    LOG.info("Cleaning up generated objects.");
     try {
       for (String bucket : bucketList) {
         ozoneManagerClient.deleteBucket(volumeName, bucket);

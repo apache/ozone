@@ -33,6 +33,8 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 
 import com.codahale.metrics.Timer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -48,6 +50,8 @@ import picocli.CommandLine.Option;
 public class OzoneClientKeyGenerator extends BaseFreonGenerator
     implements Callable<Void> {
 
+  private static final Logger LOG =
+      LoggerFactory.getLogger(OzoneClientKeyGenerator.class);
   @Option(names = {"-v", "--volume"},
       description = "Name of the bucket which contains the test data. Will be"
           + " created if missing.",
@@ -140,6 +144,7 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
 
   @Override
   protected void doCleanUp() {
+    LOG.info("Cleaning up generated objects.");
     try (OzoneClient rpcClient = createOzoneClient(omServiceID,
         ozoneConfiguration)){
       bucket.deleteKeys(keyList);

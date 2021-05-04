@@ -232,7 +232,7 @@ public class BaseFreonGenerator {
    * Provides a way to clean up the generated objects.
    */
   protected void doCleanUp() {
-    // no-op
+    LOG.info("Nothing generated, skip cleaning up.");
   }
 
   private void cleanUp() {
