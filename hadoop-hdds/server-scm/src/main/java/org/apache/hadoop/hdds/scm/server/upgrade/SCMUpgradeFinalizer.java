@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.CLOSED;
 
 import java.io.IOException;
 
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
@@ -101,9 +102,10 @@ public class SCMUpgradeFinalizer extends
     // finalization, so clients can write.
     boolean hasPipeline = false;
     while (!hasPipeline) {
-      int pipelineCount = pipelineManager.getPipelines(
-          HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.THREE,
-          Pipeline.PipelineState.OPEN).size();
+      ReplicationConfig ratisThree =
+          ReplicationConfig.fromTypeAndFactor(HddsProtos.ReplicationType.RATIS,
+          HddsProtos.ReplicationFactor.THREE);
+      int pipelineCount = pipelineManager.getPipelines(ratisThree).size();
 
       hasPipeline = (pipelineCount >= 1);
       if (!hasPipeline) {

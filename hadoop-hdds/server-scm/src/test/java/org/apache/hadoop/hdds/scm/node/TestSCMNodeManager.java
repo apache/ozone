@@ -34,6 +34,7 @@ import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -93,6 +94,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.finalizeNewLayoutVersionCommand;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto.ErrorCode.errorNodeNotPermitted;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto.ErrorCode.success;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.TestUtils.getRandomPipelineReports;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.*;
@@ -384,9 +386,10 @@ public class TestSCMNodeManager {
   private void assertPipelineCreationFailsWithNotEnoughNodes(
       int actualNodeCount) throws Exception {
     try {
-      scm.getPipelineManager()
-          .createPipeline(HddsProtos.ReplicationType.RATIS,
+      ReplicationConfig ratisThree =
+          ReplicationConfig.fromTypeAndFactor(HddsProtos.ReplicationType.RATIS,
               HddsProtos.ReplicationFactor.THREE);
+      scm.getPipelineManager().createPipeline(ratisThree);
       Assert.fail("3 nodes should not have been found for a pipeline.");
     } catch (SCMException ex) {
       Assert.assertTrue(ex.getMessage().contains("Required 3. Found " +
@@ -404,9 +407,13 @@ public class TestSCMNodeManager {
 
     LambdaTestUtils.await(10000, 1000, () -> {
 
+      ReplicationConfig replConfig =
+          ReplicationConfig.fromTypeAndFactor(HddsProtos.ReplicationType.RATIS,
+              factor);
+
       // Make sure that none of these pipelines use nodes outside of allowedDNs.
       List<Pipeline> pipelines = scm.getPipelineManager()
-          .getPipelines(HddsProtos.ReplicationType.RATIS, factor);
+          .getPipelines(replConfig);
 
       for (Pipeline pipeline: pipelines) {
         for(DatanodeDetails pipelineDN: pipeline.getNodes()) {
@@ -556,10 +563,21 @@ public class TestSCMNodeManager {
     OzoneConfiguration conf = getConf();
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, interval,
         MILLISECONDS);
+    // If factor 1 pipelines are auto created, registering the new node will
+    // trigger a pipeline creation command which may interfere with command
+    // checking in this test.
+    conf.setBoolean(OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE, false);
 
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
       DatanodeDetails dn = TestUtils.createRandomDatanodeAndRegister(
           nodeManager);
+
+      LayoutVersionManager versionManager =
+          nodeManager.getLayoutVersionManager();
+      final LayoutVersionProto layoutInfo = toLayoutVersionProto(
+          versionManager.getMetadataLayoutVersion(),
+          versionManager.getSoftwareLayoutVersion());
+
       long expiry = System.currentTimeMillis() / 1000 + 1000;
       nodeManager.setNodeOperationalState(dn,
           HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE, expiry);
@@ -567,7 +585,7 @@ public class TestSCMNodeManager {
       // If found mismatch, leader SCM fires a SetNodeOperationalStateCommand
       // to update the opState persisted in Datanode.
       scm.getScmContext().updateLeaderAndTerm(true, 1);
-      List<SCMCommand> commands = nodeManager.processHeartbeat(dn);
+      List<SCMCommand> commands = nodeManager.processHeartbeat(dn, layoutInfo);
 
       Assert.assertTrue(commands.get(0).getClass().equals(
           SetNodeOperationalStateCommand.class));
@@ -576,7 +594,7 @@ public class TestSCMNodeManager {
       // If found mismatch, follower SCM update its own opState according
       // to the heartbeat, and no SCMCommand will be fired.
       scm.getScmContext().updateLeaderAndTerm(false, 2);
-      commands = nodeManager.processHeartbeat(dn);
+      commands = nodeManager.processHeartbeat(dn, layoutInfo);
 
       assertEquals(0, commands.size());
 
