@@ -91,4 +91,5 @@ public class ECReplicationConfig implements ReplicationConfig {
   public int hashCode() {
     return Objects.hash(data, parity);
   }
+
 }
