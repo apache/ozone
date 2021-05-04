@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
+import org.apache.hadoop.ozone.container.common.utils.db.DatanodeDBProfile;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume
     .RoundRobinVolumeChoosingPolicy;
@@ -67,6 +68,7 @@ import java.util.Map;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -434,29 +436,36 @@ public class TestKeyValueContainer {
   }
 
   @Test
-  public void testContainersShareColumnFamilyOptions() throws Exception {
-    // Get a read only view (not a copy) of the options cache.
-    Map<ConfigurationSource, ColumnFamilyOptions> cachedOptions =
-        AbstractDatanodeStore.getColumnFamilyOptionsCache();
+  public void testContainersShareColumnFamilyOptions() {
+    ConfigurationSource conf = new OzoneConfiguration();
 
-    // Create Container 1
-    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
-    ColumnFamilyOptions options1 = cachedOptions.get(CONF);
-    Assert.assertNotNull(options1);
+    // Make sure ColumnFamilyOptions are same for a particular db profile
+    for (Supplier<DatanodeDBProfile> dbProfileSupplier : new Supplier[] {
+        DatanodeDBProfile.Disk::new, DatanodeDBProfile.SSD::new }) {
+      // ColumnFamilyOptions should be same across configurations
+      ColumnFamilyOptions columnFamilyOptions1 = dbProfileSupplier.get()
+          .getColumnFamilyOptions(new OzoneConfiguration());
+      ColumnFamilyOptions columnFamilyOptions2 = dbProfileSupplier.get()
+          .getColumnFamilyOptions(new OzoneConfiguration());
+      Assert.assertEquals(columnFamilyOptions1, columnFamilyOptions2);
 
-    // Create Container 2
-    keyValueContainerData = new KeyValueContainerData(2L,
-        layout,
-        (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
-        datanodeId.toString());
-    keyValueContainer = new KeyValueContainer(keyValueContainerData, CONF);
-    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+      // ColumnFamilyOptions should be same when queried multiple times
+      // for a particulat configuration
+      columnFamilyOptions1 = dbProfileSupplier.get()
+          .getColumnFamilyOptions(conf);
+      columnFamilyOptions2 = dbProfileSupplier.get()
+          .getColumnFamilyOptions(conf);
+      Assert.assertEquals(columnFamilyOptions1, columnFamilyOptions2);
+    }
 
-    ColumnFamilyOptions options2 = cachedOptions.get(CONF);
-    Assert.assertNotNull(options2);
-
-    // Column family options object should be reused.
-    Assert.assertSame(options1, options2);
+    // Make sure ColumnFamilyOptions are different for different db profile
+    DatanodeDBProfile diskProfile = new DatanodeDBProfile.Disk();
+    DatanodeDBProfile ssdProfile = new DatanodeDBProfile.SSD();
+    Assert.assertNotEquals(
+        diskProfile.getColumnFamilyOptions(new OzoneConfiguration()),
+        ssdProfile.getColumnFamilyOptions(new OzoneConfiguration()));
+    Assert.assertNotEquals(diskProfile.getColumnFamilyOptions(conf),
+        ssdProfile.getColumnFamilyOptions(conf));
   }
 
   @Test
@@ -464,7 +473,7 @@ public class TestKeyValueContainer {
     // Create Container 1
     keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
 
-    DBProfile outProfile1;
+    DatanodeDBProfile outProfile1;
     try (ReferenceCountedDB db1 =
         BlockUtils.getDB(keyValueContainer.getContainerData(), CONF)) {
       DatanodeStore store1 = db1.getStore();
@@ -484,7 +493,7 @@ public class TestKeyValueContainer {
     keyValueContainer = new KeyValueContainer(keyValueContainerData, otherConf);
     keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
 
-    DBProfile outProfile2;
+    DatanodeDBProfile outProfile2;
     try (ReferenceCountedDB db2 =
         BlockUtils.getDB(keyValueContainer.getContainerData(), otherConf)) {
       DatanodeStore store2 = db2.getStore();
