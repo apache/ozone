@@ -25,8 +25,6 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Con
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.QUASI_CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY_READONLY;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.OPEN;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.INITIAL_VERSION;
@@ -50,6 +48,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -115,6 +114,10 @@ public class TestHDDSUpgrade {
   private final int numContainersCreated = 1;
   private HDDSLayoutVersionManager scmVersionManager;
   private AtomicBoolean testPassed = new AtomicBoolean(true);
+
+  private static final ReplicationConfig RATIS_THREE =
+      ReplicationConfig.fromTypeAndFactor(HddsProtos.ReplicationType.RATIS,
+          HddsProtos.ReplicationFactor.THREE);
 
   /**
    * Create a MiniDFSCluster for testing.
@@ -212,7 +215,7 @@ public class TestHDDSUpgrade {
     // pipeline to use.
     try {
       GenericTestUtils.waitFor(() -> {
-        int pipelineCount = scmPipelineManager.getPipelines(RATIS, THREE, OPEN)
+        int pipelineCount = scmPipelineManager.getPipelines(RATIS_THREE, OPEN)
             .size();
         if (pipelineCount >= 1) {
           return true;
@@ -222,7 +225,7 @@ public class TestHDDSUpgrade {
     } catch (TimeoutException | InterruptedException e) {
       Assert.fail("Timeout waiting for Upgrade to complete on SCM.");
     }
-    int pipelineCount = scmPipelineManager.getPipelines(RATIS, THREE, OPEN)
+    int pipelineCount = scmPipelineManager.getPipelines(RATIS_THREE, OPEN)
         .size();
     Assert.assertTrue(pipelineCount >= 1);
 
@@ -321,11 +324,11 @@ public class TestHDDSUpgrade {
    * Helper function to test that we can create new pipelines Post-Upgrade.
    */
   private void testPostUpgradePipelineCreation() throws IOException {
-    Pipeline ratisPipeline1 = scmPipelineManager.createPipeline(RATIS, THREE);
+    Pipeline ratisPipeline1 = scmPipelineManager.createPipeline(RATIS_THREE);
     scmPipelineManager.openPipeline(ratisPipeline1.getId());
     Assert.assertEquals(0,
         scmPipelineManager.getNumberOfContainers(ratisPipeline1.getId()));
-    PipelineID pid = scmContainerManager.allocateContainer(RATIS, THREE,
+    PipelineID pid = scmContainerManager.allocateContainer(RATIS_THREE,
         "Owner1").getPipelineID();
     Assert.assertEquals(1, scmPipelineManager.getNumberOfContainers(pid));
     Assert.assertEquals(pid, ratisPipeline1.getId());
@@ -362,7 +365,7 @@ public class TestHDDSUpgrade {
   private void waitForPipelineCreated() throws Exception {
     LambdaTestUtils.await(10000, 500, () -> {
       List<Pipeline> pipelines =
-          scmPipelineManager.getPipelines(RATIS, THREE, OPEN);
+          scmPipelineManager.getPipelines(RATIS_THREE, OPEN);
       return pipelines.size() == 1;
     });
   }
@@ -373,7 +376,7 @@ public class TestHDDSUpgrade {
   private void createTestContainers() throws IOException {
     XceiverClientManager xceiverClientManager = new XceiverClientManager(conf);
     ContainerInfo ci1 = scmContainerManager.allocateContainer(
-        RATIS, THREE, "Owner1");
+        RATIS_THREE, "Owner1");
     Pipeline ratisPipeline1 =
         scmPipelineManager.getPipeline(ci1.getPipelineID());
     scmPipelineManager.openPipeline(ratisPipeline1.getId());
@@ -399,7 +402,7 @@ public class TestHDDSUpgrade {
     testPreUpgradeConditionsDataNodes();
 
     Set<PipelineID> preUpgradeOpenPipelines =
-        scmPipelineManager.getPipelines(RATIS, THREE, OPEN)
+        scmPipelineManager.getPipelines(RATIS_THREE, OPEN)
             .stream()
             .map(Pipeline::getId)
             .collect(Collectors.toSet());
@@ -414,7 +417,7 @@ public class TestHDDSUpgrade {
     }
 
     Set<PipelineID> postUpgradeOpenPipelines =
-        scmPipelineManager.getPipelines(RATIS, THREE, OPEN)
+        scmPipelineManager.getPipelines(RATIS_THREE, OPEN)
             .stream()
             .map(Pipeline::getId)
             .collect(Collectors.toSet());
