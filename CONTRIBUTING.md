@@ -13,7 +13,7 @@ We welcome contributions of:
    * [Newbie Ozone jiras](https://s.apache.org/OzoneNewbieJiras)
    * [All open and unassigned Ozone jiras](https://s.apache.org/OzoneUnassignedJiras)
  * **Documentation Improvements**: You can submit improvements to either:
-     * Ozone website. Instructions are here: [Modifying the Ozone Website](https://cwiki.apache.org/confluence/display/HADOOP/Modifying+the+Ozone+Website)
+     * Ozone website. Instructions are here: [Modifying the Ozone Website](https://cwiki.apache.org/confluence/display/OZONE/Modifying+the+Ozone+Website)
      * Developer docs. These are markdown files [checked into the Apache Ozone Source tree](https://github.com/apache/ozone/tree/master/hadoop-hdds/docs/content).
  * The [wiki pages](https://cwiki.apache.org/confluence/display/OZONE/Contributing+to+Ozone): Please contact us at dev@ozone.apache.org and we can provide you write access to the wiki.
  * **Testing**: We always need help to improve our testing
@@ -27,9 +27,9 @@ We welcome contributions of:
 
 If you have any questions, please don't hesitate to contact
 
- * **email**: use ozone-dev@hadoop.apache.org.
+ * **email**: use dev@ozone.apache.org.
  * **chat**: You can find the #ozone channel at the ASF slack. Invite link is [here](http://s.apache.org/slack-invite)
- * **meeting**: [We have weekly meetings](https://cwiki.apache.org/confluence/display/HADOOP/Ozone+Community+Calls) which is open to anybody. Feel free to join and ask any questions
+ * **meeting**: [We have weekly meetings](https://cwiki.apache.org/confluence/display/OZONE/Ozone+Community+Calls) which is open to anybody. Feel free to join and ask any questions
     
 ## Building from the source code
 
