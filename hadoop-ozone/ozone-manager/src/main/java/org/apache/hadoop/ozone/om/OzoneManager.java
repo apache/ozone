@@ -3617,6 +3617,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return ozAdmins;
   }
 
+  public boolean isAdmin(String username) {
+    return accessAuthorizer != null && accessAuthorizer.isAdmin(username);
+  }
+
   /**
    * Returns true if OzoneNativeAuthorizer is enabled and false if otherwise.
    *

@@ -215,17 +215,18 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
     return false;
   }
 
-  private boolean isAdmin(UserGroupInformation callerUgi) {
+  @Override
+  public boolean isAdmin(String username) {
     if (ozAdmins == null) {
       return false;
+    } else {
+      return ozAdmins.contains(username) ||
+          ozAdmins.contains(OZONE_ADMINISTRATORS_WILDCARD);
     }
+  }
 
-    if (ozAdmins.contains(callerUgi.getShortUserName()) ||
-        ozAdmins.contains(callerUgi.getUserName()) ||
-        ozAdmins.contains(OZONE_ADMINISTRATORS_WILDCARD)) {
-      return true;
-    }
-
-    return false;
+  private boolean isAdmin(UserGroupInformation callerUgi) {
+    return isAdmin(callerUgi.getShortUserName()) ||
+        isAdmin(callerUgi.getUserName());
   }
 }

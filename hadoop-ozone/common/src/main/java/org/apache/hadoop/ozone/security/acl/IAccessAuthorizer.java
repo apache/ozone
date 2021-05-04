@@ -20,6 +20,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.security.UserGroupInformation;
 
 import java.util.BitSet;
 
@@ -41,6 +42,8 @@ public interface IAccessAuthorizer {
    */
   boolean checkAccess(IOzoneObj ozoneObject, RequestContext context)
       throws OMException;
+
+  boolean isAdmin(String username);
 
   /**
    * ACL rights.
