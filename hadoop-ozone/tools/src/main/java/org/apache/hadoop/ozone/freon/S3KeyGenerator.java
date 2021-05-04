@@ -23,9 +23,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.Callable;
 
-import com.amazonaws.AmazonServiceException;
 import com.amazonaws.services.s3.model.DeleteObjectsRequest;
-import com.amazonaws.services.s3.model.HeadBucketRequest;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 
 import com.amazonaws.auth.EnvironmentVariableCredentialsProvider;
@@ -44,7 +42,6 @@ import com.codahale.metrics.Timer;
 import org.apache.commons.lang3.RandomStringUtils;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_MULTIPART_MIN_SIZE;
 
-import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
