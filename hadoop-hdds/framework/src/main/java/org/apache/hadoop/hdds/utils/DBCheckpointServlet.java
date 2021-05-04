@@ -30,7 +30,6 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
-import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -67,10 +66,8 @@ public class DBCheckpointServlet extends HttpServlet {
   private boolean aclEnabled;
   private Collection<String> ozAdmins;
 
-  private Predicate<String> permissionCheck;
-
   public void initialize(DBStore store, DBCheckpointMetrics metrics,
-                         Predicate<String> permissionCheck)
+      boolean omAclEnabled, Collection<String> ozoneAdmins)
       throws ServletException {
 
     dbStore = store;
@@ -80,7 +77,19 @@ public class DBCheckpointServlet extends HttpServlet {
           "Unable to set metadata snapshot request. DB Store is null");
     }
 
-    this.permissionCheck = permissionCheck;
+    this.aclEnabled = omAclEnabled;
+    this.ozAdmins = ozoneAdmins;
+  }
+
+  private boolean hasPermission(String username) {
+    // Check ACL for dbCheckpoint only when global Ozone ACL is enabled
+    if (aclEnabled) {
+      // Only Ozone admins are allowed
+      return ozAdmins.contains(OZONE_ADMINISTRATORS_WILDCARD)
+          || ozAdmins.contains(username);
+    } else {
+      return true;
+    }
   }
 
   /**
@@ -112,7 +121,7 @@ public class DBCheckpointServlet extends HttpServlet {
         return;
       } else {
         final String userPrincipalName = userPrincipal.getName();
-        if (!permissionCheck.test(userPrincipalName)) {
+        if (!hasPermission(userPrincipalName)) {
           LOG.error("Permission denied: User principal '{}' does not have"
                   + " access to /dbCheckpoint.\nThis can happen when Ozone"
                   + " Manager is started with a different user.\n"

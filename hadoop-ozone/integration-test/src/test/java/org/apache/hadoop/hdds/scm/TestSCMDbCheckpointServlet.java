@@ -117,7 +117,8 @@ public class TestSCMDbCheckpointServlet {
       doCallRealMethod().when(scmDbCheckpointServletMock).initialize(
           scm.getScmMetadataStore().getStore(),
           scmMetrics.getDBCheckpointMetrics(),
-          (username) -> true);
+          false,
+          Collections.emptyList());
 
       HttpServletRequest requestMock = mock(HttpServletRequest.class);
       HttpServletResponse responseMock = mock(HttpServletResponse.class);

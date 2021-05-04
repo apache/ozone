@@ -204,7 +204,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
@@ -340,8 +339,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   private boolean isNativeAuthorizerEnabled;
 
-  private Collection<String> omAdminUsernames;
-
   private ExitManager exitManager;
 
   private OzoneManagerPrepareState prepareState;
@@ -455,8 +452,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (secConfig.isBlockTokenEnabled()) {
       blockTokenMgr = createBlockTokenSecretManager(configuration);
     }
-
-    initializeOmAdmins();
 
     instantiateServices(false);
 
@@ -585,7 +580,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         authorizer.setBucketManager(bucketManager);
         authorizer.setKeyManager(keyManager);
         authorizer.setPrefixManager(prefixManager);
-        authorizer.setOzoneAdmins(omAdminUsernames);
+        authorizer.setOzoneAdmins(getOzoneAdmins(configuration));
         authorizer.setAllowListAllVolumes(allowListAllVolumes);
       }
     } else {
@@ -3609,24 +3604,17 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
-   * Initialize the list of Ozone Administrators.
+   * Return list of OzoneAdministrators.
    */
-  private void initializeOmAdmins() throws IOException {
-    omAdminUsernames =
-        configuration.getTrimmedStringCollection(OZONE_ADMINISTRATORS);
+  Collection<String> getOzoneAdmins(OzoneConfiguration conf)
+      throws IOException {
+    Collection<String> ozAdmins =
+        conf.getTrimmedStringCollection(OZONE_ADMINISTRATORS);
     String omSPN = UserGroupInformation.getCurrentUser().getShortUserName();
-    if (!omAdminUsernames.contains(omSPN)) {
-      omAdminUsernames.add(omSPN);
+    if (!ozAdmins.contains(omSPN)) {
+      ozAdmins.add(omSPN);
     }
-  }
-
-  public boolean isAdmin(String username) {
-    if (isAclEnabled) {
-      return omAdminUsernames.contains(OZONE_ADMINISTRATORS_WILDCARD)
-          || omAdminUsernames.contains(username);
-    } else {
-      return true;
-    }
+    return ozAdmins;
   }
 
   /**

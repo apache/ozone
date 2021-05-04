@@ -58,8 +58,13 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       return;
     }
 
-    initialize(om.getMetadataManager().getStore(),
-        om.getMetrics().getDBCheckpointMetrics(),
-        om::isAdmin);
+    try {
+      initialize(om.getMetadataManager().getStore(),
+          om.getMetrics().getDBCheckpointMetrics(),
+          om.getAclsEnabled(),
+          om.getOzoneAdmins(om.getConfiguration()));
+    } catch (IOException e) {
+      LOG.error("Error in getOzoneAdmins: {}", e.getMessage());
+    }
   }
 }

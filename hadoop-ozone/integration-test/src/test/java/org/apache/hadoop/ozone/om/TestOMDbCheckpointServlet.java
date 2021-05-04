@@ -127,7 +127,8 @@ public class TestOMDbCheckpointServlet {
       doCallRealMethod().when(omDbCheckpointServletMock).initialize(
           om.getMetadataManager().getStore(),
           om.getMetrics().getDBCheckpointMetrics(),
-          om::isAdmin);
+          om.getAclsEnabled(),
+          om.getOzoneAdmins(om.getConfiguration()));
 
       HttpServletRequest requestMock = mock(HttpServletRequest.class);
       // Return current user short name when asked

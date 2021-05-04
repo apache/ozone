@@ -25,7 +25,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Collections;
-import java.util.function.Predicate;
 
 /**
  * Provides the current checkpoint Snapshot of the SCM DB. (tar.gz)
@@ -58,7 +57,8 @@ public class SCMDBCheckpointServlet extends DBCheckpointServlet {
     }
 
     initialize(scm.getScmMetadataStore().getStore(),
-        StorageContainerManager.getMetrics().getDBCheckpointMetrics(),
-        (username) -> true);
+        scm.getMetrics().getDBCheckpointMetrics(),
+        false,
+        Collections.emptyList());
   }
 }
