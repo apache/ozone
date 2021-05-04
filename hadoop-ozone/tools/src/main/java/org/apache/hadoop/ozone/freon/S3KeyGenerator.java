@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.freon;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.Callable;
 
@@ -97,7 +98,7 @@ public class S3KeyGenerator extends BaseFreonGenerator
   private List<String> generatedKeys;
 
   public S3KeyGenerator() {
-    this.generatedKeys = new ArrayList<>();
+    this.generatedKeys = Collections.synchronizedList(new ArrayList<String>());
   }
 
   @Override
@@ -187,6 +188,7 @@ public class S3KeyGenerator extends BaseFreonGenerator
 
   @Override
   protected void doCleanUp() {
+    LOG.info("Cleaning up generated objects.");
     // Clean Keys
     DeleteObjectsRequest deleteObjectsRequest =
         new DeleteObjectsRequest(bucketName);
