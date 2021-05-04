@@ -27,6 +27,7 @@ import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.raftlog.RaftLog;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.slf4j.event.Level;
@@ -87,8 +88,45 @@ public class TestOzoneClientKeyGenerator {
     out.close();
     new Freon().execute(
         new String[] {"-conf", new File(path, "conf").getAbsolutePath(),
-            "ockg", "-t", "1", "--clean-up"});
+            "ockg", "-t", "1"});
     shutdown(cluster);
   }
 
+  @Test
+  public void testCleanUpOzoneClientKeyGenerator() throws Exception {
+    String volumeName = "vol1";
+    String bucketName = "bucket1";
+    OzoneConfiguration conf = new OzoneConfiguration();
+    MiniOzoneCluster cluster = startCluster(conf);
+
+    // Volume not exist before freon test
+    try {
+      cluster.getClient().getObjectStore().getVolume(volumeName);
+      Assert.fail("Cannot reach here: should have seen a OMException");
+    } catch (IOException ignore) {
+      Assert.assertNotNull(ignore.getMessage() != null);
+      Assert.assertEquals("Volume " + volumeName + " is not found",
+          ignore.getMessage());
+    }
+
+    FileOutputStream out = FileUtils.openOutputStream(new File(path, "conf"));
+    cluster.getConf().writeXml(out);
+    out.getFD().sync();
+    out.close();
+    new Freon().execute(
+        new String[] {"-conf", new File(path, "conf").getAbsolutePath(), "ockg",
+            "-t", "1", "-v", volumeName, "-b", bucketName, "--clean-up"});
+
+    // Volume been cleaned up after freon test
+    try {
+      cluster.getClient().getObjectStore().getVolume(volumeName);
+      Assert.fail("Cannot reach here: should have seen a OMException");
+    } catch (IOException ignore) {
+      Assert.assertNotNull(ignore.getMessage() != null);
+      Assert.assertEquals("Volume " + volumeName + " is not found",
+          ignore.getMessage());
+    }
+
+    shutdown(cluster);
+  }
 }

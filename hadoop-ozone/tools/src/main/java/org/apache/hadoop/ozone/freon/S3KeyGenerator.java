@@ -197,7 +197,7 @@ public class S3KeyGenerator extends BaseFreonGenerator
     s3.deleteObjects(deleteObjectsRequest);
 
     // Clean bucket
-    if (bucketCreated) {
+    if (isBucketCreated()) {
       s3.deleteBucket(bucketName);
     }
   }

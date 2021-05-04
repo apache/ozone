@@ -119,7 +119,7 @@ public class OmBucketGenerator extends BaseFreonGenerator
       for (String bucket : bucketList) {
         ozoneManagerClient.deleteBucket(volumeName, bucket);
       }
-      if (volumeCreated) {
+      if (isVolumeCreated()) {
         ozoneManagerClient.deleteVolume(volumeName);
       }
     } catch (IOException e) {

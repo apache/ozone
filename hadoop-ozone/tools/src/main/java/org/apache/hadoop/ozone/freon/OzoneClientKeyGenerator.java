@@ -148,11 +148,11 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
     try (OzoneClient rpcClient = createOzoneClient(omServiceID,
         ozoneConfiguration)){
       bucket.deleteKeys(keyList);
-      if (bucketCreated) {
+      if (isBucketCreated()) {
         rpcClient.getObjectStore().getVolume(volumeName).
             deleteBucket(bucketName);
       }
-      if (volumeCreated) {
+      if (isVolumeCreated()) {
         rpcClient.getObjectStore().deleteVolume(volumeName);
       }
     } catch (IOException e) {

@@ -21,7 +21,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.Callable;
-import java.util.concurrent.LinkedBlockingQueue;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -146,10 +145,10 @@ public class OmKeyGenerator extends BaseFreonGenerator
         new OmDeleteKeys(volumeName, bucketName, keyList);
     try {
       ozoneManagerClient.deleteKeys(omDeleteKeys);
-      if (bucketCreated) {
+      if (isBucketCreated()) {
         ozoneManagerClient.deleteBucket(volumeName, bucketName);
       }
-      if (volumeCreated) {
+      if (isVolumeCreated()) {
         ozoneManagerClient.deleteVolume(volumeName);
       }
     } catch (IOException e) {

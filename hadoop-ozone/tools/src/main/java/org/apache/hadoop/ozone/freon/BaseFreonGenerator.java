@@ -118,8 +118,8 @@ public class BaseFreonGenerator {
   private ExecutorService executor;
   private ProgressBar progressBar;
 
-  protected boolean volumeCreated;
-  protected boolean bucketCreated;
+  private boolean volumeCreated;
+  private boolean bucketCreated;
 
   /**
    * The main logic to execute a test generator.
@@ -501,5 +501,13 @@ public class BaseFreonGenerator {
 
   public long getTestNo() {
     return testNo;
+  }
+
+  protected boolean isVolumeCreated() {
+    return volumeCreated;
+  }
+
+  protected boolean isBucketCreated() {
+    return bucketCreated;
   }
 }
