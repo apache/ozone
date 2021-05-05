@@ -233,7 +233,8 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
       JSONArray info = jResonse.getJSONArray("vXGroups");
       int numIndex = info.length();
       for (int i = 0; i < numIndex; ++i) {
-        if (info.getJSONObject(i).getString("name").equals(principal.getFullMultiTenantPrincipalID())) {
+        if (info.getJSONObject(i).getString("name")
+            .equals(principal.getFullMultiTenantPrincipalID())) {
           groupIDCreated = info.getJSONObject(i).getString("id");
           break;
         }
@@ -262,7 +263,8 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
       JSONArray userinfo = jResonse.getJSONArray("vXUsers");
       int numIndex = userinfo.length();
       for (int i = 0; i < numIndex; ++i) {
-        if (userinfo.getJSONObject(i).getString("name").equals(principal.getFullMultiTenantPrincipalID())) {
+        if (userinfo.getJSONObject(i).getString("name")
+            .equals(principal.getFullMultiTenantPrincipalID())) {
           userIDCreated = userinfo.getJSONObject(i).getString("id");
           break;
         }

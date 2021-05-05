@@ -140,8 +140,8 @@ public interface OMMultiTenantManager {
    * generated secret with getUserSecret();
    * @param user
    */
-  void modifyUser(OzoneMultiTenantPrincipal user, List<String> groups_added,
-                  List<String> groups_removed) throws IOException;
+  void modifyUser(OzoneMultiTenantPrincipal user, List<String> groupsAdded,
+                  List<String> groupsRemoved) throws IOException;
 
   /**
    * Given a user, deactivate them. We will need a recon command/job to cleanup

@@ -95,7 +95,8 @@ public class TestMultiTenantAccessAuthorizerRangerPlugin {
   @Test
   public void testMultiTenantAccessAuthorizerRangerPlugin() throws Exception {
     simulateOzoneSiteXmlConfig();
-    MultiTenantAccessAuthorizer omm = new MultiTenantAccessAuthorizerRangerPlugin();
+    final MultiTenantAccessAuthorizer omm =
+        new MultiTenantAccessAuthorizerRangerPlugin();
     omm.init(conf);
 
     try {
@@ -146,7 +147,8 @@ public class TestMultiTenantAccessAuthorizerRangerPlugin {
       throws Exception {
     OzoneMultiTenantPrincipal userPrincipal = null;
     simulateOzoneSiteXmlConfig();
-    MultiTenantAccessAuthorizer omm = new MultiTenantAccessAuthorizerRangerPlugin();
+    final MultiTenantAccessAuthorizer omm =
+        new MultiTenantAccessAuthorizerRangerPlugin();
     omm.init(conf);
 
     try {
@@ -198,7 +200,7 @@ public class TestMultiTenantAccessAuthorizerRangerPlugin {
     }
   }
 
-  OzoneMultiTenantPrincipal getTestPrincipal(String tenant, String id,
+  private OzoneMultiTenantPrincipal getTestPrincipal(String tenant, String id,
       OzoneMultiTenantPrincipal.OzonePrincipalType type) {
     OzoneMultiTenantPrincipal principal = new OzoneMultiTenantPrincipalImpl(
         new BasicUserPrincipal(tenant),
@@ -206,7 +208,7 @@ public class TestMultiTenantAccessAuthorizerRangerPlugin {
     return principal;
   }
 
-  AccessPolicy createVolumeAccessPolicy(String vol, String tenant,
+  private AccessPolicy createVolumeAccessPolicy(String vol, String tenant,
                                         String group) throws IOException {
     AccessPolicy tenantVolumeAccessPolicy = new RangerAccessPolicy(
         tenant + group + "VolumeAccess" + vol + "Policy");
@@ -222,7 +224,7 @@ public class TestMultiTenantAccessAuthorizerRangerPlugin {
     return tenantVolumeAccessPolicy;
   }
 
-  AccessPolicy allowCreateBucketPolicy(String vol, String tenant,
+  private AccessPolicy allowCreateBucketPolicy(String vol, String tenant,
                                        String group) throws IOException {
     AccessPolicy tenantVolumeAccessPolicy = new RangerAccessPolicy(
         tenant + group + "AllowBucketCreate" + vol + "Policy");
@@ -235,7 +237,7 @@ public class TestMultiTenantAccessAuthorizerRangerPlugin {
     return tenantVolumeAccessPolicy;
   }
 
-  AccessPolicy allowAccessBucketPolicy(String vol, String tenant,
+  private AccessPolicy allowAccessBucketPolicy(String vol, String tenant,
                                        String group, String bucketName)
       throws IOException {
     AccessPolicy tenantVolumeAccessPolicy = new RangerAccessPolicy(
@@ -254,7 +256,7 @@ public class TestMultiTenantAccessAuthorizerRangerPlugin {
     return tenantVolumeAccessPolicy;
   }
 
-  AccessPolicy allowAccessKeyPolicy(String vol, String tenant,
+  private AccessPolicy allowAccessKeyPolicy(String vol, String tenant,
                                     String group, String bucketName)
       throws IOException {
     AccessPolicy tenantVolumeAccessPolicy = new RangerAccessPolicy(

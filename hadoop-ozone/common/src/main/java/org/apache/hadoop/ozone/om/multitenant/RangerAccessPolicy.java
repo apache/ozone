@@ -64,7 +64,8 @@ public class RangerAccessPolicy implements AccessPolicy {
   }
 
   @Override
-  public String deserializePolicyFromJsonString(JSONObject jsonObject) throws Exception {
+  public String deserializePolicyFromJsonString(JSONObject jsonObject)
+      throws Exception {
     setPolicyID(jsonObject.getString("id"));
     // TODO : retrieve other policy fields as well.
     return null;

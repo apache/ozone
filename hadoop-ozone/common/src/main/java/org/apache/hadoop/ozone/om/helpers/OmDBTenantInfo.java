@@ -114,7 +114,8 @@ public final class OmDBTenantInfo {
     return bucketPolicyGroupName;
   }
 
-  public static class Builder {
+  @SuppressWarnings("checkstyle:hiddenfield")
+  public static final class Builder {
     private String tenantName;
     private String bucketNamespaceName;
     private String accountNamespaceName;
