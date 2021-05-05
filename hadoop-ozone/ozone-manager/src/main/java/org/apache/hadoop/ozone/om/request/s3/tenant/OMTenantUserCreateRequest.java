@@ -201,8 +201,8 @@ public class OMTenantUserCreateRequest extends OMVolumeRequest {
       omMetadataManager.getLock().releaseWriteLock(S3_SECRET_LOCK, principal);
       acquiredS3SecretLock = false;
 
-      userId =
-          ozoneManager.getMultiTenantManager().createUser(tenantName, tenantUsername);
+      userId = ozoneManager.getMultiTenantManager()
+          .createUser(tenantName, tenantUsername);
 
       // Add to tenantUserTable
       omMetadataManager.getTenantUserTable().addCacheEntry(

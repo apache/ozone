@@ -27,7 +27,6 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.IOzoneObj;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
-import org.codehaus.jettison.json.JSONObject;
 
 
 /**
@@ -116,7 +115,7 @@ public interface MultiTenantAccessAuthorizer extends IAccessAuthorizer {
    * @return unique and opaque policy ID that is maintained by the plugin.
    * @throws Exception
    */
-  public AccessPolicy getAccessPolicyByName(String policyName) throws Exception;
+  AccessPolicy getAccessPolicyByName(String policyName) throws Exception;
 
   /**
    *

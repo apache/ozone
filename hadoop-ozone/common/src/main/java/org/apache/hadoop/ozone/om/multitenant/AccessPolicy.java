@@ -104,7 +104,8 @@ public interface AccessPolicy {
    * @return
    * @throws Exception
    */
-  String deserializePolicyFromJsonString(JSONObject jsonObject) throws Exception;
+  String deserializePolicyFromJsonString(JSONObject jsonObject)
+      throws Exception;
 
   /**
    * @return AccessPolicyType (Native or otherwise).

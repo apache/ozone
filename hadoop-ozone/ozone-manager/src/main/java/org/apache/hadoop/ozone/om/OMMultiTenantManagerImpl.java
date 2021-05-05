@@ -61,7 +61,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   private MultiTenantAccessAuthorizer authorizer;
   private OMMetadataManager omMetadataManager;
   private OzoneConfiguration conf;
-  ReentrantReadWriteLock controlPathLock;
+  private ReentrantReadWriteLock controlPathLock;
 
   // The following Mappings maintain all of the multi-tenancy states.
   // These mappings needs to have their persistent counterpart in OM tables.
@@ -238,7 +238,8 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     if (!inMemoryTenantNameToTenantInfoMap.containsKey(tenantID)) {
       return null;
     }
-    for (Map.Entry<String, Tenant> entry: inMemoryTenantNameToTenantInfoMap.entrySet()) {
+    for (Map.Entry<String, Tenant> entry :
+        inMemoryTenantNameToTenantInfoMap.entrySet()) {
       if (entry.getKey().equals(tenantID)) {
         return entry.getValue();
       }
@@ -264,7 +265,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
 
       inMemoryTenantNameToTenantInfoMap.remove(tenant.getTenantId());
       inMemoryTenantToPolicyNameListMap.remove(tenant.getTenantId());
-      inMemoryTenantToTenantGroups.remove(tenant);
+      inMemoryTenantToTenantGroups.remove(tenant.getTenantId());
     } catch (Exception e) {
       controlPathLock.writeLock().unlock();
       throw e;
@@ -298,20 +299,19 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
    * @throws IOException
    */
   @Override
-  public String createUser(
-      String tenantName, String userName) throws IOException {
+  public String createUser(String tenantName, String userName)
+      throws IOException {
     try {
       controlPathLock.writeLock().lock();
       Tenant tenant = getTenantInfo(tenantName);
       if (tenant == null) {
         throw new IOException("Tenant doesnt exist");
       }
-      OzoneMultiTenantPrincipal userPrincipal =
-          new OzoneMultiTenantPrincipalImpl(new BasicUserPrincipal(tenantName)
-              , new BasicUserPrincipal(userName),
-              USER_PRINCIPAL);
+      final OzoneMultiTenantPrincipal userPrincipal =
+          new OzoneMultiTenantPrincipalImpl(new BasicUserPrincipal(tenantName),
+              new BasicUserPrincipal(userName), USER_PRINCIPAL);
 
-      OzoneMultiTenantPrincipal groupTenantAllUsers = getOzonePrincipal(
+      final OzoneMultiTenantPrincipal groupTenantAllUsers = getOzonePrincipal(
           tenantName, DEFAULT_TENANT_GROUP_ALL_USERS, GROUP_PRINCIPAL);
       String idGroupTenantAllUsers = authorizer.getGroupId(groupTenantAllUsers);
       List<String> userGroupIDs = new ArrayList<>();
@@ -334,19 +334,18 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   }
 
   @Override
-  public void destroyUser(
-      String tenantName, String userName) throws IOException {
+  public void destroyUser(String tenantName, String userName)
+      throws IOException {
     try {
       controlPathLock.writeLock().lock();
-      Tenant tenant = getTenantInfo(tenantName);
+      final Tenant tenant = getTenantInfo(tenantName);
       if (tenant == null) {
         throw new IOException("Tenant doesnt exist");
       }
-      OzoneMultiTenantPrincipal userPrincipal =
-          new OzoneMultiTenantPrincipalImpl(new BasicUserPrincipal(tenantName)
-              , new BasicUserPrincipal(userName),
-              USER_PRINCIPAL);
-      String userID = authorizer.getUserId(userPrincipal);
+      final OzoneMultiTenantPrincipal userPrincipal =
+          new OzoneMultiTenantPrincipalImpl(new BasicUserPrincipal(tenantName),
+              new BasicUserPrincipal(userName), USER_PRINCIPAL);
+      final String userID = authorizer.getUserId(userPrincipal);
       authorizer.deleteUser(userID);
 
       inMemoryUserNameToTenantNameMap.remove(
@@ -368,9 +367,8 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
 
   @Override
   public void modifyUser(OzoneMultiTenantPrincipal user,
-                         List<String> groups_added,
-                         List<String> groups_removed) throws IOException {
-    // TODO
+                         List<String> groupsAdded,
+                         List<String> groupsRemoved) throws IOException {
 
   }
 
@@ -417,7 +415,8 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   }
 
   @Override
-  public void grantBucketAccess(OzoneMultiTenantPrincipal user, BucketNameSpace bucketNameSpace, String bucketName) throws IOException {
+  public void grantBucketAccess(OzoneMultiTenantPrincipal user,
+      BucketNameSpace bucketNameSpace, String bucketName) throws IOException {
 
   }
 
