@@ -823,8 +823,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     String selfNodeId = scmhaNodeDetails.getLocalNodeDetails().getNodeId();
     final String selfHostName =
         scmhaNodeDetails.getLocalNodeDetails().getHostName();
-    if (primordialSCM != null && SCMHAUtils
-        .isPrimordialSCM(conf, selfNodeId, selfHostName)) {
+    if (primordialSCM != null && SCMHAUtils.isSCMHAEnabled(conf)
+        && SCMHAUtils.isPrimordialSCM(conf, selfNodeId, selfHostName)) {
       LOG.info(
           "SCM bootstrap command can only be executed in non-Primordial SCM "
               + "{}, self id {} " + "Ignoring it.", primordialSCM, selfNodeId);
@@ -904,8 +904,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     String primordialSCM = SCMHAUtils.getPrimordialSCM(conf);
     final String selfNodeId = haDetails.getLocalNodeDetails().getNodeId();
     final String selfHostName = haDetails.getLocalNodeDetails().getHostName();
-    if (primordialSCM != null && !SCMHAUtils
-        .isPrimordialSCM(conf, selfNodeId, selfHostName)) {
+    if (primordialSCM != null && SCMHAUtils.isSCMHAEnabled(conf)
+        && !SCMHAUtils.isPrimordialSCM(conf, selfNodeId, selfHostName)) {
       LOG.info(
           "SCM init command can only be executed in Primordial SCM {}, "
               + "self id {} "

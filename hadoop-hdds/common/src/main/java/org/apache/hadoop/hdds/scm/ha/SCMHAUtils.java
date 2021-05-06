@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 
+import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
@@ -78,8 +79,10 @@ public final class SCMHAUtils {
 
   public static boolean isPrimordialSCM(ConfigurationSource conf,
       String selfNodeId, String hostName) {
+    // This should only be called if SCM HA is enabled.
+    Preconditions.checkArgument(isSCMHAEnabled(conf));
     String primordialNode = getPrimordialSCM(conf);
-    return isSCMHAEnabled(conf) && primordialNode != null && (primordialNode
+    return primordialNode != null && (primordialNode
         .equals(selfNodeId) || primordialNode.equals(hostName));
   }
   /**
