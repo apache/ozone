@@ -83,7 +83,7 @@ install_flekszible() {
 
 _install_flekszible() {
   mkdir bin
-  curl -LSs https://github.com/elek/flekszible/releases/download/v1.8.1/flekszible_1.8.1_Linux_x86_64.tar.gz | tar -xz -f - -C bin
+  curl -LSs https://github.com/elek/flekszible/releases/download/v2.3.0/flekszible_2.3.0_Linux_x86_64.tar.gz | tar -xz -f - -C bin
   chmod +x bin/flekszible
 }
 

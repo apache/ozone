@@ -1,0 +1,14 @@
+resources:
+- config-configmap.yaml
+- datanode-service.yaml
+- datanode-statefulset.yaml
+- om-service.yaml
+- om-statefulset.yaml
+- s3g-service.yaml
+- s3g-statefulset.yaml
+- scm-service.yaml
+- scm-statefulset.yaml
+- datanode-public-service.yaml
+- om-public-service.yaml
+- s3g-public-service.yaml
+- scm-public-service.yaml
