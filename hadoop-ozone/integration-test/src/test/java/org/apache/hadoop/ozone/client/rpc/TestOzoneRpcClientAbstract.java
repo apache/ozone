@@ -1845,7 +1845,7 @@ public abstract class TestOzoneRpcClientAbstract {
 
   @Test
   public void testListVolume() throws IOException {
-    String volBase = "vol-" + RandomStringUtils.randomNumeric(3);
+    String volBase = "vol-list-";
     //Create 10 volume vol-<random>-a-0-<random> to vol-<random>-a-9-<random>
     String volBaseNameA = volBase + "-a-";
     for(int i = 0; i < 10; i++) {
@@ -1964,7 +1964,7 @@ public abstract class TestOzoneRpcClientAbstract {
   @Test
   public void testListBucketsOnEmptyVolume()
       throws IOException {
-    String volume = "vol-" + RandomStringUtils.randomNumeric(5);
+    String volume = "vol-empty";
     store.createVolume(volume);
     OzoneVolume vol = store.getVolume(volume);
     Iterator<? extends OzoneBucket> buckets = vol.listBuckets("");
