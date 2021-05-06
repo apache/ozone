@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.fs.ByteBufferReadable;
 import org.apache.hadoop.fs.CanUnbuffer;
 import org.apache.hadoop.fs.FSExceptionMessages;
@@ -37,6 +38,9 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
+import org.apache.hadoop.hdds.scm.storage.ByteArrayStrategy;
+import org.apache.hadoop.hdds.scm.storage.ByteBufferStrategy;
+import org.apache.hadoop.hdds.scm.storage.ReaderStrategy;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 
@@ -218,60 +222,30 @@ public class KeyInputStream extends InputStream
    */
   @Override
   public synchronized int read(byte[] b, int off, int len) throws IOException {
-    checkOpen();
-    if (b == null) {
-      throw new NullPointerException();
-    }
-    if (off < 0 || len < 0 || len > b.length - off) {
-      throw new IndexOutOfBoundsException();
-    }
-    if (len == 0) {
+    ReaderStrategy strategy = new ByteArrayStrategy(b, off, len);
+    int bufferLen = strategy.getTargetLength();
+    if (bufferLen == 0) {
       return 0;
     }
-    int totalReadLen = 0;
-    while (len > 0) {
-      // if we are at the last block and have read the entire block, return
-      if (blockStreams.size() == 0 ||
-          (blockStreams.size() - 1 <= blockIndex &&
-              blockStreams.get(blockIndex)
-                  .getRemaining() == 0)) {
-        return totalReadLen == 0 ? EOF : totalReadLen;
-      }
-
-      // Get the current blockStream and read data from it
-      BlockInputStream current = blockStreams.get(blockIndex);
-      int numBytesToRead = Math.min(len, (int)current.getRemaining());
-      int numBytesRead = current.read(b, off, numBytesToRead);
-      if (numBytesRead != numBytesToRead) {
-        // This implies that there is either data loss or corruption in the
-        // chunk entries. Even EOF in the current stream would be covered in
-        // this case.
-        throw new IOException(String.format("Inconsistent read for blockID=%s "
-                        + "length=%d numBytesToRead=%d numBytesRead=%d",
-                current.getBlockID(), current.getLength(), numBytesToRead,
-                numBytesRead));
-      }
-      totalReadLen += numBytesRead;
-      off += numBytesRead;
-      len -= numBytesRead;
-      if (current.getRemaining() <= 0 &&
-          ((blockIndex + 1) < blockStreams.size())) {
-        blockIndex += 1;
-      }
-    }
-    return totalReadLen;
+    return readWithStrategy(strategy);
   }
 
   @Override
   public synchronized int read(ByteBuffer byteBuffer) throws IOException {
-    checkOpen();
-    if (byteBuffer == null) {
-      throw new NullPointerException();
-    }
-    int buffLen = byteBuffer.remaining();
-    if (buffLen == 0) {
+    ReaderStrategy strategy = new ByteBufferStrategy(byteBuffer);
+    int bufferLen = strategy.getTargetLength();
+    if (bufferLen == 0) {
       return 0;
     }
+    return readWithStrategy(strategy);
+  }
+
+  synchronized int readWithStrategy(ReaderStrategy strategy) throws
+      IOException {
+    Preconditions.checkArgument(strategy != null);
+    checkOpen();
+
+    int buffLen = strategy.getTargetLength();
     int totalReadLen = 0;
     while (buffLen > 0) {
       // if we are at the last block and have read the entire block, return
@@ -285,7 +259,7 @@ public class KeyInputStream extends InputStream
       // Get the current blockStream and read data from it
       BlockInputStream current = blockStreams.get(blockIndex);
       int numBytesToRead = Math.min(buffLen, (int)current.getRemaining());
-      int numBytesRead = current.read(byteBuffer);
+      int numBytesRead = strategy.readFromBlock(current, numBytesToRead);
       if (numBytesRead != numBytesToRead) {
         // This implies that there is either data loss or corruption in the
         // chunk entries. Even EOF in the current stream would be covered in
@@ -304,6 +278,7 @@ public class KeyInputStream extends InputStream
     }
     return totalReadLen;
   }
+
   /**
    * Seeks the KeyInputStream to the specified position. This involves 2 steps:
    *    1. Updating the blockIndex to the blockStream corresponding to the
