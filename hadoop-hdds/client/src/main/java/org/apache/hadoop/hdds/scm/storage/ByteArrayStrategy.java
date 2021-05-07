@@ -21,12 +21,15 @@ package org.apache.hadoop.hdds.scm.storage;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.io.InputStream;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 public class ByteArrayStrategy implements ReaderStrategy {
   private final byte[] readBuf;
   private int offset;
   private int targetLen;
 
+  @SuppressFBWarnings(value = "EI_EXPOSE_REP2",
+      justification = "Deep copy byte[] has bad impact on performance")
   public ByteArrayStrategy(byte[] b, int off, int len) {
     if (b == null) {
       throw new NullPointerException();
