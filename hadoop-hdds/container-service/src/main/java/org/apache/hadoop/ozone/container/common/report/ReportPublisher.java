@@ -22,6 +22,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 
@@ -80,7 +81,12 @@ public abstract class ReportPublisher<T extends GeneratedMessage>
    */
   private void publishReport() {
     try {
-      context.addReport(getReport());
+      GeneratedMessage report = getReport();
+      if (report instanceof CommandStatusReportsProto) {
+        context.addIncrementalReport(report);
+      } else {
+        context.refreshFullReport(report);
+      }
     } catch (IOException e) {
       LOG.error("Exception while publishing report.", e);
     }
