@@ -796,6 +796,16 @@ public class ReplicationManager implements MetricsSource, SCMService {
       } else {
         LOG.warn("Cannot replicate container {}, no healthy replica found.",
             container.containerID());
+        List<ContainerReplica> unhealthyReplicas = replicas.stream()
+            .filter(r -> !compareState(container.getState(), r.getState()))
+            .collect(Collectors.toList());
+        if (unhealthyReplicas.size() > 0) {
+          Iterator<ContainerReplica> iterator = unhealthyReplicas.iterator();
+          while (iterator.hasNext()) {
+            ContainerReplica replica = iterator.next();
+            sendDeleteCommand(container, replica.getDatanodeDetails(), false);
+          }
+        }
       }
     } catch (IOException | IllegalStateException ex) {
       LOG.warn("Exception while replicating container {}.",
