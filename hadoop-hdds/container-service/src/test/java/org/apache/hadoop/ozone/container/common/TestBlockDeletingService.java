@@ -398,7 +398,7 @@ public class TestBlockDeletingService {
   @Test
   public void testBlockDeletion() throws Exception {
     DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
-    dnConf.setBlockDeletionLimit(3);
+    dnConf.setBlockDeletionLimit(2);
     this.blockLimitPerInterval = dnConf.getBlockDeletionLimit();
     conf.setFromObject(dnConf);
     ContainerSet containerSet = new ContainerSet();
@@ -448,7 +448,8 @@ public class TestBlockDeletingService {
       deleteAndWait(svc, 1);
 
       GenericTestUtils.waitFor(() ->
-              containerData.get(0).getBytesUsed() < 3, 100, 3000);
+              containerData.get(0).getBytesUsed() == containerSpace /
+                      3, 100, 3000);
       // After first interval 2 blocks will be deleted. Hence, current space
       // used by the container should be less than the space used by the
       // container initially(before running deletion services).
@@ -711,8 +712,8 @@ public class TestBlockDeletingService {
       deleteAndWait(service, 1);
 
       GenericTestUtils.waitFor(() ->
-              blockLimitPerInterval*blockSpace ==
-                      (totalContainerSpace-
+              blockLimitPerInterval * blockSpace ==
+                      (totalContainerSpace -
                               currentBlockSpace(containerData, containerCount)),
               100, 3000);
 
@@ -726,8 +727,8 @@ public class TestBlockDeletingService {
 
       long totalContainerBlocks = blocksPerContainer*containerCount;
       GenericTestUtils.waitFor(() ->
-              totalContainerBlocks*blockSpace ==
-                      (totalContainerSpace-
+              totalContainerBlocks * blockSpace ==
+                      (totalContainerSpace -
                               currentBlockSpace(containerData, containerCount)),
               100, 3000);
 

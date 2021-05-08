@@ -288,8 +288,6 @@ public class TestSchemaOneBackwardsCompatibility {
               refCountedDB.getStore().getMetadataTable();
       assertEquals(expectedRegularBlocks + expectedDeletingBlocks,
               (long)metadataTable.get(OzoneConsts.BLOCK_COUNT));
-    //} catch(IOException ex) {
-      // Exception thrown as expected.
     }
   }
 

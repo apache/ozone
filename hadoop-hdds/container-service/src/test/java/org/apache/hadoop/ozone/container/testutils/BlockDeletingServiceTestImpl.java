@@ -80,7 +80,6 @@ public class BlockDeletingServiceTestImpl
           break;
         }
         Future<?> future = this.getExecutorService().submit(svc);
-
         try {
           // for tests, we only wait for 3s for completion
           future.get(3, TimeUnit.SECONDS);
