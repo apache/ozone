@@ -143,7 +143,7 @@ public class TestSCMInstallSnapshot {
     Assert.assertNull(
         scm.getScmMetadataStore().getPipelineTable().get(pipelineID));
     Assert.assertFalse(scm.getContainerManager().containerExist(cid));
-    scmhaManager.installCheckpoint("scm1", checkpoint);
+    scmhaManager.installCheckpoint(checkpoint);
 
     Assert.assertNotNull(
         scm.getScmMetadataStore().getPipelineTable().get(pipelineID));
