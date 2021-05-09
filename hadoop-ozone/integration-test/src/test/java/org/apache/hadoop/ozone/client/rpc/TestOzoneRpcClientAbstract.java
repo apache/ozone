@@ -1846,14 +1846,14 @@ public abstract class TestOzoneRpcClientAbstract {
   @Test
   public void testListVolume() throws IOException {
     String volBase = "vol-list-";
-    //Create 10 volume vol-<random>-a-0-<random> to vol-<random>-a-9-<random>
-    String volBaseNameA = volBase + "-a-";
+    //Create 10 volume vol-list-a-0-<random> to vol-list-a-9-<random>
+    String volBaseNameA = volBase + "a-";
     for(int i = 0; i < 10; i++) {
       store.createVolume(
           volBaseNameA + i + "-" + RandomStringUtils.randomNumeric(5));
     }
-    //Create 10 volume vol-<random>-b-0-<random> to vol-<random>-b-9-<random>
-    String volBaseNameB = volBase + "-b-";
+    //Create 10 volume vol-list-b-0-<random> to vol-list-b-9-<random>
+    String volBaseNameB = volBase + "b-";
     for(int i = 0; i < 10; i++) {
       store.createVolume(
           volBaseNameB + i + "-" + RandomStringUtils.randomNumeric(5));
