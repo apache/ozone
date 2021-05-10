@@ -44,7 +44,7 @@ public class TestContainerBalancer {
   private ContainerBalancerConfiguration balancerConfiguration;
   private ContainerBalancerMetrics balancerMetrics;
   private List<DatanodeUsageInfo> nodesInCluster;
-  List<Double> nodeUtilizations;
+  private List<Double> nodeUtilizations;
   private double averageUtilization;
   private int numberOfNodes;
 
@@ -74,12 +74,11 @@ public class TestContainerBalancer {
   }
 
   /**
-   * Checks whether ContainerBalancer is correctly updating the source nodes
-   * with varying values of Threshold.
+   * Checks whether ContainerBalancer is correctly updating the list of source
+   * nodes with varying values of Threshold.
    */
   @Test
-  public void
-  initializeIteration_Should_UpdateSourceNodesList_When_ThresholdChanges() {
+  public void initializeIterationShouldUpdateSourceNodesWhenThresholdChanges() {
     List<DatanodeUsageInfo> expectedSourceNodes;
     List<DatanodeUsageInfo> sourceNodesAccordingToBalancer;
 
@@ -108,7 +107,7 @@ public class TestContainerBalancer {
    * Checks whether the list of source is empty when the cluster is balanced.
    */
   @Test
-  public void sourceNodesList_Should_BeEmpty_When_ClusterIsBalanced() {
+  public void sourceNodesListShouldBeEmptyWhenClusterIsBalanced() {
     balancerConfiguration.setThreshold("0.99");
     containerBalancer.start(balancerConfiguration);
 
@@ -121,8 +120,7 @@ public class TestContainerBalancer {
    * MaxDatanodesToBalance is reached.
    */
   @Test
-  public void
-  containerBalancer_Should_StopBalancing_When_MaxDatanodesToBalanceIsReached() {
+  public void containerBalancerShouldStopWhenMaxDatanodesToBalanceIsReached() {
     balancerConfiguration.setMaxDatanodesToBalance(2);
     balancerConfiguration.setThreshold("0");
     containerBalancer.start(balancerConfiguration);
@@ -163,17 +161,17 @@ public class TestContainerBalancer {
    * Generates a range of equally spaced utilization(that is, used / capacity)
    * values from 0 to 1.
    *
-   * @param numberOfNodes number of values to generate.
+   * @param count number of values to generate.
    */
-  private void generateUtilizations(int numberOfNodes) {
-    if (numberOfNodes < 1) {
+  private void generateUtilizations(int count) {
+    if (count < 1) {
       throw new IllegalArgumentException(
-          "The value of argument numberOfNodes is {}. " +
-              "However, number of nodes must be greater than 0");
+          "The value of argument count is {}. " +
+              "However, count must be greater than 0");
     }
-    nodeUtilizations = new ArrayList<>(numberOfNodes);
-    for (int i = 0; i < numberOfNodes; i++) {
-      nodeUtilizations.add(i / (double) numberOfNodes);
+    nodeUtilizations = new ArrayList<>(count);
+    for (int i = 0; i < count; i++) {
+      nodeUtilizations.add(i / (double) count);
     }
   }
 
