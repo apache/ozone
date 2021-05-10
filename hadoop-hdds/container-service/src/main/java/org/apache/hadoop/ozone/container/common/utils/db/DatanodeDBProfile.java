@@ -89,7 +89,7 @@ public abstract class DatanodeDBProfile {
 
 
   private static final class StorageBasedProfile {
-    private final AtomicReference<ColumnFamilyOptions> CF_OPTIONS =
+    private final AtomicReference<ColumnFamilyOptions> cfOptions =
         new AtomicReference<>();
     private final DBProfile baseProfile;
 
@@ -103,10 +103,10 @@ public abstract class DatanodeDBProfile {
 
     private ColumnFamilyOptions getColumnFamilyOptions(
         ConfigurationSource config) {
-      CF_OPTIONS.updateAndGet(op -> op != null ? op :
+      cfOptions.updateAndGet(op -> op != null ? op :
           baseProfile.getColumnFamilyOptions()
               .setTableFormatConfig(getBlockBasedTableConfig(config)));
-      return CF_OPTIONS.get();
+      return cfOptions.get();
     }
 
     private BlockBasedTableConfig getBlockBasedTableConfig(
