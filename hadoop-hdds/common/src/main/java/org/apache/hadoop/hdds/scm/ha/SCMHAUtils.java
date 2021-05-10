@@ -22,6 +22,7 @@ package org.apache.hadoop.hdds.scm.ha;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
+import com.google.protobuf.ServiceException;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -31,6 +32,7 @@ import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ozone.ha.ConfUtils;
+import org.apache.hadoop.security.AccessControlException;
 import org.apache.ratis.protocol.exceptions.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -291,7 +293,10 @@ public final class SCMHAUtils {
 
   public static RetryPolicy.RetryAction getRetryAction(int failovers, int retry,
       Exception e, int maxRetryCount, long retryInterval) {
-    if (SCMHAUtils.checkRetriableWithNoFailoverException(e)) {
+    // For AccessControl Exception where Client is not authenticated.
+    if (isAccessControlException(e)) {
+      return RetryPolicy.RetryAction.FAIL;
+    } else if (SCMHAUtils.checkRetriableWithNoFailoverException(e)) {
       if (retry < maxRetryCount) {
         return new RetryPolicy.RetryAction(
             RetryPolicy.RetryAction.RetryDecision.RETRY, retryInterval);
@@ -309,5 +314,25 @@ public final class SCMHAUtils {
         return RetryPolicy.RetryAction.FAIL;
       }
     }
+  }
+
+  /**
+   * Unwrap exception to check if it is some kind of access control problem.
+   * {@link AccessControlException}
+   */
+  public static boolean isAccessControlException(Exception ex) {
+    if (ex instanceof ServiceException) {
+      Throwable t = ex.getCause();
+      if (t instanceof RemoteException) {
+        t = ((RemoteException) t).unwrapRemoteException();
+      }
+      while (t != null) {
+        if (t instanceof AccessControlException) {
+          return true;
+        }
+        t = t.getCause();
+      }
+    }
+    return false;
   }
 }

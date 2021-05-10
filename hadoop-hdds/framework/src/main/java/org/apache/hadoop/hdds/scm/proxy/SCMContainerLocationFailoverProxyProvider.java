@@ -77,15 +77,26 @@ public class SCMContainerLocationFailoverProxyProvider implements
 
   private final UserGroupInformation ugi;
 
-
-  public SCMContainerLocationFailoverProxyProvider(ConfigurationSource conf) {
+  /**
+   * Construct SCMContainerLocationFailoverProxyProvider.
+   * If userGroupInformation is not null, use the passed ugi, else obtain
+   * from {@link UserGroupInformation#getCurrentUser()}
+   * @param conf
+   * @param userGroupInformation
+   */
+  public SCMContainerLocationFailoverProxyProvider(ConfigurationSource conf,
+      UserGroupInformation userGroupInformation) {
     this.conf = conf;
 
-    try {
-      this.ugi = UserGroupInformation.getCurrentUser();
-    } catch (IOException ex) {
-      LOG.error("Unable to fetch user credentials from UGI", ex);
-      throw new RuntimeException(ex);
+    if (userGroupInformation == null) {
+      try {
+        this.ugi = UserGroupInformation.getCurrentUser();
+      } catch (IOException ex) {
+        LOG.error("Unable to fetch user credentials from UGI", ex);
+        throw new RuntimeException(ex);
+      }
+    } else {
+      this.ugi = userGroupInformation;
     }
     this.scmVersion = RPC.getProtocolVersion(
         StorageContainerLocationProtocolPB.class);
