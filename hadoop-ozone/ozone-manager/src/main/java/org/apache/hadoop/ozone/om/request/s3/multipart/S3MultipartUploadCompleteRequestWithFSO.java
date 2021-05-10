@@ -36,6 +36,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Iterator;
 import java.util.List;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
@@ -108,7 +109,12 @@ public class S3MultipartUploadCompleteRequestWithFSO
     long parentId =
         getParentId(omMetadataManager, volumeName, bucketName, keyName);
 
-    String fileName = Paths.get(keyName).getFileName().toString();
+    String fileName = keyName;
+    Path filePath = Paths.get(keyName).getFileName();
+    if (filePath != null) {
+      fileName = filePath.toString();
+    }
+
     return omMetadataManager.getOzonePathKey(parentId, fileName);
   }
 
@@ -120,7 +126,11 @@ public class S3MultipartUploadCompleteRequestWithFSO
     long parentId =
         getParentId(omMetadataManager, volumeName, bucketName, keyName);
 
-    String fileName = Paths.get(keyName).getFileName().toString();
+    String fileName = keyName;
+    Path filePath = Paths.get(keyName).getFileName();
+    if (filePath != null) {
+      fileName = filePath.toString();
+    }
 
     return omMetadataManager.getMultipartKey(parentId, fileName, uploadID);
   }
@@ -145,22 +155,14 @@ public class S3MultipartUploadCompleteRequestWithFSO
 
   private long getParentId(OMMetadataManager omMetadataManager,
       String volumeName, String bucketName, String keyName) throws IOException {
-    Path parentDir = Paths.get(keyName).getParent();
-    long parentId;
-    if (parentDir != null) {
-      OzoneFileStatus fileStatus = OMFileRequest
-          .getOMKeyInfoIfExists(omMetadataManager, volumeName, bucketName,
-              parentDir.toString(), 0);
 
-      parentId = fileStatus.getKeyInfo().getObjectID();
-    } else {
-      String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
-      OmBucketInfo omBucketInfo =
-          omMetadataManager.getBucketTable().get(bucketKey);
-
-      parentId = omBucketInfo.getObjectID();
-    }
-    return parentId;
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    OmBucketInfo omBucketInfo =
+        omMetadataManager.getBucketTable().get(bucketKey);
+    long bucketId = omBucketInfo.getObjectID();
+    Iterator<Path> pathComponents = Paths.get(keyName).iterator();
+    return OMFileRequest
+        .getParentID(bucketId, pathComponents, keyName, omMetadataManager);
   }
 }
 

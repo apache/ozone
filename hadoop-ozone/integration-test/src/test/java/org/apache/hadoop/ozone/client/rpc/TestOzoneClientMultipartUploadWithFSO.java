@@ -860,12 +860,9 @@ public class TestOzoneClientMultipartUploadWithFSO {
 
     // Upload Parts
     // Uploading part 1 with less than min size
-    String partKeyName1 = uploadPart(bucket, key1, uploadID1, 1,
-        "data".getBytes(UTF_8));
-    String partKeyName2 = uploadPart(bucket, key2, uploadID2, 1,
-        "data".getBytes(UTF_8));
-    String partKeyName3 = uploadPart(bucket, key3, uploadID3, 1,
-        "data".getBytes(UTF_8));
+    uploadPart(bucket, key1, uploadID1, 1, "data".getBytes(UTF_8));
+    uploadPart(bucket, key2, uploadID2, 1, "data".getBytes(UTF_8));
+    uploadPart(bucket, key3, uploadID3, 1, "data".getBytes(UTF_8));
 
     OzoneMultipartUploadList listMPUs = bucket.listMultipartUploads("dir1");
     Assert.assertEquals(3, listMPUs.getUploads().size());
@@ -931,8 +928,7 @@ public class TestOzoneClientMultipartUploadWithFSO {
         omKeyInfo.getKeyName());
     Assert.assertEquals(uploadID, omMultipartKeyInfo.getUploadID());
 
-    long parentID = getParentID(volumeName, bucketName, keyName,
-        metadataMgr);
+    getParentID(volumeName, bucketName, keyName, metadataMgr);
 
     TreeMap<Integer, OzoneManagerProtocolProtos.PartKeyInfo> partKeyInfoMap =
         omMultipartKeyInfo.getPartKeyInfoMap();
