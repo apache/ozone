@@ -222,7 +222,7 @@ public class SCMStateMachine extends BaseStateMachine {
                   leaderNodeId, checkpoint);
 
           if (termIndex != null) {
-            installingDBCheckpoint = checkpoint;
+            setInstallingDBCheckpoint(checkpoint);
           }
           return termIndex;
         },

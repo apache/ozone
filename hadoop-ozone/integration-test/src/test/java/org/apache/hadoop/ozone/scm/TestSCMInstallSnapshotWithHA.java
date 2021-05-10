@@ -153,7 +153,6 @@ public class TestSCMInstallSnapshotWithHA {
   public void testInstallOldCheckpointFailure() throws Exception {
     // Get the leader SCM
     StorageContainerManager leaderSCM = getLeader(cluster);
-    String leaderNodeId = leaderSCM.getScmNodeDetails().getNodeId();
     String followerId = getInactiveSCM(cluster).getScmId();
     // Find the inactive SCM
 
