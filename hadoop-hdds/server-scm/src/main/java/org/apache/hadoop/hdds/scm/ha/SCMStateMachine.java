@@ -81,7 +81,7 @@ public class SCMStateMachine extends BaseStateMachine {
   // The atomic variable RaftServerImpl#inProgressInstallSnapshotRequest
   // ensures serializable between notifyInstallSnapshotFromLeader()
   // and reinitialize().
-  private DBCheckpoint installingDBCheckpoint;
+  private DBCheckpoint installingDBCheckpoint = null;
 
   public SCMStateMachine(final StorageContainerManager scm,
       final SCMRatisServer ratisServer, SCMHADBTransactionBuffer buffer)
@@ -320,17 +320,21 @@ public class SCMStateMachine extends BaseStateMachine {
   @Override
   public void reinitialize() {
     Preconditions.checkNotNull(installingDBCheckpoint);
+    DBCheckpoint checkpoint = installingDBCheckpoint;
+
+    // explicitly set installingDBCheckpoint to be null
+    installingDBCheckpoint = null;
 
     TermIndex termIndex = null;
     try {
       termIndex =
-          scm.getScmHAManager().installCheckpoint(installingDBCheckpoint);
+          scm.getScmHAManager().installCheckpoint(checkpoint);
     } catch (Exception e) {
       LOG.error("Failed to reinitialize SCMStateMachine.");
       return;
     }
 
-    // re-initialize the DoubleBuffer and update the lastAppliedIndex.
+    // re-initialize the DBTransactionBuffer and update the lastAppliedIndex.
     try {
       transactionBuffer.init();
       this.setLastAppliedTermIndex(termIndex);
@@ -355,6 +359,7 @@ public class SCMStateMachine extends BaseStateMachine {
 
   @VisibleForTesting
   public void setInstallingDBCheckpoint(DBCheckpoint checkpoint) {
+    Preconditions.checkArgument(installingDBCheckpoint == null);
     installingDBCheckpoint = checkpoint;
   }
 }
