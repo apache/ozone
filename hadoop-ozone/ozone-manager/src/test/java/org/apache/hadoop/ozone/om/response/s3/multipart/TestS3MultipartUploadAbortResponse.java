@@ -45,8 +45,11 @@ public class TestS3MultipartUploadAbortResponse
     String bucketName = UUID.randomUUID().toString();
     String keyName = getKeyName();
     String multipartUploadID = UUID.randomUUID().toString();
-    String multipartKey = getMultipartKey(volumeName, bucketName, keyName,
-        multipartUploadID);
+    String multipartOpenKey = getMultipartOpenKey(volumeName, bucketName,
+        keyName, multipartUploadID);
+
+    String multipartKey = omMetadataManager.getMultipartKey(volumeName,
+        bucketName, keyName, multipartUploadID);
 
     OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
         .setVolumeName(volumeName).setBucketName(bucketName)
@@ -59,7 +62,7 @@ public class TestS3MultipartUploadAbortResponse
         batchOperation);
 
     S3MultipartUploadAbortResponse s3MultipartUploadAbortResponse =
-        createS3AbortMPUResponse(multipartKey,
+        createS3AbortMPUResponse(multipartKey, multipartOpenKey,
             s3InitiateMultipartUploadResponse.getOmMultipartKeyInfo(),
             omBucketInfo);
 
@@ -84,8 +87,10 @@ public class TestS3MultipartUploadAbortResponse
     String bucketName = UUID.randomUUID().toString();
     String keyName = getKeyName();
     String multipartUploadID = UUID.randomUUID().toString();
-    String multipartKey = getMultipartKey(volumeName, bucketName, keyName,
-        multipartUploadID);
+    String multipartOpenKey = getMultipartOpenKey(volumeName, bucketName,
+        keyName, multipartUploadID);
+    String multipartKey = omMetadataManager.getMultipartKey(volumeName,
+        bucketName, keyName, multipartUploadID);
 
     OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
         .setVolumeName(volumeName).setBucketName(bucketName)
@@ -116,7 +121,7 @@ public class TestS3MultipartUploadAbortResponse
 
 
     S3MultipartUploadAbortResponse s3MultipartUploadAbortResponse =
-        createS3AbortMPUResponse(multipartKey,
+        createS3AbortMPUResponse(multipartKey, multipartOpenKey,
             s3InitiateMultipartUploadResponse.getOmMultipartKeyInfo(),
             omBucketInfo);
 
@@ -158,7 +163,7 @@ public class TestS3MultipartUploadAbortResponse
     return UUID.randomUUID().toString();
   }
 
-  protected String getMultipartKey(String volumeName, String bucketName,
+  protected String getMultipartOpenKey(String volumeName, String bucketName,
       String keyName, String multipartUploadID) {
     return omMetadataManager.getMultipartKey(volumeName,
         bucketName, keyName, multipartUploadID);

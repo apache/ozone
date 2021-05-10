@@ -54,19 +54,20 @@ public class S3MultipartUploadAbortRequestWithFSO
 
   protected OMClientResponse getOmClientResponse(OzoneManager ozoneManager,
       OmMultipartKeyInfo multipartKeyInfo, String multipartKey,
-      OMResponse.Builder omResponse, OmBucketInfo omBucketInfo) {
+      String multipartOpenKey, OMResponse.Builder omResponse,
+      OmBucketInfo omBucketInfo) {
 
     OMClientResponse omClientResp = new S3MultipartUploadAbortResponseWithFSO(
         omResponse.setAbortMultiPartUploadResponse(
-            MultipartUploadAbortResponse.newBuilder()).build(),
-        multipartKey, multipartKeyInfo, ozoneManager.isRatisEnabled(),
+            MultipartUploadAbortResponse.newBuilder()).build(), multipartKey,
+        multipartOpenKey, multipartKeyInfo, ozoneManager.isRatisEnabled(),
         omBucketInfo.copyObject());
     return omClientResp;
   }
 
-  protected String getMultipartKey(String multipartUploadID, String volumeName,
-      String bucketName, String keyName, OMMetadataManager omMetadataManager)
-      throws IOException {
+  protected String getMultipartOpenKey(String multipartUploadID,
+      String volumeName, String bucketName, String keyName,
+      OMMetadataManager omMetadataManager) throws IOException {
 
     String fileName = OzoneFSUtils.getFileName(keyName);
     Iterator<Path> pathComponents = Paths.get(keyName).iterator();

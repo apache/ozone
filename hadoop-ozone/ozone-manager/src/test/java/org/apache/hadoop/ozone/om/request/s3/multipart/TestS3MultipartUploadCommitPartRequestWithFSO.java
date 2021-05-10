@@ -66,11 +66,18 @@ public class TestS3MultipartUploadCommitPartRequestWithFSO
             fileName, omKeyInfo, clientID, txnLogId, omMetadataManager);
   }
 
-  protected String getMultipartKey(String volumeName, String bucketName,
+  protected String getMultipartOpenKey(String volumeName, String bucketName,
       String keyName, String multipartUploadID) {
     String fileName = StringUtils.substringAfter(keyName, dirName);
     return omMetadataManager.getMultipartKey(parentID, fileName,
             multipartUploadID);
+  }
+
+  @Override
+  protected String getOpenKey(String volumeName, String bucketName,
+      String keyName, long clientID) {
+    String fileName = StringUtils.substringAfter(keyName, dirName);
+    return omMetadataManager.getOpenFileName(parentID, fileName, clientID);
   }
 
   protected OMRequest doPreExecuteInitiateMPU(String volumeName,

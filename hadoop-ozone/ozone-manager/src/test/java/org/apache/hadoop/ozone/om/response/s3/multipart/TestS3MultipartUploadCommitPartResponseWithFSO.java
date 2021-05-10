@@ -54,8 +54,8 @@ public class TestS3MultipartUploadCommitPartResponseWithFSO
 
     createParentPath(volumeName, bucketName);
     String fileName = OzoneFSUtils.getFileName(keyName);
-    String multipartKey = omMetadataManager.getMultipartKey(parentID, fileName,
-            multipartUploadID);
+    String multipartKey = omMetadataManager
+        .getMultipartKey(volumeName, bucketName, keyName, multipartUploadID);
     long clientId = Time.now();
     String openKey = omMetadataManager.getOpenFileName(parentID, fileName,
             clientId);
@@ -70,7 +70,7 @@ public class TestS3MultipartUploadCommitPartResponseWithFSO
 
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
-    Assert.assertNull(omMetadataManager.getOpenKeyTable().get(multipartKey));
+    Assert.assertNull(omMetadataManager.getOpenKeyTable().get(openKey));
     Assert.assertNotNull(
         omMetadataManager.getMultipartInfoTable().get(multipartKey));
 
@@ -93,8 +93,8 @@ public class TestS3MultipartUploadCommitPartResponseWithFSO
     String multipartUploadID = UUID.randomUUID().toString();
 
     String fileName = OzoneFSUtils.getFileName(keyName);
-    String multipartKey = omMetadataManager.getMultipartKey(parentID, fileName,
-            multipartUploadID);
+    String multipartKey = omMetadataManager
+        .getMultipartKey(volumeName, bucketName, keyName, multipartUploadID);
 
     S3InitiateMultipartUploadResponse s3InitiateMultipartUploadResponseFSO =
             createS3InitiateMPUResponseFSO(volumeName, bucketName, parentID,
@@ -128,7 +128,7 @@ public class TestS3MultipartUploadCommitPartResponseWithFSO
     s3MultipartUploadCommitPartResponse.checkAndUpdateDB(omMetadataManager,
             batchOperation);
 
-    Assert.assertNull(omMetadataManager.getOpenKeyTable().get(multipartKey));
+    Assert.assertNull(omMetadataManager.getOpenKeyTable().get(openKey));
     Assert.assertNull(
         omMetadataManager.getMultipartInfoTable().get(multipartKey));
 
@@ -199,7 +199,7 @@ public class TestS3MultipartUploadCommitPartResponseWithFSO
     s3MultipartUploadCommitPartResponse.checkAndUpdateDB(omMetadataManager,
             batchOperation);
 
-    Assert.assertNull(omMetadataManager.getOpenKeyTable().get(multipartKey));
+    Assert.assertNull(omMetadataManager.getOpenKeyTable().get(openKey));
     Assert.assertNull(
             omMetadataManager.getMultipartInfoTable().get(multipartKey));
 

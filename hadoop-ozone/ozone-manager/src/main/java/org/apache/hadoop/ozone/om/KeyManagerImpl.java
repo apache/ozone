@@ -1423,8 +1423,8 @@ public class KeyManagerImpl implements KeyManager {
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
         bucketName);
     try {
-      String multipartKey = getMultipartKey(volumeName, bucketName,
-          keyName, uploadID);
+      String multipartKey = metadataManager.getMultipartKey(volumeName,
+          bucketName, keyName, uploadID);
 
       OmMultipartKeyInfo multipartKeyInfo =
           metadataManager.getMultipartInfoTable().get(multipartKey);
@@ -1469,7 +1469,11 @@ public class KeyManagerImpl implements KeyManager {
 
         if (replicationType == null) {
           //if there are no parts, use the replicationType from the open key.
-
+          if (OzoneManagerRatisUtils.isBucketFSOptimized()) {
+            multipartKey =
+                getMultipartOpenKeyFSO(volumeName, bucketName, keyName,
+                    uploadID);
+          }
           OmKeyInfo omKeyInfo =
               metadataManager.getOpenKeyTable().get(multipartKey);
 
@@ -1541,28 +1545,20 @@ public class KeyManagerImpl implements KeyManager {
     return partName;
   }
 
-  private String getMultipartKey(String volumeName, String bucketName,
+  private String getMultipartOpenKeyFSO(String volumeName, String bucketName,
       String keyName, String uploadID) throws IOException {
+    OMMetadataManager metaMgr = ozoneManager.getMetadataManager();
+    String fileName = OzoneFSUtils.getFileName(keyName);
+    Iterator<Path> pathComponents = Paths.get(keyName).iterator();
+    String bucketKey = metaMgr.getBucketKey(volumeName, bucketName);
+    OmBucketInfo omBucketInfo = metaMgr.getBucketTable().get(bucketKey);
+    long bucketId = omBucketInfo.getObjectID();
+    long parentID =
+        OMFileRequest.getParentID(bucketId, pathComponents, keyName, metaMgr);
 
-    if (OzoneManagerRatisUtils.isBucketFSOptimized()) {
-      OMMetadataManager metaMgr = ozoneManager.getMetadataManager();
-      String fileName = OzoneFSUtils.getFileName(keyName);
-      Iterator<Path> pathComponents = Paths.get(keyName).iterator();
-      String bucketKey = metaMgr.getBucketKey(volumeName, bucketName);
-      OmBucketInfo omBucketInfo =
-          metaMgr.getBucketTable().get(bucketKey);
-      long bucketId = omBucketInfo.getObjectID();
-      long parentID = OMFileRequest.getParentID(bucketId, pathComponents,
-          keyName, metaMgr);
+    String multipartKey = metaMgr.getMultipartKey(parentID, fileName, uploadID);
 
-      String multipartKey = metaMgr.getMultipartKey(parentID, fileName,
-          uploadID);
-
-      return multipartKey;
-    } else {
-      return metadataManager.getMultipartKey(volumeName,
-          bucketName, keyName, uploadID);
-    }
+    return multipartKey;
   }
 
   /**
