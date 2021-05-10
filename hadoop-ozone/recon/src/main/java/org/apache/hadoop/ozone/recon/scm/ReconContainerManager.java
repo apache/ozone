@@ -48,7 +48,6 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHistory;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
@@ -114,7 +113,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
   public void checkAndAddNewContainer(ContainerID containerID,
       ContainerReplicaProto.State replicaState,
       DatanodeDetails datanodeDetails)
-      throws IOException {
+      throws Exception {
     if (!containerExist(containerID)) {
       LOG.info("New container {} got from {}.", containerID,
           datanodeDetails.getHostName());
@@ -122,27 +121,89 @@ public class ReconContainerManager extends ContainerManagerImpl {
           scmClient.getContainerWithPipeline(containerID.getId());
       LOG.debug("Verified new container from SCM {}, {} ",
           containerID, containerWithPipeline.getPipeline().getId());
-      // If no other client added this, go ahead and add this container.
-      if (!containerExist(containerID)) {
-        addNewContainer(containerID.getId(), containerWithPipeline);
-      }
+      // no need call "containerExist" to check, because
+      // 1 containerExist and addNewContainer can not be atomic
+      // 2 addNewContainer will double check the existence
+      addNewContainer(containerWithPipeline);
     } else {
-      // Check if container state is not open. In SCM, container state
-      // changes to CLOSING first, and then the close command is pushed down
-      // to Datanodes. Recon 'learns' this from DN, and hence replica state
-      // will move container state to 'CLOSING'.
-      ContainerInfo containerInfo = getContainer(containerID);
-      if (containerInfo.getState().equals(HddsProtos.LifeCycleState.OPEN)
-          && !replicaState.equals(ContainerReplicaProto.State.OPEN)
-          && isHealthy(replicaState)) {
-        LOG.info("Container {} has state OPEN, but Replica has State {}.",
-            containerID, replicaState);
+      checkContainerStateAndUpdate(containerID, replicaState);
+    }
+  }
+
+  /**
+   * Check and add new containers in batch if not already present in Recon.
+   *
+   * @param containerReplicaProtoList list of containerReplicaProtos.
+   */
+  public void checkAndAddNewContainerBatch(
+      List<ContainerReplicaProto> containerReplicaProtoList) {
+    Map<Boolean, List<ContainerReplicaProto>> containers =
+        containerReplicaProtoList.parallelStream()
+        .collect(Collectors.groupingBy(c ->
+            containerExist(ContainerID.valueOf(c.getContainerID()))));
+
+    List<ContainerReplicaProto> existContainers = null;
+    if (containers.containsKey(true)) {
+      existContainers = containers.get(true);
+    }
+    List<Long> noExistContainers = null;
+    if (containers.containsKey(false)){
+      noExistContainers = containers.get(false).parallelStream().
+          map(ContainerReplicaProto::getContainerID)
+          .collect(Collectors.toList());
+    }
+
+    if (null != noExistContainers) {
+      List<ContainerWithPipeline> verifiedContainerPipeline =
+          scmClient.getExistContainerWithPipelinesInBatch(noExistContainers);
+      LOG.debug("{} new containers have been verified by SCM , " +
+              "{} containers not found at SCM",
+          verifiedContainerPipeline.size(),
+          noExistContainers.size() - verifiedContainerPipeline.size());
+      for (ContainerWithPipeline cwp : verifiedContainerPipeline) {
         try {
-          updateContainerState(containerID, FINALIZE);
-        } catch (InvalidStateTransitionException e) {
-          throw new IOException(e);
+          addNewContainer(cwp);
+        } catch (IOException ioe) {
+          LOG.error("Exception while checking and adding new container.", ioe);
         }
       }
+    }
+
+    if (null != existContainers) {
+      for (ContainerReplicaProto crp : existContainers) {
+        ContainerID cID = ContainerID.valueOf(crp.getContainerID());
+        ContainerReplicaProto.State crpState = crp.getState();
+        try {
+          checkContainerStateAndUpdate(cID, crpState);
+        } catch (Exception ioe){
+          LOG.error("Exception while " +
+              "checkContainerStateAndUpdate container", ioe);
+        }
+      }
+    }
+  }
+
+  /**
+   *  Check if container state is not open. In SCM, container state
+   *  changes to CLOSING first, and then the close command is pushed down
+   *  to Datanodes. Recon 'learns' this from DN, and hence replica state
+   *  will move container state to 'CLOSING'.
+   *
+   * @param containerID containerID to check
+   * @param state  state to be compared
+   * @throws IOException
+   */
+
+  private void checkContainerStateAndUpdate(ContainerID containerID,
+                                            ContainerReplicaProto.State state)
+      throws Exception {
+    ContainerInfo containerInfo = getContainer(containerID);
+    if (containerInfo.getState().equals(HddsProtos.LifeCycleState.OPEN)
+        && !state.equals(ContainerReplicaProto.State.OPEN)
+        && isHealthy(state)) {
+      LOG.info("Container {} has state OPEN, but given state is {}.",
+          containerID, state);
+      updateContainerState(containerID, FINALIZE);
     }
   }
 
@@ -154,12 +215,10 @@ public class ReconContainerManager extends ContainerManagerImpl {
 
   /**
    * Adds a new container to Recon's container manager.
-   * @param containerId id
    * @param containerWithPipeline containerInfo with pipeline info
    * @throws IOException on Error.
    */
-  public void addNewContainer(long containerId,
-                              ContainerWithPipeline containerWithPipeline)
+  public void addNewContainer(ContainerWithPipeline containerWithPipeline)
       throws IOException {
     ContainerInfo containerInfo = containerWithPipeline.getContainerInfo();
     try {
@@ -180,10 +239,8 @@ public class ReconContainerManager extends ContainerManagerImpl {
               pipelineID, containerInfo.containerID()));
         }
       } else {
-        // Non 'Open' Container. No need to worry about pipeline since SCM
-        // returns a random pipelineID.
         getContainerStateManager().addContainer(containerInfo.getProtobuf());
-        LOG.info("Successfully added container {} to Recon.",
+        LOG.info("Successfully added no open container {} to Recon.",
             containerInfo.containerID());
       }
     } catch (IOException ex) {
