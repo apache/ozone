@@ -117,6 +117,7 @@ import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.common.Storage.StorageState;
 import org.apache.hadoop.ozone.lease.LeaseManager;
 import org.apache.hadoop.ozone.lock.LockManager;
+import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
@@ -1452,7 +1453,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   public void checkAdminAccess(String remoteUser) throws IOException {
     if (remoteUser != null && !scmAdminUsernames.contains(remoteUser) &&
         !scmAdminUsernames.contains(OZONE_ADMINISTRATORS_WILDCARD)) {
-      throw new IOException(
+      throw new AccessControlException(
           "Access denied for user " + remoteUser + ". Superuser privilege " +
               "is required.");
     }

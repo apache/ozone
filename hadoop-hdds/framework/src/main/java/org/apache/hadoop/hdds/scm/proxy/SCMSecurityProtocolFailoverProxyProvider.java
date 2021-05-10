@@ -25,7 +25,6 @@ import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolPB;
 import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
-import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.io.retry.FailoverProxyProvider;
 import org.apache.hadoop.io.retry.RetryPolicies;
@@ -268,11 +267,6 @@ public class SCMSecurityProtocolFailoverProxyProvider implements
             LOG.debug("RetryProxy: SCM {}: {}", getCurrentProxySCMNodeId(),
                 exception.getMessage());
           }
-        }
-
-        // For AccessControl Exception where Client is not authenticated.
-        if (HAUtils.isAccessControlException(exception)) {
-          return RetryAction.FAIL;
         }
 
         if (!SCMHAUtils.checkRetriableWithNoFailoverException(exception)) {
