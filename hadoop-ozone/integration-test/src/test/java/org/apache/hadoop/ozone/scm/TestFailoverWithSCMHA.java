@@ -119,7 +119,7 @@ public class TestFailoverWithSCMHA {
         .contains("Performing failover to suggested leader"));
     scm = getLeader(cluster);
     SCMContainerLocationFailoverProxyProvider proxyProvider =
-        new SCMContainerLocationFailoverProxyProvider(conf);
+        new SCMContainerLocationFailoverProxyProvider(conf, null);
     GenericTestUtils.setLogLevel(SCMContainerLocationFailoverProxyProvider.LOG,
         Level.DEBUG);
     logCapture = GenericTestUtils.LogCapturer

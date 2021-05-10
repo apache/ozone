@@ -121,6 +121,7 @@ import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.common.Storage.StorageState;
 import org.apache.hadoop.ozone.lease.LeaseManager;
 import org.apache.hadoop.ozone.lock.LockManager;
+import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
@@ -846,8 +847,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     String selfNodeId = scmhaNodeDetails.getLocalNodeDetails().getNodeId();
     final String selfHostName =
         scmhaNodeDetails.getLocalNodeDetails().getHostName();
-    if (primordialSCM != null && SCMHAUtils
-        .isPrimordialSCM(conf, selfNodeId, selfHostName)) {
+    if (primordialSCM != null && SCMHAUtils.isSCMHAEnabled(conf)
+        && SCMHAUtils.isPrimordialSCM(conf, selfNodeId, selfHostName)) {
       LOG.info(
           "SCM bootstrap command can only be executed in non-Primordial SCM "
               + "{}, self id {} " + "Ignoring it.", primordialSCM, selfNodeId);
@@ -927,8 +928,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     String primordialSCM = SCMHAUtils.getPrimordialSCM(conf);
     final String selfNodeId = haDetails.getLocalNodeDetails().getNodeId();
     final String selfHostName = haDetails.getLocalNodeDetails().getHostName();
-    if (primordialSCM != null && !SCMHAUtils
-        .isPrimordialSCM(conf, selfNodeId, selfHostName)) {
+    if (primordialSCM != null && SCMHAUtils.isSCMHAEnabled(conf)
+        && !SCMHAUtils.isPrimordialSCM(conf, selfNodeId, selfHostName)) {
       LOG.info(
           "SCM init command can only be executed in Primordial SCM {}, "
               + "self id {} "
@@ -1478,7 +1479,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   public void checkAdminAccess(String remoteUser) throws IOException {
     if (remoteUser != null && !scmAdminUsernames.contains(remoteUser) &&
         !scmAdminUsernames.contains(OZONE_ADMINISTRATORS_WILDCARD)) {
-      throw new IOException(
+      throw new AccessControlException(
           "Access denied for user " + remoteUser + ". Superuser privilege " +
               "is required.");
     }

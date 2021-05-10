@@ -16,8 +16,8 @@
  */
 package org.apache.hadoop.hdds.utils;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.HddsConfigKeys;
-import com.google.protobuf.ServiceException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.function.SupplierWithIOException;
@@ -44,13 +44,12 @@ import org.apache.hadoop.hdds.utils.db.RocksDBConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.ipc.RemoteException;
-import org.apache.hadoop.security.AccessControlException;
 
 import java.io.File;
 import java.io.IOException;
@@ -142,7 +141,20 @@ public final class HAUtils {
   public static StorageContainerLocationProtocol getScmContainerClient(
       ConfigurationSource conf) {
     SCMContainerLocationFailoverProxyProvider proxyProvider =
-        new SCMContainerLocationFailoverProxyProvider(conf);
+        new SCMContainerLocationFailoverProxyProvider(conf, null);
+    StorageContainerLocationProtocol scmContainerClient =
+        TracingUtil.createProxy(
+            new StorageContainerLocationProtocolClientSideTranslatorPB(
+                proxyProvider), StorageContainerLocationProtocol.class, conf);
+    return scmContainerClient;
+  }
+
+  @VisibleForTesting
+  public static StorageContainerLocationProtocol getScmContainerClient(
+      ConfigurationSource conf, UserGroupInformation userGroupInformation) {
+    SCMContainerLocationFailoverProxyProvider proxyProvider =
+        new SCMContainerLocationFailoverProxyProvider(conf,
+            userGroupInformation);
     StorageContainerLocationProtocol scmContainerClient =
         TracingUtil.createProxy(
             new StorageContainerLocationProtocolClientSideTranslatorPB(
@@ -331,27 +343,6 @@ public final class HAUtils {
     }
     return metadataDir;
   }
-
-  /**
-   * Unwrap exception to check if it is some kind of access control problem.
-   * {@link AccessControlException}
-   */
-  public static boolean isAccessControlException(Exception ex) {
-    if (ex instanceof ServiceException) {
-      Throwable t = ex.getCause();
-      if (t instanceof RemoteException) {
-        t = ((RemoteException) t).unwrapRemoteException();
-      }
-      while (t != null) {
-        if (t instanceof AccessControlException) {
-          return true;
-        }
-        t = t.getCause();
-      }
-    }
-    return false;
-  }
-
   /**
    * Build CA list which need to be passed to client.
    *
