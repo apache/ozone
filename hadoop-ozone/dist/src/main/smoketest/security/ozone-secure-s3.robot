@@ -46,10 +46,10 @@ Secure S3 put-object test
     ${output} =             Execute                 aws s3api --endpoint ${ENDPOINT_URL} put-object --bucket=bucket-test123 --key=tmp1/tmp2/NOTICE.txt --body=${testFilePath}
     ${output} =             Execute                 aws s3api --endpoint ${ENDPOINT_URL} list-objects --bucket=bucket-test123
                             Should contain   ${output}         tmp1/tmp2/NOTICE.txt
-    ${output} =             Execute                 aws s3api --endpoint ${ENDPOINT_URL} put-object --bucket=bucket-test123 --key=tmp3//tmp4/NOTICE.txt --body=${testFilePath}
+    ${output} =             Execute                 aws s3api --endpoint ${ENDPOINT_URL} put-object --bucket=bucket-test123 --key=tmp3/tmp4/NOTICE.txt --body=${testFilePath}
     ${output} =             Execute                 aws s3api --endpoint ${ENDPOINT_URL} list-objects --bucket=bucket-test123
                             Should contain   ${output}         tmp3/tmp4/NOTICE.txt
-    ${output} =             Execute                 aws s3api --endpoint ${ENDPOINT_URL} put-object --bucket=bucket-test123 --key=//tmp5/tmp6/NOTICE.txt --body=${testFilePath}
+    ${output} =             Execute                 aws s3api --endpoint ${ENDPOINT_URL} put-object --bucket=bucket-test123 --key=/tmp5/tmp6/NOTICE.txt --body=${testFilePath}
     ${output} =             Execute                 aws s3api --endpoint ${ENDPOINT_URL} list-objects --bucket=bucket-test123
                             Should contain   ${output}         /tmp5/tmp6/NOTICE.txt
 
