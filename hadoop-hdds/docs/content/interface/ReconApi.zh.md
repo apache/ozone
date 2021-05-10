@@ -33,9 +33,9 @@ Recon API v1 是一组 HTTP 端点，可以帮助您了解 Ozone 集群的当前
 * **/containers**
 
     **URL 结构**
-    ```
+```
     GET /api/v1/containers
-    ```
+```
 
     **参数**
 
@@ -52,7 +52,7 @@ Recon API v1 是一组 HTTP 端点，可以帮助您了解 Ozone 集群的当前
     
     回传所有 ContainerMetadata 对象。
     
-    ```json
+```json
     {
       "data": {
         "totalCount": 3,
@@ -72,14 +72,14 @@ Recon API v1 是一组 HTTP 端点，可以帮助您了解 Ozone 集群的当前
         ]
       }
     }
-    ```
+```
 
 * **/containers/:id/keys**
 
     **URL 结构**
-    ```
+```
     GET /api/v1/containers/:id/keys
-    ```
+```
     
     **参数**
     
@@ -96,7 +96,7 @@ Recon API v1 是一组 HTTP 端点，可以帮助您了解 Ozone 集群的当前
     
     回传给定容器 ID 的所有 KeyMetadata 对象。
     
-    ```json
+```json
     {
       "totalCount":7,
       "keys": [
@@ -120,13 +120,13 @@ Recon API v1 是一组 HTTP 端点，可以帮助您了解 Ozone 集群的当前
         ...
       ]
     }
-    ```
+```
 * **/containers/missing**
     
     **URL 结构**
-    ```
+```
     GET /api/v1/containers/missing
-    ```
+```
     
     **参数**
     
@@ -136,7 +136,7 @@ Recon API v1 是一组 HTTP 端点，可以帮助您了解 Ozone 集群的当前
     
     回传所有丢失容器的 MissingContainerMetadata 对象。
     
-    ```json
+```json
     {
     	"totalCount": 26,
     	"containers": [{
@@ -156,13 +156,13 @@ Recon API v1 是一组 HTTP 端点，可以帮助您了解 Ozone 集群的当前
         ...
         ]
     }
-    ```
+```
 * **/containers/:id/replicaHistory**
 
     **URL 结构**
-    ```
+```
     GET /api/v1/containers/:id/replicaHistory
-    ```
+```
     
     **参数**
     
@@ -172,7 +172,7 @@ Recon API v1 是一组 HTTP 端点，可以帮助您了解 Ozone 集群的当前
 
     回传给定容器 ID 的所有 ContainerHistory 对象。
     
-    ```json
+```json
     [
       {
         "containerId": 1,
@@ -182,13 +182,13 @@ Recon API v1 是一组 HTTP 端点，可以帮助您了解 Ozone 集群的当前
       },
       ...
     ]
-    ```
+```
 * **/containers/unhealthy**
 
     **URL 结构**
-     ```
+ ```
      GET /api/v1/containers/unhealthy
-     ```
+ ```
      
     **参数**
     
@@ -205,7 +205,7 @@ Recon API v1 是一组 HTTP 端点，可以帮助您了解 Ozone 集群的当前
     
     回传所有不健康容器的 UnhealthyContainerMetadata 对象。
     
-     ```json
+ ```json
      {
      	"missingCount": 2,
      	"underReplicatedCount": 0,
@@ -233,14 +233,14 @@ Recon API v1 是一组 HTTP 端点，可以帮助您了解 Ozone 集群的当前
         ...
         ]
      } 
-     ```
+ ```
      
 * **/containers/unhealthy/:state**
 
     **URL 结构**
-    ```
+```
     GET /api/v1/containers/unhealthy/:state
-    ```
+```
      
     **参数**
     
@@ -264,9 +264,9 @@ Recon API v1 是一组 HTTP 端点，可以帮助您了解 Ozone 集群的当前
 * **/clusterState**
 
     **URL 结构**
-    ```
+```
     GET /api/v1/clusterState
-    ```
+```
      
     **参数**
     
@@ -276,7 +276,7 @@ Recon API v1 是一组 HTTP 端点，可以帮助您了解 Ozone 集群的当前
     
     返回 Ozone 集群当前状态的摘要。
     
-     ```json
+ ```json
      {
      	"pipelines": 5,
      	"totalDatanodes": 4,
@@ -291,16 +291,16 @@ Recon API v1 是一组 HTTP 端点，可以帮助您了解 Ozone 集群的当前
      	"buckets": 26,
      	"keys": 25
      }
-     ```
+ ```
      
 #### 数据节点
 
 * **/datanodes**
 
     **URL 结构**
-    ```
+```
     GET /api/v1/datanodes
-    ```
+```
     
     **参数**
     
@@ -310,7 +310,7 @@ Recon API v1 是一组 HTTP 端点，可以帮助您了解 Ozone 集群的当前
     
     回传集群中的所有数据节点。
     
-    ```json
+```json
     {
      	"totalCount": 4,
      	"datanodes": [{
@@ -340,16 +340,16 @@ Recon API v1 是一组 HTTP 端点，可以帮助您了解 Ozone 集群的当前
         ...
         ]
      }
-     ```
+ ```
      
 #### 管道
 
 * **/pipelines**
 
     **URL 结构**
-    ```
+```
     GET /api/v1/pipelines
-    ```
+```
     **参数**
     
     没有参数
@@ -358,7 +358,7 @@ Recon API v1 是一组 HTTP 端点，可以帮助您了解 Ozone 集群的当前
     
     回传在集群中的所有管道。
     
-    ```json
+```json
      {
      	"totalCount": 5,
      	"pipelines": [{
@@ -376,16 +376,16 @@ Recon API v1 是一组 HTTP 端点，可以帮助您了解 Ozone 集群的当前
         ...
         ]
      }
-     ```  
+ ```  
 
 #### 任务
 
 * **/task/status**
 
     **URL 结构**
-    ```
+```
     GET /api/v1/task/status
-    ```
+```
     
     **参数**
     
@@ -395,7 +395,7 @@ Recon API v1 是一组 HTTP 端点，可以帮助您了解 Ozone 集群的当前
     
     回传所有 Recon 任务的状态。
   
-    ```json
+```json
      [
        {
      	"taskName": "OmDeltaRequest",
@@ -404,16 +404,16 @@ Recon API v1 是一组 HTTP 端点，可以帮助您了解 Ozone 集群的当前
        },
        ...
      ]
-    ```
+```
     
 #### 使用率
 
 * **/utilization/fileCount**
 
     **URL 结构**
-    ```
+```
     GET /api/v1/utilization/fileCount
-    ```
+```
     
     **参数**
     
@@ -433,7 +433,7 @@ Recon API v1 是一组 HTTP 端点，可以帮助您了解 Ozone 集群的当前
     
     回传不同文件范围内的文件计数，其中响应对象中的`fileSize`是文件大小范围的上限。
     
-    ```json
+```json
      [{
      	"volume": "vol-2-04168",
      	"bucket": "bucket-0-11685",
@@ -455,16 +455,16 @@ Recon API v1 是一组 HTTP 端点，可以帮助您了解 Ozone 集群的当前
      	"fileSize": 1024,
      	"count": 2
      }]
-    ```
+```
     
 #### <a name="metrics"></a> 指标
 
 * **/metrics/:api**
 
     **URL 结构**
-    ```
+```
     GET /api/v1/metrics/:api
-    ```
+```
     
     **参数**
 
@@ -475,7 +475,7 @@ Recon API v1 是一组 HTTP 端点，可以帮助您了解 Ozone 集群的当前
     这是 Prometheus 的代理端点，并回传与 Prometheus 端点相同的响应。
     示例：/api/v1/metrics/query?query=ratis_leader_election_electionCount
     
-     ```json
+ ```json
      {
        "status": "success",
        "data": {
@@ -497,6 +497,6 @@ Recon API v1 是一组 HTTP 端点，可以帮助您了解 Ozone 集群的当前
          ]
        }
      }
-     ```
+ ```
 
 

@@ -53,7 +53,7 @@ state of an Ozone cluster and to troubleshoot if needed.
     
     Returns all the ContainerMetadata objects.
     
-    ```json
+```json
     {
       "data": {
         "totalCount": 3,
@@ -97,7 +97,7 @@ state of an Ozone cluster and to troubleshoot if needed.
     
     Returns all the KeyMetadata objects for the given ContainerID.
     
-    ```json
+```json
     {
       "totalCount":7,
       "keys": [
@@ -138,7 +138,7 @@ state of an Ozone cluster and to troubleshoot if needed.
     
     Returns the MissingContainerMetadata objects for all the missing containers.
     
-    ```json
+```json
     {
     	"totalCount": 26,
     	"containers": [{
@@ -175,7 +175,7 @@ state of an Ozone cluster and to troubleshoot if needed.
     
     Returns all the ContainerHistory objects for the given ContainerID.
     
-    ```json
+```json
     [
       {
         "containerId": 1,
@@ -190,9 +190,9 @@ state of an Ozone cluster and to troubleshoot if needed.
 * **/containers/unhealthy**
  
      **URL Structure** 
-     ```
+```
      GET /api/v1/containers/unhealthy
-     ```
+```
  
      **Parameters**
      
@@ -210,7 +210,7 @@ state of an Ozone cluster and to troubleshoot if needed.
      
      Returns the UnhealthyContainerMetadata objects for all the unhealthy containers.
      
-     ```json
+```json
      {
      	"missingCount": 2,
      	"underReplicatedCount": 0,
@@ -238,14 +238,14 @@ state of an Ozone cluster and to troubleshoot if needed.
         ...
         ]
      } 
-     ```
+```
 
 * **/containers/unhealthy/:state**
  
      **URL Structure** 
-     ```
+```
      GET /api/v1/containers/unhealthy/:state
-     ```
+```
  
      **Parameters**
      
@@ -270,9 +270,9 @@ state of an Ozone cluster and to troubleshoot if needed.
 * **/clusterState**
  
      **URL Structure** 
-     ```
+```
      GET /api/v1/clusterState
-     ```
+```
  
      **Parameters**
      
@@ -282,7 +282,7 @@ state of an Ozone cluster and to troubleshoot if needed.
      
      Returns a summary of the current state of the Ozone cluster.
 
-     ```json
+```json
      {
      	"pipelines": 5,
      	"totalDatanodes": 4,
@@ -297,16 +297,16 @@ state of an Ozone cluster and to troubleshoot if needed.
      	"buckets": 26,
      	"keys": 25
      }
-     ```
+```
 
 #### Datanodes
 
 * **/datanodes**
  
      **URL Structure** 
-     ```
+```
      GET /api/v1/datanodes
-     ```
+```
  
      **Parameters**
      
@@ -316,7 +316,7 @@ state of an Ozone cluster and to troubleshoot if needed.
      
      Returns all the datanodes in the cluster.
 
-     ```json
+```json
      {
      	"totalCount": 4,
      	"datanodes": [{
@@ -346,16 +346,16 @@ state of an Ozone cluster and to troubleshoot if needed.
         ...
         ]
      }
-     ```
+```
   
 #### Pipelines
 
 * **/pipelines**
  
      **URL Structure** 
-     ```
+```
      GET /api/v1/pipelines
-     ```
+```
  
      **Parameters**
      
@@ -365,7 +365,7 @@ state of an Ozone cluster and to troubleshoot if needed.
      
      Returns all the pipelines in the cluster.
 
-     ```json
+```json
      {
      	"totalCount": 5,
      	"pipelines": [{
@@ -383,16 +383,16 @@ state of an Ozone cluster and to troubleshoot if needed.
         ...
         ]
      }
-     ```
+```
   
 #### Tasks
 
 * **/task/status**
  
      **URL Structure** 
-     ```
+```
      GET /api/v1/task/status
-     ```
+```
  
      **Parameters**
      
@@ -402,7 +402,7 @@ state of an Ozone cluster and to troubleshoot if needed.
      
      Returns the status of all the Recon tasks.
 
-     ```json
+```json
      [
        {
      	"taskName": "OmDeltaRequest",
@@ -411,16 +411,16 @@ state of an Ozone cluster and to troubleshoot if needed.
        },
        ...
      ]
-     ```
+```
 
 #### Utilization
 
 * **/utilization/fileCount**
  
      **URL Structure** 
-     ```
+```
      GET /api/v1/utilization/fileCount
-     ```
+```
  
      **Parameters**
      
@@ -441,7 +441,7 @@ state of an Ozone cluster and to troubleshoot if needed.
      Returns the file counts within different file ranges with `fileSize` in the
      response object being the upper cap for file size range. 
 
-     ```json
+```json
      [{
      	"volume": "vol-2-04168",
      	"bucket": "bucket-0-11685",
@@ -463,16 +463,16 @@ state of an Ozone cluster and to troubleshoot if needed.
      	"fileSize": 1024,
      	"count": 2
      }]
-     ```
+```
   
 #### <a name="metrics"></a> Metrics
 
 * **/metrics/:api**
  
      **URL Structure** 
-     ```
+```
      GET /api/v1/metrics/:api
-     ```
+```
  
      **Parameters**
      
@@ -485,7 +485,7 @@ state of an Ozone cluster and to troubleshoot if needed.
      the prometheus endpoint. 
      Example: /api/v1/metrics/query?query=ratis_leader_election_electionCount
 
-     ```json
+```json
      {
        "status": "success",
        "data": {
@@ -507,5 +507,5 @@ state of an Ozone cluster and to troubleshoot if needed.
          ]
        }
      }
-     ```
+```
   
