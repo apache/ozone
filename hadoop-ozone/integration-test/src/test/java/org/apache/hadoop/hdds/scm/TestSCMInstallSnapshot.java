@@ -122,7 +122,6 @@ public class TestSCMInstallSnapshot {
   public void testInstallCheckPoint() throws Exception {
     DBCheckpoint checkpoint = downloadSnapshot();
     StorageContainerManager scm = cluster.getStorageContainerManager();
-    SCMHAManagerImpl scmhaManager = (SCMHAManagerImpl)scm.getScmHAManager();
     DBStore db = HAUtils
         .loadDB(conf, checkpoint.getCheckpointLocation().getParent().toFile(),
             checkpoint.getCheckpointLocation().getFileName().toString(),
