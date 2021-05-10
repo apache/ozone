@@ -15,7 +15,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.apache.hadoop</groupId>
   <artifactId>hadoop-main-ozone</artifactId>
-  <version>1.0.0.7.1.7.0-SNAPSHOT</version>
+  <version>1.1.0.7.1.7.0-SNAPSHOT</version>
   <description>Apache Ozone Main</description>
   <name>Apache Ozone Main</name>
   <packaging>pom</packaging>
@@ -70,7 +70,7 @@
 
     <!-- version for hdds/ozone components -->
     <hdds.version>${ozone.version}</hdds.version>
-    <ozone.version>1.0.0.7.1.7.0-SNAPSHOT</ozone.version>
+    <ozone.version>1.1.0.7.1.7.0-SNAPSHOT</ozone.version>
     <ozone.release>Denali</ozone.release>
     <declared.hdds.version>${hdds.version}</declared.hdds.version>
     <declared.ozone.version>${ozone.version}</declared.ozone.version>
