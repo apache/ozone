@@ -50,6 +50,21 @@ public abstract class DatanodeDBProfile {
   public abstract ColumnFamilyOptions getColumnFamilyOptions(
       ConfigurationSource config);
 
+  /**
+   * Returns DatanodeDBProfile for corresponding storage type.
+   */
+  public static DatanodeDBProfile getProfile(DBProfile dbProfile) {
+    switch (dbProfile) {
+    case SSD:
+      return new SSD();
+    case DISK:
+      return new Disk();
+    default:
+      throw new IllegalArgumentException(
+          "DatanodeDBProfile does not exist for " + dbProfile);
+    }
+  }
+
 
 
   public static class SSD extends DatanodeDBProfile {

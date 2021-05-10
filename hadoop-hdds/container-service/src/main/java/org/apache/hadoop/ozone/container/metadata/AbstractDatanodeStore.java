@@ -79,9 +79,8 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
       AbstractDatanodeDBDefinition dbDef, boolean openReadOnly)
       throws IOException {
 
-    dbProfile = config.getEnum(HDDS_DB_PROFILE, HDDS_DEFAULT_DB_PROFILE)
-        == DBProfile.DISK ? new DatanodeDBProfile.Disk() :
-        new DatanodeDBProfile.SSD();
+    dbProfile = DatanodeDBProfile
+        .getProfile(config.getEnum(HDDS_DB_PROFILE, HDDS_DEFAULT_DB_PROFILE));
 
     // The same config instance is used on each datanode, so we can share the
     // corresponding column family options, providing a single shared cache
