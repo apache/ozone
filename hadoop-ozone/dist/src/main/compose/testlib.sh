@@ -324,7 +324,7 @@ run_test_script() {
   #required to read the .env file from the right location
   cd "${d}" || return
 
-  ret=0
+  local ret=0
   if ! ./test.sh; then
     ret=1
     echo "ERROR: Test execution of ${d} is FAILED!!!!"
@@ -336,7 +336,7 @@ run_test_script() {
 }
 
 run_test_scripts() {
-  ret=0
+  local ret=0
 
   for t in "$@"; do
     d="$(dirname "${t}")"

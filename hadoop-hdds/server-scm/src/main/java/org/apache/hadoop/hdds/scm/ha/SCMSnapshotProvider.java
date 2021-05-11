@@ -32,6 +32,7 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.security.x509.certificate.client.SCMCertificateClient;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RocksDBCheckpoint;
 
@@ -57,10 +58,14 @@ public class SCMSnapshotProvider {
 
   private Map<String, SCMNodeDetails> peerNodesMap;
 
+  private final SCMCertificateClient scmCertificateClient;
+
   public SCMSnapshotProvider(ConfigurationSource conf,
-      List<SCMNodeDetails> peerNodes) {
+      List<SCMNodeDetails> peerNodes,
+      SCMCertificateClient scmCertificateClient) {
     LOG.info("Initializing SCM Snapshot Provider");
     this.conf = conf;
+    this.scmCertificateClient = scmCertificateClient;
     // Create Ratis storage dir
     String scmRatisDirectory = SCMHAUtils.getSCMRatisDirectory(conf);
 
@@ -101,19 +106,19 @@ public class SCMSnapshotProvider {
             .getAbsolutePath();
     File targetFile = new File(snapshotFilePath + ".tar.gz");
 
+
     // the downloadClient instance will be created as and when install snapshot
     // request is received. No caching of the client as it should be a very rare
     int port = peerNodesMap.get(leaderSCMNodeID).getGrpcPort();
-    SCMSnapshotDownloader downloadClient = new InterSCMGrpcClient(
-        peerNodesMap.get(leaderSCMNodeID).getInetAddress().getHostAddress(),
-        port, conf);
-    try {
+    String host = peerNodesMap.get(leaderSCMNodeID).getInetAddress()
+            .getHostAddress();
+
+    try (SCMSnapshotDownloader downloadClient =
+        new InterSCMGrpcClient(host, port, conf, scmCertificateClient)) {
       downloadClient.download(targetFile.toPath()).get();
     } catch (ExecutionException | InterruptedException e) {
       LOG.error("Rocks DB checkpoint downloading failed", e);
       throw new IOException(e);
-    } finally {
-      downloadClient.close();
     }
 
 

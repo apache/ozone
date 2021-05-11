@@ -16,7 +16,7 @@
  * limitations under the License.
  *
  */
-package org.apache.hadoop.hdds.security.x509.certificate.utils;
+package org.apache.hadoop.hdds.security.x509.crl;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
