@@ -121,13 +121,19 @@ public class ContainerBalancer {
    * Balances the cluster.
    */
   private void balance() {
-    boolean initialized = initializeIteration();
+    overUtilizedNodes.clear();
+    underUtilizedNodes.clear();
+    aboveAverageUtilizedNodes.clear();
+    belowAverageUtilizedNodes.clear();
+    initializeIteration();
   }
 
   /**
    * Initializes an iteration during balancing. Recognizes over, under,
    * below-average,and under-average utilizes nodes. Decides whether
    * balancing needs to continue or should be stopped.
+   *
+   * @return true if successfully initialized, otherwise false.
    */
   private boolean initializeIteration() {
     List<DatanodeUsageInfo> nodes;
@@ -141,7 +147,12 @@ public class ContainerBalancer {
       return false;
     }
 
-    clusterAvgUtilisation = calculateAvgUtilization(nodes);
+    try {
+      clusterAvgUtilisation = calculateAvgUtilization(nodes);
+    } catch(ArithmeticException e) {
+      LOG.warn("Container Balancer failed to initialize an iteration", e);
+      return false;
+    }
     LOG.info("Average utilization of the cluster is {}", clusterAvgUtilisation);
 
     // under utilized nodes have utilization(that is, used / capacity) less
@@ -203,6 +214,10 @@ public class ContainerBalancer {
         numDatanodesBalanced += 1;
       }
     }
+
+    // calculate total number of nodes that have been balanced
+    numDatanodesBalanced =
+        numDatanodesBalanced + metrics.getNumDatanodesBalanced().get();
     metrics.setNumDatanodesBalanced(new LongMetric(numDatanodesBalanced));
     sourceNodes = new ArrayList<>(
         overUtilizedNodes.size() + underUtilizedNodes.size());
@@ -258,7 +273,7 @@ public class ContainerBalancer {
    *
    * @param nodeCapacity capacity of the node.
    * @param utilizationRatio used space by capacity ratio of the node.
-   * @return
+   * @return number of bytes
    */
   private double ratioToBytes(Long nodeCapacity, double utilizationRatio) {
     return nodeCapacity * utilizationRatio;
@@ -270,9 +285,10 @@ public class ContainerBalancer {
    *
    * @param nodes List of DatanodeUsageInfo to find the average utilization for
    * @return Average utilization value
+   * @throws ArithmeticException
    */
   private double calculateAvgUtilization(List<DatanodeUsageInfo> nodes)
-      throws ArithmeticException{
+      throws ArithmeticException {
     SCMNodeStat aggregatedStats = new SCMNodeStat(
         0, 0, 0);
     for (DatanodeUsageInfo node : nodes) {
@@ -286,11 +302,11 @@ public class ContainerBalancer {
       return clusterUsed / (double) clusterCapacity;
     } catch (ArithmeticException e) {
       if (clusterCapacity == 0) {
-        LOG.info("Cluster capacity found to be 0 while calculating average " +
+        LOG.warn("Cluster capacity found to be 0 while calculating average " +
             "utilisation of the cluster for Container Balancer, resulting in " +
             "division by 0.", e);
       } else {
-        LOG.info("Exception occurred while calculating average utilisation of" +
+        LOG.warn("Exception occurred while calculating average utilisation of" +
             " the cluster for Container Balancer.", e);
       }
       throw e;

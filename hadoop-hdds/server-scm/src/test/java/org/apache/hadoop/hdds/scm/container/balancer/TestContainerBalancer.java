@@ -30,19 +30,24 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class TestContainerBalancer {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TestContainerBalancer.class);
+
   private ReplicationManager replicationManager;
   private ContainerManagerV2 containerManager;
   private ContainerBalancer containerBalancer;
   private MockNodeManager mockNodeManager;
   private OzoneConfiguration conf;
   private ContainerBalancerConfiguration balancerConfiguration;
-  private ContainerBalancerMetrics balancerMetrics;
   private List<DatanodeUsageInfo> nodesInCluster;
   private List<Double> nodeUtilizations;
   private double averageUtilization;
@@ -84,7 +89,7 @@ public class TestContainerBalancer {
 
     // check for random threshold values
     for (int i = 0; i < 50; i++) {
-      double randomThreshold = new Random().nextDouble();
+      double randomThreshold = Math.random();
 
       balancerConfiguration.setThreshold(String.valueOf(randomThreshold));
       containerBalancer.start(balancerConfiguration);
@@ -161,13 +166,16 @@ public class TestContainerBalancer {
    * Generates a range of equally spaced utilization(that is, used / capacity)
    * values from 0 to 1.
    *
-   * @param count number of values to generate.
+   * @param count Number of values to generate. Count must be greater than or
+   *             equal to 1.
+   * @throws IllegalArgumentException If the value of the parameter count is
+   * less than 1.
    */
-  private void generateUtilizations(int count) {
+  private void generateUtilizations(int count) throws IllegalArgumentException {
     if (count < 1) {
-      throw new IllegalArgumentException(
-          "The value of argument count is {}. " +
-              "However, count must be greater than 0");
+      LOG.warn("The value of argument count is {}. However, count must be " +
+          "greater than 0.", count);
+      throw new IllegalArgumentException();
     }
     nodeUtilizations = new ArrayList<>(count);
     for (int i = 0; i < count; i++) {
@@ -188,7 +196,7 @@ public class TestContainerBalancer {
 
     for (double utilization : nodeUtilizations) {
       // select a random index from 0 to capacities.length
-      int index = (int) (new Random().nextFloat() * (capacities.length - 1));
+      int index = ThreadLocalRandom.current().nextInt(0, capacities.length);
       long capacity = capacities[index];
       long used = (long) (capacity * utilization);
       totalCapacity += capacity;
