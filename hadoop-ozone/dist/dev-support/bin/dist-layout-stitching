@@ -121,10 +121,7 @@ run cp -p -r "${ROOT}/hadoop-ozone/dist/target/k8s" kubernetes
 run cp -p -r "${ROOT}/hadoop-ozone/dist/target/Dockerfile" .
 
 #Copy pre-generated keytabs
-run cp -p -R "${ROOT}/hadoop-ozone/dist/src/main/keytabs" compose/ozonesecure
-run cp -p -R "${ROOT}/hadoop-ozone/dist/src/main/keytabs" compose/ozonesecure-mr
-run cp -p -R "${ROOT}/hadoop-ozone/dist/src/main/keytabs" compose/ozonesecure-om-ha
-run cp -p -R "${ROOT}/hadoop-ozone/dist/src/main/keytabs" compose/ozonesecure-ha
+run cp -p -R "${ROOT}/hadoop-ozone/dist/src/main/keytabs" compose/_keytabs
 
 #workaround for https://issues.apache.org/jira/browse/MRESOURCES-236
 find ./compose -name "*.sh" -exec chmod 755 {} \;

@@ -21,7 +21,7 @@ services:
     hostname: kdc
     volumes:
       - ../..:/opt/hadoop
-      - ./keytabs:/etc/security/keytabs
+      - ../_keytabs:/etc/security/keytabs
     command: ["krb5kdc","-n"]
   kms:
     image: apache/hadoop:${HADOOP_VERSION}
@@ -38,7 +38,7 @@ services:
     image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
     volumes:
       - ../..:/opt/hadoop
-      - ./keytabs:/etc/security/keytabs
+      - ../_keytabs:/etc/security/keytabs
       - ./krb5.conf:/etc/krb5.conf
     ports:
       - 9864
@@ -52,7 +52,7 @@ services:
     hostname: om
     volumes:
       - ../..:/opt/hadoop
-      - ./keytabs:/etc/security/keytabs
+      - ../_keytabs:/etc/security/keytabs
       - ./krb5.conf:/etc/krb5.conf
     ports:
       - 9874:9874
@@ -69,7 +69,7 @@ services:
     hostname: s3g
     volumes:
       - ../..:/opt/hadoop
-      - ./keytabs:/etc/security/keytabs
+      - ../_keytabs:/etc/security/keytabs
       - ./krb5.conf:/etc/krb5.conf
     ports:
       - 9878:9878
@@ -83,7 +83,7 @@ services:
     hostname: recon
     volumes:
       - ../..:/opt/hadoop
-      - ./keytabs:/etc/security/keytabs
+      - ../_keytabs:/etc/security/keytabs
       - ./krb5.conf:/etc/krb5.conf
     ports:
       - 9888:9888
@@ -97,7 +97,7 @@ services:
     hostname: scm
     volumes:
       - ../..:/opt/hadoop
-      - ./keytabs:/etc/security/keytabs
+      - ../_keytabs:/etc/security/keytabs
       - ./krb5.conf:/etc/krb5.conf
     ports:
       - 9876:9876

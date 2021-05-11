@@ -21,7 +21,7 @@ services:
     hostname: kdc
     volumes:
       - ../..:/opt/hadoop
-      - ./keytabs:/etc/security/keytabs
+      - ../_keytabs:/etc/security/keytabs
     command: ["krb5kdc","-n"]
     networks:
       ozone_net:
@@ -33,7 +33,7 @@ services:
     env_file:
       - ./docker-config
     volumes:
-      - ./keytabs:/etc/security/keytabs
+      - ../_keytabs:/etc/security/keytabs
       - ./krb5.conf:/etc/krb5.conf
       - ../../libexec/transformation.py:/opt/transformation.py
     environment:
@@ -46,7 +46,7 @@ services:
     image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
     volumes:
       - ../..:/opt/hadoop
-      - ./keytabs:/etc/security/keytabs
+      - ../_keytabs:/etc/security/keytabs
       - ./krb5.conf:/etc/krb5.conf
     ports:
       - 9864:9999
@@ -67,7 +67,7 @@ services:
     image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
     volumes:
       - ../..:/opt/hadoop
-      - ./keytabs:/etc/security/keytabs
+      - ../_keytabs:/etc/security/keytabs
       - ./krb5.conf:/etc/krb5.conf
     ports:
       - 9866:9999
@@ -88,7 +88,7 @@ services:
     image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
     volumes:
       - ../..:/opt/hadoop
-      - ./keytabs:/etc/security/keytabs
+      - ../_keytabs:/etc/security/keytabs
       - ./krb5.conf:/etc/krb5.conf
     ports:
       - 9868:9999
@@ -110,7 +110,7 @@ services:
     hostname: om1
     volumes:
       - ../..:/opt/hadoop
-      - ./keytabs:/etc/security/keytabs
+      - ../_keytabs:/etc/security/keytabs
       - ./krb5.conf:/etc/krb5.conf
     ports:
       - 9880:9874
@@ -135,7 +135,7 @@ services:
     hostname: om2
     volumes:
       - ../..:/opt/hadoop
-      - ./keytabs:/etc/security/keytabs
+      - ../_keytabs:/etc/security/keytabs
       - ./krb5.conf:/etc/krb5.conf
     ports:
       - 9882:9874
@@ -160,7 +160,7 @@ services:
     hostname: om3
     volumes:
       - ../..:/opt/hadoop
-      - ./keytabs:/etc/security/keytabs
+      - ../_keytabs:/etc/security/keytabs
       - ./krb5.conf:/etc/krb5.conf
     ports:
       - 9884:9874
@@ -185,7 +185,7 @@ services:
     hostname: s3g
     volumes:
       - ../..:/opt/hadoop
-      - ./keytabs:/etc/security/keytabs
+      - ../_keytabs:/etc/security/keytabs
       - ./krb5.conf:/etc/krb5.conf
     ports:
       - 9878:9878
@@ -202,7 +202,7 @@ services:
     hostname: scm1.org
     volumes:
       - ../..:/opt/hadoop
-      - ./keytabs:/etc/security/keytabs
+      - ../_keytabs:/etc/security/keytabs
       - ./krb5.conf:/etc/krb5.conf
     ports:
       - 9990:9876
@@ -229,7 +229,7 @@ services:
     hostname: scm2.org
     volumes:
       - ../..:/opt/hadoop
-      - ./keytabs:/etc/security/keytabs
+      - ../_keytabs:/etc/security/keytabs
       - ./krb5.conf:/etc/krb5.conf
     ports:
       - 9994:9876
@@ -256,7 +256,7 @@ services:
     hostname: scm3.org
     volumes:
       - ../..:/opt/hadoop
-      - ./keytabs:/etc/security/keytabs
+      - ../_keytabs:/etc/security/keytabs
       - ./krb5.conf:/etc/krb5.conf
     ports:
       - 9998:9876
