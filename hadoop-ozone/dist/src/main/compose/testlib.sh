@@ -139,7 +139,6 @@ start_docker_env(){
   create_results_dir
   export OZONE_SAFEMODE_MIN_DATANODES="${datanode_count}"
 
-  export OZONE_SCM_RATIS_ENABLE=${2:-false}
   docker-compose --no-ansi down
   if ! { docker-compose --no-ansi up -d --scale datanode="${datanode_count}" \
       && wait_for_safemode_exit \
@@ -325,7 +324,7 @@ run_test_script() {
   #required to read the .env file from the right location
   cd "${d}" || return
 
-  ret=0
+  local ret=0
   if ! ./test.sh; then
     ret=1
     echo "ERROR: Test execution of ${d} is FAILED!!!!"
@@ -337,7 +336,7 @@ run_test_script() {
 }
 
 run_test_scripts() {
-  ret=0
+  local ret=0
 
   for t in "$@"; do
     d="$(dirname "${t}")"

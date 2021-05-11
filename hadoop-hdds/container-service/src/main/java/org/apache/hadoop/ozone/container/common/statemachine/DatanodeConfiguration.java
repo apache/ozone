@@ -41,8 +41,12 @@ public class DatanodeConfiguration {
       "hdds.datanode.replication.streams.limit";
   static final String CONTAINER_DELETE_THREADS_MAX_KEY =
       "hdds.datanode.container.delete.threads.max";
+  static final String PERIODIC_DISK_CHECK_INTERVAL_MINUTES_KEY =
+      "hdds.datanode.periodic.disk.check.interval.minutes";
 
   static final int REPLICATION_MAX_STREAMS_DEFAULT = 10;
+
+  static final long PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT = 15;
 
   /**
    * The maximum number of replication commands a single datanode can execute
@@ -110,6 +114,15 @@ public class DatanodeConfiguration {
     this.blockLimitPerInterval = limit;
   }
 
+  @Config(key = "periodic.disk.check.interval.minutes",
+      defaultValue = "15",
+      type = ConfigType.LONG,
+      tags = { DATANODE },
+      description = "Periodic disk check run interval in minutes."
+  )
+  private long periodicDiskCheckIntervalMinutes =
+      PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT;
+
   @PostConstruct
   public void validate() {
     if (replicationMaxStreams < 1) {
@@ -124,6 +137,15 @@ public class DatanodeConfiguration {
               " and was set to {}. Defaulting to {}",
           containerDeleteThreads, CONTAINER_DELETE_THREADS_DEFAULT);
       containerDeleteThreads = CONTAINER_DELETE_THREADS_DEFAULT;
+    }
+
+    if (periodicDiskCheckIntervalMinutes < 1) {
+      LOG.warn(PERIODIC_DISK_CHECK_INTERVAL_MINUTES_KEY +
+              " must be greater than zero and was set to {}. Defaulting to {}",
+          periodicDiskCheckIntervalMinutes,
+          PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT);
+      periodicDiskCheckIntervalMinutes =
+          PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT;
     }
   }
 
@@ -143,4 +165,12 @@ public class DatanodeConfiguration {
     return containerDeleteThreads;
   }
 
+  public long getPeriodicDiskCheckIntervalMinutes() {
+    return periodicDiskCheckIntervalMinutes;
+  }
+
+  public void setPeriodicDiskCheckIntervalMinutes(
+      long periodicDiskCheckIntervalMinutes) {
+    this.periodicDiskCheckIntervalMinutes = periodicDiskCheckIntervalMinutes;
+  }
 }

@@ -117,6 +117,7 @@ import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.common.Storage.StorageState;
 import org.apache.hadoop.ozone.lease.LeaseManager;
 import org.apache.hadoop.ozone.lock.LockManager;
+import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
@@ -143,7 +144,6 @@ import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore.CertType.VALID_CERTS;
-import static org.apache.hadoop.hdds.utils.HAUtils.checkSecurityAndSCMHAEnabled;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.OzoneConsts.CRL_SEQUENCE_ID_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_SUB_CA_PREFIX;
@@ -270,8 +270,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     Objects.requireNonNull(configurator, "configurator cannot not be null");
     Objects.requireNonNull(conf, "configuration cannot not be null");
 
-    checkSecurityAndSCMHAEnabled(conf);
-
     scmHANodeDetails = SCMHANodeDetails.loadSCMHAConfig(conf);
 
     configuration = conf;
@@ -286,7 +284,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       String errMsg = "Please make sure you have run \'ozone scm --init\' " +
           "command to generate all the required metadata to " +
           scmStorageConfig.getStorageDir();
-      if (SCMHAUtils.isSCMHAEnabled(conf)) {
+      if (SCMHAUtils.isSCMHAEnabled(conf) && !scmStorageConfig
+          .isSCMHAEnabled()) {
         errMsg += " or make sure you have run \'ozone scm --bootstrap\' cmd to "
             + "add the SCM to existing SCM HA group";
       }
@@ -415,7 +414,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   }
 
   private void initializeCertificateClient() {
-    if (scmStorageConfig.checkPrimarySCMIdInitialized()) {
+    if (OzoneSecurityUtil.isSecurityEnabled(configuration) &&
+        scmStorageConfig.checkPrimarySCMIdInitialized()) {
       scmCertificateClient = new SCMCertificateClient(
           new SecurityConfig(configuration),
           scmStorageConfig.getScmCertSerialId());
@@ -565,7 +565,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           pipelineManager, eventQueue, serviceManager, scmContext);
     }
     scmDecommissionManager = new NodeDecommissionManager(conf, scmNodeManager,
-        containerManager, eventQueue, replicationManager);
+        containerManager, scmContext, eventQueue, replicationManager);
   }
 
   /**
@@ -644,7 +644,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     // as for SCM CA is root-CA.
     securityProtocolServer = new SCMSecurityProtocolServer(conf,
         rootCertificateServer, scmCertificateServer,
-        scmCertificateClient.getCACertificate(), this);
+        scmCertificateClient != null ?
+            scmCertificateClient.getCACertificate() : null, this);
   }
 
   /** Persist primary SCM root ca cert and sub-ca certs to DB.
@@ -821,11 +822,13 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     String primordialSCM = SCMHAUtils.getPrimordialSCM(conf);
     SCMHANodeDetails scmhaNodeDetails = SCMHANodeDetails.loadSCMHAConfig(conf);
     String selfNodeId = scmhaNodeDetails.getLocalNodeDetails().getNodeId();
-    if (primordialSCM != null && SCMHAUtils.isPrimordialSCM(conf, selfNodeId)) {
+    final String selfHostName =
+        scmhaNodeDetails.getLocalNodeDetails().getHostName();
+    if (primordialSCM != null && SCMHAUtils.isSCMHAEnabled(conf)
+        && SCMHAUtils.isPrimordialSCM(conf, selfNodeId, selfHostName)) {
       LOG.info(
           "SCM bootstrap command can only be executed in non-Primordial SCM "
-              + "{}, self id {} "
-              + "Ignoring it.", primordialSCM, selfNodeId);
+              + "{}, self id {} " + "Ignoring it.", primordialSCM, selfNodeId);
       return true;
     }
     SCMStorageConfig scmStorageConfig = new SCMStorageConfig(conf);
@@ -873,6 +876,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
               getScmAddress(scmhaNodeDetails, conf), false);
         }
         scmStorageConfig.setPrimaryScmNodeId(scmInfo.getScmId());
+        scmStorageConfig.setSCMHAFlag(true);
         scmStorageConfig.initialize();
         LOG.info("SCM BootStrap  is successful for ClusterID {}, SCMID {}",
             scmInfo.getClusterId(), scmStorageConfig.getScmId());
@@ -895,14 +899,14 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    */
   public static boolean scmInit(OzoneConfiguration conf,
       String clusterId) throws IOException {
-    checkSecurityAndSCMHAEnabled(conf);
     SCMStorageConfig scmStorageConfig = new SCMStorageConfig(conf);
     StorageState state = scmStorageConfig.getState();
     final SCMHANodeDetails haDetails = SCMHANodeDetails.loadSCMHAConfig(conf);
     String primordialSCM = SCMHAUtils.getPrimordialSCM(conf);
-    String selfNodeId = haDetails.getLocalNodeDetails().getNodeId();
-    if (primordialSCM != null && !SCMHAUtils
-        .isPrimordialSCM(conf, selfNodeId)) {
+    final String selfNodeId = haDetails.getLocalNodeDetails().getNodeId();
+    final String selfHostName = haDetails.getLocalNodeDetails().getHostName();
+    if (primordialSCM != null && SCMHAUtils.isSCMHAEnabled(conf)
+        && !SCMHAUtils.isPrimordialSCM(conf, selfNodeId, selfHostName)) {
       LOG.info(
           "SCM init command can only be executed in Primordial SCM {}, "
               + "self id {} "
@@ -921,6 +925,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           SCMRatisServerImpl.initialize(scmStorageConfig.getClusterID(),
               scmStorageConfig.getScmId(), haDetails.getLocalNodeDetails(),
               conf);
+          scmStorageConfig.setSCMHAFlag(true);
         }
 
         if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
@@ -940,13 +945,21 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       }
     } else {
       clusterId = scmStorageConfig.getClusterID();
-      LOG.info("SCM already initialized. Reusing existing cluster id for sd={}"
-              + ";cid={};layoutVersion={}", scmStorageConfig.getStorageDir(),
-          clusterId, scmStorageConfig.getLayoutVersion());
-      if (SCMHAUtils.isSCMHAEnabled(conf)) {
-        SCMRatisServerImpl.reinitialize(clusterId, scmStorageConfig.getScmId(),
-            haDetails.getLocalNodeDetails(), conf);
+      final boolean isSCMHAEnabled = scmStorageConfig.isSCMHAEnabled();
+      if (SCMHAUtils.isSCMHAEnabled(conf) && !isSCMHAEnabled) {
+        SCMRatisServerImpl.initialize(scmStorageConfig.getClusterID(),
+            scmStorageConfig.getScmId(), haDetails.getLocalNodeDetails(),
+            conf);
+        scmStorageConfig.setSCMHAFlag(true);
+        scmStorageConfig.setPrimaryScmNodeId(scmStorageConfig.getScmId());
+        scmStorageConfig.forceInitialize();
+        LOG.debug("Enabled SCM HA");
       }
+      LOG.info("SCM already initialized. Reusing existing cluster id for sd={}"
+              + ";cid={}; layoutVersion={}; HAEnabled={}",
+          scmStorageConfig.getStorageDir(), clusterId,
+          scmStorageConfig.getLayoutVersion(),
+          scmStorageConfig.isSCMHAEnabled());
       return true;
     }
   }
@@ -1084,6 +1097,16 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   @Override
   public String getClientRpcPort() {
     InetSocketAddress addr = getClientRpcAddress();
+    return addr == null ? "0" : Integer.toString(addr.getPort());
+  }
+
+  public String getBlockProtocolRpcPort() {
+    InetSocketAddress addr = getBlockProtocolServer().getBlockRpcAddress();
+    return addr == null ? "0" : Integer.toString(addr.getPort());
+  }
+
+  public String getSecurityProtocolRpcPort() {
+    InetSocketAddress addr = getSecurityProtocolServer().getRpcAddress();
     return addr == null ? "0" : Integer.toString(addr.getPort());
   }
 
@@ -1430,7 +1453,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   public void checkAdminAccess(String remoteUser) throws IOException {
     if (remoteUser != null && !scmAdminUsernames.contains(remoteUser) &&
         !scmAdminUsernames.contains(OZONE_ADMINISTRATORS_WILDCARD)) {
-      throw new IOException(
+      throw new AccessControlException(
           "Access denied for user " + remoteUser + ". Superuser privilege " +
               "is required.");
     }

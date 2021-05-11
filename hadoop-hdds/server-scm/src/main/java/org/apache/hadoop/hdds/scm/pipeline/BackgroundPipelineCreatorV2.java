@@ -20,8 +20,12 @@ package org.apache.hadoop.hdds.scm.pipeline;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.commons.collections.iterators.LoopingIterator;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMService;
@@ -40,6 +44,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.STAND_ALONE;
 import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.UNHEALTHY_TO_HEALTHY_NODE_HANDLER_TRIGGERED;
 import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.NEW_NODE_HANDLER_TRIGGERED;
 import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.PRE_CHECK_COMPLETED;
@@ -181,16 +187,18 @@ public class BackgroundPipelineCreatorV2 implements SCMService {
     }
   }
 
-  private boolean skipCreation(HddsProtos.ReplicationFactor factor,
-                               HddsProtos.ReplicationType type,
-                               boolean autoCreate) {
-    if (type == HddsProtos.ReplicationType.RATIS) {
-      return factor == HddsProtos.ReplicationFactor.ONE && (!autoCreate);
-    } else {
+  private boolean skipCreation(ReplicationConfig replicationConfig,
+      boolean autoCreate) {
+    if (replicationConfig.getReplicationType().equals(RATIS)) {
+      return RatisReplicationConfig
+          .hasFactor(replicationConfig, ReplicationFactor.ONE) && (!autoCreate);
+    } else if (replicationConfig.getReplicationType().equals(STAND_ALONE)) {
       // For STAND_ALONE Replication Type, Replication Factor 3 should not be
       // used.
-      return factor == HddsProtos.ReplicationFactor.THREE;
+      return ((StandaloneReplicationConfig) replicationConfig)
+          .getReplicationFactor() != ReplicationFactor.ONE;
     }
+    return true;
   }
 
   private void createPipelines() throws RuntimeException {
@@ -202,18 +210,20 @@ public class BackgroundPipelineCreatorV2 implements SCMService {
         ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE,
         ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE_DEFAULT);
 
-    List<HddsProtos.ReplicationFactor> list =
+    List<ReplicationConfig> list =
         new ArrayList<>();
     for (HddsProtos.ReplicationFactor factor : HddsProtos.ReplicationFactor
         .values()) {
-      if (skipCreation(factor, type, autoCreateFactorOne)) {
+      final ReplicationConfig replicationConfig =
+          ReplicationConfig.fromTypeAndFactor(type, factor);
+      if (skipCreation(replicationConfig, autoCreateFactorOne)) {
         // Skip this iteration for creating pipeline
         continue;
       }
-      list.add(factor);
+      list.add(replicationConfig);
       if (!pipelineManager.getSafeModeStatus()) {
         try {
-          pipelineManager.scrubPipeline(type, factor);
+          pipelineManager.scrubPipeline(replicationConfig);
         } catch (IOException e) {
           LOG.error("Error while scrubbing pipelines.", e);
         }
@@ -222,11 +232,11 @@ public class BackgroundPipelineCreatorV2 implements SCMService {
 
     LoopingIterator it = new LoopingIterator(list);
     while (it.hasNext()) {
-      HddsProtos.ReplicationFactor factor =
-          (HddsProtos.ReplicationFactor) it.next();
+      ReplicationConfig replicationConfig =
+          (ReplicationConfig) it.next();
 
       try {
-        pipelineManager.createPipeline(type, factor);
+        pipelineManager.createPipeline(replicationConfig);
       } catch (IOException ioe) {
         it.remove();
       } catch (Throwable t) {

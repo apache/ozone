@@ -21,9 +21,10 @@ package org.apache.hadoop.hdds.scm.pipeline;
 import java.io.IOException;
 import java.util.List;
 
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -65,18 +66,19 @@ public class MockRatisPipelineProvider extends RatisPipelineProvider {
   }
 
   @Override
-  public Pipeline create(HddsProtos.ReplicationFactor factor)
+  public Pipeline create(RatisReplicationConfig replicationConfig)
       throws IOException {
     if (autoOpenPipeline) {
-      return super.create(factor);
+      return super.create(replicationConfig);
     } else {
-      Pipeline initialPipeline = super.create(factor);
+      Pipeline initialPipeline = super.create(replicationConfig);
       Pipeline pipeline = Pipeline.newBuilder()
           .setId(initialPipeline.getId())
           // overwrite pipeline state to main ALLOCATED
           .setState(Pipeline.PipelineState.ALLOCATED)
-          .setType(initialPipeline.getType())
-          .setFactor(factor)
+          .setReplicationConfig(ReplicationConfig
+              .fromTypeAndFactor(initialPipeline.getType(),
+                  replicationConfig.getReplicationFactor()))
           .setNodes(initialPipeline.getNodes())
           .build();
       return pipeline;
@@ -97,13 +99,12 @@ public class MockRatisPipelineProvider extends RatisPipelineProvider {
   }
 
   @Override
-  public Pipeline create(HddsProtos.ReplicationFactor factor,
-                         List<DatanodeDetails> nodes) {
+  public Pipeline create(RatisReplicationConfig replicationConfig,
+      List<DatanodeDetails> nodes) {
     return Pipeline.newBuilder()
         .setId(PipelineID.randomId())
         .setState(Pipeline.PipelineState.OPEN)
-        .setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(factor)
+        .setReplicationConfig(replicationConfig)
         .setNodes(nodes)
         .build();
   }

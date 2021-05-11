@@ -22,13 +22,14 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolPB;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.io.retry.FailoverProxyProvider;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
-import org.apache.hadoop.io.retry.RetryPolicy.RetryAction;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.net.NetUtils;
@@ -40,9 +41,11 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_DUMMY_SERVICE_ID;
 
@@ -102,7 +105,7 @@ public class SCMBlockLocationFailoverProxyProvider implements
     this.retryInterval = config.getRetryInterval();
   }
 
-  private void loadConfigs() {
+  private synchronized void loadConfigs() {
 
     scmNodeIds = new ArrayList<>();
     List<SCMNodeInfo> scmNodeInfoList = SCMNodeInfo.buildNodeInfo(conf);
@@ -130,7 +133,14 @@ public class SCMBlockLocationFailoverProxyProvider implements
   }
 
   @VisibleForTesting
-  public synchronized String getCurrentProxyOMNodeId() {
+  public synchronized void changeCurrentProxy(String nodeId) {
+    currentProxyIndex = scmNodeIds.indexOf(nodeId);
+    currentProxySCMNodeId = nodeId;
+    nextProxyIndex();
+  }
+
+  @VisibleForTesting
+  public synchronized String getCurrentProxySCMNodeId() {
     return currentProxySCMNodeId;
   }
 
@@ -142,15 +152,36 @@ public class SCMBlockLocationFailoverProxyProvider implements
   }
 
   @Override
-  public void performFailover(ScmBlockLocationProtocolPB newLeader) {
+  public synchronized void performFailover(
+      ScmBlockLocationProtocolPB newLeader) {
     // Should do nothing here.
-    LOG.debug("Failing over to next proxy. {}", getCurrentProxyOMNodeId());
+    LOG.debug("Failing over to next proxy. {}", getCurrentProxySCMNodeId());
   }
 
-  public void performFailoverToAssignedLeader(String newLeader) {
+  public synchronized void performFailoverToAssignedLeader(String newLeader,
+      Exception e) {
+    ServerNotLeaderException snle =
+        (ServerNotLeaderException) SCMHAUtils.getServerNotLeaderException(e);
+    if (snle != null && snle.getSuggestedLeader() != null) {
+      Optional<SCMProxyInfo> matchedProxyInfo =
+          scmProxyInfoMap.values().stream().filter(
+              proxyInfo -> NetUtils.getHostPortString(proxyInfo.getAddress())
+                  .equals(snle.getSuggestedLeader())).findFirst();
+      if (matchedProxyInfo.isPresent()) {
+        newLeader = matchedProxyInfo.get().getNodeId();
+        LOG.debug("Performing failover to suggested leader {}, nodeId {}",
+            snle.getSuggestedLeader(), newLeader);
+      } else {
+        LOG.debug("Suggested leader {} does not match with any of the " +
+                "proxyInfo adress {}", snle.getSuggestedLeader(),
+            Arrays.toString(scmProxyInfoMap.values().toArray()));
+      }
+    }
     if (newLeader == null) {
       // If newLeader is not assigned, it will fail over to next proxy.
       nextProxyIndex();
+      LOG.debug("Performing failover to next proxy node {}",
+          currentProxySCMNodeId);
     } else {
       if (!assignLeaderToNode(newLeader)) {
         LOG.debug("Failing over SCM proxy to nodeId: {}", newLeader);
@@ -171,15 +202,6 @@ public class SCMBlockLocationFailoverProxyProvider implements
       if (scmProxy != null) {
         RPC.stopProxy(scmProxy);
       }
-    }
-  }
-
-  public RetryAction getRetryAction(int failovers) {
-    if (failovers < maxRetryCount) {
-      return new RetryAction(RetryAction.RetryDecision.FAILOVER_AND_RETRY,
-          getRetryInterval());
-    } else {
-      return RetryAction.FAIL;
     }
   }
 
@@ -257,8 +279,11 @@ public class SCMBlockLocationFailoverProxyProvider implements
       @Override
       public RetryAction shouldRetry(Exception e, int retry,
                                      int failover, boolean b) {
-        performFailoverToAssignedLeader(newLeader);
-        return getRetryAction(failover);
+        if (!SCMHAUtils.checkRetriableWithNoFailoverException(e)) {
+          performFailoverToAssignedLeader(newLeader, e);
+        }
+        return SCMHAUtils.getRetryAction(failover, retry, e, maxRetryCount,
+            getRetryInterval());
       }
     };
     return retryPolicy;

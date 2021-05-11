@@ -238,7 +238,7 @@ public final class RegisterEndpointTask implements
 
       if (datanodeDetails == null) {
         LOG.error("No datanode specified.");
-        throw new IllegalArgumentException("A vaild Node ID is needed to " +
+        throw new IllegalArgumentException("A valid Node ID is needed to " +
             "construct RegisterEndpoint task");
       }
 

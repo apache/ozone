@@ -155,7 +155,7 @@ bin/ozone debug ldb --db=/tmp/metadata/scm.db/ scan --with-keys --column_family=
 
 ## Migrating from existing SCM
 
-SCM HA can be turned on on any Ozone cluster. First enable Ratis (`ozone.scm.ratis.enable`) and configure only one node for the Ratis ring (`ozone.scm.nodes.NAME` should have one element).
+SCM HA can be turned on on any Ozone cluster. First enable Ratis (`ozone.scm.ratis.enable`) and configure only one node for the Ratis ring (`ozone.scm.nodes.serviceId` should have one element).
 
 Start the cluster and test if it works well.
 

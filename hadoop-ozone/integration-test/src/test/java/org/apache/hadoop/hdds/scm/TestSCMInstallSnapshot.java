@@ -18,13 +18,14 @@
 package org.apache.hadoop.hdds.scm;
 
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.ha.SCMHAConfiguration;
-import org.apache.hadoop.hdds.scm.ha.SCMHAManagerImpl;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMSnapshotProvider;
+import org.apache.hadoop.hdds.scm.ha.SCMStateMachine;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -49,7 +50,6 @@ import java.util.Map;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
 
 /**
  * Class to test install snapshot feature for SCM HA.
@@ -93,14 +93,16 @@ public class TestSCMInstallSnapshot {
     PipelineManager pipelineManager = scm.getPipelineManager();
     Pipeline ratisPipeline1 = pipelineManager.getPipeline(
         containerManager.allocateContainer(
-            RATIS, THREE, "Owner1").getPipelineID());
+            new RatisReplicationConfig(THREE), "Owner1").getPipelineID());
     pipelineManager.openPipeline(ratisPipeline1.getId());
     Pipeline ratisPipeline2 = pipelineManager.getPipeline(
         containerManager.allocateContainer(
-            RATIS, ONE, "Owner2").getPipelineID());
+            new RatisReplicationConfig(ONE), "Owner2").getPipelineID());
     pipelineManager.openPipeline(ratisPipeline2.getId());
     SCMNodeDetails scmNodeDetails = new SCMNodeDetails.Builder()
-        .setRpcAddress(new InetSocketAddress("0.0.0.0", 0)).setSCMNodeId("scm1")
+        .setRpcAddress(new InetSocketAddress("0.0.0.0", 0))
+        .setGrpcPort(ScmConfigKeys.OZONE_SCM_GRPC_PORT_DEFAULT)
+        .setSCMNodeId("scm1")
         .build();
     Map<String, SCMNodeDetails> peerMap = new HashMap<>();
     peerMap.put(scmNodeDetails.getNodeId(), scmNodeDetails);
@@ -119,7 +121,6 @@ public class TestSCMInstallSnapshot {
   public void testInstallCheckPoint() throws Exception {
     DBCheckpoint checkpoint = downloadSnapshot();
     StorageContainerManager scm = cluster.getStorageContainerManager();
-    SCMHAManagerImpl scmhaManager = (SCMHAManagerImpl)scm.getScmHAManager();
     DBStore db = HAUtils
         .loadDB(conf, checkpoint.getCheckpointLocation().getParent().toFile(),
             checkpoint.getCheckpointLocation().getFileName().toString(),
@@ -130,7 +131,7 @@ public class TestSCMInstallSnapshot {
     Assert.assertNotNull(db);
     HAUtils.getTransactionInfoTable(db, new SCMDBDefinition())
         .put(OzoneConsts.TRANSACTION_INFO_KEY, TransactionInfo.builder()
-            .setCurrentTerm(1).setTransactionIndex(100).build());
+            .setCurrentTerm(10).setTransactionIndex(100).build());
     db.close();
     ContainerID cid =
         scm.getContainerManager().getContainers().get(0).containerID();
@@ -141,7 +142,12 @@ public class TestSCMInstallSnapshot {
     Assert.assertNull(
         scm.getScmMetadataStore().getPipelineTable().get(pipelineID));
     Assert.assertFalse(scm.getContainerManager().containerExist(cid));
-    scmhaManager.installCheckpoint("scm1", checkpoint);
+
+    SCMStateMachine sm =
+        scm.getScmHAManager().getRatisServer().getSCMStateMachine();
+    sm.pause();
+    sm.setInstallingDBCheckpoint(checkpoint);
+    sm.reinitialize();
 
     Assert.assertNotNull(
         scm.getScmMetadataStore().getPipelineTable().get(pipelineID));

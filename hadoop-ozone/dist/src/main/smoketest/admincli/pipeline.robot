@@ -26,17 +26,18 @@ ${SCM}       scm
 *** Test Cases ***
 Create pipeline
     ${output} =         Execute          ozone admin pipeline create
-                        Should contain   ${output}   is created. Factor: ONE, Type: STAND_ALONE
+                        Should contain   ${output}   is created.
+                        Should contain   ${output}   STANDALONE/ONE
     ${pipeline} =       Execute          echo "${output}" | grep 'is created' | cut -f1 -d' ' | cut -f2 -d'='
                         Set Suite Variable    ${PIPELINE}    ${pipeline}
 
 List pipelines
     ${output} =         Execute          ozone admin pipeline list
-                        Should contain   ${output}   Factor:ONE
+                        Should contain   ${output}   STANDALONE/ONE
 
 List pipelines with explicit host
     ${output} =         Execute          ozone admin pipeline list --scm ${SCM}
-                        Should contain   ${output}   Factor:ONE
+                        Should contain   ${output}   STANDALONE/ONE
 
 Deactivate pipeline
                         Execute          ozone admin pipeline deactivate "${PIPELINE}"

@@ -65,3 +65,8 @@ hadoop-hdds/docs/public
 hadoop-ozone/recon/node_modules
 
 .mvn
+
+.dev-tools
+
+
+hadoop-ozone/dist/src/main/license/current.txt
