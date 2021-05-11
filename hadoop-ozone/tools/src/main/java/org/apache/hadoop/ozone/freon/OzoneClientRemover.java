@@ -71,8 +71,8 @@ public class OzoneClientRemover extends BaseFreonGenerator
 
   private Timer timer;
 
-  private OzoneVolume volume;
-  private OzoneBucket bucket;
+  private OzoneVolume ozoneVolume;
+  private OzoneBucket ozoneBucket;
 
   @Override
   public Void call() throws Exception {
@@ -84,14 +84,14 @@ public class OzoneClientRemover extends BaseFreonGenerator
 
     try (OzoneClient rpcClient = createOzoneClient(omServiceID,
         ozoneConfiguration)) {
-      volume = rpcClient.getObjectStore().getVolume(volumeName);
+      ozoneVolume = rpcClient.getObjectStore().getVolume(volumeName);
 
       timer = getMetrics().timer("remove");
 
       if (isRemoveBucket) {
         runTests(this::removeBucket);
       } else if (isRemoveKey) {
-        bucket = volume.getBucket(bucketName);
+        ozoneBucket = ozoneVolume.getBucket(bucketName);
         runTests(this::removeKey);
       }
     }
@@ -103,7 +103,7 @@ public class OzoneClientRemover extends BaseFreonGenerator
     final String bucket = generateBucketName(counter);
 
     timer.time(() -> {
-      volume.deleteBucket(bucket);
+      ozoneVolume.deleteBucket(bucket);
       return null;
     });
   }
@@ -112,7 +112,7 @@ public class OzoneClientRemover extends BaseFreonGenerator
     final String key = generateObjectName(counter);
 
     timer.time(() -> {
-      bucket.deleteKey(key);
+      ozoneBucket.deleteKey(key);
       return null;
     });
   }
