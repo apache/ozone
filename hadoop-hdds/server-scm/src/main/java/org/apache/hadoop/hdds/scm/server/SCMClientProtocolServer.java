@@ -408,11 +408,10 @@ public class SCMClientProtocolServer implements
 
   @Override
   public void deleteContainer(long containerID) throws IOException {
-    String remoteUser = getRpcRemoteUsername();
     boolean auditSuccess = true;
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("containerID", String.valueOf(containerID));
-    auditMap.put("remoteUser", remoteUser);
+    auditMap.put("remoteUser", getRpcRemoteUsername());
     try {
       getScm().checkAdminAccess(Server.getRemoteUser());
       scm.getContainerManager().deleteContainer(

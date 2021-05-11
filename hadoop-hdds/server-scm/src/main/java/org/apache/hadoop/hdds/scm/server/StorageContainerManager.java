@@ -377,10 +377,11 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     scmAdminUsernames = conf.getTrimmedStringCollection(OzoneConfigKeys
         .OZONE_ADMINISTRATORS);
-    String scmUsername =
+    String scmShortUsername =
         UserGroupInformation.getCurrentUser().getShortUserName();
-    if (!scmAdminUsernames.contains(scmUsername)) {
-      scmAdminUsernames.add(scmUsername);
+
+    if (!scmAdminUsernames.contains(scmShortUsername)) {
+      scmAdminUsernames.add(scmShortUsername);
     }
 
     datanodeProtocolServer = new SCMDatanodeProtocolServer(conf, this,
