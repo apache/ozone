@@ -32,6 +32,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.Principal;
+import java.util.Collection;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
@@ -145,16 +146,7 @@ public class TestOMDbCheckpointServlet {
     omDbCheckpointServletMock =
         mock(OMDBCheckpointServlet.class);
 
-    final OzoneManager om = cluster.getOzoneManager();
-
     doCallRealMethod().when(omDbCheckpointServletMock).init();
-    doCallRealMethod().when(omDbCheckpointServletMock).initialize(
-        om.getMetadataManager().getStore(),
-        om.getMetrics().getDBCheckpointMetrics(),
-        om.getAclsEnabled(),
-        om.getOzoneAdmins(om.getConfiguration()),
-        om.isSpnegoEnabled(),
-        om.getConfiguration());
 
     requestMock = mock(HttpServletRequest.class);
     // Return current user short name when asked
@@ -182,6 +174,15 @@ public class TestOMDbCheckpointServlet {
     conf.setInt(OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS, 2);
 
     setupCluster();
+
+    final OzoneManager om = cluster.getOzoneManager();
+
+    doCallRealMethod().when(omDbCheckpointServletMock).initialize(
+        om.getMetadataManager().getStore(),
+        om.getMetrics().getDBCheckpointMetrics(),
+        om.getAclsEnabled(),
+        om.getOzoneAdmins(om.getConfiguration()),
+        om.isSpnegoEnabled());
 
     doNothing().when(responseMock).setContentType("application/x-tgz");
     doNothing().when(responseMock).setHeader(Matchers.anyString(),
@@ -215,6 +216,17 @@ public class TestOMDbCheckpointServlet {
     conf.set(OZONE_RECON_KERBEROS_PRINCIPAL_KEY, "recon/host1@REALM");
 
     setupCluster();
+
+    final OzoneManager om = cluster.getOzoneManager();
+    Collection<String> allowedUsers = om.getOzoneAdmins(om.getConfiguration());
+    allowedUsers.add("recon");
+
+    doCallRealMethod().when(omDbCheckpointServletMock).initialize(
+        om.getMetadataManager().getStore(),
+        om.getMetrics().getDBCheckpointMetrics(),
+        om.getAclsEnabled(),
+        allowedUsers,
+        om.isSpnegoEnabled());
 
     omDbCheckpointServletMock.init();
     omDbCheckpointServletMock.doGet(requestMock, responseMock);

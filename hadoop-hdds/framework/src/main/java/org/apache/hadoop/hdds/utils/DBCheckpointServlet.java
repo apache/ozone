@@ -33,8 +33,6 @@ import java.util.Collection;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.recon.ReconConfig;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 
@@ -68,13 +66,12 @@ public class DBCheckpointServlet extends HttpServlet {
 
   private boolean aclEnabled;
   private boolean isSpnegoEnabled;
-  private Collection<String> ozAdmins;
-  private String reconSPN;
+  private Collection<String> allowedUsers;
 
-  @SuppressWarnings("checkstyle:hiddenfield")
   public void initialize(DBStore store, DBCheckpointMetrics metrics,
-                         boolean omAclEnabled, Collection<String> ozoneAdmins,
-                         boolean isSpnegoEnabled, OzoneConfiguration conf)
+                         boolean omAclEnabled,
+                         Collection<String> allowedAdminUsers,
+                         boolean isSpnegoAuthEnabled)
       throws ServletException {
 
     dbStore = store;
@@ -85,28 +82,17 @@ public class DBCheckpointServlet extends HttpServlet {
     }
 
     this.aclEnabled = omAclEnabled;
-    this.ozAdmins = ozoneAdmins;
-    this.isSpnegoEnabled = isSpnegoEnabled;
-    ReconConfig reconConfig = conf.getObject(ReconConfig.class);
-    String reconPrincipal = reconConfig.getKerberosPrincipal();
-    if (!reconPrincipal.isEmpty()) {
-      UserGroupInformation ugi =
-          UserGroupInformation.createRemoteUser(reconPrincipal);
-      reconSPN = ugi.getShortUserName();
-    } else {
-      reconSPN = StringUtils.EMPTY;
-    }
+    this.allowedUsers = allowedAdminUsers;
+    this.isSpnegoEnabled = isSpnegoAuthEnabled;
   }
 
   private boolean hasPermission(UserGroupInformation user) {
     // Check ACL for dbCheckpoint only when global Ozone ACL and SPNEGO is
     // enabled
     if (aclEnabled && isSpnegoEnabled) {
-      // Only Ozone admins and Recon are allowed
-      return ozAdmins.contains(OZONE_ADMINISTRATORS_WILDCARD)
-          || ozAdmins.contains(user.getShortUserName())
-          || ozAdmins.contains(user.getUserName())
-          || user.getShortUserName().equals(reconSPN);
+      return allowedUsers.contains(OZONE_ADMINISTRATORS_WILDCARD)
+          || allowedUsers.contains(user.getShortUserName())
+          || allowedUsers.contains(user.getUserName());
     } else {
       return true;
     }
