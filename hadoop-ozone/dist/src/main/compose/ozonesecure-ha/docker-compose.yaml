@@ -59,6 +59,7 @@ services:
     env_file:
       - docker-config
     environment:
+      WAITFOR: scm3.org:9865
       OZONE_OPTS:
     networks:
       ozone_net:
@@ -80,6 +81,7 @@ services:
     env_file:
       - docker-config
     environment:
+      WAITFOR: scm3.org:9865
       OZONE_OPTS:
     networks:
       ozone_net:
@@ -101,6 +103,7 @@ services:
     env_file:
       - docker-config
     environment:
+      WAITFOR: scm3.org:9865
       OZONE_OPTS:
     networks:
       ozone_net:
@@ -237,6 +240,7 @@ services:
     env_file:
       - docker-config
     environment:
+      WAITFOR: scm1.org:9865
       ENSURE_SCM_BOOTSTRAPPED: /data/metadata/scm/current/VERSION
       OZONE-SITE.XML_hdds.scm.safemode.min.datanode: "${OZONE_SAFEMODE_MIN_DATANODES:-3}"
       OZONE_OPTS:
@@ -289,7 +293,6 @@ services:
     env_file:
       - ./docker-config
     environment:
-      KERBEROS_KEYTABS: recon HTTP
       OZONE_OPTS:
     command: ["/opt/hadoop/bin/ozone","recon"]
     extra_hosts:
