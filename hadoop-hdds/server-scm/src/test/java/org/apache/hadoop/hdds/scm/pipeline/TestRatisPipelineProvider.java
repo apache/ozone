@@ -27,7 +27,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
-import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.junit.Assert;
 import org.junit.Assume;
@@ -53,13 +52,14 @@ public class TestRatisPipelineProvider {
   private static final HddsProtos.ReplicationType REPLICATION_TYPE =
       HddsProtos.ReplicationType.RATIS;
 
-  private NodeManager nodeManager;
+  private MockNodeManager nodeManager;
   private RatisPipelineProvider provider;
   private PipelineStateManager stateManager;
   private OzoneConfiguration conf;
 
   public void init(int maxPipelinePerNode) throws Exception {
     nodeManager = new MockNodeManager(true, 10);
+    nodeManager.setNumPipelinePerDatanode(maxPipelinePerNode);
     conf = new OzoneConfiguration();
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT,
         maxPipelinePerNode);
