@@ -1478,7 +1478,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
   }
 
-  public void checkAdminAccess(UserGroupInformation remoteUser) throws IOException {
+  public void checkAdminAccess(UserGroupInformation remoteUser)
+      throws IOException {
     if (remoteUser != null
         && !scmAdminUsernames.contains(remoteUser.getUserName()) &&
         !scmAdminUsernames.contains(remoteUser.getShortUserName()) &&
