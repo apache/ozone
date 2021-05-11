@@ -16,10 +16,7 @@
  */
 package org.apache.hadoop.ozone.freon;
 
-import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 import java.util.concurrent.Callable;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
@@ -27,7 +24,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.om.helpers.OmDeleteKeys;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs.Builder;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
@@ -36,8 +32,6 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 
 import com.codahale.metrics.Timer;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -54,8 +48,6 @@ import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL
     showDefaultValues = true)
 public class OmKeyGenerator extends BaseFreonGenerator
     implements Callable<Void> {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(OmKeyGenerator.class);
 
   @Option(names = {"-v", "--volume"},
       description = "Name of the bucket which contains the test data. Will be"
@@ -84,12 +76,6 @@ public class OmKeyGenerator extends BaseFreonGenerator
   private OzoneManagerProtocol ozoneManagerClient;
 
   private Timer timer;
-
-  private List<String> keyList;
-
-  public OmKeyGenerator() {
-    this.keyList = Collections.synchronizedList(new ArrayList<String>());
-  }
 
   @Override
   public Void call() throws Exception {
@@ -129,7 +115,6 @@ public class OmKeyGenerator extends BaseFreonGenerator
             ALL, ALL))
         .build();
 
-    keyList.add(keyArgs.getKeyName());
     timer.time(() -> {
       OpenKeySession openKeySession = ozoneManagerClient.openKey(keyArgs);
 
@@ -138,21 +123,4 @@ public class OmKeyGenerator extends BaseFreonGenerator
     });
   }
 
-  @Override
-  protected void doCleanUp() {
-    LOG.info("Cleaning up generated objects.");
-    OmDeleteKeys omDeleteKeys =
-        new OmDeleteKeys(volumeName, bucketName, keyList);
-    try {
-      ozoneManagerClient.deleteKeys(omDeleteKeys);
-      if (isBucketCreated()) {
-        ozoneManagerClient.deleteBucket(volumeName, bucketName);
-      }
-      if (isVolumeCreated()) {
-        ozoneManagerClient.deleteVolume(volumeName);
-      }
-    } catch (IOException e) {
-      e.printStackTrace();
-    }
-  }
 }

@@ -16,12 +16,8 @@
  */
 package org.apache.hadoop.ozone.freon;
 
-import java.io.IOException;
 import java.io.OutputStream;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
 
@@ -33,8 +29,6 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 
 import com.codahale.metrics.Timer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -50,8 +44,6 @@ import picocli.CommandLine.Option;
 public class OzoneClientKeyGenerator extends BaseFreonGenerator
     implements Callable<Void> {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(OzoneClientKeyGenerator.class);
   @Option(names = {"-v", "--volume"},
       description = "Name of the bucket which contains the test data. Will be"
           + " created if missing.",
@@ -88,23 +80,16 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
 
   private Timer timer;
 
-  private OzoneConfiguration ozoneConfiguration;
   private OzoneBucket bucket;
   private ContentGenerator contentGenerator;
   private Map<String, String> metadata;
-
-  private List<String> keyList;
-
-  public OzoneClientKeyGenerator() {
-    this.keyList = Collections.synchronizedList(new ArrayList<String>());
-  }
 
   @Override
   public Void call() throws Exception {
 
     init();
 
-    ozoneConfiguration = createOzoneConfiguration();
+    OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
 
     contentGenerator = new ContentGenerator(keySize, bufferSize);
     metadata = new HashMap<>();
@@ -133,33 +118,5 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
       }
       return null;
     });
-  }
-
-  @Override
-  public String generateObjectName(long counter) {
-    String keyName = super.generateObjectName(counter);
-    keyList.add(keyName);
-    return keyName;
-  }
-
-  @Override
-  protected void doCleanUp() {
-    LOG.info("Cleaning up generated objects.");
-    try (OzoneClient rpcClient = createOzoneClient(omServiceID,
-        ozoneConfiguration)){
-      bucket.deleteKeys(keyList);
-      if (isBucketCreated()) {
-        rpcClient.getObjectStore().getVolume(volumeName).
-            deleteBucket(bucketName);
-      }
-      if (isVolumeCreated()) {
-        rpcClient.getObjectStore().deleteVolume(volumeName);
-      }
-    } catch (IOException e) {
-      e.printStackTrace();
-    } catch (Exception e) {
-      e.printStackTrace();
-    }
-
   }
 }

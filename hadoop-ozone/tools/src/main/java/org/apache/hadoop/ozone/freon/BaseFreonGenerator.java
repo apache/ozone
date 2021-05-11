@@ -28,9 +28,6 @@ import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import com.amazonaws.AmazonServiceException;
-import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.model.HeadBucketRequest;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
@@ -104,10 +101,6 @@ public class BaseFreonGenerator {
       defaultValue = "")
   private String prefix = "";
 
-  @Option(names = {"--clean-up"},
-      description = "Clean all the generated objects.")
-  private boolean cleanUp;
-
   private MetricRegistry metrics = new MetricRegistry();
 
   private AtomicLong successCounter;
@@ -121,9 +114,6 @@ public class BaseFreonGenerator {
   private ExecutorService executor;
   private ProgressBar progressBar;
 
-  private boolean volumeCreated;
-  private boolean bucketCreated;
-
   /**
    * The main logic to execute a test generator.
    *
@@ -134,7 +124,6 @@ public class BaseFreonGenerator {
     startTaskRunners(provider);
     waitForCompletion();
     shutdown();
-    cleanUp();
     reportAnyFailure();
   }
 
@@ -229,20 +218,6 @@ public class BaseFreonGenerator {
     } catch (Exception ex) {
       ex.printStackTrace();
     }
-  }
-
-  /**
-   * Provides a way to clean up the generated objects.
-   */
-  protected void doCleanUp() {
-    LOG.info("Nothing generated, skip cleaning up.");
-  }
-
-  private void cleanUp() {
-    if (!cleanUp) {
-      return;
-    }
-    doCleanUp();
   }
 
   /**
@@ -413,7 +388,6 @@ public class BaseFreonGenerator {
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
         volume.createBucket(bucketName);
-        bucketCreated = true;
       } else {
         throw ex;
       }
@@ -432,24 +406,6 @@ public class BaseFreonGenerator {
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.VOLUME_NOT_FOUND) {
         rpcClient.getObjectStore().createVolume(volumeName);
-        volumeCreated = true;
-      } else {
-        throw ex;
-      }
-    }
-  }
-
-  /**
-   * Create missing target bucket for S3KeyGenerator.
-   */
-  public void ensureBucketExist(AmazonS3 s3, String bucketName) {
-    HeadBucketRequest headBucketRequest = new HeadBucketRequest(bucketName);
-    try {
-      s3.headBucket(headBucketRequest);
-    } catch (AmazonServiceException ex) {
-      if (ex.getErrorCode().equals("NoSuchBucket")) {
-        s3.createBucket(bucketName);
-        setBucketCreated();
       } else {
         throw ex;
       }
@@ -521,17 +477,5 @@ public class BaseFreonGenerator {
 
   public long getTestNo() {
     return testNo;
-  }
-
-  protected boolean isVolumeCreated() {
-    return volumeCreated;
-  }
-
-  protected boolean isBucketCreated() {
-    return bucketCreated;
-  }
-
-  protected void setBucketCreated() {
-    this.bucketCreated = true;
   }
 }

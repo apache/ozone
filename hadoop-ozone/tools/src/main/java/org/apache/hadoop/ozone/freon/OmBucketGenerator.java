@@ -16,10 +16,6 @@
  */
 package org.apache.hadoop.ozone.freon;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 import java.util.concurrent.Callable;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
@@ -30,8 +26,6 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 
 import com.codahale.metrics.Timer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -46,8 +40,6 @@ import picocli.CommandLine.Option;
     showDefaultValues = true)
 public class OmBucketGenerator extends BaseFreonGenerator
     implements Callable<Void> {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(OmBucketGenerator.class);
 
   @Option(names = {"-v", "--volume"},
       description = "Name of the bucket which contains the test data. Will be"
@@ -64,12 +56,6 @@ public class OmBucketGenerator extends BaseFreonGenerator
   private OzoneManagerProtocol ozoneManagerClient;
 
   private Timer bucketCreationTimer;
-
-  private List<String> bucketList;
-
-  public OmBucketGenerator() {
-    this.bucketList = Collections.synchronizedList(new ArrayList<String>());
-  }
 
   @Override
   public Void call() throws Exception {
@@ -105,25 +91,10 @@ public class OmBucketGenerator extends BaseFreonGenerator
         .setStorageType(StorageType.DISK)
         .build();
 
-    bucketList.add(bucketInfo.getBucketName());
     bucketCreationTimer.time(() -> {
       ozoneManagerClient.createBucket(bucketInfo);
       return null;
     });
   }
 
-  @Override
-  protected void doCleanUp() {
-    LOG.info("Cleaning up generated objects.");
-    try {
-      for (String bucket : bucketList) {
-        ozoneManagerClient.deleteBucket(volumeName, bucket);
-      }
-      if (isVolumeCreated()) {
-        ozoneManagerClient.deleteVolume(volumeName);
-      }
-    } catch (IOException e) {
-      e.printStackTrace();
-    }
-  }
 }
