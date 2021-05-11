@@ -64,7 +64,7 @@ public class TestVolumeSet {
   private static final String DUMMY_IP_ADDR = "0.0.0.0";
 
   private void initializeVolumeSet() throws Exception {
-    volumeSet = new MutableVolumeSet(UUID.randomUUID().toString(), conf);
+    volumeSet = new MutableVolumeSet(UUID.randomUUID().toString(), conf, null);
   }
 
   @Rule
@@ -230,7 +230,8 @@ public class TestVolumeSet {
     OzoneConfiguration ozoneConfig = new OzoneConfiguration();
     ozoneConfig.set(HDDS_DATANODE_DIR_KEY, readOnlyVolumePath.getAbsolutePath()
         + "," + volumePath.getAbsolutePath());
-    volSet = new MutableVolumeSet(UUID.randomUUID().toString(), ozoneConfig);
+    volSet = new MutableVolumeSet(UUID.randomUUID().toString(), ozoneConfig,
+        null);
     assertEquals(1, volSet.getFailedVolumesList().size());
     assertEquals(readOnlyVolumePath, volSet.getFailedVolumesList().get(0)
         .getHddsRootDir());
