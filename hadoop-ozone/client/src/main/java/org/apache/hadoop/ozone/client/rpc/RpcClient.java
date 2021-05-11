@@ -744,9 +744,7 @@ public class RpcClient implements ClientProtocol {
         .setBucketName(bucketName)
         .setKeyName(keyName)
         .setDataSize(size)
-        .setType(HddsProtos.ReplicationType
-            .valueOf(replicationConfig.getReplicationType().toString()))
-        .setFactor(ReplicationConfig.getLegacyFactor(replicationConfig))
+        .setReplicationConfig(replicationConfig)
         .addAllMetadata(metadata)
         .setAcls(getAclList());
 
@@ -867,8 +865,7 @@ public class RpcClient implements ClientProtocol {
         key.getDataSize(),
         key.getCreationTime(),
         key.getModificationTime(),
-        ReplicationType.valueOf(key.getType().toString()),
-        key.getFactor().getNumber()))
+        key.getReplicationConfig()))
         .collect(Collectors.toList());
   }
 
@@ -919,9 +916,9 @@ public class RpcClient implements ClientProtocol {
     }
     return new OzoneKeyDetails(keyInfo.getVolumeName(), keyInfo.getBucketName(),
         keyInfo.getKeyName(), keyInfo.getDataSize(), keyInfo.getCreationTime(),
-        keyInfo.getModificationTime(), ozoneKeyLocations, ReplicationType
-        .valueOf(keyInfo.getType().toString()), keyInfo.getMetadata(),
-        keyInfo.getFileEncryptionInfo(), keyInfo.getFactor().getNumber());
+        keyInfo.getModificationTime(), ozoneKeyLocations,
+        keyInfo.getReplicationConfig(), keyInfo.getMetadata(),
+        keyInfo.getFileEncryptionInfo());
   }
 
   @Override
@@ -952,8 +949,7 @@ public class RpcClient implements ClientProtocol {
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
-        .setType(replicationConfig.getReplicationType())
-        .setFactor(ReplicationConfig.getLegacyFactor(replicationConfig))
+        .setReplicationConfig(replicationConfig)
         .setAcls(getAclList())
         .build();
     OmMultipartInfo multipartInfo = ozoneManagerClient
@@ -998,8 +994,7 @@ public class RpcClient implements ClientProtocol {
             .setXceiverClientManager(xceiverClientManager)
             .setOmClient(ozoneManagerClient)
             .setRequestID(requestId)
-            .setType(openKey.getKeyInfo().getType())
-            .setFactor(openKey.getKeyInfo().getFactor())
+            .setReplicationConfig(openKey.getKeyInfo().getReplicationConfig())
             .setMultipartNumber(partNumber)
             .setMultipartUploadID(uploadID)
             .setIsMultipartKey(true)
@@ -1201,8 +1196,7 @@ public class RpcClient implements ClientProtocol {
         .setBucketName(bucketName)
         .setKeyName(keyName)
         .setDataSize(size)
-        .setType(replicationConfig.getReplicationType())
-        .setFactor(ReplicationConfig.getLegacyFactor(replicationConfig))
+        .setReplicationConfig(replicationConfig)
         .setAcls(getAclList())
         .build();
     OpenKeySession keySession =
@@ -1342,8 +1336,7 @@ public class RpcClient implements ClientProtocol {
             .setXceiverClientManager(xceiverClientManager)
             .setOmClient(ozoneManagerClient)
             .setRequestID(requestId)
-            .setType(replicationConfig.getReplicationType())
-            .setFactor(ReplicationConfig.getLegacyFactor(replicationConfig))
+            .setReplicationConfig(replicationConfig)
             .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
             .setConfig(clientConfig)
             .build();
