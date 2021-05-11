@@ -3618,7 +3618,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   public boolean isAdmin(String username) {
-    return accessAuthorizer != null && accessAuthorizer.isAdmin(username);
+    if (isAclEnabled) {
+      return accessAuthorizer != null && accessAuthorizer.isAdmin(username);
+    } else {
+      return true;
+    }
   }
 
   /**
