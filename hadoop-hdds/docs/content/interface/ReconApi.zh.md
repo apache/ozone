@@ -26,32 +26,23 @@ summary: Recon 服务器支持 HTTP 端点，以帮助故障排除和监听 Ozon
 
 Recon API v1 是一组 HTTP 端点，可以帮助您了解 Ozone 集群的当前状态，并在需要时进行故障排除。
 
-### HTTP 端点
+## 容器
 
-#### 容器
+### GET /api/v1/containers
 
-* **/containers**
+**参数**
+* prevKey (可选)
 
-    **URL 结构**
-```
-    GET /api/v1/containers
-```
+    只回传ID大于给定的 prevKey 的容器。
+    示例：prevKey=1
+* limit (可选)
 
-    **参数**
+    只回传有限数量的结果。默认限制是1000。
 
-    * prevKey (可选)
-    
-        只回传ID大于给定的 prevKey 的容器。
-        示例：prevKey=1
+**回传**
 
-    * limit (可选)
-    
-        只回传有限数量的结果。默认限制是1000。
-    
-    **回传**
-    
-    回传所有 ContainerMetadata 对象。
-    
+回传所有 ContainerMetadata 对象。
+
 ```json
     {
       "data": {
@@ -74,27 +65,22 @@ Recon API v1 是一组 HTTP 端点，可以帮助您了解 Ozone 集群的当前
     }
 ```
 
-* **/containers/:id/keys**
+### GET /api/v1/containers/:id/keys
+    
+**参数**
 
-    **URL 结构**
-```
-    GET /api/v1/containers/:id/keys
-```
+* prevKey (可选)
+ 
+    只回传在给定的 prevKey 键前缀之后的键。
+    示例：prevKey=/vol1/bucket1/key1
     
-    **参数**
+* limit (可选)
+
+    只回传有限数量的结果。默认限制是1000。
     
-    * prevKey (可选)
-     
-        只回传在给定的 prevKey 键前缀之后的键。
-        示例：prevKey=/vol1/bucket1/key1
-        
-    * limit (可选)
-    
-        只回传有限数量的结果。默认限制是1000。
-        
-    **回传**
-    
-    回传给定容器 ID 的所有 KeyMetadata 对象。
+**回传**
+
+回传给定容器 ID 的所有 KeyMetadata 对象。
     
 ```json
     {
@@ -121,20 +107,15 @@ Recon API v1 是一组 HTTP 端点，可以帮助您了解 Ozone 集群的当前
       ]
     }
 ```
-* **/containers/missing**
-    
-    **URL 结构**
-```
-    GET /api/v1/containers/missing
-```
-    
-    **参数**
-    
-    没有参数。
-    
-    **回传**
-    
-    回传所有丢失容器的 MissingContainerMetadata 对象。
+### GET /api/v1/containers/missing
+
+**参数**
+
+没有参数。
+
+**回传**
+
+回传所有丢失容器的 MissingContainerMetadata 对象。
     
 ```json
     {
@@ -157,20 +138,14 @@ Recon API v1 是一组 HTTP 端点，可以帮助您了解 Ozone 集群的当前
         ]
     }
 ```
-* **/containers/:id/replicaHistory**
+### GET /api/v1/containers/:id/replicaHistory
+    
+**参数**
 
-    **URL 结构**
-```
-    GET /api/v1/containers/:id/replicaHistory
-```
-    
-    **参数**
-    
-    没有参数。
-    
-    **回传**
+没有参数。
 
-    回传给定容器 ID 的所有 ContainerHistory 对象。
+**回传**
+回传给定容器 ID 的所有 ContainerHistory 对象。
     
 ```json
     [
@@ -183,29 +158,23 @@ Recon API v1 是一组 HTTP 端点，可以帮助您了解 Ozone 集群的当前
       ...
     ]
 ```
-* **/containers/unhealthy**
-
-    **URL 结构**
- ```
-     GET /api/v1/containers/unhealthy
- ```
+### GET /api/v1/containers/unhealthy
      
-    **参数**
-    
-    * batchNum (可选)
+**参数**
 
-        回传结果的批号(如“页码”)。
-        传递1，将回传记录1到limit。传递2，将回传limit + 1到2 * limit，依此类推。
-        
-    * limit (可选)
+* batchNum (可选)
+    回传结果的批号(如“页码”)。
+    传递1，将回传记录1到limit。传递2，将回传limit + 1到2 * limit，依此类推。
     
-        只回传有限数量的结果。默认限制是1000。
-        
-    **回传**
+* limit (可选)
+
+    只回传有限数量的结果。默认限制是1000。
     
-    回传所有不健康容器的 UnhealthyContainerMetadata 对象。
-    
- ```json
+**回传**
+
+回传所有不健康容器的 UnhealthyContainerMetadata 对象。
+
+```json
      {
      	"missingCount": 2,
      	"underReplicatedCount": 0,
@@ -233,50 +202,40 @@ Recon API v1 是一组 HTTP 端点，可以帮助您了解 Ozone 集群的当前
         ...
         ]
      } 
- ```
-     
-* **/containers/unhealthy/:state**
-
-    **URL 结构**
-```
-    GET /api/v1/containers/unhealthy/:state
 ```
      
-    **参数**
-    
-    * batchNum (可选)
-    
-        回传结果的批号(如“页码”)。
-        传递1，将回传记录1到limit。传递2，将回传limit + 1到2 * limit，依此类推。
-        
-    * limit (可选)
-    
-        只回传有限数量的结果。默认限制是1000。
-        
-    **回传**
-    
-    回传处于给定状态的容器的 UnhealthyContainerMetadata 对象。
-    不健康的容器状态可能为`MISSING`, `MIS_REPLICATED`, `UNDER_REPLICATED`, `OVER_REPLICATED`。
-    响应结构与`/containers/unhealthy`相同。
-    
-#### 集群状态
-
-* **/clusterState**
-
-    **URL 结构**
-```
-    GET /api/v1/clusterState
-```
+### GET /api/v1/containers/unhealthy/:state
      
-    **参数**
+**参数**
+
+* batchNum (可选)
+
+    回传结果的批号(如“页码”)。
+    传递1，将回传记录1到limit。传递2，将回传limit + 1到2 * limit，依此类推。
     
-    没有参数。
+* limit (可选)
+
+    只回传有限数量的结果。默认限制是1000。
     
-    **回传**
+**回传**
+
+回传处于给定状态的容器的 UnhealthyContainerMetadata 对象。
+不健康的容器状态可能为`MISSING`, `MIS_REPLICATED`, `UNDER_REPLICATED`,`OVER_REPLICATED`。
+响应结构与`/containers/unhealthy`相同。
     
-    返回 Ozone 集群当前状态的摘要。
+## 集群状态
+
+### GET /api/v1/clusterState
+     
+**参数**
+
+没有参数。
+
+**回传**
+
+返回 Ozone 集群当前状态的摘要。
     
- ```json
+```json
      {
      	"pipelines": 5,
      	"totalDatanodes": 4,
@@ -291,24 +250,19 @@ Recon API v1 是一组 HTTP 端点，可以帮助您了解 Ozone 集群的当前
      	"buckets": 26,
      	"keys": 25
      }
- ```
+```
      
-#### 数据节点
+## 数据节点
 
-* **/datanodes**
+### GET /api/v1/datanodes
+    
+**参数**
 
-    **URL 结构**
-```
-    GET /api/v1/datanodes
-```
-    
-    **参数**
-    
-    没有参数。
-    
-    **回传**
-    
-    回传集群中的所有数据节点。
+没有参数。
+
+**回传**
+
+回传集群中的所有数据节点。
     
 ```json
     {
@@ -340,23 +294,19 @@ Recon API v1 是一组 HTTP 端点，可以帮助您了解 Ozone 集群的当前
         ...
         ]
      }
- ```
+```
      
-#### 管道
+## 管道
 
-* **/pipelines**
+### GET /api/v1/pipelines
 
-    **URL 结构**
-```
-    GET /api/v1/pipelines
-```
-    **参数**
-    
-    没有参数
-    
-    **回传**
-    
-    回传在集群中的所有管道。
+**参数**
+
+没有参数
+
+**回传**
+
+回传在集群中的所有管道。
     
 ```json
      {
@@ -376,24 +326,19 @@ Recon API v1 是一组 HTTP 端点，可以帮助您了解 Ozone 集群的当前
         ...
         ]
      }
- ```  
+```  
 
-#### 任务
+## 任务
 
-* **/task/status**
+### GET /api/v1/task/status
+    
+**参数**
 
-    **URL 结构**
-```
-    GET /api/v1/task/status
-```
-    
-    **参数**
-    
-    没有参数
-    
-    **回传**
-    
-    回传所有 Recon 任务的状态。
+没有参数
+
+**回传**
+
+回传所有 Recon 任务的状态。
   
 ```json
      [
@@ -406,32 +351,26 @@ Recon API v1 是一组 HTTP 端点，可以帮助您了解 Ozone 集群的当前
      ]
 ```
     
-#### 使用率
+## 使用率
 
-* **/utilization/fileCount**
+### GET /api/v1/utilization/fileCount
+    
+**参数**
 
-    **URL 结构**
-```
-    GET /api/v1/utilization/fileCount
-```
-    
-    **参数**
-    
-    * volume (可选)
-    
-        根据给定的卷名过滤结果。
-        
-    * bucket (可选)
-    
-        根据给定的桶名过滤结果。
-        
-    * fileSize (可选)
+* volume (可选)
 
-        根据给定的文件大小筛选结果。
-        
-    **回传**
+    根据给定的卷名过滤结果。
     
-    回传不同文件范围内的文件计数，其中响应对象中的`fileSize`是文件大小范围的上限。
+* bucket (可选)
+
+    根据给定的桶名过滤结果。
+    
+* fileSize (可选)
+    根据给定的文件大小筛选结果。
+    
+**回传**
+
+回传不同文件范围内的文件计数，其中响应对象中的`fileSize`是文件大小范围的上限。
     
 ```json
      [{
@@ -457,25 +396,20 @@ Recon API v1 是一组 HTTP 端点，可以帮助您了解 Ozone 集群的当前
      }]
 ```
     
-#### <a name="metrics"></a> 指标
+## 指标
 
-* **/metrics/:api**
-
-    **URL 结构**
-```
-    GET /api/v1/metrics/:api
-```
+### GET /api/v1/metrics/:api
     
-    **参数**
+**参数**
 
-    请参阅 [Prometheus HTTP API 参考](https://prometheus.io/docs/prometheus/latest/querying/api/) 以获取完整的查询文档。
+请参阅 [Prometheus HTTP API 参考](https://prometheus.io/docs/prometheus/latestquerying/api/) 以获取完整的查询文档。
 
-    **回传**
+**回传**
 
-    这是 Prometheus 的代理端点，并回传与 Prometheus 端点相同的响应。
-    示例：/api/v1/metrics/query?query=ratis_leader_election_electionCount
+这是 Prometheus 的代理端点，并回传与 Prometheus 端点相同的响应。
+示例：/api/v1/metrics/query?query=ratis_leader_election_electionCount
     
- ```json
+```json
      {
        "status": "success",
        "data": {
@@ -497,6 +431,6 @@ Recon API v1 是一组 HTTP 端点，可以帮助您了解 Ozone 集群的当前
          ]
        }
      }
- ```
+```
 
 
