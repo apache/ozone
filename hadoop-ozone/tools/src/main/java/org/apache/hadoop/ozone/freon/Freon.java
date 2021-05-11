@@ -42,6 +42,7 @@ import picocli.CommandLine.Option;
         RandomKeyGenerator.class,
         OzoneClientKeyGenerator.class,
         OzoneClientKeyValidator.class,
+        OzoneClientRemover.class,
         OmKeyGenerator.class,
         OmBucketGenerator.class,
         HadoopFsGenerator.class,

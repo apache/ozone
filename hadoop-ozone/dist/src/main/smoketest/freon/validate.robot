@@ -22,6 +22,10 @@ Test Timeout        5 minutes
 ${PREFIX}    ${EMPTY}
 
 *** Test Cases ***
+Ozone Client Key Generator for Validator
+    ${result} =        Execute          ozone freon ockg ${OM_HA_PARAM} -t=1 -n=1 -p ockv${PREFIX}
+                       Should contain   ${result}   Successful executions: 1
+
 Ozone Client Key Validator
-    ${result} =        Execute          ozone freon ockv ${OM_HA_PARAM} -t=1 -n=1 -p ockg${PREFIX}
+    ${result} =        Execute          ozone freon ockv ${OM_HA_PARAM} -t=1 -n=1 -p ockv${PREFIX}
                        Should contain   ${result}   Successful executions: 1
