@@ -229,10 +229,10 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   public List<String> getRatisRoles() throws IOException {
     Collection<RaftPeer> peers = division.getGroup().getPeers();
     List<String> ratisRoles = new ArrayList<>();
-    InetAddress peerInetAddress = null;
     for (RaftPeer peer : peers) {
+      InetAddress peerInetAddress = null;
       try {
-       peerInetAddress = InetAddress.getByName(
+        peerInetAddress = InetAddress.getByName(
             HddsUtils.getHostName(peer.getAddress()).get());
       } catch (IOException ex) {
         LOG.error("SCM Ratis PeerInetAddress {} is unresolvable",
@@ -244,10 +244,8 @@ public class SCMRatisServerImpl implements SCMRatisServer {
       }
       ratisRoles.add((peer.getAddress() == null ? "" :
               peer.getAddress().concat(isLocal ?
-                      ":".concat(RaftProtos.RaftPeerRole.LEADER
-                              .toString()) :
-                      ":".concat(RaftProtos.RaftPeerRole.FOLLOWER
-                              .toString()))));
+                  ":".concat(RaftProtos.RaftPeerRole.LEADER.toString()) :
+                  ":".concat(RaftProtos.RaftPeerRole.FOLLOWER.toString()))));
     }
     return ratisRoles;
   }
