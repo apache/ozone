@@ -2357,7 +2357,7 @@
   </property>
   <property>
     <name>ozone.client.failover.max.attempts</name>
-    <value>100</value>
+    <value>500</value>
     <description>
       Expert only. Ozone RpcClient attempts talking to each OzoneManager
       ipc.client.connect.max.retries (default = 10) number of times before
