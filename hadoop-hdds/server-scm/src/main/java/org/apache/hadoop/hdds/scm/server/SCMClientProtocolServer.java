@@ -54,6 +54,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
+import org.apache.hadoop.hdds.security.token.ContainerTokenSecretManager;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
@@ -66,6 +67,7 @@ import org.apache.hadoop.ozone.audit.AuditLoggerType;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.audit.Auditor;
 import org.apache.hadoop.ozone.audit.SCMAction;
+import org.apache.hadoop.security.token.Token;
 import org.apache.ratis.thirdparty.com.google.common.base.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -81,6 +83,8 @@ import java.util.TreeSet;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED_DEFAULT;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StorageContainerLocationProtocolService.newReflectiveBlockingService;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY;
@@ -100,13 +104,14 @@ public class SCMClientProtocolServer implements
   private final RPC.Server clientRpcServer;
   private final InetSocketAddress clientRpcAddress;
   private final StorageContainerManager scm;
-  private final OzoneConfiguration conf;
   private final ProtocolMessageMetrics<ProtocolMessageEnum> protocolMetrics;
+  private final boolean containerTokenEnabled;
 
   public SCMClientProtocolServer(OzoneConfiguration conf,
       StorageContainerManager scm) throws IOException {
     this.scm = scm;
-    this.conf = conf;
+    containerTokenEnabled = conf.getBoolean(HDDS_CONTAINER_TOKEN_ENABLED,
+        HDDS_CONTAINER_TOKEN_ENABLED_DEFAULT);
     final int handlerCount =
         conf.getInt(OZONE_SCM_HANDLER_COUNT_KEY,
             OZONE_SCM_HANDLER_COUNT_DEFAULT);
@@ -788,6 +793,23 @@ public class SCMClientProtocolServer implements
         .map(DatanodeUsageInfo::toProto)
         .limit(count)
         .collect(Collectors.toList());
+  }
+
+  @Override
+  public Token<?> getContainerToken(ContainerID containerID)
+      throws IOException {
+    String remoteUser = getRemoteUserName();
+    getScm().checkAdminAccess(remoteUser);
+
+    if (!containerTokenEnabled) {
+      return new Token<>();
+    }
+
+    ContainerTokenSecretManager secretManager =
+        scm.getContainerTokenSecretManager();
+
+    return secretManager.generateToken(
+        secretManager.createIdentifier(remoteUser, containerID));
   }
 
   /**
