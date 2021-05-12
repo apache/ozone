@@ -54,6 +54,7 @@ execute_robot_test scm om-ratis
 execute_robot_test scm freon
 
 execute_robot_test scm cli
+execute_robot_test scm admincli
 
 stop_docker_env
 

@@ -76,3 +76,11 @@ List containers on unknown host
     ${output} =         Execute And Ignore Error     ozone admin --verbose container list --scm unknown-host
                         Should contain   ${output}   Invalid host name
 
+Cannot close container without admin privilege
+    Requires admin privilege    ozone admin container close "${CONTAINER}"
+
+Cannot create container without admin privilege
+    Requires admin privilege    ozone admin container create
+
+Cannot delete container without admin privilege
+    Requires admin privilege    ozone admin container delete "${CONTAINER}"

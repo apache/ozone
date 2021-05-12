@@ -1866,6 +1866,12 @@
     <description>True if block tokens are enabled, else false.</description>
   </property>
   <property>
+    <name>hdds.container.token.enabled</name>
+    <value>false</value>
+    <tag>OZONE, HDDS, SECURITY, TOKEN</tag>
+    <description>True if container tokens are enabled, else false.</description>
+  </property>
+  <property>
     <name>hdds.x509.file.name</name>
     <value>certificate.crt</value>
     <tag>OZONE, HDDS, SECURITY</tag>
