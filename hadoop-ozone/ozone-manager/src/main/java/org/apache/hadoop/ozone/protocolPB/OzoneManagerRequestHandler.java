@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.utils.db.SequenceNumberNotFoundException;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -492,8 +493,13 @@ public class OzoneManagerRequestHandler implements RequestHandler {
 
     omPartInfoList.forEach(partInfo -> partInfoList.add(partInfo.getProto()));
 
-    response.setType(omMultipartUploadListParts.getReplicationType());
-    response.setFactor(omMultipartUploadListParts.getReplicationFactor());
+    response.setType(
+            omMultipartUploadListParts
+                    .getReplicationConfig()
+                    .getReplicationType());
+    response.setFactor(
+            ReplicationConfig.getLegacyFactor(
+                    omMultipartUploadListParts.getReplicationConfig()));
     response.setNextPartNumberMarker(
         omMultipartUploadListParts.getNextPartNumberMarker());
     response.setIsTruncated(omMultipartUploadListParts.isTruncated());
@@ -519,8 +525,10 @@ public class OzoneManagerRequestHandler implements RequestHandler {
             .setBucketName(upload.getBucketName())
             .setKeyName(upload.getKeyName())
             .setUploadId(upload.getUploadId())
-            .setType(upload.getReplicationType())
-            .setFactor(upload.getReplicationFactor())
+            .setType(upload.getReplicationConfig().getReplicationType())
+            .setFactor(
+                    ReplicationConfig.getLegacyFactor(
+                            upload.getReplicationConfig()))
             .setCreationTime(upload.getCreationTime().toEpochMilli())
             .build())
         .collect(Collectors.toList());

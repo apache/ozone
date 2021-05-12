@@ -153,19 +153,17 @@ public class OzoneKey {
    *
    * @return replicationType
    */
+
   @Deprecated
   public ReplicationType getReplicationType() {
-    return null;
+    return ReplicationType
+            .fromProto(replicationConfig.getReplicationType());
   }
 
-  /**
-   * Returns the replication factor of the key.
-   *
-   * @return replicationFactor
-   */
   @Deprecated
-  public int getReplicationFactor() {
-    return replicationConfig.getRequiredNodes();
+  public ReplicationFactor getReplicationFactor() {
+    return ReplicationFactor
+            .fromProto(ReplicationConfig.getLegacyFactor(replicationConfig));
   }
 
 }

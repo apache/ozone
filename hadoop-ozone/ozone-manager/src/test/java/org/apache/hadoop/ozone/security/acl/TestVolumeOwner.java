@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.security.acl;
 
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
@@ -131,9 +132,10 @@ public class TestVolumeOwner {
               .setVolumeName(getTestVolumeName(i))
               .setBucketName(getTestBucketName(j))
               .setKeyName(getTestKeyName(k))
-              .setFactor(HddsProtos.ReplicationFactor.ONE)
-              .setDataSize(0)
-              .setType(HddsProtos.ReplicationType.STAND_ALONE);
+              .setReplicationConfig(
+                  new StandaloneReplicationConfig(
+                      HddsProtos.ReplicationFactor.ONE))
+              .setDataSize(0);
           if (k == 0) {
             keyArgsBuilder.setAcls(OzoneAclUtil.getAclList(
                 testUgi.getUserName(), testUgi.getGroupNames(), ALL, ALL));

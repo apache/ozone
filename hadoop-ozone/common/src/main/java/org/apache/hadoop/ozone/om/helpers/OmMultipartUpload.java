@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import java.time.Instant;
 
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
@@ -41,9 +42,7 @@ public class OmMultipartUpload {
 
   private Instant creationTime;
 
-  private HddsProtos.ReplicationType replicationType;
-
-  private HddsProtos.ReplicationFactor replicationFactor;
+  private ReplicationConfig replicationConfig;
 
   public OmMultipartUpload(String volumeName, String bucketName,
       String keyName, String uploadId) {
@@ -64,15 +63,13 @@ public class OmMultipartUpload {
 
   public OmMultipartUpload(String volumeName, String bucketName,
       String keyName, String uploadId, Instant creationTime,
-      ReplicationType replicationType,
-      ReplicationFactor replicationFactor) {
+      ReplicationConfig replicationConfig) {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.keyName = keyName;
     this.uploadId = uploadId;
     this.creationTime = creationTime;
-    this.replicationType = replicationType;
-    this.replicationFactor = replicationFactor;
+    this.replicationConfig = replicationConfig;
   }
 
   public static OmMultipartUpload from(String key) {
@@ -129,21 +126,11 @@ public class OmMultipartUpload {
     this.creationTime = creationTime;
   }
 
-  public ReplicationType getReplicationType() {
-    return replicationType;
+  public void setReplicationConfig(ReplicationConfig replicationConfig) {
+    this.replicationConfig = replicationConfig;
   }
 
-  public void setReplicationType(
-      ReplicationType replicationType) {
-    this.replicationType = replicationType;
-  }
-
-  public ReplicationFactor getReplicationFactor() {
-    return replicationFactor;
-  }
-
-  public void setReplicationFactor(
-      ReplicationFactor replicationFactor) {
-    this.replicationFactor = replicationFactor;
+  public ReplicationConfig getReplicationConfig() {
+    return replicationConfig;
   }
 }

@@ -22,6 +22,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.om.BucketManager;
@@ -108,8 +109,9 @@ public class BenchMarkOMKeyAllocation {
         .setBucketName(bucketName)
         .setKeyName(UUID.randomUUID().toString())
         .setDataSize(0)
-        .setFactor(HddsProtos.ReplicationFactor.THREE)
-        .setType(HddsProtos.ReplicationType.RATIS).build();
+        .setReplicationConfig(
+            new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE))
+        .build();
     OpenKeySession openKeySession = keyManager.openKey(omKeyArgs);
     // setting location info list
     omKeyArgs.setLocationInfoList(keyLocationInfos);
