@@ -668,7 +668,7 @@ public class SCMClientProtocolServer implements
     try {
       getScm().checkAdminAccess(remoteUser);
     } catch (IOException e) {
-      LOG.error("Authorisation failed for finalize scm upgrade", e);
+      LOG.error("Authorization failed for finalize scm upgrade", e);
       throw e;
     }
     return scm.finalizeUpgrade(upgradeClientID);
@@ -684,7 +684,7 @@ public class SCMClientProtocolServer implements
       try {
         getScm().checkAdminAccess(remoteUser);
       } catch (IOException e) {
-        LOG.error("Authorisation failed for query scm upgrade finalization " +
+        LOG.error("Authorization failed for query scm upgrade finalization " +
             "progress", e);
         throw e;
       }
@@ -713,7 +713,7 @@ public class SCMClientProtocolServer implements
     try {
       getScm().checkAdminAccess(remoteUser);
     } catch (IOException e) {
-      LOG.error("Authorisation failed", e);
+      LOG.error("Authorization failed", e);
       throw e;
     }
 
@@ -781,7 +781,7 @@ public class SCMClientProtocolServer implements
     try {
       getScm().checkAdminAccess(remoteUser);
     } catch (IOException e) {
-      LOG.error("Authorisation failed", e);
+      LOG.error("Authorization failed", e);
       throw e;
     }
 
