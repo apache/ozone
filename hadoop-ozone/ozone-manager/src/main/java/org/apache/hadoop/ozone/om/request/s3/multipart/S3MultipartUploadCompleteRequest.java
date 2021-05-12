@@ -302,7 +302,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
   @SuppressWarnings("checkstyle:ParameterNumber")
   protected OmKeyInfo getOmKeyInfo(OzoneManager ozoneManager, long trxnLogIndex,
       KeyArgs keyArgs, String volumeName, String bucketName, String keyName,
-      String multipartKey, OMMetadataManager omMetadataManager,
+      String multipartOpenKey, OMMetadataManager omMetadataManager,
       String ozoneKey, TreeMap<Integer, PartKeyInfo> partKeyInfoMap,
       List<OmKeyLocationInfo> partLocationInfos, long dataSize)
           throws IOException {
@@ -319,7 +319,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
           OmKeyLocationInfoGroup(0, partLocationInfos, true);
 
       // Get the objectID of the key from OpenKeyTable
-      OmKeyInfo dbOpenKeyInfo = getOmKeyInfoFromOpenKeyTable(multipartKey,
+      OmKeyInfo dbOpenKeyInfo = getOmKeyInfoFromOpenKeyTable(multipartOpenKey,
               keyName, omMetadataManager);
 
       // A newly created key, this is the first version.
