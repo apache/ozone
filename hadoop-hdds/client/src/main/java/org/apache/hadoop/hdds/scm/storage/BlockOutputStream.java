@@ -673,10 +673,10 @@ public class BlockOutputStream extends OutputStream {
         }
         return e;
       }, responseExecutor).exceptionally(e -> {
-        LOG.error("writing chunk failed " + chunkInfo.getChunkName() +
-                " blockID " + blockID + " with exception "
-                + e.getLocalizedMessage());
-        CompletionException ce = new CompletionException(e);
+        String msg = "Failed to write chunk " + chunkInfo.getChunkName() + " " +
+            "into block " + blockID;
+        LOG.debug("{}, exception: {}", msg, e.getLocalizedMessage());
+        CompletionException ce = new CompletionException(msg, e);
         setIoException(ce);
         throw ce;
       });
