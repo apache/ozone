@@ -63,8 +63,8 @@ public class SCMContainerLocationFailoverProxyProvider implements
   private final Map<String, SCMProxyInfo> scmProxyInfoMap;
   private List<String> scmNodeIds;
 
-  private String currentProxySCMNodeId;
-  private int currentProxyIndex;
+  private volatile String currentProxySCMNodeId;
+  private volatile int currentProxyIndex;
 
   private final ConfigurationSource conf;
   private final SCMClientConfig scmClientConfig;
@@ -76,6 +76,8 @@ public class SCMContainerLocationFailoverProxyProvider implements
   private final long retryInterval;
 
   private final UserGroupInformation ugi;
+
+  private volatile String updatedLeaderNodeID = null;
 
   /**
    * Construct SCMContainerLocationFailoverProxyProvider.
@@ -132,9 +134,6 @@ public class SCMContainerLocationFailoverProxyProvider implements
         scmNodeIds.add(scmNodeId);
         SCMProxyInfo scmProxyInfo = new SCMProxyInfo(scmServiceId, scmNodeId,
             scmClientAddress);
-        ProxyInfo< StorageContainerLocationProtocolPB > proxy
-            = new ProxyInfo<>(null, scmProxyInfo.toString());
-        scmProxies.put(scmNodeId, proxy);
         scmProxyInfoMap.put(scmNodeId, scmProxyInfo);
       }
     }
@@ -154,16 +153,20 @@ public class SCMContainerLocationFailoverProxyProvider implements
 
   @Override
   public synchronized ProxyInfo<StorageContainerLocationProtocolPB> getProxy() {
-    ProxyInfo<StorageContainerLocationProtocolPB> currentProxyInfo
-        = scmProxies.get(currentProxySCMNodeId);
-    createSCMProxyIfNeeded(currentProxyInfo, currentProxySCMNodeId);
+    ProxyInfo currentProxyInfo = scmProxies.get(getCurrentProxySCMNodeId());
+    if (currentProxyInfo == null) {
+      currentProxyInfo = createSCMProxy(getCurrentProxySCMNodeId());
+    }
     return currentProxyInfo;
   }
 
   public synchronized List<StorageContainerLocationProtocolPB> getProxies() {
-    scmProxies.forEach(
-        (nodeId, proxyInfo) -> createSCMProxyIfNeeded(proxyInfo, nodeId));
-
+    for (SCMProxyInfo scmProxyInfo : scmProxyInfoMap.values()) {
+      if (scmProxies.get(scmProxyInfo.getNodeId()) == null) {
+        scmProxies.put(scmProxyInfo.getNodeId(),
+            createSCMProxy(scmProxyInfo.getNodeId()));
+      }
+    }
     return scmProxies.values().stream()
         .map(proxyInfo -> proxyInfo.proxy).collect(Collectors.toList());
   }
@@ -171,7 +174,11 @@ public class SCMContainerLocationFailoverProxyProvider implements
   @Override
   public void performFailover(
       StorageContainerLocationProtocolPB newLeader) {
-    // Should do nothing here.
+    if (updatedLeaderNodeID != null) {
+      currentProxySCMNodeId = updatedLeaderNodeID;
+    } else {
+      nextProxyIndex();
+    }
     LOG.debug("Failing over to next proxy. {}", getCurrentProxySCMNodeId());
   }
 
@@ -194,17 +201,7 @@ public class SCMContainerLocationFailoverProxyProvider implements
             Arrays.toString(scmProxyInfoMap.values().toArray()));
       }
     }
-    if (newLeader == null) {
-      // If newLeader is not assigned, it will fail over to next proxy.
-      nextProxyIndex();
-      LOG.debug("Performing failover to next proxy node {}",
-          currentProxySCMNodeId);
-    } else {
-      if (!assignLeaderToNode(newLeader)) {
-        LOG.debug("Failing over SCM proxy to nodeId: {}", newLeader);
-        nextProxyIndex();
-      }
-    }
+    assignLeaderToNode(newLeader);
   }
 
   @Override
@@ -229,48 +226,43 @@ public class SCMContainerLocationFailoverProxyProvider implements
     return retryInterval;
   }
 
-  private synchronized int nextProxyIndex() {
+  private synchronized void nextProxyIndex() {
     // round robin the next proxy
-    currentProxyIndex = (currentProxyIndex + 1) % scmProxies.size();
+    currentProxyIndex = (currentProxyIndex + 1) % scmProxyInfoMap.size();
     currentProxySCMNodeId =  scmNodeIds.get(currentProxyIndex);
-    return currentProxyIndex;
   }
 
-  private synchronized boolean assignLeaderToNode(String newLeaderNodeId) {
-    if (!currentProxySCMNodeId.equals(newLeaderNodeId)
-        && scmProxies.containsKey(newLeaderNodeId)) {
-      currentProxySCMNodeId = newLeaderNodeId;
-      currentProxyIndex = scmNodeIds.indexOf(currentProxySCMNodeId);
-
-      LOG.debug("Failing over SCM proxy to nodeId: {}", newLeaderNodeId);
-      return true;
+  private synchronized void assignLeaderToNode(String newLeaderNodeId) {
+    if (!currentProxySCMNodeId.equals(newLeaderNodeId)) {
+      if (scmProxies.containsKey(newLeaderNodeId)) {
+        updatedLeaderNodeID = newLeaderNodeId;
+        LOG.debug("Updated LeaderNodeID {}", updatedLeaderNodeID);
+      }
+    } else {
+      updatedLeaderNodeID = null;
     }
-    return false;
   }
 
   /**
-   * Creates proxy object if it does not already exist.
+   * Creates proxy object.
    */
-  private void createSCMProxyIfNeeded(ProxyInfo proxyInfo,
-                                      String nodeId) {
-    if (proxyInfo.proxy == null) {
-      InetSocketAddress address = scmProxyInfoMap.get(nodeId).getAddress();
-      try {
-        StorageContainerLocationProtocolPB proxy =
-            createSCMProxy(address);
-        try {
-          proxyInfo.proxy = proxy;
-        } catch (IllegalAccessError iae) {
-          scmProxies.put(nodeId,
-              new ProxyInfo<>(proxy, proxyInfo.proxyInfo));
-        }
-      } catch (IOException ioe) {
-        LOG.error("{} Failed to create RPC proxy to SCM at {}",
-            this.getClass().getSimpleName(), address, ioe);
-        throw new RuntimeException(ioe);
-      }
+  private ProxyInfo createSCMProxy(String nodeId) {
+    ProxyInfo proxyInfo;
+    SCMProxyInfo scmProxyInfo = scmProxyInfoMap.get(nodeId);
+    InetSocketAddress address = scmProxyInfo.getAddress();
+    try {
+      StorageContainerLocationProtocolPB scmProxy = createSCMProxy(address);
+      // Create proxyInfo here, to make it work with all Hadoop versions.
+      proxyInfo = new ProxyInfo<>(scmProxy, scmProxyInfo.toString());
+      scmProxies.put(nodeId, proxyInfo);
+      return proxyInfo;
+    } catch (IOException ioe) {
+      LOG.error("{} Failed to create RPC proxy to SCM at {}",
+          this.getClass().getSimpleName(), address, ioe);
+      throw new RuntimeException(ioe);
     }
   }
+
 
   private StorageContainerLocationProtocolPB createSCMProxy(
       InetSocketAddress scmAddress) throws IOException {
@@ -295,12 +287,18 @@ public class SCMContainerLocationFailoverProxyProvider implements
       @Override
       public RetryAction shouldRetry(Exception e, int retry,
                                      int failover, boolean b) {
-        if (!SCMHAUtils.checkRetriableWithNoFailoverException(e)) {
+        if (SCMHAUtils.checkRetriableWithNoFailoverException(e)) {
+          setUpdatedLeaderNodeID();
+        } else {
           performFailoverToAssignedLeader(null, e);
         }
         return SCMHAUtils.getRetryAction(failover, retry, e, maxRetryCount,
             getRetryInterval());
       }
     };
+  }
+
+  public synchronized void setUpdatedLeaderNodeID() {
+    this.updatedLeaderNodeID = getCurrentProxySCMNodeId();
   }
 }
