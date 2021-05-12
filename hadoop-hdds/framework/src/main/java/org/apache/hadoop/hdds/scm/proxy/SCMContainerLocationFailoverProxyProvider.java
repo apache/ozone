@@ -172,7 +172,7 @@ public class SCMContainerLocationFailoverProxyProvider implements
   }
 
   @Override
-  public void performFailover(
+  public synchronized void performFailover(
       StorageContainerLocationProtocolPB newLeader) {
     if (updatedLeaderNodeID != null) {
       currentProxySCMNodeId = updatedLeaderNodeID;
