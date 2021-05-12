@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.pipeline;
 
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.junit.Assert;
 import org.junit.Test;
@@ -67,5 +68,17 @@ public class TestPipeline {
     Assert
         .assertEquals(2, protobufMessage.getEcReplicationConfig().getParity());
 
+  }
+
+  @Test
+  public void testReplicaIndexesSerialisedCorrectly() throws IOException {
+    Pipeline pipeline = MockPipeline.createEcPipeline();
+    HddsProtos.Pipeline protobufMessage = pipeline.getProtobufMessage(1);
+    Pipeline reloadedPipeline = Pipeline.getFromProtobuf(protobufMessage);
+
+    for (DatanodeDetails dn : pipeline.getNodes()) {
+      Assert.assertEquals(pipeline.getReplicaIndex(dn),
+          reloadedPipeline.getReplicaIndex(dn));
+    }
   }
 }
