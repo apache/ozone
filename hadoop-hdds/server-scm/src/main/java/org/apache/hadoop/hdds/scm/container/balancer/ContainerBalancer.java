@@ -58,7 +58,7 @@ public class ContainerBalancer {
   private long clusterUsed;
   private long clusterRemaining;
   private double clusterAvgUtilisation;
-  private final AtomicBoolean balancerRunning = new AtomicBoolean(false);;
+  private final AtomicBoolean balancerRunning = new AtomicBoolean(false);
 
   /**
    * Constructs ContainerBalancer with the specified arguments. Initializes
