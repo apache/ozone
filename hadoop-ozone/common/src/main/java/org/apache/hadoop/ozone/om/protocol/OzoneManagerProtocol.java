@@ -372,6 +372,7 @@ public interface OzoneManagerProtocol
    */
   OmMultipartUploadList listMultipartUploads(String volumeName,
       String bucketName, String prefix) throws IOException;
+
   /**
    * Gets s3Secret for given kerberos user.
    * @param kerberosID
@@ -379,6 +380,14 @@ public interface OzoneManagerProtocol
    * @throws IOException
    */
   S3SecretValue getS3Secret(String kerberosID) throws IOException;
+
+  /**
+   * Revokes s3Secret of given kerberos user.
+   * @param kerberosID
+   * @return S3SecretValue
+   * @throws IOException
+   */
+  void revokeS3Secret(String kerberosID) throws IOException;
 
   /**
    * OzoneFS api to get file status for an entry.

@@ -509,6 +509,14 @@ public interface ClientProtocol {
   S3SecretValue getS3Secret(String kerberosID) throws IOException;
 
   /**
+   * Revoke S3 Secret of given kerberos user.
+   * @param kerberosID
+   * @return S3SecretValue
+   * @throws IOException
+   */
+  void revokeS3Secret(String kerberosID) throws IOException;
+
+  /**
    * Get KMS client provider.
    * @return KMS client provider.
    * @throws IOException

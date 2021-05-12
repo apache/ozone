@@ -2699,6 +2699,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
+  /**
+   * {@inheritDoc}
+   */
+  public void revokeS3Secret(String kerberosID) {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+            "this to be implemented. As write requests use a new approach");
+  }
+
+  @Override
   public OmMultipartInfo initiateMultipartUpload(OmKeyArgs keyArgs) throws
       IOException {
 
