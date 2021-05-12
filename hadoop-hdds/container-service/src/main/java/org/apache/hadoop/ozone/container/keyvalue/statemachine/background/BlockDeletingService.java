@@ -419,7 +419,7 @@ public class BlockDeletingService extends BackgroundService {
             .getHandler(container.getContainerType()));
 
 
-        // fist remove the blockID from blockDataTable,and then delete the blocks
+        // remove the blockID from blockDataTable,and then delete the blocks
         // and also remove the transactions from txnTable.
         try(BatchOperation batch = meta.getStore().getBatchHandler()
             .initBatchOperation()) {
