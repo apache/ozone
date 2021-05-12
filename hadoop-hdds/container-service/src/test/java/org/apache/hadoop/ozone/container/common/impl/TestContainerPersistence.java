@@ -143,7 +143,8 @@ public class TestContainerPersistence {
     containerSet = new ContainerSet();
     volumeSet = new MutableVolumeSet(DATANODE_UUID, conf);
     blockManager = new BlockManagerImpl(conf);
-    chunkManager = ChunkManagerFactory.createChunkManager(conf, blockManager);
+    chunkManager = ChunkManagerFactory.createChunkManager(conf, blockManager,
+        null);
 
     for (String dir : conf.getStrings(ScmConfigKeys.HDDS_DATANODE_DIR_KEY)) {
       StorageLocation location = StorageLocation.parse(dir);

@@ -39,6 +39,7 @@ import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.NO_SUCH_BLOCK;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNABLE_TO_READ_METADATA_DB;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNKNOWN_BCSID;
+import static org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil.onFailure;
 
 /**
  * Utils functions to help block functions.
@@ -121,6 +122,7 @@ public final class BlockUtils {
           .getContainerDBType(), containerData.getDbFile().getAbsolutePath(),
               containerData.getSchemaVersion(), conf);
     } catch (IOException ex) {
+      onFailure(containerData.getVolume());
       String message = String.format("Error opening DB. Container:%s " +
           "ContainerPath:%s", containerData.getContainerID(), containerData
           .getDbFile().getPath());
