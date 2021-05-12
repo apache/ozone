@@ -33,6 +33,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ContainerBalancer {
 
@@ -46,8 +47,7 @@ public class ContainerBalancer {
   private double threshold;
   private int maxDatanodesToBalance;
   private long maxSizeToMove;
-  private boolean balancerRunning;
-  private List<DatanodeUsageInfo> sourceNodes;
+  private List<DatanodeUsageInfo> unBalancedNodes;
   private List<DatanodeUsageInfo> overUtilizedNodes;
   private List<DatanodeUsageInfo> underUtilizedNodes;
   private List<DatanodeUsageInfo> aboveAverageUtilizedNodes;
@@ -58,6 +58,7 @@ public class ContainerBalancer {
   private long clusterUsed;
   private long clusterRemaining;
   private double clusterAvgUtilisation;
+  private final AtomicBoolean balancerRunning = new AtomicBoolean(false);;
 
   /**
    * Constructs ContainerBalancer with the specified arguments. Initializes
@@ -78,7 +79,6 @@ public class ContainerBalancer {
     this.containerManager = containerManager;
     this.replicationManager = replicationManager;
     this.ozoneConfiguration = ozoneConfiguration;
-    this.balancerRunning = false;
     this.config = new ContainerBalancerConfiguration();
     this.metrics = new ContainerBalancerMetrics();
   }
@@ -89,11 +89,10 @@ public class ContainerBalancer {
    * @param balancerConfiguration Configuration values.
    */
   public void start(ContainerBalancerConfiguration balancerConfiguration) {
-    if (balancerRunning) {
-      LOG.info("Container Balancer is already running.");
-      throw new RuntimeException();
+    if (!balancerRunning.compareAndSet(false, true)) {
+      LOG.error("Container Balancer is already running.");
+      return;
     }
-    this.balancerRunning = true;
     ozoneConfiguration = new OzoneConfiguration();
 
     this.config = balancerConfiguration;
@@ -109,11 +108,9 @@ public class ContainerBalancer {
     this.underUtilizedNodes = new ArrayList<>();
     this.aboveAverageUtilizedNodes = new ArrayList<>();
     this.belowAverageUtilizedNodes = new ArrayList<>();
-    this.sourceNodes = new ArrayList<>();
+    this.unBalancedNodes = new ArrayList<>();
 
-    LOG.info("Starting Container Balancer...");
-    LOG.info(toString());
-
+    LOG.info("Starting Container Balancer...{}", this);
     balance();
   }
 
@@ -136,23 +133,17 @@ public class ContainerBalancer {
    * @return true if successfully initialized, otherwise false.
    */
   private boolean initializeIteration() {
-    List<DatanodeUsageInfo> nodes;
-    try {
-      // sorted list in order from most to least used
-      nodes = nodeManager.getMostOrLeastUsedDatanodes(true);
-    } catch (NullPointerException e) {
-      LOG.error("Container Balancer could not retrieve nodes from Node " +
-          "Manager.", e);
+    // sorted list in order from most to least used
+    List<DatanodeUsageInfo> datanodeUsageInfos =
+        nodeManager.getMostOrLeastUsedDatanodes(true);
+    if (datanodeUsageInfos.isEmpty()) {
+      LOG.info("Container Balancer could not retrieve nodes from Node " +
+          "Manager.");
       stop();
       return false;
     }
 
-    try {
-      clusterAvgUtilisation = calculateAvgUtilization(nodes);
-    } catch(ArithmeticException e) {
-      LOG.warn("Container Balancer failed to initialize an iteration", e);
-      return false;
-    }
+    clusterAvgUtilisation = calculateAvgUtilization(datanodeUsageInfos);
     LOG.info("Average utilization of the cluster is {}", clusterAvgUtilisation);
 
     // under utilized nodes have utilization(that is, used / capacity) less
@@ -163,42 +154,42 @@ public class ContainerBalancer {
     // than upper limit
     double upperLimit = clusterAvgUtilisation + threshold;
 
-    LOG.info("Lower limit for utilization is {}", lowerLimit);
-    LOG.info("Upper limit for utilization is {}", upperLimit);
+    LOG.info("Lower limit for utilization is {} and Upper limit for " +
+            "utilization is {}", lowerLimit, upperLimit);
 
     long numDatanodesToBalance = 0L;
     double overLoadedBytes = 0D, underLoadedBytes = 0D;
 
     // find over and under utilized nodes
-    for (DatanodeUsageInfo node : nodes) {
-      double utilization = calculateUtilization(node);
+    for (DatanodeUsageInfo datanodeUsageInfo : datanodeUsageInfos) {
+      double utilization = calculateUtilization(datanodeUsageInfo);
       if (utilization > clusterAvgUtilisation) {
         if (utilization > upperLimit) {
-          overUtilizedNodes.add(node);
+          overUtilizedNodes.add(datanodeUsageInfo);
           numDatanodesToBalance += 1;
 
           // amount of bytes greater than upper limit in this node
-          overLoadedBytes +=
-              ratioToBytes(node.getScmNodeStat().getCapacity().get(),
-                  utilization) -
-                  ratioToBytes(node.getScmNodeStat().getCapacity().get(),
+          overLoadedBytes += ratioToBytes(
+                  datanodeUsageInfo.getScmNodeStat().getCapacity().get(),
+                  utilization) - ratioToBytes(
+                      datanodeUsageInfo.getScmNodeStat().getCapacity().get(),
                       upperLimit);
         } else {
-          aboveAverageUtilizedNodes.add(node);
+          aboveAverageUtilizedNodes.add(datanodeUsageInfo);
         }
       } else if (utilization < clusterAvgUtilisation) {
         if (utilization < lowerLimit) {
-          underUtilizedNodes.add(node);
+          underUtilizedNodes.add(datanodeUsageInfo);
           numDatanodesToBalance += 1;
 
           // amount of bytes lesser than lower limit in this node
-          underLoadedBytes +=
-              ratioToBytes(node.getScmNodeStat().getCapacity().get(),
-                  lowerLimit) -
-                  ratioToBytes(node.getScmNodeStat().getCapacity().get(),
+          underLoadedBytes += ratioToBytes(
+                  datanodeUsageInfo.getScmNodeStat().getCapacity().get(),
+                  lowerLimit) - ratioToBytes(
+                      datanodeUsageInfo.getScmNodeStat().getCapacity().get(),
                       utilization);
         } else {
-          belowAverageUtilizedNodes.add(node);
+          belowAverageUtilizedNodes.add(datanodeUsageInfo);
         }
       }
     }
@@ -208,7 +199,7 @@ public class ContainerBalancer {
 
     long numDatanodesBalanced = 0;
     // count number of nodes that were balanced in previous iteration
-    for (DatanodeUsageInfo node : sourceNodes) {
+    for (DatanodeUsageInfo node : unBalancedNodes) {
       if (!containsNode(overUtilizedNodes, node) &&
           !containsNode(underUtilizedNodes, node)) {
         numDatanodesBalanced += 1;
@@ -219,7 +210,7 @@ public class ContainerBalancer {
     numDatanodesBalanced =
         numDatanodesBalanced + metrics.getNumDatanodesBalanced().get();
     metrics.setNumDatanodesBalanced(new LongMetric(numDatanodesBalanced));
-    sourceNodes = new ArrayList<>(
+    unBalancedNodes = new ArrayList<>(
         overUtilizedNodes.size() + underUtilizedNodes.size());
 
     if (numDatanodesBalanced + numDatanodesToBalance > maxDatanodesToBalance) {
@@ -228,10 +219,10 @@ public class ContainerBalancer {
       stop();
       return false;
     } else {
-      sourceNodes.addAll(overUtilizedNodes);
-      sourceNodes.addAll(underUtilizedNodes);
+      unBalancedNodes.addAll(overUtilizedNodes);
+      unBalancedNodes.addAll(underUtilizedNodes);
 
-      if (sourceNodes.isEmpty()) {
+      if (unBalancedNodes.isEmpty()) {
         LOG.info("Did not find any unbalanced Datanodes.");
         stop();
         return false;
@@ -285,7 +276,7 @@ public class ContainerBalancer {
    *
    * @param nodes List of DatanodeUsageInfo to find the average utilization for
    * @return Average utilization value
-   * @throws ArithmeticException
+   * @throws ArithmeticException Division by zero
    */
   private double calculateAvgUtilization(List<DatanodeUsageInfo> nodes)
       throws ArithmeticException {
@@ -301,14 +292,8 @@ public class ContainerBalancer {
     try {
       return clusterUsed / (double) clusterCapacity;
     } catch (ArithmeticException e) {
-      if (clusterCapacity == 0) {
-        LOG.warn("Cluster capacity found to be 0 while calculating average " +
-            "utilisation of the cluster for Container Balancer, resulting in " +
-            "division by 0.", e);
-      } else {
-        LOG.warn("Exception occurred while calculating average utilisation of" +
-            " the cluster for Container Balancer.", e);
-      }
+      LOG.warn("Division by zero while calculating average utilization of the" +
+          " cluster in ContainerBalancer.");
       throw e;
     }
   }
@@ -332,7 +317,7 @@ public class ContainerBalancer {
    */
   public void stop() {
     LOG.info("Stopping Container Balancer...");
-    balancerRunning = false;
+    balancerRunning.set(false);
     LOG.info("Container Balancer stopped.");
   }
 
@@ -366,24 +351,24 @@ public class ContainerBalancer {
   }
 
   /**
-   * Gets the list of source nodes, that is, the over and under utilized nodes
-   * in the cluster.
+   * Gets the list of unBalanced nodes, that is, the over and under utilized
+   * nodes in the cluster.
    *
-   * @return List of DatanodeUsageInfo containing source nodes.
+   * @return List of DatanodeUsageInfo containing unBalanced nodes.
    */
-  public List<DatanodeUsageInfo> getSourceNodes() {
-    return sourceNodes;
+  public List<DatanodeUsageInfo> getUnBalancedNodes() {
+    return unBalancedNodes;
   }
 
   /**
-   * Sets the source nodes, that is, the over and under utilized nodes in the
-   * cluster.
+   * Sets the unBalanced nodes, that is, the over and under utilized nodes in
+   * the cluster.
    *
-   * @param sourceNodes List of DatanodeUsageInfo
+   * @param unBalancedNodes List of DatanodeUsageInfo
    */
-  public void setSourceNodes(
-      List<DatanodeUsageInfo> sourceNodes) {
-    this.sourceNodes = sourceNodes;
+  public void setUnBalancedNodes(
+      List<DatanodeUsageInfo> unBalancedNodes) {
+    this.unBalancedNodes = unBalancedNodes;
   }
 
   /**
@@ -392,12 +377,12 @@ public class ContainerBalancer {
    * @return true if ContainerBalancer is running, false if not running.
    */
   public boolean isBalancerRunning() {
-    return balancerRunning;
+    return balancerRunning.get();
   }
 
   @Override
   public String toString() {
-    String status = String.format("Container Balancer status:%n" +
+    String status = String.format("%nContainer Balancer status:%n" +
         "%-30s %s%n" +
         "%-30s %b%n", "Key", "Value", "Running", balancerRunning);
     return status + config.toString();

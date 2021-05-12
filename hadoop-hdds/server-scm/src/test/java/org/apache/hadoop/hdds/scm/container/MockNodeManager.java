@@ -311,6 +311,9 @@ public class MockNodeManager implements NodeManager {
       boolean mostUsed) {
     List<DatanodeDetails> datanodeDetailsList =
         getNodes(NodeOperationalState.IN_SERVICE, HEALTHY);
+    if (datanodeDetailsList == null) {
+      return new ArrayList<>();
+    }
     Comparator<DatanodeUsageInfo> comparator;
     if (mostUsed) {
       comparator = DatanodeUsageInfo.getMostUsedByRemainingRatio().reversed();

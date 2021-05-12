@@ -79,13 +79,14 @@ public class TestContainerBalancer {
   }
 
   /**
-   * Checks whether ContainerBalancer is correctly updating the list of source
-   * nodes with varying values of Threshold.
+   * Checks whether ContainerBalancer is correctly updating the list of
+   * unBalanced nodes with varying values of Threshold.
    */
   @Test
-  public void initializeIterationShouldUpdateSourceNodesWhenThresholdChanges() {
-    List<DatanodeUsageInfo> expectedSourceNodes;
-    List<DatanodeUsageInfo> sourceNodesAccordingToBalancer;
+  public void
+      initializeIterationShouldUpdateUnBalancedNodesWhenThresholdChanges() {
+    List<DatanodeUsageInfo> expectedUnBalancedNodes;
+    List<DatanodeUsageInfo> unBalancedNodesAccordingToBalancer;
 
     // check for random threshold values
     for (int i = 0; i < 50; i++) {
@@ -93,15 +94,18 @@ public class TestContainerBalancer {
 
       balancerConfiguration.setThreshold(String.valueOf(randomThreshold));
       containerBalancer.start(balancerConfiguration);
-      expectedSourceNodes = determineExpectedSourceNodes(randomThreshold);
-      sourceNodesAccordingToBalancer = containerBalancer.getSourceNodes();
+      expectedUnBalancedNodes =
+          determineExpectedUnBalancedNodes(randomThreshold);
+      unBalancedNodesAccordingToBalancer =
+          containerBalancer.getUnBalancedNodes();
 
       Assert.assertEquals(
-          expectedSourceNodes.size(), sourceNodesAccordingToBalancer.size());
+          expectedUnBalancedNodes.size(),
+          unBalancedNodesAccordingToBalancer.size());
 
-      for (int j = 0; j < expectedSourceNodes.size(); j++) {
-        Assert.assertEquals(expectedSourceNodes.get(j).getDatanodeDetails(),
-            sourceNodesAccordingToBalancer.get(j).getDatanodeDetails());
+      for (int j = 0; j < expectedUnBalancedNodes.size(); j++) {
+        Assert.assertEquals(expectedUnBalancedNodes.get(j).getDatanodeDetails(),
+            unBalancedNodesAccordingToBalancer.get(j).getDatanodeDetails());
       }
       containerBalancer.stop();
     }
@@ -109,14 +113,15 @@ public class TestContainerBalancer {
   }
 
   /**
-   * Checks whether the list of source is empty when the cluster is balanced.
+   * Checks whether the list of unBalanced nodes is empty when the cluster is
+   * balanced.
    */
   @Test
-  public void sourceNodesListShouldBeEmptyWhenClusterIsBalanced() {
+  public void unBalancedNodesListShouldBeEmptyWhenClusterIsBalanced() {
     balancerConfiguration.setThreshold("0.99");
     containerBalancer.start(balancerConfiguration);
 
-    Assert.assertEquals(0, containerBalancer.getSourceNodes().size());
+    Assert.assertEquals(0, containerBalancer.getUnBalancedNodes().size());
     containerBalancer.stop();
   }
 
@@ -135,31 +140,31 @@ public class TestContainerBalancer {
   }
 
   /**
-   * Determines source nodes, that is, over and under utilized nodes,
+   * Determines unBalanced nodes, that is, over and under utilized nodes,
    * according to the generated utilization values for nodes and the threshold.
    *
    * @param threshold A fraction from range 0 to 1.
    * @return List of DatanodeUsageInfo containing the expected(correct)
-   * source nodes.
+   * unBalanced nodes.
    */
-  private List<DatanodeUsageInfo> determineExpectedSourceNodes(
+  private List<DatanodeUsageInfo> determineExpectedUnBalancedNodes(
       double threshold) {
     double lowerLimit = averageUtilization - threshold;
     double upperLimit = averageUtilization + threshold;
 
     // use node utilizations to determine over and under utilized nodes
-    List<DatanodeUsageInfo> expectedSourceNodes = new ArrayList<>();
+    List<DatanodeUsageInfo> expectedUnBalancedNodes = new ArrayList<>();
     for (int i = 0; i < numberOfNodes; i++) {
       if (nodeUtilizations.get(numberOfNodes - i - 1) > upperLimit) {
-        expectedSourceNodes.add(nodesInCluster.get(numberOfNodes - i - 1));
+        expectedUnBalancedNodes.add(nodesInCluster.get(numberOfNodes - i - 1));
       }
     }
     for (int i = 0; i < numberOfNodes; i++) {
       if (nodeUtilizations.get(i) < lowerLimit) {
-        expectedSourceNodes.add(nodesInCluster.get(i));
+        expectedUnBalancedNodes.add(nodesInCluster.get(i));
       }
     }
-    return expectedSourceNodes;
+    return expectedUnBalancedNodes;
   }
 
   /**
