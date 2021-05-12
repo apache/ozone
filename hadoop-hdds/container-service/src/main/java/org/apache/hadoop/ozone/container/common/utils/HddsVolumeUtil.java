@@ -24,6 +24,8 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.InconsistentStorageStateException;
 import org.apache.hadoop.ozone.container.common.DataNodeLayoutVersion;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.util.ExitUtil;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
@@ -233,5 +235,14 @@ public final class HddsVolumeUtil {
       return false;
     }
 
+  }
+
+  public static void onFailure(HddsVolume volume) {
+    if (volume != null) {
+      VolumeSet volumeSet = volume.getVolumeSet();
+      if (volumeSet != null && volumeSet instanceof MutableVolumeSet) {
+        ((MutableVolumeSet) volumeSet).checkVolumeAsync(volume);
+      }
+    }
   }
 }

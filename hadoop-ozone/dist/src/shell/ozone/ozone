@@ -132,7 +132,6 @@ function ozonecmd_case
     freon)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.freon.Freon
       OZONE_FREON_OPTS="${OZONE_FREON_OPTS}"
-      OZONE_OPTS="${OZONE_OPTS} ${OZONE_FREON_OPTS}"
       OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
     genesis)
@@ -168,7 +167,6 @@ function ozonecmd_case
       OZONE_CLASSNAME=org.apache.hadoop.ozone.shell.OzoneShell
       ozone_deprecate_envvar HDFS_OM_SH_OPTS OZONE_SH_OPTS
       OZONE_SH_OPTS="${OZONE_SH_OPTS} -Dhadoop.log.file=ozone-shell.log -Dlog4j.configuration=file:${ozone_shell_log4j}"
-      OZONE_OPTS="${OZONE_OPTS} ${OZONE_SH_OPTS}"
       OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
     s3)
@@ -205,7 +203,7 @@ function ozonecmd_case
     ;;
     daemonlog)
       OZONE_CLASSNAME=org.apache.hadoop.log.LogLevel
-      OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-tools"
+      OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
     insight)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.insight.Insight
@@ -292,14 +290,14 @@ ozone_assemble_classpath
 
 ozone_add_client_opts
 
-ozone_add_default_gc_opts
-
 if [[ ${OZONE_WORKER_MODE} = true ]]; then
   ozone_worker_mode_execute "${OZONE_HOME}/bin/ozone" "${OZONE_USER_PARAMS[@]}"
   exit $?
 fi
 
 ozone_subcommand_opts "${OZONE_SHELL_EXECNAME}" "${OZONE_SUBCMD}"
+
+ozone_add_default_gc_opts
 
 # everything is in globals at this point, so call the generic handler
 ozone_generic_java_subcmd_handler

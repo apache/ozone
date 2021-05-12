@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.scm.ha.HASecurityUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMHANodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -51,6 +52,7 @@ import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
+import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.Client;
@@ -322,6 +324,40 @@ public final class TestSecureOzoneCluster {
           finalScmSecurityProtocolClient::getCACertificate);
       LambdaTestUtils.intercept(IOException.class, cannotAuthMessage,
           () -> finalScmSecurityProtocolClient.getCertificate("1"));
+    } finally {
+      if (scm != null) {
+        scm.stop();
+      }
+    }
+  }
+
+  @Test
+  public void testAdminAccessControlException() throws Exception {
+    initSCM();
+    scm = TestUtils.getScmSimple(conf);
+    //Reads the SCM Info from SCM instance
+    try {
+      scm.start();
+
+      //case 1: Run admin command with non-admin user.
+      UserGroupInformation ugi =
+          UserGroupInformation.loginUserFromKeytabAndReturnUGI(
+          testUserPrincipal, testUserKeytab.getCanonicalPath());
+      StorageContainerLocationProtocol scmRpcClient =
+          HAUtils.getScmContainerClient(conf, ugi);
+      LambdaTestUtils.intercept(IOException.class, "Access denied",
+          scmRpcClient::forceExitSafeMode);
+
+
+      // Case 2: User without Kerberos credentials should fail.
+      ugi = UserGroupInformation.createRemoteUser("test");
+      ugi.setAuthenticationMethod(AuthMethod.TOKEN);
+      scmRpcClient =
+          HAUtils.getScmContainerClient(conf, ugi);
+
+      String cannotAuthMessage = "Client cannot authenticate via:[KERBEROS]";
+      LambdaTestUtils.intercept(IOException.class, cannotAuthMessage,
+          scmRpcClient::forceExitSafeMode);
     } finally {
       if (scm != null) {
         scm.stop();

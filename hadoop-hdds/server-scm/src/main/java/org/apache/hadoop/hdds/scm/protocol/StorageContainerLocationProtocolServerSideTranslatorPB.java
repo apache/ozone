@@ -42,6 +42,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerWithPipelineBatchRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerWithPipelineBatchResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetExistContainerWithPipelinesInBatchRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetExistContainerWithPipelinesInBatchResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerWithPipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerWithPipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetPipelineRequestProto;
@@ -78,6 +80,7 @@ import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdds.scm.ha.RatisUtil;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -140,9 +143,9 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     // not leader or not belong to admin command.
     if (!scm.getScmContext().isLeader()
         && !ADMIN_COMMAND_TYPE.contains(request.getCmdType())) {
-      throw new ServiceException(scm.getScmHAManager()
-                                    .getRatisServer()
-                                    .triggerNotLeaderException());
+      RatisUtil.checkRatisException(
+          scm.getScmHAManager().getRatisServer().triggerNotLeaderException(),
+          scm.getClientRpcPort(), scm.getScmId());
     }
     return dispatcher
         .processRequest(request, this::processRequest, request.getCmdType(),
@@ -183,6 +186,15 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setGetContainerWithPipelineBatchResponse(
                 getContainerWithPipelineBatch(
                     request.getGetContainerWithPipelineBatchRequest(),
+                    request.getVersion()))
+            .build();
+      case GetExistContainerWithPipelinesInBatch:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setGetExistContainerWithPipelinesInBatchResponse(
+                getExistContainerWithPipelinesInBatch(
+                    request.getGetExistContainerWithPipelinesInBatchRequest(),
                     request.getVersion()))
             .build();
       case ListContainer:
@@ -329,6 +341,8 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             "Unknown command type: " + request.getCmdType());
       }
     } catch (IOException e) {
+      RatisUtil
+          .checkRatisException(e, scm.getClientRpcPort(), scm.getScmId());
       throw new ServiceException(e);
     }
   }
@@ -371,6 +385,20 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
         .getContainerWithPipelineBatch(request.getContainerIDsList());
     GetContainerWithPipelineBatchResponseProto.Builder builder =
         GetContainerWithPipelineBatchResponseProto.newBuilder();
+    for (ContainerWithPipeline container : containers) {
+      builder.addContainerWithPipelines(container.getProtobuf(clientVersion));
+    }
+    return builder.build();
+  }
+
+  public GetExistContainerWithPipelinesInBatchResponseProto
+      getExistContainerWithPipelinesInBatch(
+      GetExistContainerWithPipelinesInBatchRequestProto request,
+      int clientVersion) throws IOException {
+    List<ContainerWithPipeline> containers = impl
+        .getExistContainerWithPipelinesInBatch(request.getContainerIDsList());
+    GetExistContainerWithPipelinesInBatchResponseProto.Builder builder =
+        GetExistContainerWithPipelinesInBatchResponseProto.newBuilder();
     for (ContainerWithPipeline container : containers) {
       builder.addContainerWithPipelines(container.getProtobuf(clientVersion));
     }

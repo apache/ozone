@@ -314,6 +314,22 @@ public class SCMClientProtocolServer implements
 
     return cpList;
   }
+
+  @Override
+  public List<ContainerWithPipeline> getExistContainerWithPipelinesInBatch(
+      List<Long> containerIDs) {
+    List<ContainerWithPipeline> cpList = new ArrayList<>();
+    for (Long containerID : containerIDs) {
+      try {
+        ContainerWithPipeline cp = getContainerWithPipelineCommon(containerID);
+        cpList.add(cp);
+      } catch (IOException ex) {
+        //not found , just go ahead
+      }
+    }
+    return cpList;
+  }
+
   /**
    * Check if container reported replicas are equal or greater than required
    * replication factor.

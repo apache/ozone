@@ -39,6 +39,7 @@ import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
 import org.apache.hadoop.ozone.common.InconsistentStorageStateException;
 import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume.VolumeState;
 import org.apache.hadoop.util.DiskChecker;
@@ -88,8 +89,6 @@ public class MutableVolumeSet implements VolumeSet {
   private final ScheduledFuture<?> periodicDiskChecker;
   private final SpaceUsageCheckFactory usageCheckFactory;
 
-  private static final long DISK_CHECK_INTERVAL_MINUTES = 15;
-
   /**
    * A Reentrant Read Write Lock to synchronize volume operations in VolumeSet.
    * Any update to {@link #volumeMap}, {@link #failedVolumeMap}, or
@@ -123,6 +122,11 @@ public class MutableVolumeSet implements VolumeSet {
             t.setDaemon(true);
             return t;
         });
+
+    DatanodeConfiguration dnConf =
+        conf.getObject(DatanodeConfiguration.class);
+    long periodicDiskCheckIntervalMinutes =
+        dnConf.getPeriodicDiskCheckIntervalMinutes();
     this.periodicDiskChecker =
       diskCheckerservice.scheduleWithFixedDelay(() -> {
         try {
@@ -130,7 +134,7 @@ public class MutableVolumeSet implements VolumeSet {
         } catch (IOException e) {
           LOG.warn("Exception while checking disks", e);
         }
-      }, DISK_CHECK_INTERVAL_MINUTES, DISK_CHECK_INTERVAL_MINUTES,
+      }, periodicDiskCheckIntervalMinutes, periodicDiskCheckIntervalMinutes,
         TimeUnit.MINUTES);
 
     usageCheckFactory = SpaceUsageCheckFactory.create(conf);
@@ -161,7 +165,7 @@ public class MutableVolumeSet implements VolumeSet {
   }
 
   @VisibleForTesting
-  HddsVolumeChecker getVolumeChecker() {
+  public HddsVolumeChecker getVolumeChecker() {
     return volumeChecker;
   }
 
@@ -284,6 +288,19 @@ public class MutableVolumeSet implements VolumeSet {
     // 2. Handle Ratis log disk failure.
   }
 
+  public void checkVolumeAsync(HddsVolume volume) {
+    volumeChecker.checkVolume(
+        volume, (healthyVolumes, failedVolumes) -> {
+          if (failedVolumes.size() > 0) {
+            LOG.warn("checkVolumeAsync callback got {} failed volumes: {}",
+                failedVolumes.size(), failedVolumes);
+          } else {
+            LOG.debug("checkVolumeAsync: no volume failures detected");
+          }
+          handleVolumeFailures(failedVolumes);
+        });
+  }
+
   /**
    * If Version file exists and the {@link #clusterID} is not set yet,
    * assign it the value from Version file. Otherwise, check that the given
@@ -349,7 +366,8 @@ public class MutableVolumeSet implements VolumeSet {
         .datanodeUuid(datanodeUuid)
         .clusterID(clusterID)
         .usageCheckFactory(usageCheckFactory)
-        .storageType(storageType);
+        .storageType(storageType)
+        .volumeSet(this);
     return volumeBuilder.build();
   }
 

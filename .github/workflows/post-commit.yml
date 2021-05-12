@@ -24,6 +24,7 @@ env:
 jobs:
   compile:
     runs-on: ubuntu-18.04
+    timeout-minutes: 30
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     strategy:
       matrix:
@@ -70,6 +71,7 @@ jobs:
         if: always()
   basic:
     runs-on: ubuntu-18.04
+    timeout-minutes: 40
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     strategy:
       matrix:
@@ -77,6 +79,7 @@ jobs:
           - author
           - bats
           - checkstyle
+          - docs
           - findbugs
           - rat
           - unit
@@ -93,7 +96,7 @@ jobs:
             maven-repo-${{ hashFiles('**/pom.xml') }}-8
             maven-repo-${{ hashFiles('**/pom.xml') }}
             maven-repo-
-        if: ${{ !contains('author,bats', matrix.check) }}
+        if: ${{ !contains('author,bats,docs', matrix.check) }}
       - name: Execute tests
         run: hadoop-ozone/dev-support/checks/${{ matrix.check }}.sh
       - name: Summary of failures
@@ -112,9 +115,37 @@ jobs:
           rm -rf ~/.m2/repository/org/apache/ozone/hdds*
           rm -rf ~/.m2/repository/org/apache/ozone/ozone*
         if: always()
+  dependency:
+    needs: compile
+    runs-on: ubuntu-18.04
+    timeout-minutes: 5
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v2
+      - name: Download compiled Ozone binaries
+        uses: actions/download-artifact@v2
+        with:
+          name: ozone-bin
+      - name: Untar binaries
+        run: |
+          mkdir dist
+          tar  -C dist --strip-components 1 -xzf hadoop-ozone*.tar.gz
+      - name: Execute tests
+        run: |
+          export OZONE_DIST_DIR=`pwd`/dist
+          ./hadoop-ozone/dev-support/checks/dependency.sh
+      - name: Archive build results
+        uses: actions/upload-artifact@v2
+        if: always()
+        with:
+          name: dependency
+          path: target/dependency
+        continue-on-error: true
   acceptance:
     needs: compile
     runs-on: ubuntu-18.04
+    timeout-minutes: 120
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     strategy:
       matrix:
@@ -159,6 +190,7 @@ jobs:
         continue-on-error: true
   integration:
     runs-on: ubuntu-18.04
+    timeout-minutes: 100
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     strategy:
       matrix:
@@ -190,6 +222,7 @@ jobs:
         continue-on-error: true
   coverage:
     runs-on: ubuntu-18.04
+    timeout-minutes: 30
     if: github.repository == 'apache/ozone' && github.event_name != 'pull_request'
     needs:
       - acceptance
@@ -235,6 +268,7 @@ jobs:
   kubernetes:
     needs: compile
     runs-on: ubuntu-18.04
+    timeout-minutes: 60
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     steps:
       - name: Checkout project
