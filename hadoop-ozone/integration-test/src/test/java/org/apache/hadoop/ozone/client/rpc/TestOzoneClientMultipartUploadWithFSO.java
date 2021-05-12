@@ -562,8 +562,9 @@ public class TestOzoneClientMultipartUploadWithFSO {
 
     bucket.abortMultipartUpload(keyName, uploadID);
 
-    String multipartOpenKey = getMultipartKey(uploadID, volumeName, bucketName,
-        keyName, metadataMgr);
+    String multipartOpenKey =
+        getMultipartOpenKey(uploadID, volumeName, bucketName, keyName,
+            metadataMgr);
     OmKeyInfo omKeyInfo = metadataMgr.getOpenKeyTable().get(multipartOpenKey);
     OmMultipartKeyInfo omMultipartKeyInfo =
         metadataMgr.getMultipartInfoTable().get(multipartKey);
@@ -913,8 +914,9 @@ public class TestOzoneClientMultipartUploadWithFSO {
   private String verifyUploadedPart(String volumeName, String bucketName,
       String keyName, String uploadID, String partName,
       OMMetadataManager metadataMgr) throws IOException {
-    String multipartOpenKey = getMultipartKey(uploadID, volumeName, bucketName,
-        keyName, metadataMgr);
+    String multipartOpenKey =
+        getMultipartOpenKey(uploadID, volumeName, bucketName, keyName,
+            metadataMgr);
 
     String multipartKey = metadataMgr.getMultipartKey(volumeName, bucketName,
         keyName, uploadID);
@@ -946,9 +948,9 @@ public class TestOzoneClientMultipartUploadWithFSO {
     return multipartKey;
   }
 
-  private String getMultipartKey(String multipartUploadID, String volumeName,
-      String bucketName, String keyName, OMMetadataManager omMetadataManager)
-      throws IOException {
+  private String getMultipartOpenKey(String multipartUploadID,
+      String volumeName, String bucketName, String keyName,
+      OMMetadataManager omMetadataManager) throws IOException {
 
     String fileName = OzoneFSUtils.getFileName(keyName);
     long parentID = getParentID(volumeName, bucketName, keyName,

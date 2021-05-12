@@ -70,6 +70,7 @@ public class S3MultipartUploadCommitPartRequestWithFSO
         omMetadataManager, openKey, keyName);
   }
 
+  @Override
   @SuppressWarnings("checkstyle:ParameterNumber")
   protected S3MultipartUploadCommitPartResponse getOmClientResponse(
       OzoneManager ozoneManager,

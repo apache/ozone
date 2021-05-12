@@ -124,6 +124,7 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
     testNonRecursivePath(key, false, false, true);
   }
 
+  @Override
   protected OmKeyInfo verifyPathInOpenKeyTable(String key, long id,
                                              boolean doAssert)
           throws Exception {
@@ -189,6 +190,7 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
     return config;
   }
 
+  @Override
   protected OMFileCreateRequest getOMFileCreateRequest(OMRequest omRequest) {
     return new OMFileCreateRequestWithFSO(omRequest);
   }

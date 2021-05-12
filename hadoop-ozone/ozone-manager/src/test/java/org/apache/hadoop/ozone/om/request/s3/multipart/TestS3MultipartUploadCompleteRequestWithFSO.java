@@ -49,6 +49,7 @@ public class TestS3MultipartUploadCompleteRequestWithFSO
     OzoneManagerRatisUtils.setBucketFSOptimized(true);
   }
 
+  @Override
   protected String getKeyName() {
     String parentDir = UUID.randomUUID().toString() + "/a/b/c";
     String fileName = "file1";
@@ -56,6 +57,7 @@ public class TestS3MultipartUploadCompleteRequestWithFSO
     return keyName;
   }
 
+  @Override
   protected void addKeyToTable(String volumeName, String bucketName,
       String keyName, long clientID) throws Exception {
     // need to initialize parentID
@@ -81,6 +83,7 @@ public class TestS3MultipartUploadCompleteRequestWithFSO
             omMetadataManager);
   }
 
+  @Override
   protected String getMultipartKey(String volumeName, String bucketName,
       String keyName, String multipartUploadID) throws IOException {
     OzoneFileStatus keyStatus = OMFileRequest.getOMKeyInfoIfExists(
@@ -106,6 +109,7 @@ public class TestS3MultipartUploadCompleteRequestWithFSO
             elements, keyName, omMetadataManager);
   }
 
+  @Override
   protected String getOzoneDBKey(String volumeName, String bucketName,
                                  String keyName) throws IOException {
     long parentID = getParentID(volumeName, bucketName, keyName);
@@ -113,16 +117,19 @@ public class TestS3MultipartUploadCompleteRequestWithFSO
     return omMetadataManager.getOzonePathKey(parentID, fileName);
   }
 
+  @Override
   protected S3MultipartUploadCompleteRequest getS3MultipartUploadCompleteReq(
           OMRequest omRequest) {
     return new S3MultipartUploadCompleteRequestWithFSO(omRequest);
   }
 
+  @Override
   protected S3MultipartUploadCommitPartRequest getS3MultipartUploadCommitReq(
           OMRequest omRequest) {
     return new S3MultipartUploadCommitPartRequestWithFSO(omRequest);
   }
 
+  @Override
   protected S3InitiateMultipartUploadRequest getS3InitiateMultipartUploadReq(
           OMRequest initiateMPURequest) {
     return new S3InitiateMultipartUploadRequestWithFSO(initiateMPURequest);

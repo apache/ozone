@@ -41,11 +41,13 @@ import java.util.NoSuchElementException;
  */
 public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
 
+  @Override
   protected OMKeyDeleteRequest getOmKeyDeleteRequest(
       OMRequest modifiedOmRequest) {
     return new OMKeyDeleteRequestWithFSO(modifiedOmRequest);
   }
 
+  @Override
   protected String addKeyToTable() throws Exception {
     String parentDir = "c/d/e";
     String fileName = "file1";

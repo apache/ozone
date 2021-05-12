@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.om.response.key;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
@@ -36,10 +35,10 @@ import org.junit.Assert;
 public class TestOMKeyCommitResponseWithFSO extends TestOMKeyCommitResponse {
 
   @NotNull
-  protected OMKeyCommitResponse getOmKeyCommitResponse(
-          OmVolumeArgs omVolumeArgs, OmKeyInfo omKeyInfo,
-          OzoneManagerProtocolProtos.OMResponse omResponse, String openKey,
-          String ozoneKey) {
+  @Override
+  protected OMKeyCommitResponse getOmKeyCommitResponse(OmKeyInfo omKeyInfo,
+      OzoneManagerProtocolProtos.OMResponse omResponse, String openKey,
+      String ozoneKey) {
     Assert.assertNotNull(omBucketInfo);
     return new OMKeyCommitResponseWithFSO(omResponse, omKeyInfo, ozoneKey,
         openKey, omBucketInfo);

@@ -38,10 +38,12 @@ public class TestS3MultipartUploadAbortResponseWithFSO
 
   private long parentID = 1027;
 
+  @Override
   protected String getKeyName() {
     return dirName + UUID.randomUUID().toString();
   }
 
+  @Override
   protected String getMultipartOpenKey(String volumeName, String bucketName,
       String keyName, String multipartUploadID) {
     String fileName = StringUtils.substringAfter(keyName, dirName);
@@ -49,6 +51,7 @@ public class TestS3MultipartUploadAbortResponseWithFSO
         multipartUploadID);
   }
 
+  @Override
   protected S3InitiateMultipartUploadResponse getS3InitiateMultipartUploadResp(
       OmMultipartKeyInfo multipartKeyInfo, OmKeyInfo omKeyInfo,
       OzoneManagerProtocolProtos.OMResponse omResponse) {
@@ -62,6 +65,7 @@ public class TestS3MultipartUploadAbortResponseWithFSO
         multipartKeyInfo, omKeyInfo, mpuDBKey, new ArrayList<>());
   }
 
+  @Override
   protected S3MultipartUploadAbortResponse getS3MultipartUploadAbortResp(
       String multipartKey, String multipartOpenKey,
       OmMultipartKeyInfo omMultipartKeyInfo, OmBucketInfo omBucketInfo,

@@ -53,6 +53,7 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
     return config;
   }
 
+  @Override
   protected void addToKeyTable(String keyName) throws Exception {
     Path keyPath = Paths.get(keyName);
     long parentId = checkIntermediatePaths(keyPath);
@@ -67,6 +68,7 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
             fileName, omKeyInfo, -1, 50, omMetadataManager);
   }
 
+  @Override
   protected void checkCreatedPaths(OMKeyCreateRequest omKeyCreateRequest,
       OMRequest omRequest, String keyName) throws Exception {
     keyName = omKeyCreateRequest.validateAndNormalizeKey(true, keyName);
@@ -84,6 +86,7 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
     Assert.assertNotNull(omKeyInfo);
   }
 
+  @Override
   protected long checkIntermediatePaths(Path keyPath) throws Exception {
     // Check intermediate paths are created
     keyPath = keyPath.getParent(); // skip the file name
@@ -112,6 +115,7 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
     return lastKnownParentId;
   }
 
+  @Override
   protected String getOpenKey(long id) throws IOException {
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
     OmBucketInfo omBucketInfo =
@@ -124,6 +128,7 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
     }
   }
 
+  @Override
   protected OMKeyCreateRequest getOMKeyCreateRequest(OMRequest omRequest) {
     return new OMKeyCreateRequestWithFSO(omRequest);
   }

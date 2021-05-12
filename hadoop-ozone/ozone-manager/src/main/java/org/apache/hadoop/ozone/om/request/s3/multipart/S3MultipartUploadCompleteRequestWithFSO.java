@@ -71,9 +71,10 @@ public class S3MultipartUploadCompleteRequestWithFSO
     }
   }
 
+  @Override
   protected OmKeyInfo getOmKeyInfoFromKeyTable(String dbOzoneFileKey,
       String keyName, OMMetadataManager omMetadataManager) throws IOException {
-    return OMFileRequest.getOmKeyInfoFromFileTable(true,
+    return OMFileRequest.getOmKeyInfoFromFileTable(false,
             omMetadataManager, dbOzoneFileKey, keyName);
   }
 
@@ -134,6 +135,7 @@ public class S3MultipartUploadCompleteRequestWithFSO
     return omMetadataManager.getMultipartKey(parentId, fileName, uploadID);
   }
 
+  @Override
   protected S3MultipartUploadCompleteResponse getOmClientResponse(
       OzoneManagerProtocolProtos.OMResponse.Builder omResponse,
       IOException exception) {
