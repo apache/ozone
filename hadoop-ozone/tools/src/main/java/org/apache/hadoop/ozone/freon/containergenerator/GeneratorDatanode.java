@@ -128,7 +128,7 @@ public class GeneratorDatanode extends BaseGenerator {
 
     BlockManager blockManager = new BlockManagerImpl(config);
     chunkManager = ChunkManagerFactory
-        .createChunkManager(config, blockManager);
+        .createChunkManager(config, blockManager, null);
 
     final Collection<String> storageDirs =
         MutableVolumeSet.getDatanodeStorageDirs(config);
