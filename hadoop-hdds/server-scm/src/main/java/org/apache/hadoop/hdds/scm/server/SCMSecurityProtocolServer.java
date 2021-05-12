@@ -52,9 +52,9 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateServer;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
+import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.security.KerberosInfo;
 
@@ -343,14 +343,13 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
   }
 
   @Override
-  public long revokeCertificates(List<Long> certIds, int reason,
+  public long revokeCertificates(List<String> certIds, int reason,
       long revocationTime) throws IOException {
     storageContainerManager.checkAdminAccess(getRpcRemoteUser());
 
     Future<Optional<Long>> revoked = scmCertificateServer.revokeCertificates(
-        certIds.stream().map(id -> BigInteger.valueOf(id))
-            .collect(Collectors.toList()),
-        CRLReason.lookup(reason),
+        certIds.stream().map(id -> new BigInteger(id))
+            .collect(Collectors.toList()), CRLReason.lookup(reason),
         new Date(revocationTime));
     try {
       return revoked.get().get().longValue();

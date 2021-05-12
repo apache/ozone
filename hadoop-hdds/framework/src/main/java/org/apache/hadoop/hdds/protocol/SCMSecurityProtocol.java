@@ -156,6 +156,6 @@ public interface SCMSecurityProtocol {
    * @return
    * @throws IOException
    */
-  long revokeCertificates(List<Long> certIds, int reason, long revocationTime)
+  long revokeCertificates(List<String> certIds, int reason, long revocationTime)
       throws IOException;
 }

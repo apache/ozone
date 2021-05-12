@@ -359,7 +359,7 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
   }
 
   @Override
-  public long revokeCertificates(List<Long> certIds, int reason,
+  public long revokeCertificates(List<String> certIds, int reason,
       long revocationTime) throws IOException {
     SCMRevokeCertificatesRequestProto req = SCMRevokeCertificatesRequestProto
         .newBuilder().addAllCertIds(certIds)

@@ -230,7 +230,7 @@ message SCMRevokeCertificatesRequestProto {
         privilegeWithdrawn = 9;
         aACompromise = 10;
     };
-    repeated int64 certIds = 1;
+    repeated string certIds = 1;
     optional Reason reason = 2 [default = unspecified];
     optional uint64 revokeTime = 3;
 }
