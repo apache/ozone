@@ -145,14 +145,9 @@ public class SCMHAManagerImpl implements SCMHAManager {
     return (SCMHADBTransactionBuffer)transactionBuffer;
 
   }
-  /**
-   * Download and install latest checkpoint from leader SCM.
-   *
-   * @param leaderId peerNodeID of the leader SCM
-   * @return If checkpoint is installed successfully, return the
-   *         corresponding termIndex. Otherwise, return null.
-   */
-  public TermIndex installSnapshotFromLeader(String leaderId) {
+
+  @Override
+  public DBCheckpoint downloadCheckpointFromLeader(String leaderId) {
     if (scmSnapshotProvider == null) {
       LOG.error("SCM Snapshot Provider is not configured as there are no peer "
           + "nodes.");
@@ -162,14 +157,43 @@ public class SCMHAManagerImpl implements SCMHAManager {
     DBCheckpoint dBCheckpoint = getDBCheckpointFromLeader(leaderId);
     LOG.info("Downloaded checkpoint from Leader {} to the location {}",
         leaderId, dBCheckpoint.getCheckpointLocation());
+    return dBCheckpoint;
+  }
 
-    TermIndex termIndex = null;
+  @Override
+  public TermIndex verifyCheckpointFromLeader(String leaderId,
+                                              DBCheckpoint checkpoint) {
     try {
-      termIndex = installCheckpoint(leaderId, dBCheckpoint);
+      Path checkpointLocation = checkpoint.getCheckpointLocation();
+      TransactionInfo checkpointTxnInfo = HAUtils
+          .getTrxnInfoFromCheckpoint(OzoneConfiguration.of(conf),
+              checkpointLocation, new SCMDBDefinition());
+
+      LOG.info("Installing checkpoint with SCMTransactionInfo {}",
+          checkpointTxnInfo);
+
+      TermIndex termIndex =
+          getRatisServer().getSCMStateMachine().getLastAppliedTermIndex();
+      long lastAppliedIndex = termIndex.getIndex();
+
+      // Check if current applied log index is smaller than the downloaded
+      // checkpoint transaction index. If yes, proceed by stopping the ratis
+      // server so that the SCM state can be re-initialized. If no then do not
+      // proceed with installSnapshot.
+      boolean canProceed = HAUtils.verifyTransactionInfo(checkpointTxnInfo,
+          lastAppliedIndex, leaderId, checkpointLocation, LOG);
+
+      if (!canProceed) {
+        LOG.warn("Cannot proceed with InstallSnapshot as SCM is at TermIndex {}"
+            + " and checkpoint has lower TermIndex {}. Reloading old"
+            + " state of SCM.", termIndex, checkpointTxnInfo.getTermIndex());
+        return null;
+      }
+      return checkpointTxnInfo.getTermIndex();
     } catch (Exception ex) {
       LOG.error("Failed to install snapshot from Leader SCM.", ex);
+      return null;
     }
-    return termIndex;
   }
 
   /**
@@ -191,14 +215,8 @@ public class SCMHAManagerImpl implements SCMHAManager {
     return null;
   }
 
-  /**
-   * Install checkpoint. If the checkpoints snapshot index is greater than
-   * SCM's last applied transaction index, then re-initialize the SCM
-   * state via this checkpoint. Before re-initializing SCM state, the SCM Ratis
-   * server should be stopped so that no new transactions can be applied.
-   */
-  @VisibleForTesting
-  public TermIndex installCheckpoint(String leaderId, DBCheckpoint dbCheckpoint)
+  @Override
+  public TermIndex installCheckpoint(DBCheckpoint dbCheckpoint)
       throws Exception {
 
     Path checkpointLocation = dbCheckpoint.getCheckpointLocation();
@@ -209,90 +227,83 @@ public class SCMHAManagerImpl implements SCMHAManager {
     LOG.info("Installing checkpoint with SCMTransactionInfo {}",
         checkpointTrxnInfo);
 
-    return installCheckpoint(leaderId, checkpointLocation, checkpointTrxnInfo);
+    return installCheckpoint(checkpointLocation, checkpointTrxnInfo);
   }
 
-  public TermIndex installCheckpoint(String leaderId, Path checkpointLocation,
-      TransactionInfo checkpointTrxnInfo) throws Exception {
-
-    File dbBackup = null;
+  public TermIndex installCheckpoint(Path checkpointLocation,
+      TransactionInfo checkpointTxnInfo) throws Exception {
+    // we have passed verification of the termIndex of checkpoint
+    // in verifyCheckpointFromLeader
     TermIndex termIndex =
         getRatisServer().getSCMStateMachine().getLastAppliedTermIndex();
-    long term = termIndex.getTerm();
-    long lastAppliedIndex = termIndex.getIndex();
-    // Check if current applied log index is smaller than the downloaded
-    // checkpoint transaction index. If yes, proceed by stopping the ratis
-    // server so that the SCM state can be re-initialized. If no then do not
-    // proceed with installSnapshot.
-    boolean canProceed = HAUtils
-        .verifyTransactionInfo(checkpointTrxnInfo, lastAppliedIndex, leaderId,
-            checkpointLocation, LOG);
-    File oldDBLocation = scm.getScmMetadataStore().getStore().getDbLocation();
-    if (canProceed) {
-      try {
-        // Stop services
-        stopServices();
+    if (checkpointTxnInfo.getTermIndex().compareTo(termIndex) < 0) {
+      LOG.warn("Cannot proceed with InstallSnapshot as SCM is at TermIndex {} "
+          + "and checkpoint has lower TermIndex {}. Reloading old "
+          + "state of SCM.", termIndex, checkpointTxnInfo.getTermIndex());
+      throw new IOException("checkpoint is too older to install.");
+    }
 
-        // Pause the State Machine so that no new transactions can be applied.
-        // This action also clears the SCM Double Buffer so that if there
-        // are any pending transactions in the buffer, they are discarded.
-        getRatisServer().getSCMStateMachine().pause();
-      } catch (Exception e) {
-        LOG.error("Failed to stop/ pause the services. Cannot proceed with "
-            + "installing the new checkpoint.");
-        startServices();
-        throw e;
-      }
+    long term = checkpointTxnInfo.getTerm();
+    long lastAppliedIndex = checkpointTxnInfo.getTransactionIndex();
+
+    File oldDBLocation = scm.getScmMetadataStore().getStore().getDbLocation();
+
+    try {
+      // Stop services
+      stopServices();
+    } catch (Exception e) {
+      LOG.error("Failed to stop/ pause the services. Cannot proceed with "
+          + "installing the new checkpoint.");
+      startServices();
+      throw e;
+    }
+
+    File dbBackup = null;
+    try {
+      dbBackup = HAUtils
+          .replaceDBWithCheckpoint(lastAppliedIndex, oldDBLocation,
+              checkpointLocation, OzoneConsts.SCM_DB_BACKUP_PREFIX);
+      LOG.info("Replaced DB with checkpoint, term: {}, index: {}",
+          term, lastAppliedIndex);
+    } catch (Exception e) {
+      LOG.error("Failed to install Snapshot as SCM failed to replace"
+          + " DB with downloaded checkpoint. Reloading old SCM state.", e);
+    }
+    // Reload the DB store with the new checkpoint.
+    // Restart (unpause) the state machine and update its last applied index
+    // to the installed checkpoint's snapshot index.
+    try {
+      reloadSCMState();
+      LOG.info("Reloaded SCM state with Term: {} and Index: {}", term,
+          lastAppliedIndex);
+    } catch (Exception ex) {
       try {
-        dbBackup = HAUtils
-            .replaceDBWithCheckpoint(lastAppliedIndex, oldDBLocation,
-                checkpointLocation, OzoneConsts.SCM_DB_BACKUP_PREFIX);
-        term = checkpointTrxnInfo.getTerm();
-        lastAppliedIndex = checkpointTrxnInfo.getTransactionIndex();
-        LOG.info(
-            "Replaced DB with checkpoint from SCM: {}, term: {}, index: {}",
-            leaderId, term, lastAppliedIndex);
-      } catch (Exception e) {
-        LOG.error("Failed to install Snapshot from {} as SCM failed to replace"
-            + " DB with downloaded checkpoint. Reloading old SCM state.", e);
-      }
-      // Reload the DB store with the new checkpoint.
-      // Restart (unpause) the state machine and update its last applied index
-      // to the installed checkpoint's snapshot index.
-      try {
-        reloadSCMState();
-        getRatisServer().getSCMStateMachine().unpause(term, lastAppliedIndex);
-        LOG.info("Reloaded SCM state with Term: {} and Index: {}", term,
-            lastAppliedIndex);
-      } catch (Exception ex) {
+        // revert to the old db, since the new db may be a corrupted one,
+        // so that SCM can restart from the old db.
+        if (dbBackup != null) {
+          dbBackup = HAUtils
+              .replaceDBWithCheckpoint(lastAppliedIndex, oldDBLocation,
+                  dbBackup.toPath(), OzoneConsts.SCM_DB_BACKUP_PREFIX);
+          startServices();
+        }
+      } finally {
         String errorMsg =
             "Failed to reload SCM state and instantiate services.";
         exitManager.exitSystem(1, errorMsg, ex, LOG);
       }
+    }
 
-      // Delete the backup DB
-      try {
-        if (dbBackup != null) {
-          FileUtils.deleteFully(dbBackup);
-        }
-      } catch (Exception e) {
-        LOG.error("Failed to delete the backup of the original DB {}",
-            dbBackup);
+    // Delete the backup DB
+    try {
+      if (dbBackup != null) {
+        FileUtils.deleteFully(dbBackup);
       }
-    } else {
-      LOG.warn("Cannot proceed with InstallSnapshot as SCM is at TermIndex {} "
-          + "and checkpoint has lower TermIndex {}. Reloading old "
-          + "state of SCM.", termIndex, checkpointTrxnInfo.getTermIndex());
+    } catch (Exception e) {
+      LOG.error("Failed to delete the backup of the original DB {}",
+          dbBackup);
     }
 
-    if (lastAppliedIndex != checkpointTrxnInfo.getTransactionIndex()) {
-      // Install Snapshot failed and old state was reloaded. Return null to
-      // Ratis to indicate that installation failed.
-      return null;
-    }
-
-    TermIndex newTermIndex = TermIndex.valueOf(term, lastAppliedIndex);
-    return newTermIndex;
+    return checkpointTxnInfo.getTermIndex();
   }
 
 
