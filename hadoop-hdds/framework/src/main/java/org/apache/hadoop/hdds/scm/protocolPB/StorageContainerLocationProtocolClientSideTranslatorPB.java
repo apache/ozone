@@ -37,6 +37,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ForceExitSafeModeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ForceExitSafeModeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerTokenRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerTokenResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerWithPipelineBatchRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerWithPipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetPipelineRequestProto;
@@ -69,6 +71,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -79,6 +82,7 @@ import org.apache.hadoop.io.retry.RetryProxy;
 import org.apache.hadoop.ipc.ProtobufHelper;
 import org.apache.hadoop.ipc.ProtocolTranslator;
 import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.security.token.Token;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -717,6 +721,21 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
         .getDatanodeUsageInfoResponse();
 
     return response.getInfoList();
+  }
+
+  @Override
+  public Token<?> getContainerToken(
+      ContainerID containerID) throws IOException {
+    GetContainerTokenRequestProto request =
+        GetContainerTokenRequestProto.newBuilder()
+            .setContainerID(containerID.getProtobuf())
+        .build();
+
+    GetContainerTokenResponseProto response =
+        submitRequest(Type.GetContainerToken,
+            builder -> builder.setContainerTokenRequest(request))
+        .getContainerTokenResponse();
+    return OzonePBHelper.tokenFromProto(response.getToken());
   }
 
   @Override

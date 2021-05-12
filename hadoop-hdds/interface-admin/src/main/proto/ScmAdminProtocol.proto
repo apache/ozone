@@ -67,6 +67,7 @@ message ScmContainerLocationRequest {
   optional RecommissionNodesRequestProto recommissionNodesRequest = 28;
   optional StartMaintenanceNodesRequestProto startMaintenanceNodesRequest = 29;
   optional DatanodeUsageInfoRequestProto DatanodeUsageInfoRequest = 30;
+  optional GetContainerTokenRequestProto containerTokenRequest = 32;
 }
 
 message ScmContainerLocationResponse {
@@ -105,6 +106,7 @@ message ScmContainerLocationResponse {
   optional RecommissionNodesResponseProto recommissionNodesResponse = 28;
   optional StartMaintenanceNodesResponseProto startMaintenanceNodesResponse = 29;
   optional DatanodeUsageInfoResponseProto DatanodeUsageInfoResponse = 30;
+  optional GetContainerTokenResponseProto containerTokenResponse = 32;
   enum Status {
     OK = 1;
     CONTAINER_ALREADY_EXISTS = 2;
@@ -140,6 +142,7 @@ enum Type {
   RecommissionNodes = 23;
   StartMaintenanceNodes = 24;
   DatanodeUsageInfo = 25;
+  GetContainerToken = 27;
 }
 
 /**
@@ -412,6 +415,21 @@ message ReplicationManagerStatusRequestProto {
 
 message ReplicationManagerStatusResponseProto {
   required bool isRunning = 1;
+}
+
+message ContainerTokenSecretProto {
+    required string ownerId = 1;
+    required ContainerID containerId = 2;
+    required uint64 expiryDate = 3;
+    required string certSerialId = 4;
+}
+
+message GetContainerTokenRequestProto {
+  required ContainerID containerID = 1;
+}
+
+message GetContainerTokenResponseProto {
+  required TokenProto token = 1;
 }
 
 /**
