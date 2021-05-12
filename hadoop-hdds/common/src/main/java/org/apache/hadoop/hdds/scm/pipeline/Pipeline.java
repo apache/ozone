@@ -292,7 +292,7 @@ public final class Pipeline {
         repIndex = pipeline.getMemberReplicaIndexes(index);
       }
       nodes.put(DatanodeDetails.getFromProtoBuf(member), repIndex);
-      index ++;
+      index++;
     }
     UUID leaderId = null;
     if (pipeline.hasLeaderID128()) {

@@ -104,7 +104,7 @@ public final class MockPipeline {
     int index = nodes.size() - 1;
     for (DatanodeDetails dn : nodes) {
       nodeIndexes.put(dn, index);
-      index --;
+      index--;
     }
 
     return Pipeline.newBuilder()
