@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.PKIProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.SelfSignedCertificate;
+import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
@@ -214,8 +215,15 @@ public class DefaultCAServer implements CertificateServer {
       CertificateApprover.ApprovalType approverType, NodeType role) {
     LocalDate beginDate = LocalDate.now().atStartOfDay().toLocalDate();
     LocalDateTime temp = LocalDateTime.of(beginDate, LocalTime.MIDNIGHT);
-    LocalDate endDate =
-        temp.plus(config.getDefaultCertDuration()).toLocalDate();
+
+    LocalDate endDate;
+    // When issuing certificates for sub-ca use the max certificate duration
+    // similar to self signed root certificate.
+    if (role == NodeType.SCM) {
+      endDate = temp.plus(config.getMaxCertificateDuration()).toLocalDate();
+    } else {
+      endDate = temp.plus(config.getDefaultCertDuration()).toLocalDate();
+    }
 
     CompletableFuture<X509CertificateHolder> xcertHolder =
         approver.inspectCSR(csr);
@@ -324,6 +332,22 @@ public class DefaultCAServer implements CertificateServer {
   @Override
   public void reinitialize(SCMMetadataStore scmMetadataStore) {
     store.reinitialize(scmMetadataStore);
+  }
+
+  /**
+   * Get the CRLInfo based on the CRL Ids.
+   * @param crlIds - list of crl ids
+   * @return CRLInfo
+   * @throws IOException
+   */
+  @Override
+  public List<CRLInfo> getCrls(List<Long> crlIds) throws IOException {
+    return store.getCrls(crlIds);
+  }
+
+  @Override
+  public long getLatestCrlId() {
+    return store.getLatestCrlId();
   }
 
   /**

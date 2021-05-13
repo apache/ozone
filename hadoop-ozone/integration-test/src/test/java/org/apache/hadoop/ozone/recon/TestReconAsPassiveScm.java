@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.recon;
 
 import java.util.Optional;
 
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -47,7 +48,6 @@ import org.slf4j.event.Level;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.CLOSE_CONTAINER;
 import static org.apache.hadoop.ozone.container.ozoneimpl.TestOzoneContainer.runTestOzoneContainerViaDataNode;
 import static org.junit.Assert.assertEquals;
@@ -114,7 +114,8 @@ public class TestReconAsPassiveScm {
     // Verify we can never create a pipeline in Recon.
     LambdaTestUtils.intercept(UnsupportedOperationException.class,
         "Trying to create pipeline in Recon, which is prohibited!",
-        () -> reconPipelineManager.createPipeline(RATIS, ONE));
+        () -> reconPipelineManager
+            .createPipeline(new RatisReplicationConfig(ONE)));
 
     ContainerManagerV2 scmContainerManager = scm.getContainerManager();
     assertTrue(scmContainerManager.getContainers().isEmpty());
@@ -128,7 +129,8 @@ public class TestReconAsPassiveScm {
     // Create container
     ContainerManagerV2 reconContainerManager = reconScm.getContainerManager();
     ContainerInfo containerInfo =
-        scmContainerManager.allocateContainer(RATIS, ONE, "test");
+        scmContainerManager
+            .allocateContainer(new RatisReplicationConfig(ONE), "test");
     long containerID = containerInfo.getContainerID();
     Pipeline pipeline =
         scmPipelineManager.getPipeline(containerInfo.getPipelineID());
@@ -168,7 +170,8 @@ public class TestReconAsPassiveScm {
 
     // Create container in SCM.
     ContainerInfo containerInfo =
-        scmContainerManager.allocateContainer(RATIS, ONE, "test");
+        scmContainerManager
+            .allocateContainer(new RatisReplicationConfig(ONE), "test");
     long containerID = containerInfo.getContainerID();
     PipelineManager scmPipelineManager = scm.getPipelineManager();
     Pipeline pipeline =
@@ -179,7 +182,7 @@ public class TestReconAsPassiveScm {
 
     // Close a pipeline
     Optional<Pipeline> pipelineToClose = scmPipelineManager
-        .getPipelines(RATIS, ONE)
+        .getPipelines(new RatisReplicationConfig(ONE))
         .stream()
         .filter(p -> !p.getId().equals(containerInfo.getPipelineID()))
         .findFirst();

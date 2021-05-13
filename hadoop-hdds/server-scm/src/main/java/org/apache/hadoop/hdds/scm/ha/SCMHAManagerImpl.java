@@ -33,7 +33,7 @@ import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
-import org.apache.hadoop.ozone.util.ExitManager;
+import org.apache.hadoop.hdds.ExitManager;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.util.FileUtils;
 import org.slf4j.Logger;
@@ -78,7 +78,8 @@ public class SCMHAManagerImpl implements SCMHAManager {
       this.ratisServer = new SCMRatisServerImpl(conf, scm,
           (SCMHADBTransactionBuffer) transactionBuffer);
       this.scmSnapshotProvider = new SCMSnapshotProvider(conf,
-          scm.getSCMHANodeDetails().getPeerNodeDetails());
+          scm.getSCMHANodeDetails().getPeerNodeDetails(),
+          scm.getScmCertificateClient());
       grpcServer = new InterSCMGrpcProtocolService(conf, scm);
     } else {
       this.transactionBuffer = new SCMDBTransactionBufferImpl();
@@ -101,14 +102,19 @@ public class SCMHAManagerImpl implements SCMHAManager {
     if (ratisServer.getDivision().getGroup().getPeers().isEmpty()) {
       // this is a bootstrapped node
       // It will first try to add itself to existing ring
-      boolean success = HAUtils.addSCM(OzoneConfiguration.of(conf),
+      final SCMNodeDetails nodeDetails =
+          scm.getSCMHANodeDetails().getLocalNodeDetails();
+      final boolean success = HAUtils.addSCM(OzoneConfiguration.of(conf),
           new AddSCMRequest.Builder().setClusterId(scm.getClusterId())
               .setScmId(scm.getScmId())
-              .setRatisAddr(scm.getSCMHANodeDetails().getLocalNodeDetails()
+              .setRatisAddr(nodeDetails
                   // TODO : Should we use IP instead of hostname??
                   .getRatisHostPortStr()).build(), scm.getSCMNodeId());
       if (!success) {
         throw new IOException("Adding SCM to existing HA group failed");
+      } else {
+        LOG.info("Successfully added SCM {} to group {}",
+            nodeDetails.getNodeId(), ratisServer.getDivision().getGroup());
       }
     } else {
       LOG.info(" scm role is {} peers {}",
@@ -354,6 +360,11 @@ public class SCMHAManagerImpl implements SCMHAManager {
   @VisibleForTesting
   public void setExitManagerForTesting(ExitManager exitManagerForTesting) {
     this.exitManager = exitManagerForTesting;
+  }
+
+  @VisibleForTesting
+  public void stopGrpcService() {
+    grpcServer.stop();
   }
 
   @VisibleForTesting

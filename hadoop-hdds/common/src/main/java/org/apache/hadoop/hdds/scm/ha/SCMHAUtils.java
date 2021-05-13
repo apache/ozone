@@ -20,16 +20,22 @@ package org.apache.hadoop.hdds.scm.ha;
 
 
 import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.server.ServerUtils;
+import org.apache.hadoop.io.retry.RetryPolicy;
+import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ozone.ha.ConfUtils;
+import org.apache.ratis.protocol.exceptions.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -46,6 +52,16 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY
 public final class SCMHAUtils {
   public static final Logger LOG =
       LoggerFactory.getLogger(SCMHAUtils.class);
+
+  private static final List<Class<? extends Exception>>
+      RETRIABLE_WITH_NO_FAILOVER_EXCEPTION_LIST =
+      ImmutableList.<Class<? extends Exception>>builder()
+          .add(LeaderNotReadyException.class)
+          .add(ReconfigurationInProgressException.class)
+          .add(ReconfigurationTimeoutException.class)
+          .add(ResourceUnavailableException.class)
+          .build();
+
   private SCMHAUtils() {
     // not used
   }
@@ -61,10 +77,10 @@ public final class SCMHAUtils {
   }
 
   public static boolean isPrimordialSCM(ConfigurationSource conf,
-      String selfNodeId) {
+      String selfNodeId, String hostName) {
     String primordialNode = getPrimordialSCM(conf);
-    return isSCMHAEnabled(conf) && primordialNode != null && primordialNode
-        .equals(selfNodeId);
+    return isSCMHAEnabled(conf) && primordialNode != null && (primordialNode
+        .equals(selfNodeId) || primordialNode.equals(hostName));
   }
   /**
    * Get a collection of all scmNodeIds for the given scmServiceId.
@@ -183,5 +199,112 @@ public final class SCMHAUtils {
       ConfigurationSource configuration) {
     String scmServiceId = getScmServiceId(configuration);
     return getSCMNodeIds(configuration, scmServiceId);
+  }
+
+  private static Throwable unwrapException(Exception e) {
+    IOException ioException = null;
+    Throwable cause = e.getCause();
+    if (cause instanceof RemoteException) {
+      ioException = ((RemoteException) cause).unwrapRemoteException();
+    }
+    return ioException == null ? e : ioException;
+  }
+
+  /**
+   * Checks if the underlying exception if of type StateMachine. Used by scm
+   * clients.
+   */
+  public static boolean isNonRetriableException(Exception e) {
+    Throwable t =
+        getExceptionForClass(e, StateMachineException.class);
+    return t == null ? false : true;
+  }
+
+  /**
+   * Checks if the underlying exception if of type non retriable. Used by scm
+   * clients.
+   */
+  public static boolean checkNonRetriableException(Exception e) {
+    Throwable t = unwrapException(e);
+    return NonRetriableException.class.isInstance(t);
+  }
+
+  // This will return the underlying exception after unwrapping
+  // the exception to see if it matches with expected exception
+  // list , returns true otherwise will return false.
+  public static boolean isRetriableWithNoFailoverException(Exception e) {
+    Throwable t = e;
+    while (t != null) {
+      for (Class<? extends Exception> clazz :
+          getRetriableWithNoFailoverExceptionList()) {
+        if (clazz.isInstance(t)) {
+          return true;
+        }
+      }
+      t = t.getCause();
+    }
+    return false;
+  }
+
+  /**
+   * Checks if the underlying exception if of type retriable with no failover.
+   * Used by scm clients.
+   */
+  public static boolean checkRetriableWithNoFailoverException(Exception e) {
+    Throwable t = unwrapException(e);
+    return RetriableWithNoFailoverException.class.isInstance(t);
+  }
+
+  public static Throwable getNotLeaderException(Exception e) {
+    return getExceptionForClass(e, NotLeaderException.class);
+  }
+
+  public static Throwable getServerNotLeaderException(Exception e) {
+    return getExceptionForClass(e, ServerNotLeaderException.class);
+  }
+
+  // This will return the underlying NotLeaderException exception
+  public static Throwable getExceptionForClass(Exception e,
+      Class<? extends Exception> clazz) {
+    IOException ioException = null;
+    Throwable cause = e.getCause();
+    if (cause instanceof RemoteException) {
+      ioException = ((RemoteException) cause).unwrapRemoteException();
+    }
+    Throwable t = ioException == null ? e : ioException;
+    while (t != null) {
+      if (clazz.isInstance(t)) {
+        return t;
+      }
+      t = t.getCause();
+    }
+    return null;
+  }
+
+  public static List<Class<? extends
+      Exception>> getRetriableWithNoFailoverExceptionList() {
+    return RETRIABLE_WITH_NO_FAILOVER_EXCEPTION_LIST;
+  }
+
+  public static RetryPolicy.RetryAction getRetryAction(int failovers, int retry,
+      Exception e, int maxRetryCount, long retryInterval) {
+    if (SCMHAUtils.checkRetriableWithNoFailoverException(e)) {
+      if (retry < maxRetryCount) {
+        return new RetryPolicy.RetryAction(
+            RetryPolicy.RetryAction.RetryDecision.RETRY, retryInterval);
+      } else {
+        return RetryPolicy.RetryAction.FAIL;
+      }
+    } else if (SCMHAUtils.checkNonRetriableException(e)) {
+      return RetryPolicy.RetryAction.FAIL;
+    } else {
+      if (failovers < maxRetryCount) {
+        return new RetryPolicy.RetryAction(
+            RetryPolicy.RetryAction.RetryDecision.FAILOVER_AND_RETRY,
+            retryInterval);
+      } else {
+        return RetryPolicy.RetryAction.FAIL;
+      }
+    }
   }
 }

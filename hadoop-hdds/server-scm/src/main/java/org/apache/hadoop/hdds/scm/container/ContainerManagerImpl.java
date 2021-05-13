@@ -35,12 +35,11 @@ import java.util.stream.Collectors;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.metrics.SCMContainerManagerMetrics;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
@@ -174,24 +173,24 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
   }
 
   @Override
-  public ContainerInfo allocateContainer(final ReplicationType type,
-      final ReplicationFactor replicationFactor, final String owner)
+  public ContainerInfo allocateContainer(
+      final ReplicationConfig replicationConfig, final String owner)
       throws IOException {
     lock.lock();
     try {
       final List<Pipeline> pipelines = pipelineManager
-          .getPipelines(type, replicationFactor, Pipeline.PipelineState.OPEN);
+          .getPipelines(replicationConfig, Pipeline.PipelineState.OPEN);
 
       final Pipeline pipeline;
       if (pipelines.isEmpty()) {
         try {
-          pipeline = pipelineManager.createPipeline(type, replicationFactor);
+          pipeline = pipelineManager.createPipeline(replicationConfig);
           pipelineManager.waitPipelineReady(pipeline.getId(), 0);
         } catch (IOException e) {
           scmContainerManagerMetrics.incNumFailureCreateContainers();
           throw new IOException("Could not allocate container. Cannot get any" +
-              " matching pipeline for Type:" + type + ", Factor:" +
-              replicationFactor + ", State:PipelineState.OPEN", e);
+              " matching pipeline for replicationConfig: " + replicationConfig
+              + ", State:PipelineState.OPEN", e);
         }
       } else {
         pipeline = pipelines.get(random.nextInt(pipelines.size()));
@@ -223,7 +222,8 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
         .setOwner(owner)
         .setContainerID(containerID.getId())
         .setDeleteTransactionId(0)
-        .setReplicationFactor(pipeline.getFactor())
+        .setReplicationFactor(
+            ReplicationConfig.getLegacyFactor(pipeline.getReplicationConfig()))
         .setReplicationType(pipeline.getType())
         .build();
     containerStateManager.addContainer(containerInfo);

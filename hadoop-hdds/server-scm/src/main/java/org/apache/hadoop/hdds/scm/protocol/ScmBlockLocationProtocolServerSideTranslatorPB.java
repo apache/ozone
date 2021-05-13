@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos;
@@ -41,6 +42,7 @@ import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.ha.RatisUtil;
 import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolPB;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -103,9 +105,9 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
   public SCMBlockLocationResponse send(RpcController controller,
       SCMBlockLocationRequest request) throws ServiceException {
     if (!scm.getScmContext().isLeader()) {
-      throw new ServiceException(scm.getScmHAManager()
-                                    .getRatisServer()
-                                    .triggerNotLeaderException());
+      RatisUtil.checkRatisException(
+          scm.getScmHAManager().getRatisServer().triggerNotLeaderException(),
+          scm.getBlockProtocolRpcPort(), scm.getScmId());
     }
     return dispatcher.processRequest(
         request,
@@ -151,6 +153,8 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
             " in ScmBlockLocationProtocol");
       }
     } catch (IOException e) {
+      RatisUtil.checkRatisException(e, scm.getBlockProtocolRpcPort(),
+          scm.getScmId());
       response.setSuccess(false);
       response.setStatus(exceptionToResponseStatus(e));
       if (e.getMessage() != null) {
@@ -174,8 +178,11 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
       throws IOException {
     List<AllocatedBlock> allocatedBlocks =
         impl.allocateBlock(request.getSize(),
-            request.getNumBlocks(), request.getType(),
-            request.getFactor(), request.getOwner(),
+            request.getNumBlocks(),
+            ReplicationConfig.fromProto(
+                request.getType(),
+                request.getFactor()),
+            request.getOwner(),
             ExcludeList.getFromProtoBuf(request.getExcludeList()));
 
     AllocateScmBlockResponseProto.Builder builder =
@@ -196,7 +203,8 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
   }
 
   public DeleteScmKeyBlocksResponseProto deleteScmKeyBlocks(
-      DeleteScmKeyBlocksRequestProto req)
+      DeleteScmKeyBlocksRequestProto req
+  )
       throws IOException {
     DeleteScmKeyBlocksResponseProto.Builder resp =
         DeleteScmKeyBlocksResponseProto.newBuilder();

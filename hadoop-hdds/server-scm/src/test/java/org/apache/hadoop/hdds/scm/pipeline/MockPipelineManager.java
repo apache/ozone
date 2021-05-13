@@ -17,10 +17,9 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.utils.db.Table;
 
@@ -48,16 +47,15 @@ public final class MockPipelineManager implements PipelineManager {
   }
 
   @Override
-  public Pipeline createPipeline(final ReplicationType type,
-                                 final ReplicationFactor factor)
+  public Pipeline createPipeline(ReplicationConfig replicationConfig)
       throws IOException {
     final List<DatanodeDetails> nodes = Stream.generate(
         MockDatanodeDetails::randomDatanodeDetails)
-        .limit(factor.getNumber()).collect(Collectors.toList());
+        .limit(replicationConfig.getRequiredNodes())
+        .collect(Collectors.toList());
     final Pipeline pipeline = Pipeline.newBuilder()
         .setId(PipelineID.randomId())
-        .setType(type)
-        .setFactor(factor)
+        .setReplicationConfig(replicationConfig)
         .setNodes(nodes)
         .setState(Pipeline.PipelineState.OPEN)
         .build();
@@ -66,13 +64,11 @@ public final class MockPipelineManager implements PipelineManager {
   }
 
   @Override
-  public Pipeline createPipeline(final ReplicationType type,
-                                 final ReplicationFactor factor,
-                                 final List<DatanodeDetails> nodes) {
+  public Pipeline createPipeline(final ReplicationConfig replicationConfig,
+      final List<DatanodeDetails> nodes) {
     return Pipeline.newBuilder()
         .setId(PipelineID.randomId())
-        .setType(type)
-        .setFactor(factor)
+        .setReplicationConfig(replicationConfig)
         .setNodes(nodes)
         .setState(Pipeline.PipelineState.OPEN)
         .build();
@@ -100,35 +96,23 @@ public final class MockPipelineManager implements PipelineManager {
   }
 
   @Override
-  public List<Pipeline> getPipelines(final ReplicationType type) {
-    return stateManager.getPipelines(type);
+  public List<Pipeline> getPipelines(
+      final ReplicationConfig replicationConfig) {
+    return stateManager.getPipelines(replicationConfig);
   }
 
   @Override
-  public List<Pipeline> getPipelines(final ReplicationType type,
-                                     final ReplicationFactor factor) {
-    return stateManager.getPipelines(type, factor);
+  public List<Pipeline> getPipelines(ReplicationConfig replicationConfig,
+      final Pipeline.PipelineState state) {
+    return stateManager.getPipelines(replicationConfig, state);
   }
 
   @Override
-  public List<Pipeline> getPipelines(final ReplicationType type,
-                                     final Pipeline.PipelineState state) {
-    return stateManager.getPipelines(type, state);
-  }
-
-  @Override
-  public List<Pipeline> getPipelines(final ReplicationType type,
-                                     final ReplicationFactor factor,
-                                     final Pipeline.PipelineState state) {
-    return stateManager.getPipelines(type, factor, state);
-  }
-
-  @Override
-  public List<Pipeline> getPipelines(final ReplicationType type,
-      final ReplicationFactor factor, final Pipeline.PipelineState state,
+  public List<Pipeline> getPipelines(ReplicationConfig replicationConfig,
+      final Pipeline.PipelineState state,
       final Collection<DatanodeDetails> excludeDns,
       final Collection<PipelineID> excludePipelines) {
-    return stateManager.getPipelines(type, factor, state,
+    return stateManager.getPipelines(replicationConfig, state,
         excludeDns, excludePipelines);
   }
 
@@ -171,8 +155,7 @@ public final class MockPipelineManager implements PipelineManager {
   }
 
   @Override
-  public void scrubPipeline(final ReplicationType type,
-                            final ReplicationFactor factor)
+  public void scrubPipeline(ReplicationConfig replicationConfig)
       throws IOException {
 
   }

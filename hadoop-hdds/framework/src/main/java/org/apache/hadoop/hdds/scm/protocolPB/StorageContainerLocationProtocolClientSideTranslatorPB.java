@@ -172,6 +172,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
    *
    * @param type   - Replication Type
    * @param factor - Replication Count
+   * @param owner  - Service owner of the container.
    */
   @Override
   public ContainerWithPipeline allocateContainer(
