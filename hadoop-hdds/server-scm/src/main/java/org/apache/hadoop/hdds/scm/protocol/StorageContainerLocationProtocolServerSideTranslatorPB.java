@@ -145,7 +145,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   public ScmContainerLocationResponse submitRequest(RpcController controller,
       ScmContainerLocationRequest request) throws ServiceException {
     // not leader or not belong to admin command.
-    if (!scm.getScmContext().isLeader()
+    if (!scm.checkLeader()
         && !ADMIN_COMMAND_TYPE.contains(request.getCmdType())) {
       RatisUtil.checkRatisException(
           scm.getScmHAManager().getRatisServer().triggerNotLeaderException(),
