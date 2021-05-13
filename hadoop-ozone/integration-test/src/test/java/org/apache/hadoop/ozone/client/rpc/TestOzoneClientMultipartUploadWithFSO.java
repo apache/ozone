@@ -930,8 +930,6 @@ public class TestOzoneClientMultipartUploadWithFSO {
         omKeyInfo.getKeyName());
     Assert.assertEquals(uploadID, omMultipartKeyInfo.getUploadID());
 
-    getParentID(volumeName, bucketName, keyName, metadataMgr);
-
     TreeMap<Integer, OzoneManagerProtocolProtos.PartKeyInfo> partKeyInfoMap =
         omMultipartKeyInfo.getPartKeyInfoMap();
     for (Map.Entry<Integer, OzoneManagerProtocolProtos.PartKeyInfo> entry :
