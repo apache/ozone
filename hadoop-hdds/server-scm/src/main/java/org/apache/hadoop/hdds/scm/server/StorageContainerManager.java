@@ -377,9 +377,11 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     scmAdminUsernames = conf.getTrimmedStringCollection(OzoneConfigKeys
         .OZONE_ADMINISTRATORS);
-    String scmUsername = UserGroupInformation.getCurrentUser().getUserName();
-    if (!scmAdminUsernames.contains(scmUsername)) {
-      scmAdminUsernames.add(scmUsername);
+    String scmShortUsername =
+        UserGroupInformation.getCurrentUser().getShortUserName();
+
+    if (!scmAdminUsernames.contains(scmShortUsername)) {
+      scmAdminUsernames.add(scmShortUsername);
     }
 
     datanodeProtocolServer = new SCMDatanodeProtocolServer(conf, this,
@@ -1476,12 +1478,15 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
   }
 
-  public void checkAdminAccess(String remoteUser) throws IOException {
-    if (remoteUser != null && !scmAdminUsernames.contains(remoteUser) &&
+  public void checkAdminAccess(UserGroupInformation remoteUser)
+      throws IOException {
+    if (remoteUser != null
+        && !scmAdminUsernames.contains(remoteUser.getUserName()) &&
+        !scmAdminUsernames.contains(remoteUser.getShortUserName()) &&
         !scmAdminUsernames.contains(OZONE_ADMINISTRATORS_WILDCARD)) {
       throw new AccessControlException(
-          "Access denied for user " + remoteUser + ". Superuser privilege " +
-              "is required.");
+          "Access denied for user " + remoteUser.getUserName() +
+              ". Superuser privilege is required.");
     }
   }
 

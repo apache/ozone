@@ -63,6 +63,6 @@ Incomplete command
                         Should contain   ${output}   deactivate
                         Should contain   ${output}   list
 
-List pipelines on unknown host
-    ${output} =         Execute And Ignore Error     ozone admin --verbose pipeline list --scm unknown-host
-                        Should contain   ${output}   Invalid host name
+#List pipelines on unknown host
+#    ${output} =         Execute And Ignore Error     ozone admin --verbose pipeline list --scm unknown-host
+#                        Should contain   ${output}   Invalid host name

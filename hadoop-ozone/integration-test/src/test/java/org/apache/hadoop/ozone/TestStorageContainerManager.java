@@ -100,6 +100,7 @@ import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.Time;
@@ -127,7 +128,6 @@ public class TestStorageContainerManager {
   private static XceiverClientManager xceiverClientManager;
   private static final Logger LOG = LoggerFactory.getLogger(
             TestStorageContainerManager.class);
-
   /**
    * Set the timeout for every test.
    */
@@ -180,8 +180,9 @@ public class TestStorageContainerManager {
 
       SCMClientProtocolServer mockClientServer = Mockito.spy(
           cluster.getStorageContainerManager().getClientProtocolServer());
-      when(mockClientServer.getRpcRemoteUsername())
-          .thenReturn(fakeRemoteUsername);
+
+      when(mockClientServer.getRemoteUser()).thenReturn(
+          UserGroupInformation.createRemoteUser(fakeRemoteUsername));
 
       try {
         mockClientServer.deleteContainer(

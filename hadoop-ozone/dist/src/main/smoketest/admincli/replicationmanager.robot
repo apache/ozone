@@ -51,7 +51,7 @@ Incomplete command
                         Should contain   ${output}   stop
                         Should contain   ${output}   status
 
-Check replicationmanager on unknown host
-    ${output} =         Execute And Ignore Error     ozone admin --verbose replicationmanager status --scm unknown-host
-                        Should contain   ${output}   Invalid host name
+#Check replicationmanager on unknown host
+#    ${output} =         Execute And Ignore Error     ozone admin --verbose replicationmanager status --scm unknown-host
+#                        Should contain   ${output}   Invalid host name
 
