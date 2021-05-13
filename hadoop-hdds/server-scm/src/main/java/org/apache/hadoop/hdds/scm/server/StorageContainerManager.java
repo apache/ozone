@@ -1471,8 +1471,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     } else {
       // FOR HA setup, the node has to be the leader and ready to serve
       // requests.
-      return scmContext.isLeader() && getScmHAManager().getRatisServer()
-          .getDivision().getInfo().isLeaderReady();
+      return getScmHAManager().getRatisServer().getDivision().getInfo()
+          .isLeaderReady();
     }
   }
 
