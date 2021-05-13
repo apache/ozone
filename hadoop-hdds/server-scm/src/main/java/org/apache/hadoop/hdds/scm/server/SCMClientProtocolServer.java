@@ -786,7 +786,7 @@ public class SCMClientProtocolServer implements
   @Override
   public Token<?> getContainerToken(ContainerID containerID)
       throws IOException {
-    String remoteUser = getRemoteUserName();
+    UserGroupInformation remoteUser = getRemoteUser();
     getScm().checkAdminAccess(remoteUser);
 
     if (!containerTokenEnabled) {
@@ -797,7 +797,7 @@ public class SCMClientProtocolServer implements
         scm.getContainerTokenSecretManager();
 
     return secretManager.generateToken(
-        secretManager.createIdentifier(remoteUser, containerID));
+        secretManager.createIdentifier(remoteUser.getUserName(), containerID));
   }
 
   /**
