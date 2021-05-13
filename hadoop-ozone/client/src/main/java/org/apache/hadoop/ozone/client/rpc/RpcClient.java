@@ -178,7 +178,7 @@ public class RpcClient implements ClientProtocol {
 
     this.clientConfig = conf.getObject(OzoneClientConfig.class);
 
-    OmTransport omTransport = createOmTransport(conf, omServiceId);
+    OmTransport omTransport = createOmTransport(omServiceId);
 
     this.ozoneManagerClient = TracingUtil.createProxy(
         new OzoneManagerProtocolClientSideTranslatorPB(omTransport,
@@ -200,7 +200,7 @@ public class RpcClient implements ClientProtocol {
     }
 
     this.xceiverClientManager =
-        createXceiverClientFactory(conf, x509Certificates);
+        createXceiverClientFactory(x509Certificates);
 
     int configuredChunkSize = (int) conf
         .getStorageSize(ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY,
@@ -252,17 +252,16 @@ public class RpcClient implements ClientProtocol {
   @NotNull
   @VisibleForTesting
   protected XceiverClientFactory createXceiverClientFactory(
-      ConfigurationSource configSource,
       List<X509Certificate> x509Certificates) throws IOException {
-    return new XceiverClientManager(configSource,
+    return new XceiverClientManager(conf,
         conf.getObject(XceiverClientManager.ScmClientConfig.class),
         x509Certificates);
   }
 
   @VisibleForTesting
-  protected OmTransport createOmTransport(ConfigurationSource configSource,
-      String omServiceId) throws IOException {
-    return OmTransportFactory.create(configSource, ugi, omServiceId);
+  protected OmTransport createOmTransport(String omServiceId)
+      throws IOException {
+    return OmTransportFactory.create(conf, ugi, omServiceId);
   }
 
   @Override
