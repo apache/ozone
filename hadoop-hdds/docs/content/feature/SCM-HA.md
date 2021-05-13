@@ -112,11 +112,12 @@ Based on the `ozone.scm.primordial.node.id`, the init process will be ignored on
 ![Overview](scm-secure-ha.png)
 
 In a secure SCM HA cluster on the SCM where we perform init, we call this SCM as a primordial SCM. 
-Primordial SCM starts root-CA with self signed certificates and is used to issue a signed certificate 
+Primordial SCM starts root-CA with self-signed certificates and is used to issue a signed certificate 
 to itself and other bootstrapped SCM’s. Only primordial SCM can issue signed certificates for other SCM’s.
 So, primordial SCM has a special role in the SCM HA cluster, as it is the only one that can issue certificates to SCM’s.
 
-In addition to root-CA primordial SCM also has a sub-CA which has a signed certificate from root CA which is used to sign certificates for OM/Datanodes.
+The primordial SCM takes a root-CA role, which signs all SCM instances with a sub-CA certificate. 
+The sub-CA certificates are used by SCM to sign certificates for OM/Datanodes.
 
 When bootstrapping a SCM, it gets a signed certificate from the primary SCM and starts sub-CA.
 
@@ -139,6 +140,9 @@ Sub-CA on the SCM’s are used to issue signed certificates for OM/DN in the clu
 Above configs are needed in addition to normal SCM HA configuration.
 
 ### Primordial SCM:
+
+Primordial SCM is determined from the config ozone.scm.primordial.node.id. 
+The value for this can be node id or hostname of the SCM.
 
 {{< highlight bash >}}
 bin/ozone scm --init
