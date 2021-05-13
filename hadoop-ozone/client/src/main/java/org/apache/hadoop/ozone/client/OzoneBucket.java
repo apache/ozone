@@ -564,22 +564,7 @@ public class OzoneBucket extends WithMetadata {
    * @throws IOException
    */
   public void deleteKey(String key) throws IOException {
-    try {
-      proxy.deleteKey(volumeName, name, key, false);
-    } catch (OMException ome) {
-      if (OzoneFSUtils.isFSOptimizedBucket(getMetadata())) {
-        // A directory deletion without recursive flag to true will throw
-        // DIRECTORY_NOT_EMPTY error for a non-empty directory.
-        // Here its converting this error to KEY_NOT_FOUND to be in sync with
-        // the existing OM layout.
-        // Note: NOT_FOUND is not a problem, AWS doesn't throw exception for
-        // missing keys.
-        if (OMException.ResultCodes.DIRECTORY_NOT_EMPTY == ome.getResult()) {
-          throw new OMException(ome, OMException.ResultCodes.KEY_NOT_FOUND);
-        }
-      }
-      throw ome;
-    }
+    proxy.deleteKey(volumeName, name, key, false);
   }
 
   /**
