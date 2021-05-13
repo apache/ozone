@@ -234,12 +234,12 @@ public class SCMContainerLocationFailoverProxyProvider implements
 
   private synchronized void assignLeaderToNode(String newLeaderNodeId) {
     if (!currentProxySCMNodeId.equals(newLeaderNodeId)) {
-      if (scmProxies.containsKey(newLeaderNodeId)) {
+      if (scmProxyInfoMap.containsKey(newLeaderNodeId)) {
         updatedLeaderNodeID = newLeaderNodeId;
         LOG.debug("Updated LeaderNodeID {}", updatedLeaderNodeID);
+      } else {
+        updatedLeaderNodeID = null;
       }
-    } else {
-      updatedLeaderNodeID = null;
     }
   }
 

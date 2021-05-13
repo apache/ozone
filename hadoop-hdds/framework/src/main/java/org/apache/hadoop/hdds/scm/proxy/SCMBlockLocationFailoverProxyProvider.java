@@ -148,7 +148,6 @@ public class SCMBlockLocationFailoverProxyProvider implements
     if (currentProxyInfo == null) {
       currentProxyInfo = createSCMProxy(currentProxyNodeId);
     }
-    LOG.info("Bharat getProxy {}", currentProxyNodeId);
     return currentProxyInfo;
   }
 
@@ -157,12 +156,9 @@ public class SCMBlockLocationFailoverProxyProvider implements
       ScmBlockLocationProtocolPB newLeader) {
     //If leader node id is set, use that or else move to next proxy index.
     if (updatedLeaderNodeID != null) {
-      LOG.info("Bharat updatedLeaderNodeID not null {}", updatedLeaderNodeID);
       currentProxySCMNodeId = updatedLeaderNodeID;
     } else {
       nextProxyIndex();
-      LOG.info("Bharat Failing over to next proxy. {}",
-          getCurrentProxySCMNodeId());
     }
 
   }
@@ -214,17 +210,13 @@ public class SCMBlockLocationFailoverProxyProvider implements
 
     currentProxyIndex = (getCurrentProxyIndex() + 1) % scmProxyInfoMap.size();
     currentProxySCMNodeId =  scmNodeIds.get(currentProxyIndex);
-    LOG.info("Bharat getCurrentProxyIndex{}, currentProxyIndex{}, " +
-            "currentProxyNodeId{}, map size {}",
-        getCurrentProxyIndex(), currentProxyIndex, currentProxySCMNodeId,
-        scmProxyInfoMap.size());
   }
 
   private synchronized void assignLeaderToNode(String newLeaderNodeId) {
     if (!currentProxySCMNodeId.equals(newLeaderNodeId)) {
       if (scmProxyInfoMap.containsKey(newLeaderNodeId)) {
         updatedLeaderNodeID = newLeaderNodeId;
-        LOG.info("Bharat Updated LeaderNodeID {}", updatedLeaderNodeID);
+        LOG.debug("Updated LeaderNodeID {}", updatedLeaderNodeID);
       } else {
         updatedLeaderNodeID = null;
       }
@@ -274,7 +266,6 @@ public class SCMBlockLocationFailoverProxyProvider implements
       @Override
       public RetryAction shouldRetry(Exception e, int retry,
                                      int failover, boolean b) {
-        LOG.info("Bharat retry called");
         if (SCMHAUtils.checkRetriableWithNoFailoverException(e)) {
           setUpdatedLeaderNodeID();
         } else {
@@ -292,7 +283,6 @@ public class SCMBlockLocationFailoverProxyProvider implements
   }
 
   public synchronized void setUpdatedLeaderNodeID() {
-    LOG.info("Bharat setUpdatedLeaderNodeID {}", updatedLeaderNodeID);
     this.updatedLeaderNodeID = getCurrentProxySCMNodeId();
   }
 }
