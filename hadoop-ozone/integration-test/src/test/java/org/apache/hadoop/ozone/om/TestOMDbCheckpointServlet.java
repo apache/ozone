@@ -52,11 +52,11 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FL
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
 import static org.apache.hadoop.ozone.om.OMDBCheckpointServlet.writeDBCheckpointToStream;
 
-import org.junit.AfterClass;
+import org.junit.After;
 import org.junit.Assert;
 
 import static org.junit.Assert.assertNotNull;
-import org.junit.BeforeClass;
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -74,10 +74,10 @@ import static org.mockito.Mockito.when;
  * Class used for testing the OM DB Checkpoint provider servlet.
  */
 public class TestOMDbCheckpointServlet {
-  private static OzoneConfiguration conf;
-  private static File tempFile;
-  private static ServletOutputStream servletOutputStream;
-  private static MiniOzoneCluster cluster = null;
+  private OzoneConfiguration conf;
+  private File tempFile;
+  private ServletOutputStream servletOutputStream;
+  private MiniOzoneCluster cluster = null;
   private OMMetrics omMetrics = null;
   private HttpServletRequest requestMock = null;
   private HttpServletResponse responseMock = null;
@@ -95,8 +95,8 @@ public class TestOMDbCheckpointServlet {
    *
    * @throws Exception
    */
-  @BeforeClass
-  public static void init() throws Exception {
+  @Before
+  public void init() throws Exception {
     conf = new OzoneConfiguration();
 
     tempFile = File.createTempFile("testDoGet_" + System
@@ -124,22 +124,18 @@ public class TestOMDbCheckpointServlet {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @AfterClass
-  public static void shutdown() throws InterruptedException {
+  @After
+  public void shutdown() throws InterruptedException {
     if (cluster != null) {
       cluster.shutdown();
     }
     FileUtils.deleteQuietly(tempFile);
   }
 
-  private static void setCluster(MiniOzoneCluster cluster) {
-    TestOMDbCheckpointServlet.cluster = cluster;
-  }
-
   private void setupCluster() throws Exception {
-    setCluster(MiniOzoneCluster.newBuilder(conf)
+    cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(1)
-        .build());
+        .build();
     cluster.waitForClusterToBeReady();
     omMetrics = cluster.getOzoneManager().getMetrics();
 
@@ -209,7 +205,6 @@ public class TestOMDbCheckpointServlet {
 
   @Test
   public void testSpnegoEnabled() throws Exception {
-    cluster.shutdown();
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     conf.set(OZONE_ADMINISTRATORS, "");
     conf.set(OZONE_OM_HTTP_AUTH_TYPE, "kerberos");
@@ -296,7 +291,7 @@ public class TestOMDbCheckpointServlet {
 
 class TestDBCheckpoint implements DBCheckpoint {
 
-  private Path checkpointFile;
+  private final Path checkpointFile;
 
   TestDBCheckpoint(Path checkpointFile) {
     this.checkpointFile = checkpointFile;
