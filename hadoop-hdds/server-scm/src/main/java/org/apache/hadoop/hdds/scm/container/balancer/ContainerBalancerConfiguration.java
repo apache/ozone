@@ -49,7 +49,7 @@ public final class ContainerBalancerConfiguration {
       "Balancer will not balance more number of datanodes than this limit.")
   private int maxDatanodesToBalance = 5;
 
-  @Config(key = "size.moved.max", type = ConfigType.LONG,
+  @Config(key = "size.moved.max", type = ConfigType.SIZE,
       defaultValue = "10", tags = {ConfigTag.BALANCER},
       description = "The maximum size of data in GB that will be moved " +
           "by Container Balancer.")
@@ -69,19 +69,12 @@ public final class ContainerBalancerConfiguration {
    *
    * @param threshold a fraction in the range 0 to 1
    */
-  public void setThreshold(String threshold) {
-    try {
-      double tempThreshold = Double.parseDouble(threshold);
-      if (tempThreshold < 0 || tempThreshold > 1) {
-        throw new IllegalArgumentException(
-            "Threshold must be a fraction in the" +
-                " the range 0 to 1.");
-      }
-    } catch (NumberFormatException e) {
-      LOG.warn("Threshold provided is not a fraction in the range 0 to 1.");
-      throw e;
+  public void setThreshold(double threshold) {
+    if (threshold < 0 || threshold > 1) {
+      throw new IllegalArgumentException(
+          "Threshold must be a fraction in the range 0 to 1.");
     }
-    this.threshold = threshold;
+    this.threshold = String.valueOf(threshold);
   }
 
   /**

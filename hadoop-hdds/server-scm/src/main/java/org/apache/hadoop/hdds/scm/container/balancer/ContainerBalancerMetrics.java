@@ -65,9 +65,8 @@ public final class ContainerBalancerMetrics {
     return totalSizeToBalanceGB;
   }
 
-  public void setTotalSizeToBalanceGB(
-      LongMetric totalSizeToBalanceGB) {
-    this.totalSizeToBalanceGB = totalSizeToBalanceGB;
+  public void setTotalSizeToBalanceGB(long size) {
+    this.totalSizeToBalanceGB = new LongMetric(size);
   }
 
   public LongMetric getGigaBytesMoved() {
@@ -104,6 +103,17 @@ public final class ContainerBalancerMetrics {
   public void setNumDatanodesBalanced(
       LongMetric numDatanodesBalanced) {
     this.numDatanodesBalanced = numDatanodesBalanced;
+  }
+
+  /**
+   * Add specified valueToAdd to NumDatanodesBalanced.
+   *
+   * @param valueToAdd The value to add.
+   * @return The result after addition.
+   */
+  public long addToNumDatanodesBalanced(long valueToAdd) {
+    numDatanodesBalanced.add(valueToAdd);
+    return numDatanodesBalanced.get();
   }
 
   public double getMaxUtilizedDatanodeRatio() {

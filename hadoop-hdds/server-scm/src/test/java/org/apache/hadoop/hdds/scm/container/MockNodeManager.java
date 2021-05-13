@@ -98,9 +98,7 @@ public class MockNodeManager implements NodeManager {
   private int numRaftLogDisksPerDatanode;
   private int numPipelinePerDatanode;
 
-  public MockNodeManager(NetworkTopologyImpl clusterMap,
-                         List<DatanodeDetails> nodes,
-                         boolean initializeFakeNodes, int nodeCount) {
+  {
     this.healthyNodes = new LinkedList<>();
     this.staleNodes = new LinkedList<>();
     this.deadNodes = new LinkedList<>();
@@ -109,6 +107,12 @@ public class MockNodeManager implements NodeManager {
     this.node2ContainerMap = new Node2ContainerMap();
     this.dnsToUuidMap = new ConcurrentHashMap<>();
     this.aggregateStat = new SCMNodeStat();
+    this.clusterMap = new NetworkTopologyImpl(new OzoneConfiguration());
+  }
+
+  public MockNodeManager(NetworkTopologyImpl clusterMap,
+                         List<DatanodeDetails> nodes,
+                         boolean initializeFakeNodes, int nodeCount) {
     this.clusterMap = clusterMap;
     if (!nodes.isEmpty()) {
       for (int x = 0; x < nodes.size(); x++) {
@@ -139,16 +143,6 @@ public class MockNodeManager implements NodeManager {
 
   public MockNodeManager(List<DatanodeUsageInfo> nodes)
       throws IllegalArgumentException {
-    this.healthyNodes = new LinkedList<>();
-    this.staleNodes = new LinkedList<>();
-    this.deadNodes = new LinkedList<>();
-    this.nodeMetricMap = new HashMap<>();
-    this.node2PipelineMap = new Node2PipelineMap();
-    this.node2ContainerMap = new Node2ContainerMap();
-    this.dnsToUuidMap = new ConcurrentHashMap<>();
-    this.aggregateStat = new SCMNodeStat();
-    this.clusterMap = new NetworkTopologyImpl(new OzoneConfiguration());
-
     if (!nodes.isEmpty()) {
       for (DatanodeUsageInfo node : nodes) {
         register(node.getDatanodeDetails(), null, null);
@@ -157,7 +151,8 @@ public class MockNodeManager implements NodeManager {
         healthyNodes.add(node.getDatanodeDetails());
       }
     } else {
-      throw new IllegalArgumentException("The input array must not be empty.");
+      throw new IllegalArgumentException("The argument nodes list must not " +
+          "be empty");
     }
 
     safemode = false;

@@ -22,8 +22,8 @@ package org.apache.hadoop.hdds.scm.container.balancer;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager;
-import org.apache.hadoop.hdds.scm.container.placement.metrics.LongMetric;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.slf4j.Logger;
@@ -44,14 +44,14 @@ public class ContainerBalancer {
   private ContainerManagerV2 containerManager;
   private ReplicationManager replicationManager;
   private OzoneConfiguration ozoneConfiguration;
+  private final SCMContext scmContext;
   private double threshold;
   private int maxDatanodesToBalance;
   private long maxSizeToMove;
   private List<DatanodeUsageInfo> unBalancedNodes;
   private List<DatanodeUsageInfo> overUtilizedNodes;
   private List<DatanodeUsageInfo> underUtilizedNodes;
-  private List<DatanodeUsageInfo> aboveAverageUtilizedNodes;
-  private List<DatanodeUsageInfo> belowAverageUtilizedNodes;
+  private List<DatanodeUsageInfo> withinThresholdUtilizedNodes;
   private ContainerBalancerConfiguration config;
   private ContainerBalancerMetrics metrics;
   private long clusterCapacity;
@@ -74,13 +74,15 @@ public class ContainerBalancer {
       NodeManager nodeManager,
       ContainerManagerV2 containerManager,
       ReplicationManager replicationManager,
-      OzoneConfiguration ozoneConfiguration) {
+      OzoneConfiguration ozoneConfiguration,
+      final SCMContext scmContext) {
     this.nodeManager = nodeManager;
     this.containerManager = containerManager;
     this.replicationManager = replicationManager;
     this.ozoneConfiguration = ozoneConfiguration;
     this.config = new ContainerBalancerConfiguration();
     this.metrics = new ContainerBalancerMetrics();
+    this.scmContext = scmContext;
   }
 
   /**
@@ -88,10 +90,14 @@ public class ContainerBalancer {
    *
    * @param balancerConfiguration Configuration values.
    */
-  public void start(ContainerBalancerConfiguration balancerConfiguration) {
+  public boolean start(ContainerBalancerConfiguration balancerConfiguration) {
     if (!balancerRunning.compareAndSet(false, true)) {
       LOG.error("Container Balancer is already running.");
-      return;
+      return false;
+    }
+    if (scmContext.isInSafeMode()) {
+      LOG.error("Container Balancer cannot operate while SCM is in Safe Mode.");
+      return false;
     }
     ozoneConfiguration = new OzoneConfiguration();
 
@@ -106,12 +112,12 @@ public class ContainerBalancer {
 
     this.overUtilizedNodes = new ArrayList<>();
     this.underUtilizedNodes = new ArrayList<>();
-    this.aboveAverageUtilizedNodes = new ArrayList<>();
-    this.belowAverageUtilizedNodes = new ArrayList<>();
     this.unBalancedNodes = new ArrayList<>();
+    this.withinThresholdUtilizedNodes = new ArrayList<>();
 
     LOG.info("Starting Container Balancer...{}", this);
     balance();
+    return true;
   }
 
   /**
@@ -120,8 +126,7 @@ public class ContainerBalancer {
   private void balance() {
     overUtilizedNodes.clear();
     underUtilizedNodes.clear();
-    aboveAverageUtilizedNodes.clear();
-    belowAverageUtilizedNodes.clear();
+    withinThresholdUtilizedNodes.clear();
     initializeIteration();
   }
 
@@ -155,7 +160,7 @@ public class ContainerBalancer {
     double upperLimit = clusterAvgUtilisation + threshold;
 
     LOG.info("Lower limit for utilization is {} and Upper limit for " +
-            "utilization is {}", lowerLimit, upperLimit);
+        "utilization is {}", lowerLimit, upperLimit);
 
     long numDatanodesToBalance = 0L;
     double overLoadedBytes = 0D, underLoadedBytes = 0D;
@@ -163,39 +168,31 @@ public class ContainerBalancer {
     // find over and under utilized nodes
     for (DatanodeUsageInfo datanodeUsageInfo : datanodeUsageInfos) {
       double utilization = calculateUtilization(datanodeUsageInfo);
-      if (utilization > clusterAvgUtilisation) {
-        if (utilization > upperLimit) {
-          overUtilizedNodes.add(datanodeUsageInfo);
-          numDatanodesToBalance += 1;
+      if (utilization > upperLimit) {
+        overUtilizedNodes.add(datanodeUsageInfo);
+        numDatanodesToBalance += 1;
 
-          // amount of bytes greater than upper limit in this node
-          overLoadedBytes += ratioToBytes(
-                  datanodeUsageInfo.getScmNodeStat().getCapacity().get(),
-                  utilization) - ratioToBytes(
-                      datanodeUsageInfo.getScmNodeStat().getCapacity().get(),
-                      upperLimit);
-        } else {
-          aboveAverageUtilizedNodes.add(datanodeUsageInfo);
-        }
-      } else if (utilization < clusterAvgUtilisation) {
-        if (utilization < lowerLimit) {
-          underUtilizedNodes.add(datanodeUsageInfo);
-          numDatanodesToBalance += 1;
+        // amount of bytes greater than upper limit in this node
+        overLoadedBytes += ratioToBytes(
+            datanodeUsageInfo.getScmNodeStat().getCapacity().get(),
+            utilization) - ratioToBytes(
+            datanodeUsageInfo.getScmNodeStat().getCapacity().get(),
+            upperLimit);
+      } else if (utilization < lowerLimit) {
+        underUtilizedNodes.add(datanodeUsageInfo);
+        numDatanodesToBalance += 1;
 
-          // amount of bytes lesser than lower limit in this node
-          underLoadedBytes += ratioToBytes(
-                  datanodeUsageInfo.getScmNodeStat().getCapacity().get(),
-                  lowerLimit) - ratioToBytes(
-                      datanodeUsageInfo.getScmNodeStat().getCapacity().get(),
-                      utilization);
-        } else {
-          belowAverageUtilizedNodes.add(datanodeUsageInfo);
-        }
+        // amount of bytes lesser than lower limit in this node
+        underLoadedBytes += ratioToBytes(
+            datanodeUsageInfo.getScmNodeStat().getCapacity().get(),
+            lowerLimit) - ratioToBytes(
+            datanodeUsageInfo.getScmNodeStat().getCapacity().get(),
+            utilization);
+      } else {
+        withinThresholdUtilizedNodes.add(datanodeUsageInfo);
       }
     }
-
     Collections.reverse(underUtilizedNodes);
-    Collections.reverse(belowAverageUtilizedNodes);
 
     long numDatanodesBalanced = 0;
     // count number of nodes that were balanced in previous iteration
@@ -205,11 +202,10 @@ public class ContainerBalancer {
         numDatanodesBalanced += 1;
       }
     }
-
-    // calculate total number of nodes that have been balanced
+    // calculate total number of nodes that have been balanced so far
     numDatanodesBalanced =
-        numDatanodesBalanced + metrics.getNumDatanodesBalanced().get();
-    metrics.setNumDatanodesBalanced(new LongMetric(numDatanodesBalanced));
+        metrics.addToNumDatanodesBalanced(numDatanodesBalanced);
+
     unBalancedNodes = new ArrayList<>(
         overUtilizedNodes.size() + underUtilizedNodes.size());
 
@@ -256,7 +252,7 @@ public class ContainerBalancer {
     } else {
       index = Collections.binarySearch(listToSearch, node, comparator);
     }
-    return index >= 0;
+    return index >= 0 && listToSearch.get(index).equals(node);
   }
 
   /**

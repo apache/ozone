@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.junit.Assert;
 import org.junit.Before;
@@ -63,19 +64,16 @@ public class TestContainerBalancer {
     replicationManager = Mockito.mock(ReplicationManager.class);
 
     balancerConfiguration = new ContainerBalancerConfiguration();
-    balancerConfiguration.setThreshold("0.1");
+    balancerConfiguration.setThreshold(0.1);
     balancerConfiguration.setMaxDatanodesToBalance(10);
     balancerConfiguration.setMaxSizeToMove(500L);
     conf.setFromObject(balancerConfiguration);
-
-    this.numberOfNodes = 10;
-    generateUtilizations(numberOfNodes);
 
     // create datanodes with the generated nodeUtilization values
     this.averageUtilization = createNodesInCluster();
     mockNodeManager = new MockNodeManager(nodesInCluster);
     containerBalancer = new ContainerBalancer(mockNodeManager, containerManager,
-        replicationManager, conf);
+        replicationManager, conf, SCMContext.emptyContext());
   }
 
   /**
@@ -92,7 +90,7 @@ public class TestContainerBalancer {
     for (int i = 0; i < 50; i++) {
       double randomThreshold = Math.random();
 
-      balancerConfiguration.setThreshold(String.valueOf(randomThreshold));
+      balancerConfiguration.setThreshold(randomThreshold);
       containerBalancer.start(balancerConfiguration);
       expectedUnBalancedNodes =
           determineExpectedUnBalancedNodes(randomThreshold);
@@ -118,7 +116,7 @@ public class TestContainerBalancer {
    */
   @Test
   public void unBalancedNodesListShouldBeEmptyWhenClusterIsBalanced() {
-    balancerConfiguration.setThreshold("0.99");
+    balancerConfiguration.setThreshold(0.99);
     containerBalancer.start(balancerConfiguration);
 
     Assert.assertEquals(0, containerBalancer.getUnBalancedNodes().size());
@@ -132,7 +130,7 @@ public class TestContainerBalancer {
   @Test
   public void containerBalancerShouldStopWhenMaxDatanodesToBalanceIsReached() {
     balancerConfiguration.setMaxDatanodesToBalance(2);
-    balancerConfiguration.setThreshold("0");
+    balancerConfiguration.setThreshold(0);
     containerBalancer.start(balancerConfiguration);
 
     Assert.assertFalse(containerBalancer.isBalancerRunning());
@@ -195,6 +193,8 @@ public class TestContainerBalancer {
    * @return Average utilization of the created cluster.
    */
   private double createNodesInCluster() {
+    this.numberOfNodes = 10;
+    generateUtilizations(numberOfNodes);
     nodesInCluster = new ArrayList<>(nodeUtilizations.size());
     long[] capacities = {1000000, 2000000, 3000000, 4000000, 5000000};
     double totalUsed = 0, totalCapacity = 0;
