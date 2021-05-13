@@ -22,40 +22,75 @@ import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
 import org.apache.hadoop.test.LambdaTestUtils;
-import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.UUID;
 
-public class TestSCMHAUnfinalized {
+import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
+
+@RunWith(Parameterized.class)
+public class TestSCMHAUnfinalizedStateValidationAction {
 
   @Rule
   public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
-  private StorageContainerManager scm;
+  private final int layoutVersion;
+  private final boolean scmHaAlreadyEnabled;
+  private final boolean shouldFail;
 
-  @Before
-  public void setup() {
+  @Parameterized.Parameters(name = "LayoutVersion={0} scmHaAlreadyEnabled={1}")
+  public static Collection<Object[]> cases() {
+    return Arrays.asList(
+        new Object[]{HDDSLayoutFeature.SCM_HA.layoutVersion(), true},
+        new Object[]{HDDSLayoutFeature.INITIAL_VERSION.layoutVersion(), true},
+        new Object[]{HDDSLayoutFeature.SCM_HA.layoutVersion(), false},
+        new Object[]{HDDSLayoutFeature.INITIAL_VERSION.layoutVersion(), false}
+    );
+  }
+
+  public TestSCMHAUnfinalizedStateValidationAction(
+      int layoutVersion, boolean scmHaAlreadyEnabled) {
+    this.layoutVersion = layoutVersion;
+    this.scmHaAlreadyEnabled = scmHaAlreadyEnabled;
+
+    shouldFail =
+        !this.scmHaAlreadyEnabled &&
+            this.layoutVersion < HDDSLayoutFeature.SCM_HA.layoutVersion();
   }
 
   @Test
-  public void testSCMHAConfigsUsedUnfinalized() throws Exception {
-    // Build unfinalized SCM with HA configuration enabled.
+  public void testSCMHAValidationAction() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
     conf.setInt(ScmConfig.ConfigStrings.HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION,
-        HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
+        layoutVersion);
     conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS,
         temporaryFolder.newFolder().getAbsolutePath());
 
     StorageContainerManager.scmInit(conf, UUID.randomUUID().toString());
-    scm = new StorageContainerManager(conf);
+    StorageContainerManager scm = new StorageContainerManager(conf);
 
-    LambdaTestUtils.intercept(UpgradeException.class, scm::start);
+    if (scmHaAlreadyEnabled) {
+      scm.getScmMetadataStore().getTransactionInfoTable()
+          .put(TRANSACTION_INFO_KEY, TransactionInfo.builder().build());
+    }
+
+    if (shouldFail) {
+      LambdaTestUtils.intercept(UpgradeException.class, scm::start);
+    } else {
+      // no exception should be thrown.
+      scm.start();
+      scm.stop();
+    }
   }
 }

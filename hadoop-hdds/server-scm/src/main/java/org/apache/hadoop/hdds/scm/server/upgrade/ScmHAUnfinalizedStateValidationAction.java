@@ -25,6 +25,7 @@ import static org.apache.hadoop.ozone.upgrade.UpgradeActionHdds.Component.SCM;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.upgrade.HDDSUpgradeAction;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.upgrade.UpgradeActionHdds;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
 
@@ -35,15 +36,20 @@ public class ScmHAUnfinalizedStateValidationAction
 
   @Override
   public void execute(StorageContainerManager scm) throws Exception {
-    boolean isHAEnabled =
-        scm.getConfiguration().getBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,
-        ScmConfigKeys.OZONE_SCM_HA_ENABLE_DEFAULT);
+    boolean isHAAlreadyEnabled =
+        TransactionInfo.readTransactionInfo(scm.getScmMetadataStore()) != null;
 
-    if (isHAEnabled) {
-      throw new UpgradeException(String.format("Configuration %s cannot be " +
-          "used until SCM upgrade has been finalized",
-          ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY),
-          UpgradeException.ResultCodes.PREFINALIZE_ACTION_VALIDATION_FAILED);
+    if (!isHAAlreadyEnabled) {
+      boolean isHAEnabled =
+          scm.getConfiguration().getBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,
+              ScmConfigKeys.OZONE_SCM_HA_ENABLE_DEFAULT);
+
+      if (isHAEnabled) {
+        throw new UpgradeException(String.format("Configuration %s cannot be " +
+                "used until SCM upgrade has been finalized",
+            ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY),
+            UpgradeException.ResultCodes.PREFINALIZE_ACTION_VALIDATION_FAILED);
+      }
     }
   }
 }
