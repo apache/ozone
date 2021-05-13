@@ -1485,8 +1485,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         !scmAdminUsernames.contains(remoteUser.getShortUserName()) &&
         !scmAdminUsernames.contains(OZONE_ADMINISTRATORS_WILDCARD)) {
       throw new AccessControlException(
-          "Access denied for user " + remoteUser + ". Superuser privilege " +
-              "is required.");
+          "Access denied for user " + remoteUser.getUserName() +
+              ". Superuser privilege is required.");
     }
   }
 
