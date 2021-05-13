@@ -74,15 +74,16 @@ public class TestOzoneClient {
     client = new OzoneClient(config, new RpcClient(config, null) {
 
       @Override
-      protected OmTransport createOmTransport(ConfigurationSource conf,
-          String omServiceId) throws IOException {
+      protected OmTransport createOmTransport(
+          String omServiceId)
+          throws IOException {
         return new MockOmTransport();
       }
 
       @NotNull
       @Override
       protected XceiverClientFactory createXceiverClientFactory(
-          ConfigurationSource conf, List<X509Certificate> x509Certificates)
+          List<X509Certificate> x509Certificates)
           throws IOException {
         return new MockXceiverClientFactory();
       }
