@@ -106,6 +106,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
    * OM DB stores metadata as KV pairs in different column families.
    * <p>
    * OM DB Schema:
+   *
+   *
+   * Common Tables:
    * |----------------------------------------------------------------------|
    * |  Column Family     |        VALUE                                    |
    * |----------------------------------------------------------------------|
@@ -115,19 +118,31 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
    * |----------------------------------------------------------------------|
    * | bucketTable        |     /volume/bucket-> BucketInfo                 |
    * |----------------------------------------------------------------------|
-   * | keyTable           | /volumeName/bucketName/keyName->KeyInfo         |
-   * |----------------------------------------------------------------------|
-   * | deletedTable       | /volumeName/bucketName/keyName->RepeatedKeyInfo |
-   * |----------------------------------------------------------------------|
-   * | openKey            | /volumeName/bucketName/keyName/id->KeyInfo      |
-   * |----------------------------------------------------------------------|
    * | s3SecretTable      | s3g_access_key_id -> s3Secret                   |
    * |----------------------------------------------------------------------|
    * | dTokenTable        | OzoneTokenID -> renew_time                      |
    * |----------------------------------------------------------------------|
    * | prefixInfoTable    | prefix -> PrefixInfo                            |
    * |----------------------------------------------------------------------|
-   * |  multipartInfoTable| /volumeName/bucketName/keyName/uploadId ->...   |
+   * | multipartInfoTable | /volumeName/bucketName/keyName/uploadId ->...   |
+   * |----------------------------------------------------------------------|
+   * | transactionInfoTable| #TRANSACTIONINFO -> OMTransactionInfo          |
+   * |----------------------------------------------------------------------|
+   *
+   * Simple Tables:
+   * |----------------------------------------------------------------------|
+   * |  Column Family     |        VALUE                                    |
+   * |----------------------------------------------------------------------|
+   * | keyTable           | /volumeName/bucketName/keyName->KeyInfo         |
+   * |----------------------------------------------------------------------|
+   * | deletedTable       | /volumeName/bucketName/keyName->RepeatedKeyInfo |
+   * |----------------------------------------------------------------------|
+   * | openKey            | /volumeName/bucketName/keyName/id->KeyInfo      |
+   * |----------------------------------------------------------------------|
+   *
+   * Prefix Tables:
+   * |----------------------------------------------------------------------|
+   * |  Column Family     |        VALUE                                    |
    * |----------------------------------------------------------------------|
    * |  directoryTable    | parentId/directoryName -> DirectoryInfo         |
    * |----------------------------------------------------------------------|
@@ -135,12 +150,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
    * |----------------------------------------------------------------------|
    * |  openFileTable     | parentId/fileName/id -> KeyInfo                 |
    * |----------------------------------------------------------------------|
-   * |  multipartFileInfoTable | parentId/fileName/uploadId ->...           |
+   * |  deletedDirTable   | parentId/directoryName -> KeyInfo               |
    * |----------------------------------------------------------------------|
-   * |  deletedDirTable      | parentId/directoryName -> KeyInfo            |
-   * |----------------------------------------------------------------------|
-   * |  transactionInfoTable | #TRANSACTIONINFO -> OMTransactionInfo        |
-   * |----------------------------------------------------------------------|
+   *
    */
 
   public static final String USER_TABLE = "userTable";
@@ -156,7 +168,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   public static final String DIRECTORY_TABLE = "directoryTable";
   public static final String FILE_TABLE = "fileTable";
   public static final String OPEN_FILE_TABLE = "openFileTable";
-  public static final String MULTIPARTFILEINFO_TABLE = "multipartFileInfoTable";
   public static final String DELETED_DIR_TABLE = "deletedDirectoryTable";
   public static final String TRANSACTION_INFO_TABLE =
       "transactionInfoTable";
@@ -182,7 +193,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   private Table transactionInfoTable;
   private boolean isRatisEnabled;
   private boolean ignorePipelineinKey;
-  private Table<String, OmMultipartKeyInfo> multipartFileInfoTable;
   private Table deletedDirTable;
 
   // Epoch is used to generate the objectIDs. The most significant 2 bits of
@@ -284,9 +294,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
 
   @Override
   public Table<String, OmMultipartKeyInfo> getMultipartInfoTable() {
-    if (OzoneManagerRatisUtils.isBucketFSOptimized()) {
-      return multipartFileInfoTable;
-    }
     return multipartInfoTable;
   }
 
@@ -380,7 +387,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         .addTable(DIRECTORY_TABLE)
         .addTable(FILE_TABLE)
         .addTable(OPEN_FILE_TABLE)
-        .addTable(MULTIPARTFILEINFO_TABLE)
         .addTable(DELETED_DIR_TABLE)
         .addTable(TRANSACTION_INFO_TABLE)
         .addCodec(OzoneTokenIdentifier.class, new TokenIdentifierCodec())
@@ -459,10 +465,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     openFileTable = this.store.getTable(OPEN_FILE_TABLE, String.class,
             OmKeyInfo.class);
     checkTableStatus(openFileTable, OPEN_FILE_TABLE);
-
-    multipartFileInfoTable = this.store.getTable(MULTIPARTFILEINFO_TABLE,
-            String.class, OmMultipartKeyInfo.class);
-    checkTableStatus(multipartFileInfoTable, MULTIPARTFILEINFO_TABLE);
 
     deletedDirTable = this.store.getTable(DELETED_DIR_TABLE, String.class,
         OmKeyInfo.class);

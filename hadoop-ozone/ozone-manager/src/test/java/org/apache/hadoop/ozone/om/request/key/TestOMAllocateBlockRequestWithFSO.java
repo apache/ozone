@@ -50,6 +50,7 @@ public class TestOMAllocateBlockRequestWithFSO
     return config;
   }
 
+  @Override
   protected String addKeyToOpenKeyTable(String volumeName, String bucketName)
           throws Exception {
     // need to initialize parentID
@@ -77,6 +78,7 @@ public class TestOMAllocateBlockRequestWithFSO
   }
 
   @NotNull
+  @Override
   protected OMAllocateBlockRequest getOmAllocateBlockRequest(
           OzoneManagerProtocolProtos.OMRequest modifiedOmRequest) {
     return new OMAllocateBlockRequestWithFSO(modifiedOmRequest);

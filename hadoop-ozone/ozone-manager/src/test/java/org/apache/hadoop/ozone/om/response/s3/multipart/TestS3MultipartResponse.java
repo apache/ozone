@@ -121,8 +121,8 @@ public class TestS3MultipartResponse {
   }
 
   public S3MultipartUploadAbortResponse createS3AbortMPUResponse(
-      String multipartKey, OmMultipartKeyInfo omMultipartKeyInfo,
-      OmBucketInfo omBucketInfo) {
+      String multipartKey, String multipartOpenKey,
+      OmMultipartKeyInfo omMultipartKeyInfo, OmBucketInfo omBucketInfo) {
     OMResponse omResponse = OMResponse.newBuilder()
         .setCmdType(OzoneManagerProtocolProtos.Type.AbortMultiPartUpload)
         .setStatus(OzoneManagerProtocolProtos.Status.OK)
@@ -131,7 +131,7 @@ public class TestS3MultipartResponse {
             MultipartUploadAbortResponse.newBuilder().build()).build();
 
     return getS3MultipartUploadAbortResp(multipartKey,
-        omMultipartKeyInfo, omBucketInfo, omResponse);
+        multipartOpenKey, omMultipartKeyInfo, omBucketInfo, omResponse);
   }
 
   public void addPart(int partNumber, PartKeyInfo partKeyInfo,
@@ -212,8 +212,12 @@ public class TestS3MultipartResponse {
                             .setKeyName(keyName)
                             .setMultipartUploadID(multipartUploadID)).build();
 
+    String mpuKey = omMetadataManager.getMultipartKey(
+        omKeyInfo.getVolumeName(), omKeyInfo.getBucketName(),
+        keyName, multipartUploadID);
+
     return new S3InitiateMultipartUploadResponseWithFSO(omResponse,
-        multipartKeyInfo, omKeyInfo, parentDirInfos);
+        multipartKeyInfo, omKeyInfo, mpuKey, parentDirInfos);
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
@@ -236,7 +240,9 @@ public class TestS3MultipartResponse {
 
     String fileName = OzoneFSUtils.getFileName(keyName);
 
-    String multipartKey = getMultipartKey(parentID, keyName, multipartUploadID);
+    String multipartKey = omMetadataManager
+        .getMultipartKey(volumeName, bucketName, keyName, multipartUploadID);
+
     boolean isRatisEnabled = true;
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
     OmBucketInfo omBucketInfo =
@@ -274,7 +280,12 @@ public class TestS3MultipartResponse {
           OzoneManagerProtocolProtos.Status status,
           List<OmKeyInfo> unUsedParts) {
 
-    String multipartKey = getMultipartKey(parentID, keyName, multipartUploadID);
+
+    String multipartKey = omMetadataManager
+        .getMultipartKey(volumeName, bucketName, keyName, multipartUploadID);
+
+    String multipartOpenKey = getMultipartKey(parentID, keyName,
+        multipartUploadID);
 
     OMResponse omResponse = OMResponse.newBuilder()
             .setCmdType(OzoneManagerProtocolProtos.Type.CompleteMultiPartUpload)
@@ -285,7 +296,7 @@ public class TestS3MultipartResponse {
                             .setVolume(volumeName).setKey(keyName)).build();
 
     return new S3MultipartUploadCompleteResponseWithFSO(omResponse,
-        multipartKey, omKeyInfo, unUsedParts);
+        multipartKey, multipartOpenKey, omKeyInfo, unUsedParts);
   }
 
   private String getMultipartKey(long parentID, String keyName,
@@ -303,9 +314,10 @@ public class TestS3MultipartResponse {
   }
 
   protected S3MultipartUploadAbortResponse getS3MultipartUploadAbortResp(
-      String multipartKey, OmMultipartKeyInfo omMultipartKeyInfo,
-      OmBucketInfo omBucketInfo, OMResponse omResponse) {
+      String multipartKey, String multipartOpenKey,
+      OmMultipartKeyInfo omMultipartKeyInfo, OmBucketInfo omBucketInfo,
+      OMResponse omResponse) {
     return new S3MultipartUploadAbortResponse(omResponse, multipartKey,
-        omMultipartKeyInfo, true, omBucketInfo);
+        multipartOpenKey, omMultipartKeyInfo, true, omBucketInfo);
   }
 }

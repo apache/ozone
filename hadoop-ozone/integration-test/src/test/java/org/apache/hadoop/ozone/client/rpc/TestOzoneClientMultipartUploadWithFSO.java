@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.client.rpc;
 
 import org.apache.commons.lang3.RandomUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -29,6 +28,8 @@ import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
+import org.apache.hadoop.ozone.client.OzoneMultipartUpload;
+import org.apache.hadoop.ozone.client.OzoneMultipartUploadList;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
@@ -561,7 +562,10 @@ public class TestOzoneClientMultipartUploadWithFSO {
 
     bucket.abortMultipartUpload(keyName, uploadID);
 
-    OmKeyInfo omKeyInfo = metadataMgr.getOpenKeyTable().get(multipartKey);
+    String multipartOpenKey =
+        getMultipartOpenKey(uploadID, volumeName, bucketName, keyName,
+            metadataMgr);
+    OmKeyInfo omKeyInfo = metadataMgr.getOpenKeyTable().get(multipartOpenKey);
     OmMultipartKeyInfo omMultipartKeyInfo =
         metadataMgr.getMultipartInfoTable().get(multipartKey);
     Assert.assertNull(omKeyInfo);
@@ -607,14 +611,14 @@ public class TestOzoneClientMultipartUploadWithFSO {
     Assert.assertEquals(3,
         ozoneMultipartUploadPartListParts.getPartInfoList().size());
 
-    verifyPartNamesInDB(volumeName, bucketName, parentDir, keyName, partsMap,
+    verifyPartNamesInDB(volumeName, bucketName, keyName, partsMap,
         ozoneMultipartUploadPartListParts, uploadID);
 
     Assert.assertFalse(ozoneMultipartUploadPartListParts.isTruncated());
   }
 
   private void verifyPartNamesInDB(String volumeName, String bucketName,
-      String parentDir, String keyName, Map<Integer, String> partsMap,
+      String keyName, Map<Integer, String> partsMap,
       OzoneMultipartUploadPartListParts ozoneMultipartUploadPartListParts,
       String uploadID) throws IOException {
 
@@ -633,13 +637,12 @@ public class TestOzoneClientMultipartUploadWithFSO {
 
     OMMetadataManager metadataMgr =
         cluster.getOzoneManager().getMetadataManager();
-    String multipartKey = getMultipartKey(uploadID, volumeName, bucketName,
-        keyName, metadataMgr);
+    String multipartKey = metadataMgr.getMultipartKey(volumeName, bucketName,
+        keyName, uploadID);
     OmMultipartKeyInfo omMultipartKeyInfo =
         metadataMgr.getMultipartInfoTable().get(multipartKey);
     Assert.assertNotNull(omMultipartKeyInfo);
 
-    long parentID = getParentID(volumeName, bucketName, keyName, metadataMgr);
     TreeMap<Integer, OzoneManagerProtocolProtos.PartKeyInfo> partKeyInfoMap =
         omMultipartKeyInfo.getPartKeyInfoMap();
     for (Map.Entry<Integer, OzoneManagerProtocolProtos.PartKeyInfo> entry :
@@ -647,17 +650,16 @@ public class TestOzoneClientMultipartUploadWithFSO {
       OzoneManagerProtocolProtos.PartKeyInfo partKeyInfo = entry.getValue();
       String partKeyName = partKeyInfo.getPartName();
 
-      // partKeyName format in DB - <parentID>/partFileName + ClientID
-      Assert.assertTrue("Invalid partKeyName format in DB",
-          partKeyName.startsWith(parentID + OzoneConsts.OM_KEY_PREFIX));
-      partKeyName = StringUtils.remove(partKeyName,
-          parentID + OzoneConsts.OM_KEY_PREFIX);
-
       // reconstruct full part name with volume, bucket, partKeyName
-      String fullKeyPartName = metadataMgr.getOzoneKey(volumeName, bucketName,
-          parentDir + partKeyName);
+      String fullKeyPartName =
+          metadataMgr.getOzoneKey(volumeName, bucketName, keyName);
 
-      listPartNames.remove(fullKeyPartName);
+      // partKeyName format in DB - partKeyName + ClientID
+      Assert.assertTrue("Invalid partKeyName format in DB: " + partKeyName
+              + ", expected name:" + fullKeyPartName,
+          partKeyName.startsWith(fullKeyPartName));
+
+      listPartNames.remove(partKeyName);
     }
 
     Assert.assertTrue("Wrong partKeyName format in DB!",
@@ -831,12 +833,94 @@ public class TestOzoneClientMultipartUploadWithFSO {
         });
   }
 
+  @Test
+  public void testListMultipartUpload() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String dirName = "dir1/dir2/dir3";
+    String key1 = "dir1" + "/key1";
+    String key2 = "dir1/dir2" + "/key2";
+    String key3 = dirName + "/key3";
+    List<String> keys = new ArrayList<>();
+    keys.add(key1);
+    keys.add(key2);
+    keys.add(key3);
+
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    // Initiate multipart upload
+    String uploadID1 = initiateMultipartUpload(bucket, key1, STAND_ALONE,
+        ONE);
+    String uploadID2 = initiateMultipartUpload(bucket, key2, STAND_ALONE,
+        ONE);
+    String uploadID3 = initiateMultipartUpload(bucket, key3, STAND_ALONE,
+        ONE);
+
+    // Upload Parts
+    // Uploading part 1 with less than min size
+    uploadPart(bucket, key1, uploadID1, 1, "data".getBytes(UTF_8));
+    uploadPart(bucket, key2, uploadID2, 1, "data".getBytes(UTF_8));
+    uploadPart(bucket, key3, uploadID3, 1, "data".getBytes(UTF_8));
+
+    OzoneMultipartUploadList listMPUs = bucket.listMultipartUploads("dir1");
+    Assert.assertEquals(3, listMPUs.getUploads().size());
+    List<String> expectedList = new ArrayList<>(keys);
+    for (OzoneMultipartUpload mpu : listMPUs.getUploads()) {
+      expectedList.remove(mpu.getKeyName());
+    }
+    Assert.assertEquals(0, expectedList.size());
+
+    listMPUs = bucket.listMultipartUploads("dir1/dir2");
+    Assert.assertEquals(2, listMPUs.getUploads().size());
+    expectedList = new ArrayList<>();
+    expectedList.add(key2);
+    expectedList.add(key3);
+    for (OzoneMultipartUpload mpu : listMPUs.getUploads()) {
+      expectedList.remove(mpu.getKeyName());
+    }
+    Assert.assertEquals(0, expectedList.size());
+
+    listMPUs = bucket.listMultipartUploads("dir1/dir2/dir3");
+    Assert.assertEquals(1, listMPUs.getUploads().size());
+    expectedList = new ArrayList<>();
+    expectedList.add(key3);
+    for (OzoneMultipartUpload mpu : listMPUs.getUploads()) {
+      expectedList.remove(mpu.getKeyName());
+    }
+    Assert.assertEquals(0, expectedList.size());
+
+    // partial key
+    listMPUs = bucket.listMultipartUploads("d");
+    Assert.assertEquals(3, listMPUs.getUploads().size());
+    expectedList = new ArrayList<>(keys);
+    for (OzoneMultipartUpload mpu : listMPUs.getUploads()) {
+      expectedList.remove(mpu.getKeyName());
+    }
+    Assert.assertEquals(0, expectedList.size());
+
+    // partial key
+    listMPUs = bucket.listMultipartUploads("");
+    Assert.assertEquals(3, listMPUs.getUploads().size());
+    expectedList = new ArrayList<>(keys);
+    for (OzoneMultipartUpload mpu : listMPUs.getUploads()) {
+      expectedList.remove(mpu.getKeyName());
+    }
+    Assert.assertEquals(0, expectedList.size());
+  }
+
   private String verifyUploadedPart(String volumeName, String bucketName,
       String keyName, String uploadID, String partName,
       OMMetadataManager metadataMgr) throws IOException {
-    String multipartKey = getMultipartKey(uploadID, volumeName, bucketName,
-        keyName, metadataMgr);
-    OmKeyInfo omKeyInfo = metadataMgr.getOpenKeyTable().get(multipartKey);
+    String multipartOpenKey =
+        getMultipartOpenKey(uploadID, volumeName, bucketName, keyName,
+            metadataMgr);
+
+    String multipartKey = metadataMgr.getMultipartKey(volumeName, bucketName,
+        keyName, uploadID);
+    OmKeyInfo omKeyInfo = metadataMgr.getOpenKeyTable().get(multipartOpenKey);
     OmMultipartKeyInfo omMultipartKeyInfo =
         metadataMgr.getMultipartInfoTable().get(multipartKey);
 
@@ -846,9 +930,6 @@ public class TestOzoneClientMultipartUploadWithFSO {
         omKeyInfo.getKeyName());
     Assert.assertEquals(uploadID, omMultipartKeyInfo.getUploadID());
 
-    long parentID = getParentID(volumeName, bucketName, keyName,
-        metadataMgr);
-
     TreeMap<Integer, OzoneManagerProtocolProtos.PartKeyInfo> partKeyInfoMap =
         omMultipartKeyInfo.getPartKeyInfoMap();
     for (Map.Entry<Integer, OzoneManagerProtocolProtos.PartKeyInfo> entry :
@@ -857,21 +938,17 @@ public class TestOzoneClientMultipartUploadWithFSO {
       OmKeyInfo currentKeyPartInfo =
           OmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
 
-      Assert.assertEquals(OzoneFSUtils.getFileName(keyName),
-          currentKeyPartInfo.getKeyName());
+      Assert.assertEquals(keyName, currentKeyPartInfo.getKeyName());
 
-      // prepare dbPartName <parentID>/partFileName
-      String partFileName = OzoneFSUtils.getFileName(partName);
-      String dbPartName = metadataMgr.getOzonePathKey(parentID, partFileName);
-
-      Assert.assertEquals(dbPartName, partKeyInfo.getPartName());
+      // verify dbPartName
+      Assert.assertEquals(partName, partKeyInfo.getPartName());
     }
     return multipartKey;
   }
 
-  private String getMultipartKey(String multipartUploadID, String volumeName,
-      String bucketName, String keyName, OMMetadataManager omMetadataManager)
-      throws IOException {
+  private String getMultipartOpenKey(String multipartUploadID,
+      String volumeName, String bucketName, String keyName,
+      OMMetadataManager omMetadataManager) throws IOException {
 
     String fileName = OzoneFSUtils.getFileName(keyName);
     long parentID = getParentID(volumeName, bucketName, keyName,

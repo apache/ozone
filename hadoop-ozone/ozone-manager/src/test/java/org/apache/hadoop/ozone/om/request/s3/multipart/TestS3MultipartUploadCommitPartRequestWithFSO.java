@@ -40,20 +40,24 @@ public class TestS3MultipartUploadCommitPartRequestWithFSO
 
   private long parentID;
 
+  @Override
   protected S3MultipartUploadCommitPartRequest getS3MultipartUploadCommitReq(
           OMRequest omRequest) {
     return new S3MultipartUploadCommitPartRequestWithFSO(omRequest);
   }
 
+  @Override
   protected S3InitiateMultipartUploadRequest getS3InitiateMultipartUploadReq(
           OMRequest initiateMPURequest) {
     return new S3InitiateMultipartUploadRequestWithFSO(initiateMPURequest);
   }
 
+  @Override
   protected String getKeyName() {
     return dirName + UUID.randomUUID().toString();
   }
 
+  @Override
   protected void addKeyToOpenKeyTable(String volumeName, String bucketName,
       String keyName, long clientID) throws Exception {
     long txnLogId = 10000;
@@ -66,13 +70,22 @@ public class TestS3MultipartUploadCommitPartRequestWithFSO
             fileName, omKeyInfo, clientID, txnLogId, omMetadataManager);
   }
 
-  protected String getMultipartKey(String volumeName, String bucketName,
+  @Override
+  protected String getMultipartOpenKey(String volumeName, String bucketName,
       String keyName, String multipartUploadID) {
     String fileName = StringUtils.substringAfter(keyName, dirName);
     return omMetadataManager.getMultipartKey(parentID, fileName,
             multipartUploadID);
   }
 
+  @Override
+  protected String getOpenKey(String volumeName, String bucketName,
+      String keyName, long clientID) {
+    String fileName = StringUtils.substringAfter(keyName, dirName);
+    return omMetadataManager.getOpenFileName(parentID, fileName, clientID);
+  }
+
+  @Override
   protected OMRequest doPreExecuteInitiateMPU(String volumeName,
       String bucketName, String keyName) throws Exception {
     OMRequest omRequest =
@@ -95,6 +108,7 @@ public class TestS3MultipartUploadCommitPartRequestWithFSO
     return modifiedRequest;
   }
 
+  @Override
   protected void createParentPath(String volumeName, String bucketName)
       throws Exception {
     // Create parent dirs for the path

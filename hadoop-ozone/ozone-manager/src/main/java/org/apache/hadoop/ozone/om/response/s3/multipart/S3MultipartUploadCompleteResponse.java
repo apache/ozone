@@ -39,22 +39,30 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
 
 /**
  * Response for Multipart Upload Complete request.
+ *
+ * This performs:
+ * 1) Delete multipart key from OpenKeyTable, MPUTable,
+ * 2) Add key to KeyTable,
+ * 3) Delete unused parts.
  */
 @CleanupTableInfo(cleanupTables = {OPEN_KEY_TABLE, KEY_TABLE, DELETED_TABLE,
     MULTIPARTINFO_TABLE})
 public class S3MultipartUploadCompleteResponse extends OMClientResponse {
   private String multipartKey;
+  private String multipartOpenKey;
   private OmKeyInfo omKeyInfo;
   private List<OmKeyInfo> partsUnusedList;
 
   public S3MultipartUploadCompleteResponse(
       @Nonnull OMResponse omResponse,
       @Nonnull String multipartKey,
+      @Nonnull String multipartOpenKey,
       @Nonnull OmKeyInfo omKeyInfo,
       @Nonnull List<OmKeyInfo> unUsedParts) {
     super(omResponse);
     this.partsUnusedList = unUsedParts;
     this.multipartKey = multipartKey;
+    this.multipartOpenKey = multipartOpenKey;
     this.omKeyInfo = omKeyInfo;
   }
 
@@ -71,16 +79,16 @@ public class S3MultipartUploadCompleteResponse extends OMClientResponse {
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
+    // 1. Delete multipart key from OpenKeyTable, MPUTable
     omMetadataManager.getOpenKeyTable().deleteWithBatch(batchOperation,
-        multipartKey);
+        multipartOpenKey);
     omMetadataManager.getMultipartInfoTable().deleteWithBatch(batchOperation,
         multipartKey);
 
-    String ozoneKey = omMetadataManager.getOzoneKey(omKeyInfo.getVolumeName(),
-        omKeyInfo.getBucketName(), omKeyInfo.getKeyName());
-    omMetadataManager.getKeyTable().putWithBatch(batchOperation, ozoneKey,
-        omKeyInfo);
+    // 2. Add key to KeyTable
+    String ozoneKey = addToKeyTable(omMetadataManager, batchOperation);
 
+    // 3. Delete unused parts
     if (!partsUnusedList.isEmpty()) {
       // Add unused parts to deleted key table.
       RepeatedOmKeyInfo repeatedOmKeyInfo = omMetadataManager.getDeletedTable()
@@ -94,6 +102,16 @@ public class S3MultipartUploadCompleteResponse extends OMClientResponse {
       omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
           ozoneKey, repeatedOmKeyInfo);
     }
+  }
+
+  protected String addToKeyTable(OMMetadataManager omMetadataManager,
+      BatchOperation batchOperation) throws IOException {
+
+    String ozoneKey = omMetadataManager.getOzoneKey(omKeyInfo.getVolumeName(),
+        omKeyInfo.getBucketName(), omKeyInfo.getKeyName());
+    omMetadataManager.getKeyTable().putWithBatch(batchOperation, ozoneKey,
+        omKeyInfo);
+    return ozoneKey;
   }
 
   protected String getMultipartKey() {

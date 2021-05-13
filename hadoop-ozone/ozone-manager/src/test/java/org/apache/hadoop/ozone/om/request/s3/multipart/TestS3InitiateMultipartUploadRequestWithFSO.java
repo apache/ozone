@@ -78,12 +78,17 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
 
     long parentID = verifyDirectoriesInDB(dirs, bucketID);
 
-    String multipartFileKey = omMetadataManager.getMultipartKey(parentID,
+    String multipartFileKey = omMetadataManager
+        .getMultipartKey(volumeName, bucketName, keyName,
+            modifiedRequest.getInitiateMultiPartUploadRequest().getKeyArgs()
+                .getMultipartUploadID());
+
+    String multipartOpenFileKey = omMetadataManager.getMultipartKey(parentID,
             fileName, modifiedRequest.getInitiateMultiPartUploadRequest()
                     .getKeyArgs().getMultipartUploadID());
 
     OmKeyInfo omKeyInfo = omMetadataManager.getOpenKeyTable()
-            .get(multipartFileKey);
+            .get(multipartOpenFileKey);
     Assert.assertNotNull("Failed to find the fileInfo", omKeyInfo);
     Assert.assertEquals("FileName mismatches!", fileName,
             omKeyInfo.getKeyName());
@@ -132,6 +137,7 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
     return parentID;
   }
 
+  @Override
   protected S3InitiateMultipartUploadRequest getS3InitiateMultipartUploadReq(
       OMRequest initiateMPURequest) {
     return new S3InitiateMultipartUploadRequestWithFSO(initiateMPURequest);

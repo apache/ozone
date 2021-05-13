@@ -26,23 +26,24 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import javax.annotation.Nonnull;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.MULTIPARTFILEINFO_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.MULTIPARTINFO_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
 
 /**
  * Response for Multipart Abort Request - prefix layout.
  */
 @CleanupTableInfo(cleanupTables = {OPEN_FILE_TABLE, DELETED_TABLE,
-    MULTIPARTFILEINFO_TABLE})
+    MULTIPARTINFO_TABLE})
 public class S3MultipartUploadAbortResponseWithFSO
     extends S3MultipartUploadAbortResponse {
 
   public S3MultipartUploadAbortResponseWithFSO(@Nonnull OMResponse omResponse,
-      String multipartKey, @Nonnull OmMultipartKeyInfo omMultipartKeyInfo,
-      boolean isRatisEnabled, @Nonnull OmBucketInfo omBucketInfo) {
+      String multipartKey, String multipartOpenKey,
+      @Nonnull OmMultipartKeyInfo omMultipartKeyInfo, boolean isRatisEnabled,
+      @Nonnull OmBucketInfo omBucketInfo) {
 
-    super(omResponse, multipartKey, omMultipartKeyInfo, isRatisEnabled,
-        omBucketInfo);
+    super(omResponse, multipartKey, multipartOpenKey, omMultipartKeyInfo,
+        isRatisEnabled, omBucketInfo);
   }
 
   /**

@@ -81,16 +81,19 @@ public class TestS3MultipartUploadAbortRequest extends TestS3MultipartRequest {
         s3MultipartUploadAbortRequest.validateAndUpdateCache(ozoneManager, 2L,
             ozoneManagerDoubleBufferHelper);
 
+    String multipartKey = omMetadataManager.getMultipartKey(volumeName,
+        bucketName, keyName, multipartUploadID);
 
-    String multipartKey = getMultipartKey(volumeName, bucketName, keyName,
-        multipartUploadID);
+    String multipartOpenKey = getMultipartOpenKey(volumeName, bucketName,
+        keyName, multipartUploadID);
 
     // Check table and response.
     Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
     Assert.assertNull(
         omMetadataManager.getMultipartInfoTable().get(multipartKey));
-    Assert.assertNull(omMetadataManager.getOpenKeyTable().get(multipartKey));
+    Assert
+        .assertNull(omMetadataManager.getOpenKeyTable().get(multipartOpenKey));
 
   }
 
@@ -189,7 +192,7 @@ public class TestS3MultipartUploadAbortRequest extends TestS3MultipartRequest {
     // no parent hierarchy
   }
 
-  protected String getMultipartKey(String volumeName, String bucketName,
+  protected String getMultipartOpenKey(String volumeName, String bucketName,
       String keyName, String multipartUploadID) {
     return omMetadataManager.getMultipartKey(volumeName,
         bucketName, keyName, multipartUploadID);

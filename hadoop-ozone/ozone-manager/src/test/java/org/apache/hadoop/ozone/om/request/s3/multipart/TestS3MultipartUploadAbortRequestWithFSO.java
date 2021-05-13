@@ -60,7 +60,7 @@ public class TestS3MultipartUploadAbortRequestWithFSO
   }
 
   @Override
-  protected String getMultipartKey(String volumeName, String bucketName,
+  protected String getMultipartOpenKey(String volumeName, String bucketName,
       String keyName, String multipartUploadID) {
     String fileName = StringUtils.substringAfter(keyName, dirName);
     return omMetadataManager.getMultipartKey(parentID, fileName,

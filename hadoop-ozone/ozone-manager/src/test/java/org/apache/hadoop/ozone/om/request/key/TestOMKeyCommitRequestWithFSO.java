@@ -102,6 +102,7 @@ public class TestOMKeyCommitRequestWithFSO extends TestOMKeyCommitRequest {
     return new OMKeyCommitRequestWithFSO(omRequest);
   }
 
+  @Override
   protected void verifyKeyName(OmKeyInfo omKeyInfo) {
     // prefix layout format - stores fileName in the keyName DB field.
     String fileName = OzoneFSUtils.getFileName(keyName);

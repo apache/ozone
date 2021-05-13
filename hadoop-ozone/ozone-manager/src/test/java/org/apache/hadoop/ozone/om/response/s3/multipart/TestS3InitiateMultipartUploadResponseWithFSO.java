@@ -58,10 +58,14 @@ public class TestS3InitiateMultipartUploadResponseWithFSO
     // Do manual commit and see whether addToBatch is successful or not.
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
-    String multipartKey = omMetadataManager.getMultipartKey(parentID, fileName,
-            multipartUploadID);
+    String multipartKey = omMetadataManager
+        .getMultipartKey(volumeName, bucketName, keyName, multipartUploadID);
 
-    OmKeyInfo omKeyInfo = omMetadataManager.getOpenKeyTable().get(multipartKey);
+    String multipartOpenKey = omMetadataManager
+        .getMultipartKey(parentID, fileName, multipartUploadID);
+
+    OmKeyInfo omKeyInfo =
+        omMetadataManager.getOpenKeyTable().get(multipartOpenKey);
     Assert.assertNotNull("Failed to find the fileInfo", omKeyInfo);
     Assert.assertEquals("FileName mismatches!", fileName,
             omKeyInfo.getKeyName());

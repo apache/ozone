@@ -39,6 +39,7 @@ public class TestOMAllocateBlockResponseWithFSO
   private long parentID = 10;
   private String fileName = "file1";
 
+  @Override
   protected OmKeyInfo createOmKeyInfo() throws Exception {
     // need to initialize parentID
     String parentDir = keyName;
@@ -55,12 +56,14 @@ public class TestOMAllocateBlockResponseWithFSO
     return omKeyInfoFSO;
   }
 
+  @Override
   protected String getOpenKey() throws Exception {
     return omMetadataManager.getOpenFileName(
             parentID, fileName, clientID);
   }
 
   @NotNull
+  @Override
   protected OMAllocateBlockResponse getOmAllocateBlockResponse(
           OmKeyInfo omKeyInfo, OmBucketInfo omBucketInfo,
           OMResponse omResponse) {
