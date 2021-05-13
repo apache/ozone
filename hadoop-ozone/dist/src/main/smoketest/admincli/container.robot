@@ -72,9 +72,9 @@ Incomplete command
                         Should contain   ${output}   create
                         Should contain   ${output}   close
 
-List containers on unknown host
-    ${output} =         Execute And Ignore Error     ozone admin --verbose container list --scm unknown-host
-                        Should contain   ${output}   Invalid host name
+#List containers on unknown host
+#    ${output} =         Execute And Ignore Error     ozone admin --verbose container list --scm unknown-host
+#                        Should contain   ${output}   Invalid host name
 
 Cannot close container without admin privilege
     Requires admin privilege    ozone admin container close "${CONTAINER}"
