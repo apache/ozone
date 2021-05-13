@@ -126,9 +126,17 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
       multipartKey = omMetadataManager.getMultipartKey(
           volumeName, bucketName, keyName, keyArgs.getMultipartUploadID());
 
-      String multipartOpenKey =
-          getMultipartOpenKey(keyArgs.getMultipartUploadID(), volumeName,
-              bucketName, keyName, omMetadataManager);
+      String multipartOpenKey;
+      try {
+        multipartOpenKey =
+            getMultipartOpenKey(keyArgs.getMultipartUploadID(), volumeName,
+                bucketName, keyName, omMetadataManager);
+      } catch (OMException ome) {
+        throw new OMException(
+            "Abort Multipart Upload Failed: volume: " + requestedVolume
+                + ", bucket: " + requestedBucket + ", key: " + keyName, ome,
+            OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
+      }
 
       OmKeyInfo omKeyInfo =
           omMetadataManager.getOpenKeyTable().get(multipartOpenKey);
