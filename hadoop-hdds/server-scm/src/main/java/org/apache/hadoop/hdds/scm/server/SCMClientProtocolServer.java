@@ -68,6 +68,7 @@ import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.audit.Auditor;
 import org.apache.hadoop.ozone.audit.SCMAction;
 import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.thirdparty.com.google.common.base.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -181,11 +182,9 @@ public class SCMClientProtocolServer implements
     getClientRpcServer().join();
   }
 
-  @VisibleForTesting
-  public String getRpcRemoteUsername() {
-    return getRemoteUserName();
+  public UserGroupInformation getRemoteUser() {
+    return Server.getRemoteUser();
   }
-
   @Override
   public ContainerWithPipeline allocateContainer(HddsProtos.ReplicationType
       replicationType, HddsProtos.ReplicationFactor factor,
@@ -194,7 +193,7 @@ public class SCMClientProtocolServer implements
       throw new SCMException("SafeModePrecheck failed for allocateContainer",
           ResultCodes.SAFE_MODE_EXCEPTION);
     }
-    getScm().checkAdminAccess(getRpcRemoteUsername());
+    getScm().checkAdminAccess(getRemoteUser());
 
     final ContainerInfo container = scm.getContainerManager()
         .allocateContainer(
@@ -207,11 +206,10 @@ public class SCMClientProtocolServer implements
 
   @Override
   public ContainerInfo getContainer(long containerID) throws IOException {
-    String remoteUser = getRpcRemoteUsername();
     boolean auditSuccess = true;
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("containerID", String.valueOf(containerID));
-    getScm().checkAdminAccess(remoteUser);
+    getScm().checkAdminAccess(getRemoteUser());
     try {
       return scm.getContainerManager()
           .getContainer(ContainerID.valueOf(containerID));
@@ -393,11 +391,11 @@ public class SCMClientProtocolServer implements
 
   @Override
   public void deleteContainer(long containerID) throws IOException {
-    String remoteUser = getRpcRemoteUsername();
     boolean auditSuccess = true;
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("containerID", String.valueOf(containerID));
-    auditMap.put("remoteUser", remoteUser);
+    UserGroupInformation remoteUser = getRemoteUser();
+    auditMap.put("remoteUser", remoteUser.getUserName());
     try {
       getScm().checkAdminAccess(remoteUser);
       scm.getContainerManager().deleteContainer(
@@ -447,9 +445,8 @@ public class SCMClientProtocolServer implements
   @Override
   public List<DatanodeAdminError> decommissionNodes(List<String> nodes)
       throws IOException {
-    String remoteUser = getRpcRemoteUsername();
     try {
-      getScm().checkAdminAccess(remoteUser);
+      getScm().checkAdminAccess(getRemoteUser());
       return scm.getScmDecommissionManager().decommissionNodes(nodes);
     } catch (Exception ex) {
       LOG.error("Failed to decommission nodes", ex);
@@ -460,9 +457,8 @@ public class SCMClientProtocolServer implements
   @Override
   public List<DatanodeAdminError> recommissionNodes(List<String> nodes)
       throws IOException {
-    String remoteUser = getRpcRemoteUsername();
     try {
-      getScm().checkAdminAccess(remoteUser);
+      getScm().checkAdminAccess(getRemoteUser());
       return scm.getScmDecommissionManager().recommissionNodes(nodes);
     } catch (Exception ex) {
       LOG.error("Failed to recommission nodes", ex);
@@ -473,9 +469,8 @@ public class SCMClientProtocolServer implements
   @Override
   public List<DatanodeAdminError> startMaintenanceNodes(List<String> nodes,
       int endInHours) throws IOException {
-    String remoteUser = getRpcRemoteUsername();
     try {
-      getScm().checkAdminAccess(remoteUser);
+      getScm().checkAdminAccess(getRemoteUser());
       return scm.getScmDecommissionManager()
           .startMaintenanceNodes(nodes, endInHours);
     } catch (Exception ex) {
@@ -486,10 +481,10 @@ public class SCMClientProtocolServer implements
 
   @Override
   public void closeContainer(long containerID) throws IOException {
-    final String remoteUser = getRpcRemoteUsername();
+    final UserGroupInformation remoteUser = getRemoteUser();
     final Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("containerID", String.valueOf(containerID));
-    auditMap.put("remoteUser", remoteUser);
+    auditMap.put("remoteUser", remoteUser.getUserName());
     try {
       scm.checkAdminAccess(remoteUser);
       final ContainerID cid = ContainerID.valueOf(containerID);
@@ -547,8 +542,7 @@ public class SCMClientProtocolServer implements
   @Override
   public void deactivatePipeline(HddsProtos.PipelineID pipelineID)
       throws IOException {
-    String remoteUser = getRemoteUserName();
-    getScm().checkAdminAccess(remoteUser);
+    getScm().checkAdminAccess(getRemoteUser());
     AUDIT.logReadSuccess(buildAuditMessageForSuccess(
         SCMAction.DEACTIVATE_PIPELINE, null));
     scm.getPipelineManager().deactivatePipeline(
@@ -558,8 +552,7 @@ public class SCMClientProtocolServer implements
   @Override
   public void closePipeline(HddsProtos.PipelineID pipelineID)
       throws IOException {
-    String remoteUser = getRemoteUserName();
-    getScm().checkAdminAccess(remoteUser);
+    getScm().checkAdminAccess(getRemoteUser());
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("pipelineID", pipelineID.getId());
     PipelineManager pipelineManager = scm.getPipelineManager();
@@ -634,8 +627,7 @@ public class SCMClientProtocolServer implements
    */
   @Override
   public boolean forceExitSafeMode() throws IOException {
-    String remoteUser = getRemoteUserName();
-    getScm().checkAdminAccess(remoteUser);
+    getScm().checkAdminAccess(getRemoteUser());
     AUDIT.logWriteSuccess(
         buildAuditMessageForSuccess(SCMAction.FORCE_EXIT_SAFE_MODE, null)
     );
@@ -644,8 +636,7 @@ public class SCMClientProtocolServer implements
 
   @Override
   public void startReplicationManager() throws IOException {
-    String remoteUser = getRemoteUserName();
-    getScm().checkAdminAccess(remoteUser);
+    getScm().checkAdminAccess(getRemoteUser());
     AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
         SCMAction.START_REPLICATION_MANAGER, null));
     scm.getReplicationManager().start();
@@ -653,8 +644,7 @@ public class SCMClientProtocolServer implements
 
   @Override
   public void stopReplicationManager() throws IOException {
-    String remoteUser = getRemoteUserName();
-    getScm().checkAdminAccess(remoteUser);
+    getScm().checkAdminAccess(getRemoteUser());
     AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
         SCMAction.STOP_REPLICATION_MANAGER, null));
     scm.getReplicationManager().stop();
@@ -682,9 +672,8 @@ public class SCMClientProtocolServer implements
       String ipaddress, String uuid) throws IOException {
 
     // check admin authorisation
-    String remoteUser = getRpcRemoteUsername();
     try {
-      getScm().checkAdminAccess(remoteUser);
+      getScm().checkAdminAccess(getRemoteUser());
     } catch (IOException e) {
       LOG.error("Authorisation failed", e);
       throw e;
@@ -750,9 +739,8 @@ public class SCMClientProtocolServer implements
       boolean mostUsed, int count) throws IOException, IllegalArgumentException{
 
     // check admin authorisation
-    String remoteUser = getRpcRemoteUsername();
     try {
-      getScm().checkAdminAccess(remoteUser);
+      getScm().checkAdminAccess(getRemoteUser());
     } catch (IOException e) {
       LOG.error("Authorisation failed", e);
       throw e;
@@ -782,7 +770,7 @@ public class SCMClientProtocolServer implements
   @Override
   public Token<?> getContainerToken(ContainerID containerID)
       throws IOException {
-    String remoteUser = getRemoteUserName();
+    UserGroupInformation remoteUser = getRemoteUser();
     getScm().checkAdminAccess(remoteUser);
 
     if (!containerTokenEnabled) {
@@ -793,7 +781,7 @@ public class SCMClientProtocolServer implements
         scm.getContainerTokenSecretManager();
 
     return secretManager.generateToken(
-        secretManager.createIdentifier(remoteUser, containerID));
+        secretManager.createIdentifier(remoteUser.getUserName(), containerID));
   }
 
   /**
