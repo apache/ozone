@@ -160,11 +160,5 @@ public class TestOmAcls {
     public boolean checkAccess(IOzoneObj ozoneObject, RequestContext context) {
       return TestOmAcls.aclAllow;
     }
-
-    @Override
-    public boolean isAdmin(String username) {
-      return TestOmAcls.aclAllow;
-    }
   }
-
 }

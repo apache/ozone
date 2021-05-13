@@ -28,9 +28,4 @@ public class OzoneAccessAuthorizer implements IAccessAuthorizer {
       throws OMException {
     return true;
   }
-
-  @Override
-  public boolean isAdmin(String username) {
-    return true;
-  }
 }

@@ -42,8 +42,6 @@ public interface IAccessAuthorizer {
   boolean checkAccess(IOzoneObj ozoneObject, RequestContext context)
       throws OMException;
 
-  boolean isAdmin(String username);
-
   /**
    * ACL rights.
    */
@@ -147,7 +145,6 @@ public interface IAccessAuthorizer {
         throw new IllegalArgumentException("ACL right is not recognized");
       }
     }
-
   }
 
   /**
