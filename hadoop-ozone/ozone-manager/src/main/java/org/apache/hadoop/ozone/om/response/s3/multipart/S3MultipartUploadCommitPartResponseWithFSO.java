@@ -30,13 +30,13 @@ import javax.annotation.Nullable;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.MULTIPARTFILEINFO_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.MULTIPARTINFO_TABLE;
 
 /**
- * Response for S3MultipartUploadCommitPart request.
+ * Response for S3MultipartUploadCommitPartWithFSO request.
  */
 @CleanupTableInfo(cleanupTables = {OPEN_FILE_TABLE, DELETED_TABLE,
-    MULTIPARTFILEINFO_TABLE})
+    MULTIPARTINFO_TABLE})
 public class S3MultipartUploadCommitPartResponseWithFSO
         extends S3MultipartUploadCommitPartResponse {
 
@@ -50,6 +50,9 @@ public class S3MultipartUploadCommitPartResponseWithFSO
    * @param openKey
    * @param omMultipartKeyInfo
    * @param oldPartKeyInfo
+   * @param openPartKeyInfoToBeDeleted
+   * @param isRatisEnabled
+   * @param omBucketInfo
    */
   @SuppressWarnings("checkstyle:ParameterNumber")
   public S3MultipartUploadCommitPartResponseWithFSO(

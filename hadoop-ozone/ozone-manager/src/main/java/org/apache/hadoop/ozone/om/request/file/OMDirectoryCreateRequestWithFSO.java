@@ -297,7 +297,7 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
    * @param inheritAcls
    * @return the OmDirectoryInfo structure
    */
-  public static OmDirectoryInfo createDirectoryInfoWithACL(
+  private static OmDirectoryInfo createDirectoryInfoWithACL(
           String dirName, KeyArgs keyArgs, long objectId,
           long parentObjectId, long transactionIndex,
           List<OzoneAcl> inheritAcls) {

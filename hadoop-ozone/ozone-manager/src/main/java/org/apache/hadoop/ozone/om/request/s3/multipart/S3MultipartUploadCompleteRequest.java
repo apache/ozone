@@ -141,18 +141,19 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       String ozoneKey = omMetadataManager.getOzoneKey(
           volumeName, bucketName, keyName);
 
+      String dbOzoneKey =
+          getDBOzoneKey(omMetadataManager, volumeName, bucketName, keyName);
+
+      String dbMultipartOpenKey =
+          getDBMultipartOpenKey(volumeName, bucketName, keyName, uploadID,
+              omMetadataManager);
+
       OmMultipartKeyInfo multipartKeyInfo = omMetadataManager
           .getMultipartInfoTable().get(multipartKey);
 
       // Check for directory exists with same name, if it exists throw error. 
-      if (ozoneManager.getEnableFileSystemPaths()) {
-        if (checkDirectoryAlreadyExists(volumeName, bucketName, keyName,
-                omMetadataManager)) {
-          throw new OMException("Can not Complete MPU for file: " + keyName +
-                  " as there is already directory in the given path",
-                  NOT_A_FILE);
-        }
-      }
+      checkDirectoryAlreadyExists(ozoneManager, volumeName, bucketName, keyName,
+          omMetadataManager);
 
       if (multipartKeyInfo == null) {
         throw new OMException(
@@ -184,10 +185,10 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
 
         // All parts have same replication information. Here getting from last
         // part.
-        OmKeyInfo omKeyInfo = getOmKeyInfo(ozoneManager, trxnLogIndex, keyArgs,
-                volumeName, bucketName, keyName, multipartKey,
-                omMetadataManager, ozoneKey, partKeyInfoMap, partLocationInfos,
-                dataSize);
+        OmKeyInfo omKeyInfo =
+            getOmKeyInfo(ozoneManager, trxnLogIndex, keyArgs, volumeName,
+                bucketName, keyName, dbMultipartOpenKey, omMetadataManager,
+                dbOzoneKey, partKeyInfoMap, partLocationInfos, dataSize);
 
         //Find all unused parts.
         List<OmKeyInfo> unUsedParts = new ArrayList<>();
@@ -199,8 +200,8 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
           }
         }
 
-        updateCache(omMetadataManager, ozoneKey, multipartKey, omKeyInfo,
-            trxnLogIndex);
+        updateCache(omMetadataManager, dbOzoneKey, dbMultipartOpenKey,
+            multipartKey, omKeyInfo, trxnLogIndex);
 
         omResponse.setCompleteMultiPartUploadResponse(
             MultipartUploadCompleteResponse.newBuilder()
@@ -209,8 +210,9 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
                 .setKey(keyName)
                 .setHash(DigestUtils.sha256Hex(keyName)));
 
-        omClientResponse = new S3MultipartUploadCompleteResponse(
-            omResponse.build(), multipartKey, omKeyInfo, unUsedParts);
+        omClientResponse =
+            getOmClientResponse(multipartKey, omResponse, dbMultipartOpenKey,
+                omKeyInfo, unUsedParts);
 
         result = Result.SUCCESS;
       } else {
@@ -223,8 +225,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
     } catch (IOException ex) {
       result = Result.FAILURE;
       exception = ex;
-      omClientResponse = new S3MultipartUploadCompleteResponse(
-          createErrorOMResponse(omResponse, exception));
+      omClientResponse = getOmClientResponse(omResponse, exception);
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
@@ -238,6 +239,33 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
             auditMap, volumeName, bucketName, keyName, exception, result);
 
     return omClientResponse;
+  }
+
+  protected S3MultipartUploadCompleteResponse getOmClientResponse(
+      OMResponse.Builder omResponse, IOException exception) {
+    return new S3MultipartUploadCompleteResponse(
+        createErrorOMResponse(omResponse, exception));
+  }
+
+  protected OMClientResponse getOmClientResponse(String multipartKey,
+      OMResponse.Builder omResponse, String dbMultipartOpenKey,
+      OmKeyInfo omKeyInfo, List<OmKeyInfo> unUsedParts) {
+
+    return new S3MultipartUploadCompleteResponse(omResponse.build(),
+        multipartKey, dbMultipartOpenKey, omKeyInfo, unUsedParts);
+  }
+
+  protected void checkDirectoryAlreadyExists(OzoneManager ozoneManager,
+      String volumeName, String bucketName, String keyName,
+      OMMetadataManager omMetadataManager) throws IOException {
+    if (ozoneManager.getEnableFileSystemPaths()) {
+      if (checkDirectoryAlreadyExists(volumeName, bucketName, keyName,
+              omMetadataManager)) {
+        throw new OMException("Can not Complete MPU for file: " + keyName +
+                " as there is already directory in the given path",
+                NOT_A_FILE);
+      }
+    }
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
@@ -274,7 +302,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
   @SuppressWarnings("checkstyle:ParameterNumber")
   protected OmKeyInfo getOmKeyInfo(OzoneManager ozoneManager, long trxnLogIndex,
       KeyArgs keyArgs, String volumeName, String bucketName, String keyName,
-      String multipartKey, OMMetadataManager omMetadataManager,
+      String multipartOpenKey, OMMetadataManager omMetadataManager,
       String ozoneKey, TreeMap<Integer, PartKeyInfo> partKeyInfoMap,
       List<OmKeyLocationInfo> partLocationInfos, long dataSize)
           throws IOException {
@@ -291,7 +319,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
           OmKeyLocationInfoGroup(0, partLocationInfos, true);
 
       // Get the objectID of the key from OpenKeyTable
-      OmKeyInfo dbOpenKeyInfo = getOmKeyInfoFromOpenKeyTable(multipartKey,
+      OmKeyInfo dbOpenKeyInfo = getOmKeyInfoFromOpenKeyTable(multipartOpenKey,
               keyName, omMetadataManager);
 
       // A newly created key, this is the first version.
@@ -332,6 +360,18 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
     // FSO is disabled. Do nothing.
   }
 
+  protected String getDBOzoneKey(OMMetadataManager omMetadataManager,
+      String volumeName, String bucketName, String keyName) throws IOException {
+    return omMetadataManager.getOzoneKey(volumeName, bucketName, keyName);
+  }
+
+  protected String getDBMultipartOpenKey(String volumeName, String bucketName,
+      String keyName, String uploadID, OMMetadataManager omMetadataManager)
+      throws IOException {
+    return omMetadataManager
+        .getMultipartKey(volumeName, bucketName, keyName, uploadID);
+  }
+
   protected OmKeyInfo getOmKeyInfoFromKeyTable(String dbOzoneKey,
       String keyName, OMMetadataManager omMetadataManager) throws IOException {
     return omMetadataManager.getKeyTable().get(dbOzoneKey);
@@ -342,7 +382,15 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
     return omMetadataManager.getOpenKeyTable().get(dbMultipartKey);
   }
 
-  protected int getPartsListSize(String requestedVolume,
+  protected void addKeyTableCacheEntry(OMMetadataManager omMetadataManager,
+      String dbOzoneKey, OmKeyInfo omKeyInfo, long transactionLogIndex) {
+
+    // Add key entry to file table.
+    omMetadataManager.getKeyTable().addCacheEntry(new CacheKey<>(dbOzoneKey),
+        new CacheValue<>(Optional.of(omKeyInfo), transactionLogIndex));
+  }
+
+  private int getPartsListSize(String requestedVolume,
       String requestedBucket, String keyName, String ozoneKey,
       List<Integer> partNumbers,
       List<OzoneManagerProtocolProtos.Part> partsList) throws OMException {
@@ -368,7 +416,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
-  protected long getMultipartDataSize(String requestedVolume,
+  private long getMultipartDataSize(String requestedVolume,
       String requestedBucket, String keyName, String ozoneKey,
       TreeMap<Integer, PartKeyInfo> partKeyInfoMap,
       int partsListSize, List<OmKeyLocationInfo> partLocationInfos,
@@ -386,8 +434,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
 
       String dbPartName = null;
       if (partKeyInfo != null) {
-        dbPartName = preparePartName(requestedVolume, requestedBucket, keyName,
-                partKeyInfo, ozoneManager.getMetadataManager());
+        dbPartName = partKeyInfo.getPartName();
       }
       if (!StringUtils.equals(partName, dbPartName)) {
         String omPartName = partKeyInfo == null ? null : dbPartName;
@@ -430,34 +477,26 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
     return dataSize;
   }
 
-  protected String preparePartName(String requestedVolume,
-      String requestedBucket, String keyName, PartKeyInfo partKeyInfo,
-      OMMetadataManager omMetadataManager) {
-
-    return partKeyInfo.getPartName();
-  }
-
   private static String failureMessage(String volume, String bucket,
       String keyName) {
     return "Complete Multipart Upload Failed: volume: " +
         volume + " bucket: " + bucket + " key: " + keyName;
   }
 
-  protected void updateCache(OMMetadataManager omMetadataManager,
-      String ozoneKey, String multipartKey, OmKeyInfo omKeyInfo,
-      long transactionLogIndex) {
+  private void updateCache(OMMetadataManager omMetadataManager,
+      String dbOzoneKey, String dbMultipartOpenKey, String dbMultipartKey,
+      OmKeyInfo omKeyInfo, long transactionLogIndex) {
     // Update cache.
     // 1. Add key entry to key table.
     // 2. Delete multipartKey entry from openKeyTable and multipartInfo table.
-    omMetadataManager.getKeyTable().addCacheEntry(
-        new CacheKey<>(ozoneKey),
-        new CacheValue<>(Optional.of(omKeyInfo), transactionLogIndex));
+    addKeyTableCacheEntry(omMetadataManager, dbOzoneKey, omKeyInfo,
+        transactionLogIndex);
 
     omMetadataManager.getOpenKeyTable().addCacheEntry(
-        new CacheKey<>(multipartKey),
+        new CacheKey<>(dbMultipartOpenKey),
         new CacheValue<>(Optional.absent(), transactionLogIndex));
     omMetadataManager.getMultipartInfoTable().addCacheEntry(
-        new CacheKey<>(multipartKey),
+        new CacheKey<>(dbMultipartKey),
         new CacheValue<>(Optional.absent(), transactionLogIndex));
   }
 }

@@ -89,17 +89,21 @@ public class TestS3MultipartUploadCommitPartRequest
     Assert.assertTrue(omClientResponse.getOMResponse().getStatus()
         == OzoneManagerProtocolProtos.Status.OK);
 
-    String multipartKey = getMultipartKey(volumeName, bucketName, keyName,
-            multipartUploadID);
+    String multipartOpenKey = getMultipartOpenKey(volumeName, bucketName,
+        keyName, multipartUploadID);
+
+    String multipartKey = omMetadataManager.getMultipartKey(volumeName,
+        bucketName, keyName, multipartUploadID);
 
     Assert.assertNotNull(
         omMetadataManager.getMultipartInfoTable().get(multipartKey));
     Assert.assertTrue(omMetadataManager.getMultipartInfoTable()
         .get(multipartKey).getPartKeyInfoMap().size() == 1);
-    Assert.assertNull(omMetadataManager.getOpenKeyTable()
-        .get(omMetadataManager.getOpenKey(volumeName, bucketName, keyName,
-            clientID)));
+    Assert.assertNotNull(omMetadataManager.getOpenKeyTable()
+        .get(multipartOpenKey));
 
+    String partKey = getOpenKey(volumeName, bucketName, keyName, clientID);
+    Assert.assertNull(omMetadataManager.getOpenKeyTable().get(partKey));
   }
 
   @Test
@@ -133,8 +137,8 @@ public class TestS3MultipartUploadCommitPartRequest
     Assert.assertTrue(omClientResponse.getOMResponse().getStatus()
         == OzoneManagerProtocolProtos.Status.NO_SUCH_MULTIPART_UPLOAD_ERROR);
 
-    String multipartKey = getMultipartKey(volumeName, bucketName, keyName,
-            multipartUploadID);
+    String multipartKey = omMetadataManager.getMultipartKey(volumeName,
+        bucketName, keyName, multipartUploadID);
 
     Assert.assertNull(
         omMetadataManager.getMultipartInfoTable().get(multipartKey));
@@ -216,10 +220,16 @@ public class TestS3MultipartUploadCommitPartRequest
     return UUID.randomUUID().toString();
   }
 
-  protected String getMultipartKey(String volumeName, String bucketName,
+  protected String getMultipartOpenKey(String volumeName, String bucketName,
       String keyName, String multipartUploadID) {
-    return omMetadataManager.getMultipartKey(volumeName,
-            bucketName, keyName, multipartUploadID);
+    return omMetadataManager
+        .getMultipartKey(volumeName, bucketName, keyName, multipartUploadID);
+  }
+
+  protected String getOpenKey(String volumeName, String bucketName,
+      String keyName, long clientID) {
+    return omMetadataManager.getOpenKey(volumeName, bucketName,
+        keyName, clientID);
   }
 
   protected void createParentPath(String volumeName, String bucketName)

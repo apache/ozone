@@ -66,6 +66,7 @@ public class TestOMKeyCreateResponseWithFSO extends TestOMKeyCreateResponse {
   }
 
   @NotNull
+  @Override
   protected OMKeyCreateResponse getOmKeyCreateResponse(OmKeyInfo keyInfo,
       OmBucketInfo bucketInfo, OMResponse response) {
 

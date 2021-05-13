@@ -147,7 +147,11 @@ public class S3InitiateMultipartUploadRequestWithFSO
       // multipart upload request is received, it returns multipart upload id
       // for the key.
 
-      String multipartKey = omMetadataManager
+      String multipartKey = omMetadataManager.getMultipartKey(
+          volumeName, bucketName, keyName,
+          keyArgs.getMultipartUploadID());
+
+      String multipartOpenKey = omMetadataManager
           .getMultipartKey(pathInfoFSO.getLastKnownParentId(),
               pathInfoFSO.getLeafNodeName(), keyArgs.getMultipartUploadID());
 
@@ -189,7 +193,7 @@ public class S3InitiateMultipartUploadRequestWithFSO
               transactionLogIndex);
 
       OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
-              multipartKey, omKeyInfo, pathInfoFSO.getLeafNodeName(),
+          multipartOpenKey, omKeyInfo, pathInfoFSO.getLeafNodeName(),
               transactionLogIndex);
 
       // Add to cache
@@ -205,7 +209,8 @@ public class S3InitiateMultipartUploadRequestWithFSO
                       .setBucketName(requestedBucket)
                       .setKeyName(keyName)
                       .setMultipartUploadID(keyArgs.getMultipartUploadID()))
-                  .build(), multipartKeyInfo, omKeyInfo, missingParentInfos);
+                  .build(), multipartKeyInfo, omKeyInfo, multipartKey,
+              missingParentInfos);
 
       result = Result.SUCCESS;
     } catch (IOException ex) {

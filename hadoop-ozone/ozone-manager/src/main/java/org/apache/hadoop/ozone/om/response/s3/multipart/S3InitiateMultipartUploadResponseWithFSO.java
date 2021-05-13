@@ -33,25 +33,27 @@ import java.io.IOException;
 import java.util.List;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.MULTIPARTFILEINFO_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.MULTIPARTINFO_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
 
 /**
  * Response for S3 Initiate Multipart Upload request for prefix layout.
  */
 @CleanupTableInfo(cleanupTables = {DIRECTORY_TABLE, OPEN_FILE_TABLE,
-        MULTIPARTFILEINFO_TABLE})
+    MULTIPARTINFO_TABLE})
 public class S3InitiateMultipartUploadResponseWithFSO extends
         S3InitiateMultipartUploadResponse {
   private List<OmDirectoryInfo> parentDirInfos;
+  private String mpuDBKey;
 
   public S3InitiateMultipartUploadResponseWithFSO(
       @Nonnull OMResponse omResponse,
       @Nonnull OmMultipartKeyInfo omMultipartKeyInfo,
-      @Nonnull OmKeyInfo omKeyInfo,
+      @Nonnull OmKeyInfo omKeyInfo, @Nonnull String mpuDBKey,
       @Nonnull List<OmDirectoryInfo> parentDirInfos) {
     super(omResponse, omMultipartKeyInfo, omKeyInfo);
     this.parentDirInfos = parentDirInfos;
+    this.mpuDBKey = mpuDBKey;
   }
 
   /**
@@ -79,11 +81,10 @@ public class S3InitiateMultipartUploadResponseWithFSO extends
       }
     }
 
-    String multipartFileKey =
-            OMFileRequest.addToOpenFileTable(omMetadataManager, batchOperation,
-                    getOmKeyInfo(), getOmMultipartKeyInfo().getUploadID());
+    OMFileRequest.addToOpenFileTable(omMetadataManager, batchOperation,
+        getOmKeyInfo(), getOmMultipartKeyInfo().getUploadID());
 
     omMetadataManager.getMultipartInfoTable().putWithBatch(batchOperation,
-            multipartFileKey, getOmMultipartKeyInfo());
+        mpuDBKey, getOmMultipartKeyInfo());
   }
 }
