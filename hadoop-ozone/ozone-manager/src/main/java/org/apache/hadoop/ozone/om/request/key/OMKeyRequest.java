@@ -136,16 +136,15 @@ public abstract class OMKeyRequest extends OMClientRequest {
       throw ex;
     }
     for (AllocatedBlock allocatedBlock : allocatedBlocks) {
+      BlockID blockID = new BlockID(allocatedBlock.getBlockID());
       OmKeyLocationInfo.Builder builder = new OmKeyLocationInfo.Builder()
-          .setBlockID(new BlockID(allocatedBlock.getBlockID()))
+          .setBlockID(blockID)
           .setLength(scmBlockSize)
           .setOffset(0)
           .setPipeline(allocatedBlock.getPipeline());
       if (grpcBlockTokenEnabled) {
-        builder.setToken(secretManager
-            .generateToken(remoteUser, allocatedBlock.getBlockID().toString(),
-                EnumSet.of(READ, WRITE),
-                scmBlockSize));
+        builder.setToken(secretManager.generateToken(remoteUser, blockID,
+            EnumSet.of(READ, WRITE), scmBlockSize));
       }
       locationInfos.add(builder.build());
     }
