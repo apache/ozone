@@ -321,7 +321,7 @@ public final class OzoneConfigKeys {
   public static final String HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE =
       "hdds.datanode.metadata.rocksdb.cache.size";
   public static final String
-      HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE_DEFAULT = "64MB";
+      HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE_DEFAULT = "1GB";
 
   public static final String OZONE_SECURITY_ENABLED_KEY =
       "ozone.security.enabled";
