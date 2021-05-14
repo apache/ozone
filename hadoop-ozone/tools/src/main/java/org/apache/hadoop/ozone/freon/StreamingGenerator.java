@@ -109,9 +109,7 @@ public class StreamingGenerator extends BaseFreonGenerator
                      new StreamingClient("localhost", port,
                              new DirectoryServerDestination(
                                      destinationDir))) {
-          final Channel connect = client.connect();
-          connect.writeAndFlush(subdir + "\n").await();
-          connect.closeFuture().sync().await();
+          client.stream(subdir);
         }
         LOG.info("Replication has been finished to {}", sourceDir);
 
