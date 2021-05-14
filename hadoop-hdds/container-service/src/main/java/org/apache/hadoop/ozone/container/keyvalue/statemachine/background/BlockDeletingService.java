@@ -430,9 +430,9 @@ public class BlockDeletingService extends BackgroundService {
               meta.getStore().getBlockDataTable().deleteWithBatch(batch, bID);
             }
           }
-          meta.getStore().getBatchHandler().commitBatchOperation(batch);
           totalBlocks =
               deleteTransactions(delBlocks, handler, blockDataTable, container);
+          meta.getStore().getBatchHandler().commitBatchOperation(batch);
           containerData.updateAndCommitDBCounters(meta, batch,
               totalBlocks);
           // update count of pending deletion blocks and block count in
