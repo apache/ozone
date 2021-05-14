@@ -394,12 +394,18 @@ public final class HddsUtils {
   public static boolean requireBlockToken(
       ContainerProtos.Type cmdType) {
     switch (cmdType) {
-    case ReadChunk:
+    case CompactChunk:
+    case DeleteBlock:
+    case DeleteChunk:
     case GetBlock:
-    case WriteChunk:
+    case GetCommittedBlockLength:
+    case GetSmallFile:
+    case ListBlock:
+    case ListChunk:
     case PutBlock:
     case PutSmallFile:
-    case GetSmallFile:
+    case ReadChunk:
+    case WriteChunk:
       return true;
     default:
       return false;
