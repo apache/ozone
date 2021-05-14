@@ -19,25 +19,25 @@ Resource            ../lib/os.robot
 Test Timeout        5 minutes
 
 *** Variables ***
-${PREFIX}    ${EMPTY}
+${OCKR_PREFIX}    ockr
+${OMBR_PREFIX}    ombr
 
 *** Test Cases ***
-Ozone Client Remover (Error)
-    ${result} =        Execute and checkrc    ozone freon ocr ${OM_HA_PARAM} -t=1 -n=1 -p ocr${PREFIX} --remove-key --remove-bucket    255
-                       Should contain         ${result}   Invalid Option
+Ozone Client Key Remover
+    [Setup]            Ozone Client Key Generator For Remover    ${OCKR_PREFIX}
+    ${result} =        Execute                ozone freon ockr ${OM_HA_PARAM} -t=1 -n=1 -p ${OCKR_PREFIX}
+                       Should contain         ${result}   Successful executions: 1
 
+OM Bucket Remover
+    [Setup]            OM Bucket Generator For Remover           ${OMBR_PREFIX}
+    ${result} =        Execute                ozone freon ombr ${OM_HA_PARAM} -t=1 -n=1 -p ${OMBR_PREFIX}
+                       Should contain         ${result}   Successful executions: 1
+
+*** Keywords ***
 Ozone Client Key Generator For Remover
-    ${result} =        Execute                ozone freon ockg ${OM_HA_PARAM} -t=1 -n=1 -p ocr${PREFIX}
-                       Should contain         ${result}   Successful executions: 1
-
-Ozone Client Remover (KEY)
-    ${result} =        Execute                ozone freon ocr ${OM_HA_PARAM} -t=1 -n=1 -p ocr${PREFIX} --remove-key
-                       Should contain         ${result}   Successful executions: 1
+    [Arguments]        ${PREFIX}
+    Execute            ozone freon ockg ${OM_HA_PARAM} -t=1 -n=1 -p ${PREFIX}
 
 OM Bucket Generator For Remover
-    ${result} =        Execute                ozone freon ombg ${OM_HA_PARAM} -t=1 -n=1 -p ocr${PREFIX}
-                       Should contain         ${result}   Successful executions: 1
-
-Ozone Client Remover (BUCKET)
-    ${result} =        Execute                ozone freon ocr ${OM_HA_PARAM} -t=1 -n=1 -p ocr${PREFIX} --remove-bucket
-                       Should contain         ${result}   Successful executions: 1
+    [Arguments]        ${PREFIX}
+    Execute            ozone freon ombg ${OM_HA_PARAM} -t=1 -n=1 -p ${PREFIX}

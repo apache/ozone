@@ -30,13 +30,13 @@ import java.util.concurrent.Callable;
 /**
  * Data remover tool test om performance.
  */
-@Command(name = "ocr",
-    aliases = "ozone-client-remover",
+@Command(name = "ockr",
+    aliases = "ozone-client-key-remover",
     description = "Remove keys with the help of the ozone clients.",
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
-public class OzoneClientRemover extends BaseFreonGenerator
+public class OzoneClientKeyRemover extends BaseFreonGenerator
     implements Callable<Void> {
 
   @Option(names = {"-v", "--volume"},
@@ -47,7 +47,7 @@ public class OzoneClientRemover extends BaseFreonGenerator
 
   @Option(names = {"-b", "--bucket"},
       description = "Name of the bucket which contains the test data. Will be"
-          + " ignored when \"--remove-bucket\" is set.",
+          + " created if missing.",
       defaultValue = "bucket1")
   private String bucketName;
 
@@ -57,18 +57,6 @@ public class OzoneClientRemover extends BaseFreonGenerator
   )
   private String omServiceID = null;
 
-  @Option(names = {"--remove-bucket"},
-      description = "If turned on, Remover will be used to remove buckets. "
-          + "Can only set one option between \"--remove-key\" "
-          + "and \"--remove-bucket\"")
-  private boolean isRemoveBucket;
-
-  @Option(names = {"--remove-key"},
-      description = "If turned on, Remover will be used to remove keys. "
-          + "Can only set one option between \"--remove-key\" "
-          + "and \"--remove-bucket\"")
-  private boolean isRemoveKey;
-
   private Timer timer;
 
   private OzoneVolume ozoneVolume;
@@ -77,35 +65,21 @@ public class OzoneClientRemover extends BaseFreonGenerator
   @Override
   public Void call() throws Exception {
 
-    checkOption();
-
     init();
     OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
 
     try (OzoneClient rpcClient = createOzoneClient(omServiceID,
         ozoneConfiguration)) {
-      ozoneVolume = rpcClient.getObjectStore().getVolume(volumeName);
+      ozoneBucket = rpcClient.getObjectStore().getVolume(volumeName)
+          .getBucket(bucketName);
 
       timer = getMetrics().timer("remove");
 
-      if (isRemoveBucket) {
-        runTests(this::removeBucket);
-      } else if (isRemoveKey) {
-        ozoneBucket = ozoneVolume.getBucket(bucketName);
-        runTests(this::removeKey);
-      }
+      runTests(this::removeKey);
+
     }
 
     return null;
-  }
-
-  private void removeBucket(long counter) throws Exception {
-    final String bucket = generateBucketName(counter);
-
-    timer.time(() -> {
-      ozoneVolume.deleteBucket(bucket);
-      return null;
-    });
   }
 
   private void removeKey(long counter) throws Exception {
@@ -117,11 +91,4 @@ public class OzoneClientRemover extends BaseFreonGenerator
     });
   }
 
-  private void checkOption() {
-    if (isRemoveBucket && isRemoveKey) {
-      throw new UnsupportedOperationException("Invalid Option. Can only support"
-          + " one option between \"--remove-bucket\" and \"--remove-key\".");
-
-    }
-  }
 }
