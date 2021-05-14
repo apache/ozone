@@ -59,7 +59,6 @@ public class OzoneClientKeyRemover extends BaseFreonGenerator
 
   private Timer timer;
 
-  private OzoneVolume ozoneVolume;
   private OzoneBucket ozoneBucket;
 
   @Override
