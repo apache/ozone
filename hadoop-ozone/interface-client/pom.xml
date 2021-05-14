@@ -32,10 +32,28 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <dependency>
       <groupId>com.google.protobuf</groupId>
       <artifactId>protobuf-java</artifactId>
+      <version>2.5.0</version>      
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-hdds-interface-client</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.grpc</groupId>
+      <artifactId>grpc-bom</artifactId>
+      <version>1.37.0</version>
+      <type>pom</type>
+      <scope>import</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.grpc</groupId>
+      <artifactId>grpc-protobuf</artifactId>
+      <version>1.37.0</version>
+    </dependency>
+    <dependency>
+      <groupId>io.grpc</groupId>
+      <artifactId>grpc-stub</artifactId>
+      <version>1.37.0</version>
     </dependency>
   </dependencies>
   <build>
@@ -51,16 +69,46 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
         <extensions>true</extensions>
         <executions>
           <execution>
-            <id>compile-protoc</id>
+            <id>compile-protoc-3</id>
+            <goals>
+              <goal>compile</goal>
+              <goal>test-compile</goal>
+              <goal>compile-custom</goal>
+              <goal>test-compile-custom</goal>
+            </goals>
+            <configuration>
+              <protocArtifact>
+                com.google.protobuf:protoc:${protobuf.version}:exe:${os.detected.classifier}
+              </protocArtifact>
+              <protoSourceRoot>${basedir}/src/main/proto/</protoSourceRoot>
+              <includes>
+                <include>OmClientProtocol.proto</include>
+              </includes>
+              <outputDirectory>target/generated-sources/protobuf/java</outputDirectory>
+              <clearOutputDirectory>false</clearOutputDirectory>
+              <pluginId>grpc-java</pluginId>
+              <pluginArtifact>
+                io.grpc:protoc-gen-grpc-java:${grpc-compile.version}:exe:${os.detected.classifier}
+              </pluginArtifact>
+            </configuration>
+          </execution>
+          <execution>
+            <id>compile-protoc-2</id>
             <goals>
               <goal>compile</goal>
               <goal>test-compile</goal>
             </goals>
             <configuration>
-              <protoSourceRoot>${basedir}/src/main/proto/</protoSourceRoot>
               <protocArtifact>
                 com.google.protobuf:protoc:${protobuf.version}:exe:${os.detected.classifier}
               </protocArtifact>
+              <protoSourceRoot>${basedir}/src/main/proto/</protoSourceRoot>
+              <includes>
+
+                <include>Security.proto</include>
+              </includes>
+              <outputDirectory>target/generated-sources/protobuf/java</outputDirectory>
+              <clearOutputDirectory>false</clearOutputDirectory>
             </configuration>
           </execution>
         </executions>
