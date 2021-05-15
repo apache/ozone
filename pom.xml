@@ -76,10 +76,10 @@
     <declared.ozone.version>${ozone.version}</declared.ozone.version>
 
     <!-- Apache Ratis version -->
-    <ratis.version>1.0.0.7.1.7.0-SNAPSHOT</ratis.version>
+    <ratis.version>2.0.0.7.1.7.0-SNAPSHOT</ratis.version>
 
     <!-- Apache Ratis thirdparty version -->
-    <ratis.thirdparty.version>0.4.0.7.1.7.0-SNAPSHOT</ratis.thirdparty.version>
+    <ratis.thirdparty.version>0.6.0.7.1.7.0-SNAPSHOT</ratis.thirdparty.version>
 
     <distMgmtSnapshotsId>apache.snapshots.https</distMgmtSnapshotsId>
     <distMgmtSnapshotsName>Apache Development Snapshot Repository</distMgmtSnapshotsName>
