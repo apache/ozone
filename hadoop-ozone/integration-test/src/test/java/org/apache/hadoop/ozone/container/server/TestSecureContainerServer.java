@@ -76,10 +76,12 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getCreateContainerRequest;
-import static org.apache.hadoop.ozone.container.ContainerTestHelper.getPutBlockRequest;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getTestBlockID;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getTestContainerID;
-import static org.apache.hadoop.ozone.container.ContainerTestHelper.getWriteChunkRequest;
+import static org.apache.hadoop.ozone.container.ContainerTestHelper.newDeleteBlockRequestBuilder;
+import static org.apache.hadoop.ozone.container.ContainerTestHelper.newDeleteChunkRequestBuilder;
+import static org.apache.hadoop.ozone.container.ContainerTestHelper.newPutBlockRequestBuilder;
+import static org.apache.hadoop.ozone.container.ContainerTestHelper.newWriteChunkRequestBuilder;
 
 import com.google.common.collect.Maps;
 import org.apache.commons.io.FileUtils;
@@ -88,6 +90,7 @@ import org.apache.commons.lang3.RandomUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.hadoop.test.LambdaTestUtils;
 import org.apache.ratis.rpc.RpcType;
+
 import static org.apache.ratis.rpc.SupportedRpcType.GRPC;
 import org.apache.ratis.util.function.CheckedBiConsumer;
 import org.junit.After;
@@ -253,33 +256,48 @@ public class TestSecureContainerServer {
       ContainerProtocolCalls.createContainer(client, containerID,
           getToken(ContainerID.valueOf(containerID)));
 
-      // Test 1: Test putBlock failure without block token.
-      assertFailsTokenVerification(client, getPutBlockRequest(pipeline, null,
-          getWriteChunkRequest(pipeline, blockID, 1024, null).getWriteChunk()));
-
-      // Test 2: Test putBlock succeeded with valid block token.
       Token<OzoneBlockTokenIdentifier> token =
           blockTokenSecretManager.generateToken(blockID,
-          EnumSet.allOf(AccessModeProto.class), RandomUtils.nextLong());
+              EnumSet.allOf(AccessModeProto.class), RandomUtils.nextLong());
+      String encodedToken = token.encodeToUrlString();
 
-      ContainerCommandRequestProto writeChunkRequest = getWriteChunkRequest(
-          pipeline, blockID, 1024, token.encodeToUrlString());
-      assertSucceeds(client, writeChunkRequest);
+      ContainerCommandRequestProto.Builder writeChunk =
+          newWriteChunkRequestBuilder(pipeline, blockID, 1024, 0);
+      assertRequiresToken(client, encodedToken, writeChunk);
 
-      assertSucceeds(client, getPutBlockRequest(pipeline,
-          token.encodeToUrlString(), writeChunkRequest.getWriteChunk()));
+      ContainerCommandRequestProto.Builder putBlock =
+          newPutBlockRequestBuilder(pipeline, writeChunk.getWriteChunk());
+      assertRequiresToken(client, encodedToken, putBlock);
+
+      ContainerCommandRequestProto.Builder deleteChunk =
+          newDeleteChunkRequestBuilder(pipeline, writeChunk.getWriteChunk());
+      assertRequiresToken(client, encodedToken, deleteChunk);
+
+      ContainerCommandRequestProto.Builder deleteBlock =
+          newDeleteBlockRequestBuilder(pipeline, putBlock.getPutBlock());
+      assertRequiresToken(client, encodedToken, deleteBlock);
     } finally {
       stopServer.accept(pipeline);
       servers.forEach(XceiverServerSpi::stop);
     }
   }
 
-  private static ContainerCommandRequestProto assertSucceeds(
+  private static void assertRequiresToken(XceiverClientSpi client,
+      String encodedToken, ContainerCommandRequestProto.Builder requestBuilder)
+      throws Exception {
+
+    requestBuilder.setEncodedToken("");
+    assertFailsTokenVerification(client, requestBuilder.build());
+
+    requestBuilder.setEncodedToken(encodedToken);
+    assertSucceeds(client, requestBuilder.build());
+  }
+
+  private static void assertSucceeds(
       XceiverClientSpi client, ContainerCommandRequestProto req)
       throws IOException {
     ContainerCommandResponseProto response = client.sendCommand(req);
     assertEquals(SUCCESS, response.getResult());
-    return req;
   }
 
   private static void assertFailsTokenVerification(XceiverClientSpi client,

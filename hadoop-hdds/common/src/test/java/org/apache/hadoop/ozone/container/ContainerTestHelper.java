@@ -135,6 +135,17 @@ public final class ContainerTestHelper {
   public static ContainerCommandRequestProto getWriteChunkRequest(
       Pipeline pipeline, BlockID blockID, int datalen, int seq, String token)
       throws IOException {
+    Builder builder = newWriteChunkRequestBuilder(pipeline, blockID, datalen,
+        seq);
+    if (!Strings.isNullOrEmpty(token)) {
+      builder.setEncodedToken(token);
+    }
+    return builder.build();
+  }
+
+  public static Builder newWriteChunkRequestBuilder(
+      Pipeline pipeline, BlockID blockID, int datalen, int seq)
+      throws IOException {
     LOG.trace("writeChunk {} (blockID={}) to pipeline={}",
         datalen, blockID, pipeline);
     ContainerProtos.WriteChunkRequestProto.Builder writeRequest =
@@ -156,11 +167,8 @@ public final class ContainerTestHelper {
     request.setContainerID(blockID.getContainerID());
     request.setWriteChunk(writeRequest);
     request.setDatanodeUuid(pipeline.getFirstNode().getUuidString());
-    if (!Strings.isNullOrEmpty(token)) {
-      request.setEncodedToken(token);
-    }
 
-    return request.build();
+    return request;
   }
 
   /**
@@ -259,6 +267,11 @@ public final class ContainerTestHelper {
   public static ContainerCommandRequestProto getDeleteChunkRequest(
       Pipeline pipeline, ContainerProtos.WriteChunkRequestProto writeRequest)
       throws IOException {
+    return newDeleteChunkRequestBuilder(pipeline, writeRequest).build();
+  }
+
+  public static Builder newDeleteChunkRequestBuilder(Pipeline pipeline,
+      ContainerProtos.WriteChunkRequestProto writeRequest) throws IOException {
     LOG.trace("deleteChunk blockID={} from pipeline={}",
         writeRequest.getBlockID(), pipeline);
 
@@ -275,7 +288,7 @@ public final class ContainerTestHelper {
     request.setContainerID(writeRequest.getBlockID().getContainerID());
     request.setDeleteChunk(deleteRequest);
     request.setDatanodeUuid(pipeline.getFirstNode().getUuidString());
-    return request.build();
+    return request;
   }
 
   /**
@@ -404,8 +417,17 @@ public final class ContainerTestHelper {
       Pipeline pipeline, String token,
       ContainerProtos.WriteChunkRequestProto writeRequest)
       throws IOException {
-    LOG.trace("putBlock: {} to pipeline={} with token {}",
-        writeRequest.getBlockID(), pipeline, token);
+    Builder builder = newPutBlockRequestBuilder(pipeline, writeRequest);
+    if (!Strings.isNullOrEmpty(token)) {
+      builder.setEncodedToken(token);
+    }
+    return builder.build();
+  }
+
+  public static Builder newPutBlockRequestBuilder(Pipeline pipeline,
+      ContainerProtos.WriteChunkRequestProto writeRequest) throws IOException {
+    LOG.trace("putBlock: {} to pipeline={}",
+        writeRequest.getBlockID(), pipeline);
 
     ContainerProtos.PutBlockRequestProto.Builder putRequest =
         ContainerProtos.PutBlockRequestProto.newBuilder();
@@ -424,10 +446,7 @@ public final class ContainerTestHelper {
     request.setContainerID(blockData.getContainerID());
     request.setPutBlock(putRequest);
     request.setDatanodeUuid(pipeline.getFirstNode().getUuidString());
-    if (!Strings.isNullOrEmpty(token)) {
-      request.setEncodedToken(token);
-    }
-    return request.build();
+    return request;
   }
 
   /**
@@ -478,6 +497,11 @@ public final class ContainerTestHelper {
   public static ContainerCommandRequestProto getDeleteBlockRequest(
       Pipeline pipeline, ContainerProtos.PutBlockRequestProto putBlockRequest)
       throws IOException {
+    return newDeleteBlockRequestBuilder(pipeline, putBlockRequest).build();
+  }
+
+  public static Builder newDeleteBlockRequestBuilder(Pipeline pipeline,
+      ContainerProtos.PutBlockRequestProto putBlockRequest) throws IOException {
     ContainerProtos.DatanodeBlockID blockID = putBlockRequest.getBlockData()
         .getBlockID();
     LOG.trace("deleteBlock: name={}", blockID);
@@ -490,7 +514,7 @@ public final class ContainerTestHelper {
     request.setContainerID(blockID.getContainerID());
     request.setDeleteBlock(delRequest);
     request.setDatanodeUuid(pipeline.getFirstNode().getUuidString());
-    return request.build();
+    return request;
   }
 
   /**
