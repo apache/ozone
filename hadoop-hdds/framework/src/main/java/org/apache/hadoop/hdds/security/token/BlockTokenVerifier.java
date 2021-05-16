@@ -80,7 +80,8 @@ public class BlockTokenVerifier extends
     HddsProtos.BlockTokenSecretProto.AccessModeProto accessMode;
     if (HddsUtils.isReadOnly(cmd)) {
       accessMode = READ;
-    } else if (cmd.getCmdType() == DeleteBlock || cmd.getCmdType() == DeleteChunk) {
+    } else if (cmd.getCmdType() == DeleteBlock ||
+        cmd.getCmdType() == DeleteChunk) {
       accessMode = DELETE;
     } else {
       accessMode = WRITE;
