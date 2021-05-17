@@ -199,7 +199,7 @@ public class TrashOzoneFileSystem extends FileSystem {
     return new FileStatus(
         status.getKeyInfo().getDataSize(),
         status.isDirectory(),
-        status.getKeyInfo().getFactor().getNumber(),
+        status.getKeyInfo().getReplicationConfig().getRequiredNodes(),
         status.getBlockSize(),
         status.getKeyInfo().getModificationTime(),
         temp

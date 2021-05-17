@@ -38,6 +38,7 @@ import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -195,7 +196,7 @@ public class TestKeyManagerImpl {
             Mockito.any(ReplicationType.class),
             Mockito.any(ReplicationFactor.class), Mockito.anyString(),
             Mockito.any(ExcludeList.class))).thenThrow(
-        new SCMException("SafeModePrecheck failed for allocateBlock",
+                new SCMException("SafeModePrecheck failed for allocateBlock",
             ResultCodes.SAFE_MODE_EXCEPTION));
     createVolume(VOLUME_NAME);
     createBucket(VOLUME_NAME, BUCKET_NAME);
@@ -265,8 +266,7 @@ public class TestKeyManagerImpl {
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
         .setDataSize(0)
-        .setReplicationType(keyArgs.getType())
-        .setReplicationFactor(keyArgs.getFactor())
+        .setReplicationConfig(keyArgs.getReplicationConfig())
         .setFileEncryptionInfo(null).build();
     metadataManager.getOpenKeyTable().put(
         metadataManager.getOpenKey(VOLUME_NAME, BUCKET_NAME, KEY_NAME, 1L),
@@ -1371,9 +1371,9 @@ public class TestKeyManagerImpl {
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
     return new OmKeyArgs.Builder()
         .setBucketName(BUCKET_NAME)
-        .setFactor(ReplicationFactor.ONE)
         .setDataSize(0)
-        .setType(ReplicationType.STAND_ALONE)
+        .setReplicationConfig(
+            new StandaloneReplicationConfig(ReplicationFactor.ONE))
         .setAcls(OzoneAclUtil.getAclList(ugi.getUserName(), ugi.getGroupNames(),
             ALL, ALL))
         .setVolumeName(VOLUME_NAME);

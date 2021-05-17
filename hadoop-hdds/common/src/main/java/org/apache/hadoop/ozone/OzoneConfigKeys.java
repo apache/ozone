@@ -150,8 +150,8 @@ public final class OzoneConfigKeys {
   public static final int OZONE_CLIENT_CONNECTION_TIMEOUT_DEFAULT = 5000;
 
   public static final String OZONE_REPLICATION = "ozone.replication";
-  public static final int OZONE_REPLICATION_DEFAULT =
-      ReplicationFactor.THREE.getValue();
+  public static final String OZONE_REPLICATION_DEFAULT =
+      ReplicationFactor.THREE.toString();
 
   public static final String OZONE_REPLICATION_TYPE = "ozone.replication.type";
   public static final String OZONE_REPLICATION_TYPE_DEFAULT =

@@ -18,6 +18,7 @@ package org.apache.hadoop.ozone.security.acl;
 
 import com.google.common.base.Optional;
 import org.apache.commons.lang3.RandomUtils;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
@@ -172,9 +173,9 @@ public class TestOzoneNativeAuthorizer {
         .setVolumeName(volume)
         .setBucketName(bucket)
         .setKeyName(keyName)
-        .setFactor(HddsProtos.ReplicationFactor.ONE)
+        .setReplicationConfig(
+            new StandaloneReplicationConfig(HddsProtos.ReplicationFactor.ONE))
         .setDataSize(0)
-        .setType(HddsProtos.ReplicationType.STAND_ALONE)
         .setAcls(OzoneAclUtil.getAclList(testUgi.getUserName(),
             testUgi.getGroupNames(), ALL, ALL))
         .build();

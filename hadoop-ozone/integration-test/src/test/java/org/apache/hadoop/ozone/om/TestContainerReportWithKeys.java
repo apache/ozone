@@ -20,6 +20,7 @@ import org.apache.commons.lang3.RandomStringUtils;
 
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -116,8 +117,9 @@ public class TestContainerReportWithKeys {
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
-        .setType(HddsProtos.ReplicationType.STAND_ALONE)
-        .setFactor(HddsProtos.ReplicationFactor.ONE).setDataSize(keySize)
+        .setReplicationConfig(
+            new StandaloneReplicationConfig(HddsProtos.ReplicationFactor.ONE))
+        .setDataSize(keySize)
         .setRefreshPipeline(true)
         .build();
 

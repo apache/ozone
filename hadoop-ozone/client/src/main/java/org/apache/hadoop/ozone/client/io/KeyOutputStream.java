@@ -28,9 +28,8 @@ import java.util.stream.Collectors;
 
 import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.fs.FileEncryptionInfo;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
@@ -133,7 +132,7 @@ public class KeyOutputStream extends OutputStream {
       OpenKeySession handler,
       XceiverClientFactory xceiverClientManager,
       OzoneManagerProtocol omClient, int chunkSize,
-      String requestId, ReplicationFactor factor, ReplicationType type,
+      String requestId, ReplicationConfig replicationConfig,
       String uploadID, int partNumber, boolean isMultipart,
       boolean unsafeByteBufferConversion
   ) {
@@ -143,7 +142,7 @@ public class KeyOutputStream extends OutputStream {
         new BlockOutputStreamEntryPool(
             config,
             omClient,
-            requestId, factor, type,
+            requestId, replicationConfig,
             uploadID, partNumber,
             isMultipart, info,
             unsafeByteBufferConversion,
@@ -553,13 +552,12 @@ public class KeyOutputStream extends OutputStream {
     private OzoneManagerProtocol omClient;
     private int chunkSize;
     private String requestID;
-    private ReplicationType type;
-    private ReplicationFactor factor;
     private String multipartUploadID;
     private int multipartNumber;
     private boolean isMultipartKey;
     private boolean unsafeByteBufferConversion;
     private OzoneClientConfig clientConfig;
+    private ReplicationConfig replicationConfig;
 
     public Builder setMultipartUploadID(String uploadID) {
       this.multipartUploadID = uploadID;
@@ -596,16 +594,6 @@ public class KeyOutputStream extends OutputStream {
       return this;
     }
 
-    public Builder setType(ReplicationType replicationType) {
-      this.type = replicationType;
-      return this;
-    }
-
-    public Builder setFactor(ReplicationFactor replicationFactor) {
-      this.factor = replicationFactor;
-      return this;
-    }
-
     public Builder setIsMultipartKey(boolean isMultipart) {
       this.isMultipartKey = isMultipart;
       return this;
@@ -621,6 +609,12 @@ public class KeyOutputStream extends OutputStream {
       return this;
     }
 
+
+    public Builder setReplicationConfig(ReplicationConfig replConfig) {
+      this.replicationConfig = replConfig;
+      return this;
+    }
+
     public KeyOutputStream build() {
       return new KeyOutputStream(
           clientConfig,
@@ -629,13 +623,13 @@ public class KeyOutputStream extends OutputStream {
           omClient,
           chunkSize,
           requestID,
-          factor,
-          type,
+          replicationConfig,
           multipartUploadID,
           multipartNumber,
           isMultipartKey,
           unsafeByteBufferConversion);
     }
+
   }
 
   /**

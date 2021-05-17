@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
@@ -265,7 +266,8 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
           OmKeyInfo.Builder builder =
               new OmKeyInfo.Builder().setVolumeName(volumeName)
               .setBucketName(bucketName).setKeyName(keyName)
-              .setReplicationFactor(factor).setReplicationType(type)
+              .setReplicationConfig(
+                      ReplicationConfig.fromTypeAndFactor(type, factor))
               .setCreationTime(keyArgs.getModificationTime())
               .setModificationTime(keyArgs.getModificationTime())
               .setDataSize(dataSize)

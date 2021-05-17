@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.scm;
 
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -167,8 +168,10 @@ public class TestStorageContainerManagerHA {
     Assert.assertFalse(key.getModificationTime().isBefore(testStartTime));
     is.close();
     final OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
-        .setBucketName(bucketName).setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.ONE).setKeyName(keyName)
+        .setBucketName(bucketName)
+        .setReplicationConfig(new RatisReplicationConfig(
+            HddsProtos.ReplicationFactor.ONE))
+        .setKeyName(keyName)
         .setRefreshPipeline(true).build();
     final OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
     final List<OmKeyLocationInfo> keyLocationInfos =
