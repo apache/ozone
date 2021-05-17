@@ -6,7 +6,6 @@ menu:
       parent: "Client Interfaces"
 summary: Recon server supports HTTP endpoints to help troubleshoot and monitor Ozone cluster.
 ---
-
 <!---
   Licensed to the Apache Software Foundation (ASF) under one or more
   contributor license agreements.  See the NOTICE file distributed with
@@ -27,33 +26,26 @@ summary: Recon server supports HTTP endpoints to help troubleshoot and monitor O
 The Recon API v1 is a set of HTTP endpoints that help you understand the current 
 state of an Ozone cluster and to troubleshoot if needed. 
 
-### HTTP Endpoints
+## Containers 
 
-#### Containers
+### GET /api/v1/containers
 
-* **/containers**
+**Parameters**
 
-    **URL Structure** 
-    ```
-    GET /api/v1/containers
-    ```
+* prevKey (optional)
 
-    **Parameters**
+    Only returns the containers with ID greater than the given prevKey.
+    Example: prevKey=1
     
-    * prevKey (optional)
-    
-        Only returns the containers with ID greater than the given prevKey.
-        Example: prevKey=1
-        
-    * limit (optional)
-    
-        Only returns the limited number of results. The default limit is 1000.
-    
-    **Returns**
-    
-    Returns all the ContainerMetadata objects.
-    
-    ```json
+* limit (optional)
+
+    Only returns the limited number of results. The default limit is 1000.
+
+**Returns**
+
+Returns all the ContainerMetadata objects.
+
+```json
     {
       "data": {
         "totalCount": 3,
@@ -73,31 +65,26 @@ state of an Ozone cluster and to troubleshoot if needed.
         ]
       }
     }
-    ```
+```
 
-* **/containers/:id/keys**
+### GET /api/v1/containers/:id/keys
 
-    **URL Structure** 
-    ```
-    GET /api/v1/containers/:id/keys
-    ```
+**Parameters**
 
-    **Parameters**
+* prevKey (optional)
+
+    Only returns the keys that are present after the given prevKey key prefix.
+    Example: prevKey=/vol1/bucket1/key1
     
-    * prevKey (optional)
+* limit (optional)
+
+    Only returns the limited number of results. The default limit is 1000.  
+
+**Returns**
+
+Returns all the KeyMetadata objects for the given ContainerID.
     
-        Only returns the keys that are present after the given prevKey key prefix.
-        Example: prevKey=/vol1/bucket1/key1
-        
-    * limit (optional)
-    
-        Only returns the limited number of results. The default limit is 1000.  
-    
-    **Returns**
-    
-    Returns all the KeyMetadata objects for the given ContainerID.
-    
-    ```json
+```json
     {
       "totalCount":7,
       "keys": [
@@ -121,24 +108,19 @@ state of an Ozone cluster and to troubleshoot if needed.
         ...
       ]
     }
-    ```
+```
 
-* **/containers/missing**
+### GET /api/v1/containers/missing
 
-    **URL Structure** 
-    ```
-    GET /api/v1/containers/missing
-    ```
+**Parameters**
 
-    **Parameters**
+No parameters.  
+
+**Returns**
+
+Returns the MissingContainerMetadata objects for all the missing containers.
     
-    No parameters.  
-    
-    **Returns**
-    
-    Returns the MissingContainerMetadata objects for all the missing containers.
-    
-    ```json
+```json
     {
     	"totalCount": 26,
     	"containers": [{
@@ -158,24 +140,19 @@ state of an Ozone cluster and to troubleshoot if needed.
         ...
         ]
     }
-    ``` 
+``` 
   
-* **/containers/:id/replicaHistory**
+### GET /api/v1/containers/:id/replicaHistory
 
-    **URL Structure** 
-    ```
-    GET /api/v1/containers/:id/replicaHistory
-    ```
+**Parameters**
 
-    **Parameters**
+No parameters.  
+
+**Returns**
+
+Returns all the ContainerHistory objects for the given ContainerID.
     
-    No parameters.  
-    
-    **Returns**
-    
-    Returns all the ContainerHistory objects for the given ContainerID.
-    
-    ```json
+```json
     [
       {
         "containerId": 1,
@@ -185,32 +162,28 @@ state of an Ozone cluster and to troubleshoot if needed.
       },
       ...
     ]
-    ```
+```
  
-* **/containers/unhealthy**
+### GET /api/v1/containers/unhealthy
+
  
-     **URL Structure** 
-     ```
-     GET /api/v1/containers/unhealthy
-     ```
- 
-     **Parameters**
+**Parameters**
+
+* batchNum (optional)
+
+    The batch number (like "page number") of results to return.
+    Passing 1, will return records 1 to limit. 2 will return
+    limit + 1 to 2 * limit, etc.
+    
+* limit (optional)
+
+    Only returns the limited number of results. The default limit is 1000.  
+
+**Returns**
+
+Returns the UnhealthyContainerMetadata objects for all the unhealthycontainers.
      
-     * batchNum (optional)
-     
-         The batch number (like "page number") of results to return.
-         Passing 1, will return records 1 to limit. 2 will return
-         limit + 1 to 2 * limit, etc.
-         
-     * limit (optional)
-     
-         Only returns the limited number of results. The default limit is 1000.  
-     
-     **Returns**
-     
-     Returns the UnhealthyContainerMetadata objects for all the unhealthy containers.
-     
-     ```json
+```json
      {
      	"missingCount": 2,
      	"underReplicatedCount": 0,
@@ -238,51 +211,41 @@ state of an Ozone cluster and to troubleshoot if needed.
         ...
         ]
      } 
-     ```
+```
 
-* **/containers/unhealthy/:state**
+### GET /api/v1/containers/unhealthy/:state
  
-     **URL Structure** 
-     ```
-     GET /api/v1/containers/unhealthy/:state
-     ```
- 
-     **Parameters**
-     
-     * batchNum (optional)
-          
-        The batch number (like "page number") of results to return.
-        Passing 1, will return records 1 to limit. 2 will return
-        limit + 1 to 2 * limit, etc.
-      
-     * limit (optional)
-    
-        Only returns the limited number of results. The default limit is 1000.  
-     
-     **Returns**
-     
-     Returns the UnhealthyContainerMetadata objects for the containers in the given state.
-     Possible unhealthy container states are `MISSING`, `MIS_REPLICATED`, `UNDER_REPLICATED`, `OVER_REPLICATED`.
-     The response structure is same as `/containers/unhealthy`.
-     
-#### ClusterState
+**Parameters**
 
-* **/clusterState**
+* batchNum (optional)
+     
+   The batch number (like "page number") of results to return.
+   Passing 1, will return records 1 to limit. 2 will return
+   limit + 1 to 2 * limit, etc.
  
-     **URL Structure** 
-     ```
-     GET /api/v1/clusterState
-     ```
- 
-     **Parameters**
-     
-     No parameters.  
-     
-     **Returns**
-     
-     Returns a summary of the current state of the Ozone cluster.
+* limit (optional)
 
-     ```json
+   Only returns the limited number of results. The default limit is 1000.  
+
+**Returns**
+
+Returns the UnhealthyContainerMetadata objects for the containers in the givenstate.
+Possible unhealthy container states are `MISSING`, `MIS_REPLICATED`,`UNDER_REPLICATED`, `OVER_REPLICATED`.
+The response structure is same as `/containers/unhealthy`.
+     
+## ClusterState
+
+### GET /api/v1/clusterState
+ 
+**Parameters**
+
+No parameters.  
+
+**Returns**
+
+Returns a summary of the current state of the Ozone cluster.
+
+```json
      {
      	"pipelines": 5,
      	"totalDatanodes": 4,
@@ -297,26 +260,21 @@ state of an Ozone cluster and to troubleshoot if needed.
      	"buckets": 26,
      	"keys": 25
      }
-     ```
+```
 
-#### Datanodes
+## Datanodes
 
-* **/datanodes**
+### GET /api/v1/datanodes
  
-     **URL Structure** 
-     ```
-     GET /api/v1/datanodes
-     ```
- 
-     **Parameters**
-     
-     No parameters.  
-     
-     **Returns**
-     
-     Returns all the datanodes in the cluster.
+**Parameters**
 
-     ```json
+No parameters.  
+
+**Returns**
+
+Returns all the datanodes in the cluster.
+
+```json
      {
      	"totalCount": 4,
      	"datanodes": [{
@@ -346,26 +304,21 @@ state of an Ozone cluster and to troubleshoot if needed.
         ...
         ]
      }
-     ```
+```
   
-#### Pipelines
+## Pipelines
 
-* **/pipelines**
+### GET /api/v1/pipelines
  
-     **URL Structure** 
-     ```
-     GET /api/v1/pipelines
-     ```
- 
-     **Parameters**
-     
-     No parameters.  
-     
-     **Returns**
-     
-     Returns all the pipelines in the cluster.
+**Parameters**
 
-     ```json
+No parameters.  
+
+**Returns**
+
+Returns all the pipelines in the cluster.
+
+```json
      {
      	"totalCount": 5,
      	"pipelines": [{
@@ -383,26 +336,21 @@ state of an Ozone cluster and to troubleshoot if needed.
         ...
         ]
      }
-     ```
+```
   
-#### Tasks
+## Tasks
 
-* **/task/status**
+### GET /api/v1/task/status
  
-     **URL Structure** 
-     ```
-     GET /api/v1/task/status
-     ```
- 
-     **Parameters**
-     
-     No parameters.  
-     
-     **Returns**
-     
-     Returns the status of all the Recon tasks.
+**Parameters**
 
-     ```json
+No parameters.  
+
+**Returns**
+
+Returns the status of all the Recon tasks.
+
+```json
      [
        {
      	"taskName": "OmDeltaRequest",
@@ -411,37 +359,32 @@ state of an Ozone cluster and to troubleshoot if needed.
        },
        ...
      ]
-     ```
+```
 
-#### Utilization
+## Utilization
 
-* **/utilization/fileCount**
+### GET /api/v1/utilization/fileCount
  
-     **URL Structure** 
-     ```
-     GET /api/v1/utilization/fileCount
-     ```
- 
-     **Parameters**
-     
-     * volume (optional)
-          
-        Filters the results based on the given volume name.
-      
-     * bucket (optional)
-    
-        Filters the results based on the given bucket name.
-        
-     * fileSize (optional)
-     
-        Filters the results based on the given fileSize.
-     
-     **Returns**
-     
-     Returns the file counts within different file ranges with `fileSize` in the
-     response object being the upper cap for file size range. 
+**Parameters**
 
-     ```json
+* volume (optional)
+     
+   Filters the results based on the given volume name.
+ 
+* bucket (optional)
+
+   Filters the results based on the given bucket name.
+   
+* fileSize (optional)
+
+   Filters the results based on the given fileSize.
+
+**Returns**
+
+Returns the file counts within different file ranges with `fileSize` in the
+response object being the upper cap for file size range. 
+
+```json
      [{
      	"volume": "vol-2-04168",
      	"bucket": "bucket-0-11685",
@@ -463,29 +406,24 @@ state of an Ozone cluster and to troubleshoot if needed.
      	"fileSize": 1024,
      	"count": 2
      }]
-     ```
+```
   
-#### <a name="metrics"></a> Metrics
+## Metrics
 
-* **/metrics/:api**
+### GET /api/v1/metrics/:api
  
-     **URL Structure** 
-     ```
-     GET /api/v1/metrics/:api
-     ```
- 
-     **Parameters**
-     
-     Refer to [Prometheus HTTP API Reference](https://prometheus.io/docs/prometheus/latest/querying/api/) 
-     for complete documentation on querying. 
-     
-     **Returns**
-     
-     This is a proxy endpoint for Prometheus and returns the same response as 
-     the prometheus endpoint. 
-     Example: /api/v1/metrics/query?query=ratis_leader_election_electionCount
+**Parameters**
 
-     ```json
+Refer to [Prometheus HTTP API Reference](https://prometheus.io/docs/prometheuslatest/querying/api/) 
+for complete documentation on querying. 
+
+**Returns**
+
+This is a proxy endpoint for Prometheus and returns the same response as 
+the prometheus endpoint. 
+Example: /api/v1/metrics/query?query=ratis_leader_election_electionCount
+
+```json
      {
        "status": "success",
        "data": {
@@ -507,5 +445,5 @@ state of an Ozone cluster and to troubleshoot if needed.
          ]
        }
      }
-     ```
+```
   

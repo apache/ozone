@@ -185,9 +185,9 @@ public class TestBlockDeletingService {
       int numOfChunksPerBlock) throws IOException {
     ChunkManager chunkManager;
     if (layout == FILE_PER_BLOCK) {
-      chunkManager = new FilePerBlockStrategy(true, null);
+      chunkManager = new FilePerBlockStrategy(true, null, null);
     } else {
-      chunkManager = new FilePerChunkStrategy(true, null);
+      chunkManager = new FilePerChunkStrategy(true, null, null);
     }
     byte[] arr = randomAlphanumeric(1048576).getBytes(UTF_8);
     ChunkBuffer buffer = ChunkBuffer.wrap(ByteBuffer.wrap(arr));
@@ -590,6 +590,7 @@ public class TestBlockDeletingService {
   }
 
   @Test(timeout = 30000)
+  @org.junit.Ignore
   public void testContainerThrottle() throws Exception {
     // Properties :
     //  - Number of containers : 2
