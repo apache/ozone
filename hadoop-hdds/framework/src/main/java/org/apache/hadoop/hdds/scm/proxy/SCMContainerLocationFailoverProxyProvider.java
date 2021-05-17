@@ -63,6 +63,13 @@ public class SCMContainerLocationFailoverProxyProvider implements
   private final Map<String, SCMProxyInfo> scmProxyInfoMap;
   private List<String> scmNodeIds;
 
+  // As when SCM Client is shared across threads, performFailOver method
+  // updates the currentProxySCMNodeId based on updateLeaderNodeId which is
+  // updated in shouldRetry. So, when 2 threads run parallel for
+  // one of the thread performFailOver is not called which is taken care by
+  // RetryInvocationHandler by checking expectedFailOverCount. So other thread
+  // shall not call performFailOver it will call getProxy() where we use
+  // currentProxySCMNodeId and return proxy.
   private volatile String currentProxySCMNodeId;
   private volatile int currentProxyIndex;
 
