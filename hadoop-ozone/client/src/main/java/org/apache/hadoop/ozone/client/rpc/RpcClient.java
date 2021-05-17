@@ -50,6 +50,7 @@ import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
@@ -129,6 +130,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OLD_QUOTA_DEFAULT;
 
 import org.apache.logging.log4j.util.Strings;
 import org.apache.ratis.protocol.ClientId;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -144,7 +146,7 @@ public class RpcClient implements ClientProtocol {
 
   private final ConfigurationSource conf;
   private final OzoneManagerProtocol ozoneManagerClient;
-  private final XceiverClientManager xceiverClientManager;
+  private final XceiverClientFactory xceiverClientManager;
   private final int chunkSize;
   private final UserGroupInformation ugi;
   private final ACLType userRights;
@@ -177,7 +179,7 @@ public class RpcClient implements ClientProtocol {
 
     this.clientConfig = conf.getObject(OzoneClientConfig.class);
 
-    OmTransport omTransport = OmTransportFactory.create(conf, ugi, omServiceId);
+    OmTransport omTransport = createOmTransport(omServiceId);
 
     this.ozoneManagerClient = TracingUtil.createProxy(
         new OzoneManagerProtocolClientSideTranslatorPB(omTransport,
@@ -198,9 +200,8 @@ public class RpcClient implements ClientProtocol {
       x509Certificates = OzoneSecurityUtil.convertToX509(caCertPems);
     }
 
-    this.xceiverClientManager = new XceiverClientManager(conf,
-        conf.getObject(XceiverClientManager.ScmClientConfig.class),
-        x509Certificates);
+    this.xceiverClientManager =
+        createXceiverClientFactory(x509Certificates);
 
     int configuredChunkSize = (int) conf
         .getStorageSize(ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY,
@@ -247,6 +248,21 @@ public class RpcClient implements ClientProtocol {
             }
           }
         }).build();
+  }
+
+  @NotNull
+  @VisibleForTesting
+  protected XceiverClientFactory createXceiverClientFactory(
+      List<X509Certificate> x509Certificates) throws IOException {
+    return new XceiverClientManager(conf,
+        conf.getObject(XceiverClientManager.ScmClientConfig.class),
+        x509Certificates);
+  }
+
+  @VisibleForTesting
+  protected OmTransport createOmTransport(String omServiceId)
+      throws IOException {
+    return OmTransportFactory.create(conf, ugi, omServiceId);
   }
 
   @Override

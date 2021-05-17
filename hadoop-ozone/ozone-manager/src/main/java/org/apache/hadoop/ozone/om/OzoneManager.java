@@ -23,6 +23,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
+import java.io.UncheckedIOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
@@ -30,9 +31,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.security.KeyPair;
-import java.security.PrivateKey;
 import java.security.PrivilegedExceptionAction;
-import java.security.PublicKey;
 import java.security.cert.CertificateException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -106,6 +105,8 @@ import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.common.Storage.StorageState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
+import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
+import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.ha.OMHANodeDetails;
 import org.apache.hadoop.ozone.om.ha.OMNodeDetails;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
@@ -132,6 +133,7 @@ import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.common.ha.ratis.RatisSnapshotInfo;
+import org.apache.hadoop.hdds.security.OzoneSecurityException;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
@@ -147,7 +149,6 @@ import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.Persisted
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
 import org.apache.hadoop.ozone.security.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.ozone.security.OzoneDelegationTokenSecretManager;
-import org.apache.hadoop.ozone.security.OzoneSecurityException;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
@@ -215,6 +216,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HANDLER_COUNT_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METRICS_SAVE_INTERVAL;
@@ -291,6 +293,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final Runnable shutdownHook;
   private final File omMetaDir;
   private final boolean isAclEnabled;
+  private final boolean isSpnegoEnabled;
   private IAccessAuthorizer accessAuthorizer;
   private JvmPauseMonitor jvmPauseMonitor;
   private final SecurityConfig secConfig;
@@ -377,6 +380,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     omMetaDir = OMStorage.getOmDbDir(configuration);
     this.isAclEnabled = conf.getBoolean(OZONE_ACL_ENABLED,
         OZONE_ACL_ENABLED_DEFAULT);
+    this.isSpnegoEnabled = conf.get(OZONE_OM_HTTP_AUTH_TYPE, "simple")
+        .equals("kerberos");
     this.scmBlockSize = (long) conf.getStorageSize(OZONE_SCM_BLOCK_SIZE,
         OZONE_SCM_BLOCK_SIZE_DEFAULT, StorageUnit.BYTES);
     this.preallocateBlocksMax = conf.getInt(
@@ -747,10 +752,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @VisibleForTesting
   public void startSecretManager() {
     try {
-      readKeyPair();
+      certClient.assertValidKeysAndCertificate();
     } catch (OzoneSecurityException e) {
       LOG.error("Unable to read key pair for OM.", e);
-      throw new RuntimeException(e);
+      throw new UncheckedIOException(e);
     }
     if (secConfig.isBlockTokenEnabled() && blockTokenMgr != null) {
       try {
@@ -759,7 +764,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       } catch (IOException e) {
         // Unable to start secret manager.
         LOG.error("Error starting block token secret manager.", e);
-        throw new RuntimeException(e);
+        throw new UncheckedIOException(e);
       }
     }
 
@@ -770,7 +775,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       } catch (IOException e) {
         // Unable to start secret manager.
         LOG.error("Error starting delegation token secret manager.", e);
-        throw new RuntimeException(e);
+        throw new UncheckedIOException(e);
       }
     }
   }
@@ -781,24 +786,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public void setCertClient(CertificateClient certClient) {
     // TODO: Initialize it in constructor with implementation for certClient.
     this.certClient = certClient;
-  }
-
-  /**
-   * Read private key from file.
-   */
-  private void readKeyPair() throws OzoneSecurityException {
-    try {
-      LOG.info("Reading keypair and certificate from file system.");
-      PublicKey pubKey = certClient.getPublicKey();
-      PrivateKey pvtKey = certClient.getPrivateKey();
-      Objects.requireNonNull(pubKey);
-      Objects.requireNonNull(pvtKey);
-      Objects.requireNonNull(certClient.getCertificate());
-    } catch (Exception e) {
-      throw new OzoneSecurityException("Error reading keypair & certificate "
-          + "OzoneManager.", e, OzoneSecurityException
-          .ResultCodes.OM_PUBLIC_PRIVATE_KEY_FILE_NOT_EXIST);
-    }
   }
 
   /**
@@ -883,6 +870,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         false)) {
       rpcServer.refreshServiceAcl(conf, OMPolicyProvider.getInstance());
     }
+
+    rpcServer.addSuppressedLoggingExceptions(OMNotLeaderException.class,
+        OMLeaderNotReadyException.class);
+
     return rpcServer;
   }
 
@@ -1792,6 +1783,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public boolean getAclsEnabled() {
     return isAclEnabled;
+  }
+
+  /**
+   * Return true if SPNEGO auth is enabled for OM HTTP server, otherwise false.
+   *
+   * @return boolean
+   */
+  public boolean isSpnegoEnabled() {
+    return isSpnegoEnabled;
   }
 
   /**
