@@ -84,7 +84,7 @@ public class SCMContainerLocationFailoverProxyProvider implements
 
   private final UserGroupInformation ugi;
 
-  private volatile String updatedLeaderNodeID = null;
+  private String updatedLeaderNodeID = null;
 
   /**
    * Construct SCMContainerLocationFailoverProxyProvider.
