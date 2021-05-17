@@ -283,9 +283,16 @@ public final class Pipeline {
       throws UnknownPipelineStateException {
     Preconditions.checkNotNull(pipeline, "Pipeline is null");
 
-    List<DatanodeDetails> nodes = new ArrayList<>();
+    Map<DatanodeDetails, Integer> nodes = new LinkedHashMap<>();
+    int index = 0;
+    int repIndexListLength = pipeline.getMemberReplicaIndexesCount();
     for (DatanodeDetailsProto member : pipeline.getMembersList()) {
-      nodes.add(DatanodeDetails.getFromProtoBuf(member));
+      int repIndex = 0;
+      if (index < repIndexListLength) {
+        repIndex = pipeline.getMemberReplicaIndexes(index);
+      }
+      nodes.put(DatanodeDetails.getFromProtoBuf(member), repIndex);
+      index++;
     }
     UUID leaderId = null;
     if (pipeline.hasLeaderID128()) {
@@ -309,7 +316,8 @@ public final class Pipeline {
     return new Builder().setId(PipelineID.getFromProtobuf(pipeline.getId()))
         .setReplicationConfig(config)
         .setState(PipelineState.fromProtobuf(pipeline.getState()))
-        .setNodes(nodes)
+        .setNodes(new ArrayList<>(nodes.keySet()))
+        .setReplicaIndexes(nodes)
         .setLeaderId(leaderId)
         .setSuggestedLeaderId(suggestedLeaderId)
         .setNodesInOrder(pipeline.getMemberOrdersList())
@@ -480,7 +488,6 @@ public final class Pipeline {
       this.leaderId = leaderId1;
       return this;
     }
-
     public Builder setNodes(List<DatanodeDetails> nodes) {
       this.nodeStatus = new LinkedHashMap<>();
       nodes.forEach(node -> nodeStatus.put(node, -1L));
