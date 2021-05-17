@@ -946,6 +946,25 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           scmStorageConfig.setClusterId(clusterId);
         }
 
+
+        if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
+          HASecurityUtils.initializeSecurity(scmStorageConfig, conf,
+              getScmAddress(haDetails, conf), true);
+        }
+
+        // Do not move these code lines. If SCM version file is created file
+        // the subsequent scm init should use the groupID from version file.
+        // So, initialize() should happen before ratis server initialize. In
+        // this way,we do not leave ratis storage directory with multiple raft
+        // Groups in failure scenario.
+
+        // The order of init should be
+        // 1. SCM storage config initialize to create version file.
+        // 2. Initialize Ratis server.
+
+        scmStorageConfig.setPrimaryScmNodeId(scmStorageConfig.getScmId());
+        scmStorageConfig.initialize();
+
         if (SCMHAUtils.isSCMHAEnabled(conf)) {
           SCMRatisServerImpl.initialize(scmStorageConfig.getClusterID(),
               scmStorageConfig.getScmId(), haDetails.getLocalNodeDetails(),
@@ -953,12 +972,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           scmStorageConfig.setSCMHAFlag(true);
         }
 
-        if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
-          HASecurityUtils.initializeSecurity(scmStorageConfig, conf,
-              getScmAddress(haDetails, conf), true);
-        }
-        scmStorageConfig.setPrimaryScmNodeId(scmStorageConfig.getScmId());
-        scmStorageConfig.initialize();
         LOG.info("SCM initialization succeeded. Current cluster id for sd={}"
                 + "; cid={}; layoutVersion={}; scmId={}",
             scmStorageConfig.getStorageDir(), scmStorageConfig.getClusterID(),
