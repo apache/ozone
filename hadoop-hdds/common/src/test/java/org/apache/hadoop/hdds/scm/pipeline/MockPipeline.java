@@ -19,7 +19,9 @@ package org.apache.hadoop.hdds.scm.pipeline;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -97,12 +99,21 @@ public final class MockPipeline {
     nodes.add(MockDatanodeDetails.randomDatanodeDetails());
     nodes.add(MockDatanodeDetails.randomDatanodeDetails());
 
+    Map<DatanodeDetails, Integer> nodeIndexes = new HashMap<>();
+
+    int index = nodes.size() - 1;
+    for (DatanodeDetails dn : nodes) {
+      nodeIndexes.put(dn, index);
+      index--;
+    }
+
     return Pipeline.newBuilder()
         .setState(Pipeline.PipelineState.OPEN)
         .setId(PipelineID.randomId())
         .setReplicationConfig(
             new ECReplicationConfig(3, 2))
         .setNodes(nodes)
+        .setReplicaIndexes(nodeIndexes)
         .build();
   }
 
