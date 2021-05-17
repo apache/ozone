@@ -394,8 +394,9 @@ public abstract class OMKeyRequest extends OMClientRequest {
     }
     // For this upload part we don't need to check in KeyTable. As this
     // is not an actual key, it is a part of the key.
-    return createKeyInfo(args, locations, partKeyInfo.getReplicationConfig(), size, encInfo,
-        prefixManager, omBucketInfo, transactionLogIndex, objectId);
+    return createKeyInfo(args, locations, partKeyInfo.getReplicationConfig(),
+        size, encInfo, prefixManager, omBucketInfo, transactionLogIndex,
+        objectId);
   }
 
   /**

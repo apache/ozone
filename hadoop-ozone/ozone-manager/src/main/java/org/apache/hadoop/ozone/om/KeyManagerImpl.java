@@ -49,9 +49,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
@@ -364,8 +362,13 @@ public class KeyManagerImpl implements KeyManager {
     List<AllocatedBlock> allocatedBlocks;
     try {
       allocatedBlocks = scmClient.getBlockClient()
-          .allocateBlock(scmBlockSize, numBlocks, keyInfo.getReplicationConfig(),
-                  omId, excludeList);
+          .allocateBlock(
+              scmBlockSize,
+              numBlocks,
+              keyInfo.getReplicationConfig(),
+              omId,
+              excludeList);
+
     } catch (SCMException ex) {
       if (ex.getResult()
           .equals(SCMException.ResultCodes.SAFE_MODE_EXCEPTION)) {
@@ -1379,7 +1382,7 @@ public class KeyManagerImpl implements KeyManager {
         Iterator<Map.Entry<Integer, PartKeyInfo>> partKeyInfoMapIterator =
             partKeyInfoMap.entrySet().iterator();
 
-       ReplicationConfig replicationConfig = null;
+        ReplicationConfig replicationConfig = null;
 
         int count = 0;
         List<OmPartInfo> omPartInfoList = new ArrayList<>();

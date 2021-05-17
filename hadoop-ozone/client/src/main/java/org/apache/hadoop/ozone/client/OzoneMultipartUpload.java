@@ -57,8 +57,8 @@ public class OzoneMultipartUpload {
   }
 
   public OzoneMultipartUpload(String volumeName, String bucketName,
-                              String keyName, String uploadId, Instant creationTime,
-                              ReplicationConfig replicationConfig) {
+      String keyName, String uploadId, Instant creationTime,
+      ReplicationConfig replicationConfig) {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.keyName = keyName;

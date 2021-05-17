@@ -21,7 +21,6 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -53,7 +52,8 @@ public class TestOmKeyInfo {
         .setCreationTime(123L)
         .setModificationTime(123L)
         .setDataSize(123L)
-        .setReplicationConfig(new RatisReplicationConfig(ReplicationFactor.THREE))
+        .setReplicationConfig(
+            new RatisReplicationConfig(ReplicationFactor.THREE))
         .addMetadata("key1", "value1")
         .addMetadata("key2", "value2")
         .build();

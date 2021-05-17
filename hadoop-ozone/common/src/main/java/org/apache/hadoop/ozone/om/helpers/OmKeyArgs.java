@@ -49,11 +49,11 @@ public final class OmKeyArgs implements Auditable {
 
   @SuppressWarnings("parameternumber")
   private OmKeyArgs(String volumeName, String bucketName, String keyName,
-                    long dataSize, ReplicationConfig replicationConfig,
-                    List<OmKeyLocationInfo> locationInfoList, boolean isMultipart,
-                    String uploadID, int partNumber,
-                    Map<String, String> metadataMap, boolean refreshPipeline,
-                    List<OzoneAcl> acls, boolean sortDatanode) {
+      long dataSize, ReplicationConfig replicationConfig,
+      List<OmKeyLocationInfo> locationInfoList, boolean isMultipart,
+      String uploadID, int partNumber,
+      Map<String, String> metadataMap, boolean refreshPipeline,
+      List<OzoneAcl> acls, boolean sortDatanode) {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.keyName = keyName;
@@ -141,8 +141,8 @@ public final class OmKeyArgs implements Auditable {
     auditMap.put(OzoneConsts.KEY, this.keyName);
     auditMap.put(OzoneConsts.DATA_SIZE, String.valueOf(this.dataSize));
     auditMap.put(OzoneConsts.REPLICATION_CONFIG,
-            (this.replicationConfig != null) ?
-                    this.replicationConfig.toString() : null);
+        (this.replicationConfig != null) ?
+            this.replicationConfig.toString() : null);
     return auditMap;
   }
 
@@ -155,21 +155,20 @@ public final class OmKeyArgs implements Auditable {
   }
 
   public OmKeyArgs.Builder toBuilder() {
-    final Builder builder = new Builder()
-            .setVolumeName(volumeName)
-            .setBucketName(bucketName)
-            .setKeyName(keyName)
-            .setDataSize(dataSize)
-            .setReplicationConfig(replicationConfig)
-            .setLocationInfoList(locationInfoList)
-            .setIsMultipartKey(isMultipartKey)
-            .setMultipartUploadID(multipartUploadID)
-            .setMultipartUploadPartNumber(multipartUploadPartNumber)
-            .addAllMetadata(metadata)
-            .setRefreshPipeline(refreshPipeline)
-            .setSortDatanodesInPipeline(sortDatanodesInPipeline)
-            .setAcls(acls);
-    return builder;
+    return new OmKeyArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setDataSize(dataSize)
+        .setReplicationConfig(replicationConfig)
+        .setLocationInfoList(locationInfoList)
+        .setIsMultipartKey(isMultipartKey)
+        .setMultipartUploadID(multipartUploadID)
+        .setMultipartUploadPartNumber(multipartUploadPartNumber)
+        .addAllMetadata(metadata)
+        .setRefreshPipeline(refreshPipeline)
+        .setSortDatanodesInPipeline(sortDatanodesInPipeline)
+        .setAcls(acls);
   }
 
   /**
@@ -210,8 +209,8 @@ public final class OmKeyArgs implements Auditable {
       return this;
     }
 
-    public Builder setReplicationConfig(ReplicationConfig replicationConfig) {
-      this.replicationConfig = replicationConfig;
+    public Builder setReplicationConfig(ReplicationConfig replConfig) {
+      this.replicationConfig = replConfig;
       return this;
     }
 

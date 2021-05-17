@@ -559,7 +559,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     }
 
     if (args.getReplicationConfig() != null) {
-      keyArgs.setFactor(ReplicationConfig.getLegacyFactor(args.getReplicationConfig()));
+      keyArgs.setFactor(
+          ReplicationConfig.getLegacyFactor(args.getReplicationConfig()));
       keyArgs.setType(args.getReplicationConfig().getReplicationType());
     }
 
@@ -616,7 +617,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setDataSize(args.getDataSize());
 
     if (args.getReplicationConfig() != null) {
-      keyArgs.setFactor(ReplicationConfig.getLegacyFactor(args.getReplicationConfig()));
+      keyArgs.setFactor(
+          ReplicationConfig.getLegacyFactor(args.getReplicationConfig()));
       keyArgs.setType(args.getReplicationConfig().getReplicationType());
     }
 
@@ -649,9 +651,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             .map(info -> info.getProtobuf(CURRENT_VERSION))
             .collect(Collectors.toList()));
 
-
     if (args.getReplicationConfig() != null) {
-      keyArgsBuilder.setFactor(ReplicationConfig.getLegacyFactor(args.getReplicationConfig()));
+      keyArgsBuilder.setFactor(
+          ReplicationConfig.getLegacyFactor(args.getReplicationConfig()));
       keyArgsBuilder.setType(args.getReplicationConfig().getReplicationType());
     }
 

@@ -372,8 +372,8 @@ public final class OmKeyInfo extends WithObjectID {
       return this;
     }
 
-    public Builder setReplicationConfig(ReplicationConfig replicationConfig) {
-      this.replicationConfig = replicationConfig;
+    public Builder setReplicationConfig(ReplicationConfig replConfig) {
+      this.replicationConfig = replConfig;
       return this;
     }
 

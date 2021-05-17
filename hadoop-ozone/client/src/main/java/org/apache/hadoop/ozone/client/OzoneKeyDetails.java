@@ -62,10 +62,11 @@ public class OzoneKeyDetails extends OzoneKey {
    */
   @SuppressWarnings("parameternumber")
   public OzoneKeyDetails(String volumeName, String bucketName, String keyName,
-                         long size, long creationTime, long modificationTime,
-                         List<OzoneKeyLocation> ozoneKeyLocations,
-                         ReplicationConfig replicationConfig, Map<String, String> metadata,
-                         FileEncryptionInfo feInfo) {
+      long size, long creationTime, long modificationTime,
+      List<OzoneKeyLocation> ozoneKeyLocations,
+      ReplicationConfig replicationConfig,
+      Map<String, String> metadata,
+      FileEncryptionInfo feInfo) {
     super(volumeName, bucketName, keyName, size, creationTime,
             modificationTime, replicationConfig);
     this.ozoneKeyLocations = ozoneKeyLocations;

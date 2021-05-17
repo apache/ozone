@@ -311,7 +311,6 @@ public class TestDeleteWithSlowFollower {
       }
     } catch (IOException ioe) {
       Assert.fail("Exception should not be thrown.");
-
     }
     long numReadStateMachineOps =
         stateMachine.getMetrics().getNumReadStateMachineOps();
@@ -348,6 +347,5 @@ public class TestDeleteWithSlowFollower {
             == ContainerProtos.Result.UNABLE_TO_FIND_CHUNK);
       }
     }
-
   }
 }

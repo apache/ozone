@@ -175,7 +175,8 @@ public class TestMultiBlockWritesWithDnFailures {
     key.close();
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName)
-        .setReplicationConfig(new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE))
+        .setReplicationConfig(
+            new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE))
         .setKeyName(keyName)
         .setRefreshPipeline(true)
         .build();
