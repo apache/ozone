@@ -278,7 +278,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private PrefixManagerImpl prefixManager;
 
   /**
-   * OM super user / admin list
+   * OM super user / admin list.
    */
   private final Collection<String> omAdminUsernames;
 
