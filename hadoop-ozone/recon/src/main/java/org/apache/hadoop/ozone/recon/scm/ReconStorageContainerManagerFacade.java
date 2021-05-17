@@ -194,6 +194,7 @@ public class ReconStorageContainerManagerFacade
         reconTaskConfig));
     reconScmTasks.add(new ContainerHealthTask(
         containerManager,
+        scmServiceProvider,
         reconTaskStatusDao, containerHealthSchemaManager,
         containerPlacementPolicy,
         reconTaskConfig));
@@ -332,5 +333,9 @@ public class ReconStorageContainerManagerFacade
 
   public EventQueue getEventQueue() {
     return eventQueue;
+  }
+
+  public StorageContainerServiceProvider getScmServiceProvider() {
+    return scmServiceProvider;
   }
 }
