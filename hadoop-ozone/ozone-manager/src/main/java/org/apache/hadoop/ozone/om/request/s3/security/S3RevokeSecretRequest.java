@@ -118,8 +118,7 @@ public class S3RevokeSecretRequest extends OMClientRequest {
         omMetadataManager.getKeyTable().addCacheEntry(
             new CacheKey<>(kerberosID),
             new CacheValue<>(Optional.absent(), transactionLogIndex));
-        omClientResponse = new S3RevokeSecretResponse(
-                new S3SecretValue(kerberosID, null),
+        omClientResponse = new S3RevokeSecretResponse(kerberosID,
                 omResponse.setStatus(Status.OK).build());
       } else {
         omClientResponse = new S3RevokeSecretResponse(null,

@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.om.response.s3.security;
 
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -38,21 +37,21 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.S3_SECRET_TABLE;
 @CleanupTableInfo(cleanupTables = {S3_SECRET_TABLE})
 public class S3RevokeSecretResponse extends OMClientResponse {
 
-  private final S3SecretValue s3SecretValue;
+  private final String kerberosID;
 
-  public S3RevokeSecretResponse(@Nullable S3SecretValue s3SecretValue,
+  public S3RevokeSecretResponse(@Nullable String kerberosID,
                                 @Nonnull OMResponse omResponse) {
     super(omResponse);
-    this.s3SecretValue = s3SecretValue;
+    this.kerberosID = kerberosID;
   }
 
   @Override
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    if (s3SecretValue != null && getOMResponse().getStatus() == Status.OK) {
+    if (kerberosID != null && getOMResponse().getStatus() == Status.OK) {
       omMetadataManager.getS3SecretTable().deleteWithBatch(batchOperation,
-          s3SecretValue.getKerberosID());
+          kerberosID);
     }
   }
 }

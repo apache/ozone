@@ -24,6 +24,8 @@ import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.Scanner;
 
 /**
@@ -59,7 +61,8 @@ public class RevokeS3SecretHandler extends S3Handler {
       out().print("Enter 'y' to confirm S3 secret revocation for '" +
           username + "': ");
       out().flush();
-      Scanner scanner = new Scanner(System.in);
+      Scanner scanner = new Scanner(new InputStreamReader(
+          System.in, StandardCharsets.UTF_8));
       String confirmation = scanner.next().trim().toLowerCase();
       if (!confirmation.equals("y")) {
         out().println("Operation cancelled.");

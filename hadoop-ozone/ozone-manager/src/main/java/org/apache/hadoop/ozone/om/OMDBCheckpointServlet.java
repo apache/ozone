@@ -26,8 +26,6 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-
 /**
  * Provides the current checkpoint Snapshot of the OM DB. (tar.gz)
  *
