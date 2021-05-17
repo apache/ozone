@@ -1158,6 +1158,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    */
   @Override
   public void start() throws IOException {
+    upgradeFinalizer.runPrefinalizeStateActions(scmStorageConfig, this);
+
     if (LOG.isInfoEnabled()) {
       LOG.info(buildRpcServerStartMessage(
           "StorageContainerLocationProtocol RPC server",
@@ -1168,8 +1170,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     ms = HddsServerUtil
         .initializeMetrics(configuration, "StorageContainerManager");
-
-    upgradeFinalizer.runPrefinalizeStateActions(scmStorageConfig, this);
 
     commandWatcherLeaseManager.start();
     getClientProtocolServer().start();

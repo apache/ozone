@@ -44,7 +44,7 @@ import org.junit.Test;
  */
 // Tests are ignored to speed up CI runs. Run manually if changes are made
 // relating to the SCM HA validation action.
-//@Ignore
+@Ignore
 public class TestScmHAUnfinalizedStateValidationAction {
   private static final OzoneConfiguration CONF = new OzoneConfiguration();
 
