@@ -25,10 +25,17 @@ import static org.apache.hadoop.ozone.upgrade.UpgradeActionHdds.Component.SCM;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.upgrade.HDDSUpgradeAction;
-import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.upgrade.UpgradeActionHdds;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
+import org.apache.ratis.server.raftlog.RaftLog;
 
+/**
+ * Checks that SCM HA cannot be used in a pre-finalized cluster, unless it
+ * was already being used before this action was run. Usage before this
+ * action is checked by checking if there are raft log indices present.
+ */
+// Testing of this class is ignored to speed up CI runs. Run tests manually if
+// changes are made relating to the SCM HA validation action.
 @UpgradeActionHdds(feature = SCM_HA, component = SCM,
     type = VALIDATE_IN_PREFINALIZE)
 public class ScmHAUnfinalizedStateValidationAction
@@ -36,15 +43,19 @@ public class ScmHAUnfinalizedStateValidationAction
 
   @Override
   public void execute(StorageContainerManager scm) throws Exception {
-    boolean isHAAlreadyEnabled =
-        TransactionInfo.readTransactionInfo(scm.getScmMetadataStore()) != null;
+    boolean isHAEnabled =
+        scm.getConfiguration().getBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,
+            ScmConfigKeys.OZONE_SCM_HA_ENABLE_DEFAULT);
 
-    if (!isHAAlreadyEnabled) {
-      boolean isHAEnabled =
-          scm.getConfiguration().getBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,
-              ScmConfigKeys.OZONE_SCM_HA_ENABLE_DEFAULT);
+    if (isHAEnabled) {
+      long lastIndex = scm.getScmHAManager()
+          .getRatisServer()
+          .getDivision()
+          .getRaftLog()
+          .getLastCommittedIndex();
 
-      if (isHAEnabled) {
+      boolean isHAAlreadyEnabled = (lastIndex != RaftLog.INVALID_LOG_INDEX);
+      if (!isHAAlreadyEnabled) {
         throw new UpgradeException(String.format("Configuration %s cannot be " +
                 "used until SCM upgrade has been finalized",
             ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY),
