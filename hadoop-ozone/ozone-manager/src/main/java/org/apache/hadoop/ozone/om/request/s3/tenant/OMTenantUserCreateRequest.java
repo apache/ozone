@@ -203,6 +203,7 @@ public class OMTenantUserCreateRequest extends OMVolumeRequest {
 
       userId = ozoneManager.getMultiTenantManager()
           .createUser(tenantName, tenantUsername);
+      LOG.info("userId = {}", userId);
 
       // Add to tenantUserTable
       omMetadataManager.getTenantUserTable().addCacheEntry(
@@ -220,9 +221,6 @@ public class OMTenantUserCreateRequest extends OMVolumeRequest {
           new CacheKey<>(principal),
           new CacheValue<>(Optional.of(roleName), transactionLogIndex));
 
-//      tenantPrincipal = ozoneManager.getMultiTenantManager()
-//          .createUser(tenantName, principal or tenantUsername);
-
       omResponse.setCreateTenantUserResponse(
           CreateTenantUserResponse.newBuilder().setSuccess(true)
               .setS3Secret(S3Secret.newBuilder()
@@ -233,10 +231,10 @@ public class OMTenantUserCreateRequest extends OMVolumeRequest {
     } catch (IOException ex) {
       if (userId != null) {
         try {
-          ozoneManager.getMultiTenantManager().destroyUser(tenantName,
-              tenantUsername);
+          ozoneManager.getMultiTenantManager().destroyUser(
+              tenantName, tenantUsername);
         } catch (IOException e) {
-          // Best Effort cleanup
+          // TODO: Best Effort cleanup
           e.printStackTrace();
         }
       }
@@ -244,13 +242,6 @@ public class OMTenantUserCreateRequest extends OMVolumeRequest {
       // Set response success flag to false
       omResponse.setCreateTenantUserResponse(
           CreateTenantUserResponse.newBuilder().setSuccess(false).build());
-//      if (tenantPrincipal != null) {
-//        try {
-//          ozoneManager.getMultiTenantManager()
-//              .deactivateUser(tenantPrincipal);
-//        } catch (Exception ignored) {
-//        }
-//      }
       omClientResponse = new OMTenantCreateResponse(
           createErrorOMResponse(omResponse, ex));
     } finally {
