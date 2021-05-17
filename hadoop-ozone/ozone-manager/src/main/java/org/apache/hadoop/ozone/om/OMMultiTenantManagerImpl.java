@@ -324,12 +324,12 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       inMemoryUserNameToListOfGroupsMap.put(
           userPrincipal.getFullMultiTenantPrincipalID(), userGroupIDs);
 
-      controlPathLock.writeLock().unlock();
       return userID;
     } catch (Exception e) {
       destroyUser(tenantName, userName);
-      controlPathLock.writeLock().unlock();
       throw new IOException(e.getMessage());
+    } finally {
+      controlPathLock.writeLock().unlock();
     }
   }
 
@@ -352,10 +352,10 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
           userPrincipal.getFullMultiTenantPrincipalID());
       inMemoryUserNameToListOfGroupsMap.remove(
           userPrincipal.getFullMultiTenantPrincipalID());
-      controlPathLock.writeLock().unlock();
     } catch (Exception e) {
-      controlPathLock.writeLock().unlock();
       throw new IOException(e.getMessage());
+    } finally {
+      controlPathLock.writeLock().unlock();
     }
   }
 
