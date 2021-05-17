@@ -17,7 +17,6 @@
 package org.apache.hadoop.ozone.freon;
 
 import com.codahale.metrics.Timer;
-import io.netty.channel.Channel;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.ozone.container.stream.DirectoryServerDestination;
@@ -64,6 +63,7 @@ public class StreamingGenerator extends BaseFreonGenerator
   private int port = 1234;
 
   private String subdir = "dir1";
+  private Timer timer;
 
 
   @Override
@@ -72,10 +72,9 @@ public class StreamingGenerator extends BaseFreonGenerator
 
     generateBaseData();
 
-    Timer timer = getMetrics().timer("streaming");
+    timer = getMetrics().timer("streaming");
     setThreadNo(1);
     runTests(this::copyDir);
-
 
     return null;
   }
@@ -109,7 +108,9 @@ public class StreamingGenerator extends BaseFreonGenerator
                      new StreamingClient("localhost", port,
                              new DirectoryServerDestination(
                                      destinationDir))) {
-          client.stream(subdir);
+
+          timer.time(() -> client.stream(subdir));
+
         }
         LOG.info("Replication has been finished to {}", sourceDir);
 

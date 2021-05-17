@@ -31,7 +31,7 @@ import static org.apache.hadoop.ozone.container.stream.DirstreamServerHandler.EN
 
 public class StreamingClient implements AutoCloseable {
 
-    private static EventLoopGroup group;
+    private EventLoopGroup group;
     private final Bootstrap bootstrap;
     private int port;
     private String host;

@@ -82,10 +82,16 @@ public class DirstreamClientHandler extends ChannelInboundHandlerAdapter {
         String[] parts = currentFileName.toString().split(" ", 2);
         remaining = Long.parseLong(parts[0]);
         Path destFilePath = destination.mapToDestination(parts[1]);
-        Files.createDirectories(destFilePath.getParent());
+        final Path destfileParent = destFilePath.getParent();
+        if (destfileParent == null) {
+          throw new IllegalArgumentException("Streaming destination " +
+              "provider return with invalid path: " + destFilePath);
+        }
+        Files.createDirectories(destfileParent);
         this.destFile =
             new RandomAccessFile(destFilePath.toFile(), "rw");
         destFileChannel = this.destFile.getChannel();
+
       } else {
         currentFileName
             .append(buffer.toString(StandardCharsets.UTF_8));
