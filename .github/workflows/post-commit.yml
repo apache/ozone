@@ -21,6 +21,7 @@ on:
     - cron: 30 0,12 * * *
 env:
   FAIL_FAST: ${{ github.event_name == 'pull_request' }}
+  MAVEN_OPTS: -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryHandler.class=standard -Dmaven.wagon.http.retryHandler.count=3
 jobs:
   compile:
     runs-on: ubuntu-18.04
