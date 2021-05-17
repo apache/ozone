@@ -33,6 +33,8 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetOMC
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetSCMCertRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMListCertificateRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMListCertificateResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMRevokeCertificatesRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMRevokeCertificatesResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityRequest;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityResponse;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.Status;
@@ -140,6 +142,12 @@ public class SCMSecurityProtocolServerSideTranslatorPB
             .setCmdType(request.getCmdType())
             .setGetLatestCrlIdResponseProto(getLatestCrlId(
                 request.getGetLatestCrlIdRequest()))
+            .build();
+      case RevokeCertificates:
+        return SCMSecurityResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setRevokeCertificatesResponseProto(revokeCertificates(
+                request.getRevokeCertificatesRequest()))
             .build();
       default:
         throw new IllegalArgumentException(
@@ -322,6 +330,14 @@ public class SCMSecurityProtocolServerSideTranslatorPB
     return builder.build();
   }
 
+  public SCMRevokeCertificatesResponseProto revokeCertificates(
+      SCMRevokeCertificatesRequestProto request) throws IOException {
+    SCMRevokeCertificatesResponseProto.Builder builder =
+        SCMRevokeCertificatesResponseProto.newBuilder().setCrlId(
+            impl.revokeCertificates(request.getCertIdsList(),
+                request.getReason().getNumber(), request.getRevokeTime()));
+    return builder.build();
+  }
 
   public SCMGetCertResponseProto getRootCACertificate() throws IOException {
     if (scm.getScmStorageConfig().checkPrimarySCMIdInitialized()) {

@@ -147,4 +147,15 @@ public interface SCMSecurityProtocol {
    */
   long getLatestCrlId() throws IOException;
 
+
+  /**
+   * Revoke a list of certificates at specified time.
+   * @param certIds - cert ids
+   * @param reason - reason code: refer @org.bouncycastle.asn1.x509.CRLReason.
+   * @param revocationTime - revocation time.
+   * @return
+   * @throws IOException
+   */
+  long revokeCertificates(List<String> certIds, int reason, long revocationTime)
+      throws IOException;
 }

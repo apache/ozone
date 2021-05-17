@@ -64,8 +64,16 @@ public class SCMSecurityProtocolFailoverProxyProvider implements
 
   private List<String> scmNodeIds;
 
-  private String currentProxySCMNodeId;
-  private int currentProxyIndex;
+  // As SCM Client is shared across threads, performFailOver()
+  // updates the currentProxySCMNodeId based on the updateLeaderNodeId which is
+  // updated in shouldRetry(). When 2 or more threads run in parallel, the
+  // RetryInvocationHandler will check the expectedFailOverCount
+  // and not execute performFailOver() for one of them. So the other thread(s)
+  // shall not call performFailOver(), it will call getProxy() which uses
+  // currentProxySCMNodeId and returns the proxy.
+  private volatile String currentProxySCMNodeId;
+  private volatile int currentProxyIndex;
+
 
   private final ConfigurationSource conf;
   private final SCMClientConfig scmClientConfig;
@@ -77,6 +85,8 @@ public class SCMSecurityProtocolFailoverProxyProvider implements
   private final long retryInterval;
 
   private final UserGroupInformation ugi;
+
+  private String updatedLeaderNodeID = null;
 
   /**
    * Construct fail-over proxy provider for SCMSecurityProtocol Server.
@@ -176,11 +186,12 @@ public class SCMSecurityProtocolFailoverProxyProvider implements
 
   @Override
   public synchronized void performFailover(SCMSecurityProtocolPB currentProxy) {
-    if (LOG.isDebugEnabled()) {
-      int currentIndex = getCurrentProxyIndex();
-      LOG.debug("Failing over SCM Security proxy to index: {}, nodeId: {}",
-          currentIndex, scmNodeIds.get(currentIndex));
+    if (updatedLeaderNodeID != null) {
+      currentProxySCMNodeId = updatedLeaderNodeID;
+    } else {
+      nextProxyIndex();
     }
+    LOG.debug("Failing over to next proxy. {}", getCurrentProxySCMNodeId());
   }
 
   public synchronized void performFailoverToAssignedLeader(String newLeader,
@@ -202,39 +213,18 @@ public class SCMSecurityProtocolFailoverProxyProvider implements
             Arrays.toString(scmProxyInfoMap.values().toArray()));
       }
     }
-    if (newLeader == null) {
-      // If newLeader is not assigned, it will fail over to next proxy.
-      performFailoverToNextProxy();
-      LOG.debug("Performing failover to next proxy node {}",
-          currentProxySCMNodeId);
-    } else {
-      if (!assignLeaderToNode(newLeader)) {
-        LOG.debug("Failing over SCM proxy to nodeId: {}", newLeader);
-        performFailoverToNextProxy();
+    assignLeaderToNode(newLeader);
+  }
+
+
+  private synchronized void assignLeaderToNode(String newLeaderNodeId) {
+    if (!currentProxySCMNodeId.equals(newLeaderNodeId)) {
+      if (scmProxyInfoMap.containsKey(newLeaderNodeId)) {
+        updatedLeaderNodeID = newLeaderNodeId;
+        LOG.debug("Updated LeaderNodeID {}", updatedLeaderNodeID);
+      } else {
+        updatedLeaderNodeID = null;
       }
-    }
-  }
-
-  private synchronized boolean assignLeaderToNode(String newLeaderNodeId) {
-    if (!currentProxySCMNodeId.equals(newLeaderNodeId)
-        && scmProxies.containsKey(newLeaderNodeId)) {
-      currentProxySCMNodeId = newLeaderNodeId;
-      currentProxyIndex = scmNodeIds.indexOf(currentProxySCMNodeId);
-
-      LOG.debug("Failing over SCM proxy to nodeId: {}", newLeaderNodeId);
-      return true;
-    }
-
-    return false;
-  }
-  /**
-   * Performs fail-over to the next proxy.
-   */
-  public synchronized void performFailoverToNextProxy() {
-    int newProxyIndex = incrementProxyIndex();
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Incrementing SCM Security proxy index to {}, nodeId: {}",
-          newProxyIndex, scmNodeIds.get(newProxyIndex));
     }
   }
 
@@ -242,10 +232,10 @@ public class SCMSecurityProtocolFailoverProxyProvider implements
    * Update the proxy index to the next proxy in the list.
    * @return the new proxy index
    */
-  private synchronized int incrementProxyIndex() {
-    currentProxyIndex = (currentProxyIndex + 1) % scmProxyInfoMap.size();
-    currentProxySCMNodeId = scmNodeIds.get(currentProxyIndex);
-    return currentProxyIndex;
+  private synchronized void nextProxyIndex() {
+    // round robin the next proxy
+    currentProxyIndex = (getCurrentProxyIndex() + 1) % scmProxyInfoMap.size();
+    currentProxySCMNodeId =  scmNodeIds.get(currentProxyIndex);
   }
 
   public RetryPolicy getRetryPolicy() {
@@ -269,7 +259,9 @@ public class SCMSecurityProtocolFailoverProxyProvider implements
           }
         }
 
-        if (!SCMHAUtils.checkRetriableWithNoFailoverException(exception)) {
+        if (SCMHAUtils.checkRetriableWithNoFailoverException(exception)) {
+          setUpdatedLeaderNodeID();
+        } else {
           performFailoverToAssignedLeader(null, exception);
         }
         return SCMHAUtils
@@ -281,6 +273,9 @@ public class SCMSecurityProtocolFailoverProxyProvider implements
     return retryPolicy;
   }
 
+  public synchronized void setUpdatedLeaderNodeID() {
+    this.updatedLeaderNodeID = getCurrentProxySCMNodeId();
+  }
 
   @Override
   public Class< SCMSecurityProtocolPB > getInterface() {
