@@ -18,6 +18,9 @@
 
 package org.apache.hadoop.ozone.om.request.s3.security;
 
+import com.google.common.base.Optional;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
@@ -63,10 +66,14 @@ public class S3RevokeSecretRequest extends OMClientRequest {
     final String kerberosID = s3RevokeSecretRequest.getKerberosID();
     final UserGroupInformation user = ProtobufRpcEngine.Server.getRemoteUser();
 
+    // Permission check. Users need to be themselves or have admin privilege
     if (!user.getUserName().equals(kerberosID)) {
-      throw new OMException("User mismatch. Requested user name is " +
-          "mismatched " + kerberosID +", with current user " +
-          user.getUserName(), OMException.ResultCodes.USER_MISMATCH);
+      if (!ozoneManager.isAdmin(kerberosID)) {
+        throw new OMException("Requested user name '" + kerberosID +
+            "' doesn't match current user '" + user.getUserName() +
+            "', nor does current user has administrator privilege.",
+            OMException.ResultCodes.USER_MISMATCH);
+      }
     }
 
     final RevokeS3SecretRequest revokeS3SecretRequest =
@@ -74,7 +81,6 @@ public class S3RevokeSecretRequest extends OMClientRequest {
                     .setKerberosID(kerberosID).build();
 
     OMRequest.Builder omRequest = OMRequest.newBuilder()
-        .setUserInfo(getUserInfo())
         .setRevokeS3SecretRequest(revokeS3SecretRequest)
         .setCmdType(getOmRequest().getCmdType())
         .setClientId(getOmRequest().getClientId());
@@ -108,7 +114,10 @@ public class S3RevokeSecretRequest extends OMClientRequest {
 
       // Remove if entry exists in table
       if (omMetadataManager.getS3SecretTable().isExist(kerberosID)) {
-//        omMetadataManager.getS3SecretTable().delete(kerberosID);
+        // Invalid entry in table cache immediately
+        omMetadataManager.getKeyTable().addCacheEntry(
+            new CacheKey<>(kerberosID),
+            new CacheValue<>(Optional.absent(), transactionLogIndex));
         omClientResponse = new S3RevokeSecretResponse(
                 new S3SecretValue(kerberosID, null),
                 omResponse.setStatus(Status.OK).build());

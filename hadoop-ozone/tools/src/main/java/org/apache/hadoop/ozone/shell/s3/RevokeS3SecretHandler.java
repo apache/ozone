@@ -33,6 +33,11 @@ import java.util.Scanner;
     description = "Revoke s3 secret for current user")
 public class RevokeS3SecretHandler extends S3Handler {
 
+  @Option(names = "-u",
+      description = "Specify the user name to perform the operation on "
+          + "(admins only)'")
+  private String username;
+
   @Option(names = "-y",
       description = "Continue without interactive user confirmation")
   private boolean yes;
@@ -45,19 +50,24 @@ public class RevokeS3SecretHandler extends S3Handler {
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
-    String userName = UserGroupInformation.getCurrentUser().getUserName();
+    if (username == null || username.isEmpty()) {
+      username = UserGroupInformation.getCurrentUser().getUserName();
+    }
 
     if (!yes) {
       // Ask for user confirmation
-      out().print("Type 'y' to confirm revoking S3 secret for " + userName + ": ");
+      out().print("Enter 'y' to confirm S3 secret revocation for '" +
+          username + "': ");
       out().flush();
       Scanner scanner = new Scanner(System.in);
       String confirmation = scanner.next().trim().toLowerCase();
       if (!confirmation.equals("y")) {
-        out().println("Cancelled.");
+        out().println("Operation cancelled.");
         return;
       }
     }
-    client.getObjectStore().revokeS3Secret(userName);
+
+    client.getObjectStore().revokeS3Secret(username);
+    out().println("S3 secret revoked.");
   }
 }
