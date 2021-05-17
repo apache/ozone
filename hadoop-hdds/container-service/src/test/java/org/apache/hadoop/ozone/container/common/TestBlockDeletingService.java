@@ -590,6 +590,7 @@ public class TestBlockDeletingService {
   }
 
   @Test(timeout = 30000)
+  @org.junit.Ignore
   public void testContainerThrottle() throws Exception {
     // Properties :
     //  - Number of containers : 2
