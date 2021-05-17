@@ -400,7 +400,6 @@ public final class HddsUtils {
     case GetBlock:
     case GetCommittedBlockLength:
     case GetSmallFile:
-    case ListBlock:
     case ListChunk:
     case PutBlock:
     case PutSmallFile:
