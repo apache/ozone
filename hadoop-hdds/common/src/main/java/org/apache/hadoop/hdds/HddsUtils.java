@@ -414,10 +414,10 @@ public final class HddsUtils {
   public static boolean requireContainerToken(
       ContainerProtos.Type cmdType) {
     switch (cmdType) {
+    case ListBlock:
     case CloseContainer:
     case CreateContainer:
     case DeleteContainer:
-    case ListContainer:
     case ReadContainer:
     case UpdateContainer:
       return true;
