@@ -35,7 +35,8 @@ public class DirectoryServerSource implements StreamingSource {
   }
 
   @Override
-  public Map<String, Path> getFilesToStream(String id) throws InterruptedException {
+  public Map<String, Path> getFilesToStream(String id)
+      throws InterruptedException {
     Map<String, Path> files = new HashMap<>();
     try {
       Files.walk(root.resolve(id))

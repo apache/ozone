@@ -88,13 +88,15 @@ public class TestStreamingServer {
     Files.write(sourceDir.resolve(SUBDIR).resolve("file1"), CONTENT);
 
     //WHEN: stream subdir
-    try (StreamingServer server = new StreamingServer(new DirectoryServerSource(sourceDir) {
-      @Override
-      public Map<String, Path> getFilesToStream(String id) throws InterruptedException {
-        Thread.sleep(3000L);
-        return super.getFilesToStream(id);
-      }
-    }, 0)) {
+    try (StreamingServer server =
+             new StreamingServer(new DirectoryServerSource(sourceDir) {
+               @Override
+               public Map<String, Path> getFilesToStream(String id)
+                   throws InterruptedException {
+                 Thread.sleep(3000L);
+                 return super.getFilesToStream(id);
+               }
+             }, 0)) {
       server.start();
       try (StreamingClient client =
                new StreamingClient("localhost", server.getPort(),
@@ -109,8 +111,10 @@ public class TestStreamingServer {
 
   }
 
-  private void streamDir(Path sourceDir, Path destDir, String subdir) throws InterruptedException {
-    try (StreamingServer server = new StreamingServer(new DirectoryServerSource(sourceDir), 0)) {
+  private void streamDir(Path sourceDir, Path destDir, String subdir)
+      throws InterruptedException {
+    try (StreamingServer server = new StreamingServer(
+        new DirectoryServerSource(sourceDir), 0)) {
       server.start();
       try (StreamingClient client =
                new StreamingClient("localhost", server.getPort(),
