@@ -952,11 +952,12 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
               getScmAddress(haDetails, conf), true);
         }
 
-        // Do not move these code lines. If SCM version file is created,
-        // the subsequent scm init should use the groupID from version file.
+        // Ensure scmRatisServer#initialize() is called post scm storage
+        // config initialization.. If SCM version file is created,
+        // the subsequent scm init should use the clusterID from version file.
         // So, scmStorageConfig#initialize() should happen before ratis server
         // initialize. In this way,we do not leave ratis storage directory
-        // with multiple raft Groups in failure scenario.
+        // with multiple raft group directories in failure scenario.
 
         // The order of init should be
         // 1. SCM storage config initialize to create version file.
