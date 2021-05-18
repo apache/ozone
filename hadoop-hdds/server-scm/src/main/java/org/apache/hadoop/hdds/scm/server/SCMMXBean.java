@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.hdds.scm.server;
 
+import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -70,4 +72,9 @@ public interface SCMMXBean extends ServiceRuntimeInfo {
   String getScmId();
 
   String getClusterId();
+
+  List<String> getScmRatisRoles() throws IOException;
+
+  String getPrimordialNode();
+
 }

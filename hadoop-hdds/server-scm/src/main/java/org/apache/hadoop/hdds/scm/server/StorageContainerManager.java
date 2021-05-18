@@ -1708,4 +1708,17 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     return containerTokenMgr;
   }
 
+  @Override
+  public List<String> getScmRatisRoles() throws IOException {
+    return getScmHAManager().getRatisServer().getRatisRoles();
+  }
+
+  @Override
+  public String getPrimordialNode() {
+    if (SCMHAUtils.isSCMHAEnabled(configuration)) {
+      return SCMHAUtils.getPrimordialSCM(configuration);
+    }
+    return null;
+  }
+
 }
