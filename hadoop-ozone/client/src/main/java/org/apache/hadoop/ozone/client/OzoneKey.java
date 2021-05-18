@@ -161,9 +161,8 @@ public class OzoneKey {
   }
 
   @Deprecated
-  public ReplicationFactor getReplicationFactor() {
-    return ReplicationFactor
-            .fromProto(ReplicationConfig.getLegacyFactor(replicationConfig));
+  public int getReplicationFactor() {
+    return replicationConfig.getRequiredNodes();
   }
 
 }
