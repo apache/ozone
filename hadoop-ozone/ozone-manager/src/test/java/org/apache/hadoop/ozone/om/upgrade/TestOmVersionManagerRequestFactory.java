@@ -33,12 +33,14 @@ import org.apache.hadoop.ozone.om.request.key.OMKeyCreateRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.junit.Assert;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.reflections.Reflections;
 
 /**
  * Test OmVersionFactory.
  */
+@Ignore
 public class TestOmVersionManagerRequestFactory {
 
   private static OMLayoutVersionManager omVersionManager;

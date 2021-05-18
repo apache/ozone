@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.upgrade;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
 
+import java.io.IOException;
 import java.lang.reflect.Method;
 
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -30,8 +31,8 @@ import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Before;
+import org.aspectj.lang.annotation.Pointcut;
 import org.aspectj.lang.reflect.MethodSignature;
-
 
 /**
  * 'Aspect' for OM Layout Feature API. All methods annotated with the
@@ -45,7 +46,7 @@ public class OMLayoutFeatureAspect {
       "getOmVersionManager";
 
   @Before("@annotation(DisallowedUntilLayoutVersion) && execution(* *(..))")
-  public void checkLayoutFeature(JoinPoint joinPoint) throws Throwable {
+  public void checkLayoutFeature(JoinPoint joinPoint) throws IOException {
     String featureName = ((MethodSignature) joinPoint.getSignature())
         .getMethod().getAnnotation(DisallowedUntilLayoutVersion.class)
         .value().name();
@@ -63,16 +64,41 @@ public class OMLayoutFeatureAspect {
         lvm = new OMLayoutVersionManager();
       }
     }
+    checkIsAllowed(joinPoint.getSignature().toShortString(), lvm, featureName);
+  }
+
+  private void checkIsAllowed(String operationName,
+                              LayoutVersionManager lvm,
+                              String featureName) throws OMException {
     if (!lvm.isAllowed(featureName)) {
       LayoutFeature layoutFeature = lvm.getFeature(featureName);
       throw new OMException(String.format("Operation %s cannot be invoked " +
               "before finalization. It belongs to the layout feature %s, " +
               "whose layout version is %d. Current Layout version is %d",
-          joinPoint.getSignature().toShortString(),
+          operationName,
           layoutFeature.name(),
           layoutFeature.layoutVersion(),
           lvm.getMetadataLayoutVersion()),
           NOT_SUPPORTED_OPERATION);
     }
   }
+
+  @Pointcut("execution(* (@BelongsToLayoutVersion *).preExecute(..))")
+  public void omRequestPointCut() {
+  }
+
+  @Before("omRequestPointCut()")
+  public void beforeRequestApplyTxn(final JoinPoint joinPoint)
+      throws OMException {
+    Object[] args = joinPoint.getArgs();
+    OzoneManager om = (OzoneManager) args[0];
+
+    BelongsToLayoutVersion annotation = joinPoint.getTarget().getClass()
+        .getAnnotation(BelongsToLayoutVersion.class);
+    LayoutFeature lf = annotation.value();
+
+    checkIsAllowed(joinPoint.getTarget().getClass().getSimpleName(),
+        om.getVersionManager(), lf.name());
+  }
+
 }
