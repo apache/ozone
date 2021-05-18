@@ -74,13 +74,12 @@ public class S3GetSecretRequest extends OMClientRequest {
 
     UserGroupInformation user = ProtobufRpcEngine.Server.getRemoteUser();
     // Permission check. Users need to be themselves or have admin privilege
-    if (!user.getUserName().equals(kerberosID)) {
-      if (!ozoneManager.isAdmin(kerberosID)) {
-        throw new OMException("Requested user name '" + kerberosID +
-            "' doesn't match current user '" + user.getUserName() +
-            "', nor does current user has administrator privilege.",
-            OMException.ResultCodes.USER_MISMATCH);
-      }
+    if (!user.getUserName().equals(kerberosID) &&
+        !ozoneManager.isAdmin(kerberosID)) {
+      throw new OMException("Requested user name '" + kerberosID +
+          "' doesn't match current user '" + user.getUserName() +
+          "', nor does current user has administrator privilege.",
+          OMException.ResultCodes.USER_MISMATCH);
     }
 
     String s3Secret = DigestUtils.sha256Hex(OmUtils.getSHADigest());

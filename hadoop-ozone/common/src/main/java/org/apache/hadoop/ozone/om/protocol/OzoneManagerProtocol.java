@@ -384,7 +384,6 @@ public interface OzoneManagerProtocol
   /**
    * Revokes s3Secret of given kerberos user.
    * @param kerberosID
-   * @return S3SecretValue
    * @throws IOException
    */
   void revokeS3Secret(String kerberosID) throws IOException;

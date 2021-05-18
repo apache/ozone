@@ -511,7 +511,6 @@ public interface ClientProtocol {
   /**
    * Revoke S3 Secret of given kerberos user.
    * @param kerberosID
-   * @return S3SecretValue
    * @throws IOException
    */
   void revokeS3Secret(String kerberosID) throws IOException;
