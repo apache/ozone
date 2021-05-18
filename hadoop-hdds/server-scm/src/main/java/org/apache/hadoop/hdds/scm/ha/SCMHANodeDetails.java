@@ -60,6 +60,9 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVIC
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY;
 
+/**
+ * TODO: javadoc.
+ */
 public class SCMHANodeDetails {
   public static final Logger LOG =
       LoggerFactory.getLogger(SCMHANodeDetails.class);

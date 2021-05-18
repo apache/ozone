@@ -24,6 +24,9 @@ import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
 
+/**
+ * TODO: javadoc.
+ */
 @XmlAccessorType(XmlAccessType.FIELD)
 @XmlRootElement(name = "Owner")
 public class S3Owner {

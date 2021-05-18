@@ -177,6 +177,9 @@ public final class SCMContext {
     return scm;
   }
 
+  /**
+   * Builder for SCMContext.
+   */
   public static class Builder {
     /**
      * The default context:

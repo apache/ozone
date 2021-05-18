@@ -31,6 +31,10 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Container balancer is a service in SCM to move containers between over- and
+ * under-utilized datanodes.
+ */
 public class ContainerBalancer {
 
   private static final Logger LOG =
