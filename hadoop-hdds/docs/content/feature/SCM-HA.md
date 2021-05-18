@@ -142,7 +142,8 @@ Above configs are needed in addition to normal SCM HA configuration.
 ### Primordial SCM:
 
 Primordial SCM is determined from the config ozone.scm.primordial.node.id. 
-The value for this can be node id or hostname of the SCM.
+The value for this can be node id or hostname of the SCM. If the config is 
+not defined, the node where init is run is considered as the primordial SCM.
 
 {{< highlight bash >}}
 bin/ozone scm --init
@@ -160,6 +161,9 @@ bin/ozone scm --bootstrap
 
 This will set up a public, private key pair for sub CA and generate CSR to get a 
 signed certificate for sub-CA from root CA.
+
+**Note**: Make sure to run **--init** only on one of the SCM host if 
+primordial SCM is not defined. Bring other SCM's using **--bootstrap**. 
 
 ### Current SCM HA Security limitation:
 1. When primordial SCM is down, new SCM’s cannot be bootstrapped and join the 
