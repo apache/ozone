@@ -26,10 +26,10 @@ import org.apache.hadoop.security.UserGroupInformation;
  * Factory to create the default GrpcOm transport.
  */
 public class GrpcOmTransportFactory implements OmTransportFactory {
-    @Override
-    public OmTransport createOmTransport(ConfigurationSource source,
-                                         UserGroupInformation ugi, String omServiceId) throws IOException {
-
-        return new GrpcOmTransport(source, ugi, omServiceId);
-    }
+  @Override
+  public OmTransport createOmTransport(ConfigurationSource source,
+                                       UserGroupInformation ugi,
+                                       String omServiceId) throws IOException {
+    return new GrpcOmTransport(source, ugi, omServiceId);
+  }
 }
