@@ -174,13 +174,15 @@ public class OzoneContainer {
         new BlockDeletingService(this, svcInterval.toMillis(), serviceTimeout,
             TimeUnit.MILLISECONDS, config);
 
-    List< X509Certificate > x509Certificates = null;
-    if (certClient != null) {
+    List<X509Certificate> x509Certificates = null;
+    if (certClient != null && secConf.isGrpcTlsEnabled()) {
       x509Certificates = HAUtils.buildCAX509List(certClient, conf);
+      tlsClientConfig = new GrpcTlsConfig(
+          certClient.getPrivateKey(), certClient.getCertificate(),
+          x509Certificates, true);
+    } else {
+      tlsClientConfig = null;
     }
-
-    tlsClientConfig = RatisHelper.createTlsClientConfig(secConf,
-        x509Certificates);
 
     initializingStatus =
         new AtomicReference<>(InitializingStatus.UNINITIALIZED);
