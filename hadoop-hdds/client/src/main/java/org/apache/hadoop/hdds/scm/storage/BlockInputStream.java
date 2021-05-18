@@ -265,12 +265,75 @@ public class BlockInputStream extends InputStream
    */
   @Override
   public synchronized int read(byte[] b, int off, int len) throws IOException {
-    ReaderStrategy strategy = new ByteArrayStrategy(b, off, len);
-    int bufLen = strategy.getTargetLength();
-    if (bufLen == 0) {
+    ReaderStrategy strategy = new ByteArrayReader(b, off, len);
+    if (len == 0) {
       return 0;
     }
     return readWithStrategy(strategy);
+  }
+
+  @Override
+  public synchronized int read(ByteBuffer byteBuffer) throws IOException {
+    ReaderStrategy strategy = new ByteBufferReader(byteBuffer);
+    int len = strategy.getTargetLength();
+    if (len == 0) {
+      return 0;
+    }
+    return readWithStrategy(strategy);
+  }
+
+  synchronized int readWithStrategy(ReaderStrategy strategy) throws
+      IOException {
+    Preconditions.checkArgument(strategy != null);
+    if (!initialized) {
+      initialize();
+    }
+
+    checkOpen();
+    int totalReadLen = 0;
+    int len = strategy.getTargetLength();
+    while (len > 0) {
+      // if we are at the last chunk and have read the entire chunk, return
+      if (chunkStreams.size() == 0 ||
+          (chunkStreams.size() - 1 <= chunkIndex &&
+              chunkStreams.get(chunkIndex)
+                  .getRemaining() == 0)) {
+        return totalReadLen == 0 ? EOF : totalReadLen;
+      }
+
+      // Get the current chunkStream and read data from it
+      ChunkInputStream current = chunkStreams.get(chunkIndex);
+      int numBytesToRead = Math.min(len, (int)current.getRemaining());
+      int numBytesRead;
+      try {
+        numBytesRead = strategy.readFromBlock(current, numBytesToRead);
+        retries = 0; // reset retries after successful read
+      } catch (StorageContainerException e) {
+        if (shouldRetryRead(e)) {
+          handleReadError(e);
+          continue;
+        } else {
+          throw e;
+        }
+      }
+
+      if (numBytesRead != numBytesToRead) {
+        // This implies that there is either data loss or corruption in the
+        // chunk entries. Even EOF in the current stream would be covered in
+        // this case.
+        throw new IOException(String.format(
+            "Inconsistent read for chunkName=%s length=%d numBytesToRead= %d " +
+                "numBytesRead=%d", current.getChunkName(), current.getLength(),
+            numBytesToRead, numBytesRead));
+      }
+      totalReadLen += numBytesRead;
+      len -= numBytesRead;
+      if (current.getRemaining() <= 0 &&
+          ((chunkIndex + 1) < chunkStreams.size())) {
+        chunkIndex += 1;
+      }
+    }
+    return totalReadLen;
   }
 
   /**
@@ -456,69 +519,5 @@ public class BlockInputStream extends InputStream
   @VisibleForTesting
   public synchronized List<ChunkInputStream> getChunkStreams() {
     return chunkStreams;
-  }
-
-  @Override
-  public synchronized int read(ByteBuffer byteBuffer) throws IOException {
-    ReaderStrategy strategy = new ByteBufferStrategy(byteBuffer);
-    int bufferLen = strategy.getTargetLength();
-    if (bufferLen == 0) {
-      return 0;
-    }
-    return readWithStrategy(strategy);
-  }
-
-  synchronized int readWithStrategy(ReaderStrategy strategy) throws
-      IOException {
-    Preconditions.checkArgument(strategy != null);
-    if (!initialized) {
-      initialize();
-    }
-
-    checkOpen();
-    int totalReadLen = 0;
-    int bufferLen = strategy.getTargetLength();
-    while (bufferLen > 0) {
-      // if we are at the last chunk and have read the entire chunk, return
-      if (chunkStreams.size() == 0 ||
-          (chunkStreams.size() - 1 <= chunkIndex &&
-              chunkStreams.get(chunkIndex)
-                  .getRemaining() == 0)) {
-        return totalReadLen == 0 ? EOF : totalReadLen;
-      }
-
-      // Get the current chunkStream and read data from it
-      ChunkInputStream current = chunkStreams.get(chunkIndex);
-      int numBytesToRead = Math.min(bufferLen, (int)current.getRemaining());
-      int numBytesRead;
-      try {
-        numBytesRead = strategy.readFromBlock(current, numBytesToRead);
-        retries = 0; // reset retries after successful read
-      } catch (StorageContainerException e) {
-        if (shouldRetryRead(e)) {
-          handleReadError(e);
-          continue;
-        } else {
-          throw e;
-        }
-      }
-
-      if (numBytesRead != numBytesToRead) {
-        // This implies that there is either data loss or corruption in the
-        // chunk entries. Even EOF in the current stream would be covered in
-        // this case.
-        throw new IOException(String.format(
-            "Inconsistent read for chunkName=%s length=%d numBytesToRead= %d " +
-                "numBytesRead=%d", current.getChunkName(), current.getLength(),
-            numBytesToRead, numBytesRead));
-      }
-      totalReadLen += numBytesRead;
-      bufferLen -= numBytesRead;
-      if (current.getRemaining() <= 0 &&
-          ((chunkIndex + 1) < chunkStreams.size())) {
-        chunkIndex += 1;
-      }
-    }
-    return totalReadLen;
   }
 }

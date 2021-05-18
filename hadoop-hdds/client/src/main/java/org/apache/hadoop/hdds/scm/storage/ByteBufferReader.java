@@ -19,36 +19,47 @@
 package org.apache.hadoop.hdds.scm.storage;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.fs.ByteBufferReadable;
+
 import java.io.IOException;
 import java.io.InputStream;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import java.nio.ByteBuffer;
 
-public class ByteArrayStrategy implements ReaderStrategy {
-  private final byte[] readBuf;
-  private int offset;
+/**
+ * An {@link ReaderStrategy} implementation which supports ByteBuffer as the
+ * input read data buffer.
+ */
+public class ByteBufferReader implements ReaderStrategy {
+  private final ByteBuffer readBuf;
   private int targetLen;
 
-  @SuppressFBWarnings(value = "EI_EXPOSE_REP2",
-      justification = "Deep copy byte[] has bad impact on performance")
-  public ByteArrayStrategy(byte[] b, int off, int len) {
-    if (b == null) {
+  public ByteBufferReader(ByteBuffer buf) {
+    if (buf == null) {
       throw new NullPointerException();
     }
-    if (off < 0 || len < 0 || len > b.length - off) {
-      throw new IndexOutOfBoundsException();
-    }
-
-    this.readBuf = b;
-    this.offset = off;
-    this.targetLen = len;
+    this.readBuf = buf;
+    this.targetLen = buf.remaining();
   }
 
   @Override
   public int readFromBlock(InputStream is, int numBytesToRead) throws
       IOException {
     Preconditions.checkArgument(is != null);
-    int numBytesRead = is.read(readBuf, offset, numBytesToRead);
-    offset += numBytesRead;
+    Preconditions.checkArgument(is instanceof ByteBufferReadable);
+    // change buffer limit
+    int bufferLimit = readBuf.limit();
+    if (numBytesToRead < targetLen) {
+      readBuf.limit(readBuf.position() + numBytesToRead);
+    }
+    int numBytesRead;
+    try {
+      numBytesRead = ((ByteBufferReadable)is).read(readBuf);
+    } finally {
+      // restore buffer limit
+      if (numBytesToRead < targetLen) {
+        readBuf.limit(bufferLimit);
+      }
+    }
     targetLen -= numBytesRead;
     return numBytesRead;
   }

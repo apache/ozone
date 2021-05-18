@@ -21,6 +21,9 @@ package org.apache.hadoop.hdds.scm.storage;
 import java.io.IOException;
 import java.io.InputStream;
 
+/**
+ * A Reader interface to work with InputStream.
+ */
 public interface ReaderStrategy {
   /**
    * Read from a block using the InputStream.

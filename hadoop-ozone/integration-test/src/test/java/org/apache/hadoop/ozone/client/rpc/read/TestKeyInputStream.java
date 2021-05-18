@@ -192,7 +192,7 @@ public class TestKeyInputStream extends TestInputStreamBase {
     int dataLength = 2 * BLOCK_SIZE + (BLOCK_SIZE / 2);
     byte[] data = writeRandomBytes(keyName, dataLength);
 
-    // read chunk data
+    // read chunk data using Byte Array
     try (KeyInputStream keyInputStream = getKeyInputStream(keyName)) {
 
       int[] bufferSizeList = {BYTES_PER_CHECKSUM + 1, CHUNK_SIZE / 4,
@@ -201,7 +201,17 @@ public class TestKeyInputStream extends TestInputStreamBase {
       for (int bufferSize : bufferSizeList) {
         assertReadFully(data, keyInputStream, bufferSize, 0);
         keyInputStream.seek(0);
-        assertReadFullyUseByteBuffer(data, keyInputStream, bufferSize, 0);
+      }
+    }
+
+    // read chunk data using ByteBuffer
+    try (KeyInputStream keyInputStream = getKeyInputStream(keyName)) {
+
+      int[] bufferSizeList = {BYTES_PER_CHECKSUM + 1, CHUNK_SIZE / 4,
+          CHUNK_SIZE / 2, CHUNK_SIZE - 1, CHUNK_SIZE, CHUNK_SIZE + 1,
+          BLOCK_SIZE - 1, BLOCK_SIZE, BLOCK_SIZE + 1, BLOCK_SIZE * 2};
+      for (int bufferSize : bufferSizeList) {
+        assertReadFullyUsingByteBuffer(data, keyInputStream, bufferSize, 0);
         keyInputStream.seek(0);
       }
     }
@@ -319,7 +329,7 @@ public class TestKeyInputStream extends TestInputStreamBase {
       }
       getCluster().shutdownHddsDatanode(pipelineNodes.get(0));
       // check that we can still read it
-      assertReadFullyUseByteBuffer(data, keyInputStream, dataLength - 1, 1);
+      assertReadFullyUsingByteBuffer(data, keyInputStream, dataLength - 1, 1);
     }
   }
 
@@ -363,7 +373,7 @@ public class TestKeyInputStream extends TestInputStreamBase {
     Assert.assertEquals(data.length, totalRead);
   }
 
-  private void assertReadFullyUseByteBuffer(byte[] data, KeyInputStream in,
+  private void assertReadFullyUsingByteBuffer(byte[] data, KeyInputStream in,
       int bufferSize, int totalRead) throws IOException {
 
     ByteBuffer buffer = ByteBuffer.allocateDirect(bufferSize);

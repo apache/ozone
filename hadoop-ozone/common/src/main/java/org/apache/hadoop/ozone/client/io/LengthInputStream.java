@@ -58,7 +58,7 @@ public class LengthInputStream extends FilterInputStream implements
       return ((ByteBufferReadable)in).read(byteBuffer);
     } else {
       throw new UnsupportedOperationException("Read with ByteBuffer is not " +
-          " supported by this input stream");
+          " supported by " + in.getClass().getName());
     }
   }
 }

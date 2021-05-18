@@ -61,7 +61,7 @@ public class OzoneInputStream extends InputStream implements CanUnbuffer,
       return ((ByteBufferReadable)inputStream).read(byteBuffer);
     } else {
       throw new UnsupportedOperationException("Read with ByteBuffer is not " +
-          " supported by this detail input stream");
+          " supported by " + inputStream.getClass().getName());
     }
   }
 

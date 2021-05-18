@@ -38,8 +38,8 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
-import org.apache.hadoop.hdds.scm.storage.ByteArrayStrategy;
-import org.apache.hadoop.hdds.scm.storage.ByteBufferStrategy;
+import org.apache.hadoop.hdds.scm.storage.ByteArrayReader;
+import org.apache.hadoop.hdds.scm.storage.ByteBufferReader;
 import org.apache.hadoop.hdds.scm.storage.ReaderStrategy;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -222,7 +222,7 @@ public class KeyInputStream extends InputStream
    */
   @Override
   public synchronized int read(byte[] b, int off, int len) throws IOException {
-    ReaderStrategy strategy = new ByteArrayStrategy(b, off, len);
+    ReaderStrategy strategy = new ByteArrayReader(b, off, len);
     int bufferLen = strategy.getTargetLength();
     if (bufferLen == 0) {
       return 0;
@@ -232,7 +232,7 @@ public class KeyInputStream extends InputStream
 
   @Override
   public synchronized int read(ByteBuffer byteBuffer) throws IOException {
-    ReaderStrategy strategy = new ByteBufferStrategy(byteBuffer);
+    ReaderStrategy strategy = new ByteBufferReader(byteBuffer);
     int bufferLen = strategy.getTargetLength();
     if (bufferLen == 0) {
       return 0;

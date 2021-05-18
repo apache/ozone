@@ -197,14 +197,14 @@ public class ChunkInputStream extends InputStream
     if (byteBuffer == null) {
       throw new NullPointerException();
     }
-    int bufferLen = byteBuffer.remaining();
-    if (bufferLen == 0) {
+    int len = byteBuffer.remaining();
+    if (len == 0) {
       return 0;
     }
     acquireClient();
     int total = 0;
-    while (bufferLen > 0) {
-      int available = prepareRead(bufferLen);
+    while (len > 0) {
+      int available = prepareRead(len);
       if (available == EOF) {
         // There is no more data in the chunk stream. The buffers should have
         // been released by now
@@ -217,7 +217,7 @@ public class ChunkInputStream extends InputStream
       byteBuffer.put(tmpBuf);
       readBuf.position(tmpBuf.position());
 
-      bufferLen -= available;
+      len -= available;
       total += available;
 
       if (bufferEOF()) {
