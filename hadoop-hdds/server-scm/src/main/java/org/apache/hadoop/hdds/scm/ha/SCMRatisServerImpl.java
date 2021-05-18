@@ -99,8 +99,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
     Parameters parameters = createSCMServerTlsParameters(grpcTlsConfig);
 
     this.server = newRaftServer(scm.getScmId(), conf)
-        .setStateMachineRegistry(
-            (gId) -> new SCMStateMachine(scm, buffer))
+        .setStateMachineRegistry((gId) -> new SCMStateMachine(scm, buffer))
         .setGroup(RaftGroup.valueOf(groupId))
         .setParameters(parameters).build();
 
