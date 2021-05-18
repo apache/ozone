@@ -163,7 +163,7 @@ This will set up a public, private key pair for sub CA and generate CSR to get a
 signed certificate for sub-CA from root CA.
 
 **Note**: Make sure to run **--init** only on one of the SCM host if 
-primordial SCM is not defined. Bring other SCM's using **--bootstrap**. 
+primordial SCM is not defined. Bring up other SCM's using **--bootstrap**. 
 
 ### Current SCM HA Security limitation:
 1. When primordial SCM is down, new SCM’s cannot be bootstrapped and join the 
