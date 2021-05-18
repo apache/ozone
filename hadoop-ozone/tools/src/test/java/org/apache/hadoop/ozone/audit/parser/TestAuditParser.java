@@ -181,7 +181,7 @@ public class TestAuditParser {
   }
 
   /**
-   * Test to execute load audit log
+   * Test to execute load audit log.
    */
   @Test
   public void testLoadCommand() {
@@ -190,7 +190,8 @@ public class TestAuditParser {
       execute(args1, "");
       fail("No exception thrown.");
     } catch (Exception e) {
-      assertTrue(e.getMessage().contains("java.lang.ArrayIndexOutOfBoundsException: 5"));
+      assertTrue(e.getMessage()
+          .contains("java.lang.ArrayIndexOutOfBoundsException: 5"));
     }
   }
 
