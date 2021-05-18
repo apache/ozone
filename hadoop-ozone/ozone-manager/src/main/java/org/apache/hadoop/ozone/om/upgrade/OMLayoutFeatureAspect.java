@@ -95,8 +95,11 @@ public class OMLayoutFeatureAspect {
 
     BelongsToLayoutVersion annotation = joinPoint.getTarget().getClass()
         .getAnnotation(BelongsToLayoutVersion.class);
-    LayoutFeature lf = annotation.value();
+    if (annotation == null) {
+      return;
+    }
 
+    LayoutFeature lf = annotation.value();
     checkIsAllowed(joinPoint.getTarget().getClass().getSimpleName(),
         om.getVersionManager(), lf.name());
   }
