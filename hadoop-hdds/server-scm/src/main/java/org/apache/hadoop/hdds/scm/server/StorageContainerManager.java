@@ -971,6 +971,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
               scmStorageConfig.getScmId(), haDetails.getLocalNodeDetails(),
               conf);
           scmStorageConfig.setSCMHAFlag(true);
+          // Do force initialize to persist SCM_HA flag.
+          scmStorageConfig.forceInitialize();
         }
 
         LOG.info("SCM initialization succeeded. Current cluster id for sd={}"
