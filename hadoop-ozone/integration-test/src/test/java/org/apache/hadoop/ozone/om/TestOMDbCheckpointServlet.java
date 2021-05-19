@@ -177,7 +177,7 @@ public class TestOMDbCheckpointServlet {
         om.getMetadataManager().getStore(),
         om.getMetrics().getDBCheckpointMetrics(),
         om.getAclsEnabled(),
-        om.getOzoneAdmins(om.getConfiguration()),
+        om.getOmAdminUsernames(),
         om.isSpnegoEnabled());
 
     doNothing().when(responseMock).setContentType("application/x-tgz");
@@ -213,7 +213,7 @@ public class TestOMDbCheckpointServlet {
     setupCluster();
 
     final OzoneManager om = cluster.getOzoneManager();
-    Collection<String> allowedUsers = om.getOzoneAdmins(om.getConfiguration());
+    Collection<String> allowedUsers = om.getOmAdminUsernames();
     allowedUsers.add("recon");
 
     doCallRealMethod().when(omDbCheckpointServletMock).initialize(
