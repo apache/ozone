@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -16,29 +16,26 @@
  */
 package org.apache.hadoop.ozone.freon;
 
-import java.util.concurrent.Callable;
-
+import com.codahale.metrics.Timer;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.StorageType;
+import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-
-import com.codahale.metrics.Timer;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
+import java.util.concurrent.Callable;
+
 /**
- * Data generator tool test om performance.
+ * Data remover tool test om performance.
  */
-@Command(name = "ombg",
-    aliases = "om-bucket-generator",
-    description = "Generate ozone buckets on OM side.",
+@Command(name = "ockr",
+    aliases = "ozone-client-key-remover",
+    description = "Remove keys with the help of the ozone clients.",
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
-public class OmBucketGenerator extends BaseFreonGenerator
+public class OzoneClientKeyRemover extends BaseFreonGenerator
     implements Callable<Void> {
 
   @Option(names = {"-v", "--volume"},
@@ -47,52 +44,47 @@ public class OmBucketGenerator extends BaseFreonGenerator
       defaultValue = "vol1")
   private String volumeName;
 
+  @Option(names = {"-b", "--bucket"},
+      description = "Name of the bucket which contains the test data. Will be"
+          + " created if missing.",
+      defaultValue = "bucket1")
+  private String bucketName;
+
   @Option(
       names = "--om-service-id",
       description = "OM Service ID"
   )
   private String omServiceID = null;
 
-  private OzoneManagerProtocol ozoneManagerClient;
+  private Timer timer;
 
-  private Timer bucketCreationTimer;
+  private OzoneBucket ozoneBucket;
 
   @Override
   public Void call() throws Exception {
 
     init();
-
     OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
 
     try (OzoneClient rpcClient = createOzoneClient(omServiceID,
         ozoneConfiguration)) {
-      ensureVolumeExists(rpcClient, volumeName);
+      ozoneBucket = rpcClient.getObjectStore().getVolume(volumeName)
+          .getBucket(bucketName);
 
-      ozoneManagerClient = createOmClient(ozoneConfiguration, omServiceID);
+      timer = getMetrics().timer("remove");
 
-      bucketCreationTimer = getMetrics().timer("bucket-create");
+      runTests(this::removeKey);
 
-      runTests(this::createBucket);
-
-    } finally {
-      if (ozoneManagerClient != null) {
-        ozoneManagerClient.close();
-      }
     }
 
     return null;
   }
 
-  private void createBucket(long index) throws Exception {
+  private void removeKey(long counter) throws Exception {
+    final String key = generateObjectName(counter);
 
-    OmBucketInfo bucketInfo = new OmBucketInfo.Builder()
-        .setBucketName(generateBucketName(index))
-        .setVolumeName(volumeName)
-        .setStorageType(StorageType.DISK)
-        .build();
-
-    bucketCreationTimer.time(() -> {
-      ozoneManagerClient.createBucket(bucketInfo);
+    timer.time(() -> {
+      ozoneBucket.deleteKey(key);
       return null;
     });
   }

@@ -16,29 +16,25 @@
  */
 package org.apache.hadoop.ozone.freon;
 
-import java.util.concurrent.Callable;
-
+import com.codahale.metrics.Timer;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.StorageType;
-import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-
-import com.codahale.metrics.Timer;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
+
+import java.util.concurrent.Callable;
 
 /**
  * Data generator tool test om performance.
  */
-@Command(name = "ombg",
-    aliases = "om-bucket-generator",
-    description = "Generate ozone buckets on OM side.",
+@Command(name = "ombr",
+    aliases = "om-bucket-remover",
+    description = "Remove ozone buckets on OM side.",
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
-public class OmBucketGenerator extends BaseFreonGenerator
+public class OmBucketRemover extends BaseFreonGenerator
     implements Callable<Void> {
 
   @Option(names = {"-v", "--volume"},
@@ -64,15 +60,13 @@ public class OmBucketGenerator extends BaseFreonGenerator
 
     OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
 
-    try (OzoneClient rpcClient = createOzoneClient(omServiceID,
-        ozoneConfiguration)) {
-      ensureVolumeExists(rpcClient, volumeName);
+    try {
 
       ozoneManagerClient = createOmClient(ozoneConfiguration, omServiceID);
 
-      bucketCreationTimer = getMetrics().timer("bucket-create");
+      bucketCreationTimer = getMetrics().timer("bucket-remove");
 
-      runTests(this::createBucket);
+      runTests(this::removeBucket);
 
     } finally {
       if (ozoneManagerClient != null) {
@@ -83,16 +77,12 @@ public class OmBucketGenerator extends BaseFreonGenerator
     return null;
   }
 
-  private void createBucket(long index) throws Exception {
+  private void removeBucket(long index) throws Exception {
 
-    OmBucketInfo bucketInfo = new OmBucketInfo.Builder()
-        .setBucketName(generateBucketName(index))
-        .setVolumeName(volumeName)
-        .setStorageType(StorageType.DISK)
-        .build();
+    String bucketName = generateBucketName(index);
 
     bucketCreationTimer.time(() -> {
-      ozoneManagerClient.createBucket(bucketInfo);
+      ozoneManagerClient.deleteBucket(volumeName, bucketName);
       return null;
     });
   }

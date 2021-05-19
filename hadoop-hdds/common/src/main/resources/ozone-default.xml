@@ -2029,7 +2029,7 @@
 
   <property>
     <name>ozone.scm.ratis.port</name>
-    <value>9865</value>
+    <value>9894</value>
     <tag>OZONE, SCM, HA, RATIS</tag>
     <description>
       The port number of the SCM's Ratis server.
@@ -2038,7 +2038,7 @@
 
   <property>
     <name>ozone.scm.grpc.port</name>
-    <value>9866</value>
+    <value>9895</value>
     <tag>OZONE, SCM, HA, RATIS</tag>
     <description>
       The port number of the SCM's grpc server.
