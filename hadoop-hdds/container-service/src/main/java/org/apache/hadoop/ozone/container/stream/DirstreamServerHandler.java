@@ -72,7 +72,6 @@ public class DirstreamServerHandler extends ChannelInboundHandlerAdapter {
     }
 
     if (headerProcessed) {
-      ChannelFuture lastFuture = null;
       final List<Entry<String, Path>> entriesToWrite = new ArrayList<>(
           source.getFilesToStream(id.toString().trim()).entrySet());
 

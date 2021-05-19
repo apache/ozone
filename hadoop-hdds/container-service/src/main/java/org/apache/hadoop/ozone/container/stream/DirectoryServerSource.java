@@ -35,6 +35,11 @@ public class DirectoryServerSource implements StreamingSource {
   }
 
   @Override
+  /**
+   * Return logicalNames and real file path to replicate.
+   *
+   * @param id name of the subdirectory to replitace relative to root.
+   */
   public Map<String, Path> getFilesToStream(String id)
       throws InterruptedException {
     Map<String, Path> files = new HashMap<>();

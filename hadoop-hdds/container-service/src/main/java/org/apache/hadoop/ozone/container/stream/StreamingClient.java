@@ -18,7 +18,11 @@
 package org.apache.hadoop.ozone.container.stream;
 
 import io.netty.bootstrap.Bootstrap;
-import io.netty.channel.*;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelInitializer;
+import io.netty.channel.ChannelOption;
+import io.netty.channel.ChannelPipeline;
+import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
@@ -29,6 +33,9 @@ import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.ozone.container.stream.DirstreamServerHandler.END_MARKER;
 
+/**
+ * Client to stream huge binaries from a streamling server.
+ */
 public class StreamingClient implements AutoCloseable {
 
   private final Bootstrap bootstrap;
@@ -51,6 +58,7 @@ public class StreamingClient implements AutoCloseable {
     bootstrap.group(group)
         .channel(NioSocketChannel.class)
         .option(ChannelOption.SO_RCVBUF, 1024 * 1024)
+        .option(ChannelOption.SO_KEEPALIVE, true)
         .handler(new ChannelInitializer<SocketChannel>() {
           @Override
           public void initChannel(SocketChannel ch) throws Exception {
