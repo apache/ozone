@@ -37,7 +37,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
-import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
@@ -174,13 +173,15 @@ public class OzoneContainer {
         new BlockDeletingService(this, svcInterval.toMillis(), serviceTimeout,
             TimeUnit.MILLISECONDS, config);
 
-    List< X509Certificate > x509Certificates = null;
-    if (certClient != null) {
-      x509Certificates = HAUtils.buildCAX509List(certClient, conf);
+    if (certClient != null && secConf.isGrpcTlsEnabled()) {
+      List<X509Certificate> x509Certificates =
+          HAUtils.buildCAX509List(certClient, conf);
+      tlsClientConfig = new GrpcTlsConfig(
+          certClient.getPrivateKey(), certClient.getCertificate(),
+          x509Certificates, true);
+    } else {
+      tlsClientConfig = null;
     }
-
-    tlsClientConfig = RatisHelper.createTlsClientConfig(secConf,
-        x509Certificates);
 
     initializingStatus =
         new AtomicReference<>(InitializingStatus.UNINITIALIZED);
