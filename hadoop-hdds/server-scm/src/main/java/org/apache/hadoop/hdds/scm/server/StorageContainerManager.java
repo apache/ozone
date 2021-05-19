@@ -1709,8 +1709,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-  public List<String> getScmRatisRoles() throws IOException {
-    return getScmHAManager().getRatisServer().getRatisRoles();
+  public String getScmRatisRoles() throws IOException {
+    return HddsUtils.format(getScmHAManager().getRatisServer().getRatisRoles());
   }
 
   @Override

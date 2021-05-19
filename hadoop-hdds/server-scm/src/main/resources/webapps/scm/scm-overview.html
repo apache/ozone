@@ -66,7 +66,7 @@
         <td> SCM Roles (HA) </td>
         <td>{{$ctrl.overview.jmx.ScmRatisRoles}}</td>
     </tr>
-    <tr>
+    <tr ng-hide="!$ctrl.overview.jmx.PrimordialNode">
         <td> Primordial Node (HA) </td>
         <td>{{$ctrl.overview.jmx.PrimordialNode}}</td>
     </tr>
