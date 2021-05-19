@@ -65,8 +65,8 @@ import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CA_LIST_RETRY_WAIT_DURATION;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CA_LIST_WAIT_RETRY_DURATION_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CA_LIST_RETRY_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CA_LIST_RETRY_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURATION;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURATION_DEFAULT;
 import static org.apache.hadoop.hdds.server.ServerUtils.getOzoneMetaDirPath;
@@ -361,8 +361,8 @@ public final class HAUtils {
       ConfigurationSource configuration) throws IOException {
     List<String> caCertPemList;
     long waitDuration =
-        configuration.getTimeDuration(OZONE_SCM_CA_LIST_RETRY_WAIT_DURATION,
-            OZONE_SCM_CA_LIST_WAIT_RETRY_DURATION_DEFAULT, TimeUnit.SECONDS);
+        configuration.getTimeDuration(OZONE_SCM_CA_LIST_RETRY_INTERVAL,
+            OZONE_SCM_CA_LIST_RETRY_INTERVAL_DEFAULT, TimeUnit.SECONDS);
     if (certClient != null) {
       caCertPemList = new ArrayList<>();
       if (!SCMHAUtils.isSCMHAEnabled(configuration)) {

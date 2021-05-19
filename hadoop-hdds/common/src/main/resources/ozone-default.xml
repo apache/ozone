@@ -2843,7 +2843,7 @@
 
 
   <property>
-    <name>ozone.scm.ca.list.retry.wait.duration</name>
+    <name>ozone.scm.ca.list.retry.interval</name>
     <tag>OZONE, SCM, OM, DATANODE</tag>
     <value>10s</value>
     <description>SCM client wait duration between each retry to get Scm CA
