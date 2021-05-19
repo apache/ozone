@@ -40,12 +40,12 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <dependency>
       <groupId>io.grpc</groupId>
       <artifactId>grpc-protobuf</artifactId>
-      <version>1.37.0</version>
+      <version>${grpc-compile.version}</version>
     </dependency>
     <dependency>
       <groupId>io.grpc</groupId>
       <artifactId>grpc-stub</artifactId>
-      <version>1.37.0</version>
+      <version>${grpc-compile.version}</version>
     </dependency>
   </dependencies>
   <build>
