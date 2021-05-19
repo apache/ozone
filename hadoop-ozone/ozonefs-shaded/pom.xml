@@ -106,7 +106,6 @@
                     <include>org.sqlite.**.*</include>
                     <include>org.tukaani.**.*</include>
                     <include>org.bouncycastle.**.*</include>
-                    <include>org.fusesource.leveldbjni.**.*</include>
                     <include>org.rocksdb.**.*</include>
                     <include>org.apache.commons.cli.**.*</include>
                     <include>org.apache.commons.compress.**.*</include>

@@ -88,6 +88,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
           <groupId>io.netty</groupId>
           <artifactId>*</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>org.fusesource.leveldbjni</groupId>
+          <artifactId>leveldbjni-all</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
   </dependencies>
