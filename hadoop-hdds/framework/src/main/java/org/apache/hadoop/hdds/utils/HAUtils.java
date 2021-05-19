@@ -422,7 +422,6 @@ public final class HAUtils {
    * Retry for ever until CA list matches expected count.
    * @param task - task to get CA list.
    * @return CA list.
-   * @throws IOException
    */
   private static List<String> getCAListWithRetry(Callable<List<String>> task,
       long waitDuration) throws IOException {
