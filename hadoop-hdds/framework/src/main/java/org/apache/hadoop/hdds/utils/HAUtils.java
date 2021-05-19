@@ -384,7 +384,7 @@ public final class HAUtils {
             return caCertPemList;
           }
           caCertPemList = getCAListWithRetry(() ->
-              waitForCACerts(() -> certClient.updateCAList(), expectedCount),
+              waitForCACerts(certClient::updateCAList, expectedCount),
               waitDuration);
         } else {
           caCertPemList = certClient.listCA();
