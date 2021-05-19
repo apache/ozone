@@ -429,7 +429,7 @@ public final class HAUtils {
     RetryPolicy retryPolicy = RetryPolicies.retryForeverWithFixedSleep(
         waitDuration, TimeUnit.SECONDS);
     RetriableTask<List<String>> retriableTask =
-        new RetriableTask(retryPolicy, "getCAList", task);
+        new RetriableTask<>(retryPolicy, "getCAList", task);
     try {
       return retriableTask.call();
     } catch (Exception ex) {
