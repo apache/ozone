@@ -207,10 +207,17 @@ jobs:
         uses: actions/checkout@v2
         with:
           path: mnt/ozone
-      - name: Execute tests
-        uses: ./mnt/ozone/.github/buildenv
+      - name: Cache for maven dependencies
+        uses: actions/cache@v2
         with:
-          args: ./mnt/ozone/hadoop-ozone/dev-support/checks/integration.sh -P${{ matrix.profile }}
+          path: ~/.m2/repository
+          key: maven-repo-${{ hashFiles('**/pom.xml') }}-8-${{ matrix.check }}
+          restore-keys: |
+            maven-repo-${{ hashFiles('**/pom.xml') }}-8
+            maven-repo-${{ hashFiles('**/pom.xml') }}
+            maven-repo-
+      - name: Execute tests
+        run: mnt/ozone/hadoop-ozone/dev-support/checks/integration.sh -P${{ matrix.profile }}
       - name: Summary of failures
         run: cat mnt/ozone/target/${{ github.job }}/summary.txt
         if: always()
@@ -221,6 +228,12 @@ jobs:
           name: it-${{ matrix.profile }}
           path: mnt/ozone/target/integration
         continue-on-error: true
+      - name: Delete temporary build artifacts before caching
+        run: |
+          #Never cache local artifacts
+          rm -rf ~/.m2/repository/org/apache/hadoop/hadoop-hdds*
+          rm -rf ~/.m2/repository/org/apache/hadoop/hadoop-ozone*
+        if: always()
   coverage:
     runs-on: ubuntu-18.04
     timeout-minutes: 30
