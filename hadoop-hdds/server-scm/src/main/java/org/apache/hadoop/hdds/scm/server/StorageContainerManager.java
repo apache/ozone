@@ -970,6 +970,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           SCMRatisServerImpl.initialize(scmStorageConfig.getClusterID(),
               scmStorageConfig.getScmId(), haDetails.getLocalNodeDetails(),
               conf);
+          scmStorageConfig = new SCMStorageConfig(conf);
           scmStorageConfig.setSCMHAFlag(true);
           // Do force initialize to persist SCM_HA flag.
           scmStorageConfig.forceInitialize();
