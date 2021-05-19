@@ -424,7 +424,7 @@ public final class HAUtils {
    * @return CA list.
    * @throws IOException
    */
-  private static List<String> getCAListWithRetry(Callable task,
+  private static List<String> getCAListWithRetry(Callable<List<String>> task,
       long waitDuration) throws IOException {
     RetryPolicy retryPolicy = RetryPolicies.retryForeverWithFixedSleep(
         waitDuration, TimeUnit.SECONDS);
