@@ -33,6 +33,8 @@ import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Before;
 import org.aspectj.lang.annotation.Pointcut;
 import org.aspectj.lang.reflect.MethodSignature;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * 'Aspect' for OM Layout Feature API. All methods annotated with the
@@ -44,6 +46,8 @@ public class OMLayoutFeatureAspect {
 
   public static final String GET_VERSION_MANAGER_METHOD_NAME =
       "getOmVersionManager";
+  private static final Logger LOG = LoggerFactory
+      .getLogger(OMLayoutFeatureAspect.class);
 
   @Before("@annotation(DisallowedUntilLayoutVersion) && execution(* *(..))")
   public void checkLayoutFeature(JoinPoint joinPoint) throws IOException {
@@ -83,13 +87,16 @@ public class OMLayoutFeatureAspect {
     }
   }
 
-  @Pointcut("execution(* (@BelongsToLayoutVersion *).preExecute(..))")
+  @Pointcut("execution(* " +
+      "org.apache.hadoop.ozone.om.request.OMClientRequest+.preExecute(..)) " +
+      "&& @this(org.apache.hadoop.ozone.om.upgrade.BelongsToLayoutVersion)")
   public void omRequestPointCut() {
   }
 
   @Before("omRequestPointCut()")
   public void beforeRequestApplyTxn(final JoinPoint joinPoint)
       throws OMException {
+
     Object[] args = joinPoint.getArgs();
     OzoneManager om = (OzoneManager) args[0];
 

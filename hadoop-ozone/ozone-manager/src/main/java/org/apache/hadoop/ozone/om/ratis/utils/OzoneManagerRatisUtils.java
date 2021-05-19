@@ -161,7 +161,7 @@ public final class OzoneManagerRatisUtils {
       return new OMTrashRecoverRequest(omRequest);
     case FinalizeUpgrade:
       return new OMFinalizeUpgradeRequest(omRequest);
-    case PrepareStatus:
+    case Prepare:
       return new OMPrepareRequest(omRequest);
     case CancelPrepare:
       return new OMCancelPrepareRequest(omRequest);
