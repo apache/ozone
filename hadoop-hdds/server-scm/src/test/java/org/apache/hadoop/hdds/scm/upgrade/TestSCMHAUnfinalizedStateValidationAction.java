@@ -86,7 +86,8 @@ public class TestSCMHAUnfinalizedStateValidationAction {
     StorageContainerManager.scmInit(conf, UUID.randomUUID().toString());
 
     // Set up new pre-finalized SCM.
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, haEnabledPreFinalized);
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,
+        haEnabledPreFinalized);
     StorageContainerManager scm = TestUtils.getScm(conf);
 
     if (shouldFail) {

@@ -33,8 +33,6 @@ import org.apache.hadoop.ozone.upgrade.UpgradeException;
  * Checks that SCM HA cannot be used in a pre-finalized cluster, unless it
  * was already being used before this action was run.
  */
-// Testing of this class is ignored to speed up CI runs. Run tests manually if
-// changes are made relating to the SCM HA validation action.
 @UpgradeActionHdds(feature = SCM_HA, component = SCM,
     type = VALIDATE_IN_PREFINALIZE)
 public class ScmHAUnfinalizedStateValidationAction
@@ -44,10 +42,10 @@ public class ScmHAUnfinalizedStateValidationAction
   public void execute(StorageContainerManager scm) throws Exception {
     if (SCMHAUtils.isSCMHAEnabled(scm.getConfiguration()) &&
         !scm.getScmStorageConfig().isSCMHAEnabled()) {
-        throw new UpgradeException(String.format("Configuration %s cannot be " +
-                "used until SCM upgrade has been finalized",
-            ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY),
-            UpgradeException.ResultCodes.PREFINALIZE_ACTION_VALIDATION_FAILED);
+      throw new UpgradeException(String.format("Configuration %s cannot be " +
+          "used until SCM upgrade has been finalized",
+          ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY),
+          UpgradeException.ResultCodes.PREFINALIZE_ACTION_VALIDATION_FAILED);
     }
   }
 }
