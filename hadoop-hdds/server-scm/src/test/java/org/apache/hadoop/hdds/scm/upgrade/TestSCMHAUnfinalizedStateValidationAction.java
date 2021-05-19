@@ -38,6 +38,18 @@ import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Tests that the SCM HA pre-finalize validation action is only triggered in
+ * pre-finalize startup if SCM HA was not already being used in the cluster,
+ * but has been turned on after.
+ *
+ * Starting a new SCM HA cluster finalized should not trigger the action. This
+ * is tested by all other tests that use SCM HA from the latest version of the
+ * code.
+ *
+ * Starting a new cluster finalized without SCM HA enabled should not trigger
+ * the action. This is tested by all other tests that run non-HA clusters.
+ */
 @RunWith(Parameterized.class)
 public class TestSCMHAUnfinalizedStateValidationAction {
   @Rule
