@@ -408,7 +408,7 @@ public final class HAUtils {
         int expectedCount = scmNodes.size() + 1;
         if (scmNodes.size() > 1) {
           caCertPemList = getCAListWithRetry(() -> waitForCACerts(
-              () -> scmSecurityProtocolClient.listCACertificate(),
+              scmSecurityProtocolClient::listCACertificate,
               expectedCount), waitDuration);
         } else{
           caCertPemList = scmSecurityProtocolClient.listCACertificate();
