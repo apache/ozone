@@ -96,5 +96,4 @@ public class TestOMLayoutFeatureAspect {
         "cannot be invoked before finalization",
         () -> aspect.beforeRequestApplyTxn(joinPoint));
   }
-
 }
