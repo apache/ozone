@@ -97,14 +97,14 @@ public class OMLayoutFeatureAspect {
   public void beforeRequestApplyTxn(final JoinPoint joinPoint)
       throws OMException {
 
-    Object[] args = joinPoint.getArgs();
-    OzoneManager om = (OzoneManager) args[0];
-
     BelongsToLayoutVersion annotation = joinPoint.getTarget().getClass()
         .getAnnotation(BelongsToLayoutVersion.class);
     if (annotation == null) {
       return;
     }
+
+    Object[] args = joinPoint.getArgs();
+    OzoneManager om = (OzoneManager) args[0];
 
     LayoutFeature lf = annotation.value();
     checkIsAllowed(joinPoint.getTarget().getClass().getSimpleName(),
