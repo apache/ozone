@@ -444,10 +444,8 @@ public final class HAUtils {
     //  refetched if listCA size is less than scm ha config node list size.
     // For now when Client of SCM's are started we compare their node list
     // size and ca list size if it is as expected, we return the ca list.
-    boolean caListUpToDate;
-    List<String> caCertPemList;
-    caCertPemList = applyFunction.get();
-    caListUpToDate = caCertPemList.size() == expectedCount;
+    List<String> caCertPemList = applyFunction.get();
+    boolean caListUpToDate = caCertPemList.size() == expectedCount;
     if (!caListUpToDate) {
       LOG.info("Expected CA list size {}, where as received CA List size " +
           "{}.", expectedCount, caCertPemList.size());
