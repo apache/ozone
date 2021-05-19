@@ -24,9 +24,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
@@ -34,13 +33,14 @@ import org.apache.hadoop.hdds.scm.node.NodeStatus;
 /**
  * Interface for creating pipelines.
  */
-public abstract class PipelineProvider {
+public abstract class PipelineProvider<REPLICATION_CONFIG
+    extends ReplicationConfig> {
 
   private final NodeManager nodeManager;
-  private final PipelineStateManager stateManager;
+  private final StateManager stateManager;
 
   public PipelineProvider(NodeManager nodeManager,
-      PipelineStateManager stateManager) {
+      StateManager stateManager) {
     this.nodeManager = nodeManager;
     this.stateManager = stateManager;
   }
@@ -54,24 +54,26 @@ public abstract class PipelineProvider {
     return nodeManager;
   }
 
-  public PipelineStateManager getPipelineStateManager() {
+  public StateManager getPipelineStateManager() {
     return stateManager;
   }
 
-  protected abstract Pipeline create(ReplicationFactor factor)
+  protected abstract Pipeline create(REPLICATION_CONFIG replicationConfig)
       throws IOException;
 
-  protected abstract Pipeline create(ReplicationFactor factor,
-      List<DatanodeDetails> nodes);
+  protected abstract Pipeline create(
+      REPLICATION_CONFIG replicationConfig,
+      List<DatanodeDetails> nodes
+  );
 
   protected abstract void close(Pipeline pipeline) throws IOException;
 
   protected abstract void shutdown();
 
-  List<DatanodeDetails> pickNodesNeverUsed(ReplicationType type,
-      ReplicationFactor factor) throws SCMException {
+  List<DatanodeDetails> pickNodesNeverUsed(REPLICATION_CONFIG replicationConfig)
+      throws SCMException {
     Set<DatanodeDetails> dnsUsed = new HashSet<>();
-    stateManager.getPipelines(type, factor).stream().filter(
+    stateManager.getPipelines(replicationConfig).stream().filter(
         p -> p.getPipelineState().equals(Pipeline.PipelineState.OPEN) ||
             p.getPipelineState().equals(Pipeline.PipelineState.DORMANT) ||
             p.getPipelineState().equals(Pipeline.PipelineState.ALLOCATED))
@@ -82,12 +84,13 @@ public abstract class PipelineProvider {
         .getNodes(NodeStatus.inServiceHealthy())
         .parallelStream()
         .filter(dn -> !dnsUsed.contains(dn))
-        .limit(factor.getNumber())
+        .limit(replicationConfig.getRequiredNodes())
         .collect(Collectors.toList());
-    if (dns.size() < factor.getNumber()) {
+    if (dns.size() < replicationConfig.getRequiredNodes()) {
       String e = String
-          .format("Cannot create pipeline of factor %d using %d nodes." +
-                  " Used %d nodes. Healthy nodes %d", factor.getNumber(),
+          .format("Cannot create pipeline %s using %d nodes." +
+                  " Used %d nodes. Healthy nodes %d",
+              replicationConfig.toString(),
               dns.size(), dnsUsed.size(),
               nodeManager.getNodes(NodeStatus.inServiceHealthy()).size());
       throw new SCMException(e,

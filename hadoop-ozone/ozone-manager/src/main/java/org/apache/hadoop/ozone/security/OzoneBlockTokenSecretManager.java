@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -19,10 +19,11 @@ package org.apache.hadoop.ozone.security;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto;
+import org.apache.hadoop.hdds.security.token.ShortLivedTokenSecretManager;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
@@ -32,7 +33,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.time.Instant;
-import java.util.EnumSet;
+import java.util.Set;
 
 /**
  * SecretManager for Ozone Master block tokens.
@@ -40,25 +41,14 @@ import java.util.EnumSet;
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public class OzoneBlockTokenSecretManager extends
-    OzoneSecretManager<OzoneBlockTokenIdentifier> {
+    ShortLivedTokenSecretManager<OzoneBlockTokenIdentifier> {
 
   private static final Logger LOG = LoggerFactory
-      .getLogger(OzoneBlockTokenSecretManager.class);;
-  // Will be set by grpc clients for individual datanodes.
-  static final Text SERVICE = new Text("HDDS_SERVICE");
-  private final String omCertSerialId;
+      .getLogger(OzoneBlockTokenSecretManager.class);
 
-  /**
-   * Create a secret manager.
-   *
-   * @param conf
-   * @param blockTokenExpirytime token expiry time for expired tokens in
-   * milliseconds
-   */
   public OzoneBlockTokenSecretManager(SecurityConfig conf,
-      long blockTokenExpirytime, String omCertSerialId) {
-    super(conf, blockTokenExpirytime, blockTokenExpirytime, SERVICE, LOG);
-    this.omCertSerialId = omCertSerialId;
+      long tokenLifetime, String omCertSerialId) {
+    super(conf, tokenLifetime, omCertSerialId, LOG);
   }
 
   @Override
@@ -68,23 +58,17 @@ public class OzoneBlockTokenSecretManager extends
   }
 
   public OzoneBlockTokenIdentifier createIdentifier(String owner,
-      String blockId, EnumSet<AccessModeProto> modes, long maxLength) {
-    return new OzoneBlockTokenIdentifier(owner, blockId, modes,
-        getTokenExpiryTime(), omCertSerialId, maxLength);
+      BlockID blockID, Set<AccessModeProto> modes, long maxLength) {
+    return new OzoneBlockTokenIdentifier(owner, blockID, modes,
+        getTokenExpiryTime().toEpochMilli(), getCertSerialId(), maxLength);
   }
 
   /**
    * Generate an block token for specified user, blockId. Service field for
    * token is set to blockId.
-   *
-   * @param user
-   * @param blockId
-   * @param modes
-   * @param maxLength
-   * @return token
    */
   public Token<OzoneBlockTokenIdentifier> generateToken(String user,
-      String blockId, EnumSet<AccessModeProto> modes, long maxLength) {
+      BlockID blockId, Set<AccessModeProto> modes, long maxLength) {
     OzoneBlockTokenIdentifier tokenIdentifier = createIdentifier(user,
         blockId, modes, maxLength);
     if (LOG.isDebugEnabled()) {
@@ -92,21 +76,16 @@ public class OzoneBlockTokenSecretManager extends
       LOG.info("Issued delegation token -> expiryTime:{}, tokenId:{}",
           Instant.ofEpochMilli(expiryTime), tokenIdentifier);
     }
-    // Pass blockId as service.
     return new Token<>(tokenIdentifier.getBytes(),
         createPassword(tokenIdentifier), tokenIdentifier.getKind(),
-        new Text(blockId));
+        new Text(tokenIdentifier.getService()));
   }
 
   /**
    * Generate an block token for current user.
-   *
-   * @param blockId
-   * @param modes
-   * @return token
    */
-  public Token<OzoneBlockTokenIdentifier> generateToken(String blockId,
-      EnumSet<AccessModeProto> modes, long maxLength) throws IOException {
+  public Token<OzoneBlockTokenIdentifier> generateToken(BlockID blockId,
+      Set<AccessModeProto> modes, long maxLength) throws IOException {
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
     String userID = (ugi == null ? null : ugi.getShortUserName());
     return generateToken(userID, blockId, modes, maxLength);
@@ -121,14 +100,14 @@ public class OzoneBlockTokenSecretManager extends
 
   @Override
   public long renewToken(Token<OzoneBlockTokenIdentifier> token,
-      String renewer) throws IOException {
+      String renewer) {
     throw new UnsupportedOperationException("Renew token operation is not " +
         "supported for ozone block tokens.");
   }
 
   @Override
   public OzoneBlockTokenIdentifier cancelToken(Token<OzoneBlockTokenIdentifier>
-      token, String canceller) throws IOException {
+      token, String canceller) {
     throw new UnsupportedOperationException("Cancel token operation is not " +
         "supported for ozone block tokens.");
   }
@@ -137,6 +116,7 @@ public class OzoneBlockTokenSecretManager extends
    * Find the OzoneBlockTokenInfo for the given token id, and verify that if the
    * token is not expired.
    */
+  @Override
   public boolean validateToken(OzoneBlockTokenIdentifier identifier)
       throws InvalidToken {
     long now = Time.now();
@@ -146,6 +126,7 @@ public class OzoneBlockTokenSecretManager extends
           " expiry time: " + identifier.getExpiryDate());
     }
 
+    // FIXME since verifySignature always throws, don't see how this could work
     if (!verifySignature(identifier, createPassword(identifier))) {
       throw new InvalidToken("Tampered/Invalid token.");
     }
@@ -154,39 +135,10 @@ public class OzoneBlockTokenSecretManager extends
 
   /**
    * Validates if given hash is valid.
-   *
-   * @param identifier
-   * @param password
    */
   public boolean verifySignature(OzoneBlockTokenIdentifier identifier,
       byte[] password) {
     throw new UnsupportedOperationException("This operation is not " +
         "supported for block tokens.");
-  }
-
-  /**
-   * Should be called before this object is used.
-   * @param client
-   */
-  @Override
-  public synchronized void start(CertificateClient client) throws IOException {
-    super.start(client);
-  }
-
-  /**
-   * Returns expiry time by adding configured expiry time with current time.
-   *
-   * @return Expiry time.
-   */
-  private long getTokenExpiryTime() {
-    return Time.now() + getTokenRenewInterval();
-  }
-
-  /**
-   * Should be called before this object is used.
-   */
-  @Override
-  public synchronized void stop() throws IOException {
-    super.stop();
   }
 }

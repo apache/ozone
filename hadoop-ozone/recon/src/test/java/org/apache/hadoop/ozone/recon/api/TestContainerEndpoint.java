@@ -52,6 +52,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
@@ -71,6 +72,7 @@ import org.apache.hadoop.ozone.recon.persistence.ContainerHistory;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
+import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
@@ -97,12 +99,14 @@ public class TestContainerEndpoint {
 
   private OzoneStorageContainerManager ozoneStorageContainerManager;
   private ReconContainerManager reconContainerManager;
+  private ReconPipelineManager reconPipelineManager;
   private ContainerDBServiceProvider containerDbServiceProvider;
   private ContainerEndpoint containerEndpoint;
   private boolean isSetupDone = false;
   private ContainerHealthSchemaManager containerHealthSchemaManager;
   private ReconOMMetadataManager reconOMMetadataManager;
-  private ContainerID containerID = new ContainerID(1L);
+  private ContainerID containerID = ContainerID.valueOf(1L);
+  private Pipeline pipeline;
   private PipelineID pipelineID;
   private long keyCount = 5L;
 
@@ -115,9 +119,6 @@ public class TestContainerEndpoint {
     reconOMMetadataManager = getTestReconOmMetadataManager(
         initializeNewOmMetadataManager(temporaryFolder.newFolder()),
         temporaryFolder.newFolder());
-
-    Pipeline pipeline = getRandomPipeline();
-    pipelineID = pipeline.getId();
 
     ReconTestInjector reconTestInjector =
         new ReconTestInjector.Builder(temporaryFolder)
@@ -139,11 +140,17 @@ public class TestContainerEndpoint {
         reconTestInjector.getInstance(OzoneStorageContainerManager.class);
     reconContainerManager = (ReconContainerManager)
         ozoneStorageContainerManager.getContainerManager();
+    reconPipelineManager = (ReconPipelineManager)
+        ozoneStorageContainerManager.getPipelineManager();
     containerDbServiceProvider =
         reconTestInjector.getInstance(ContainerDBServiceProvider.class);
     containerEndpoint = reconTestInjector.getInstance(ContainerEndpoint.class);
     containerHealthSchemaManager =
         reconTestInjector.getInstance(ContainerHealthSchemaManager.class);
+
+    pipeline = getRandomPipeline();
+    pipelineID = pipeline.getId();
+    reconPipelineManager.addPipeline(pipeline);
   }
 
   @Before
@@ -153,8 +160,6 @@ public class TestContainerEndpoint {
       initializeInjector();
       isSetupDone = true;
     }
-    //Write Data to OM
-    Pipeline pipeline = getRandomPipeline();
 
     List<OmKeyLocationInfo> omKeyLocationInfoList = new ArrayList<>();
     BlockID blockID1 = new BlockID(1, 101);
@@ -472,9 +477,8 @@ public class TestContainerEndpoint {
   void putContainerInfos(int num) throws IOException {
     for (int i = 1; i <= num; i++) {
       final ContainerInfo info = newContainerInfo(i);
-      reconContainerManager.getContainerStore().put(new ContainerID(i), info);
-      reconContainerManager.getContainerStateManager().addContainerInfo(
-          i, info, null, null);
+      reconContainerManager.addNewContainer(
+          new ContainerWithPipeline(info, pipeline));
     }
   }
 

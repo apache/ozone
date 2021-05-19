@@ -19,10 +19,11 @@
 package org.apache.hadoop.ozone.scm;
 
 import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms
     .SCMContainerPlacementMetrics;
@@ -53,6 +54,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic
     .NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
@@ -67,8 +69,8 @@ public class TestSCMContainerPlacementPolicyMetrics {
 
   private MiniOzoneCluster cluster;
   private MetricsRecordBuilder metrics;
-  private static OzoneClient ozClient = null;
-  private static ObjectStore store = null;
+  private OzoneClient ozClient = null;
+  private ObjectStore store = null;
 
   @Before
   public void setup() throws Exception {
@@ -110,21 +112,21 @@ public class TestSCMContainerPlacementPolicyMetrics {
 
     // Write data into a key
     try (OzoneOutputStream out = bucket.createKey(keyName,
-        value.getBytes().length, ReplicationType.RATIS,
+        value.getBytes(UTF_8).length, ReplicationType.RATIS,
         THREE, new HashMap<>())) {
-      out.write(value.getBytes());
+      out.write(value.getBytes(UTF_8));
     }
 
     // close container
     PipelineManager manager =
         cluster.getStorageContainerManager().getPipelineManager();
     List<Pipeline> pipelines = manager.getPipelines().stream().filter(p ->
-        p.getType() == HddsProtos.ReplicationType.RATIS &&
-            p.getFactor() == HddsProtos.ReplicationFactor.THREE)
+        RatisReplicationConfig
+            .hasFactor(p.getReplicationConfig(), ReplicationFactor.THREE))
         .collect(Collectors.toList());
     Pipeline targetPipeline = pipelines.get(0);
     List<DatanodeDetails> nodes = targetPipeline.getNodes();
-    manager.finalizeAndDestroyPipeline(pipelines.get(0), true);
+    manager.closePipeline(pipelines.get(0), true);
 
     // kill datanode to trigger under-replicated container replication
     cluster.shutdownHddsDatanode(nodes.get(0));

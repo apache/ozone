@@ -102,7 +102,7 @@ CONF_DESTINATION_DIR="${HADOOP_CONF_DIR:-/opt/hadoop/etc/hadoop}"
 #Try to copy the defaults
 set +e
 if [[ -d "/opt/ozone/etc/hadoop" ]]; then
-   cp /opt/hadoop/etc/hadoop/* "$CONF_DESTINATION_DIR/" > /dev/null 2>&1
+   cp /opt/ozone/etc/hadoop/* "$CONF_DESTINATION_DIR/" > /dev/null 2>&1
 elif [[ -d "/opt/hadoop/etc/hadoop" ]]; then
    cp /opt/hadoop/etc/hadoop/* "$CONF_DESTINATION_DIR/" > /dev/null 2>&1
 fi
@@ -114,6 +114,11 @@ if [ -n "$ENSURE_SCM_INITIALIZED" ]; then
   if [ ! -f "$ENSURE_SCM_INITIALIZED" ]; then
     # Improve om and scm start up options
     /opt/hadoop/bin/ozone scm --init || /opt/hadoop/bin/ozone scm -init
+  fi
+elif [ -n "$ENSURE_SCM_BOOTSTRAPPED" ]; then
+  if [ ! -f "$ENSURE_SCM_BOOTSTRAPPED" ]; then
+    # Improve om and scm start up options
+    /opt/hadoop/bin/ozone scm --bootstrap
   fi
 fi
 

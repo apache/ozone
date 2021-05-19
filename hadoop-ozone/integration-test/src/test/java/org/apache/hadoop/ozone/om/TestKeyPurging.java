@@ -56,11 +56,11 @@ public class TestKeyPurging {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = new Timeout(300000);
+  public Timeout timeout = Timeout.seconds(300);
 
-  private static MiniOzoneCluster cluster;
-  private static ObjectStore store;
-  private static OzoneManager om;
+  private MiniOzoneCluster cluster;
+  private ObjectStore store;
+  private OzoneManager om;
 
   private static final int NUM_KEYS = 10;
   private static final int KEY_SIZE = 100;

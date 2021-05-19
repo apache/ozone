@@ -17,22 +17,13 @@
 SCRIPT_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )
 ALL_RESULT_DIR="$SCRIPT_DIR/result"
 mkdir -p "$ALL_RESULT_DIR"
-rm "$ALL_RESULT_DIR/*" || true
+rm "$ALL_RESULT_DIR"/* || true
 source "$SCRIPT_DIR/../testlib.sh"
 
 tests=$(find_tests)
 cd "$SCRIPT_DIR"
 
-RESULT=0
-# shellcheck disable=SC2044
-for t in ${tests}; do
-  d="$(dirname "${t}")"
-
-  if ! run_test_script "${d}"; then
-    RESULT=1
-  fi
-
-  copy_results "${d}" "${ALL_RESULT_DIR}"
-done
+run_test_scripts ${tests}
+RESULT=$?
 
 exit ${RESULT}

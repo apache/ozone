@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+   Licensed to the Apache Software Foundation (ASF) under one or more
+   contributor license agreements.  See the NOTICE file distributed with
+   this work for additional information regarding copyright ownership.
+   The ASF licenses this file to You under the Apache License, Version 2.0
+   (the "License"); you may not use this file except in compliance with
+   the License.  You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+-->
+<FindBugsFilter>
+  <!-- For unread timeouts -->
+  <Match>
+    <Package name="~org\.apache\.hadoop.*"/>
+    <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD" />
+  </Match>
+  <!-- For unused File operations -->
+  <Match>
+    <Package name="~org\.apache\.hadoop.*"/>
+    <Bug pattern="RV_RETURN_VALUE_IGNORED_BAD_PRACTICE" />
+  </Match>
+  <!-- For read stream check -->
+  <Match>
+    <Package name="~org\.apache\.hadoop\.ozone.*"/>
+    <Bug pattern="RR_NOT_CHECKED" />
+  </Match>
+
+  <Match>
+    <Class name="org.apache.hadoop.fs.ozone.TestOzoneFSWithObjectStoreCreate"/>
+    <Bug pattern="RR_NOT_CHECKED" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.fs.ozone.TestOzoneFileInterfaces"/>
+    <Bug pattern="DLS_DEAD_LOCAL_STORE" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.hdds.scm.container.TestContainerStateManagerIntegration"/>
+    <Bug pattern="DLS_DEAD_LOCAL_STORE" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.ozone.TestContainerStateMachineIdempotency"/>
+    <Bug pattern="RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.ozone.client.rpc.TestBCSID"/>
+    <Bug pattern="RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.ozone.client.rpc.TestContainerStateMachine"/>
+    <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.ozone.client.rpc.TestContainerStateMachineFailures"/>
+    <Bug pattern="RV_RETURN_VALUE_IGNORED" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.ozone.client.rpc.TestKeyInputStream"/>
+    <Bug pattern="SR_NOT_CHECKED" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.ozone.client.rpc.TestOzoneRpcClientAbstract"/>
+    <Bug pattern="DLS_DEAD_LOCAL_STORE" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.ozone.client.rpc.TestOzoneRpcClientAbstract"/>
+    <Bug pattern="NP_NULL_ON_SOME_PATH" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.ozone.client.rpc.TestOzoneRpcClientAbstract"/>
+    <Bug pattern="RV_RETURN_VALUE_IGNORED" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.ozone.client.rpc.TestCommitWatcher"/>
+    <Bug pattern="URF_UNREAD_FIELD" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.ozone.container.ozoneimpl.TestSecureOzoneContainer"/>
+    <Bug pattern="DLS_DEAD_LOCAL_STORE" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.ozone.om.TestKeyManagerImpl"/>
+    <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.ozone.om.TestOMRatisSnapshots"/>
+    <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.ozone.om.TestOzoneManagerHAWithData"/>
+    <Bug pattern="DLS_DEAD_LOCAL_STORE" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.ozone.om.TestScmSafeMode"/>
+    <Bug pattern="DLS_DEAD_LOCAL_STORE" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.ozone.om.TestOmAcls"/>
+    <Bug pattern="ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.ozone.om.TestSecureOzoneManager"/>
+    <Bug pattern="UWF_NULL_FIELD" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.ozone.scm.TestContainerSmallFile"/>
+    <Bug pattern="DLS_DEAD_LOCAL_STORE" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.fs.ozone.TestRootedOzoneFileSystem"/>
+    <Bug pattern="ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.fs.ozone.TestOzoneFileSystem"/>
+    <Bug pattern="ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.fs.ozone.TestOzoneFileSystemMissingParent"/>
+    <Bug pattern="ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.ozone.client.rpc.TestDeleteWithSlowFollower"/>
+    <Bug pattern="ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.hdds.scm.TestSCMInstallSnapshot"/>
+    <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.ozone.scm.TestSCMInstallSnapshotWithHA"/>
+    <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE" />
+  </Match>
+</FindBugsFilter>

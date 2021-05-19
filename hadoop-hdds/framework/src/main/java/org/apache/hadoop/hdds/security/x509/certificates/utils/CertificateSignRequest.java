@@ -59,6 +59,8 @@ import org.bouncycastle.pkcs.jcajce.JcaPKCS10CertificationRequestBuilder;
 import org.bouncycastle.util.io.pem.PemObject;
 import org.bouncycastle.util.io.pem.PemReader;
 
+import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.INVALID_CSR;
+
 /**
  * A certificate sign request object that wraps operations to build a
  * PKCS10CertificationRequest to CertificateServer.
@@ -134,7 +136,8 @@ public final class CertificateSignRequest {
     try (PemReader reader = new PemReader(new StringReader(csr))) {
       PemObject pemObject = reader.readPemObject();
       if(pemObject.getContent() == null) {
-        throw new SCMSecurityException("Invalid Certificate signing request");
+        throw new SCMSecurityException("Invalid Certificate signing request",
+            INVALID_CSR);
       }
       return new PKCS10CertificationRequest(pemObject.getContent());
     }
@@ -190,12 +193,24 @@ public final class CertificateSignRequest {
       return this;
     }
 
-    // Support SAN extenion with DNS and RFC822 Name
+    // Support SAN extension with DNS and RFC822 Name
     // other name type will be added as needed.
     public CertificateSignRequest.Builder addDnsName(String dnsName) {
       Preconditions.checkNotNull(dnsName, "dnsName cannot be null");
       this.addAltName(GeneralName.dNSName, dnsName);
       return this;
+    }
+
+    public boolean hasDnsName() {
+      if (altNames == null || altNames.isEmpty()) {
+        return false;
+      }
+      for (GeneralName name : altNames) {
+        if (name.getTagNo() == GeneralName.dNSName) {
+          return true;
+        }
+      }
+      return false;
     }
 
     // IP address is subject to change which is optional for now.

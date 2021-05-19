@@ -22,10 +22,13 @@ package org.apache.hadoop.hdds.scm;
 import java.net.InetSocketAddress;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 
 import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.assertThat;
+
+import org.apache.hadoop.net.NetUtils;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -37,21 +40,10 @@ import org.junit.rules.Timeout;
 public class TestHddsServerUtil {
 
   @Rule
-  public Timeout timeout = new Timeout(300000);
+  public Timeout timeout = Timeout.seconds(300);
 
   @Rule
   public ExpectedException thrown= ExpectedException.none();
-
-  /**
-   * Verify DataNode endpoint lookup failure if neither the client nor
-   * datanode endpoint are configured.
-   */
-  @Test
-  public void testMissingScmDataNodeAddress() {
-    final OzoneConfiguration conf = new OzoneConfiguration();
-    thrown.expect(IllegalArgumentException.class);
-    HddsServerUtil.getScmAddressForDataNodes(conf);
-  }
 
   /**
    * Verify that the datanode endpoint is parsed correctly.
@@ -65,7 +57,8 @@ public class TestHddsServerUtil {
     // First try a client address with just a host name. Verify it falls
     // back to the default port.
     conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "1.2.3.4");
-    InetSocketAddress addr = HddsServerUtil.getScmAddressForDataNodes(conf);
+    InetSocketAddress addr = NetUtils.createSocketAddr(
+        SCMNodeInfo.buildNodeInfo(conf).get(0).getScmDatanodeAddress());
     assertThat(addr.getHostString(), is("1.2.3.4"));
     assertThat(addr.getPort(), is(
         ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT));
@@ -73,10 +66,11 @@ public class TestHddsServerUtil {
     // Next try a client address with just a host name and port.
     // Verify the port is ignored and the default DataNode port is used.
     conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "1.2.3.4:100");
-    addr = HddsServerUtil.getScmAddressForDataNodes(conf);
+    addr = NetUtils.createSocketAddr(
+        SCMNodeInfo.buildNodeInfo(conf).get(0).getScmDatanodeAddress());
     assertThat(addr.getHostString(), is("1.2.3.4"));
-    assertThat(addr.getPort(), is(
-        ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT));
+    assertThat(addr.getPort(),
+        is(ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT));
 
     // Set both OZONE_SCM_CLIENT_ADDRESS_KEY and
     // OZONE_SCM_DATANODE_ADDRESS_KEY.
@@ -84,8 +78,8 @@ public class TestHddsServerUtil {
     // default.
     conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "1.2.3.4:100");
     conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY, "5.6.7.8");
-    addr =
-        HddsServerUtil.getScmAddressForDataNodes(conf);
+    addr = NetUtils.createSocketAddr(
+            SCMNodeInfo.buildNodeInfo(conf).get(0).getScmDatanodeAddress());
     assertThat(addr.getHostString(), is("5.6.7.8"));
     assertThat(addr.getPort(), is(
         ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT));
@@ -96,7 +90,8 @@ public class TestHddsServerUtil {
     // used.
     conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "1.2.3.4:100");
     conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY, "5.6.7.8:200");
-    addr = HddsServerUtil.getScmAddressForDataNodes(conf);
+    addr = NetUtils.createSocketAddr(
+        SCMNodeInfo.buildNodeInfo(conf).get(0).getScmDatanodeAddress());
     assertThat(addr.getHostString(), is("5.6.7.8"));
     assertThat(addr.getPort(), is(200));
   }

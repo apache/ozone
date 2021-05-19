@@ -22,9 +22,13 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.TestUtils;
+import org.apache.hadoop.hdds.scm.DatanodeAdminError;
+import org.apache.hadoop.hdds.scm.container.SimpleMockNodeManager;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.Before;
@@ -57,8 +61,8 @@ public class TestNodeDecommissionManager {
         TestDeadNodeHandler.class.getSimpleName() + UUID.randomUUID());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, storageDir);
     nodeManager = createNodeManager(conf);
-    decom = new NodeDecommissionManager(
-        conf, nodeManager, null, null, null);
+    decom = new NodeDecommissionManager(conf, nodeManager, null,
+        SCMContext.emptyContext(), new EventQueue(), null);
   }
 
   @Test
@@ -83,7 +87,7 @@ public class TestNodeDecommissionManager {
     assertEquals(1234, def.getPort());
 
     try {
-      def = new NodeDecommissionManager.HostDefinition("foobar:abcd");
+      new NodeDecommissionManager.HostDefinition("foobar:abcd");
       fail("InvalidHostStringException should have been thrown");
     } catch (InvalidHostStringException e) {
     }
@@ -174,6 +178,22 @@ public class TestNodeDecommissionManager {
   }
 
   @Test
+  public void testDeadNodeDecommissionsImmediately()
+      throws NodeNotFoundException, InvalidNodeStateException {
+    List<DatanodeDetails> dns = generateDatanodes();
+    DatanodeDetails dn = dns.get(1);
+
+    SimpleMockNodeManager mockNM = new SimpleMockNodeManager();
+    mockNM.register(dn, NodeStatus.inServiceDead());
+    NodeDecommissionManager decomMgr = new NodeDecommissionManager(conf, mockNM,
+        null, SCMContext.emptyContext(), new EventQueue(), null);
+
+    decomMgr.startDecommission(dns.get(1));
+    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONED,
+        mockNM.getNodeStatus(dns.get(1)).getOperationalState());
+  }
+
+  @Test
   public void testNodesCanBePutIntoMaintenanceAndRecommissioned()
       throws InvalidHostStringException, NodeNotFoundException {
     List<DatanodeDetails> dns = generateDatanodes();
@@ -217,6 +237,22 @@ public class TestNodeDecommissionManager {
   }
 
   @Test
+  public void testDeadNodeGoesToMaintenanceImmediately()
+      throws NodeNotFoundException, InvalidNodeStateException {
+    List<DatanodeDetails> dns = generateDatanodes();
+    DatanodeDetails dn = dns.get(1);
+
+    SimpleMockNodeManager mockNM = new SimpleMockNodeManager();
+    mockNM.register(dn, NodeStatus.inServiceDead());
+    NodeDecommissionManager decomMgr = new NodeDecommissionManager(conf, mockNM,
+        null, SCMContext.emptyContext(), new EventQueue(), null);
+
+    decomMgr.startMaintenance(dns.get(1), 0);
+    assertEquals(HddsProtos.NodeOperationalState.IN_MAINTENANCE,
+        mockNM.getNodeStatus(dns.get(1)).getOperationalState());
+  }
+
+  @Test
   public void testNodesCannotTransitionFromDecomToMaint() throws Exception {
     List<DatanodeDetails> dns = generateDatanodes();
 
@@ -229,18 +265,18 @@ public class TestNodeDecommissionManager {
         nodeManager.getNodeStatus(dns.get(2)).getOperationalState());
 
     // Try to go from maint to decom:
-    try {
-      decom.startDecommission(dns.get(1));
-      fail("Expected InvalidNodeStateException");
-    } catch (InvalidNodeStateException e) {
-    }
+    List<String> dn = new ArrayList<>();
+    dn.add(dns.get(1).getIpAddress());
+    List<DatanodeAdminError> errors = decom.decommissionNodes(dn);
+    assertEquals(1, errors.size());
+    assertEquals(dns.get(1).getHostName(), errors.get(0).getHostname());
 
     // Try to go from decom to maint:
-    try {
-      decom.startMaintenance(dns.get(2), 100);
-      fail("Expected InvalidNodeStateException");
-    } catch (InvalidNodeStateException e) {
-    }
+    dn = new ArrayList<>();
+    dn.add(dns.get(2).getIpAddress());
+    errors = decom.startMaintenanceNodes(dn, 100);
+    assertEquals(1, errors.size());
+    assertEquals(dns.get(2).getHostName(), errors.get(0).getHostname());
 
     // Ensure the states are still as before
     assertEquals(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
@@ -249,11 +285,37 @@ public class TestNodeDecommissionManager {
         nodeManager.getNodeStatus(dns.get(2)).getOperationalState());
   }
 
+  @Test
+  public void testNodeDecommissionManagerOnBecomeLeader() throws Exception {
+    List<DatanodeDetails> dns = generateDatanodes();
 
+    long maintenanceEnd =
+        (System.currentTimeMillis() / 1000L) + (100 * 60L * 60L);
+
+    // Put 1 node into entering_maintenance, 1 node into decommissioning
+    // and 1 node into in_maintenance.
+    nodeManager.setNodeOperationalState(dns.get(1),
+        HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE, maintenanceEnd);
+    nodeManager.setNodeOperationalState(dns.get(2),
+        HddsProtos.NodeOperationalState.DECOMMISSIONING, 0);
+    nodeManager.setNodeOperationalState(dns.get(3),
+        HddsProtos.NodeOperationalState.IN_MAINTENANCE, maintenanceEnd);
+
+    // trackedNodes should be empty now.
+    assertEquals(decom.getMonitor().getTrackedNodes().size(), 0);
+
+    // all nodes with decommissioning, entering_maintenance and in_maintenance
+    // should be added to trackedNodes
+    decom.onBecomeLeader();
+    decom.getMonitor().run();
+
+    // so size of trackedNodes will be 3.
+    assertEquals(decom.getMonitor().getTrackedNodes().size(), 3);
+  }
 
   private SCMNodeManager createNodeManager(OzoneConfiguration config)
       throws IOException, AuthenticationException {
-    scm = HddsTestUtils.getScm(config);
+    scm = TestUtils.getScm(config);
     return (SCMNodeManager) scm.getScmNodeManager();
   }
 

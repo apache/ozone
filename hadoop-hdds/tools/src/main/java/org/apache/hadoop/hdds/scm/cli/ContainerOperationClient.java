@@ -17,49 +17,44 @@
  */
 package org.apache.hadoop.hdds.scm.cli;
 
-import javax.net.SocketFactory;
 import java.io.IOException;
-import java.net.InetSocketAddress;
+import java.security.cert.X509Certificate;
 import java.util.List;
 import java.util.Map;
 
+import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
-import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
-import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
-import org.apache.hadoop.hdds.tracing.TracingUtil;
-import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
-import org.apache.hadoop.ipc.Client;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
-import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
-import org.apache.hadoop.security.UserGroupInformation;
 
-import com.google.common.base.Preconditions;
-import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForClients;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT;
-import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+
+import com.google.common.annotations.VisibleForTesting;
+
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
 
 /**
  * This class provides the client-facing APIs of container operations.
@@ -73,6 +68,7 @@ public class ContainerOperationClient implements ScmClient {
   private final HddsProtos.ReplicationType replicationType;
   private final StorageContainerLocationProtocol
       storageContainerLocationClient;
+  private final boolean containerTokenEnabled;
 
   public XceiverClientManager getXceiverClientManager() {
     return xceiverClientManager;
@@ -95,20 +91,25 @@ public class ContainerOperationClient implements ScmClient {
       replicationFactor = HddsProtos.ReplicationFactor.ONE;
       replicationType = HddsProtos.ReplicationType.STAND_ALONE;
     }
+    containerTokenEnabled = conf.getBoolean(HDDS_CONTAINER_TOKEN_ENABLED,
+        HDDS_CONTAINER_TOKEN_ENABLED_DEFAULT);
+  }
+
+  @VisibleForTesting
+  public StorageContainerLocationProtocol
+      getStorageContainerLocationProtocol() {
+    return storageContainerLocationClient;
   }
 
   private XceiverClientManager newXCeiverClientManager(ConfigurationSource conf)
       throws IOException {
     XceiverClientManager manager;
     if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
-      SecurityConfig securityConfig = new SecurityConfig(conf);
-      SCMSecurityProtocol scmSecurityProtocolClient = getScmSecurityClient(
-          (OzoneConfiguration) securityConfig.getConfiguration());
-      String caCertificate =
-          scmSecurityProtocolClient.getCACertificate();
+      List<X509Certificate> caCertificates =
+          HAUtils.buildCAX509List(null, conf);
       manager = new XceiverClientManager(conf,
           conf.getObject(XceiverClientManager.ScmClientConfig.class),
-          caCertificate);
+          caCertificates);
     } else {
       manager = new XceiverClientManager(conf);
     }
@@ -116,27 +117,8 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   public static StorageContainerLocationProtocol newContainerRpcClient(
-      ConfigurationSource configSource) throws IOException {
-
-    Class<StorageContainerLocationProtocolPB> protocol =
-        StorageContainerLocationProtocolPB.class;
-    Configuration conf =
-        LegacyHadoopConfigurationSource.asHadoopConfiguration(configSource);
-    RPC.setProtocolEngine(conf, protocol, ProtobufRpcEngine.class);
-    long version = RPC.getProtocolVersion(protocol);
-    InetSocketAddress scmAddress = getScmAddressForClients(configSource);
-    UserGroupInformation user = UserGroupInformation.getCurrentUser();
-    SocketFactory socketFactory = NetUtils.getDefaultSocketFactory(conf);
-    int rpcTimeOut = Client.getRpcTimeout(conf);
-
-    StorageContainerLocationProtocolPB rpcProxy =
-        RPC.getProxy(protocol, version, scmAddress, user, conf,
-            socketFactory, rpcTimeOut);
-
-    StorageContainerLocationProtocolClientSideTranslatorPB client =
-        new StorageContainerLocationProtocolClientSideTranslatorPB(rpcProxy);
-    return TracingUtil.createProxy(
-        client, StorageContainerLocationProtocol.class, configSource);
+      ConfigurationSource configSource) {
+    return HAUtils.getScmContainerClient(configSource);
   }
 
   @Override
@@ -175,7 +157,9 @@ public class ContainerOperationClient implements ScmClient {
    */
   public void createContainer(XceiverClientSpi client,
       long containerId) throws IOException {
-    ContainerProtocolCalls.createContainer(client, containerId, null);
+    String encodedToken = getEncodedContainerToken(containerId);
+
+    ContainerProtocolCalls.createContainer(client, containerId, encodedToken);
 
     // Let us log this info after we let SCM know that we have completed the
     // creation state.
@@ -185,8 +169,17 @@ public class ContainerOperationClient implements ScmClient {
     }
   }
 
+  private String getEncodedContainerToken(long containerId) throws IOException {
+    if (!containerTokenEnabled) {
+      return "";
+    }
+    ContainerID containerID = ContainerID.valueOf(containerId);
+    return storageContainerLocationClient.getContainerToken(containerID)
+        .encodeToUrlString();
+  }
+
   /**
-   * Creates a pipeline over the machines choosen by the SCM.
+   * Creates a pipeline over the machines chosen by the SCM.
    *
    * @param client   - Client
    * @param pipeline - pipeline to be createdon Datanodes.
@@ -275,23 +268,26 @@ public class ContainerOperationClient implements ScmClient {
       HddsProtos.QueryScope queryScope, String poolName)
       throws IOException {
     return storageContainerLocationClient.queryNode(opState, nodeState,
-        queryScope, poolName);
+        queryScope, poolName, CURRENT_VERSION);
   }
 
   @Override
-  public void decommissionNodes(List<String> hosts) throws IOException {
-    storageContainerLocationClient.decommissionNodes(hosts);
-  }
-
-  @Override
-  public void recommissionNodes(List<String> hosts) throws IOException {
-    storageContainerLocationClient.recommissionNodes(hosts);
-  }
-
-  @Override
-  public void startMaintenanceNodes(List<String> hosts, int endHours)
+  public List<DatanodeAdminError> decommissionNodes(List<String> hosts)
       throws IOException {
-    storageContainerLocationClient.startMaintenanceNodes(hosts, endHours);
+    return storageContainerLocationClient.decommissionNodes(hosts);
+  }
+
+  @Override
+  public List<DatanodeAdminError> recommissionNodes(List<String> hosts)
+      throws IOException {
+    return storageContainerLocationClient.recommissionNodes(hosts);
+  }
+
+  @Override
+  public List<DatanodeAdminError> startMaintenanceNodes(List<String> hosts,
+      int endHours) throws IOException {
+    return storageContainerLocationClient.startMaintenanceNodes(
+        hosts, endHours);
   }
 
   /**
@@ -356,9 +352,11 @@ public class ContainerOperationClient implements ScmClient {
       boolean force) throws IOException {
     XceiverClientSpi client = null;
     try {
+      String encodedToken = getEncodedContainerToken(containerId);
+
       client = xceiverClientManager.acquireClient(pipeline);
       ContainerProtocolCalls
-          .deleteContainer(client, containerId, force, null);
+          .deleteContainer(client, containerId, force, encodedToken);
       storageContainerLocationClient
           .deleteContainer(containerId);
       if (LOG.isDebugEnabled()) {
@@ -393,6 +391,13 @@ public class ContainerOperationClient implements ScmClient {
         startContainerID, count);
   }
 
+  @Override
+  public List<ContainerInfo> listContainer(long startContainerID,
+      int count, HddsProtos.LifeCycleState state) throws IOException {
+    return storageContainerLocationClient.listContainer(
+        startContainerID, count, state);
+  }
+
   /**
    * Get meta data from an existing container.
    *
@@ -404,11 +409,13 @@ public class ContainerOperationClient implements ScmClient {
   @Override
   public ContainerDataProto readContainer(long containerID,
       Pipeline pipeline) throws IOException {
+    String encodedToken = getEncodedContainerToken(containerID);
+
     XceiverClientSpi client = null;
     try {
       client = xceiverClientManager.acquireClientForReadData(pipeline);
-      ReadContainerResponseProto response =
-          ContainerProtocolCalls.readContainer(client, containerID, null);
+      ReadContainerResponseProto response = ContainerProtocolCalls
+          .readContainer(client, containerID, encodedToken);
       if (LOG.isDebugEnabled()) {
         LOG.debug("Read container {}, machines: {} ", containerID,
             pipeline.getNodes());
@@ -495,10 +502,12 @@ public class ContainerOperationClient implements ScmClient {
    * @return Returns true if SCM is in safe mode else returns false.
    * @throws IOException
    */
+  @Override
   public boolean inSafeMode() throws IOException {
     return storageContainerLocationClient.inSafeMode();
   }
 
+  @Override
   public Map<String, Pair<Boolean, String>> getSafeModeRuleStatuses()
       throws IOException {
     return storageContainerLocationClient.getSafeModeRuleStatuses();
@@ -529,4 +538,39 @@ public class ContainerOperationClient implements ScmClient {
     return storageContainerLocationClient.getReplicationManagerStatus();
   }
 
+  @Override
+  public List<String> getScmRatisRoles() throws IOException {
+    return storageContainerLocationClient.getScmInfo().getRatisPeerRoles();
+  }
+
+  /**
+   * Get Datanode Usage information by ipaddress or uuid.
+   *
+   * @param ipaddress datanode ipaddress String
+   * @param uuid datanode uuid String
+   * @return List of DatanodeUsageInfoProto. Each element contains info such as
+   * capacity, SCMused, and remaining space.
+   * @throws IOException
+   */
+  @Override
+  public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
+      String ipaddress, String uuid) throws IOException {
+    return storageContainerLocationClient.getDatanodeUsageInfo(ipaddress,
+        uuid);
+  }
+
+  /**
+   * Get usage information of most or least used datanodes.
+   *
+   * @param mostUsed true if most used, false if least used
+   * @param count Integer number of nodes to get info for
+   * @return List of DatanodeUsageInfoProto. Each element contains info such as
+   * capacity, SCMUsed, and remaining space.
+   * @throws IOException
+   */
+  @Override
+  public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
+      boolean mostUsed, int count) throws IOException {
+    return storageContainerLocationClient.getDatanodeUsageInfo(mostUsed, count);
+  }
 }

@@ -31,6 +31,7 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.ratis.retrypolicy.RetryPolicyCreator;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -40,9 +41,9 @@ import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.ratis.RaftConfigKeys;
 import org.apache.ratis.client.RaftClient;
 import org.apache.ratis.client.RaftClientConfigKeys;
+import org.apache.ratis.conf.Parameters;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.grpc.GrpcConfigKeys;
-import org.apache.ratis.grpc.GrpcFactory;
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.protocol.RaftGroup;
@@ -94,9 +95,8 @@ public final class RatisHelper {
     return toDatanodeId(RaftPeerId.valueOf(peerId.getId()));
   }
 
-  private static String toRaftPeerAddressString(DatanodeDetails id) {
-    return id.getIpAddress() + ":" +
-        id.getPort(DatanodeDetails.Port.Name.RATIS).getValue();
+  private static String toRaftPeerAddress(DatanodeDetails id, Port.Name port) {
+    return id.getIpAddress() + ":" + id.getPort(port).getValue();
   }
 
   public static RaftPeerId toRaftPeerId(DatanodeDetails id) {
@@ -104,18 +104,21 @@ public final class RatisHelper {
   }
 
   public static RaftPeer toRaftPeer(DatanodeDetails id) {
-    return RaftPeer.newBuilder()
-        .setId(toRaftPeerId(id))
-        .setAddress(toRaftPeerAddressString(id))
-        .build();
+    return raftPeerBuilderFor(id).build();
   }
 
   public static RaftPeer toRaftPeer(DatanodeDetails id, int priority) {
-    return RaftPeer.newBuilder()
-        .setId(toRaftPeerId(id))
-        .setAddress(toRaftPeerAddressString(id))
+    return raftPeerBuilderFor(id)
         .setPriority(priority)
         .build();
+  }
+
+  private static RaftPeer.Builder raftPeerBuilderFor(DatanodeDetails dn) {
+    return RaftPeer.newBuilder()
+        .setId(toRaftPeerId(dn))
+        .setAddress(toRaftPeerAddress(dn, Port.Name.RATIS_SERVER))
+        .setAdminAddress(toRaftPeerAddress(dn, Port.Name.RATIS_ADMIN))
+        .setClientAddress(toRaftPeerAddress(dn, Port.Name.RATIS));
   }
 
   private static List<RaftPeer> toRaftPeers(Pipeline pipeline) {
@@ -224,7 +227,9 @@ public final class RatisHelper {
 
     // TODO: GRPC TLS only for now, netty/hadoop RPC TLS support later.
     if (tlsConfig != null && rpcType == SupportedRpcType.GRPC) {
-      builder.setParameters(GrpcFactory.newRaftParameters(tlsConfig));
+      Parameters parameters = new Parameters();
+      GrpcConfigKeys.Client.setTlsConf(parameters, tlsConfig);
+      builder.setParameters(parameters);
     }
     return builder.build();
   }
@@ -254,9 +259,10 @@ public final class RatisHelper {
   }
 
   private static boolean isGrpcClientConfig(String key) {
-    return key.startsWith(GrpcConfigKeys.PREFIX) && !key
-        .startsWith(GrpcConfigKeys.TLS.PREFIX) && !key
-        .startsWith(GrpcConfigKeys.Server.PREFIX);
+    return key.startsWith(GrpcConfigKeys.PREFIX) &&
+        !key.startsWith(GrpcConfigKeys.TLS.PREFIX) &&
+        !key.startsWith(GrpcConfigKeys.Admin.PREFIX) &&
+        !key.startsWith(GrpcConfigKeys.Server.PREFIX);
   }
   /**
    * Set all server properties matching with prefix
@@ -288,11 +294,11 @@ public final class RatisHelper {
   // For External gRPC client to server with gRPC TLS.
   // No mTLS for external client as SCM CA does not issued certificates for them
   public static GrpcTlsConfig createTlsClientConfig(SecurityConfig conf,
-      X509Certificate caCert) {
+      List<X509Certificate> caCerts) {
     GrpcTlsConfig tlsConfig = null;
     if (conf.isSecurityEnabled() && conf.isGrpcTlsEnabled()) {
       tlsConfig = new GrpcTlsConfig(null, null,
-          caCert, false);
+          caCerts, false);
     }
     return tlsConfig;
   }

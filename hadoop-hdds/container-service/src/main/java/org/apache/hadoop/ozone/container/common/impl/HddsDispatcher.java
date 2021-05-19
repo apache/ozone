@@ -38,6 +38,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.InvalidContainerStateException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.security.token.NoopTokenVerifier;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
@@ -87,10 +88,9 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   private final ProtocolMessageMetrics<ProtocolMessageEnum> protocolMetrics;
   private OzoneProtocolMessageDispatcher<ContainerCommandRequestProto,
       ContainerCommandResponseProto, ProtocolMessageEnum> dispatcher;
-  private String scmID;
+  private String clusterId;
   private ContainerMetrics metrics;
   private final TokenVerifier tokenVerifier;
-  private final boolean isBlockTokenEnabled;
 
   /**
    * Constructs an OzoneContainer that receives calls from
@@ -109,10 +109,8 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     this.containerCloseThreshold = conf.getFloat(
         HddsConfigKeys.HDDS_CONTAINER_CLOSE_THRESHOLD,
         HddsConfigKeys.HDDS_CONTAINER_CLOSE_THRESHOLD_DEFAULT);
-    this.isBlockTokenEnabled = conf.getBoolean(
-        HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED,
-        HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT);
-    this.tokenVerifier = tokenVerifier;
+    this.tokenVerifier = tokenVerifier != null ? tokenVerifier
+        : new NoopTokenVerifier();
 
     protocolMetrics =
         new ProtocolMessageMetrics<>(
@@ -208,7 +206,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
             == DispatcherContext.WriteChunkStage.COMMIT_DATA);
 
     try {
-      validateBlockToken(msg);
+      validateToken(msg);
     } catch (IOException ioe) {
       StorageContainerException sce = new StorageContainerException(
           "Block token verification failed. " + ioe.getMessage(), ioe,
@@ -425,15 +423,12 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     return handler.handle(requestBuilder.build(), null, null);
   }
 
-  private void validateBlockToken(
+  private void validateToken(
       ContainerCommandRequestProto msg) throws IOException {
-    if (isBlockTokenEnabled && tokenVerifier != null &&
-        HddsUtils.requireBlockToken(msg.getCmdType())) {
-      tokenVerifier.verify(
-          UserGroupInformation.getCurrentUser().getShortUserName(),
-          msg.getEncodedToken(), msg.getCmdType(),
-          HddsUtils.getBlockID(msg).getContainerBlockID().toString());
-    }
+    tokenVerifier.verify(
+        msg, UserGroupInformation.getCurrentUser().getShortUserName(),
+        msg.getEncodedToken()
+    );
   }
 
   /**
@@ -495,7 +490,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     }
 
     try {
-      validateBlockToken(msg);
+      validateToken(msg);
     } catch (IOException ioe) {
       throw new StorageContainerException(
           "Block token verification failed. " + ioe.getMessage(), ioe,
@@ -551,12 +546,12 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   }
 
   @Override
-  public void setScmId(String scmId) {
-    Preconditions.checkNotNull(scmId, "scmId Cannot be null");
-    if (this.scmID == null) {
-      this.scmID = scmId;
+  public void setClusterId(String clusterId) {
+    Preconditions.checkNotNull(clusterId, "clusterId Cannot be null");
+    if (this.clusterId == null) {
+      this.clusterId = clusterId;
       for (Map.Entry<ContainerType, Handler> handlerMap : handlers.entrySet()) {
-        handlerMap.getValue().setScmID(scmID);
+        handlerMap.getValue().setClusterID(clusterId);
       }
     }
   }

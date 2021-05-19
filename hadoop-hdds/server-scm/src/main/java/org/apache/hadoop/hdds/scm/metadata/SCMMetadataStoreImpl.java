@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.metadata;
 
+import java.io.File;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
@@ -25,9 +26,13 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.security.x509.certificate.CertInfo;
+import org.apache.hadoop.hdds.utils.HAUtils;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
+import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperationHandler;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
@@ -35,10 +40,19 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.CONTAINERS;
+import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.CRLS;
+import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.CRL_SEQUENCE_ID;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.DELETED_BLOCKS;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.PIPELINES;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.REVOKED_CERTS;
+import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.REVOKED_CERTS_V2;
+import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.TRANSACTIONINFO;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.VALID_CERTS;
+import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.VALID_SCM_CERTS;
+import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.SEQUENCE_ID;
+import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
+
+import org.apache.ratis.util.ExitUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,11 +66,23 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
 
   private Table<BigInteger, X509Certificate> validCertsTable;
 
+  private Table<BigInteger, X509Certificate> validSCMCertsTable;
+
   private Table<BigInteger, X509Certificate> revokedCertsTable;
+
+  private Table<BigInteger, CertInfo> revokedCertsV2Table;
 
   private Table<ContainerID, ContainerInfo> containerTable;
 
   private Table<PipelineID, Pipeline> pipelineTable;
+
+  private Table<String, TransactionInfo> transactionInfoTable;
+
+  private Table<Long, CRLInfo> crlInfoTable;
+
+  private Table<String, Long> crlSequenceIdTable;
+
+  private Table<String, Long> sequenceIdTable;
 
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMMetadataStoreImpl.class);
@@ -80,6 +106,23 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
       throws IOException {
     if (this.store == null) {
 
+      File metaDir = HAUtils.getMetaDir(new SCMDBDefinition(), configuration);
+      // Check if there is a DB Inconsistent Marker in the metaDir. This
+      // marker indicates that the DB is in an inconsistent state and hence
+      // the OM process should be terminated.
+      File markerFile = new File(metaDir, DB_TRANSIENT_MARKER);
+      if (markerFile.exists()) {
+        LOG.error("File {} marks that SCM DB is in an inconsistent state.",
+            markerFile);
+        // Note - The marker file should be deleted only after fixing the DB.
+        // In an HA setup, this can be done by replacing this DB with a
+        // checkpoint from another SCM.
+        String errorMsg = "Cannot load SCM DB as it is in an inconsistent " +
+            "state.";
+        ExitUtils.terminate(1, errorMsg, LOG);
+      }
+
+
       this.store = DBStoreBuilder.createDBStore(config, new SCMDBDefinition());
 
       deletedBlocksTable =
@@ -92,13 +135,37 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
 
       checkTableStatus(validCertsTable, VALID_CERTS.getName());
 
+      validSCMCertsTable = VALID_SCM_CERTS.getTable(store);
+
+      checkTableStatus(validSCMCertsTable, VALID_SCM_CERTS.getName());
+
       revokedCertsTable = REVOKED_CERTS.getTable(store);
 
       checkTableStatus(revokedCertsTable, REVOKED_CERTS.getName());
 
+      revokedCertsV2Table = REVOKED_CERTS_V2.getTable(store);
+
+      checkTableStatus(revokedCertsV2Table, REVOKED_CERTS_V2.getName());
+
       pipelineTable = PIPELINES.getTable(store);
 
+      checkTableStatus(pipelineTable, PIPELINES.getName());
+
       containerTable = CONTAINERS.getTable(store);
+
+      checkTableStatus(containerTable, CONTAINERS.getName());
+
+      transactionInfoTable = TRANSACTIONINFO.getTable(store);
+
+      checkTableStatus(transactionInfoTable, TRANSACTIONINFO.getName());
+
+      crlInfoTable = CRLS.getTable(store);
+
+      crlSequenceIdTable = CRL_SEQUENCE_ID.getTable(store);
+
+      sequenceIdTable = SEQUENCE_ID.getTable(store);
+
+      checkTableStatus(sequenceIdTable, SEQUENCE_ID.getName());
     }
   }
 
@@ -120,15 +187,45 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
     return deletedBlocksTable;
   }
 
-
   @Override
   public Table<BigInteger, X509Certificate> getValidCertsTable() {
     return validCertsTable;
   }
 
   @Override
+  public Table<BigInteger, X509Certificate> getValidSCMCertsTable() {
+    return validSCMCertsTable;
+  }
+
+  @Override
   public Table<BigInteger, X509Certificate> getRevokedCertsTable() {
     return revokedCertsTable;
+  }
+
+  @Override
+  public Table<BigInteger, CertInfo> getRevokedCertsV2Table() {
+    return revokedCertsV2Table;
+  }
+
+  /**
+   * A table that maintains X509 Certificate Revocation Lists and its metadata.
+   *
+   * @return Table.
+   */
+  @Override
+  public Table<Long, CRLInfo> getCRLInfoTable() {
+    return crlInfoTable;
+  }
+
+  /**
+   * A table that maintains the last CRL SequenceId. This helps to make sure
+   * that the CRL Sequence Ids are monotonically increasing.
+   *
+   * @return Table.
+   */
+  @Override
+  public Table<String, Long> getCRLSequenceIdTable() {
+    return crlSequenceIdTable;
   }
 
   @Override
@@ -150,6 +247,11 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
   }
 
   @Override
+  public Table<String, TransactionInfo> getTransactionInfoTable() {
+    return transactionInfoTable;
+  }
+
+  @Override
   public BatchOperationHandler getBatchHandler() {
     return this.store;
   }
@@ -159,7 +261,10 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
     return containerTable;
   }
 
-
+  @Override
+  public Table<String, Long> getSequenceIdTable() {
+    return sequenceIdTable;
+  }
 
   private void checkTableStatus(Table table, String name) throws IOException {
     String logMessage = "Unable to get a reference to %s table. Cannot " +

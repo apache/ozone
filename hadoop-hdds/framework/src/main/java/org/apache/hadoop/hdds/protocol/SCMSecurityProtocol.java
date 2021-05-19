@@ -23,7 +23,9 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.OzoneManagerDetailsProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ScmNodeDetailsProto;
 import org.apache.hadoop.hdds.scm.ScmConfig;
+import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.security.KerberosInfo;
 
 /**
@@ -62,6 +64,18 @@ public interface SCMSecurityProtocol {
   String getOMCertificate(OzoneManagerDetailsProto omDetails,
       String certSignReq) throws IOException;
 
+
+  /**
+   * Get signed certificate for SCM.
+   *
+   * @param scmNodeDetails  - SCM Node Details.
+   * @param certSignReq     - Certificate signing request.
+   * @return String         - pem encoded SCM signed
+   *                          certificate.
+   */
+  String getSCMCertificate(ScmNodeDetailsProto scmNodeDetails,
+      String certSignReq) throws IOException;
+
   /**
    * Get SCM signed certificate for given certificate serial id if it exists.
    * Throws exception if it's not found.
@@ -92,4 +106,56 @@ public interface SCMSecurityProtocol {
   List<String> listCertificate(HddsProtos.NodeType type, long startSerialId,
       int count, boolean isRevoked) throws IOException;
 
+  /**
+   * Get Root CA certificate.
+   * @return
+   * @throws IOException
+   */
+  String getRootCACertificate() throws IOException;
+
+  /**
+   * Returns all the individual SCM CA's along with Root CA.
+   *
+   * For example 3 nodes SCM HA cluster, the output will be
+   *
+   * SCM1 CA
+   * SCM2 CA
+   * SCM3 CA
+   * Root CA
+   * @return list of CA's
+   *
+   * For example on non-HA cluster the output will be SCM CA and Root CA.
+   *
+   * SCM CA
+   * Root CA
+   *
+   * @throws IOException
+   */
+  List<String> listCACertificate() throws IOException;
+
+  /**
+   * Get the CRLInfo based on the CRL Id.
+   * @param crlIds - crl ids
+   * @return list of CRLInfo
+   * @throws IOException
+   */
+  List<CRLInfo> getCrls(List<Long> crlIds) throws IOException;
+
+  /**
+   * Get the latest CRL id.
+   * @return latest CRL id.
+   */
+  long getLatestCrlId() throws IOException;
+
+
+  /**
+   * Revoke a list of certificates at specified time.
+   * @param certIds - cert ids
+   * @param reason - reason code: refer @org.bouncycastle.asn1.x509.CRLReason.
+   * @param revocationTime - revocation time.
+   * @return
+   * @throws IOException
+   */
+  long revokeCertificates(List<String> certIds, int reason, long revocationTime)
+      throws IOException;
 }

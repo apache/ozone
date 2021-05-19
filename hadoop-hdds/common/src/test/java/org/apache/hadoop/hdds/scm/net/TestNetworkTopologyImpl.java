@@ -65,14 +65,14 @@ public class TestNetworkTopologyImpl {
   public TestNetworkTopologyImpl(NodeSchema[] schemas, Node[] nodeArray) {
     NodeSchemaManager.getInstance().init(schemas, true);
     cluster = new NetworkTopologyImpl(NodeSchemaManager.getInstance());
-    dataNodes = nodeArray;
+    dataNodes = nodeArray.clone();
     for (int i = 0; i < dataNodes.length; i++) {
       cluster.add(dataNodes[i]);
     }
   }
 
   @Rule
-  public Timeout testTimeout = new Timeout(3000000);
+  public Timeout testTimeout = Timeout.seconds(300);
 
   @Parameters
   public static Collection<Object[]> setupDatanodes() {
@@ -634,8 +634,7 @@ public class TestNetworkTopologyImpl {
                         key.getNetworkFullPath() + ", ancestor node:" +
                         affinityAncestor.getNetworkFullPath() +
                         ", excludedScope: " + pathList.toString() + ", " +
-                        "excludedList:" + (excludedList == null ? "" :
-                        excludedList.toString()));
+                        "excludedList:" + excludedList.toString());
                   }
                 }
               }

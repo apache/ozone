@@ -128,6 +128,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BL
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DIRECTORY_NOT_FOUND;
@@ -371,14 +372,15 @@ public class KeyManagerImpl implements KeyManager {
       throw ex;
     }
     for (AllocatedBlock allocatedBlock : allocatedBlocks) {
+      BlockID blockID = new BlockID(allocatedBlock.getBlockID());
       OmKeyLocationInfo.Builder builder = new OmKeyLocationInfo.Builder()
-          .setBlockID(new BlockID(allocatedBlock.getBlockID()))
+          .setBlockID(blockID)
           .setLength(scmBlockSize)
           .setOffset(0)
           .setPipeline(allocatedBlock.getPipeline());
       if (grpcBlockTokenEnabled) {
         builder.setToken(secretManager
-            .generateToken(remoteUser, allocatedBlock.getBlockID().toString(),
+            .generateToken(remoteUser, blockID,
                 EnumSet.of(READ, WRITE), scmBlockSize));
       }
       locationInfos.add(builder.build());
@@ -620,7 +622,7 @@ public class KeyManagerImpl implements KeyManager {
       keyInfo.setModificationTime(Time.now());
 
       //update the block length for each block
-      keyInfo.updateLocationInfoList(locationInfoList);
+      keyInfo.updateLocationInfoList(locationInfoList, false);
       metadataManager.getStore().move(
           openKey,
           objectKey,
@@ -697,8 +699,7 @@ public class KeyManagerImpl implements KeyManager {
       String remoteUser = getRemoteUser().getShortUserName();
       for (OmKeyLocationInfoGroup key : value.getKeyLocationVersions()) {
         key.getLocationList().forEach(k -> {
-          k.setToken(secretManager.generateToken(remoteUser,
-              k.getBlockID().getContainerBlockID().toString(),
+          k.setToken(secretManager.generateToken(remoteUser, k.getBlockID(),
               EnumSet.of(READ), k.getLength()));
         });
       }
@@ -1115,7 +1116,7 @@ public class KeyManagerImpl implements KeyManager {
 
       // set the data size and location info list
       keyInfo.setDataSize(omKeyArgs.getDataSize());
-      keyInfo.updateLocationInfoList(omKeyArgs.getLocationInfoList());
+      keyInfo.updateLocationInfoList(omKeyArgs.getLocationInfoList(), true);
 
       partName = metadataManager.getOzoneKey(volumeName, bucketName, keyName)
           + clientID;
@@ -1139,7 +1140,8 @@ public class KeyManagerImpl implements KeyManager {
         PartKeyInfo.Builder partKeyInfo = PartKeyInfo.newBuilder();
         partKeyInfo.setPartName(partName);
         partKeyInfo.setPartNumber(partNumber);
-        partKeyInfo.setPartKeyInfo(keyInfo.getProtobuf());
+        // TODO remove unused write code path
+        partKeyInfo.setPartKeyInfo(keyInfo.getProtobuf(CURRENT_VERSION));
         multipartKeyInfo.addPartKeyInfo(partNumber, partKeyInfo.build());
         if (oldPartKeyInfo == null) {
           // This is the first time part is being added.
@@ -1746,6 +1748,7 @@ public class KeyManagerImpl implements KeyManager {
    * @throws IOException if there is error in the db
    *                     invalid arguments
    */
+  @Override
   public OzoneFileStatus getFileStatus(OmKeyArgs args) throws IOException {
     Preconditions.checkNotNull(args, "Key args can not be null");
     return getFileStatus(args, null);
@@ -1763,6 +1766,7 @@ public class KeyManagerImpl implements KeyManager {
    * @throws IOException if there is error in the db
    *                     invalid arguments
    */
+  @Override
   public OzoneFileStatus getFileStatus(OmKeyArgs args, String clientAddress)
           throws IOException {
     Preconditions.checkNotNull(args, "Key args can not be null");
@@ -1844,6 +1848,7 @@ public class KeyManagerImpl implements KeyManager {
    * @throws IOException if there is error in the db
    *                     invalid arguments
    */
+  @Override
   public void createDirectory(OmKeyArgs args) throws IOException {
     Preconditions.checkNotNull(args, "Key args can not be null");
     String volumeName = args.getVolumeName();
@@ -1992,6 +1997,7 @@ public class KeyManagerImpl implements KeyManager {
    * Refresh the key block location information by get latest info from SCM.
    * @param key
    */
+  @Override
   public void refresh(OmKeyInfo key) throws IOException {
     Preconditions.checkNotNull(key, "Key info can not be null");
     refreshPipeline(Arrays.asList(key));
@@ -2046,6 +2052,7 @@ public class KeyManagerImpl implements KeyManager {
    * @param numEntries Number of entries to list from the start key
    * @return list of file status
    */
+  @Override
   public List<OzoneFileStatus> listStatus(OmKeyArgs args, boolean recursive,
                                           String startKey, long numEntries)
           throws IOException {
@@ -2065,6 +2072,7 @@ public class KeyManagerImpl implements KeyManager {
    *                      pipeline by distance between client and datanode.
    * @return list of file status
    */
+  @Override
   public List<OzoneFileStatus> listStatus(OmKeyArgs args, boolean recursive,
       String startKey, long numEntries, String clientAddress)
           throws IOException {

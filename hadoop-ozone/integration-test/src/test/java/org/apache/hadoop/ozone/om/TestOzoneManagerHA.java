@@ -22,7 +22,7 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
+import org.apache.hadoop.ozone.MiniOzoneOMHAClusterImpl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -51,6 +51,7 @@ import java.time.Duration;
 import java.util.UUID;
 import java.util.HashMap;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IPC_CLIENT_CONNECT_MAX_RETRIES_KEY;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IPC_CLIENT_CONNECT_RETRY_INTERVAL_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
@@ -67,7 +68,7 @@ import static org.junit.Assert.fail;
  */
 public abstract class TestOzoneManagerHA {
 
-  private MiniOzoneHAClusterImpl cluster = null;
+  private MiniOzoneOMHAClusterImpl cluster = null;
   private ObjectStore objectStore;
   private OzoneConfiguration conf;
   private String clusterId;
@@ -85,9 +86,9 @@ public abstract class TestOzoneManagerHA {
   public ExpectedException exception = ExpectedException.none();
 
   @Rule
-  public Timeout timeout = new Timeout(300_000);
+  public Timeout timeout = Timeout.seconds(300);;
 
-  public MiniOzoneHAClusterImpl getCluster() {
+  public MiniOzoneOMHAClusterImpl getCluster() {
     return cluster;
   }
 
@@ -163,7 +164,7 @@ public abstract class TestOzoneManagerHA {
      */
     conf.set(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, "10s");
     conf.set(OZONE_KEY_DELETING_LIMIT_PER_TASK, "2");
-    cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
+    cluster = (MiniOzoneOMHAClusterImpl) MiniOzoneCluster.newOMHABuilder(conf)
         .setClusterId(clusterId)
         .setScmId(scmId)
         .setOMServiceId(omServiceId)
@@ -188,13 +189,13 @@ public abstract class TestOzoneManagerHA {
    * Create a key in the bucket.
    * @return the key name.
    */
-  static String createKey(OzoneBucket ozoneBucket) throws IOException {
+  public static String createKey(OzoneBucket ozoneBucket) throws IOException {
     String keyName = "key" + RandomStringUtils.randomNumeric(5);
     String data = "data" + RandomStringUtils.randomNumeric(5);
     OzoneOutputStream ozoneOutputStream = ozoneBucket.createKey(keyName,
         data.length(), ReplicationType.STAND_ALONE,
         ReplicationFactor.ONE, new HashMap<>());
-    ozoneOutputStream.write(data.getBytes(), 0, data.length());
+    ozoneOutputStream.write(data.getBytes(UTF_8), 0, data.length());
     ozoneOutputStream.close();
     return keyName;
   }
@@ -304,7 +305,7 @@ public abstract class TestOzoneManagerHA {
         data.length(), ReplicationType.RATIS, ReplicationFactor.ONE,
         overwrite, recursive);
 
-    ozoneOutputStream.write(data.getBytes(), 0, data.length());
+    ozoneOutputStream.write(data.getBytes(UTF_8), 0, data.length());
     ozoneOutputStream.close();
 
     OzoneKeyDetails ozoneKeyDetails = ozoneBucket.getKey(keyName);
@@ -317,9 +318,9 @@ public abstract class TestOzoneManagerHA {
 
     OzoneInputStream ozoneInputStream = ozoneBucket.readKey(keyName);
 
-    byte[] fileContent = new byte[data.getBytes().length];
+    byte[] fileContent = new byte[data.getBytes(UTF_8).length];
     ozoneInputStream.read(fileContent);
-    Assert.assertEquals(data, new String(fileContent));
+    Assert.assertEquals(data, new String(fileContent, UTF_8));
   }
 
 }

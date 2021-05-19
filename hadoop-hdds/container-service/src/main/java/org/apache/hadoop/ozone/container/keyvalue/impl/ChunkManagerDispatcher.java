@@ -28,6 +28,7 @@ import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
+import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
@@ -56,9 +57,12 @@ public class ChunkManagerDispatcher implements ChunkManager {
   private final Map<ChunkLayOutVersion, ChunkManager> handlers
       = new EnumMap<>(ChunkLayOutVersion.class);
 
-  ChunkManagerDispatcher(boolean sync, BlockManager manager) {
-    handlers.put(FILE_PER_CHUNK, new FilePerChunkStrategy(sync, manager));
-    handlers.put(FILE_PER_BLOCK, new FilePerBlockStrategy(sync));
+  ChunkManagerDispatcher(boolean sync, BlockManager manager,
+                         VolumeSet volSet) {
+    handlers.put(FILE_PER_CHUNK,
+        new FilePerChunkStrategy(sync, manager, volSet));
+    handlers.put(FILE_PER_BLOCK,
+        new FilePerBlockStrategy(sync, manager, volSet));
   }
 
   @Override

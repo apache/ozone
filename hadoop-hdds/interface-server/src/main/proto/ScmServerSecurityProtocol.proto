@@ -49,6 +49,11 @@ message SCMSecurityRequest {
     optional SCMGetCertificateRequestProto getCertificateRequest = 5;
     optional SCMGetCACertificateRequestProto getCACertificateRequest = 6;
     optional SCMListCertificateRequestProto listCertificateRequest = 7;
+    optional SCMGetSCMCertRequestProto getSCMCertificateRequest = 8;
+    optional SCMListCACertificateRequestProto listCACertificateRequestProto = 9;
+    optional SCMGetCrlsRequestProto getCrlsRequest = 10;
+    optional SCMGetLatestCrlIdRequestProto getLatestCrlIdRequest = 11;
+    optional SCMRevokeCertificatesRequestProto revokeCertificatesRequest = 12;
 
 }
 
@@ -69,6 +74,12 @@ message SCMSecurityResponse {
 
     optional SCMListCertificateResponseProto listCertificateResponseProto = 7;
 
+    optional SCMGetCrlsResponseProto getCrlsResponseProto = 8;
+
+    optional SCMGetLatestCrlIdResponseProto getLatestCrlIdResponseProto = 9;
+
+    optional SCMRevokeCertificatesResponseProto revokeCertificatesResponseProto = 10;
+
 }
 
 enum Type {
@@ -77,10 +88,32 @@ enum Type {
     GetCertificate = 3;
     GetCACertificate = 4;
     ListCertificate = 5;
+    GetSCMCertificate = 6;
+    GetRootCACertificate = 7;
+    ListCACertificate = 8;
+    GetCrls = 9;
+    GetLatestCrlId = 10;
+    RevokeCertificates = 11;
 }
 
 enum Status {
     OK = 1;
+    INVALID_CSR = 2;
+    UNABLE_TO_ISSUE_CERTIFICATE = 3;
+    GET_DN_CERTIFICATE_FAILED = 4;
+    GET_OM_CERTIFICATE_FAILED = 5;
+    GET_SCM_CERTIFICATE_FAILED = 6;
+    GET_CERTIFICATE_FAILED = 7;
+    GET_CA_CERT_FAILED = 8;
+    CERTIFICATE_NOT_FOUND = 9;
+    PEM_ENCODE_FAILED = 10;
+    INTERNAL_ERROR = 11;
+    DEFAULT = 12;
+    MISSING_BLOCK_TOKEN = 13;
+    BLOCK_TOKEN_VERIFICATION_FAILED = 14;
+    GET_ROOT_CA_CERTIFICATE_FAILED = 15;
+    NOT_A_PRIMARY_SCM = 16;
+    REVOKE_CERTIFICATE_FAILED = 17;
 }
 /**
 * This message is send by data node to prove its identity and get an SCM
@@ -97,6 +130,11 @@ message SCMGetDataNodeCertRequestProto {
 */
 message SCMGetOMCertRequestProto {
     required OzoneManagerDetailsProto omDetails = 1;
+    required string CSR = 2;
+}
+
+message SCMGetSCMCertRequestProto {
+    required ScmNodeDetailsProto scmDetails = 1;
     required string CSR = 2;
 }
 
@@ -135,6 +173,8 @@ message SCMGetCertResponseProto {
     required ResponseCode responseCode = 1;
     required string x509Certificate = 2; // Base64 encoded X509 certificate.
     optional string x509CACertificate = 3; // Base64 encoded CA X509 certificate.
+    // Base64 encoded Root CA X509 certificate.
+    optional string x509RootCACertificate = 4;
 }
 
 /**
@@ -149,6 +189,55 @@ message SCMListCertificateResponseProto {
     repeated string certificates = 2;
 }
 
+message SCMGetRootCACertificateRequestProto {
+}
+
+message SCMListCACertificateRequestProto {
+}
+
+/**
+* Proto request to get CRL.
+*/
+message SCMGetCrlsRequestProto {
+    repeated int64 crlId = 1;
+}
+
+message SCMGetCrlsResponseProto {
+    repeated CRLInfoProto crlInfos = 1;
+}
+
+/**
+* Proto request to get latest CRL id.
+*/
+message SCMGetLatestCrlIdRequestProto {
+}
+
+message SCMGetLatestCrlIdResponseProto {
+    optional int64 crlId = 1;
+}
+
+message SCMRevokeCertificatesRequestProto {
+    // Match with org.bouncycastle.asn1.x509.CRLReason
+    enum Reason {
+        unspecified = 0;
+        keyCompromise = 1;
+        cACompromise = 2;
+        affiliationChanged = 3;
+        superseded = 4;
+        cessationOfOperation = 5;
+        certificateHold = 6;
+        removeFromCRL = 8;
+        privilegeWithdrawn = 9;
+        aACompromise = 10;
+    };
+    repeated string certIds = 1;
+    optional Reason reason = 2 [default = unspecified];
+    optional uint64 revokeTime = 3;
+}
+
+message SCMRevokeCertificatesResponseProto {
+    optional int64 crlId = 1;
+}
 
 service SCMSecurityProtocolService {
     rpc submitRequest (SCMSecurityRequest) returns (SCMSecurityResponse);

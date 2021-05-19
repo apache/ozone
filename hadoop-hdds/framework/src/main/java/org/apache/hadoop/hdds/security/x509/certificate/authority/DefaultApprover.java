@@ -67,6 +67,7 @@ public class DefaultApprover extends BaseApprover {
 
   /**
    * Sign function signs a Certificate.
+   *
    * @param config - Security Config.
    * @param caPrivate - CAs private Key.
    * @param caCertificate - CA Certificate.
@@ -80,7 +81,8 @@ public class DefaultApprover extends BaseApprover {
    * @throws OperatorCreationException - on Error.
    */
   @SuppressWarnings("ParameterNumber")
-  public  X509CertificateHolder sign(
+  @Override
+  public X509CertificateHolder sign(
       SecurityConfig config,
       PrivateKey caPrivate,
       X509CertificateHolder caCertificate,
@@ -88,7 +90,8 @@ public class DefaultApprover extends BaseApprover {
       Date validTill,
       PKCS10CertificationRequest certificationRequest,
       String scmId,
-      String clusterId) throws IOException, OperatorCreationException {
+      String clusterId) throws IOException,
+      OperatorCreationException {
 
     AlgorithmIdentifier sigAlgId = new
         DefaultSignatureAlgorithmIdentifierFinder().find(
@@ -108,7 +111,7 @@ public class DefaultApprover extends BaseApprover {
     String csrClusterId = x500Name.getRDNs(BCStyle.O)[0].getFirst().getValue().
         toASN1Primitive().toString();
 
-    if (!scmId.equals(csrScmId) || !clusterId.equals(csrClusterId)) {
+    if (!clusterId.equals(csrClusterId)) {
       if (csrScmId.equalsIgnoreCase("null") &&
           csrClusterId.equalsIgnoreCase("null")) {
         // Special case to handle DN certificate generation as DN might not know
@@ -134,7 +137,7 @@ public class DefaultApprover extends BaseApprover {
         new X509v3CertificateBuilder(
             caCertificate.getSubject(),
             // Serial is not sequential but it is monotonically increasing.
-            BigInteger.valueOf(Time.monotonicNowNanos()),
+            BigInteger.valueOf(generateSerialId()),
             validFrom,
             validTill,
             x500Name, keyInfo);
@@ -152,6 +155,12 @@ public class DefaultApprover extends BaseApprover {
 
     return certificateGenerator.build(sigGen);
 
+  }
+
+  public long generateSerialId() {
+    // TODO: to make generation of serialId distributed.
+    // This issue will be fixed in HDDS-4999.
+    return Time.monotonicNowNanos();
   }
 
   @Override

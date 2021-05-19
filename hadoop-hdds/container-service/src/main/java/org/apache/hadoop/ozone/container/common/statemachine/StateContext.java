@@ -23,6 +23,7 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -31,6 +32,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
@@ -114,6 +116,18 @@ public class StateContext {
   private boolean shutdownOnError = false;
   private boolean shutdownGracefully = false;
   private final AtomicLong threadPoolNotAvailableCount;
+
+  /**
+   * term of latest leader SCM, extract from SCMCommand.
+   *
+   * Only leader SCM (both latest and stale) can send out SCMCommand,
+   * which will save its term in SCMCommand. Since latest leader SCM
+   * always has the highest term, term can be used to detect SCMCommand
+   * from stale leader SCM.
+   *
+   * For non-HA mode, term of SCMCommand will be 0.
+   */
+  private Optional<Long> termOfLeaderSCM = Optional.empty();
 
   /**
    * Starting with a 2 sec heartbeat frequency which will be updated to the
@@ -242,21 +256,21 @@ public class StateContext {
     Preconditions.checkState(descriptor != null);
     final String reportType = descriptor.getFullName();
     Preconditions.checkState(reportType != null);
-    for (InetSocketAddress endpoint : endpoints) {
-      if (reportType.equals(CONTAINER_REPORTS_PROTO_NAME)) {
-        containerReports.set(report);
-      } else if (reportType.equals(NODE_REPORT_PROTO_NAME)) {
-        nodeReport.set(report);
-      } else if (reportType.equals(PIPELINE_REPORTS_PROTO_NAME)) {
-        pipelineReports.set(report);
-      } else if (ACCEPTED_INCREMENTAL_REPORT_TYPE_SET.contains(reportType)) {
-        synchronized (incrementalReportsQueue) {
+    if (reportType.equals(CONTAINER_REPORTS_PROTO_NAME)) {
+      containerReports.set(report);
+    } else if (reportType.equals(NODE_REPORT_PROTO_NAME)) {
+      nodeReport.set(report);
+    } else if (reportType.equals(PIPELINE_REPORTS_PROTO_NAME)) {
+      pipelineReports.set(report);
+    } else if (ACCEPTED_INCREMENTAL_REPORT_TYPE_SET.contains(reportType)) {
+      synchronized (incrementalReportsQueue) {
+        for (InetSocketAddress endpoint : endpoints) {
           incrementalReportsQueue.get(endpoint).add(report);
         }
-      } else {
-        throw new IllegalArgumentException(
-            "Unidentified report message type: " + reportType);
       }
+    } else {
+      throw new IllegalArgumentException(
+          "Unidentified report message type: " + reportType);
     }
   }
 
@@ -318,6 +332,23 @@ public class StateContext {
     return reportsToReturn;
   }
 
+  List<GeneratedMessage> getNonIncrementalReports() {
+    List<GeneratedMessage> nonIncrementalReports = new LinkedList<>();
+    GeneratedMessage report = containerReports.get();
+    if (report != null) {
+      nonIncrementalReports.add(report);
+    }
+    report = nodeReport.get();
+    if (report != null) {
+      nonIncrementalReports.add(report);
+    }
+    report = pipelineReports.get();
+    if (report != null) {
+      nonIncrementalReports.add(report);
+    }
+    return nonIncrementalReports;
+  }
+
   /**
    * Returns available reports from the report queue with a max limit on
    * list size, or empty list if the queue is empty.
@@ -326,21 +357,17 @@ public class StateContext {
    */
   public List<GeneratedMessage> getReports(InetSocketAddress endpoint,
                                            int maxLimit) {
-    List<GeneratedMessage> reportsToReturn =
-        getIncrementalReports(endpoint, maxLimit);
-    GeneratedMessage report = containerReports.get();
-    if (report != null) {
-      reportsToReturn.add(report);
+    if (maxLimit < 0) {
+      throw new IllegalArgumentException("Illegal maxLimit value: " + maxLimit);
     }
-    report = nodeReport.get();
-    if (report != null) {
-      reportsToReturn.add(report);
+    List<GeneratedMessage> reports = getNonIncrementalReports();
+    if (maxLimit <= reports.size()) {
+      return reports.subList(0, maxLimit);
+    } else {
+      reports.addAll(getIncrementalReports(endpoint,
+          maxLimit - reports.size()));
+      return reports;
     }
-    report = pipelineReports.get();
-    if (report != null) {
-      reportsToReturn.add(report);
-    }
-    return reportsToReturn;
   }
 
 
@@ -412,6 +439,24 @@ public class StateContext {
   }
 
   /**
+   * Helper function for addPipelineActionIfAbsent that check if inputs are the
+   * same close pipeline action.
+   *
+   * Important Note: Make sure to double check for correctness before using this
+   * helper function for other purposes!
+   *
+   * @return true if a1 and a2 are the same close pipeline action,
+   *         false otherwise
+   */
+  boolean isSameClosePipelineAction(PipelineAction a1, PipelineAction a2) {
+    return a1.getAction() == a2.getAction()
+        && a1.hasClosePipeline()
+        && a2.hasClosePipeline()
+        && a1.getClosePipeline().getPipelineID()
+        .equals(a2.getClosePipeline().getPipelineID());
+  }
+
+  /**
    * Add PipelineAction to PipelineAction queue if it's not present.
    *
    * @param pipelineAction PipelineAction to be added
@@ -427,18 +472,12 @@ public class StateContext {
        * multiple times here.
        */
       for (InetSocketAddress endpoint : endpoints) {
-        Queue<PipelineAction> actionsForEndpoint =
-            this.pipelineActions.get(endpoint);
-        for (PipelineAction pipelineActionIter : actionsForEndpoint) {
-          if (pipelineActionIter.getAction() == pipelineAction.getAction()
-              && pipelineActionIter.hasClosePipeline() && pipelineAction
-              .hasClosePipeline()
-              && pipelineActionIter.getClosePipeline().getPipelineID()
-              .equals(pipelineAction.getClosePipeline().getPipelineID())) {
-            break;
-          }
+        final Queue<PipelineAction> actionsForEndpoint =
+            pipelineActions.get(endpoint);
+        if (actionsForEndpoint.stream().noneMatch(
+            action -> isSameClosePipelineAction(action, pipelineAction))) {
+          actionsForEndpoint.add(pipelineAction);
         }
-        actionsForEndpoint.add(pipelineAction);
       }
     }
   }
@@ -561,6 +600,65 @@ public class StateContext {
   }
 
   /**
+   * After startup, datanode needs detect latest leader SCM before handling
+   * any SCMCommand, so that it won't be disturbed by stale leader SCM.
+   *
+   * The rule is: after majority SCMs are in HEARTBEAT state and has
+   * heard from leader SCMs (commandQueue is not empty), datanode will init
+   * termOfLeaderSCM with the max term found in commandQueue.
+   *
+   * The init process also works for non-HA mode. In that case, term of all
+   * SCMCommands will be 0.
+   */
+  private void initTermOfLeaderSCM() {
+    // only init once
+    if (termOfLeaderSCM.isPresent()) {
+      return;
+    }
+
+    AtomicInteger scmNum = new AtomicInteger(0);
+    AtomicInteger activeScmNum = new AtomicInteger(0);
+
+    getParent().getConnectionManager().getValues()
+        .forEach(endpoint -> {
+          if (endpoint.isPassive()) {
+            return;
+          }
+          scmNum.incrementAndGet();
+          if (endpoint.getState()
+              == EndpointStateMachine.EndPointStates.HEARTBEAT) {
+            activeScmNum.incrementAndGet();
+          }
+        });
+
+    // majority SCMs should be in HEARTBEAT state.
+    if (activeScmNum.get() < scmNum.get() / 2 + 1) {
+      return;
+    }
+
+    // if commandQueue is not empty, init termOfLeaderSCM
+    // with the largest term found in commandQueue
+    commandQueue.stream()
+        .mapToLong(SCMCommand::getTerm)
+        .max()
+        .ifPresent(term -> termOfLeaderSCM = Optional.of(term));
+  }
+
+  /**
+   * monotonically increase termOfLeaderSCM.
+   * Always record the latest term that has seen.
+   */
+  private void updateTermOfLeaderSCM(SCMCommand<?> command) {
+    if (!termOfLeaderSCM.isPresent()) {
+      LOG.error("should init termOfLeaderSCM before update it.");
+      return;
+    }
+
+    termOfLeaderSCM = Optional.of(
+        Long.max(termOfLeaderSCM.get(), command.getTerm()));
+  }
+
+  /**
    * Returns the next command or null if it is empty.
    *
    * @return SCMCommand or Null.
@@ -568,7 +666,26 @@ public class StateContext {
   public SCMCommand getNextCommand() {
     lock.lock();
     try {
-      return commandQueue.poll();
+      initTermOfLeaderSCM();
+      if (!termOfLeaderSCM.isPresent()) {
+        return null;      // not ready yet
+      }
+
+      while (true) {
+        SCMCommand<?> command = commandQueue.poll();
+        if (command == null) {
+          return null;
+        }
+
+        updateTermOfLeaderSCM(command);
+        if (command.getTerm() == termOfLeaderSCM.get()) {
+          return command;
+        }
+
+        LOG.warn("Detect and drop a SCMCommand {} from stale leader SCM," +
+            " stale term {}, latest term {}.",
+            command, command.getTerm(), termOfLeaderSCM.get());
+      }
     } finally {
       lock.unlock();
     }

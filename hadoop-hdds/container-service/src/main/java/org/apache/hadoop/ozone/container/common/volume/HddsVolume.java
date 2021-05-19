@@ -52,9 +52,9 @@ import org.slf4j.LoggerFactory;
  * <p>
  * The disk layout per volume is as follows:
  * <p>../hdds/VERSION
- * <p>{@literal ../hdds/<<scmUuid>>/current/<<containerDir>>/<<containerID
+ * <p>{@literal ../hdds/<<clusterUuid>>/current/<<containerDir>>/<<containerID
  * >>/metadata}
- * <p>{@literal ../hdds/<<scmUuid>>/current/<<containerDir>>/<<containerID
+ * <p>{@literal ../hdds/<<clusterUuid>>/current/<<containerDir>>/<<containerID
  * >>/<<dataDir>>}
  * <p>
  * Each hdds volume has its own VERSION file. The hdds volume will have one
@@ -78,6 +78,7 @@ public class HddsVolume
   private final VolumeInfo volumeInfo;
   private VolumeState state;
   private final VolumeIOStats volumeIOStats;
+  private final VolumeSet volumeSet;
 
   // VERSION file properties
   private String storageID;       // id of the file system
@@ -115,6 +116,7 @@ public class HddsVolume
     private String clusterID;
     private boolean failedVolume = false;
     private SpaceUsageCheckFactory usageCheckFactory;
+    private VolumeSet volumeSet;
 
     public Builder(String rootDirStr) {
       this.volumeRootStr = rootDirStr;
@@ -153,6 +155,11 @@ public class HddsVolume
       return this;
     }
 
+    public Builder volumeSet(VolumeSet volSet) {
+      this.volumeSet = volSet;
+      return this;
+    }
+
     public HddsVolume build() throws IOException {
       return new HddsVolume(this);
     }
@@ -172,6 +179,7 @@ public class HddsVolume
           .usageCheckFactory(b.usageCheckFactory)
           .build();
       this.committedBytes = new AtomicLong(0);
+      this.volumeSet = b.volumeSet;
 
       LOG.info("Creating Volume: {} of storage type : {} and capacity : {}",
           hddsRootDir, b.storageType, volumeInfo.getCapacity());
@@ -186,6 +194,7 @@ public class HddsVolume
       storageID = UUID.randomUUID().toString();
       state = VolumeState.FAILED;
       committedBytes = null;
+      volumeSet = null;
     }
   }
 
@@ -393,6 +402,10 @@ public class HddsVolume
 
   public VolumeIOStats getVolumeIOStats() {
     return volumeIOStats;
+  }
+
+  public VolumeSet getVolumeSet() {
+    return volumeSet;
   }
 
   public void failVolume() {

@@ -24,24 +24,25 @@ import java.util.Collection;
 import java.util.List;
 import java.util.NavigableSet;
 
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
-import org.apache.hadoop.hdds.server.events.EventHandler;
+import org.apache.hadoop.hdds.utils.db.Table;
 
 /**
  * Interface which exposes the api for pipeline management.
  */
-public interface PipelineManager extends Closeable, PipelineManagerMXBean,
-    EventHandler<SafeModeStatus> {
+public interface PipelineManager extends Closeable, PipelineManagerMXBean {
 
-  Pipeline createPipeline(ReplicationType type, ReplicationFactor factor)
+  Pipeline createPipeline(
+      ReplicationConfig replicationConfig
+  )
       throws IOException;
 
-  Pipeline createPipeline(ReplicationType type, ReplicationFactor factor,
-      List<DatanodeDetails> nodes);
+  Pipeline createPipeline(
+      ReplicationConfig replicationConfig,
+      List<DatanodeDetails> nodes
+  );
 
   Pipeline getPipeline(PipelineID pipelineID) throws PipelineNotFoundException;
 
@@ -49,20 +50,20 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean,
 
   List<Pipeline> getPipelines();
 
-  List<Pipeline> getPipelines(ReplicationType type);
+  List<Pipeline> getPipelines(
+      ReplicationConfig replicationConfig
+  );
 
-  List<Pipeline> getPipelines(ReplicationType type,
-      ReplicationFactor factor);
+  List<Pipeline> getPipelines(
+      ReplicationConfig replicationConfig, Pipeline.PipelineState state
+  );
 
-  List<Pipeline> getPipelines(ReplicationType type,
-      Pipeline.PipelineState state);
-
-  List<Pipeline> getPipelines(ReplicationType type,
-      ReplicationFactor factor, Pipeline.PipelineState state);
-
-  List<Pipeline> getPipelines(ReplicationType type, ReplicationFactor factor,
-      Pipeline.PipelineState state, Collection<DatanodeDetails> excludeDns,
-      Collection<PipelineID> excludePipelines);
+  List<Pipeline> getPipelines(
+      ReplicationConfig replicationConfig,
+      Pipeline.PipelineState state,
+      Collection<DatanodeDetails> excludeDns,
+      Collection<PipelineID> excludePipelines
+  );
 
   void addContainerToPipeline(PipelineID pipelineID, ContainerID containerID)
       throws IOException;
@@ -77,10 +78,9 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean,
 
   void openPipeline(PipelineID pipelineId) throws IOException;
 
-  void finalizeAndDestroyPipeline(Pipeline pipeline, boolean onTimeout)
-      throws IOException;
+  void closePipeline(Pipeline pipeline, boolean onTimeout) throws IOException;
 
-  void scrubPipeline(ReplicationType type, ReplicationFactor factor)
+  void scrubPipeline(ReplicationConfig replicationConfig)
       throws IOException;
 
   void startPipelineCreator();
@@ -125,4 +125,11 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean,
    * @return boolean
    */
   boolean getSafeModeStatus();
+
+  /**
+   * Reinitialize the pipelineManager with the lastest pipeline store
+   * during SCM reload.
+   */
+  void reinitialize(Table<PipelineID, Pipeline> pipelineStore)
+      throws IOException;
 }

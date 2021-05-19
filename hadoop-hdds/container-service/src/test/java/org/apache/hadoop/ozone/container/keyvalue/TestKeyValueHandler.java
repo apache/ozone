@@ -74,16 +74,16 @@ import static org.mockito.Mockito.times;
 public class TestKeyValueHandler {
 
   @Rule
-  public TestRule timeout = new Timeout(300000);
-
-  private static HddsDispatcher dispatcher;
-  private static KeyValueHandler handler;
+  public TestRule timeout = Timeout.seconds(300);
 
   private static final String DATANODE_UUID = UUID.randomUUID().toString();
 
   private static final long DUMMY_CONTAINER_ID = 9999;
 
   private final ChunkLayOutVersion layout;
+
+  private HddsDispatcher dispatcher;
+  private KeyValueHandler handler;
 
   public TestKeyValueHandler(ChunkLayOutVersion layout) {
     this.layout = layout;
@@ -372,7 +372,7 @@ public class TestKeyValueHandler {
       final KeyValueHandler kvHandler = new KeyValueHandler(conf,
           UUID.randomUUID().toString(), containerSet, volumeSet, metrics,
           c -> icrReceived.incrementAndGet());
-      kvHandler.setScmID(UUID.randomUUID().toString());
+      kvHandler.setClusterID(UUID.randomUUID().toString());
 
       final ContainerCommandRequestProto createContainer =
           ContainerCommandRequestProto.newBuilder()

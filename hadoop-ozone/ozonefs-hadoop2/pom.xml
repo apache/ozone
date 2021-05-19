@@ -19,12 +19,12 @@
   <parent>
     <groupId>org.apache.hadoop</groupId>
     <artifactId>hadoop-ozone</artifactId>
-    <version>1.1.0-SNAPSHOT</version>
+    <version>1.2.0-SNAPSHOT</version>
   </parent>
   <artifactId>hadoop-ozone-filesystem-hadoop2</artifactId>
-  <name>Apache Hadoop Ozone FS Hadoop 2.x compatibility</name>
+  <name>Apache Ozone FS Hadoop 2.x compatibility</name>
   <packaging>jar</packaging>
-  <version>1.1.0-SNAPSHOT</version>
+  <version>1.2.0-SNAPSHOT</version>
   <properties>
     <shaded.prefix>org.apache.hadoop.ozone.shaded</shaded.prefix>
   </properties>
@@ -104,14 +104,11 @@
         </executions>
       </plugin>
       <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>animal-sniffer-maven-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>signature-check</id>
-            <phase/>
-          </execution>
-        </executions>
+        <groupId>com.github.spotbugs</groupId>
+        <artifactId>spotbugs-maven-plugin</artifactId>
+        <configuration>
+          <onlyAnalyze>org.apache.hadoop.fs.ozone.*</onlyAnalyze>
+        </configuration>
       </plugin>
     </plugins>
   </build>

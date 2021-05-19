@@ -38,7 +38,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.NodeReportFromDatanode;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
-import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
@@ -142,7 +141,7 @@ public class TestSCMNodeManager {
 
   SCMNodeManager createNodeManager(OzoneConfiguration config)
       throws IOException, AuthenticationException {
-    scm = HddsTestUtils.getScm(config);
+    scm = TestUtils.getScm(config);
     return (SCMNodeManager) scm.getScmNodeManager();
   }
 
@@ -280,12 +279,13 @@ public class TestSCMNodeManager {
   }
 
   /**
-   * Ensure that a change to the operationalState of a node fires a datanode
-   * event of type SetNodeOperationalStateCommand.
+   * For leader SCM, ensure that a change to the operationalState of a node
+   * fires a SCMCommand of type SetNodeOperationalStateCommand.
+   *
+   * For follower SCM, no SetNodeOperationalStateCommand should be fired, yet
+   * operationalState of the node will be updated according to the heartbeat.
    */
   @Test
-  @Ignore // TODO - this test is no longer valid as the heartbeat processing
-          //        now generates the command message.
   public void testSetNodeOpStateAndCommandFired()
       throws IOException, NodeNotFoundException, AuthenticationException {
     final int interval = 100;
@@ -300,11 +300,27 @@ public class TestSCMNodeManager {
       long expiry = System.currentTimeMillis() / 1000 + 1000;
       nodeManager.setNodeOperationalState(dn,
           HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE, expiry);
-      List<SCMCommand> commands = nodeManager.getCommandQueue(dn.getUuid());
+
+      // If found mismatch, leader SCM fires a SetNodeOperationalStateCommand
+      // to update the opState persisted in Datanode.
+      scm.getScmContext().updateLeaderAndTerm(true, 1);
+      List<SCMCommand> commands = nodeManager.processHeartbeat(dn);
 
       Assert.assertTrue(commands.get(0).getClass().equals(
           SetNodeOperationalStateCommand.class));
       assertEquals(1, commands.size());
+
+      // If found mismatch, follower SCM update its own opState according
+      // to the heartbeat, and no SCMCommand will be fired.
+      scm.getScmContext().updateLeaderAndTerm(false, 2);
+      commands = nodeManager.processHeartbeat(dn);
+
+      assertEquals(0, commands.size());
+
+      NodeStatus scmStatus = nodeManager.getNodeStatus(dn);
+      assertTrue(scmStatus.getOperationalState() == dn.getPersistedOpState()
+          && scmStatus.getOpStateExpiryEpochSeconds()
+          == dn.getPersistedOpStateExpiryEpochSec());
     }
   }
 
@@ -317,6 +333,7 @@ public class TestSCMNodeManager {
    * @throws TimeoutException
    */
   @Test
+  @Ignore("HDDS-5098")
   public void testScmDetectStaleAndDeadNode()
       throws IOException, InterruptedException, AuthenticationException {
     final int interval = 100;
@@ -1227,12 +1244,10 @@ public class TestSCMNodeManager {
     final int nodeCount = hostNames.length;
     // use default IP address to resolve node
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
-      DatanodeDetails[] nodes = new DatanodeDetails[nodeCount];
       for (int i = 0; i < nodeCount; i++) {
         DatanodeDetails node = createDatanodeDetails(
             UUID.randomUUID().toString(), hostNames[i], ipAddress[i], null);
         nodeManager.register(node, null, null);
-        nodes[i] = node;
       }
 
       // verify network topology cluster has all the registered nodes
@@ -1272,12 +1287,10 @@ public class TestSCMNodeManager {
     final int nodeCount = hostNames.length;
     // use default IP address to resolve node
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
-      DatanodeDetails[] nodes = new DatanodeDetails[nodeCount];
       for (int i = 0; i < nodeCount; i++) {
         DatanodeDetails node = createDatanodeDetails(
             UUID.randomUUID().toString(), hostNames[i], ipAddress[i], null);
         nodeManager.register(node, null, null);
-        nodes[i] = node;
       }
 
       // verify network topology cluster has all the registered nodes
@@ -1375,7 +1388,6 @@ public class TestSCMNodeManager {
     }
     final int nodeCount = hostNames.length;
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
-      DatanodeDetails[] nodes = new DatanodeDetails[nodeCount];
       for (int i = 0; i < nodeCount; i++) {
         DatanodeDetails node = createDatanodeDetails(
             UUID.randomUUID().toString(), hostNames[i], ipAddress[i], null);

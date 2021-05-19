@@ -85,6 +85,7 @@ public class TopologySubcommand extends ScmSubcommand
     }
   }
 
+  @Override
   public Class<?> getParentType() {
     return OzoneAdmin.class;
   }

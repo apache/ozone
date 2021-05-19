@@ -17,16 +17,19 @@
  */
 package org.apache.hadoop.hdds.scm.pipeline;
 
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.container.common.helpers
     .ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -36,12 +39,8 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Set;
 
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos
-    .ReplicationType.RATIS;
 import org.junit.Rule;
 import org.junit.rules.Timeout;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos
-    .ReplicationFactor.THREE;
 
 /**
  * Test for the Node2Pipeline map.
@@ -52,14 +51,14 @@ public class TestNode2PipelineMap {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = new Timeout(300000);
+  public Timeout timeout = Timeout.seconds(300);
 
-  private static MiniOzoneCluster cluster;
-  private static OzoneConfiguration conf;
-  private static StorageContainerManager scm;
-  private static ContainerWithPipeline ratisContainer;
-  private static ContainerManager containerManager;
-  private static PipelineManager pipelineManager;
+  private MiniOzoneCluster cluster;
+  private OzoneConfiguration conf;
+  private StorageContainerManager scm;
+  private ContainerWithPipeline ratisContainer;
+  private ContainerManagerV2 containerManager;
+  private PipelineManager pipelineManager;
 
   /**
    * Create a MiniDFSCluster for testing.
@@ -75,7 +74,8 @@ public class TestNode2PipelineMap {
     containerManager = scm.getContainerManager();
     pipelineManager = scm.getPipelineManager();
     ContainerInfo containerInfo = containerManager.allocateContainer(
-        RATIS, THREE, "testOwner");
+        new RatisReplicationConfig(
+            ReplicationFactor.THREE), "testOwner");
     ratisContainer = new ContainerWithPipeline(containerInfo,
         pipelineManager.getPipeline(containerInfo.getPipelineID()));
     pipelineManager = scm.getPipelineManager();
@@ -92,7 +92,8 @@ public class TestNode2PipelineMap {
   }
 
   @Test
-  public void testPipelineMap() throws IOException {
+  public void testPipelineMap() throws IOException,
+      InvalidStateTransitionException {
 
     Set<ContainerID> set = pipelineManager
         .getContainersInPipeline(ratisContainer.getPipeline().getId());
@@ -121,7 +122,7 @@ public class TestNode2PipelineMap {
     Assert.assertEquals(0, set2.size());
 
     pipelineManager
-        .finalizeAndDestroyPipeline(ratisContainer.getPipeline(), false);
+        .closePipeline(ratisContainer.getPipeline(), false);
     pipelines = scm.getScmNodeManager()
         .getPipelines(dns.get(0));
     Assert

@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos;
@@ -36,12 +37,15 @@ import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.SCMB
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.SortDatanodesRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.SortDatanodesResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.Status;
+import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.ha.RatisUtil;
 import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolPB;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
@@ -63,6 +67,7 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
     implements ScmBlockLocationProtocolPB {
 
   private final ScmBlockLocationProtocol impl;
+  private final StorageContainerManager scm;
 
   private static final Logger LOG = LoggerFactory
       .getLogger(ScmBlockLocationProtocolServerSideTranslatorPB.class);
@@ -78,9 +83,11 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
    */
   public ScmBlockLocationProtocolServerSideTranslatorPB(
       ScmBlockLocationProtocol impl,
+      StorageContainerManager scm,
       ProtocolMessageMetrics<ProtocolMessageEnum> metrics)
       throws IOException {
     this.impl = impl;
+    this.scm = scm;
     dispatcher = new OzoneProtocolMessageDispatcher<>(
         "BlockLocationProtocol", metrics, LOG);
 
@@ -97,6 +104,11 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
   @Override
   public SCMBlockLocationResponse send(RpcController controller,
       SCMBlockLocationRequest request) throws ServiceException {
+    if (!scm.checkLeader()) {
+      RatisUtil.checkRatisException(
+          scm.getScmHAManager().getRatisServer().triggerNotLeaderException(),
+          scm.getBlockProtocolRpcPort(), scm.getScmId());
+    }
     return dispatcher.processRequest(
         request,
         this::processMessage,
@@ -115,8 +127,8 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
     try {
       switch (request.getCmdType()) {
       case AllocateScmBlock:
-        response.setAllocateScmBlockResponse(
-            allocateScmBlock(request.getAllocateScmBlockRequest()));
+        response.setAllocateScmBlockResponse(allocateScmBlock(
+            request.getAllocateScmBlockRequest(), request.getVersion()));
         break;
       case DeleteScmKeyBlocks:
         response.setDeleteScmKeyBlocksResponse(
@@ -126,9 +138,14 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
         response.setGetScmInfoResponse(
             getScmInfo(request.getGetScmInfoRequest()));
         break;
+      case AddScm:
+        response.setAddScmResponse(
+            getAddSCMResponse(request.getAddScmRequestProto()));
+        break;
       case SortDatanodes:
-        response.setSortDatanodesResponse(
-            sortDatanodes(request.getSortDatanodesRequest()));
+        response.setSortDatanodesResponse(sortDatanodes(
+            request.getSortDatanodesRequest(), request.getVersion()
+        ));
         break;
       default:
         // Should never happen
@@ -136,6 +153,8 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
             " in ScmBlockLocationProtocol");
       }
     } catch (IOException e) {
+      RatisUtil.checkRatisException(e, scm.getBlockProtocolRpcPort(),
+          scm.getScmId());
       response.setSuccess(false);
       response.setStatus(exceptionToResponseStatus(e));
       if (e.getMessage() != null) {
@@ -155,12 +174,15 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
   }
 
   public AllocateScmBlockResponseProto allocateScmBlock(
-      AllocateScmBlockRequestProto request)
+      AllocateScmBlockRequestProto request, int clientVersion)
       throws IOException {
     List<AllocatedBlock> allocatedBlocks =
         impl.allocateBlock(request.getSize(),
-            request.getNumBlocks(), request.getType(),
-            request.getFactor(), request.getOwner(),
+            request.getNumBlocks(),
+            ReplicationConfig.fromProto(
+                request.getType(),
+                request.getFactor()),
+            request.getOwner(),
             ExcludeList.getFromProtoBuf(request.getExcludeList()));
 
     AllocateScmBlockResponseProto.Builder builder =
@@ -174,14 +196,15 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
     for (AllocatedBlock block : allocatedBlocks) {
       builder.addBlocks(AllocateBlockResponse.newBuilder()
           .setContainerBlockID(block.getBlockID().getProtobuf())
-          .setPipeline(block.getPipeline().getProtobufMessage()));
+          .setPipeline(block.getPipeline().getProtobufMessage(clientVersion)));
     }
 
     return builder.build();
   }
 
   public DeleteScmKeyBlocksResponseProto deleteScmKeyBlocks(
-      DeleteScmKeyBlocksRequestProto req)
+      DeleteScmKeyBlocksRequestProto req
+  )
       throws IOException {
     DeleteScmKeyBlocksResponseProto.Builder resp =
         DeleteScmKeyBlocksResponseProto.newBuilder();
@@ -211,16 +234,28 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
         .build();
   }
 
+  public HddsProtos.AddScmResponseProto getAddSCMResponse(
+      HddsProtos.AddScmRequestProto req)
+      throws IOException {
+    boolean status = impl.addSCM(AddSCMRequest.getFromProtobuf(req));
+    return HddsProtos.AddScmResponseProto.newBuilder()
+        .setSuccess(status)
+        .build();
+  }
+
   public SortDatanodesResponseProto sortDatanodes(
-      SortDatanodesRequestProto request) throws ServiceException {
+      SortDatanodesRequestProto request, int clientVersion)
+      throws ServiceException {
     SortDatanodesResponseProto.Builder resp =
         SortDatanodesResponseProto.newBuilder();
     try {
       List<String> nodeList = request.getNodeNetworkNameList();
       final List<DatanodeDetails> results =
           impl.sortDatanodes(nodeList, request.getClient());
-      if (results != null && results.size() > 0) {
-        results.stream().forEach(dn -> resp.addNode(dn.getProtoBufMessage()));
+      if (results != null) {
+        for (DatanodeDetails dn : results) {
+          resp.addNode(dn.toProto(clientVersion));
+        }
       }
       return resp.build();
     } catch (IOException ex) {

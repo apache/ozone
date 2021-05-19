@@ -18,8 +18,8 @@
 package org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineStateManager;
 import org.apache.hadoop.hdds.scm.pipeline.RatisPipelineProvider;
@@ -36,13 +36,10 @@ import static org.mockito.Mockito.mock;
 public class TestLeaderChoosePolicy {
   private OzoneConfiguration conf;
 
-  private ScmConfig scmConfig;
-
   @Before
   public void setup() {
     //initialize network topology instance
     conf = new OzoneConfiguration();
-    scmConfig = conf.getObject(ScmConfig.class);
   }
 
   @Test
@@ -51,7 +48,8 @@ public class TestLeaderChoosePolicy {
         mock(NodeManager.class),
         mock(PipelineStateManager.class),
         conf,
-        mock(EventPublisher.class));
+        mock(EventPublisher.class),
+        SCMContext.emptyContext());
     Assert.assertSame(
         ratisPipelineProvider.getLeaderChoosePolicy().getClass(),
         MinLeaderCountChoosePolicy.class);
@@ -67,7 +65,8 @@ public class TestLeaderChoosePolicy {
         mock(NodeManager.class),
         mock(PipelineStateManager.class),
         conf,
-        mock(EventPublisher.class));
+        mock(EventPublisher.class),
+        SCMContext.emptyContext());
 
     // expecting exception
   }

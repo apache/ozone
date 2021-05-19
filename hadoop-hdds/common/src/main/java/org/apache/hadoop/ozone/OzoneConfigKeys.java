@@ -28,6 +28,8 @@ import org.apache.hadoop.http.HttpConfig;
 import org.apache.ratis.proto.RaftProtos.ReplicationLevel;
 import org.apache.ratis.util.TimeDuration;
 
+import java.util.concurrent.TimeUnit;
+
 /**
  * This class contains constants for configuration keys used in Ozone.
  */
@@ -64,6 +66,18 @@ public final class OzoneConfigKeys {
   public static final String DFS_CONTAINER_RATIS_IPC_PORT =
       "dfs.container.ratis.ipc";
   public static final int DFS_CONTAINER_RATIS_IPC_PORT_DEFAULT = 9858;
+  /**
+   * Ratis Port where containers listen to admin requests.
+   */
+  public static final String DFS_CONTAINER_RATIS_ADMIN_PORT =
+      "dfs.container.ratis.admin.port";
+  public static final int DFS_CONTAINER_RATIS_ADMIN_PORT_DEFAULT = 9857;
+  /**
+   * Ratis Port where containers listen to server-to-server requests.
+   */
+  public static final String DFS_CONTAINER_RATIS_SERVER_PORT =
+      "dfs.container.ratis.server.port";
+  public static final int DFS_CONTAINER_RATIS_SERVER_PORT_DEFAULT = 9856;
 
   /**
    * When set to true, allocate a random free port for ozone container, so that
@@ -307,7 +321,7 @@ public final class OzoneConfigKeys {
   public static final String HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE =
       "hdds.datanode.metadata.rocksdb.cache.size";
   public static final String
-      HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE_DEFAULT = "64MB";
+      HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE_DEFAULT = "1GB";
 
   public static final String OZONE_SECURITY_ENABLED_KEY =
       "ozone.security.enabled";
@@ -316,12 +330,14 @@ public final class OzoneConfigKeys {
   public static final String OZONE_HTTP_SECURITY_ENABLED_KEY =
       "ozone.security.http.kerberos.enabled";
   public static final boolean OZONE_HTTP_SECURITY_ENABLED_DEFAULT = false;
+  public static final String OZONE_HTTP_FILTER_INITIALIZERS_KEY =
+      "ozone.http.filter.initializers";
 
   public static final String OZONE_CONTAINER_COPY_WORKDIR =
       "hdds.datanode.replication.work.dir";
 
 
-  public static final int OZONE_CLIENT_BYTES_PER_CHECKSUM_MIN_SIZE = 256 * 1024;
+  public static final int OZONE_CLIENT_BYTES_PER_CHECKSUM_MIN_SIZE = 16 * 1024;
 
   public static final String OZONE_CLIENT_READ_TIMEOUT
           = "ozone.client.read.timeout";
@@ -352,7 +368,7 @@ public final class OzoneConfigKeys {
   public static final String OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY =
       "ozone.client.failover.max.attempts";
   public static final int OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_DEFAULT =
-      15;
+      500;
   public static final String OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_KEY =
       "ozone.client.wait.between.retries.millis";
   public static final long OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT =
@@ -427,6 +443,11 @@ public final class OzoneConfigKeys {
       "ozone.om.keyname.character.check.enabled";
   public static final boolean OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT =
       false;
+
+  public static final String OZONE_CLIENT_KEY_PROVIDER_CACHE_EXPIRY =
+      "ozone.client.key.provider.cache.expiry";
+  public static final long OZONE_CLIENT_KEY_PROVIDER_CACHE_EXPIRY_DEFAULT =
+      TimeUnit.DAYS.toMillis(10); // 10 days
 
   /**
    * There is no need to instantiate this class.

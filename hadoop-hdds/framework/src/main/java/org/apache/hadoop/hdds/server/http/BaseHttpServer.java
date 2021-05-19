@@ -42,6 +42,7 @@ import org.apache.hadoop.security.authorize.AccessControlList;
 import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
+import static org.apache.hadoop.hdds.HddsUtils.createDir;
 import static org.apache.hadoop.hdds.server.http.HttpConfig.getHttpPolicy;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_HTTPS_NEED_AUTH_DEFAULT;
@@ -177,6 +178,7 @@ public abstract class BaseHttpServer {
 
       String baseDir = conf.get(OzoneConfigKeys.OZONE_HTTP_BASEDIR);
       if (!StringUtils.isEmpty(baseDir)) {
+        createDir(baseDir);
         httpServer.getWebAppContext().setAttribute(JETTY_BASETMPDIR, baseDir);
         LOG.info("HTTP server of {} uses base directory {}", name, baseDir);
       }
@@ -359,7 +361,7 @@ public abstract class BaseHttpServer {
    * clear text in config - if falling back is allowed.
    *
    * @param conf  Configuration instance
-   * @param alias name of the credential to retreive
+   * @param alias name of the credential to retrieve
    * @return String credential value or null
    */
   static String getPassword(ConfigurationSource conf, String alias) {

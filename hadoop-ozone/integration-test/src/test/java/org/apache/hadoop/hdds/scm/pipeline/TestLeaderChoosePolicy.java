@@ -18,8 +18,9 @@
 package org.apache.hadoop.hdds.scm.pipeline;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.test.GenericTestUtils;
@@ -46,9 +47,9 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_L
 @Ignore
 public class TestLeaderChoosePolicy {
 
-  private static MiniOzoneCluster cluster;
+  private MiniOzoneCluster cluster;
   private OzoneConfiguration conf = new OzoneConfiguration();
-  private static PipelineManager pipelineManager;
+  private PipelineManager pipelineManager;
 
   public void init(int numDatanodes, int datanodePipelineLimit)
       throws Exception {
@@ -75,8 +76,8 @@ public class TestLeaderChoosePolicy {
   private void checkLeaderBalance(int dnNum, int leaderNumOfEachDn)
       throws Exception {
     List<Pipeline> pipelines = pipelineManager
-        .getPipelines(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, Pipeline.PipelineState.OPEN);
+        .getPipelines(new RatisReplicationConfig(
+            ReplicationFactor.THREE), Pipeline.PipelineState.OPEN);
 
     for (Pipeline pipeline : pipelines) {
       LambdaTestUtils.await(30000, 500, () ->
@@ -94,8 +95,8 @@ public class TestLeaderChoosePolicy {
     }
 
     Assert.assertTrue(leaderCount.size() == dnNum);
-    for (UUID key : leaderCount.keySet()) {
-      Assert.assertTrue(leaderCount.get(key) == leaderNumOfEachDn);
+    for (Map.Entry<UUID, Integer> entry: leaderCount.entrySet()) {
+      Assert.assertTrue(leaderCount.get(entry.getKey()) == leaderNumOfEachDn);
     }
   }
 
@@ -114,9 +115,9 @@ public class TestLeaderChoosePolicy {
     // make sure two pipelines are created
     waitForPipelines(pipelineNum);
     // No Factor ONE pipeline is auto created.
-    Assert.assertEquals(0, pipelineManager.getPipelines(
-        HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.ONE).size());
+    Assert.assertEquals(0,
+        pipelineManager.getPipelines(new RatisReplicationConfig(
+            ReplicationFactor.ONE)).size());
 
     // pipelineNum pipelines in 3 datanodes,
     // each datanode has leaderNumOfEachDn leaders after balance
@@ -164,8 +165,8 @@ public class TestLeaderChoosePolicy {
     waitForPipelines(pipelineNum);
     // No Factor ONE pipeline is auto created.
     Assert.assertEquals(0, pipelineManager.getPipelines(
-        HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.ONE).size());
+        new RatisReplicationConfig(
+            ReplicationFactor.ONE)).size());
 
     // pipelineNum pipelines in 3 datanodes,
     // each datanode has leaderNumOfEachDn leaders after balance
@@ -177,12 +178,12 @@ public class TestLeaderChoosePolicy {
       // then check leader balance
 
       List<Pipeline> pipelines = pipelineManager
-          .getPipelines(HddsProtos.ReplicationType.RATIS,
-              HddsProtos.ReplicationFactor.THREE, Pipeline.PipelineState.OPEN);
+          .getPipelines(new RatisReplicationConfig(
+              ReplicationFactor.THREE), Pipeline.PipelineState.OPEN);
 
       int destroyNum = r.nextInt(pipelines.size());
       for (int k = 0; k <= destroyNum; k++) {
-        pipelineManager.finalizeAndDestroyPipeline(pipelines.get(k), false);
+        pipelineManager.closePipeline(pipelines.get(k), false);
       }
 
       waitForPipelines(pipelineNum);
@@ -209,8 +210,8 @@ public class TestLeaderChoosePolicy {
   private void waitForPipelines(int numPipelines)
       throws TimeoutException, InterruptedException {
     GenericTestUtils.waitFor(() -> pipelineManager
-        .getPipelines(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, Pipeline.PipelineState.OPEN)
+        .getPipelines(new RatisReplicationConfig(
+            ReplicationFactor.THREE), Pipeline.PipelineState.OPEN)
         .size() >= numPipelines, 100, 60000);
   }
 }

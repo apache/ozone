@@ -213,10 +213,10 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
 
     // KeyLocation should be set.
     Assert.assertTrue(allocateBlockRequest.hasKeyLocation());
-    Assert.assertEquals(containerID,
+    Assert.assertEquals(CONTAINER_ID,
         allocateBlockRequest.getKeyLocation().getBlockID()
             .getContainerBlockID().getContainerID());
-    Assert.assertEquals(localID,
+    Assert.assertEquals(LOCAL_ID,
         allocateBlockRequest.getKeyLocation().getBlockID()
             .getContainerBlockID().getLocalID());
     Assert.assertTrue(allocateBlockRequest.getKeyLocation().hasPipeline());

@@ -17,7 +17,9 @@
  */
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
+import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import picocli.CommandLine;
@@ -36,8 +38,11 @@ import java.util.List;
     versionProvider = HddsVersionProvider.class)
 public class MaintenanceSubCommand extends ScmSubcommand {
 
+  @CommandLine.Spec
+  private CommandLine.Model.CommandSpec spec;
+
   @CommandLine.Parameters(description = "List of fully qualified host names")
-  private List<String> hosts = new ArrayList<String>();
+  private List<String> hosts = new ArrayList<>();
 
   @CommandLine.Option(names = {"--end"},
       description = "Automatically end maintenance after the given hours. "+
@@ -46,6 +51,23 @@ public class MaintenanceSubCommand extends ScmSubcommand {
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
-    scmClient.startMaintenanceNodes(hosts, endInHours);
+    if (hosts.size() > 0) {
+      List<DatanodeAdminError> errors =
+          scmClient.startMaintenanceNodes(hosts, endInHours);
+      System.out.println("Entering maintenance mode on datanode(s):\n" +
+          String.join("\n", hosts));
+      if (errors.size() > 0) {
+        for (DatanodeAdminError error : errors) {
+          System.err.println("Error: " + error.getHostname() +": "
+              + error.getError());
+        }
+        // Throwing the exception will cause a non-zero exit status for the
+        // command.
+        throw new IOException(
+            "Some nodes could not start the maintenance workflow");
+      }
+    } else {
+      GenericCli.missingSubcommand(spec);
+    }
   }
 }

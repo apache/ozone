@@ -56,7 +56,7 @@ public class TestOzoneManagerRestInterface {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = new Timeout(300000);
+  public Timeout timeout = Timeout.seconds(300);
 
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;
@@ -106,8 +106,9 @@ public class TestOzoneManagerRestInterface {
     Assert.assertEquals(server.getHttpAddress().getPort(),
         omInfo.getPort(ServicePort.Type.HTTP));
 
+    Assert.assertTrue(getScmAddressForClients(conf).iterator().hasNext());
     InetSocketAddress scmAddress =
-        getScmAddressForClients(conf);
+        getScmAddressForClients(conf).iterator().next();
     ServiceInfo scmInfo = serviceMap.get(HddsProtos.NodeType.SCM);
 
     Assert.assertEquals(scmAddress.getHostName(), scmInfo.getHostname());

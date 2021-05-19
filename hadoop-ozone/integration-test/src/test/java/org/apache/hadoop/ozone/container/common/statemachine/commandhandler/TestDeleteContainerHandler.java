@@ -39,6 +39,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
+import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -51,6 +52,8 @@ import java.util.UUID;
 
 import org.junit.Rule;
 import org.junit.rules.Timeout;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
 
 /**
@@ -62,7 +65,7 @@ public class TestDeleteContainerHandler {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = new Timeout(300000);
+  public Timeout timeout = Timeout.seconds(300);
 
 
   private static MiniOzoneCluster cluster;
@@ -132,8 +135,11 @@ public class TestDeleteContainerHandler {
         cluster.getStorageContainerManager().getScmNodeManager();
 
     //send the order to close the container
-    nodeManager.addDatanodeCommand(datanodeDetails.getUuid(),
-            new CloseContainerCommand(containerId.getId(), pipeline.getId()));
+    SCMCommand<?> command = new CloseContainerCommand(
+        containerId.getId(), pipeline.getId());
+    command.setTerm(
+        cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
+    nodeManager.addDatanodeCommand(datanodeDetails.getUuid(), command);
 
     GenericTestUtils.waitFor(() ->
             isContainerClosed(hddsDatanodeService, containerId.getId()),
@@ -148,8 +154,10 @@ public class TestDeleteContainerHandler {
         containerId.getId()));
 
     // send delete container to the datanode
-    nodeManager.addDatanodeCommand(datanodeDetails.getUuid(),
-            new DeleteContainerCommand(containerId.getId(), false));
+    command = new DeleteContainerCommand(containerId.getId(), false);
+    command.setTerm(
+        cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
+    nodeManager.addDatanodeCommand(datanodeDetails.getUuid(), command);
 
     GenericTestUtils.waitFor(() ->
             isContainerDeleted(hddsDatanodeService, containerId.getId()),
@@ -183,8 +191,11 @@ public class TestDeleteContainerHandler {
         cluster.getStorageContainerManager().getScmNodeManager();
 
     // Send delete container command with force flag set to false.
-    nodeManager.addDatanodeCommand(datanodeDetails.getUuid(),
-        new DeleteContainerCommand(containerId.getId(), false));
+    SCMCommand<?> command = new DeleteContainerCommand(
+        containerId.getId(), false);
+    command.setTerm(
+        cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
+    nodeManager.addDatanodeCommand(datanodeDetails.getUuid(), command);
 
     // Here it should not delete it, and the container should exist in the
     // containerset
@@ -205,9 +216,10 @@ public class TestDeleteContainerHandler {
 
     // Now delete container with force flag set to true. now it should delete
     // container
-
-    nodeManager.addDatanodeCommand(datanodeDetails.getUuid(),
-        new DeleteContainerCommand(containerId.getId(), true));
+    command = new DeleteContainerCommand(containerId.getId(), true);
+    command.setTerm(
+        cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
+    nodeManager.addDatanodeCommand(datanodeDetails.getUuid(), command);
 
     GenericTestUtils.waitFor(() ->
             isContainerDeleted(hddsDatanodeService, containerId.getId()),
@@ -228,7 +240,7 @@ public class TestDeleteContainerHandler {
         .getBucket(bucketName)
         .createKey(keyName, 1024, ReplicationType.STAND_ALONE,
             ReplicationFactor.ONE, new HashMap<>());
-    key.write("test".getBytes());
+    key.write("test".getBytes(UTF_8));
     key.close();
   }
 
@@ -252,7 +264,7 @@ public class TestDeleteContainerHandler {
         cluster.getOzoneManager().lookupKey(keyArgs).getKeyLocationVersions()
             .get(0).getBlocksLatestVersionOnly().get(0);
 
-    return ContainerID.valueof(
+    return ContainerID.valueOf(
         omKeyLocationInfo.getContainerID());
   }
 

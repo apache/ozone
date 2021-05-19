@@ -29,11 +29,11 @@ import java.util.Map;
 
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos;
-import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.DeleteBlockResult;
@@ -62,7 +62,6 @@ import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocolServerSideTra
 import com.google.common.collect.Maps;
 import com.google.protobuf.BlockingService;
 import com.google.protobuf.ProtocolMessageEnum;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY;
 import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.IO_EXCEPTION;
@@ -115,11 +114,11 @@ public class SCMBlockProtocolServer implements
     BlockingService blockProtoPbService =
         ScmBlockLocationProtocolProtos.ScmBlockLocationProtocolService
             .newReflectiveBlockingService(
-                new ScmBlockLocationProtocolServerSideTranslatorPB(this,
+                new ScmBlockLocationProtocolServerSideTranslatorPB(this, scm,
                     protocolMessageMetrics));
 
-    final InetSocketAddress scmBlockAddress = HddsServerUtil
-        .getScmBlockClientBindAddress(conf);
+    final InetSocketAddress scmBlockAddress =
+        scm.getScmNodeDetails().getBlockProtocolServerAddress();
     blockRpcServer =
         startRpcServer(
             conf,
@@ -129,8 +128,8 @@ public class SCMBlockProtocolServer implements
             handlerCount);
     blockRpcAddress =
         updateRPCListenAddress(
-            conf, OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY, scmBlockAddress,
-            blockRpcServer);
+            conf, scm.getScmNodeDetails().getBlockProtocolServerAddressKey(),
+            scmBlockAddress, blockRpcServer);
     if (conf.getBoolean(CommonConfigurationKeys.HADOOP_SECURITY_AUTHORIZATION,
         false)) {
       blockRpcServer.refreshServiceAcl(conf, SCMPolicyProvider.getInstance());
@@ -170,14 +169,15 @@ public class SCMBlockProtocolServer implements
   }
 
   @Override
-  public List<AllocatedBlock> allocateBlock(long size, int num,
-      HddsProtos.ReplicationType type, HddsProtos.ReplicationFactor factor,
-      String owner, ExcludeList excludeList) throws IOException {
+  public List<AllocatedBlock> allocateBlock(
+      long size, int num,
+      ReplicationConfig replicationConfig,
+      String owner, ExcludeList excludeList
+  ) throws IOException {
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("size", String.valueOf(size));
     auditMap.put("num", String.valueOf(num));
-    auditMap.put("type", type.name());
-    auditMap.put("factor", factor.name());
+    auditMap.put("replication", replicationConfig.toString());
     auditMap.put("owner", owner);
     List<AllocatedBlock> blocks = new ArrayList<>(num);
     boolean auditSuccess = true;
@@ -189,7 +189,7 @@ public class SCMBlockProtocolServer implements
     try {
       for (int i = 0; i < num; i++) {
         AllocatedBlock block = scm.getScmBlockManager()
-            .allocateBlock(size, type, factor, owner, excludeList);
+            .allocateBlock(size, replicationConfig, owner, excludeList);
         if (block != null) {
           blocks.add(block);
         }
@@ -288,6 +288,33 @@ public class SCMBlockProtocolServer implements
       if(auditSuccess) {
         AUDIT.logReadSuccess(
             buildAuditMessageForSuccess(SCMAction.GET_SCM_INFO, null)
+        );
+      }
+    }
+  }
+
+  @Override
+  public boolean addSCM(AddSCMRequest request) throws IOException {
+    LOG.debug("Adding SCM {} addr {} cluster id {}",
+        request.getScmId(), request.getRatisAddr(), request.getClusterId());
+
+    Map<String, String> auditMap = Maps.newHashMap();
+    auditMap.put("scmId", String.valueOf(request.getScmId()));
+    auditMap.put("cluster", String.valueOf(request.getClusterId()));
+    auditMap.put("addr", String.valueOf(request.getRatisAddr()));
+    boolean auditSuccess = true;
+    try{
+      return scm.getScmHAManager().addSCM(request);
+    } catch (Exception ex) {
+      auditSuccess = false;
+      AUDIT.logReadFailure(
+          buildAuditMessageForFailure(SCMAction.ADD_SCM, auditMap, ex)
+      );
+      throw ex;
+    } finally {
+      if(auditSuccess) {
+        AUDIT.logReadSuccess(
+            buildAuditMessageForSuccess(SCMAction.ADD_SCM, auditMap)
         );
       }
     }

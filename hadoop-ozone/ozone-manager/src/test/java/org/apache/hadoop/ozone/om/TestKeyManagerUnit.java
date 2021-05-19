@@ -35,6 +35,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
@@ -143,14 +144,9 @@ public class TestKeyManagerUnit {
     createBucket(metadataManager, "vol1", "bucket1");
     createBucket(metadataManager, "vol1", "bucket2");
 
-    OmMultipartInfo upload1 =
-        initMultipartUpload(keyManager, "vol1", "bucket1", "dir/key1");
-
-    OmMultipartInfo upload2 =
-        initMultipartUpload(keyManager, "vol1", "bucket1", "dir/key2");
-
-    OmMultipartInfo upload3 =
-        initMultipartUpload(keyManager, "vol1", "bucket2", "dir/key1");
+    initMultipartUpload(keyManager, "vol1", "bucket1", "dir/key1");
+    initMultipartUpload(keyManager, "vol1", "bucket1", "dir/key2");
+    initMultipartUpload(keyManager, "vol1", "bucket2", "dir/key1");
 
     //WHEN
     OmMultipartUploadList omMultipartUploadList =
@@ -263,8 +259,7 @@ public class TestKeyManagerUnit {
     createBucket(metadataManager, "vol1", "bucket1");
     createBucket(metadataManager, "vol1", "bucket2");
 
-    OmMultipartInfo upload1 =
-        initMultipartUpload(keyManager, "vol1", "bucket1", "dip/key1");
+    initMultipartUpload(keyManager, "vol1", "bucket1", "dip/key1");
 
     initMultipartUpload(keyManager, "vol1", "bucket1", "dir/key1");
     initMultipartUpload(keyManager, "vol1", "bucket1", "dir/key2");
@@ -332,8 +327,6 @@ public class TestKeyManagerUnit {
 
   private void abortMultipart(
       String volume, String bucket, String key, String uploadID) {
-    Map<Integer, OzoneManagerProtocolProtos.PartKeyInfo > partKeyInfoMap =
-        new HashMap<>();
     metadataManager.getMultipartInfoTable().addCacheEntry(
         new CacheKey<>(metadataManager.getMultipartKey(volume, bucket, key,
             uploadID)), new CacheValue<>(Optional.absent(),
@@ -352,8 +345,8 @@ public class TestKeyManagerUnit {
 
     final Pipeline pipelineOne = Pipeline.newBuilder()
         .setId(PipelineID.randomId())
-        .setType(ReplicationType.RATIS)
-        .setFactor(ReplicationFactor.THREE)
+        .setReplicationConfig(
+            new RatisReplicationConfig(ReplicationFactor.THREE))
         .setState(Pipeline.PipelineState.OPEN)
         .setLeaderId(dnOne.getUuid())
         .setNodes(Arrays.asList(dnOne, dnTwo, dnThree))
@@ -361,8 +354,8 @@ public class TestKeyManagerUnit {
 
     final Pipeline pipelineTwo = Pipeline.newBuilder()
         .setId(PipelineID.randomId())
-        .setType(ReplicationType.RATIS)
-        .setFactor(ReplicationFactor.THREE)
+        .setReplicationConfig(
+            new RatisReplicationConfig(ReplicationFactor.THREE))
         .setState(Pipeline.PipelineState.OPEN)
         .setLeaderId(dnFour.getUuid())
         .setNodes(Arrays.asList(dnFour, dnFive, dnSix))

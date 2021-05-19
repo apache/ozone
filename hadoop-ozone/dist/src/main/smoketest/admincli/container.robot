@@ -22,6 +22,7 @@ Suite Setup         Create test data
 
 *** Variables ***
 ${CONTAINER}
+${SCM}       scm
 
 *** Keywords ***
 Create test data
@@ -40,8 +41,12 @@ List containers
                         Should contain   ${output}   OPEN
 
 List containers with explicit host
-    ${output} =         Execute          ozone admin container list --scm scm
+    ${output} =         Execute          ozone admin container list --scm ${SCM}
                         Should contain   ${output}   OPEN
+
+List containers with container state
+    ${output} =         Execute          ozone admin container list --state=CLOSED
+                        Should Not contain   ${output}   OPEN
 
 Container info
     ${output} =         Execute          ozone admin container info "${CONTAINER}"
@@ -67,7 +72,15 @@ Incomplete command
                         Should contain   ${output}   create
                         Should contain   ${output}   close
 
-List containers on unknown host
-    ${output} =         Execute And Ignore Error     ozone admin --verbose container list --scm unknown-host
-                        Should contain   ${output}   Invalid host name
+#List containers on unknown host
+#    ${output} =         Execute And Ignore Error     ozone admin --verbose container list --scm unknown-host
+#                        Should contain   ${output}   Invalid host name
 
+Cannot close container without admin privilege
+    Requires admin privilege    ozone admin container close "${CONTAINER}"
+
+Cannot create container without admin privilege
+    Requires admin privilege    ozone admin container create
+
+Cannot delete container without admin privilege
+    Requires admin privilege    ozone admin container delete "${CONTAINER}"

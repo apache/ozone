@@ -42,7 +42,7 @@ public class TestOzoneManagerRocksDBLogging {
   private RocksDBConfiguration dbConf;
 
   @Rule
-  public Timeout timeout = new Timeout(100000);
+  public Timeout timeout = Timeout.seconds(100);
 
   private static GenericTestUtils.LogCapturer logCapturer =
       GenericTestUtils.LogCapturer.captureLogs(DBStoreBuilder.ROCKS_DB_LOGGER);
@@ -91,7 +91,7 @@ public class TestOzoneManagerRocksDBLogging {
       throws TimeoutException, InterruptedException {
     GenericTestUtils.waitFor(() -> logCapturer.getOutput()
             .contains("db_impl.cc"),
-        1000, 10000);
+        1000, 30000);
   }
 
 }

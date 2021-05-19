@@ -44,6 +44,7 @@ import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.conf.OMClientConfig;
+import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
@@ -51,7 +52,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.token.SecretManager;
 
-import com.google.common.base.Joiner;
 import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
@@ -121,7 +121,7 @@ public final class OmUtils {
       }
       for (String nodeId : getOMNodeIds(conf, serviceId)) {
         String rpcAddr = getOmRpcAddress(conf,
-            addKeySuffixes(OZONE_OM_ADDRESS_KEY, serviceId, nodeId));
+            ConfUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY, serviceId, nodeId));
         if (rpcAddr != null) {
           result.get(serviceId).add(NetUtils.createSocketAddr(rpcAddr));
         } else {
@@ -318,49 +318,11 @@ public final class OmUtils {
   }
 
   /**
-   * Add non empty and non null suffix to a key.
-   */
-  private static String addSuffix(String key, String suffix) {
-    if (suffix == null || suffix.isEmpty()) {
-      return key;
-    }
-    assert !suffix.startsWith(".") :
-        "suffix '" + suffix + "' should not already have '.' prepended.";
-    return key + "." + suffix;
-  }
-
-  /**
-   * Concatenate list of suffix strings '.' separated.
-   */
-  private static String concatSuffixes(String... suffixes) {
-    if (suffixes == null) {
-      return null;
-    }
-    return Joiner.on(".").skipNulls().join(suffixes);
-  }
-
-  /**
-   * Return configuration key of format key.suffix1.suffix2...suffixN.
-   */
-  public static String addKeySuffixes(String key, String... suffixes) {
-    String keySuffix = concatSuffixes(suffixes);
-    return addSuffix(key, keySuffix);
-  }
-
-  /**
-   * Match input address to local address.
-   * Return true if it matches, false otherwsie.
-   */
-  public static boolean isAddressLocal(InetSocketAddress addr) {
-    return NetUtils.isLocalAddress(addr.getAddress());
-  }
-
-  /**
    * Get a collection of all omNodeIds for the given omServiceId.
    */
   public static Collection<String> getOMNodeIds(ConfigurationSource conf,
       String omServiceId) {
-    String key = addSuffix(OZONE_OM_NODES_KEY, omServiceId);
+    String key = ConfUtils.addSuffix(OZONE_OM_NODES_KEY, omServiceId);
     return conf.getTrimmedStringCollection(key);
   }
 
@@ -385,7 +347,7 @@ public final class OmUtils {
    */
   public static String getConfSuffixedWithOMNodeId(ConfigurationSource conf,
       String confKey, String omServiceID, String omNodeId) {
-    String suffixedConfKey = OmUtils.addKeySuffixes(
+    String suffixedConfKey = ConfUtils.addKeySuffixes(
         confKey, omServiceID, omNodeId);
     String confValue = conf.getTrimmed(suffixedConfKey);
     if (StringUtils.isNotEmpty(confValue)) {
@@ -404,13 +366,16 @@ public final class OmUtils {
   public static String getHttpAddressForOMPeerNode(ConfigurationSource conf,
       String omServiceId, String omNodeId, String omNodeHostAddr) {
     final Optional<String> bindHost = getHostNameFromConfigKeys(conf,
-        addKeySuffixes(OZONE_OM_HTTP_BIND_HOST_KEY, omServiceId, omNodeId));
+        ConfUtils.addKeySuffixes(
+            OZONE_OM_HTTP_BIND_HOST_KEY, omServiceId, omNodeId));
 
     final OptionalInt addressPort = getPortNumberFromConfigKeys(conf,
-        addKeySuffixes(OZONE_OM_HTTP_ADDRESS_KEY, omServiceId, omNodeId));
+        ConfUtils.addKeySuffixes(
+            OZONE_OM_HTTP_ADDRESS_KEY, omServiceId, omNodeId));
 
     final Optional<String> addressHost = getHostNameFromConfigKeys(conf,
-        addKeySuffixes(OZONE_OM_HTTP_ADDRESS_KEY, omServiceId, omNodeId));
+        ConfUtils.addKeySuffixes(
+            OZONE_OM_HTTP_ADDRESS_KEY, omServiceId, omNodeId));
 
     String hostName = bindHost.orElse(addressHost.orElse(omNodeHostAddr));
 
@@ -427,13 +392,16 @@ public final class OmUtils {
   public static String getHttpsAddressForOMPeerNode(ConfigurationSource conf,
       String omServiceId, String omNodeId, String omNodeHostAddr) {
     final Optional<String> bindHost = getHostNameFromConfigKeys(conf,
-        addKeySuffixes(OZONE_OM_HTTPS_BIND_HOST_KEY, omServiceId, omNodeId));
+        ConfUtils.addKeySuffixes(
+            OZONE_OM_HTTPS_BIND_HOST_KEY, omServiceId, omNodeId));
 
     final OptionalInt addressPort = getPortNumberFromConfigKeys(conf,
-        addKeySuffixes(OZONE_OM_HTTPS_ADDRESS_KEY, omServiceId, omNodeId));
+        ConfUtils.addKeySuffixes(
+            OZONE_OM_HTTPS_ADDRESS_KEY, omServiceId, omNodeId));
 
     final Optional<String> addressHost = getHostNameFromConfigKeys(conf,
-        addKeySuffixes(OZONE_OM_HTTPS_ADDRESS_KEY, omServiceId, omNodeId));
+        ConfUtils.addKeySuffixes(
+            OZONE_OM_HTTPS_ADDRESS_KEY, omServiceId, omNodeId));
 
     String hostName = bindHost.orElse(addressHost.orElse(omNodeHostAddr));
 

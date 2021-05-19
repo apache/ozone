@@ -47,6 +47,8 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Set;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+
 /**
  * This class tests container report with DN container state info.
  */
@@ -56,7 +58,7 @@ public class TestContainerReportWithKeys {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = new Timeout(300000);
+  public Timeout timeout = Timeout.seconds(300);
   private static final Logger LOG = LoggerFactory.getLogger(
       TestContainerReportWithKeys.class);
   private static MiniOzoneCluster cluster = null;
@@ -107,7 +109,7 @@ public class TestContainerReportWithKeys {
             .createKey(keyName, keySize, ReplicationType.STAND_ALONE,
                 ReplicationFactor.ONE, new HashMap<>());
     String dataString = RandomStringUtils.randomAlphabetic(keySize);
-    key.write(dataString.getBytes());
+    key.write(dataString.getBytes(UTF_8));
     key.close();
 
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
@@ -128,7 +130,7 @@ public class TestContainerReportWithKeys {
     ContainerInfo cinfo = scm.getContainerInfo(keyInfo.getContainerID());
     Set<ContainerReplica> replicas =
         scm.getContainerManager().getContainerReplicas(
-            new ContainerID(keyInfo.getContainerID()));
+            ContainerID.valueOf(keyInfo.getContainerID()));
     Assert.assertTrue(replicas.size() == 1);
     replicas.stream().forEach(rp ->
         Assert.assertTrue(rp.getDatanodeDetails().getParent() != null));

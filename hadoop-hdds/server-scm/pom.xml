@@ -20,12 +20,12 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <parent>
     <groupId>org.apache.hadoop</groupId>
     <artifactId>hadoop-hdds</artifactId>
-    <version>1.1.0-SNAPSHOT</version>
+    <version>1.2.0-SNAPSHOT</version>
   </parent>
   <artifactId>hadoop-hdds-server-scm</artifactId>
-  <version>1.1.0-SNAPSHOT</version>
-  <description>Apache Hadoop Distributed Data Store Storage Container Manager Server</description>
-  <name>Apache Hadoop HDDS SCM Server</name>
+  <version>1.2.0-SNAPSHOT</version>
+  <description>Apache Ozone Distributed Data Store Storage Container Manager Server</description>
+  <name>Apache Ozone HDDS SCM Server</name>
   <packaging>jar</packaging>
 
   <dependencies>
@@ -135,6 +135,11 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>hadoop-hdds-hadoop-dependency-test</artifactId>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>com.google.protobuf</groupId>
+      <artifactId>protobuf-java</artifactId>
+      <scope>compile</scope>
+    </dependency>
   </dependencies>
   <build>
     <plugins>
@@ -169,6 +174,13 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
             </configuration>
           </execution>
         </executions>
+      </plugin>
+      <plugin>
+        <groupId>com.github.spotbugs</groupId>
+        <artifactId>spotbugs-maven-plugin</artifactId>
+        <configuration>
+          <excludeFilterFile>${basedir}/dev-support/findbugsExcludeFile.xml</excludeFilterFile>
+        </configuration>
       </plugin>
     </plugins>
     <testResources>

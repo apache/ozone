@@ -112,7 +112,6 @@ public class OMPrefixAddAclRequest extends OMPrefixAclRequest {
       }
       break;
     case FAILURE:
-      omMetrics.incNumBucketUpdateFails();
       LOG.error("Add acl {} to path {} failed!", ozoneAcls,
           ozoneObj.getPath(), exception);
       break;

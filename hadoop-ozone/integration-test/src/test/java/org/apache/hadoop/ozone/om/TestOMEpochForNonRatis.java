@@ -43,6 +43,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.OmUtils.EPOCH_ID_SHIFT;
 import static org.apache.hadoop.ozone.OmUtils.EPOCH_WHEN_RATIS_NOT_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY;
@@ -58,7 +59,7 @@ public class TestOMEpochForNonRatis {
   private static String omId;
 
   @Rule
-  public Timeout timeout = new Timeout(240_000);
+  public Timeout timeout = Timeout.seconds(240);
 
   @BeforeClass
   public static void init() throws Exception {
@@ -135,7 +136,7 @@ public class TestOMEpochForNonRatis {
     OzoneOutputStream ozoneOutputStream = ozoneVolume.getBucket(bucketName)
         .createKey(keyName, data.length(), ReplicationType.RATIS,
             ReplicationFactor.ONE, new HashMap<>());
-    ozoneOutputStream.write(data.getBytes(), 0, data.length());
+    ozoneOutputStream.write(data.getBytes(UTF_8), 0, data.length());
     ozoneOutputStream.close();
 
     // Verify last transactionIndex is updated after key creation and the

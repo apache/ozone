@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.client.rpc;
 
-import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -53,6 +52,8 @@ import java.util.concurrent.TimeUnit;
 
 import org.junit.Rule;
 import org.junit.rules.Timeout;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.*;
 
 /**
@@ -64,7 +65,7 @@ public class TestMultiBlockWritesWithDnFailures {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = new Timeout(300000);
+  public Timeout timeout = Timeout.seconds(300);
 
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf;
@@ -147,7 +148,7 @@ public class TestMultiBlockWritesWithDnFailures {
     String data =
         ContainerTestHelper
             .getFixedLengthString(keyString, blockSize + chunkSize);
-    key.write(data.getBytes());
+    key.write(data.getBytes(UTF_8));
 
     // get the name of a valid container
     Assert.assertTrue(key.getOutputStream() instanceof KeyOutputStream);
@@ -159,7 +160,7 @@ public class TestMultiBlockWritesWithDnFailures {
     long containerId = locationInfoList.get(1).getContainerID();
     ContainerInfo container = cluster.getStorageContainerManager()
         .getContainerManager()
-        .getContainer(ContainerID.valueof(containerId));
+        .getContainer(ContainerID.valueOf(containerId));
     Pipeline pipeline =
         cluster.getStorageContainerManager().getPipelineManager()
             .getPipeline(container.getPipelineID());
@@ -169,7 +170,7 @@ public class TestMultiBlockWritesWithDnFailures {
 
     // The write will fail but exception will be handled and length will be
     // updated correctly in OzoneManager once the steam is closed
-    key.write(data.getBytes());
+    key.write(data.getBytes(UTF_8));
     key.close();
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName).setType(HddsProtos.ReplicationType.RATIS)
@@ -177,8 +178,8 @@ public class TestMultiBlockWritesWithDnFailures {
         .setRefreshPipeline(true)
         .build();
     OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
-    Assert.assertEquals(2 * data.getBytes().length, keyInfo.getDataSize());
-    validateData(keyName, data.concat(data).getBytes());
+    Assert.assertEquals(2 * data.getBytes(UTF_8).length, keyInfo.getDataSize());
+    validateData(keyName, data.concat(data).getBytes(UTF_8));
   }
 
   @Test
@@ -190,7 +191,7 @@ public class TestMultiBlockWritesWithDnFailures {
         createKey(keyName, ReplicationType.RATIS, 6 * blockSize);
     String data = ContainerTestHelper
         .getFixedLengthString(keyString, blockSize + chunkSize);
-    key.write(data.getBytes());
+    key.write(data.getBytes(UTF_8));
 
     // get the name of a valid container
     Assert.assertTrue(key.getOutputStream() instanceof KeyOutputStream);
@@ -201,13 +202,12 @@ public class TestMultiBlockWritesWithDnFailures {
 
     // Assert that 6 block will be preallocated
     Assert.assertEquals(6, streamEntryList.size());
-    key.write(data.getBytes());
+    key.write(data.getBytes(UTF_8));
     key.flush();
     long containerId = streamEntryList.get(0).getBlockID().getContainerID();
-    BlockID blockId = streamEntryList.get(0).getBlockID();
     ContainerInfo container =
         cluster.getStorageContainerManager().getContainerManager()
-            .getContainer(ContainerID.valueof(containerId));
+            .getContainer(ContainerID.valueOf(containerId));
     Pipeline pipeline =
         cluster.getStorageContainerManager().getPipelineManager()
             .getPipeline(container.getPipelineID());
@@ -216,11 +216,11 @@ public class TestMultiBlockWritesWithDnFailures {
 
     // The write will fail but exception will be handled and length will be
     // updated correctly in OzoneManager once the steam is closed
-    key.write(data.getBytes());
+    key.write(data.getBytes(UTF_8));
 
     // shutdown the second datanode
     cluster.shutdownHddsDatanode(datanodes.get(1));
-    key.write(data.getBytes());
+    key.write(data.getBytes(UTF_8));
     key.close();
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName).setType(HddsProtos.ReplicationType.RATIS)
@@ -228,9 +228,9 @@ public class TestMultiBlockWritesWithDnFailures {
         .setRefreshPipeline(true)
         .build();
     OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
-    Assert.assertEquals(4 * data.getBytes().length, keyInfo.getDataSize());
+    Assert.assertEquals(4 * data.getBytes(UTF_8).length, keyInfo.getDataSize());
     validateData(keyName,
-        data.concat(data).concat(data).concat(data).getBytes());
+        data.concat(data).concat(data).concat(data).getBytes(UTF_8));
   }
 
   private OzoneOutputStream createKey(String keyName, ReplicationType type,

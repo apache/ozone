@@ -20,11 +20,11 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <parent>
     <artifactId>hadoop-ozone-fault-injection-test</artifactId>
     <groupId>org.apache.hadoop</groupId>
-    <version>1.1.0-SNAPSHOT</version>
+    <version>1.2.0-SNAPSHOT</version>
   </parent>
-  <version>1.1.0-SNAPSHOT</version>
-  <description>Apache Hadoop Ozone Mini Ozone Chaos Tests</description>
-  <name>Apache Hadoop Ozone Mini Ozone Chaos Tests</name>
+  <version>1.2.0-SNAPSHOT</version>
+  <description>Apache Ozone Mini Ozone Chaos Tests</description>
+  <name>Apache Ozone Mini Ozone Chaos Tests</name>
 
   <artifactId>mini-chaos-tests</artifactId>
   <dependencies>
@@ -50,8 +50,27 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-hdds-server-scm</artifactId>
+      <scope>test</scope>
+      <type>test-jar</type>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-hdds-hadoop-dependency-test</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>com.github.spotbugs</groupId>
+        <artifactId>spotbugs-maven-plugin</artifactId>
+        <configuration>
+          <excludeFilterFile>${basedir}/dev-support/findbugsExcludeFile.xml
+          </excludeFilterFile>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
 </project>

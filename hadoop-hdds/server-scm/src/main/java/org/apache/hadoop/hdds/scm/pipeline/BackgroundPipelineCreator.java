@@ -18,8 +18,13 @@
 package org.apache.hadoop.hdds.scm.pipeline;
 
 import org.apache.commons.collections.iterators.LoopingIterator;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.hdds.utils.Scheduler;
@@ -91,19 +96,23 @@ class BackgroundPipelineCreator {
     scheduler.schedule(this::createPipelines, 0, TimeUnit.MILLISECONDS);
   }
 
-  private boolean skipCreation(HddsProtos.ReplicationFactor factor,
-                               HddsProtos.ReplicationType type,
-                               boolean autoCreate) {
-    if (type == HddsProtos.ReplicationType.RATIS) {
-      return factor == HddsProtos.ReplicationFactor.ONE && (!autoCreate);
-    } else {
+  private boolean skipCreation(ReplicationConfig replicationConfig,
+      boolean autoCreate) {
+    if (replicationConfig.getReplicationType()
+        == HddsProtos.ReplicationType.RATIS) {
+      return RatisReplicationConfig
+          .hasFactor(replicationConfig, ReplicationFactor.ONE) && (!autoCreate);
+    } else if (replicationConfig.getReplicationType()
+        == ReplicationType.STAND_ALONE) {
       // For STAND_ALONE Replication Type, Replication Factor 3 should not be
       // used.
-      return factor == HddsProtos.ReplicationFactor.THREE;
+      return ((StandaloneReplicationConfig) replicationConfig)
+          .getReplicationFactor() == ReplicationFactor.ONE;
     }
+    return true;
   }
 
-  private void createPipelines() {
+  private void createPipelines() throws RuntimeException {
     // TODO: #CLUTIL Different replication factor may need to be supported
     HddsProtos.ReplicationType type = HddsProtos.ReplicationType.valueOf(
         conf.get(OzoneConfigKeys.OZONE_REPLICATION_TYPE,
@@ -112,18 +121,22 @@ class BackgroundPipelineCreator {
         ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE,
         ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE_DEFAULT);
 
-    List<HddsProtos.ReplicationFactor> list =
+    List<ReplicationConfig> list =
         new ArrayList<>();
     for (HddsProtos.ReplicationFactor factor : HddsProtos.ReplicationFactor
         .values()) {
-      if (skipCreation(factor, type, autoCreateFactorOne)) {
+
+      final ReplicationConfig replicationConfig =
+          ReplicationConfig.fromTypeAndFactor(type, factor);
+
+      if (skipCreation(replicationConfig, autoCreateFactorOne)) {
         // Skip this iteration for creating pipeline
         continue;
       }
-      list.add(factor);
+      list.add(replicationConfig);
       if (!pipelineManager.getSafeModeStatus()) {
         try {
-          pipelineManager.scrubPipeline(type, factor);
+          pipelineManager.scrubPipeline(replicationConfig);
         } catch (IOException e) {
           LOG.error("Error while scrubbing pipelines.", e);
         }
@@ -132,14 +145,14 @@ class BackgroundPipelineCreator {
 
     LoopingIterator it = new LoopingIterator(list);
     while (it.hasNext()) {
-      HddsProtos.ReplicationFactor factor =
-          (HddsProtos.ReplicationFactor) it.next();
+      ReplicationConfig replicationConfig =
+          (ReplicationConfig) it.next();
 
       try {
         if (scheduler.isClosed()) {
           break;
         }
-        pipelineManager.createPipeline(type, factor);
+        pipelineManager.createPipeline(replicationConfig);
       } catch (IOException ioe) {
         it.remove();
       } catch (Throwable t) {

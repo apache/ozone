@@ -29,9 +29,12 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.security.x509.certificate.CertInfo;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.scm.metadata.PipelineCodec;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
+import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperationHandler;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
@@ -92,7 +95,32 @@ public class TestSCMStoreImplWithOldPipelineIDKeyFormat
   }
 
   @Override
+  public Table<BigInteger, X509Certificate> getValidSCMCertsTable() {
+    return null;
+  }
+
+  @Override
   public Table<BigInteger, X509Certificate> getRevokedCertsTable() {
+    return null;
+  }
+
+  @Override
+  public Table<BigInteger, CertInfo> getRevokedCertsV2Table() {
+    return null;
+  }
+
+  @Override
+  public Table<Long, CRLInfo> getCRLInfoTable() {
+    return null;
+  }
+
+  @Override
+  public Table<String, Long> getCRLSequenceIdTable() {
+    return null;
+  }
+
+  @Override
+  public Table<String, Long> getSequenceIdTable() {
     return null;
   }
 
@@ -104,6 +132,11 @@ public class TestSCMStoreImplWithOldPipelineIDKeyFormat
   @Override
   public Table<PipelineID, Pipeline> getPipelineTable() {
     return pipelineTable;
+  }
+
+  @Override
+  public Table<String, TransactionInfo> getTransactionInfoTable() {
+    return null;
   }
 
   @Override

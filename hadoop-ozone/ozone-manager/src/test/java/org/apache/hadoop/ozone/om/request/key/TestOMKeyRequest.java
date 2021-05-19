@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request.key;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 import java.util.UUID;
 
 import org.apache.commons.lang3.tuple.Pair;
@@ -36,8 +37,10 @@ import org.junit.rules.TemporaryFolder;
 import org.mockito.Mockito;
 
 import org.apache.hadoop.hdds.client.ContainerBlockID;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -78,8 +81,8 @@ public class TestOMKeyRequest {
   protected OzoneBlockTokenSecretManager ozoneBlockTokenSecretManager;
   protected ScmBlockLocationProtocol scmBlockLocationProtocol;
 
-  protected final long containerID = 1000L;
-  protected final long localID = 100L;
+  protected static final long CONTAINER_ID = 1000L;
+  protected static final long LOCAL_ID = 100L;
 
   protected String volumeName;
   protected String bucketName;
@@ -89,6 +92,7 @@ public class TestOMKeyRequest {
   protected long clientID;
   protected long scmBlockSize = 1000L;
   protected long dataSize;
+  protected Random random;
 
   // Just setting ozoneManagerDoubleBuffer which does nothing.
   protected OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper =
@@ -132,14 +136,14 @@ public class TestOMKeyRequest {
     Pipeline pipeline = Pipeline.newBuilder()
         .setState(Pipeline.PipelineState.OPEN)
         .setId(PipelineID.randomId())
-        .setType(HddsProtos.ReplicationType.STAND_ALONE)
-        .setFactor(HddsProtos.ReplicationFactor.ONE)
+        .setReplicationConfig(
+            new StandaloneReplicationConfig(ReplicationFactor.ONE))
         .setNodes(new ArrayList<>())
         .build();
 
     AllocatedBlock allocatedBlock =
         new AllocatedBlock.Builder()
-            .setContainerBlockID(new ContainerBlockID(containerID, localID))
+            .setContainerBlockID(new ContainerBlockID(CONTAINER_ID, LOCAL_ID))
             .setPipeline(pipeline).build();
 
     List<AllocatedBlock> allocatedBlocks = new ArrayList<>();
@@ -159,6 +163,7 @@ public class TestOMKeyRequest {
     replicationType = HddsProtos.ReplicationType.RATIS;
     clientID = Time.now();
     dataSize = 1000L;
+    random = new Random();
 
     Pair<String, String> volumeAndBucket = Pair.of(volumeName, bucketName);
     when(ozoneManager.resolveBucketLink(any(KeyArgs.class),

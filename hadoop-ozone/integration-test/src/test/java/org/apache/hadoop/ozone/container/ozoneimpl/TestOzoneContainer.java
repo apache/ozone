@@ -55,7 +55,7 @@ public class TestOzoneContainer {
    * Set the timeout for every test.
    */
   @Rule
-  public Timeout testTimeout = new Timeout(300000);
+  public Timeout testTimeout = Timeout.seconds(300);
 
   @Rule
   public TemporaryFolder tempFolder = new TemporaryFolder();
@@ -359,7 +359,7 @@ public class TestOzoneContainer {
       Assert.assertEquals(ContainerProtos.Result.SUCCESS,
           response.getResult());
 
-      // Close the contianer.
+      // Close the container.
       request = ContainerTestHelper.getCloseContainer(
           client.getPipeline(), containerID);
       response = client.sendCommand(request);

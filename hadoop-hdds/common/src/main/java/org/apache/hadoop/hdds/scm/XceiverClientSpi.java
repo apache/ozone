@@ -170,7 +170,7 @@ public abstract class XceiverClientSpi implements Closeable {
   public abstract HddsProtos.ReplicationType getPipelineType();
 
   /**
-   * Check if an specfic commitIndex is replicated to majority/all servers.
+   * Check if an specific commitIndex is replicated to majority/all servers.
    * @param index index to watch for
    * @return reply containing the min commit index replicated to all or majority
    *         servers in case of a failure

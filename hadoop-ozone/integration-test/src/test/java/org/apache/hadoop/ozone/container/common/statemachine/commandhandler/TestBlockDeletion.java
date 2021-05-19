@@ -80,6 +80,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import static java.lang.Math.max;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds
     .HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
@@ -169,10 +170,11 @@ public class TestBlockDeletion {
 
     String keyName = UUID.randomUUID().toString();
 
-    OzoneOutputStream out = bucket.createKey(keyName, value.getBytes().length,
-        ReplicationType.RATIS, ReplicationFactor.THREE, new HashMap<>());
+    OzoneOutputStream out = bucket.createKey(keyName,
+        value.getBytes(UTF_8).length, ReplicationType.RATIS,
+        ReplicationFactor.THREE, new HashMap<>());
     for (int i = 0; i < 100; i++) {
-      out.write(value.getBytes());
+      out.write(value.getBytes(UTF_8));
     }
     out.close();
 
@@ -252,9 +254,10 @@ public class TestBlockDeletion {
     OzoneBucket bucket = volume.getBucket(bucketName);
 
     String keyName = UUID.randomUUID().toString();
-    OzoneOutputStream out = bucket.createKey(keyName, value.getBytes().length,
-        ReplicationType.RATIS, ReplicationFactor.THREE, new HashMap<>());
-    out.write(value.getBytes());
+    OzoneOutputStream out = bucket.createKey(keyName,
+        value.getBytes(UTF_8).length, ReplicationType.RATIS,
+        ReplicationFactor.THREE, new HashMap<>());
+    out.write(value.getBytes(UTF_8));
     out.close();
 
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
@@ -268,7 +271,7 @@ public class TestBlockDeletion {
     Thread.sleep(5000);
     List<ContainerInfo> containerInfos =
         scm.getContainerManager().getContainers();
-    final int valueSize = value.getBytes().length;
+    final int valueSize = value.getBytes(UTF_8).length;
     final int keyCount = 1;
     containerInfos.stream().forEach(container -> {
       Assert.assertEquals(valueSize, container.getUsedBytes());
@@ -360,8 +363,7 @@ public class TestBlockDeletion {
   }
 
   private void verifyTransactionsCommitted() throws IOException {
-    DeletedBlockLogImpl deletedBlockLog =
-        (DeletedBlockLogImpl) scm.getScmBlockManager().getDeletedBlockLog();
+    scm.getScmBlockManager().getDeletedBlockLog();
     for (long txnID = 1; txnID <= maxTransactionId; txnID++) {
       Assert.assertNull(
           scm.getScmMetadataStore().getDeletedBlocksTXTable().get(txnID));

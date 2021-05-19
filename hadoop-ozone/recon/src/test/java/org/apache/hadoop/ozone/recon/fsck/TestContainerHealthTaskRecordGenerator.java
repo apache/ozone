@@ -59,7 +59,7 @@ public class TestContainerHealthTaskRecordGenerator {
     container = mock(ContainerInfo.class);
     when(container.getReplicationFactor())
         .thenReturn(HddsProtos.ReplicationFactor.THREE);
-    when(container.containerID()).thenReturn(new ContainerID(123456));
+    when(container.containerID()).thenReturn(ContainerID.valueOf(123456));
     when(container.getContainerID()).thenReturn((long)123456);
     when(placementPolicy.validateContainerPlacement(
         Mockito.anyList(), Mockito.anyInt()))
@@ -307,25 +307,25 @@ public class TestContainerHealthTaskRecordGenerator {
 
   private UnhealthyContainersRecord missingRecord() {
     return new UnhealthyContainersRecord(container.containerID().getId(),
-        UnHealthyContainerStates.MISSING.toString(), new Long(10),
+        UnHealthyContainerStates.MISSING.toString(), 10L,
         3, 0, 3, null);
   }
 
   private UnhealthyContainersRecord underReplicatedRecord() {
     return new UnhealthyContainersRecord(container.containerID().getId(),
         UnHealthyContainerStates.UNDER_REPLICATED.toString(),
-        new Long(10), 3, 1, 2, null);
+        10L, 3, 1, 2, null);
   }
 
   private UnhealthyContainersRecord overReplicatedRecord() {
     return new UnhealthyContainersRecord(container.containerID().getId(),
-        UnHealthyContainerStates.OVER_REPLICATED.toString(), new Long(10),
+        UnHealthyContainerStates.OVER_REPLICATED.toString(), 10L,
         3, 5, -2, null);
   }
 
   private UnhealthyContainersRecord misReplicatedRecord() {
     return new UnhealthyContainersRecord(container.containerID().getId(),
-        UnHealthyContainerStates.MIS_REPLICATED.toString(), new Long(10),
+        UnHealthyContainerStates.MIS_REPLICATED.toString(), 10L,
         3, 1, 2, "should be on 1 more rack");
   }
 

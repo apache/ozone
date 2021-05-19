@@ -17,12 +17,9 @@
  */
 package org.apache.hadoop.hdds.scm.pipeline;
 
-import com.google.common.base.Preconditions;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
-import org.apache.commons.lang3.builder.HashCodeBuilder;
+import com.google.common.base.Preconditions;;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState;
 import org.slf4j.Logger;
@@ -46,7 +43,7 @@ class PipelineStateMap {
 
   private final Map<PipelineID, Pipeline> pipelineMap;
   private final Map<PipelineID, NavigableSet<ContainerID>> pipeline2container;
-  private final Map<PipelineQuery, List<Pipeline>> query2OpenPipelines;
+  private final Map<ReplicationConfig, List<Pipeline>> query2OpenPipelines;
 
   PipelineStateMap() {
 
@@ -54,17 +51,7 @@ class PipelineStateMap {
     pipelineMap = new ConcurrentHashMap<>();
     pipeline2container = new ConcurrentHashMap<>();
     query2OpenPipelines = new HashMap<>();
-    initializeQueryMap();
 
-  }
-
-  private void initializeQueryMap() {
-    for (ReplicationType type : ReplicationType.values()) {
-      for (ReplicationFactor factor : ReplicationFactor.values()) {
-        query2OpenPipelines
-            .put(new PipelineQuery(type, factor), new CopyOnWriteArrayList<>());
-      }
-    }
   }
 
   /**
@@ -76,9 +63,11 @@ class PipelineStateMap {
   void addPipeline(Pipeline pipeline) throws IOException {
     Preconditions.checkNotNull(pipeline, "Pipeline cannot be null");
     Preconditions.checkArgument(
-        pipeline.getNodes().size() == pipeline.getFactor().getNumber(),
+        pipeline.getNodes().size() == pipeline.getReplicationConfig()
+            .getRequiredNodes(),
         String.format("Nodes size=%d, replication factor=%d do not match ",
-                pipeline.getNodes().size(), pipeline.getFactor().getNumber()));
+            pipeline.getNodes().size(), pipeline.getReplicationConfig()
+                .getRequiredNodes()));
 
     if (pipelineMap.putIfAbsent(pipeline.getId(), pipeline) != null) {
       LOG.warn("Duplicate pipeline ID detected. {}", pipeline.getId());
@@ -87,7 +76,8 @@ class PipelineStateMap {
     }
     pipeline2container.put(pipeline.getId(), new TreeSet<>());
     if (pipeline.getPipelineState() == PipelineState.OPEN) {
-      query2OpenPipelines.get(new PipelineQuery(pipeline)).add(pipeline);
+      query2OpenPipelines.computeIfAbsent(pipeline.getReplicationConfig(),
+          any -> new CopyOnWriteArrayList<>()).add(pipeline);
     }
   }
 
@@ -144,62 +134,16 @@ class PipelineStateMap {
   /**
    * Get pipeline corresponding to specified replication type.
    *
-   * @param type - ReplicationType
+   * @param replicationConfig - ReplicationConfig
    * @return List of pipelines which have the specified replication type
    */
-  List<Pipeline> getPipelines(ReplicationType type) {
-    Preconditions.checkNotNull(type, "Replication type cannot be null");
+  List<Pipeline> getPipelines(ReplicationConfig replicationConfig) {
+    Preconditions
+        .checkNotNull(replicationConfig, "ReplicationConfig cannot be null");
 
     List<Pipeline> pipelines = new ArrayList<>();
     for (Pipeline pipeline : pipelineMap.values()) {
-      if (pipeline.getType() == type) {
-        pipelines.add(pipeline);
-      }
-    }
-
-    return pipelines;
-  }
-
-  /**
-   * Get pipeline corresponding to specified replication type and factor.
-   *
-   * @param type - ReplicationType
-   * @param factor - ReplicationFactor
-   * @return List of pipelines with specified replication type and factor
-   */
-  List<Pipeline> getPipelines(ReplicationType type, ReplicationFactor factor) {
-    Preconditions.checkNotNull(type, "Replication type cannot be null");
-    Preconditions.checkNotNull(factor, "Replication factor cannot be null");
-
-    List<Pipeline> pipelines = new ArrayList<>();
-    for (Pipeline pipeline : pipelineMap.values()) {
-      if (pipeline.getType() == type && pipeline.getFactor() == factor) {
-        pipelines.add(pipeline);
-      }
-    }
-
-    return pipelines;
-  }
-
-  /**
-   * Get list of pipeline corresponding to specified replication type and
-   * pipeline states.
-   *
-   * @param type - ReplicationType
-   * @param states - Array of required PipelineState
-   * @return List of pipelines with specified replication type and states
-   */
-  List<Pipeline> getPipelines(ReplicationType type, PipelineState... states) {
-    Preconditions.checkNotNull(type, "Replication type cannot be null");
-    Preconditions.checkNotNull(states, "Pipeline state cannot be null");
-
-    Set<PipelineState> pipelineStates = new HashSet<>();
-    pipelineStates.addAll(Arrays.asList(states));
-
-    List<Pipeline> pipelines = new ArrayList<>();
-    for (Pipeline pipeline : pipelineMap.values()) {
-      if (pipeline.getType() == type
-          && pipelineStates.contains(pipeline.getPipelineState())) {
+      if (pipeline.getReplicationConfig().equals(replicationConfig)) {
         pipelines.add(pipeline);
       }
     }
@@ -211,28 +155,27 @@ class PipelineStateMap {
    * Get list of pipeline corresponding to specified replication type,
    * replication factor and pipeline state.
    *
-   * @param type - ReplicationType
-   * @param state - Required PipelineState
+   * @param replicationConfig - ReplicationConfig
+   * @param state             - Required PipelineState
    * @return List of pipelines with specified replication type,
    * replication factor and pipeline state
    */
-  List<Pipeline> getPipelines(ReplicationType type, ReplicationFactor factor,
+  List<Pipeline> getPipelines(ReplicationConfig replicationConfig,
       PipelineState state) {
-    Preconditions.checkNotNull(type, "Replication type cannot be null");
-    Preconditions.checkNotNull(factor, "Replication factor cannot be null");
+    Preconditions
+        .checkNotNull(replicationConfig, "ReplicationConfig cannot be null");
     Preconditions.checkNotNull(state, "Pipeline state cannot be null");
 
     if (state == PipelineState.OPEN) {
       return new ArrayList<>(
           query2OpenPipelines.getOrDefault(
-              new PipelineQuery(type, factor), Collections.EMPTY_LIST));
+              replicationConfig, Collections.EMPTY_LIST));
     }
 
     List<Pipeline> pipelines = new ArrayList<>();
     for (Pipeline pipeline : pipelineMap.values()) {
-      if (pipeline.getType() == type
-          && pipeline.getPipelineState() == state
-          && pipeline.getFactor() == factor) {
+      if (pipeline.getReplicationConfig().equals(replicationConfig)
+          && pipeline.getPipelineState() == state) {
         pipelines.add(pipeline);
       }
     }
@@ -244,18 +187,18 @@ class PipelineStateMap {
    * Get list of pipeline corresponding to specified replication type,
    * replication factor and pipeline state.
    *
-   * @param type - ReplicationType
-   * @param state - Required PipelineState
-   * @param excludeDns dns to exclude
-   * @param excludePipelines pipelines to exclude
+   * @param replicationConfig - ReplicationType
+   * @param state             - Required PipelineState
+   * @param excludeDns        dns to exclude
+   * @param excludePipelines  pipelines to exclude
    * @return List of pipelines with specified replication type,
    * replication factor and pipeline state
    */
-  List<Pipeline> getPipelines(ReplicationType type, ReplicationFactor factor,
+  List<Pipeline> getPipelines(ReplicationConfig replicationConfig,
       PipelineState state, Collection<DatanodeDetails> excludeDns,
       Collection<PipelineID> excludePipelines) {
-    Preconditions.checkNotNull(type, "Replication type cannot be null");
-    Preconditions.checkNotNull(factor, "Replication factor cannot be null");
+    Preconditions
+        .checkNotNull(replicationConfig, "ReplicationConfig cannot be null");
     Preconditions.checkNotNull(state, "Pipeline state cannot be null");
     Preconditions
         .checkNotNull(excludeDns, "Datanode exclude list cannot be null");
@@ -265,7 +208,7 @@ class PipelineStateMap {
     List<Pipeline> pipelines = null;
     if (state == PipelineState.OPEN) {
       pipelines = new ArrayList<>(query2OpenPipelines.getOrDefault(
-          new PipelineQuery(type, factor), Collections.EMPTY_LIST));
+          replicationConfig, Collections.EMPTY_LIST));
     } else {
       pipelines = new ArrayList<>(pipelineMap.values());
     }
@@ -273,9 +216,8 @@ class PipelineStateMap {
     Iterator<Pipeline> iter = pipelines.iterator();
     while (iter.hasNext()) {
       Pipeline pipeline = iter.next();
-      if (pipeline.getType() != type ||
+      if (!pipeline.getReplicationConfig().equals(replicationConfig) ||
           pipeline.getPipelineState() != state ||
-          pipeline.getFactor() != factor ||
           excludePipelines.contains(pipeline.getId())) {
         iter.remove();
       } else {
@@ -389,15 +331,23 @@ class PipelineStateMap {
     Preconditions.checkNotNull(state, "Pipeline LifeCycleState cannot be null");
 
     final Pipeline pipeline = getPipeline(pipelineID);
+    // Return the old pipeline if updating same state
+    if (pipeline.getPipelineState() == state) {
+      LOG.debug("CurrentState and NewState are the same, return from " +
+          "updatePipelineState directly.");
+      return pipeline;
+    }
     Pipeline updatedPipeline = pipelineMap.compute(pipelineID,
         (id, p) -> Pipeline.newBuilder(pipeline).setState(state).build());
-    PipelineQuery query = new PipelineQuery(pipeline);
-    List<Pipeline> pipelineList = query2OpenPipelines.get(query);
+
+    List<Pipeline> pipelineList =
+        query2OpenPipelines.get(pipeline.getReplicationConfig());
+
     if (updatedPipeline.getPipelineState() == PipelineState.OPEN) {
       // for transition to OPEN state add pipeline to query2OpenPipelines
       if (pipelineList == null) {
         pipelineList = new CopyOnWriteArrayList<>();
-        query2OpenPipelines.put(query, pipelineList);
+        query2OpenPipelines.put(pipeline.getReplicationConfig(), pipelineList);
       }
       pipelineList.add(updatedPipeline);
     } else {
@@ -410,39 +360,4 @@ class PipelineStateMap {
     return updatedPipeline;
   }
 
-  private static class PipelineQuery {
-    private ReplicationType type;
-    private ReplicationFactor factor;
-
-    PipelineQuery(ReplicationType type, ReplicationFactor factor) {
-      this.type = Preconditions.checkNotNull(type);
-      this.factor = Preconditions.checkNotNull(factor);
-    }
-
-    PipelineQuery(Pipeline pipeline) {
-      type = pipeline.getType();
-      factor = pipeline.getFactor();
-    }
-
-    @Override
-    @SuppressFBWarnings("NP_EQUALS_SHOULD_HANDLE_NULL_ARGUMENT")
-    public boolean equals(Object other) {
-      if (this == other) {
-        return true;
-      }
-      if (!this.getClass().equals(other.getClass())) {
-        return false;
-      }
-      PipelineQuery otherQuery = (PipelineQuery) other;
-      return type == otherQuery.type && factor == otherQuery.factor;
-    }
-
-    @Override
-    public int hashCode() {
-      return new HashCodeBuilder()
-          .append(type)
-          .append(factor)
-          .toHashCode();
-    }
-  }
 }

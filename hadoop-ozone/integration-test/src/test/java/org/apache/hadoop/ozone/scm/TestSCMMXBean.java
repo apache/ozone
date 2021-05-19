@@ -20,10 +20,12 @@ package org.apache.hadoop.ozone.scm;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -62,7 +64,7 @@ public class TestSCMMXBean {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = new Timeout(300000);
+  public Timeout timeout = Timeout.seconds(300);
 
   public static final Log LOG = LogFactory.getLog(TestSCMMXBean.class);
   private static int numOfDatanodes = 3;
@@ -146,29 +148,32 @@ public class TestSCMMXBean {
     verifyEquals(data, containerStateCount);
 
     // Do some changes like allocate containers and change the container states
-    ContainerManager scmContainerManager = scm.getContainerManager();
+    ContainerManagerV2 scmContainerManager = scm.getContainerManager();
 
     List<ContainerInfo> containerInfoList = new ArrayList<>();
     for (int i=0; i < 10; i++) {
-      containerInfoList.add(scmContainerManager.allocateContainer(HddsProtos
-          .ReplicationType.STAND_ALONE, HddsProtos.ReplicationFactor.ONE,
-          UUID.randomUUID().toString()));
+      containerInfoList.add(
+          scmContainerManager.allocateContainer(new StandaloneReplicationConfig(
+                  ReplicationFactor.ONE),
+              UUID.randomUUID().toString()));
     }
     long containerID;
     for (int i=0; i < 10; i++) {
       if (i % 2 == 0) {
         containerID = containerInfoList.get(i).getContainerID();
         scmContainerManager.updateContainerState(
-            new ContainerID(containerID), HddsProtos.LifeCycleEvent.FINALIZE);
-        assertEquals(scmContainerManager.getContainer(new ContainerID(
+            ContainerID.valueOf(containerID),
+            HddsProtos.LifeCycleEvent.FINALIZE);
+        assertEquals(scmContainerManager.getContainer(ContainerID.valueOf(
             containerID)).getState(), HddsProtos.LifeCycleState.CLOSING);
       } else {
         containerID = containerInfoList.get(i).getContainerID();
         scmContainerManager.updateContainerState(
-            new ContainerID(containerID), HddsProtos.LifeCycleEvent.FINALIZE);
+            ContainerID.valueOf(containerID),
+            HddsProtos.LifeCycleEvent.FINALIZE);
         scmContainerManager.updateContainerState(
-            new ContainerID(containerID), HddsProtos.LifeCycleEvent.CLOSE);
-        assertEquals(scmContainerManager.getContainer(new ContainerID(
+            ContainerID.valueOf(containerID), HddsProtos.LifeCycleEvent.CLOSE);
+        assertEquals(scmContainerManager.getContainer(ContainerID.valueOf(
             containerID)).getState(), HddsProtos.LifeCycleState.CLOSED);
       }
 
@@ -179,9 +184,9 @@ public class TestSCMMXBean {
     containerStateCount = scm.getContainerStateCount();
 
     containerStateCount.forEach((k, v) -> {
-      if(k == HddsProtos.LifeCycleState.CLOSING.toString()) {
+      if(k.equals(HddsProtos.LifeCycleState.CLOSING.toString())) {
         assertEquals((int)v, 5);
-      } else if (k == HddsProtos.LifeCycleState.CLOSED.toString()) {
+      } else if (k.equals(HddsProtos.LifeCycleState.CLOSED.toString())) {
         assertEquals((int)v, 5);
       } else  {
         // Remaining all container state count should be zero.

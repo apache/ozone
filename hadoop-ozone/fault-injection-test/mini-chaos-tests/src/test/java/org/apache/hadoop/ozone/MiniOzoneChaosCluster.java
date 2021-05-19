@@ -58,24 +58,32 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
 
   private final int numDatanodes;
   private final int numOzoneManagers;
+  private final int numStorageContainerManagers;
 
   private final FailureManager failureManager;
 
   private final int waitForClusterToBeReadyTimeout = 120000; // 2 min
 
   private final Set<OzoneManager> failedOmSet;
+  private final Set<StorageContainerManager> failedScmSet;
   private final Set<DatanodeDetails> failedDnSet;
 
   // The service on which chaos will be unleashed.
   enum FailureService {
     DATANODE,
-    OZONE_MANAGER;
+    OZONE_MANAGER,
+    STORAGE_CONTAINER_MANAGER;
 
     public String toString() {
-      if (this == DATANODE) {
+      switch (this) {
+      case DATANODE:
         return "Datanode";
-      } else {
+      case OZONE_MANAGER:
         return "OzoneManager";
+      case STORAGE_CONTAINER_MANAGER:
+        return "StorageContainerManager";
+      default:
+        return "";
       }
     }
 
@@ -84,6 +92,8 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
         return DATANODE;
       } else if (serviceName.equalsIgnoreCase("OzoneManager")) {
         return OZONE_MANAGER;
+      } else if (serviceName.equalsIgnoreCase("StorageContainerManager")) {
+        return STORAGE_CONTAINER_MANAGER;
       }
       throw new IllegalArgumentException("Unrecognized value for " +
           "FailureService enum: " + serviceName);
@@ -91,15 +101,17 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
   }
 
   public MiniOzoneChaosCluster(OzoneConfiguration conf,
-      List<OzoneManager> ozoneManagers, StorageContainerManager scm,
+      List<OzoneManager> ozoneManagers, List<StorageContainerManager> scms,
       List<HddsDatanodeService> hddsDatanodes, String omServiceID,
-      Set<Class<? extends Failures>> clazzes) {
-    super(conf, ozoneManagers, scm, hddsDatanodes, omServiceID);
+      String scmServiceId, Set<Class<? extends Failures>> clazzes) {
+    super(conf, ozoneManagers, scms, hddsDatanodes, omServiceID, scmServiceId);
     this.numDatanodes = getHddsDatanodes().size();
     this.numOzoneManagers = ozoneManagers.size();
+    this.numStorageContainerManagers = scms.size();
 
     this.failedOmSet = new HashSet<>();
     this.failedDnSet = new HashSet<>();
+    this.failedScmSet = new HashSet<>();
 
     this.failureManager = new FailureManager(this, conf, clazzes);
     LOG.info("Starting MiniOzoneChaosCluster with {} OzoneManagers and {} " +
@@ -109,11 +121,13 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
 
   void startChaos(long initialDelay, long period, TimeUnit timeUnit) {
     LOG.info("Starting Chaos with failure period:{} unit:{} numDataNodes:{} " +
-            "numOzoneManagers:{}", period, timeUnit, numDatanodes,
-        numOzoneManagers);
+            "numOzoneManagers:{} numStorageContainerManagers:{}",
+        period, timeUnit, numDatanodes,
+        numOzoneManagers, numStorageContainerManagers);
     failureManager.start(initialDelay, period, timeUnit);
   }
 
+  @Override
   public void shutdown() {
     try {
       failureManager.stop();
@@ -166,6 +180,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
      * @param val number of datanodes
      * @return MiniOzoneChaosCluster.Builder
      */
+    @Override
     public Builder setNumDatanodes(int val) {
       super.setNumDatanodes(val);
       return this;
@@ -191,11 +206,26 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
       return this;
     }
 
+    /**
+     * Sets SCM Service ID.
+     */
+    public Builder setSCMServiceID(String scmServiceID) {
+      super.setSCMServiceId(scmServiceID);
+      return this;
+    }
+
+    public Builder setNumStorageContainerManagers(int val) {
+      super.setNumOfStorageContainerManagers(val);
+      super.setNumOfActiveSCMs(val);
+      return this;
+    }
+
     public Builder addFailures(Class<? extends Failures> clazz) {
       this.clazzes.add(clazz);
       return this;
     }
 
+    @Override
     protected void initializeConfiguration() throws IOException {
       super.initializeConfiguration();
 
@@ -253,6 +283,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
      *
      * @return MiniOzoneCluster.Builder
      */
+    @Override
     public Builder setNumDataVolumes(int val) {
       numDataVolumes = val;
       return this;
@@ -267,11 +298,16 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
         initOMRatisConf();
       }
 
-      StorageContainerManager scm;
       List<OzoneManager> omList;
+      List<StorageContainerManager> scmList;
       try {
-        scm = createSCM();
-        scm.start();
+        if (numOfSCMs > 1) {
+          scmList = createSCMService();
+        } else {
+          StorageContainerManager scm = createSCM();
+          scm.start();
+          scmList = Arrays.asList(scm);
+        }
         if (numOfOMs > 1) {
           omList = createOMService();
         } else {
@@ -284,11 +320,11 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
       }
 
       final List<HddsDatanodeService> hddsDatanodes = createHddsDatanodes(
-          scm, null);
+          scmList, null);
 
       MiniOzoneChaosCluster cluster =
-          new MiniOzoneChaosCluster(conf, omList, scm, hddsDatanodes,
-              omServiceId, clazzes);
+          new MiniOzoneChaosCluster(conf, omList, scmList, hddsDatanodes,
+              omServiceId, scmServiceId, clazzes);
 
       if (startDataNodes) {
         cluster.startHddsDatanodes();
@@ -297,7 +333,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
     }
   }
 
-  // OzoneManager specifc
+  // OzoneManager specific
   public static int getNumberOfOmToFail() {
     return 1;
   }
@@ -317,11 +353,13 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
     return oms;
   }
 
+  @Override
   public void shutdownOzoneManager(OzoneManager om) {
     super.shutdownOzoneManager(om);
     failedOmSet.add(om);
   }
 
+  @Override
   public void restartOzoneManager(OzoneManager om, boolean waitForOM)
       throws IOException, TimeoutException, InterruptedException {
     super.restartOzoneManager(om, waitForOM);
@@ -329,14 +367,14 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
   }
 
   // Should the selected node be stopped or started.
-  public boolean shouldStop() {
+  public boolean shouldStopOm() {
     if (failedOmSet.size() >= numOzoneManagers/2) {
       return false;
     }
     return RandomUtils.nextBoolean();
   }
 
-  // Datanode specifc
+  // Datanode specific
   private int getNumberOfDnToFail() {
     return RandomUtils.nextBoolean() ? 1 : 2;
   }
@@ -370,4 +408,45 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
   public boolean shouldStop(DatanodeDetails dn) {
     return !failedDnSet.contains(dn);
   }
+
+  // StorageContainerManager specific
+  public static int getNumberOfScmToFail() {
+    return 1;
+  }
+
+  public Set<StorageContainerManager> scmToFail() {
+    int numNodesToFail = getNumberOfScmToFail();
+    if (failedScmSet.size() >= numStorageContainerManagers/2) {
+      return Collections.emptySet();
+    }
+
+    int numSCMs = getStorageContainerManagersList().size();
+    Set<StorageContainerManager> scms = new HashSet<>();
+    for (int i = 0; i < numNodesToFail; i++) {
+      int failedNodeIndex = FailureManager.getBoundedRandomIndex(numSCMs);
+      scms.add(getStorageContainerManager(failedNodeIndex));
+    }
+    return scms;
+  }
+
+  public void shutdownStorageContainerManager(StorageContainerManager scm) {
+    super.shutdownStorageContainerManager(scm);
+    failedScmSet.add(scm);
+  }
+
+  public void restartStorageContainerManager(StorageContainerManager scm,
+      boolean waitForScm) throws IOException, TimeoutException,
+      InterruptedException, AuthenticationException {
+    super.restartStorageContainerManager(scm, waitForScm);
+    failedScmSet.remove(scm);
+  }
+
+  // Should the selected node be stopped or started.
+  public boolean shouldStopScm() {
+    if (failedScmSet.size() >= numStorageContainerManagers/2) {
+      return false;
+    }
+    return RandomUtils.nextBoolean();
+  }
+
 }

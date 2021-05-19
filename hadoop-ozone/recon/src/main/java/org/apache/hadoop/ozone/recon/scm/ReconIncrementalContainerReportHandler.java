@@ -23,13 +23,15 @@ import java.io.IOException;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.IncrementalContainerReportHandler;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.IncrementalContainerReportFromDatanode;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,8 +45,8 @@ public class ReconIncrementalContainerReportHandler
       ReconIncrementalContainerReportHandler.class);
 
   public ReconIncrementalContainerReportHandler(NodeManager nodeManager,
-      ContainerManager containerManager) {
-    super(nodeManager, containerManager);
+      ContainerManagerV2 containerManager, SCMContext scmContext) {
+    super(nodeManager, containerManager, scmContext);
   }
 
   @Override
@@ -70,12 +72,12 @@ public class ReconIncrementalContainerReportHandler
     for (ContainerReplicaProto replicaProto :
         report.getReport().getReportList()) {
       try {
-        final ContainerID id = ContainerID.valueof(
+        final ContainerID id = ContainerID.valueOf(
             replicaProto.getContainerID());
         try {
           containerManager.checkAndAddNewContainer(id, replicaProto.getState(),
               report.getDatanodeDetails());
-        } catch (IOException ioEx) {
+        } catch (Exception ioEx) {
           LOG.error("Exception while checking and adding new container.", ioEx);
           return;
         }
@@ -88,7 +90,7 @@ public class ReconIncrementalContainerReportHandler
         success = false;
         LOG.error("Received ICR from unknown datanode {}.",
             report.getDatanodeDetails(), ex);
-      } catch (IOException e) {
+      } catch (IOException | InvalidStateTransitionException e) {
         success = false;
         LOG.error("Exception while processing ICR for container {}",
             replicaProto.getContainerID());

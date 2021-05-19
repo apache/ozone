@@ -48,13 +48,12 @@ import org.mockito.Mockito;
  */
 public class TestHandler {
   @Rule
-  public TestRule timeout = new Timeout(300000);
+  public TestRule timeout = Timeout.seconds(300);
 
   private OzoneConfiguration conf;
   private HddsDispatcher dispatcher;
   private ContainerSet containerSet;
   private VolumeSet volumeSet;
-  private Handler handler;
 
   @Before
   public void setup() throws Exception {

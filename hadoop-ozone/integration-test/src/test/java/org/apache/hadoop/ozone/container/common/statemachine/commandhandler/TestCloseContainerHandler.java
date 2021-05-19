@@ -37,8 +37,10 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
+import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.test.GenericTestUtils;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
 
 import org.junit.After;
@@ -57,7 +59,7 @@ public class TestCloseContainerHandler {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = new Timeout(300000);
+  public Timeout timeout = Timeout.seconds(300);
 
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf;
@@ -91,7 +93,7 @@ public class TestCloseContainerHandler {
     OzoneOutputStream key = objectStore.getVolume("test").getBucket("test")
         .createKey("test", 1024, ReplicationType.STAND_ALONE,
             ReplicationFactor.ONE, new HashMap<>());
-    key.write("test".getBytes());
+    key.write("test".getBytes(UTF_8));
     key.close();
 
     //get the name of a valid container
@@ -107,7 +109,7 @@ public class TestCloseContainerHandler {
         cluster.getOzoneManager().lookupKey(keyArgs).getKeyLocationVersions()
             .get(0).getBlocksLatestVersionOnly().get(0);
 
-    ContainerID containerId = ContainerID.valueof(
+    ContainerID containerId = ContainerID.valueOf(
         omKeyLocationInfo.getContainerID());
     ContainerInfo container = cluster.getStorageContainerManager()
         .getContainerManager().getContainer(containerId);
@@ -119,9 +121,12 @@ public class TestCloseContainerHandler {
     DatanodeDetails datanodeDetails =
         cluster.getHddsDatanodes().get(0).getDatanodeDetails();
     //send the order to close the container
+    SCMCommand<?> command = new CloseContainerCommand(
+        containerId.getId(), pipeline.getId());
+    command.setTerm(
+        cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
     cluster.getStorageContainerManager().getScmNodeManager()
-        .addDatanodeCommand(datanodeDetails.getUuid(),
-            new CloseContainerCommand(containerId.getId(), pipeline.getId()));
+        .addDatanodeCommand(datanodeDetails.getUuid(), command);
 
     GenericTestUtils.waitFor(() ->
             isContainerClosed(cluster, containerId.getId()),

@@ -28,7 +28,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementCapacity;
@@ -66,6 +66,8 @@ import java.io.File;
 
 import org.junit.Rule;
 import org.junit.rules.Timeout;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationType.STAND_ALONE;
 
@@ -78,7 +80,7 @@ public class TestDataScrubber {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = new Timeout(300000);
+  public Timeout timeout = Timeout.seconds(300);
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration ozoneConfig;
   private static OzoneClient ozClient = null;
@@ -134,19 +136,19 @@ public class TestDataScrubber {
       String keyName = UUID.randomUUID().toString();
 
       OzoneOutputStream out = bucket.createKey(keyName,
-          value.getBytes().length, STAND_ALONE,
+          value.getBytes(UTF_8).length, STAND_ALONE,
           ONE, new HashMap<>());
-      out.write(value.getBytes());
+      out.write(value.getBytes(UTF_8));
       out.close();
       OzoneKey key = bucket.getKey(keyName);
       Assert.assertEquals(keyName, key.getName());
       OzoneInputStream is = bucket.readKey(keyName);
-      byte[] fileContent = new byte[value.getBytes().length];
+      byte[] fileContent = new byte[value.getBytes(UTF_8).length];
       is.read(fileContent);
       Assert.assertTrue(verifyRatisReplication(volumeName, bucketName,
           keyName, STAND_ALONE,
           ONE));
-      Assert.assertEquals(value, new String(fileContent));
+      Assert.assertEquals(value, new String(fileContent, UTF_8));
       Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
       Assert.assertFalse(key.getModificationTime().isBefore(testStartTime));
     }
@@ -179,10 +181,10 @@ public class TestDataScrubber {
     // wait for the incremental container report to propagate to SCM
     Thread.sleep(5000);
 
-    ContainerManager cm = cluster.getStorageContainerManager()
+    ContainerManagerV2 cm = cluster.getStorageContainerManager()
         .getContainerManager();
     Set<ContainerReplica> replicas = cm.getContainerReplicas(
-        ContainerID.valueof(c.getContainerData().getContainerID()));
+        ContainerID.valueOf(c.getContainerData().getContainerID()));
     Assert.assertEquals(1, replicas.size());
     ContainerReplica r = replicas.iterator().next();
     Assert.assertEquals(StorageContainerDatanodeProtocolProtos.

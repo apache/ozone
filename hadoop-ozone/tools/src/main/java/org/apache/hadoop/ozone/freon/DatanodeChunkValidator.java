@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.concurrent.Callable;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -99,7 +100,9 @@ public class DatanodeChunkValidator extends BaseFreonGenerator
 
       } else {
         pipeline = pipelines.stream()
-              .filter(p -> p.getFactor() == HddsProtos.ReplicationFactor.THREE)
+            .filter(
+                p -> ReplicationConfig.getLegacyFactor(p.getReplicationConfig())
+                    == HddsProtos.ReplicationFactor.THREE)
               .findFirst()
               .orElseThrow(() -> new IllegalArgumentException(
                       "Pipeline ID is NOT defined, and no pipeline " +
@@ -172,9 +175,13 @@ public class DatanodeChunkValidator extends BaseFreonGenerator
         xceiverClientSpi.sendCommand(request);
 
     checksum = new Checksum(ContainerProtos.ChecksumType.CRC32, chunkSize);
-    checksumReference = checksum.computeChecksum(
-        response.getReadChunk().getData().toByteArray()
-    );
+    if (response.getReadChunk().hasData()) {
+      checksumReference = checksum.computeChecksum(
+          response.getReadChunk().getData().toByteArray());
+    } else {
+      checksumReference = checksum.computeChecksum(
+          response.getReadChunk().getDataBuffers().getBuffersList());
+    }
 
   }
 
@@ -221,10 +228,14 @@ public class DatanodeChunkValidator extends BaseFreonGenerator
         ContainerProtos.ContainerCommandResponseProto response =
             xceiverClientSpi.sendCommand(request);
 
-        ChecksumData checksumOfChunk =
-            checksum.computeChecksum(
-                response.getReadChunk().getData().toByteArray()
-            );
+        ChecksumData checksumOfChunk;
+        if (response.getReadChunk().hasData()) {
+          checksumOfChunk = checksum.computeChecksum(
+              response.getReadChunk().getData().toByteArray());
+        } else {
+          checksumOfChunk = checksum.computeChecksum(
+              response.getReadChunk().getDataBuffers().getBuffersList());
+        }
 
         if (!checksumReference.equals(checksumOfChunk)) {
           throw new IllegalStateException(

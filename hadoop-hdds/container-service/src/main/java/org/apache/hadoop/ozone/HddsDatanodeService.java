@@ -33,12 +33,15 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
+import org.apache.hadoop.hdds.DatanodeVersions;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.datanode.metadata.DatanodeCRLStore;
+import org.apache.hadoop.hdds.datanode.metadata.DatanodeCRLStoreImpl;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
@@ -103,6 +106,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   private DNMXBeanImpl serviceRuntimeInfo =
       new DNMXBeanImpl(HddsVersionInfo.HDDS_VERSION_INFO) {};
   private ObjectName dnInfoBeanName;
+  private DatanodeCRLStore dnCRLStore;
 
   //Constructor for DataNode PluginService
   public HddsDatanodeService(){}
@@ -209,6 +213,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       datanodeDetails.setRevision(
           HddsVersionInfo.HDDS_VERSION_INFO.getRevision());
       datanodeDetails.setBuildDate(HddsVersionInfo.HDDS_VERSION_INFO.getDate());
+      datanodeDetails.setCurrentVersion(DatanodeVersions.CURRENT_VERSION);
       TracingUtil.initTracing(
           "HddsDatanodeService." + datanodeDetails.getUuidString()
               .substring(0, 8), conf);
@@ -240,6 +245,10 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
         }
         LOG.info("Hdds Datanode login successful.");
       }
+
+      // initialize datanode CRL store
+      dnCRLStore = new DatanodeCRLStoreImpl(conf);
+
       if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
         initializeCertificateClient(conf);
       }
@@ -282,7 +291,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   private void startRatisForTest() throws IOException {
     String scmId = "scm-01";
     String clusterId = "clusterId";
-    datanodeStateMachine.getContainer().start(scmId);
+    datanodeStateMachine.getContainer().start(clusterId);
     MutableVolumeSet volumeSet =
         getDatanodeStateMachine().getContainer().getVolumeSet();
 
@@ -340,9 +349,10 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       PKCS10CertificationRequest csr = getCSR(config);
       // TODO: For SCM CA we should fetch certificate from multiple SCMs.
       SCMSecurityProtocolClientSideTranslatorPB secureScmClient =
-          HddsServerUtil.getScmSecurityClient(config);
+          HddsServerUtil.getScmSecurityClientWithMaxRetry(config);
       SCMGetCertResponseProto response = secureScmClient.
-          getDataNodeCertificateChain(datanodeDetails.getProtoBufMessage(),
+          getDataNodeCertificateChain(
+              datanodeDetails.getProtoBufMessage(),
               getEncodedString(csr));
       // Persist certificates.
       if(response.hasX509CACertificate()) {
@@ -350,6 +360,12 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
         dnCertClient.storeCertificate(pemEncodedCert, true);
         dnCertClient.storeCertificate(response.getX509CACertificate(), true,
             true);
+
+        // Store Root CA certificate.
+        if (response.hasX509RootCACertificate()) {
+          dnCertClient.storeRootCACertificate(
+              response.getX509RootCACertificate(), true);
+        }
         String dnCertSerialId = getX509Certificate(pemEncodedCert).
             getSerialNumber().toString();
         datanodeDetails.setCertSerialId(dnCertSerialId);
@@ -433,7 +449,11 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     } else {
       // There is no datanode.id file, this might be the first time datanode
       // is started.
-      return DatanodeDetails.newBuilder().setUuid(UUID.randomUUID()).build();
+      DatanodeDetails details = DatanodeDetails.newBuilder()
+          .setUuid(UUID.randomUUID()).build();
+      details.setInitialVersion(DatanodeVersions.CURRENT_VERSION);
+      details.setCurrentVersion(DatanodeVersions.CURRENT_VERSION);
+      return details;
     }
   }
 
@@ -510,6 +530,11 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     return datanodeStateMachine;
   }
 
+  @VisibleForTesting
+  public DatanodeCRLStore getCRLStore() {
+    return dnCRLStore;
+  }
+
   public void join() {
     if (datanodeStateMachine != null) {
       try {
@@ -525,7 +550,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     stop();
     terminate(1);
   }
-
 
   @Override
   public void stop() {
@@ -551,6 +575,12 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
         }
       }
       unregisterMXBean();
+      // stop dn crl store
+      try {
+        dnCRLStore.stop();
+      } catch (Exception ex) {
+        LOG.error("Datanode CRL store stop failed", ex);
+      }
     }
   }
 
@@ -579,5 +609,10 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   @VisibleForTesting
   public void setCertificateClient(CertificateClient client) {
     dnCertClient = client;
+  }
+
+  @Override
+  public void printError(Throwable error) {
+    LOG.error("Exception in HddsDatanodeService.", error);
   }
 }

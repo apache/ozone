@@ -28,8 +28,10 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -39,6 +41,8 @@ import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.util.Time;
 
 import com.google.common.collect.ImmutableSet;
+
+import static java.util.stream.Collectors.toList;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.reregisterCommand;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,7 +70,8 @@ public class ReconNodeManager extends SCMNodeManager {
                           EventPublisher eventPublisher,
                           NetworkTopology networkTopology,
                           Table<UUID, DatanodeDetails> nodeDB) {
-    super(conf, scmStorageConfig, eventPublisher, networkTopology);
+    super(conf, scmStorageConfig, eventPublisher, networkTopology,
+        SCMContext.emptyContext());
     this.nodeDB = nodeDB;
     loadExistingNodes();
   }
@@ -109,13 +114,12 @@ public class ReconNodeManager extends SCMNodeManager {
   @Override
   public void onMessage(CommandForDatanode commandForDatanode,
                         EventPublisher ignored) {
-    if (ALLOWED_COMMANDS.contains(
-        commandForDatanode.getCommand().getType())) {
+    final Type cmdType = commandForDatanode.getCommand().getType();
+    if (ALLOWED_COMMANDS.contains(cmdType)) {
       super.onMessage(commandForDatanode, ignored);
     } else {
-      LOG.info("Ignoring unsupported command {} for Datanode {}.",
-          commandForDatanode.getCommand().getType(),
-          commandForDatanode.getDatanodeId());
+      LOG.debug("Ignoring unsupported command {} for Datanode {}.",
+          cmdType, commandForDatanode.getDatanodeId());
     }
   }
 
@@ -129,6 +133,20 @@ public class ReconNodeManager extends SCMNodeManager {
   public List<SCMCommand> processHeartbeat(DatanodeDetails datanodeDetails) {
     // Update heartbeat map with current time
     datanodeHeartbeatMap.put(datanodeDetails.getUuid(), Time.now());
-    return super.processHeartbeat(datanodeDetails);
+
+    List<SCMCommand> cmds = super.processHeartbeat(datanodeDetails);
+    return cmds.stream()
+        .filter(c -> ALLOWED_COMMANDS.contains(c.getType()))
+        .collect(toList());
+  }
+
+  @Override
+  protected void updateDatanodeOpState(DatanodeDetails reportedDn)
+      throws NodeNotFoundException {
+    super.updateDatanodeOpState(reportedDn);
+    // Update NodeOperationalState in NodeStatus to keep it consistent for Recon
+    super.getNodeStateManager().setNodeOperationalState(reportedDn,
+        reportedDn.getPersistedOpState(),
+        reportedDn.getPersistedOpStateExpiryEpochSec());
   }
 }

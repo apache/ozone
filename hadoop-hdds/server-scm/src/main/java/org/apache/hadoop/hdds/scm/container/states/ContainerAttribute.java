@@ -84,7 +84,8 @@ public class ContainerAttribute<T> {
   }
 
   /**
-   * Insert or update the value in the Attribute map.
+   * Insert the value in the Attribute map, keep the original value if it exists
+   * already.
    *
    * @param key - The key to the set where the ContainerID should exist.
    * @param value - Actual Container ID.
@@ -93,30 +94,8 @@ public class ContainerAttribute<T> {
   public boolean insert(T key, ContainerID value) throws SCMException {
     Preconditions.checkNotNull(key);
     Preconditions.checkNotNull(value);
-
-    if (attributeMap.containsKey(key)) {
-      if (attributeMap.get(key).add(value)) {
-        return true; //we inserted the value as it doesn’t exist in the set.
-      } else { // Failure indicates that this ContainerID exists in the Set
-        if (!attributeMap.get(key).remove(value)) {
-          LOG.error("Failure to remove the object from the Map.Key:{}, " +
-              "ContainerID: {}", key, value);
-          throw new SCMException("Failure to remove the object from the Map",
-              FAILED_TO_CHANGE_CONTAINER_STATE);
-        }
-        attributeMap.get(key).add(value);
-        return true;
-      }
-    } else {
-      // This key does not exist, we need to allocate this key in the map.
-      // TODO: Replace TreeSet with FoldedTreeSet from HDFS Utils.
-      // Skipping for now, since FoldedTreeSet does not have implementations
-      // for headSet and TailSet. We need those calls.
-      this.attributeMap.put(key, new TreeSet<>());
-      // This should not fail, we just allocated this object.
-      attributeMap.get(key).add(value);
-      return true;
-    }
+    attributeMap.computeIfAbsent(key, any -> new TreeSet<>()).add(value);
+    return true;
   }
 
   /**
@@ -153,7 +132,7 @@ public class ContainerAttribute<T> {
    * @return true or false
    */
   public boolean hasContainerID(T key, int id) {
-    return hasContainerID(key, ContainerID.valueof(id));
+    return hasContainerID(key, ContainerID.valueOf(id));
   }
 
   /**
@@ -230,7 +209,10 @@ public class ContainerAttribute<T> {
       throws SCMException {
     Preconditions.checkNotNull(currentKey);
     Preconditions.checkNotNull(newKey);
-
+    // Return if container attribute not changed
+    if (currentKey == newKey) {
+      return;
+    }
     boolean removed = false;
     try {
       removed = remove(currentKey, value);

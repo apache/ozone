@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
+import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -84,7 +85,7 @@ public class SimpleMockNodeManager implements NodeManager {
   }
 
   /**
-   * If the given node was registed with the nodeManager, return the
+   * If the given node was registered with the nodeManager, return the
    * NodeStatus for the node. Otherwise return a NodeStatus of "In Service
    * and Healthy".
    * @param datanodeDetails DatanodeDetails
@@ -211,6 +212,20 @@ public class SimpleMockNodeManager implements NodeManager {
     return null;
   }
 
+  /**
+   * Gets a sorted list of most or least used DatanodeUsageInfo containing
+   * healthy, in-service nodes. If the specified mostUsed is true, the returned
+   * list is in descending order of usage. Otherwise, the returned list is in
+   * ascending order of usage.
+   *
+   * @param mostUsed true if most used, false if least used
+   * @return List of DatanodeUsageInfo
+   */
+  @Override
+  public List<DatanodeUsageInfo> getMostOrLeastUsedDatanodes(boolean mostUsed) {
+    return null;
+  }
+
   @Override
   public SCMNodeMetric getNodeStat(DatanodeDetails datanodeDetails) {
     return null;
@@ -317,7 +332,7 @@ public class SimpleMockNodeManager implements NodeManager {
 
   @Override
   public Boolean isNodeRegistered(DatanodeDetails datanodeDetails) {
-    return null;
+    return false;
   }
 
 }

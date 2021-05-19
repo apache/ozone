@@ -55,6 +55,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 
@@ -67,7 +68,7 @@ public class TestFailureHandlingByClientFlushDelay {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = new Timeout(300000);
+  public Timeout timeout = Timeout.seconds(300);
 
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf;
@@ -177,13 +178,13 @@ public class TestFailureHandlingByClientFlushDelay {
 
     // Assert that 1 block will be preallocated
     Assert.assertEquals(1, streamEntryList.size());
-    key.write(data.getBytes());
+    key.write(data.getBytes(UTF_8));
     key.flush();
     long containerId = streamEntryList.get(0).getBlockID().getContainerID();
     BlockID blockId = streamEntryList.get(0).getBlockID();
     ContainerInfo container =
         cluster.getStorageContainerManager().getContainerManager()
-            .getContainer(ContainerID.valueof(containerId));
+            .getContainer(ContainerID.valueOf(containerId));
     Pipeline pipeline =
         cluster.getStorageContainerManager().getPipelineManager()
             .getPipeline(container.getPipelineID());
@@ -194,7 +195,7 @@ public class TestFailureHandlingByClientFlushDelay {
     cluster.shutdownHddsDatanode(datanodes.get(0));
     cluster.shutdownHddsDatanode(datanodes.get(1));
 
-    key.write(data.getBytes());
+    key.write(data.getBytes(UTF_8));
     key.flush();
     Assert.assertTrue(
         keyOutputStream.getExcludeList().getContainerIds().isEmpty());
@@ -202,7 +203,7 @@ public class TestFailureHandlingByClientFlushDelay {
         keyOutputStream.getExcludeList().getDatanodes().isEmpty());
     Assert.assertTrue(
         keyOutputStream.getExcludeList().getDatanodes().isEmpty());
-    key.write(data.getBytes());
+    key.write(data.getBytes(UTF_8));
     // The close will just write to the buffer
     key.close();
 
@@ -217,8 +218,8 @@ public class TestFailureHandlingByClientFlushDelay {
     Assert.assertNotEquals(
         keyInfo.getLatestVersionLocations().getBlocksLatestVersionOnly().get(0)
             .getBlockID(), blockId);
-    Assert.assertEquals(3 * data.getBytes().length, keyInfo.getDataSize());
-    validateData(keyName, data.concat(data).concat(data).getBytes());
+    Assert.assertEquals(3 * data.getBytes(UTF_8).length, keyInfo.getDataSize());
+    validateData(keyName, data.concat(data).concat(data).getBytes(UTF_8));
   }
 
   private OzoneOutputStream createKey(String keyName, ReplicationType type,

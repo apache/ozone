@@ -40,7 +40,7 @@ import static org.junit.Assert.assertEquals;
 public class TestBlockData {
   static final Logger LOG = LoggerFactory.getLogger(TestBlockData.class);
   @Rule
-  public TestRule timeout = new Timeout(10000);
+  public TestRule timeout = Timeout.seconds(10);
 
   static ContainerProtos.ChunkInfo buildChunkInfo(String name, long offset,
       long len) {
@@ -138,7 +138,7 @@ public class TestBlockData {
     final BlockID blockID = new BlockID(5, 123);
     blockID.setBlockCommitSequenceId(42);
     final BlockData subject = new BlockData(blockID);
-    assertEquals("[blockId=conID: 5 locID: 123 bcsId: 42,size=0]",
+    assertEquals("[blockId=conID: 5 locID: 123 bcsId: 42, size=0]",
         subject.toString());
   }
 }

@@ -22,9 +22,23 @@ cd "$DIR/../../.." || exit 1
 : ${CHECK:="unit"}
 : ${ITERATIONS:="1"}
 
-export MAVEN_OPTS="-Xmx4096m"
+declare -i ITERATIONS
+if [[ ${ITERATIONS} -le 0 ]]; then
+  ITERATIONS=1
+fi
+
+export MAVEN_OPTS="-Xmx4096m $MAVEN_OPTS"
 MAVEN_OPTIONS='-B -Dskip.npx -Dskip.installnpx'
-mvn ${MAVEN_OPTIONS} -DskipTests clean install
+
+if [[ "${FAIL_FAST:-}" == "true" ]]; then
+  MAVEN_OPTIONS="${MAVEN_OPTIONS} --fail-fast -Dsurefire.skipAfterFailureCount=1"
+else
+  MAVEN_OPTIONS="${MAVEN_OPTIONS} --fail-at-end"
+fi
+
+if [[ "${CHECK}" == "integration" ]] || [[ ${ITERATIONS} -gt 1 ]]; then
+  mvn ${MAVEN_OPTIONS} -DskipTests clean install
+fi
 
 REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/${CHECK}"}
 mkdir -p "$REPORT_DIR"
@@ -37,7 +51,7 @@ for i in $(seq 1 ${ITERATIONS}); do
     mkdir -p "${REPORT_DIR}"
   fi
 
-  mvn ${MAVEN_OPTIONS} -fae "$@" test \
+  mvn ${MAVEN_OPTIONS} "$@" test \
     | tee "${REPORT_DIR}/output.log"
   irc=$?
 

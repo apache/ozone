@@ -108,7 +108,8 @@ public class BasicOzoneFileSystem extends FileSystem {
       "should be one of the following formats: " +
       "o3fs://bucket.volume/key  OR " +
       "o3fs://bucket.volume.om-host.example.com/key  OR " +
-      "o3fs://bucket.volume.om-host.example.com:5678/key";
+      "o3fs://bucket.volume.om-host.example.com:5678/key  OR " +
+      "o3fs://bucket.volume.omServiceId/key";
 
   @Override
   public void initialize(URI name, Configuration conf) throws IOException {
@@ -408,6 +409,7 @@ public class BasicOzoneFileSystem extends FileSystem {
    * Intercept rename to trash calls from TrashPolicyDefault.
    */
   @Deprecated
+  @Override
   protected void rename(final Path src, final Path dst,
       final Rename... options) throws IOException {
     boolean hasMoveToTrash = false;
@@ -763,6 +765,16 @@ public class BasicOzoneFileSystem extends FileSystem {
     return super.getFileChecksum(f, length);
   }
 
+  @Override
+  protected Path fixRelativePart(Path p) {
+    String pathPatternString = p.toUri().getPath();
+    if (pathPatternString.isEmpty()) {
+      return new Path("/");
+    } else {
+      return super.fixRelativePart(p);
+    }
+  }
+   
   @Override
   public FileStatus[] globStatus(Path pathPattern) throws IOException {
     incrementCounter(Statistic.INVOCATION_GLOB_STATUS);

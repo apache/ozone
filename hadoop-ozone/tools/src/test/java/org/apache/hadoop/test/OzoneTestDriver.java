@@ -50,7 +50,9 @@ public class OzoneTestDriver {
       e.printStackTrace();
     }
 
-    System.exit(exitCode);
+    if (exitCode != 0) {
+      throw new RuntimeException();
+    }
   }
 
   public static void main(String[] args){

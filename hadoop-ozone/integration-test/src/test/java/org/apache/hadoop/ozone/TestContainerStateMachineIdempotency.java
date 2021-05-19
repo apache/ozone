@@ -43,8 +43,11 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.io.IOException;
+
 import org.junit.Rule;
 import org.junit.rules.Timeout;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
  * Tests the idempotent operations in ContainerStateMachine.
@@ -55,7 +58,7 @@ public class TestContainerStateMachineIdempotency {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = new Timeout(300000);
+  public Timeout timeout = Timeout.seconds(300);
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration ozoneConfig;
   private static StorageContainerLocationProtocolClientSideTranslatorPB
@@ -97,7 +100,8 @@ public class TestContainerStateMachineIdempotency {
       // call create Container again
       BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
       byte[] data =
-          RandomStringUtils.random(RandomUtils.nextInt(0, 1024)).getBytes();
+          RandomStringUtils.random(RandomUtils.nextInt(0, 1024))
+              .getBytes(UTF_8);
       ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
           ContainerTestHelper
               .getWriteChunkRequest(container.getPipeline(), blockID,

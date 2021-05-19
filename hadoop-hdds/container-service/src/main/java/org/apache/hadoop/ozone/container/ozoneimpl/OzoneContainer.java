@@ -19,12 +19,14 @@
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
 import java.io.IOException;
+import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -35,10 +37,10 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
-import org.apache.hadoop.hdds.ratis.RatisHelper;
-import org.apache.hadoop.hdds.security.token.BlockTokenVerifier;
+import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
+import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
@@ -61,6 +63,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT;
+
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -86,8 +89,13 @@ public class OzoneContainer {
   private List<ContainerDataScanner> dataScanners;
   private final BlockDeletingService blockDeletingService;
   private final GrpcTlsConfig tlsClientConfig;
+  private final AtomicReference<InitializingStatus> initializingStatus;
   private final ReplicationServer replicationServer;
   private DatanodeDetails datanodeDetails;
+
+  enum InitializingStatus {
+    UNINITIALIZED, INITIALIZING, INITIALIZED
+  }
 
   /**
    * Construct OzoneContainer object.
@@ -110,7 +118,7 @@ public class OzoneContainer {
     containerSet = new ContainerSet();
     metadataScanner = null;
 
-    buildContainerSet();
+    buildContainerSet(volumeSet, containerSet, config);
     final ContainerMetrics metrics = ContainerMetrics.create(conf);
     handlers = Maps.newHashMap();
 
@@ -133,8 +141,7 @@ public class OzoneContainer {
 
     SecurityConfig secConf = new SecurityConfig(conf);
     hddsDispatcher = new HddsDispatcher(config, containerSet, volumeSet,
-        handlers, context, metrics, secConf.isBlockTokenEnabled()?
-        new BlockTokenVerifier(secConf, certClient) : null);
+        handlers, context, metrics, TokenVerifier.create(secConf, certClient));
 
     /*
      * ContainerController is the control plane
@@ -165,8 +172,19 @@ public class OzoneContainer {
     blockDeletingService =
         new BlockDeletingService(this, svcInterval.toMillis(), serviceTimeout,
             TimeUnit.MILLISECONDS, config);
-    tlsClientConfig = RatisHelper.createTlsClientConfig(
-        secConf, certClient != null ? certClient.getCACertificate() : null);
+
+    if (certClient != null && secConf.isGrpcTlsEnabled()) {
+      List<X509Certificate> x509Certificates =
+          HAUtils.buildCAX509List(certClient, conf);
+      tlsClientConfig = new GrpcTlsConfig(
+          certClient.getPrivateKey(), certClient.getCertificate(),
+          x509Certificates, true);
+    } else {
+      tlsClientConfig = null;
+    }
+
+    initializingStatus =
+        new AtomicReference<>(InitializingStatus.UNINITIALIZED);
   }
 
   public GrpcTlsConfig getTlsClientConfig() {
@@ -178,7 +196,8 @@ public class OzoneContainer {
   /**
    * Build's container map.
    */
-  private void buildContainerSet() {
+  public static void buildContainerSet(MutableVolumeSet volumeSet,
+        ContainerSet containerSet, ConfigurationSource config) {
     Iterator<HddsVolume> volumeSetIterator = volumeSet.getVolumesList()
         .iterator();
     ArrayList<Thread> volumeThreads = new ArrayList<>();
@@ -251,7 +270,25 @@ public class OzoneContainer {
    *
    * @throws IOException
    */
-  public void start(String scmId) throws IOException {
+  public void start(String clusterId) throws IOException {
+    // If SCM HA is enabled, OzoneContainer#start() will be called multi-times
+    // from VersionEndpointTask. The first call should do the initializing job,
+    // the successive calls should wait until OzoneContainer is initialized.
+    if (!initializingStatus.compareAndSet(
+        InitializingStatus.UNINITIALIZED, InitializingStatus.INITIALIZING)) {
+
+      // wait OzoneContainer to finish its initializing.
+      while (initializingStatus.get() != InitializingStatus.INITIALIZED) {
+        try {
+          Thread.sleep(1);
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+        }
+      }
+      LOG.info("Ignore. OzoneContainer already started.");
+      return;
+    }
+
     LOG.info("Attempting to start container services.");
     startContainerScrub();
 
@@ -261,8 +298,11 @@ public class OzoneContainer {
     writeChannel.start();
     readChannel.start();
     hddsDispatcher.init();
-    hddsDispatcher.setScmId(scmId);
+    hddsDispatcher.setClusterId(clusterId);
     blockDeletingService.start();
+
+    // mark OzoneContainer as INITIALIZED.
+    initializingStatus.set(InitializingStatus.INITIALIZED);
   }
 
   /**
@@ -347,4 +387,5 @@ public class OzoneContainer {
   public MutableVolumeSet getVolumeSet() {
     return volumeSet;
   }
+
 }

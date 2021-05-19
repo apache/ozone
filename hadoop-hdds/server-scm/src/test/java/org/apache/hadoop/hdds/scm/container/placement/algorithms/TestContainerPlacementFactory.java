@@ -18,20 +18,23 @@ package org.apache.hadoop.hdds.scm.container.placement.algorithms;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
+import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.net.NodeSchema;
 import org.apache.hadoop.hdds.scm.net.NodeSchemaManager;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.junit.Assert;
@@ -43,7 +46,6 @@ import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
 
-import static org.mockito.Matchers.anyObject;
 import static org.mockito.Mockito.when;
 
 /**
@@ -53,9 +55,9 @@ public class TestContainerPlacementFactory {
   // network topology cluster
   private NetworkTopology cluster;
   // datanodes array list
-  private List<DatanodeDetails> datanodes = new ArrayList<>();
+  private List<DatanodeInfo> datanodes = new ArrayList<>();
   // node storage capacity
-  private final long storageCapacity = 100L;
+  private static final long STORAGE_CAPACITY = 100L;
   // configuration
   private OzoneConfiguration conf;
   // node manager
@@ -82,24 +84,43 @@ public class TestContainerPlacementFactory {
     String hostname = "node";
     for (int i = 0; i < 15; i++) {
       // Totally 3 racks, each has 5 datanodes
-      DatanodeDetails node = MockDatanodeDetails.createDatanodeDetails(
-          hostname + i, rack + (i / 5));
-      datanodes.add(node);
-      cluster.add(node);
+      DatanodeInfo datanodeInfo = new DatanodeInfo(
+          MockDatanodeDetails.createDatanodeDetails(
+          hostname + i, rack + (i / 5)), NodeStatus.inServiceHealthy());
+
+      StorageReportProto storage1 = TestUtils.createStorageReport(
+          datanodeInfo.getUuid(), "/data1-" + datanodeInfo.getUuidString(),
+          STORAGE_CAPACITY, 0, 100L, null);
+      datanodeInfo.updateStorageReports(
+          new ArrayList<>(Arrays.asList(storage1)));
+
+      datanodes.add(datanodeInfo);
+      cluster.add(datanodeInfo);
     }
+
+    StorageReportProto storage2 = TestUtils.createStorageReport(
+        datanodes.get(2).getUuid(),
+        "/data1-" + datanodes.get(2).getUuidString(),
+        STORAGE_CAPACITY, 90L, 10L, null);
+    datanodes.get(2).updateStorageReports(
+        new ArrayList<>(Arrays.asList(storage2)));
+    StorageReportProto storage3 = TestUtils.createStorageReport(
+        datanodes.get(3).getUuid(),
+        "/data1-" + datanodes.get(3).getUuidString(),
+        STORAGE_CAPACITY, 80L, 20L, null);
+    datanodes.get(3).updateStorageReports(
+        new ArrayList<>(Arrays.asList(storage3)));
+    StorageReportProto storage4 = TestUtils.createStorageReport(
+        datanodes.get(4).getUuid(),
+        "/data1-" + datanodes.get(4).getUuidString(),
+        STORAGE_CAPACITY, 70L, 30L, null);
+    datanodes.get(4).updateStorageReports(
+        new ArrayList<>(Arrays.asList(storage4)));
 
     // create mock node manager
     nodeManager = Mockito.mock(NodeManager.class);
     when(nodeManager.getNodes(NodeStatus.inServiceHealthy()))
         .thenReturn(new ArrayList<>(datanodes));
-    when(nodeManager.getNodeStat(anyObject()))
-        .thenReturn(new SCMNodeMetric(storageCapacity, 0L, 100L));
-    when(nodeManager.getNodeStat(datanodes.get(2)))
-        .thenReturn(new SCMNodeMetric(storageCapacity, 90L, 10L));
-    when(nodeManager.getNodeStat(datanodes.get(3)))
-        .thenReturn(new SCMNodeMetric(storageCapacity, 80L, 20L));
-    when(nodeManager.getNodeStat(datanodes.get(4)))
-        .thenReturn(new SCMNodeMetric(storageCapacity, 70L, 30L));
 
     PlacementPolicy policy = ContainerPlacementPolicyFactory
         .getPolicy(conf, nodeManager, cluster, true,

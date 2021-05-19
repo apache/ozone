@@ -19,13 +19,19 @@
 
 package org.apache.hadoop.hdds.security.x509.certificate.authority;
 
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-
+import org.apache.hadoop.hdds.security.x509.certificate.CertInfo;
+import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
+import org.bouncycastle.asn1.x509.CRLReason;
+import org.bouncycastle.cert.X509CertificateHolder;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
+import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
 import java.util.Collections;
+import java.util.Date;
 import java.util.List;
+import java.util.Optional;
 
 /**
  *
@@ -33,14 +39,28 @@ import java.util.List;
 public class MockCAStore implements CertificateStore {
   @Override
   public void storeValidCertificate(BigInteger serialID,
-                                    X509Certificate certificate)
+      X509Certificate certificate, NodeType role)
       throws IOException {
 
   }
 
   @Override
-  public void revokeCertificate(BigInteger serialID) throws IOException {
+  public void checkValidCertID(BigInteger serialID) throws IOException {
+  }
 
+  @Override
+  public void storeValidScmCertificate(BigInteger serialID,
+      X509Certificate certificate) throws IOException {
+  }
+
+  @Override
+  public Optional<Long> revokeCertificates(
+      List<BigInteger> serialIDs,
+      X509CertificateHolder caCertificateHolder,
+      CRLReason reason,
+      Date revocationTime,
+      CRLApprover approver) throws IOException {
+    return Optional.empty();
   }
 
   @Override
@@ -57,9 +77,28 @@ public class MockCAStore implements CertificateStore {
   }
 
   @Override
-  public List<X509Certificate> listCertificate(HddsProtos.NodeType role,
+  public CertInfo getRevokedCertificateInfoByID(BigInteger serialID)
+      throws IOException {
+    return null;
+  }
+
+  @Override
+  public List<X509Certificate> listCertificate(NodeType role,
       BigInteger startSerialID, int count, CertType certType)
       throws IOException {
     return Collections.emptyList();
+  }
+
+  @Override
+  public void reinitialize(SCMMetadataStore metadataStore) {}
+
+  @Override
+  public List<CRLInfo> getCrls(List<Long> crlIds) throws IOException {
+    return Collections.emptyList();
+  }
+
+  @Override
+  public long getLatestCrlId() {
+    return 0;
   }
 }

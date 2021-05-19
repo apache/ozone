@@ -19,6 +19,8 @@
 package org.apache.hadoop.hdds.scm.storage;
 
 import java.io.EOFException;
+import java.nio.ByteBuffer;
+import java.util.List;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -49,8 +51,8 @@ public class TestChunkInputStream {
   private static final int BYTES_PER_CHECKSUM = 20;
   private static final String CHUNK_NAME = "dummyChunk";
   private static final Random RANDOM = new Random();
-  private static Checksum checksum;
 
+  private Checksum checksum;
   private DummyChunkInputStream chunkStream;
   private ChunkInfo chunkInfo;
   private byte[] chunkData;
@@ -94,6 +96,19 @@ public class TestChunkInputStream {
     }
   }
 
+  private void matchWithInputData(List<ByteString> byteStrings,
+      int inputDataStartIndex, int length) {
+    int offset = inputDataStartIndex;
+    int totalBufferLen = 0;
+    for (ByteString byteString : byteStrings) {
+      int bufferLen = byteString.size();
+      matchWithInputData(byteString.toByteArray(), offset, bufferLen);
+      offset += bufferLen;
+      totalBufferLen += bufferLen;
+    }
+    Assert.assertEquals(length, totalBufferLen);
+  }
+
   /**
    * Seek to a position and verify through getPos().
    */
@@ -123,10 +138,9 @@ public class TestChunkInputStream {
     // To read chunk data from index 0 to 49 (len = 50), we need to read
     // chunk from offset 0 to 60 as the checksum boundary is at every 20
     // bytes. Verify that 60 bytes of chunk data are read and stored in the
-    // buffers.
-    matchWithInputData(chunkStream.getReadByteBuffers().get(0).toByteArray(),
-        0, 60);
-
+    // buffers. Since checksum boundary is at every 20 bytes, there should be
+    // 60/20 number of buffers.
+    matchWithInputData(chunkStream.getReadByteBuffers(), 0, 60);
   }
 
   @Test
@@ -152,23 +166,32 @@ public class TestChunkInputStream {
     byte[] b = new byte[30];
     chunkStream.read(b, 0, 30);
     matchWithInputData(b, 25, 30);
-    matchWithInputData(chunkStream.getReadByteBuffers().get(0).toByteArray(),
-        20, 40);
+    matchWithInputData(chunkStream.getReadByteBuffers(), 20, 40);
 
     // After read, the position of the chunkStream is evaluated from the
     // buffers and the chunkPosition should be reset to -1.
     Assert.assertEquals(-1, chunkStream.getChunkPosition());
 
-    // Seek to a position within the current buffers. Current buffers contain
-    // data from index 20 to 59. ChunkPosition should still not be used to
-    // set the position.
-    seekAndVerify(35);
+    // Only the last BYTES_PER_CHECKSUM will be cached in the buffers as
+    // buffers are released after each checksum boundary is read. So the
+    // buffers should contain data from index 40 to 59.
+    // Seek to a position within the cached buffers. ChunkPosition should
+    // still not be used to set the position.
+    seekAndVerify(45);
     Assert.assertEquals(-1, chunkStream.getChunkPosition());
 
-    // Seek to a position outside the current buffers. In this case, the
+    // Seek to a position outside the current cached buffers. In this case, the
     // chunkPosition should be updated to the seeked position.
     seekAndVerify(75);
     Assert.assertEquals(75, chunkStream.getChunkPosition());
+
+    // Read upto checksum boundary should result in all the buffers being
+    // released and hence chunkPosition updated with current position of chunk.
+    seekAndVerify(25);
+    b = new byte[15];
+    chunkStream.read(b, 0, 15);
+    matchWithInputData(b, 25, 15);
+    Assert.assertEquals(40, chunkStream.getChunkPosition());
   }
 
   @Test
@@ -216,18 +239,23 @@ public class TestChunkInputStream {
     ChunkInputStream subject = new ChunkInputStream(chunkInfo, null,
         clientFactory, pipelineRef::get, false, null) {
       @Override
-      protected ByteString readChunk(ChunkInfo readChunkInfo) {
-        return ByteString.copyFrom(chunkData);
+      protected ByteBuffer[] readChunk(ChunkInfo readChunkInfo) {
+        return ByteString.copyFrom(chunkData).asReadOnlyByteBufferList()
+            .toArray(new ByteBuffer[0]);
       }
     };
 
-    // WHEN
-    subject.unbuffer();
-    pipelineRef.set(newPipeline);
-    int b = subject.read();
+    try {
+      // WHEN
+      subject.unbuffer();
+      pipelineRef.set(newPipeline);
+      int b = subject.read();
 
-    // THEN
-    Assert.assertNotEquals(-1, b);
-    verify(clientFactory).acquireClientForReadData(newPipeline);
+      // THEN
+      Assert.assertNotEquals(-1, b);
+      verify(clientFactory).acquireClientForReadData(newPipeline);
+    } finally {
+      subject.close();
+    }
   }
 }

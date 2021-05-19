@@ -19,6 +19,8 @@ package org.apache.hadoop.ozone.insight;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
+import java.io.UnsupportedEncodingException;
+import java.nio.charset.StandardCharsets;
 
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
@@ -41,7 +43,7 @@ public class TestConfigurationSubCommand {
 
   @Before
   public void setup() throws Exception {
-    System.setOut(new PrintStream(out));
+    System.setOut(new PrintStream(out, false, StandardCharsets.UTF_8.name()));
   }
 
   @After
@@ -50,14 +52,14 @@ public class TestConfigurationSubCommand {
   }
 
   @Test
-  public void testPrintConfig() {
+  public void testPrintConfig() throws UnsupportedEncodingException {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set("ozone.scm.client.address", "omclient");
     ConfigurationSubCommand subCommand = new ConfigurationSubCommand();
 
     subCommand.printConfig(CustomConfig.class, conf);
 
-    final String output = out.toString();
+    final String output = out.toString(StandardCharsets.UTF_8.name());
     Assert.assertTrue(output.contains(">>> ozone.scm.client.address"));
     Assert.assertTrue(output.contains("default: localhost"));
     Assert.assertTrue(output.contains("current: omclient"));
@@ -86,7 +88,7 @@ public class TestConfigurationSubCommand {
   public static class CustomConfig extends ParentConfig {
 
     @Config(key = "address", defaultValue = "localhost", description = "Client "
-        + "addres (To test string injection).", tags = ConfigTag.MANAGEMENT)
+        + "address (To test string injection).", tags = ConfigTag.MANAGEMENT)
     private String clientAddress;
 
     public String getClientAddress() {

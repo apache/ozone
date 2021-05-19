@@ -40,6 +40,7 @@ message ScmContainerLocationRequest {
   // A string that identifies this command, we generate  Trace ID in Ozone
   // frontend and this allows us to trace that command all over ozone.
   optional string traceID = 2;
+  optional uint32 version = 3;
 
   optional ContainerRequestProto containerRequest = 6;
   optional GetContainerRequestProto getContainerRequest = 7;
@@ -65,6 +66,9 @@ message ScmContainerLocationRequest {
   optional DecommissionNodesRequestProto decommissionNodesRequest = 27;
   optional RecommissionNodesRequestProto recommissionNodesRequest = 28;
   optional StartMaintenanceNodesRequestProto startMaintenanceNodesRequest = 29;
+  optional DatanodeUsageInfoRequestProto DatanodeUsageInfoRequest = 30;
+  optional GetExistContainerWithPipelinesInBatchRequestProto getExistContainerWithPipelinesInBatchRequest = 31;
+  optional GetContainerTokenRequestProto containerTokenRequest = 32;
 }
 
 message ScmContainerLocationResponse {
@@ -102,10 +106,15 @@ message ScmContainerLocationResponse {
   optional DecommissionNodesResponseProto decommissionNodesResponse = 27;
   optional RecommissionNodesResponseProto recommissionNodesResponse = 28;
   optional StartMaintenanceNodesResponseProto startMaintenanceNodesResponse = 29;
+  optional DatanodeUsageInfoResponseProto DatanodeUsageInfoResponse = 30;
+  optional GetExistContainerWithPipelinesInBatchResponseProto getExistContainerWithPipelinesInBatchResponse = 31;
+  optional GetContainerTokenResponseProto containerTokenResponse = 32;
+
   enum Status {
     OK = 1;
     CONTAINER_ALREADY_EXISTS = 2;
     CONTAINER_IS_MISSING = 3;
+    SCM_NOT_LEADER = 4;
   }
 }
 
@@ -135,6 +144,9 @@ enum Type {
   DecommissionNodes = 22;
   RecommissionNodes = 23;
   StartMaintenanceNodes = 24;
+  DatanodeUsageInfo = 25;
+  GetExistContainerWithPipelinesInBatch = 26;
+  GetContainerToken = 27;
 }
 
 /**
@@ -156,6 +168,7 @@ message ContainerResponseProto {
     success = 1;
     errorContainerAlreadyExists = 2;
     errorContainerMissing = 3;
+    scmNotLeader = 4;
   }
   required Error errorCode = 1;
   required ContainerWithPipeline containerWithPipeline = 2;
@@ -187,6 +200,11 @@ message GetContainerWithPipelineBatchRequestProto {
   optional string traceID = 2;
 }
 
+message GetExistContainerWithPipelinesInBatchRequestProto {
+  repeated int64 containerIDs = 1;
+  optional string traceID = 2;
+}
+
 message GetSafeModeRuleStatusesRequestProto {
 }
 
@@ -204,10 +222,15 @@ message GetContainerWithPipelineBatchResponseProto {
   repeated ContainerWithPipeline containerWithPipelines = 1;
 }
 
+message GetExistContainerWithPipelinesInBatchResponseProto {
+  repeated ContainerWithPipeline containerWithPipelines = 1;
+}
+
 message SCMListContainerRequestProto {
   required uint32 count = 1;
   optional uint64 startContainerID = 2;
   optional string traceID = 3;
+  optional LifeCycleState state = 4;
 }
 
 message SCMListContainerResponseProto {
@@ -250,14 +273,34 @@ message NodeQueryResponseProto {
 }
 
 /*
+  Datanode usage info request message.
+*/
+message DatanodeUsageInfoRequestProto {
+  optional string ipaddress = 1;
+  optional string uuid = 2;
+  optional bool mostUsed = 3;
+  optional uint32 count = 4;
+}
+
+message DatanodeUsageInfoResponseProto {
+  repeated DatanodeUsageInfoProto info = 1;
+}
+
+/*
   Decommission a list of hosts
 */
 message DecommissionNodesRequestProto {
   repeated string hosts = 1;
 }
 
+
+message DatanodeAdminErrorResponseProto {
+  required string host = 1;
+  required string error = 2;
+}
+
 message DecommissionNodesResponseProto {
-  // empty response
+  repeated DatanodeAdminErrorResponseProto failedHosts = 1;
 }
 
 /*
@@ -268,7 +311,7 @@ message RecommissionNodesRequestProto {
 }
 
 message RecommissionNodesResponseProto {
-  // empty response
+  repeated DatanodeAdminErrorResponseProto failedHosts = 1;
 }
 
 /*
@@ -280,7 +323,7 @@ message StartMaintenanceNodesRequestProto {
 }
 
 message StartMaintenanceNodesResponseProto {
-  // empty response
+  repeated DatanodeAdminErrorResponseProto failedHosts = 1;
 }
 
 /**
@@ -297,7 +340,7 @@ message PipelineRequestProto {
   optional string traceID = 5;
 }
 
-message  PipelineResponseProto {
+message PipelineResponseProto {
   enum Error {
     success = 1;
     errorPipelineAlreadyExists = 2;
@@ -385,6 +428,21 @@ message ReplicationManagerStatusRequestProto {
 
 message ReplicationManagerStatusResponseProto {
   required bool isRunning = 1;
+}
+
+message ContainerTokenSecretProto {
+    required string ownerId = 1;
+    required ContainerID containerId = 2;
+    required uint64 expiryDate = 3;
+    required string certSerialId = 4;
+}
+
+message GetContainerTokenRequestProto {
+  required ContainerID containerID = 1;
+}
+
+message GetContainerTokenResponseProto {
+  required TokenProto token = 1;
 }
 
 /**

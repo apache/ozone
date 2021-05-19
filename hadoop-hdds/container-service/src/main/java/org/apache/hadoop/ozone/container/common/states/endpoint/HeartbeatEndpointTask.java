@@ -271,6 +271,9 @@ public class HeartbeatEndpointTask
         DeleteBlocksCommand db = DeleteBlocksCommand
             .getFromProtobuf(
                 commandResponseProto.getDeleteBlocksCommandProto());
+        if (commandResponseProto.hasTerm()) {
+          db.setTerm(commandResponseProto.getTerm());
+        }
         if (!db.blocksTobeDeleted().isEmpty()) {
           if (LOG.isDebugEnabled()) {
             LOG.debug(DeletedContainerBlocksSummary
@@ -284,6 +287,9 @@ public class HeartbeatEndpointTask
         CloseContainerCommand closeContainer =
             CloseContainerCommand.getFromProtobuf(
                 commandResponseProto.getCloseContainerCommandProto());
+        if (commandResponseProto.hasTerm()) {
+          closeContainer.setTerm(commandResponseProto.getTerm());
+        }
         if (LOG.isDebugEnabled()) {
           LOG.debug("Received SCM container close request for container {}",
               closeContainer.getContainerID());
@@ -294,6 +300,9 @@ public class HeartbeatEndpointTask
         ReplicateContainerCommand replicateContainerCommand =
             ReplicateContainerCommand.getFromProtobuf(
                 commandResponseProto.getReplicateContainerCommandProto());
+        if (commandResponseProto.hasTerm()) {
+          replicateContainerCommand.setTerm(commandResponseProto.getTerm());
+        }
         if (LOG.isDebugEnabled()) {
           LOG.debug("Received SCM container replicate request for container {}",
               replicateContainerCommand.getContainerID());
@@ -304,6 +313,9 @@ public class HeartbeatEndpointTask
         DeleteContainerCommand deleteContainerCommand =
             DeleteContainerCommand.getFromProtobuf(
                 commandResponseProto.getDeleteContainerCommandProto());
+        if (commandResponseProto.hasTerm()) {
+          deleteContainerCommand.setTerm(commandResponseProto.getTerm());
+        }
         if (LOG.isDebugEnabled()) {
           LOG.debug("Received SCM delete container request for container {}",
               deleteContainerCommand.getContainerID());
@@ -314,6 +326,9 @@ public class HeartbeatEndpointTask
         CreatePipelineCommand createPipelineCommand =
             CreatePipelineCommand.getFromProtobuf(
                 commandResponseProto.getCreatePipelineCommandProto());
+        if (commandResponseProto.hasTerm()) {
+          createPipelineCommand.setTerm(commandResponseProto.getTerm());
+        }
         if (LOG.isDebugEnabled()) {
           LOG.debug("Received SCM create pipeline request {}",
               createPipelineCommand.getPipelineID());
@@ -324,6 +339,9 @@ public class HeartbeatEndpointTask
         ClosePipelineCommand closePipelineCommand =
             ClosePipelineCommand.getFromProtobuf(
                 commandResponseProto.getClosePipelineCommandProto());
+        if (commandResponseProto.hasTerm()) {
+          closePipelineCommand.setTerm(commandResponseProto.getTerm());
+        }
         if (LOG.isDebugEnabled()) {
           LOG.debug("Received SCM close pipeline request {}",
               closePipelineCommand.getPipelineID());
@@ -334,6 +352,10 @@ public class HeartbeatEndpointTask
         SetNodeOperationalStateCommand setNodeOperationalStateCommand =
             SetNodeOperationalStateCommand.getFromProtobuf(
                 commandResponseProto.getSetNodeOperationalStateCommandProto());
+        if (commandResponseProto.hasTerm()) {
+          setNodeOperationalStateCommand.setTerm(
+              commandResponseProto.getTerm());
+        }
         if (LOG.isDebugEnabled()) {
           LOG.debug("Received SCM set operational state command. State: {} " +
               "Expiry: {}", setNodeOperationalStateCommand.getOpState(),
@@ -421,7 +443,7 @@ public class HeartbeatEndpointTask
 
       if (datanodeDetails == null) {
         LOG.error("No datanode specified.");
-        throw new IllegalArgumentException("A vaild Node ID is needed to " +
+        throw new IllegalArgumentException("A valid Node ID is needed to " +
             "construct HeartbeatEndpointTask task");
       }
 

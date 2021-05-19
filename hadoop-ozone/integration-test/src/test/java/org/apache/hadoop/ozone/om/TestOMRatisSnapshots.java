@@ -27,38 +27,37 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
+import org.apache.hadoop.ozone.MiniOzoneOMHAClusterImpl;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
-import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
-import org.apache.hadoop.ozone.util.ExitManager;
+import org.apache.hadoop.hdds.ExitManager;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.ratis.server.protocol.TermIndex;
 
 import static org.apache.hadoop.ozone.om.TestOzoneManagerHAWithData.createKey;
 import static org.junit.Assert.assertTrue;
 
-import org.junit.After;
 import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.event.Level;
 
 /**
  * Tests the Ratis snaphsots feature in OM.
  */
+@Timeout(500)
 public class TestOMRatisSnapshots {
 
-  private MiniOzoneHAClusterImpl cluster = null;
+  private MiniOzoneOMHAClusterImpl cluster = null;
   private ObjectStore objectStore;
   private OzoneConfiguration conf;
   private String clusterId;
@@ -72,12 +71,6 @@ public class TestOMRatisSnapshots {
   private static final long SNAPSHOT_THRESHOLD = 50;
   private static final int LOG_PURGE_GAP = 50;
 
-  @Rule
-  public ExpectedException exception = ExpectedException.none();
-
-  @Rule
-  public Timeout timeout = new Timeout(500_000);
-
   /**
    * Create a MiniOzoneCluster for testing. The cluster initially has one
    * inactive OM. So at the start of the cluster, there will be 2 active and 1
@@ -85,7 +78,7 @@ public class TestOMRatisSnapshots {
    *
    * @throws IOException
    */
-  @Before
+  @BeforeEach
   public void init() throws Exception {
     conf = new OzoneConfiguration();
     clusterId = UUID.randomUUID().toString();
@@ -95,7 +88,7 @@ public class TestOMRatisSnapshots {
     conf.setLong(
         OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY,
         SNAPSHOT_THRESHOLD);
-    cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
+    cluster = (MiniOzoneOMHAClusterImpl) MiniOzoneCluster.newOMHABuilder(conf)
         .setClusterId(clusterId)
         .setScmId(scmId)
         .setOMServiceId("om-service-test1")
@@ -124,7 +117,7 @@ public class TestOMRatisSnapshots {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @After
+  @AfterEach
   public void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
@@ -142,9 +135,9 @@ public class TestOMRatisSnapshots {
     OzoneManagerRatisServer leaderRatisServer = leaderOM.getOmRatisServer();
 
     // Find the inactive OM
-    String followerNodeId = leaderOM.getPeerNodes().get(0).getOMNodeId();
+    String followerNodeId = leaderOM.getPeerNodes().get(0).getNodeId();
     if (cluster.isOMActive(followerNodeId)) {
-      followerNodeId = leaderOM.getPeerNodes().get(1).getOMNodeId();
+      followerNodeId = leaderOM.getPeerNodes().get(1).getNodeId();
     }
     OzoneManager followerOM = cluster.getOzoneManager(followerNodeId);
 
@@ -152,11 +145,11 @@ public class TestOMRatisSnapshots {
     List<String> keys = writeKeysToIncreaseLogIndex(leaderRatisServer, 200);
 
     // Get the latest db checkpoint from the leader OM.
-    OMTransactionInfo omTransactionInfo =
-        OMTransactionInfo.readTransactionInfo(leaderOM.getMetadataManager());
+    TransactionInfo transactionInfo =
+        TransactionInfo.readTransactionInfo(leaderOM.getMetadataManager());
     TermIndex leaderOMTermIndex =
-        TermIndex.valueOf(omTransactionInfo.getTerm(),
-            omTransactionInfo.getTransactionIndex());
+        TermIndex.valueOf(transactionInfo.getTerm(),
+            transactionInfo.getTransactionIndex());
     long leaderOMSnaphsotIndex = leaderOMTermIndex.getIndex();
     long leaderOMSnapshotTermIndex = leaderOMTermIndex.getTerm();
 
@@ -207,9 +200,9 @@ public class TestOMRatisSnapshots {
     OzoneManager leaderOM = cluster.getOzoneManager(leaderOMNodeId);
 
     // Find the inactive OM and start it
-    String followerNodeId = leaderOM.getPeerNodes().get(0).getOMNodeId();
+    String followerNodeId = leaderOM.getPeerNodes().get(0).getNodeId();
     if (cluster.isOMActive(followerNodeId)) {
-      followerNodeId = leaderOM.getPeerNodes().get(1).getOMNodeId();
+      followerNodeId = leaderOM.getPeerNodes().get(1).getNodeId();
     }
     cluster.startInactiveOM(followerNodeId);
 
@@ -262,12 +255,11 @@ public class TestOMRatisSnapshots {
     OzoneManagerRatisServer leaderRatisServer = leaderOM.getOmRatisServer();
 
     // Find the inactive OM
-    String followerNodeId = leaderOM.getPeerNodes().get(0).getOMNodeId();
+    String followerNodeId = leaderOM.getPeerNodes().get(0).getNodeId();
     if (cluster.isOMActive(followerNodeId)) {
-      followerNodeId = leaderOM.getPeerNodes().get(1).getOMNodeId();
+      followerNodeId = leaderOM.getPeerNodes().get(1).getNodeId();
     }
     OzoneManager followerOM = cluster.getOzoneManager(followerNodeId);
-    OzoneManagerRatisServer followerRatisServer = followerOM.getOmRatisServer();
 
     // Do some transactions so that the log index increases
     writeKeysToIncreaseLogIndex(leaderRatisServer, 100);
@@ -275,7 +267,7 @@ public class TestOMRatisSnapshots {
     DBCheckpoint leaderDbCheckpoint = leaderOM.getMetadataManager().getStore()
         .getCheckpoint(false);
     Path leaderCheckpointLocation = leaderDbCheckpoint.getCheckpointLocation();
-    OMTransactionInfo leaderCheckpointTrxnInfo = OzoneManagerRatisUtils
+    TransactionInfo leaderCheckpointTrxnInfo = OzoneManagerRatisUtils
         .getTrxnInfoFromCheckpoint(conf, leaderCheckpointLocation);
 
     // Corrupt the leader checkpoint and install that on the OM. The
@@ -318,7 +310,7 @@ public class TestOMRatisSnapshots {
     return keys;
   }
 
-  private class DummyExitManager extends ExitManager {
+  private static class DummyExitManager extends ExitManager {
     @Override
     public void exitSystem(int status, String message, Throwable throwable,
         Logger log) {

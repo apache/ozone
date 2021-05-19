@@ -136,9 +136,9 @@ public class TestNodeStateMap {
 
     UUID dnUuid = datanodeDetails.getUuid();
 
-    nodeStateMap.addContainer(dnUuid, new ContainerID(1L));
-    nodeStateMap.addContainer(dnUuid, new ContainerID(2L));
-    nodeStateMap.addContainer(dnUuid, new ContainerID(3L));
+    nodeStateMap.addContainer(dnUuid, ContainerID.valueOf(1L));
+    nodeStateMap.addContainer(dnUuid, ContainerID.valueOf(2L));
+    nodeStateMap.addContainer(dnUuid, ContainerID.valueOf(3L));
 
     CountDownLatch elementRemoved = new CountDownLatch(1);
     CountDownLatch loopStarted = new CountDownLatch(1);
@@ -146,7 +146,7 @@ public class TestNodeStateMap {
     new Thread(() -> {
       try {
         loopStarted.await();
-        nodeStateMap.removeContainer(dnUuid, new ContainerID(1L));
+        nodeStateMap.removeContainer(dnUuid, ContainerID.valueOf(1L));
         elementRemoved.countDown();
       } catch (Exception e) {
         e.printStackTrace();

@@ -49,10 +49,10 @@ public class TestPipelineManagerMXBean {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = new Timeout(300000);
+  public Timeout timeout = Timeout.seconds(300);
 
   private MiniOzoneCluster cluster;
-  private static MBeanServer mbs;
+  private MBeanServer mbs;
 
   @Before
   public void init()

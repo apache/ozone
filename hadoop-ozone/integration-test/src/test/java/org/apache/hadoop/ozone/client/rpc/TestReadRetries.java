@@ -53,6 +53,8 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 
 import org.junit.AfterClass;
 import org.junit.Assert;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.Assert.fail;
 import org.junit.BeforeClass;
 import org.junit.Rule;
@@ -69,7 +71,7 @@ public class TestReadRetries {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = new Timeout(300000);
+  public Timeout timeout = Timeout.seconds(300);
 
   @Rule
   public ExpectedException thrown = ExpectedException.none();
@@ -141,12 +143,12 @@ public class TestReadRetries {
     String keyName = UUID.randomUUID().toString();
 
     OzoneOutputStream out = bucket
-        .createKey(keyName, value.getBytes().length, ReplicationType.RATIS,
+        .createKey(keyName, value.getBytes(UTF_8).length, ReplicationType.RATIS,
             ReplicationFactor.THREE, new HashMap<>());
     KeyOutputStream groupOutputStream =
         (KeyOutputStream) out.getOutputStream();
     XceiverClientFactory factory = groupOutputStream.getXceiverClientFactory();
-    out.write(value.getBytes());
+    out.write(value.getBytes(UTF_8));
     out.close();
     // First, confirm the key info from the client matches the info in OM.
     OmKeyArgs.Builder builder = new OmKeyArgs.Builder();
@@ -165,11 +167,11 @@ public class TestReadRetries {
     Assert.assertEquals(localID, keyLocations.get(0).getLocalID());
 
     // Make sure that the data size matched.
-    Assert
-        .assertEquals(value.getBytes().length, keyLocations.get(0).getLength());
+    Assert.assertEquals(value.getBytes(UTF_8).length,
+        keyLocations.get(0).getLength());
 
     ContainerInfo container = cluster.getStorageContainerManager()
-        .getContainerManager().getContainer(ContainerID.valueof(containerID));
+        .getContainerManager().getContainer(ContainerID.valueOf(containerID));
     Pipeline pipeline = cluster.getStorageContainerManager()
         .getPipelineManager().getPipeline(container.getPipelineID());
     List<DatanodeDetails> datanodes = pipeline.getNodes();
@@ -213,7 +215,7 @@ public class TestReadRetries {
     OzoneKey key = bucket.getKey(keyName);
     Assert.assertEquals(keyName, key.getName());
     OzoneInputStream is = bucket.readKey(keyName);
-    byte[] fileContent = new byte[data.getBytes().length];
+    byte[] fileContent = new byte[data.getBytes(UTF_8).length];
     is.read(fileContent);
     is.close();
   }

@@ -21,14 +21,10 @@ weight: 4
     limitations under the License.
     -->
 
-{{<jumbotron title="GDPR compliance in Ozone">}}
-          The General Data Protection Regulation (GDPR) is a law that governs how personal data should be handled. This is an European Union law, but due to the nature of software oftentimes spills into other geographies.
-          Ozone supports GDPR's Right to Erasure(Right to be Forgotten).
+
+{{<jumbotron title="Ozone Features">}}
+          Ozone features are explained in the following pages. Features such as high availability, topology awareness, metrics tools are detailed in next pages.
 {{</jumbotron>}}
 
-
-
-Once you create a GDPR compliant bucket, any key created in that bucket will 
-automatically be GDPR compliant.
 
 

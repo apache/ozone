@@ -56,6 +56,8 @@ public class OzoneAddress {
 
   private String keyName = "";
 
+  private boolean isPrefix = false;
+
   public OzoneAddress() throws OzoneClientException {
     this("o3:///");
   }
@@ -295,6 +297,10 @@ public class OzoneAddress {
     return keyName;
   }
 
+  public boolean isPrefix() {
+    return isPrefix;
+  }
+
   public void ensureBucketAddress() throws OzoneClientException {
     if (keyName.length() > 0) {
       throw new OzoneClientException(
@@ -306,6 +312,22 @@ public class OzoneAddress {
       throw new OzoneClientException(
           "Bucket name is required.");
     }
+  }
+
+  // Ensure prefix address with a prefix flag
+  // Allow CLI to differentiate key and prefix address
+  public void ensurePrefixAddress() throws OzoneClientException {
+    if (keyName.length() == 0) {
+      throw new OzoneClientException(
+          "prefix name is missing.");
+    } else if (volumeName.length() == 0) {
+      throw new OzoneClientException(
+          "Volume name is missing");
+    } else if (bucketName.length() == 0) {
+      throw new OzoneClientException(
+          "Bucket name is missing");
+    }
+    isPrefix = true;
   }
 
   public void ensureKeyAddress() throws OzoneClientException {
@@ -354,7 +376,8 @@ public class OzoneAddress {
 
   private OzoneObj.ResourceType getResourceType() {
     if (!keyName.isEmpty()) {
-      return OzoneObj.ResourceType.KEY;
+      return isPrefix ? OzoneObj.ResourceType.PREFIX :
+          OzoneObj.ResourceType.KEY;
     }
     if (!bucketName.isEmpty()) {
       return OzoneObj.ResourceType.BUCKET;

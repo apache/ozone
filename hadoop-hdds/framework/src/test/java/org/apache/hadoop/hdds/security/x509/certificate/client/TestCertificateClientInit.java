@@ -201,7 +201,7 @@ public class TestCertificateClientInit {
     }
     InitResponse response = omCertificateClient.init();
 
-    if (pvtKeyPresent && pubKeyPresent & !certPresent) {
+    if (pvtKeyPresent && pubKeyPresent && !certPresent) {
       assertTrue(response.equals(RECOVER));
     } else {
       assertTrue(response.equals(expectedResult));

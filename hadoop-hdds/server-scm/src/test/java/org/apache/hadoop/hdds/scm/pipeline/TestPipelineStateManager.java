@@ -18,9 +18,13 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.junit.Assert;
 import org.junit.Before;
@@ -37,7 +41,7 @@ import java.util.Set;
  */
 public class TestPipelineStateManager {
 
-  private PipelineStateManager stateManager;
+  private StateManager stateManager;
 
   @Before
   public void init() throws Exception {
@@ -56,8 +60,7 @@ public class TestPipelineStateManager {
       nodes.add(MockDatanodeDetails.randomDatanodeDetails());
     }
     return Pipeline.newBuilder()
-        .setType(type)
-        .setFactor(factor)
+        .setReplicationConfig(ReplicationConfig.fromTypeAndFactor(type, factor))
         .setNodes(nodes)
         .setState(Pipeline.PipelineState.ALLOCATED)
         .setId(PipelineID.randomId())
@@ -110,8 +113,8 @@ public class TestPipelineStateManager {
     stateManager.openPipeline(pipeline.getId());
     pipelines.add(pipeline);
 
-    Set<Pipeline> pipelines1 = new HashSet<>(stateManager.getPipelines(
-        HddsProtos.ReplicationType.RATIS));
+    Set<Pipeline> pipelines1 = new HashSet<>(stateManager
+        .getPipelines(new RatisReplicationConfig(ReplicationFactor.ONE)));
     Assert.assertEquals(pipelines1.size(), pipelines.size());
 
     pipelines1 = new HashSet<>(stateManager.getPipelines());
@@ -126,8 +129,8 @@ public class TestPipelineStateManager {
   @Test
   public void testGetPipelinesByTypeAndFactor() throws IOException {
     Set<Pipeline> pipelines = new HashSet<>();
-    for (HddsProtos.ReplicationType type : HddsProtos.ReplicationType
-        .values()) {
+    for (HddsProtos.ReplicationType type : new ReplicationType[] {
+        ReplicationType.RATIS, ReplicationType.STAND_ALONE}) {
       for (HddsProtos.ReplicationFactor factor : HddsProtos.ReplicationFactor
           .values()) {
         for (int i = 0; i < 5; i++) {
@@ -152,17 +155,17 @@ public class TestPipelineStateManager {
       }
     }
 
-    for (HddsProtos.ReplicationType type : HddsProtos.ReplicationType
-        .values()) {
+    for (HddsProtos.ReplicationType type : new ReplicationType[] {
+        ReplicationType.RATIS, ReplicationType.STAND_ALONE}) {
       for (HddsProtos.ReplicationFactor factor : HddsProtos.ReplicationFactor
           .values()) {
         // verify pipelines received
         List<Pipeline> pipelines1 =
-            stateManager.getPipelines(type, factor);
+            stateManager.getPipelines(
+                ReplicationConfig.fromTypeAndFactor(type, factor));
         Assert.assertEquals(15, pipelines1.size());
         pipelines1.stream().forEach(p -> {
           Assert.assertEquals(type, p.getType());
-          Assert.assertEquals(factor, p.getFactor());
         });
       }
     }
@@ -174,60 +177,10 @@ public class TestPipelineStateManager {
   }
 
   @Test
-  public void testGetPipelinesByTypeAndState() throws IOException {
-    Set<Pipeline> pipelines = new HashSet<>();
-    for (HddsProtos.ReplicationType type : HddsProtos.ReplicationType
-        .values()) {
-      HddsProtos.ReplicationFactor factor = HddsProtos.ReplicationFactor.THREE;
-      for (int i = 0; i < 5; i++) {
-        // 5 pipelines in allocated state for each type and factor
-        Pipeline pipeline =
-            createDummyPipeline(type, factor, factor.getNumber());
-        stateManager.addPipeline(pipeline);
-        pipelines.add(pipeline);
-
-        // 5 pipelines in open state for each type and factor
-        pipeline = createDummyPipeline(type, factor, factor.getNumber());
-        stateManager.addPipeline(pipeline);
-        stateManager.openPipeline(pipeline.getId());
-        pipelines.add(pipeline);
-
-        // 5 pipelines in closed state for each type and factor
-        pipeline = createDummyPipeline(type, factor, factor.getNumber());
-        stateManager.addPipeline(pipeline);
-        stateManager.finalizePipeline(pipeline.getId());
-        pipelines.add(pipeline);
-      }
-    }
-
-    for (HddsProtos.ReplicationType type : HddsProtos.ReplicationType
-        .values()) {
-      // verify pipelines received
-      List<Pipeline> pipelines1 = stateManager
-          .getPipelines(type, Pipeline.PipelineState.OPEN);
-      Assert.assertEquals(5, pipelines1.size());
-      pipelines1.forEach(p -> {
-        Assert.assertEquals(type, p.getType());
-        Assert.assertEquals(Pipeline.PipelineState.OPEN, p.getPipelineState());
-      });
-
-      pipelines1 = stateManager
-          .getPipelines(type, Pipeline.PipelineState.OPEN,
-              Pipeline.PipelineState.CLOSED, Pipeline.PipelineState.ALLOCATED);
-      Assert.assertEquals(15, pipelines1.size());
-    }
-
-    //clean up
-    for (Pipeline pipeline : pipelines) {
-      removePipeline(pipeline);
-    }
-  }
-
-  @Test
   public void testGetPipelinesByTypeFactorAndState() throws IOException {
     Set<Pipeline> pipelines = new HashSet<>();
-    for (HddsProtos.ReplicationType type : HddsProtos.ReplicationType
-        .values()) {
+    for (HddsProtos.ReplicationType type : new ReplicationType[] {
+        ReplicationType.RATIS, ReplicationType.STAND_ALONE}) {
       for (HddsProtos.ReplicationFactor factor : HddsProtos.ReplicationFactor
           .values()) {
         for (int i = 0; i < 5; i++) {
@@ -259,18 +212,18 @@ public class TestPipelineStateManager {
       }
     }
 
-    for (HddsProtos.ReplicationType type : HddsProtos.ReplicationType
-        .values()) {
+    for (HddsProtos.ReplicationType type : new HddsProtos.ReplicationType[] {
+        ReplicationType.RATIS, ReplicationType.STAND_ALONE}) {
       for (HddsProtos.ReplicationFactor factor : HddsProtos.ReplicationFactor
           .values()) {
         for (Pipeline.PipelineState state : Pipeline.PipelineState.values()) {
           // verify pipelines received
           List<Pipeline> pipelines1 =
-              stateManager.getPipelines(type, factor, state);
+              stateManager.getPipelines(
+                  ReplicationConfig.fromTypeAndFactor(type, factor), state);
           Assert.assertEquals(5, pipelines1.size());
           pipelines1.forEach(p -> {
             Assert.assertEquals(type, p.getType());
-            Assert.assertEquals(factor, p.getFactor());
             Assert.assertEquals(state, p.getPipelineState());
           });
         }
@@ -290,14 +243,14 @@ public class TestPipelineStateManager {
     stateManager.addPipeline(pipeline);
     pipeline = stateManager.getPipeline(pipeline.getId());
     stateManager.addContainerToPipeline(pipeline.getId(),
-        ContainerID.valueof(++containerID));
+        ContainerID.valueOf(++containerID));
 
     // move pipeline to open state
     stateManager.openPipeline(pipeline.getId());
     stateManager.addContainerToPipeline(pipeline.getId(),
-        ContainerID.valueof(++containerID));
+        ContainerID.valueOf(++containerID));
     stateManager.addContainerToPipeline(pipeline.getId(),
-        ContainerID.valueof(++containerID));
+        ContainerID.valueOf(++containerID));
 
     //verify the number of containers returned
     Set<ContainerID> containerIDs =
@@ -307,7 +260,7 @@ public class TestPipelineStateManager {
     removePipeline(pipeline);
     try {
       stateManager.addContainerToPipeline(pipeline.getId(),
-          ContainerID.valueof(++containerID));
+          ContainerID.valueOf(++containerID));
       Assert.fail("Container should not have been added");
     } catch (IOException e) {
       // Can not add a container to removed pipeline
@@ -322,7 +275,7 @@ public class TestPipelineStateManager {
     // close the pipeline
     stateManager.openPipeline(pipeline.getId());
     stateManager
-        .addContainerToPipeline(pipeline.getId(), ContainerID.valueof(1));
+        .addContainerToPipeline(pipeline.getId(), ContainerID.valueOf(1));
 
     try {
       stateManager.removePipeline(pipeline.getId());
@@ -347,26 +300,26 @@ public class TestPipelineStateManager {
     stateManager.openPipeline(pipeline.getId());
 
     stateManager.addContainerToPipeline(pipeline.getId(),
-        ContainerID.valueof(containerID));
+        ContainerID.valueOf(containerID));
     Assert.assertEquals(1, stateManager.getContainers(pipeline.getId()).size());
     stateManager.removeContainerFromPipeline(pipeline.getId(),
-        ContainerID.valueof(containerID));
+        ContainerID.valueOf(containerID));
     Assert.assertEquals(0, stateManager.getContainers(pipeline.getId()).size());
 
     // add two containers in the pipeline
     stateManager.addContainerToPipeline(pipeline.getId(),
-        ContainerID.valueof(++containerID));
+        ContainerID.valueOf(++containerID));
     stateManager.addContainerToPipeline(pipeline.getId(),
-        ContainerID.valueof(++containerID));
+        ContainerID.valueOf(++containerID));
     Assert.assertEquals(2, stateManager.getContainers(pipeline.getId()).size());
 
     // move pipeline to closing state
     stateManager.finalizePipeline(pipeline.getId());
 
     stateManager.removeContainerFromPipeline(pipeline.getId(),
-        ContainerID.valueof(containerID));
+        ContainerID.valueOf(containerID));
     stateManager.removeContainerFromPipeline(pipeline.getId(),
-        ContainerID.valueof(--containerID));
+        ContainerID.valueOf(--containerID));
     Assert.assertEquals(0, stateManager.getContainers(pipeline.getId()).size());
 
     // clean up
@@ -430,15 +383,15 @@ public class TestPipelineStateManager {
     // pipeline in allocated state should not be reported
     stateManager.addPipeline(pipeline);
     Assert.assertEquals(0, stateManager
-        .getPipelines(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, Pipeline.PipelineState.OPEN)
+        .getPipelines(new RatisReplicationConfig(ReplicationFactor.THREE),
+            Pipeline.PipelineState.OPEN)
         .size());
 
     // pipeline in open state should be reported
     stateManager.openPipeline(pipeline.getId());
     Assert.assertEquals(1, stateManager
-        .getPipelines(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, Pipeline.PipelineState.OPEN)
+        .getPipelines(new RatisReplicationConfig(ReplicationFactor.THREE),
+            Pipeline.PipelineState.OPEN)
         .size());
 
     Pipeline pipeline2 = createDummyPipeline(HddsProtos.ReplicationType.RATIS,
@@ -449,15 +402,15 @@ public class TestPipelineStateManager {
     // pipeline in open state should be reported
     stateManager.addPipeline(pipeline2);
     Assert.assertEquals(2, stateManager
-        .getPipelines(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, Pipeline.PipelineState.OPEN)
+        .getPipelines(new RatisReplicationConfig(ReplicationFactor.THREE),
+            Pipeline.PipelineState.OPEN)
         .size());
 
     // pipeline in closed state should not be reported
     stateManager.finalizePipeline(pipeline2.getId());
     Assert.assertEquals(1, stateManager
-        .getPipelines(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, Pipeline.PipelineState.OPEN)
+        .getPipelines(new RatisReplicationConfig(ReplicationFactor.THREE),
+            Pipeline.PipelineState.OPEN)
         .size());
 
     // clean up

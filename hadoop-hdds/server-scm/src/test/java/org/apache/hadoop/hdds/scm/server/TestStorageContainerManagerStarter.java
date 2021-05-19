@@ -24,6 +24,8 @@ import org.junit.Test;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.io.UnsupportedEncodingException;
+import java.nio.charset.StandardCharsets;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import static org.junit.Assert.*;
@@ -39,13 +41,14 @@ public class TestStorageContainerManagerStarter {
   private final ByteArrayOutputStream errContent = new ByteArrayOutputStream();
   private final PrintStream originalOut = System.out;
   private final PrintStream originalErr = System.err;
+  private static final String DEFAULT_ENCODING = StandardCharsets.UTF_8.name();
 
   private MockSCMStarter mock;
 
   @Before
-  public void setUpStreams() {
-    System.setOut(new PrintStream(outContent));
-    System.setErr(new PrintStream(errContent));
+  public void setUpStreams() throws UnsupportedEncodingException {
+    System.setOut(new PrintStream(outContent, false, DEFAULT_ENCODING));
+    System.setErr(new PrintStream(errContent, false, DEFAULT_ENCODING));
     mock = new MockSCMStarter();
   }
 
@@ -85,6 +88,12 @@ public class TestStorageContainerManagerStarter {
   }
 
   @Test
+  public void testPassingBootStrapSwitchCallsBootStrap() {
+    executeCommand("--bootstrap");
+    assertTrue(mock.bootStrapCalled);
+  }
+
+  @Test
   public void testInitSwitchAcceptsClusterIdSSwitch() {
     executeCommand("--init", "--clusterid=abcdefg");
     assertEquals("abcdefg", mock.clusterId);
@@ -97,10 +106,27 @@ public class TestStorageContainerManagerStarter {
   }
 
   @Test
+  public void testBootStrapSwitchWithInvalidParamDoesNotRun() {
+    executeCommand("--bootstrap", "--clusterid=abcdefg", "--invalid");
+    assertFalse(mock.bootStrapCalled);
+  }
+
+  @Test
   public void testUnSuccessfulInitThrowsException() {
     mock.throwOnInit = true;
     try {
       executeCommand("--init");
+      fail("Exception show have been thrown");
+    } catch (Exception e) {
+      assertTrue(true);
+    }
+  }
+
+  @Test
+  public void testUnSuccessfulBootStrapThrowsException() {
+    mock.throwOnBootstrap = true;
+    try {
+      executeCommand("--bootstrap");
       fail("Exception show have been thrown");
     } catch (Exception e) {
       assertTrue(true);
@@ -120,10 +146,11 @@ public class TestStorageContainerManagerStarter {
   }
 
   @Test
-  public void testUsagePrintedOnInvalidInput() {
+  public void testUsagePrintedOnInvalidInput()
+      throws UnsupportedEncodingException {
     executeCommand("--invalid");
     Pattern p = Pattern.compile("^Unknown option:.*--invalid.*\nUsage");
-    Matcher m = p.matcher(errContent.toString());
+    Matcher m = p.matcher(errContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
   }
 
@@ -136,11 +163,14 @@ public class TestStorageContainerManagerStarter {
     private boolean initStatus = true;
     private boolean throwOnStart = false;
     private boolean throwOnInit  = false;
+    private boolean throwOnBootstrap  = false;
     private boolean startCalled = false;
     private boolean initCalled = false;
+    private boolean bootStrapCalled = false;
     private boolean generateCalled = false;
     private String clusterId = null;
 
+    @Override
     public void start(OzoneConfiguration conf) throws Exception {
       if (throwOnStart) {
         throw new Exception("Simulated error on start");
@@ -148,6 +178,7 @@ public class TestStorageContainerManagerStarter {
       startCalled = true;
     }
 
+    @Override
     public boolean init(OzoneConfiguration conf, String cid)
         throws IOException {
       if (throwOnInit) {
@@ -158,6 +189,17 @@ public class TestStorageContainerManagerStarter {
       return initStatus;
     }
 
+    @Override
+    public boolean bootStrap(OzoneConfiguration conf)
+        throws IOException {
+      if (throwOnBootstrap) {
+        throw new IOException("Simulated error on init");
+      }
+      bootStrapCalled = true;
+      return initStatus;
+    }
+
+    @Override
     public String generateClusterId() {
       generateCalled = true;
       return "static-cluster-id";

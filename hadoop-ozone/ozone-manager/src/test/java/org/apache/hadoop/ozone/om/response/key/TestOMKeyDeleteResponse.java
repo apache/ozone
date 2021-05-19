@@ -19,11 +19,11 @@
 package org.apache.hadoop.ozone.om.response.key;
 
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.util.Time;
 import org.junit.Assert;
 import org.junit.Test;
@@ -45,9 +45,6 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
 
     OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo(volumeName,
         bucketName, keyName, replicationType, replicationFactor);
-    OmVolumeArgs omVolumeArgs = OmVolumeArgs.newBuilder()
-        .setOwnerName(keyName).setAdminName(keyName)
-        .setVolume(volumeName).setCreationTime(Time.now()).build();
     OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
         .setVolumeName(volumeName).setBucketName(bucketName)
         .setCreationTime(Time.now()).build();
@@ -87,9 +84,6 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
 
     OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo(volumeName,
         bucketName, keyName, replicationType, replicationFactor);
-    OmVolumeArgs omVolumeArgs = OmVolumeArgs.newBuilder()
-        .setOwnerName(keyName).setAdminName(keyName)
-        .setVolume(volumeName).setCreationTime(Time.now()).build();
     OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
         .setVolumeName(volumeName).setBucketName(bucketName)
         .setCreationTime(Time.now()).build();
@@ -100,8 +94,7 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
     Pipeline pipeline = Pipeline.newBuilder()
         .setState(Pipeline.PipelineState.OPEN)
         .setId(PipelineID.randomId())
-        .setType(replicationType)
-        .setFactor(replicationFactor)
+        .setReplicationConfig(new RatisReplicationConfig(replicationFactor))
         .setNodes(new ArrayList<>())
         .build();
 

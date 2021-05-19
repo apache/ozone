@@ -131,7 +131,7 @@ public class BenchmarkChunkManager {
   public void writeMultipleFiles(BenchmarkState state, Blackhole sink)
       throws StorageContainerException {
 
-    ChunkManager chunkManager = new FilePerChunkStrategy(true, null);
+    ChunkManager chunkManager = new FilePerChunkStrategy(true, null, null);
     benchmark(chunkManager, FILE_PER_CHUNK, state, sink);
   }
 
@@ -139,7 +139,7 @@ public class BenchmarkChunkManager {
   public void writeSingleFile(BenchmarkState state, Blackhole sink)
       throws StorageContainerException {
 
-    ChunkManager chunkManager = new FilePerBlockStrategy(true);
+    ChunkManager chunkManager = new FilePerBlockStrategy(true, null, null);
     benchmark(chunkManager, FILE_PER_BLOCK, state, sink);
   }
 

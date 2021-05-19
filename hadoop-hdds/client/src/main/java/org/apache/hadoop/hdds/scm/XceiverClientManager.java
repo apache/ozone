@@ -20,8 +20,8 @@ package org.apache.hadoop.hdds.scm;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 
@@ -31,8 +31,6 @@ import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
-import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -68,7 +66,7 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
   //TODO : change this to SCM configuration class
   private final ConfigurationSource conf;
   private final Cache<String, XceiverClientSpi> clientCache;
-  private X509Certificate caCert;
+  private List<X509Certificate> caCerts;
 
   private static XceiverClientMetrics metrics;
   private boolean isSecurityEnabled;
@@ -86,20 +84,15 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
 
   public XceiverClientManager(ConfigurationSource conf,
       ScmClientConfig clientConf,
-      String caCertPem) throws IOException {
+      List<X509Certificate> caCerts) throws IOException {
     Preconditions.checkNotNull(clientConf);
     Preconditions.checkNotNull(conf);
     long staleThresholdMs = clientConf.getStaleThreshold(MILLISECONDS);
     this.conf = conf;
     this.isSecurityEnabled = OzoneSecurityUtil.isSecurityEnabled(conf);
     if (isSecurityEnabled) {
-      Preconditions.checkNotNull(caCertPem);
-      try {
-        this.caCert = CertificateCodec.getX509Cert(caCertPem);
-      } catch (CertificateException ex) {
-        throw new SCMSecurityException("Error: Fail to get SCM CA certificate",
-            ex);
-      }
+      Preconditions.checkNotNull(caCerts);
+      this.caCerts = caCerts;
     }
 
     this.clientCache = CacheBuilder.newBuilder()
@@ -139,6 +132,7 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
    * @return XceiverClientSpi connected to a container
    * @throws IOException if a XceiverClientSpi cannot be acquired
    */
+  @Override
   public XceiverClientSpi acquireClient(Pipeline pipeline)
       throws IOException {
     return acquireClient(pipeline, false);
@@ -154,6 +148,7 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
    * @return XceiverClientSpi connected to a container
    * @throws IOException if a XceiverClientSpi cannot be acquired
    */
+  @Override
   public XceiverClientSpi acquireClientForReadData(Pipeline pipeline)
       throws IOException {
     return acquireClient(pipeline, true);
@@ -179,6 +174,7 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
    * @param client client to release
    * @param invalidateClient if true, invalidates the client in cache
    */
+  @Override
   public void releaseClient(XceiverClientSpi client, boolean invalidateClient) {
     releaseClient(client, invalidateClient, false);
   }
@@ -189,6 +185,7 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
    * @param client client to release
    * @param invalidateClient if true, invalidates the client in cache
    */
+  @Override
   public void releaseClientForReadData(XceiverClientSpi client,
       boolean invalidateClient) {
     releaseClient(client, invalidateClient, true);
@@ -228,10 +225,10 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
             switch (type) {
             case RATIS:
               client = XceiverClientRatis.newXceiverClientRatis(pipeline, conf,
-                  caCert);
+                  caCerts);
               break;
             case STAND_ALONE:
-              client = new XceiverClientGrpc(pipeline, conf, caCert);
+              client = new XceiverClientGrpc(pipeline, conf, caCerts);
               break;
             case CHAINED:
             default:

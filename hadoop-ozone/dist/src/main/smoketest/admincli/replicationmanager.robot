@@ -17,7 +17,11 @@
 Documentation       Test ozone admin replicationmanager command
 Library             BuiltIn
 Resource            ../commonlib.robot
+Suite Setup         Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
 Test Timeout        5 minutes
+
+*** Variables ***
+${SCM}       scm
 
 *** Test Cases ***
 Check replicationmanager
@@ -26,19 +30,19 @@ Check replicationmanager
                         Should contain   ${output}   Running
 
 Check replicationmanager with explicit host
-    ${output} =         Execute          ozone admin replicationmanager status --scm scm
+    ${output} =         Execute          ozone admin replicationmanager status --scm ${SCM}
                         Should contain   ${output}   ReplicationManager
                         Should contain   ${output}   Running
-
-Start replicationmanager
-    ${output} =         Execute          ozone admin replicationmanager start
-                        Should contain   ${output}   Starting ReplicationManager
-                        Wait Until Keyword Succeeds    30sec    5sec    Execute          ozone admin replicationmanager status | grep -q 'is Running'
 
 Stop replicationmanager
     ${output} =         Execute          ozone admin replicationmanager stop
                         Should contain   ${output}   Stopping ReplicationManager
                         Wait Until Keyword Succeeds    30sec    5sec    Execute          ozone admin replicationmanager status | grep -q 'is Not Running'
+
+Start replicationmanager
+    ${output} =         Execute          ozone admin replicationmanager start
+                        Should contain   ${output}   Starting ReplicationManager
+                        Wait Until Keyword Succeeds    30sec    5sec    Execute          ozone admin replicationmanager status | grep -q 'is Running'
 
 Incomplete command
     ${output} =         Execute And Ignore Error     ozone admin replicationmanager
@@ -47,7 +51,7 @@ Incomplete command
                         Should contain   ${output}   stop
                         Should contain   ${output}   status
 
-Check replicationmanager on unknown host
-    ${output} =         Execute And Ignore Error     ozone admin --verbose replicationmanager status --scm unknown-host
-                        Should contain   ${output}   Invalid host name
+#Check replicationmanager on unknown host
+#    ${output} =         Execute And Ignore Error     ozone admin --verbose replicationmanager status --scm unknown-host
+#                        Should contain   ${output}   Invalid host name
 

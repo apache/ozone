@@ -59,7 +59,7 @@ public class TestStorageContainerManagerHelper {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = new Timeout(300000);
+  public Timeout timeout = Timeout.seconds(300);
 
   private final MiniOzoneCluster cluster;
   private final OzoneConfiguration conf;
@@ -145,9 +145,8 @@ public class TestStorageContainerManagerHelper {
 
   public boolean verifyBlocksWithTxnTable(Map<Long, List<Long>> containerBlocks)
       throws IOException {
-    Set<Long> containerIDs = containerBlocks.keySet();
-    for (Long entry : containerIDs) {
-      ReferenceCountedDB meta = getContainerMetadata(entry);
+    for (Map.Entry<Long, List<Long>> entry : containerBlocks.entrySet()) {
+      ReferenceCountedDB meta = getContainerMetadata(entry.getKey());
       DatanodeStore ds = meta.getStore();
       DatanodeStoreSchemaTwoImpl dnStoreTwoImpl =
           (DatanodeStoreSchemaTwoImpl) ds;
@@ -159,7 +158,7 @@ public class TestStorageContainerManagerHelper {
           txnsInTxnTable) {
         conID.addAll(txn.getValue().getLocalIDList());
       }
-      if (!conID.equals(containerBlocks.get(entry))) {
+      if (!conID.equals(containerBlocks.get(entry.getKey()))) {
         return false;
       }
       meta.close();

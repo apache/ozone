@@ -37,6 +37,7 @@ import java.util.UUID;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -49,6 +50,8 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
+import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.net.NodeSchema;
@@ -129,7 +132,7 @@ public class TestKeyManagerImpl {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = new Timeout(300000);
+  public Timeout timeout = Timeout.seconds(300);
 
   private static PrefixManager prefixManager;
   private static KeyManagerImpl keyManager;
@@ -170,6 +173,8 @@ public class TestKeyManagerImpl {
     SCMConfigurator configurator = new SCMConfigurator();
     configurator.setScmNodeManager(nodeManager);
     configurator.setNetworkTopology(clusterMap);
+    configurator.setSCMHAManager(MockSCMHAManager.getInstance(true));
+    configurator.setScmContext(SCMContext.emptyContext());
     scm = TestUtils.getScm(conf, configurator);
     scm.start();
     scm.exitSafeMode();
@@ -305,13 +310,15 @@ public class TestKeyManagerImpl {
   @Test
   public void testCreateDirectory() throws IOException {
     // Create directory where the parent directory does not exist
-    String keyName = RandomStringUtils.randomAlphabetic(5);
+    StringBuffer keyNameBuf = new StringBuffer();
+    keyNameBuf.append(RandomStringUtils.randomAlphabetic(5));
     OmKeyArgs keyArgs = createBuilder()
-        .setKeyName(keyName)
+        .setKeyName(keyNameBuf.toString())
         .build();
     for (int i =0; i< 5; i++) {
-      keyName += "/" + RandomStringUtils.randomAlphabetic(5);
+      keyNameBuf.append("/").append(RandomStringUtils.randomAlphabetic(5));
     }
+    String keyName = keyNameBuf.toString();
     keyManager.createDirectory(keyArgs);
     Path path = Paths.get(keyName);
     while (path != null) {
@@ -329,9 +336,6 @@ public class TestKeyManagerImpl {
     keyArgs.setLocationInfoList(
         keySession.getKeyInfo().getLatestVersionLocations().getLocationList());
     keyManager.commitKey(keyArgs, keySession.getId());
-    for (int i =0; i< 5; i++) {
-      keyName += "/" + RandomStringUtils.randomAlphabetic(5);
-    }
     try {
       keyManager.createDirectory(keyArgs);
       Assert.fail("Creation should fail for directory.");
@@ -387,10 +391,12 @@ public class TestKeyManagerImpl {
 
     // try to create a file where parent directories do not exist and
     // recursive flag is set to false
-    keyName = RandomStringUtils.randomAlphabetic(5);
+    StringBuffer keyNameBuf = new StringBuffer();
+    keyNameBuf.append(RandomStringUtils.randomAlphabetic(5));
     for (int i =0; i< 5; i++) {
-      keyName += "/" + RandomStringUtils.randomAlphabetic(5);
+      keyNameBuf.append("/").append(RandomStringUtils.randomAlphabetic(5));
     }
+    keyName = keyNameBuf.toString();
     keyArgs = createBuilder()
         .setKeyName(keyName)
         .build();
@@ -604,7 +610,7 @@ public class TestKeyManagerImpl {
         .setStoreType(OzoneObj.StoreType.OZONE)
         .build();
 
-
+    prefixManager.addAcl(ozPrefix1, ozAcl1);
     List<OzoneAcl> ozAclGet = prefixManager.getAcl(ozPrefix1);
     Assert.assertEquals(1, ozAclGet.size());
     Assert.assertEquals(ozAcl1, ozAclGet.get(0));
@@ -612,8 +618,7 @@ public class TestKeyManagerImpl {
     // get acl with invalid prefix name
     exception.expect(OMException.class);
     exception.expectMessage("Invalid prefix name");
-    ozAclGet = prefixManager.getAcl(ozInvalidPrefix);
-    Assert.assertEquals(null, ozAcl1);
+    prefixManager.getAcl(ozInvalidPrefix);
 
     // set acl with invalid prefix name
     List<OzoneAcl> ozoneAcls = new ArrayList<OzoneAcl>();
@@ -754,11 +759,15 @@ public class TestKeyManagerImpl {
     Assume.assumeFalse(nodeList.get(0).equals(nodeList.get(2)));
     // create a pipeline using 3 datanodes
     Pipeline pipeline = scm.getPipelineManager().createPipeline(
-        ReplicationType.RATIS, ReplicationFactor.THREE, nodeList);
+        new RatisReplicationConfig(ReplicationFactor.THREE), nodeList);
     List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
+    List<OmKeyLocationInfo> locationList =
+        keySession.getKeyInfo().getLatestVersionLocations().getLocationList();
+    Assert.assertEquals(1, locationList.size());
     locationInfoList.add(
         new OmKeyLocationInfo.Builder().setPipeline(pipeline)
-            .setBlockID(new BlockID(1L, 1L)).build());
+            .setBlockID(new BlockID(locationList.get(0).getContainerID(),
+                locationList.get(0).getLocalID())).build());
     keyArgs.setLocationInfoList(locationInfoList);
 
     keyManager.commitKey(keyArgs, keySession.getId());
@@ -1245,8 +1254,8 @@ public class TestKeyManagerImpl {
     return Pipeline.newBuilder()
         .setState(Pipeline.PipelineState.OPEN)
         .setId(PipelineID.randomId())
-        .setType(ReplicationType.RATIS)
-        .setFactor(ReplicationFactor.THREE)
+        .setReplicationConfig(
+            new RatisReplicationConfig(ReplicationFactor.THREE))
         .setNodes(new ArrayList<>())
         .build();
   }

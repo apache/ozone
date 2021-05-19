@@ -26,6 +26,8 @@ import java.util.Map;
 import java.util.Objects;
 
 import org.apache.hadoop.fs.FileEncryptionInfo;
+import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
@@ -34,6 +36,8 @@ import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.util.Time;
 
 import com.google.common.base.Preconditions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Args for key block. The block instance for the key requested in putKey.
@@ -41,6 +45,7 @@ import com.google.common.base.Preconditions;
  * datanode. Also, this is the metadata written to om.db on server side.
  */
 public final class OmKeyInfo extends WithObjectID {
+  private static final Logger LOG = LoggerFactory.getLogger(OmKeyInfo.class);
   private final String volumeName;
   private final String bucketName;
   // name of key client specified
@@ -145,9 +150,37 @@ public final class OmKeyInfo extends WithObjectID {
    *
    * @param locationInfoList list of locationInfo
    */
-  public void updateLocationInfoList(List<OmKeyLocationInfo> locationInfoList) {
+  public void updateLocationInfoList(List<OmKeyLocationInfo> locationInfoList,
+      boolean isMpu) {
+    updateLocationInfoList(locationInfoList, isMpu, false);
+  }
+
+  /**
+   * updates the length of the each block in the list given.
+   * This will be called when the key is being committed to OzoneManager.
+   *
+   * @param locationInfoList list of locationInfo
+   * @param isMpu a true represents multi part key, false otherwise
+   * @param skipBlockIDCheck a true represents that the blockId verification
+   *                         check should be skipped, false represents that
+   *                         the blockId verification will be required
+   */
+  public void updateLocationInfoList(List<OmKeyLocationInfo> locationInfoList,
+      boolean isMpu, boolean skipBlockIDCheck) {
     long latestVersion = getLatestVersionLocations().getVersion();
     OmKeyLocationInfoGroup keyLocationInfoGroup = getLatestVersionLocations();
+
+    keyLocationInfoGroup.setMultipartKey(isMpu);
+
+    // Compare user given block location against allocatedBlockLocations
+    // present in OmKeyInfo.
+    List<OmKeyLocationInfo> updatedBlockLocations;
+    if (skipBlockIDCheck) {
+      updatedBlockLocations = locationInfoList;
+    } else {
+      updatedBlockLocations =
+          verifyAndGetKeyLocations(locationInfoList, keyLocationInfoGroup);
+    }
     // Updates the latest locationList in the latest version only with
     // given locationInfoList here.
     // TODO : The original allocated list and the updated list here may vary
@@ -156,9 +189,36 @@ public final class OmKeyInfo extends WithObjectID {
     // need to be garbage collected in case the ozone client dies.
     keyLocationInfoGroup.removeBlocks(latestVersion);
     // set each of the locationInfo object to the latest version
-    locationInfoList.forEach(omKeyLocationInfo -> omKeyLocationInfo
+    updatedBlockLocations.forEach(omKeyLocationInfo -> omKeyLocationInfo
         .setCreateVersion(latestVersion));
-    keyLocationInfoGroup.addAll(latestVersion, locationInfoList);
+    keyLocationInfoGroup.addAll(latestVersion, updatedBlockLocations);
+  }
+
+  private List<OmKeyLocationInfo> verifyAndGetKeyLocations(
+      List<OmKeyLocationInfo> locationInfoList,
+      OmKeyLocationInfoGroup keyLocationInfoGroup) {
+
+    List<OmKeyLocationInfo> allocatedBlockLocations =
+        keyLocationInfoGroup.getBlocksLatestVersionOnly();
+    List<OmKeyLocationInfo> updatedBlockLocations = new ArrayList<>();
+
+    List<ContainerBlockID> existingBlockIDs = new ArrayList<>();
+    for (OmKeyLocationInfo existingLocationInfo : allocatedBlockLocations) {
+      BlockID existingBlockID = existingLocationInfo.getBlockID();
+      existingBlockIDs.add(existingBlockID.getContainerBlockID());
+    }
+
+    for (OmKeyLocationInfo modifiedLocationInfo : locationInfoList) {
+      BlockID modifiedBlockID = modifiedLocationInfo.getBlockID();
+      if (existingBlockIDs.contains(modifiedBlockID.getContainerBlockID())) {
+        updatedBlockLocations.add(modifiedLocationInfo);
+      } else {
+        LOG.warn("Unknown BlockLocation:{}, where the blockID of given "
+            + "location doesn't match with the stored/allocated block of"
+            + " keyName:{}", modifiedLocationInfo, keyName);
+      }
+    }
+    return updatedBlockLocations;
   }
 
   /**
@@ -381,8 +441,8 @@ public final class OmKeyInfo extends WithObjectID {
    * For network transmit.
    * @return
    */
-  public KeyInfo getProtobuf() {
-    return getProtobuf(false);
+  public KeyInfo getProtobuf(int clientVersion) {
+    return getProtobuf(false, clientVersion);
   }
 
   /**
@@ -390,13 +450,14 @@ public final class OmKeyInfo extends WithObjectID {
    * @param ignorePipeline true for persist to DB, false for network transmit.
    * @return
    */
-  public KeyInfo getProtobuf(boolean ignorePipeline) {
+  public KeyInfo getProtobuf(boolean ignorePipeline, int clientVersion) {
     long latestVersion = keyLocationVersions.size() == 0 ? -1 :
         keyLocationVersions.get(keyLocationVersions.size() - 1).getVersion();
 
     List<KeyLocationList> keyLocations = new ArrayList<>();
     for (OmKeyLocationInfoGroup locationInfoGroup : keyLocationVersions) {
-      keyLocations.add(locationInfoGroup.getProtobuf(ignorePipeline));
+      keyLocations.add(locationInfoGroup.getProtobuf(
+          ignorePipeline, clientVersion));
     }
 
     KeyInfo.Builder kb = KeyInfo.newBuilder()

@@ -24,8 +24,10 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.test.PathUtils;
 
 import org.apache.commons.io.FileUtils;
@@ -51,7 +53,7 @@ public class TestHddsServerUtils {
       TestHddsServerUtils.class);
 
   @Rule
-  public Timeout timeout = new Timeout(300_000);
+  public Timeout timeout = Timeout.seconds(300);;
 
   @Rule
   public ExpectedException thrown= ExpectedException.none();
@@ -66,7 +68,8 @@ public class TestHddsServerUtils {
     final OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_DATANODE_ADDRESS_KEY, scmHost);
     final InetSocketAddress address =
-        HddsServerUtil.getScmAddressForDataNodes(conf);
+        NetUtils.createSocketAddr(
+            SCMNodeInfo.buildNodeInfo(conf).get(0).getScmDatanodeAddress());
     assertEquals(address.getHostName(), scmHost.split(":")[0]);
     assertEquals(address.getPort(), Integer.parseInt(scmHost.split(":")[1]));
   }
@@ -80,7 +83,8 @@ public class TestHddsServerUtils {
     final OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_DATANODE_ADDRESS_KEY, scmHost);
     final InetSocketAddress address =
-        HddsServerUtil.getScmAddressForDataNodes(conf);
+        NetUtils.createSocketAddr(
+            SCMNodeInfo.buildNodeInfo(conf).get(0).getScmDatanodeAddress());
     assertEquals(scmHost, address.getHostName());
     assertEquals(OZONE_SCM_DATANODE_PORT_DEFAULT, address.getPort());
   }
@@ -95,7 +99,8 @@ public class TestHddsServerUtils {
     final OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, scmHost);
     final InetSocketAddress address =
-        HddsServerUtil.getScmAddressForDataNodes(conf);
+        NetUtils.createSocketAddr(
+            SCMNodeInfo.buildNodeInfo(conf).get(0).getScmDatanodeAddress());
     assertEquals(scmHost, address.getHostName());
     assertEquals(OZONE_SCM_DATANODE_PORT_DEFAULT, address.getPort());
   }
@@ -112,7 +117,8 @@ public class TestHddsServerUtils {
     final OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, scmHost);
     final InetSocketAddress address =
-        HddsServerUtil.getScmAddressForDataNodes(conf);
+        NetUtils.createSocketAddr(
+            SCMNodeInfo.buildNodeInfo(conf).get(0).getScmDatanodeAddress());
     assertEquals(address.getHostName(), scmHost.split(":")[0]);
     assertEquals(address.getPort(), OZONE_SCM_DATANODE_PORT_DEFAULT);
   }
@@ -126,8 +132,8 @@ public class TestHddsServerUtils {
     final String scmHost = "host123";
     final OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_NAMES, scmHost);
-    final InetSocketAddress address =
-        HddsServerUtil.getScmAddressForDataNodes(conf);
+    final InetSocketAddress address = NetUtils.createSocketAddr(
+        SCMNodeInfo.buildNodeInfo(conf).get(0).getScmDatanodeAddress());
     assertEquals(scmHost, address.getHostName());
     assertEquals(OZONE_SCM_DATANODE_PORT_DEFAULT, address.getPort());
   }
@@ -144,22 +150,10 @@ public class TestHddsServerUtils {
     final OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_NAMES, scmHost);
     final InetSocketAddress address =
-        HddsServerUtil.getScmAddressForDataNodes(conf);
+        NetUtils.createSocketAddr(
+            SCMNodeInfo.buildNodeInfo(conf).get(0).getScmDatanodeAddress());
     assertEquals(address.getHostName(), scmHost.split(":")[0]);
     assertEquals(OZONE_SCM_DATANODE_PORT_DEFAULT, address.getPort());
-  }
-
-  /**
-   * getScmAddressForDataNodes should fail when OZONE_SCM_NAMES has
-   * multiple addresses.
-   */
-  @Test
-  public void testClientFailsWithMultipleScmNames() {
-    final String scmHost = "host123,host456";
-    final OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(OZONE_SCM_NAMES, scmHost);
-    thrown.expect(IllegalArgumentException.class);
-    HddsServerUtil.getScmAddressForDataNodes(conf);
   }
 
   /**

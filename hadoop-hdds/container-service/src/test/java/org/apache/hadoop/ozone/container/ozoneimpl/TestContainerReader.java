@@ -70,7 +70,7 @@ public class TestContainerReader {
 
   private RoundRobinVolumeChoosingPolicy volumeChoosingPolicy;
   private UUID datanodeId;
-  private String scmId = UUID.randomUUID().toString();
+  private String clusterId = UUID.randomUUID().toString();
   private int blockCount = 10;
   private long blockLen = 1024;
 
@@ -85,7 +85,7 @@ public class TestContainerReader {
     datanodeId = UUID.randomUUID();
     hddsVolume = new HddsVolume.Builder(volumeDir
         .getAbsolutePath()).conf(conf).datanodeUuid(datanodeId
-        .toString()).build();
+        .toString()).clusterID(clusterId).build();
 
     volumeSet = mock(MutableVolumeSet.class);
     volumeChoosingPolicy = mock(RoundRobinVolumeChoosingPolicy.class);
@@ -101,7 +101,7 @@ public class TestContainerReader {
       KeyValueContainer keyValueContainer =
           new KeyValueContainer(keyValueContainerData,
               conf);
-      keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+      keyValueContainer.create(volumeSet, volumeChoosingPolicy, clusterId);
 
 
       List<Long> blkNames;
@@ -214,6 +214,50 @@ public class TestContainerReader {
   }
 
   @Test
+  public void testContainerReaderWithLoadException() throws Exception {
+    MutableVolumeSet volumeSet1;
+    HddsVolume hddsVolume1;
+    ContainerSet containerSet1 = new ContainerSet();
+    File volumeDir1 = tempDir.newFolder();
+    RoundRobinVolumeChoosingPolicy volumeChoosingPolicy1;
+
+    volumeSet1 = Mockito.mock(MutableVolumeSet.class);
+    UUID datanode = UUID.randomUUID();
+    hddsVolume1 = new HddsVolume.Builder(volumeDir1
+        .getAbsolutePath()).conf(conf).datanodeUuid(datanode
+        .toString()).clusterID(clusterId).build();
+    volumeChoosingPolicy1 = mock(RoundRobinVolumeChoosingPolicy.class);
+    Mockito.when(volumeChoosingPolicy1.chooseVolume(anyList(), anyLong()))
+        .thenReturn(hddsVolume1);
+
+    int containerCount = 3;
+    for (int i = 0; i < containerCount; i++) {
+      KeyValueContainerData keyValueContainerData = new KeyValueContainerData(i,
+          ChunkLayOutVersion.FILE_PER_BLOCK,
+          (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
+          datanodeId.toString());
+      KeyValueContainer keyValueContainer =
+          new KeyValueContainer(keyValueContainerData, conf);
+      keyValueContainer.create(volumeSet1, volumeChoosingPolicy1, clusterId);
+      BlockUtils.removeDB(keyValueContainerData, conf);
+
+      if (i == 0) {
+        // rename first container directory name
+        String containerPathStr =
+            keyValueContainer.getContainerData().getContainerPath();
+        File containerPath = new File(containerPathStr);
+        String renamePath = containerPathStr + "-aa";
+        Assert.assertTrue(containerPath.renameTo(new File(renamePath)));
+      }
+    }
+
+    ContainerReader containerReader = new ContainerReader(volumeSet1,
+        hddsVolume1, containerSet1, conf);
+    containerReader.readVolume(hddsVolume1.getHddsRootDir());
+    Assert.assertEquals(containerCount - 1, containerSet1.containerCount());
+  }
+
+  @Test
   public void testMultipleContainerReader() throws Exception {
     final int volumeNum = 10;
     StringBuffer datanodeDirs = new StringBuffer();
@@ -225,7 +269,7 @@ public class TestContainerReader {
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY,
         datanodeDirs.toString());
     MutableVolumeSet volumeSets =
-        new MutableVolumeSet(datanodeId.toString(), conf);
+        new MutableVolumeSet(datanodeId.toString(), clusterId, conf);
     ContainerCache cache = ContainerCache.getInstance(conf);
     cache.clear();
 
@@ -243,7 +287,7 @@ public class TestContainerReader {
       KeyValueContainer keyValueContainer =
           new KeyValueContainer(keyValueContainerData,
               conf);
-      keyValueContainer.create(volumeSets, policy, scmId);
+      keyValueContainer.create(volumeSets, policy, clusterId);
 
       List<Long> blkNames;
       if (i % 2 == 0) {

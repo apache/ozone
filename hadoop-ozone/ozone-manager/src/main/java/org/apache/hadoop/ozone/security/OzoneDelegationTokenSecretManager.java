@@ -30,6 +30,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.security.OzoneSecretManager;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
@@ -328,7 +329,7 @@ public class OzoneDelegationTokenSecretManager
       OzoneTokenIdentifier ozoneTokenIdentifier, long expiryTime) {
     //TODO: Instead of having in-memory map inside this class, we can use
     // cache from table and make this table cache clean up policy NEVER. In
-    // this way, we don't need to maintain seperate in-memory map. To do this
+    // this way, we don't need to maintain separate in-memory map. To do this
     // work we need to merge HA/Non-HA code.
     TokenInfo tokenInfo = new TokenInfo(expiryTime, token.getPassword(),
         ozoneTokenIdentifier.getTrackingId());
@@ -342,6 +343,7 @@ public class OzoneDelegationTokenSecretManager
    * @throws InvalidToken for invalid token
    * @throws AccessControlException if the user isn't allowed to cancel
    */
+  @Override
   public OzoneTokenIdentifier cancelToken(Token<OzoneTokenIdentifier> token,
       String canceller) throws IOException {
     OzoneTokenIdentifier id = OzoneTokenIdentifier.readProtoBuf(
@@ -472,6 +474,19 @@ public class OzoneDelegationTokenSecretManager
   private byte[] validateS3AuthInfo(OzoneTokenIdentifier identifier)
       throws InvalidToken {
     LOG.trace("Validating S3AuthInfo for identifier:{}", identifier);
+    if (identifier.getOwner() == null) {
+      throw new InvalidToken(
+          "Owner is missing from the S3 auth token");
+    }
+    if (!identifier.getOwner().toString().equals(identifier.getAwsAccessId())) {
+      LOG.error(
+          "Owner and AWSAccessId is different in the S3 token. Possible "
+              + " security attack: {}",
+          identifier);
+      throw new InvalidToken(
+          "Invalid S3 identifier: owner=" + identifier.getOwner()
+              + ", awsAccessId=" + identifier.getAwsAccessId());
+    }
     String awsSecret;
     try {
       awsSecret = s3SecretManager.getS3UserSecretString(identifier

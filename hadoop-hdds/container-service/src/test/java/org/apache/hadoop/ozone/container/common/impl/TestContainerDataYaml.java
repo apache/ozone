@@ -41,13 +41,14 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+
 /**
  * This class tests create/read .container files.
  */
 @RunWith(Parameterized.class)
 public class TestContainerDataYaml {
 
-  private static long testContainerID = 1234;
+  private long testContainerID = 1234;
 
   private static String testRoot = new FileSystemTestHelper().getTestRootDir();
 
@@ -58,7 +59,7 @@ public class TestContainerDataYaml {
   private static final String CONTAINER_DB_TYPE = "RocksDB";
 
   private final ChunkLayOutVersion layout;
-
+    
   public TestContainerDataYaml(ChunkLayOutVersion layout) {
     this.layout = layout;
   }
@@ -125,9 +126,10 @@ public class TestContainerDataYaml {
     assertEquals(MAXSIZE, kvData.getMaxSize());
     assertEquals(MAXSIZE, kvData.getMaxSize());
     assertTrue(kvData.lastDataScanTime().isPresent());
-    assertEquals(SCAN_TIME, kvData.lastDataScanTime().get());
     assertEquals(SCAN_TIME.toEpochMilli(),
-        kvData.getDataScanTimestamp().longValue());
+                 kvData.lastDataScanTime().get().toEpochMilli());
+    assertEquals(SCAN_TIME.toEpochMilli(),
+                 kvData.getDataScanTimestamp().longValue());
     assertEquals(OzoneConsts.SCHEMA_LATEST,
             kvData.getSchemaVersion());
 
@@ -160,9 +162,10 @@ public class TestContainerDataYaml {
         kvData.getMetadata().get(OzoneConsts.OWNER));
     assertEquals(MAXSIZE, kvData.getMaxSize());
     assertTrue(kvData.lastDataScanTime().isPresent());
-    assertEquals(SCAN_TIME, kvData.lastDataScanTime().get());
     assertEquals(SCAN_TIME.toEpochMilli(),
-        kvData.getDataScanTimestamp().longValue());
+                 kvData.lastDataScanTime().get().toEpochMilli());
+    assertEquals(SCAN_TIME.toEpochMilli(),
+                 kvData.getDataScanTimestamp().longValue());
   }
 
   @Test

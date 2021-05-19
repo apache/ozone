@@ -64,9 +64,9 @@ public class TestOzoneClientRetriesOnExceptionFlushDelay {
    * Set a timeout for each test.
    */
   @Rule
-  public Timeout timeout = new Timeout(300000);
+  public Timeout timeout = Timeout.seconds(300);
 
-  private static MiniOzoneCluster cluster;
+  private MiniOzoneCluster cluster;
   private OzoneConfiguration conf = new OzoneConfiguration();
   private OzoneClient client;
   private ObjectStore objectStore;
@@ -156,7 +156,7 @@ public class TestOzoneClientRetriesOnExceptionFlushDelay {
     Assert.assertTrue(keyOutputStream.getStreamEntries().size() == 1);
     ContainerInfo container =
         cluster.getStorageContainerManager().getContainerManager()
-            .getContainer(ContainerID.valueof(containerID));
+            .getContainer(ContainerID.valueOf(containerID));
     Pipeline pipeline =
         cluster.getStorageContainerManager().getPipelineManager()
             .getPipeline(container.getPipelineID());

@@ -73,6 +73,12 @@ message OzoneManagerDetailsProto {
     repeated Port ports = 4;
 }
 
+message ScmNodeDetailsProto {
+    required string scmNodeId = 1;     // SCM Node Id.
+    required string clusterId = 2;     // Cluster Id of SCM cluster.
+    required string hostName = 3;      // Hostname of SCM.
+}
+
 message Port {
     required string name = 1;
     required uint32 value = 2;
@@ -83,6 +89,10 @@ message PipelineID {
   optional string id = 1;
   // TODO(runzhiwang): when id is gone, specify 1 as the index of uuid128 and mark as required
   optional UUID uuid128 = 100;
+}
+
+message ContainerID {
+    required uint64 id = 1;
 }
 
 enum PipelineState {
@@ -156,6 +166,13 @@ message NodePool {
     repeated Node nodes = 1;
 }
 
+message DatanodeUsageInfoProto {
+    optional int64 capacity = 1;
+    optional int64 used = 2;
+    optional int64 remaining = 3;
+    optional DatanodeDetailsProto node = 4;
+}
+
 /**
  * LifeCycleState for SCM object creation state machine:
  *    ->Allocated: allocated on SCM but client has not started creating it yet.
@@ -190,6 +207,7 @@ enum LifeCycleEvent {
 }
 
 message ContainerInfoProto {
+    // Replace int64 with ContainerID message
     required int64 containerID = 1;
     required LifeCycleState state = 2;
     optional PipelineID pipelineID = 3;
@@ -215,8 +233,19 @@ message GetScmInfoRequestProto {
 message GetScmInfoResponseProto {
     required string clusterId = 1;
     required string scmId = 2;
+    repeated string peerRoles = 3;
 }
 
+message AddScmRequestProto {
+    required string clusterId = 1;
+    required string scmId = 2;
+    required string ratisAddr = 3;
+}
+
+message AddScmResponseProto {
+    required bool success = 1;
+    optional string scmId = 2;
+}
 
 enum ReplicationType {
     RATIS = 1;
@@ -245,6 +274,7 @@ enum ScmOps {
 
 message ExcludeListProto {
     repeated string datanodes = 1;
+    // Replace int64 with ContainerID message
     repeated int64 containerIds = 2;
     repeated PipelineID pipelineIds = 3;
 }
@@ -253,10 +283,27 @@ message ExcludeListProto {
  * Block ID that uniquely identify a block by SCM.
  */
 message ContainerBlockID {
+    // Replace int64 with ContainerID message
     required int64 containerID = 1;
     required int64 localID = 2;
 }
 
+message SecretKeyProto {
+    required uint32 keyId = 1;
+    required uint64 expiryDate = 2;
+    required bytes privateKeyBytes = 3;
+    required bytes publicKeyBytes = 4;
+}
+
+/**
+ * Security token identifier
+ */
+message TokenProto {
+  required bytes identifier = 1;
+  required bytes password = 2;
+  required string kind = 3;
+  required string service = 4;
+}
 
 /**
  * Information for the Hdds block token.
@@ -284,4 +331,21 @@ message BlockTokenSecretProto {
 message BlockID {
     required ContainerBlockID containerBlockID = 1;
     optional uint64 blockCommitSequenceId = 2 [default = 0];
+}
+
+/**
+ * Information for Certificate Revocation List.
+ */
+message CRLInfoProto {
+    required string x509CRL = 1;
+    required uint64 creationTimestamp = 2;
+    required int64 crlSequenceID = 3;
+}
+
+/**
+ * Information for X509 Certificate.
+ */
+message CertInfoProto {
+    required string x509Certificate = 1;
+    required uint64 timestamp = 2;
 }

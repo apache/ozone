@@ -18,12 +18,16 @@ package org.apache.hadoop.hdds.scm.container;
 
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto
         .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
+import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.net.NetConstants;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.net.Node;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
+import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -51,6 +55,7 @@ import org.assertj.core.util.Preconditions;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -198,7 +203,22 @@ public class MockNodeManager implements NodeManager {
   public List<DatanodeDetails> getNodes(
       HddsProtos.NodeOperationalState opState, HddsProtos.NodeState nodestate) {
     if (nodestate == HEALTHY) {
-      return healthyNodes;
+      // mock storage reports for SCMCommonPlacementPolicy.hasEnoughSpace()
+      List<DatanodeDetails> healthyNodesWithInfo = new ArrayList<>();
+      for (DatanodeDetails dd : healthyNodes) {
+        DatanodeInfo di = new DatanodeInfo(dd, NodeStatus.inServiceHealthy());
+
+        long capacity = nodeMetricMap.get(dd).getCapacity().get();
+        long used = nodeMetricMap.get(dd).getScmUsed().get();
+        long remaining = nodeMetricMap.get(dd).getRemaining().get();
+        StorageReportProto storage1 = TestUtils.createStorageReport(
+            di.getUuid(), "/data1-" + di.getUuidString(),
+            capacity, used, remaining, null);
+        di.updateStorageReports(new ArrayList<>(Arrays.asList(storage1)));
+
+        healthyNodesWithInfo.add(di);
+      }
+      return healthyNodesWithInfo;
     }
 
     if (nodestate == STALE) {
@@ -268,6 +288,21 @@ public class MockNodeManager implements NodeManager {
   }
 
   /**
+   * Gets a sorted list of most or least used DatanodeUsageInfo containing
+   * healthy, in-service nodes. If the specified mostUsed is true, the returned
+   * list is in descending order of usage. Otherwise, the returned list is in
+   * ascending order of usage.
+   *
+   * @param mostUsed true if most used, false if least used
+   * @return List of DatanodeUsageInfo
+   */
+  @Override
+  public List<DatanodeUsageInfo> getMostOrLeastUsedDatanodes(
+      boolean mostUsed) {
+    return null;
+  }
+
+  /**
    * Return the node stat of the specified datanode.
    * @param datanodeDetails - datanode details.
    * @return node stat if it is live/stale, null if it is decommissioned or
@@ -299,6 +334,7 @@ public class MockNodeManager implements NodeManager {
    * @param datanodeDetails The datanode to set the new state for
    * @param newState The new operational state for the node
    */
+  @Override
   public void setNodeOperationalState(DatanodeDetails datanodeDetails,
       HddsProtos.NodeOperationalState newState) throws NodeNotFoundException {
   }
@@ -308,6 +344,7 @@ public class MockNodeManager implements NodeManager {
    * @param datanodeDetails The datanode to set the new state for
    * @param newState The new operational state for the node
    */
+  @Override
   public void setNodeOperationalState(DatanodeDetails datanodeDetails,
       HddsProtos.NodeOperationalState newState, long opStateExpiryEpocSec)
       throws NodeNotFoundException {
@@ -542,7 +579,7 @@ public class MockNodeManager implements NodeManager {
   @Override
   public Boolean isNodeRegistered(
       DatanodeDetails datanodeDetails) {
-    return null;
+    return false;
   }
 
   @Override

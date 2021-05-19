@@ -59,7 +59,7 @@ public class TestContainerStateMachineFlushDelay {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = new Timeout(300000);
+  public Timeout timeout = Timeout.seconds(300);
 
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf = new OzoneConfiguration();
@@ -68,11 +68,11 @@ public class TestContainerStateMachineFlushDelay {
   private String volumeName;
   private String bucketName;
   private String path;
-  private static int chunkSize;
-  private static int flushSize;
-  private static int maxFlushSize;
-  private static int blockSize;
-  private static String keyString;
+  private int chunkSize;
+  private int flushSize;
+  private int maxFlushSize;
+  private int blockSize;
+  private String keyString;
 
   /**
    * Create a MiniDFSCluster for testing.
@@ -149,7 +149,7 @@ public class TestContainerStateMachineFlushDelay {
     // First write and flush creates a container in the datanode
     key.write(data);
     key.flush();
-    key.write("ratis".getBytes());
+    key.write("ratis".getBytes(UTF_8));
 
     //get the name of a valid container
     KeyOutputStream groupOutputStream =

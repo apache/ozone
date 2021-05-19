@@ -15,7 +15,7 @@
   limitations under the License.
 -->
 
-# History of Apache Hadoop Ozone project
+# History of Apache Ozone project
 
 Ozone development was started on a feature branch HDFS-7240 as part of the Apache Hadoop HDFS project. Based on the Jira information the first Ozone commit was the commit of [HDFS-8456 Ozone: Introduce STORAGE_CONTAINER_SERVICE as a new NodeType.](https://issues.apache.org/jira/browse/HDFS-8456) in May 2015.
 
@@ -58,4 +58,6 @@ In October 2019, the Ozone sources were moved out to the [apache/hadoop-ozone](h
  * Some newer HDDS commits have different commit hash in `hadoop` and `hadoop-ozone` repository.
 
 
-In March 2020, [Ozone 0.5.0 was released](https://hadoop.apache.org/ozone/release/0.5.0-beta/), the first release marked as _beta_tag (earlier releases were alpha).
+In March 2020, the first beta release ([Ozone 0.5.0](https://hadoop.apache.org/ozone/release/0.5.0-beta/) was published, after the earlier alpha releases from 2018 and 2019.
+
+In September/October 2020 -- just after the first 1.0.0 stable release -- Hadoop community decided to move Ozone to a separated, top level Apache project. Apache Ozone is established by the board of the Apache Software Foundation during the October 2020 [board meeting](https://www.apache.org/foundation/records/minutes/2020/board_minutes_2020_10_21.txt).

@@ -111,7 +111,7 @@ public class TestRootedOzoneFileSystem {
   }
 
   @Rule
-  public Timeout globalTimeout = new Timeout(300_000);
+  public Timeout globalTimeout = Timeout.seconds(300);;
 
   private static boolean enabledFileSystemPaths;
   private static boolean omRatisEnabled;
@@ -1195,15 +1195,27 @@ public class TestRootedOzoneFileSystem {
   /**
    * 1.Move a Key to Trash
    * 2.Verify that the key gets deleted by the trash emptier.
+   * 3.Create a second Key in different bucket and verify deletion.
    * @throws Exception
    */
   @Test
   public void testTrash() throws Exception {
     String testKeyName = "keyToBeDeleted";
-    Path path = new Path(bucketPath, testKeyName);
-    try (FSDataOutputStream stream = fs.create(path)) {
+    Path keyPath1 = new Path(bucketPath, testKeyName);
+    try (FSDataOutputStream stream = fs.create(keyPath1)) {
       stream.write(1);
     }
+    // create second bucket and write a key in it.
+    OzoneBucket bucket2 = TestDataUtil.createVolumeAndBucket(cluster);
+    String volumeName2 = bucket2.getVolumeName();
+    Path volumePath2 = new Path(OZONE_URI_DELIMITER, volumeName2);
+    String bucketName2 = bucket2.getName();
+    Path bucketPath2 = new Path(volumePath2, bucketName2);
+    Path keyPath2 = new Path(bucketPath2, testKeyName + "1");
+    try (FSDataOutputStream stream = fs.create(keyPath2)) {
+      stream.write(1);
+    }
+
     Assert.assertTrue(trash.getConf().getClass(
         "fs.trash.classname", TrashPolicy.class).
         isAssignableFrom(TrashPolicyOzone.class));
@@ -1215,20 +1227,26 @@ public class TestRootedOzoneFileSystem {
     long prevNumTrashFileRenames = getOMMetrics().getNumTrashFilesRenames();
 
     // Call moveToTrash. We can't call protected fs.rename() directly
-    trash.moveToTrash(path);
+    trash.moveToTrash(keyPath1);
+    // for key in second bucket
+    trash.moveToTrash(keyPath2);
 
-    // Construct paths
+    // Construct paths for first key
     String username = UserGroupInformation.getCurrentUser().getShortUserName();
     Path trashRoot = new Path(bucketPath, TRASH_PREFIX);
     Path userTrash = new Path(trashRoot, username);
-    Path userTrashCurrent = new Path(userTrash, "Current");
-    String key = path.toString().substring(1);
-    Path trashPath = new Path(userTrashCurrent, key);
+    Path trashPath = getTrashKeyPath(keyPath1, userTrash);
 
-    // Wait until the TrashEmptier purges the key
+    // Construct paths for second key in different bucket
+    Path trashRoot2 = new Path(bucketPath2, TRASH_PREFIX);
+    Path userTrash2 = new Path(trashRoot2, username);
+    Path trashPath2 = getTrashKeyPath(keyPath2, userTrash2);
+
+
+    // Wait until the TrashEmptier purges the keys
     GenericTestUtils.waitFor(()-> {
       try {
-        return !ofs.exists(trashPath);
+        return !ofs.exists(trashPath) && !ofs.exists(trashPath2);
       } catch (IOException e) {
         LOG.error("Delete from Trash Failed", e);
         Assert.fail("Delete from Trash Failed");
@@ -1242,6 +1260,18 @@ public class TestRootedOzoneFileSystem {
     Assert.assertTrue(getOMMetrics()
         .getNumTrashFilesRenames() > prevNumTrashFileRenames);
 
+    // wait for deletion of checkpoint dir
+    GenericTestUtils.waitFor(()-> {
+      try {
+        return ofs.listStatus(userTrash).length==0 &&
+            ofs.listStatus(userTrash2).length==0;
+      } catch (IOException e) {
+        LOG.error("Delete from Trash Failed", e);
+        Assert.fail("Delete from Trash Failed");
+        return false;
+      }
+    }, 1000, 120000);
+
     // This condition should succeed once the checkpoint directory is deleted
     GenericTestUtils.waitFor(
         () -> getOMMetrics().getNumTrashDeletes() > prevNumTrashDeletes
@@ -1249,7 +1279,14 @@ public class TestRootedOzoneFileSystem {
             > prevNumTrashFileDeletes, 100, 180000);
     // Cleanup
     ofs.delete(trashRoot, true);
+    ofs.delete(trashRoot2, true);
 
+  }
+
+  private Path getTrashKeyPath(Path keyPath, Path userTrash) {
+    Path userTrashCurrent = new Path(userTrash, "Current");
+    String key = keyPath.toString().substring(1);
+    return new Path(userTrashCurrent, key);
   }
 
   @Test

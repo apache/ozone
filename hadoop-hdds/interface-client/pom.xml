@@ -20,13 +20,13 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <parent>
     <groupId>org.apache.hadoop</groupId>
     <artifactId>hadoop-hdds</artifactId>
-    <version>1.1.0-SNAPSHOT</version>
+    <version>1.2.0-SNAPSHOT</version>
   </parent>
   <artifactId>hadoop-hdds-interface-client</artifactId>
-  <version>1.1.0-SNAPSHOT</version>
-  <description>Apache Hadoop Distributed Data Store Client interface
+  <version>1.2.0-SNAPSHOT</version>
+  <description>Apache Ozone Distributed Data Store Client interface
   </description>
-  <name>Apache Hadoop HDDS Client Interface</name>
+  <name>Apache Ozone HDDS Client Interface</name>
   <packaging>jar</packaging>
 
   <dependencies>
@@ -71,6 +71,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
               <protoSourceRoot>${basedir}/src/main/proto/</protoSourceRoot>
               <includes>
                 <include>DatanodeClientProtocol.proto</include>
+                <include>InterSCMProtocol.proto</include>
               </includes>
               <outputDirectory>target/generated-sources/java</outputDirectory>
               <clearOutputDirectory>false</clearOutputDirectory>
@@ -118,6 +119,18 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
                 <replace token="com.google.common"
                          value="org.apache.ratis.thirdparty.com.google.common"
                          dir="target/generated-sources/java/org/apache/hadoop/hdds/protocol/datanode/proto">
+                </replace>
+                <replace token="com.google.protobuf"
+                         value="org.apache.ratis.thirdparty.com.google.protobuf"
+                         dir="target/generated-sources/java/org/apache/hadoop/hdds/protocol/scm/proto">
+                </replace>
+                <replace token="io.grpc"
+                         value="org.apache.ratis.thirdparty.io.grpc"
+                         dir="target/generated-sources/java/org/apache/hadoop/hdds/protocol/scm/proto">
+                </replace>
+                <replace token="com.google.common"
+                         value="org.apache.ratis.thirdparty.com.google.common"
+                         dir="target/generated-sources/java/org/apache/hadoop/hdds/protocol/scm/proto">
                 </replace>
               </tasks>
             </configuration>

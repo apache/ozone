@@ -69,6 +69,26 @@ public final class OzoneAclUtil {
   }
 
   /**
+   * Helper function to get acl list for one user/group.
+   *
+   * @param identityName
+   * @param type
+   * @param aclList
+   * @return list of OzoneAcls
+   * */
+  public static List<OzoneAcl> filterAclList(String identityName,
+      IAccessAuthorizer.ACLIdentityType type, List<OzoneAcl> aclList) {
+
+    if (aclList == null || aclList.isEmpty()) {
+      return new ArrayList<>();
+    }
+
+    List retList = aclList.stream().filter(acl -> acl.getType() == type
+        && acl.getName().equals(identityName)).collect(Collectors.toList());
+    return retList;
+  }
+
+  /**
    * Check if acl right requested for given RequestContext exist
    * in provided acl list.
    * Acl validation rules:
@@ -175,7 +195,7 @@ public final class OzoneAclUtil {
       inheritedAcls = parentAcls.stream()
           .filter(a -> a.getAclScope() == DEFAULT)
           .map(acl -> new OzoneAcl(acl.getType(), acl.getName(),
-              acl.getAclBitSet(), OzoneAcl.AclScope.ACCESS))
+              acl.getAclBitSet(), ACCESS))
           .collect(Collectors.toList());
     }
     if (inheritedAcls != null && !inheritedAcls.isEmpty()) {

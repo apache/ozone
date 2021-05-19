@@ -19,8 +19,9 @@
 package org.apache.hadoop.hdds.scm.pipeline;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -46,7 +47,7 @@ public class TestNodeFailure {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = new Timeout(300000);
+  public Timeout timeout = Timeout.seconds(300);
 
   private static MiniOzoneCluster cluster;
   private static List<Pipeline> ratisPipelines;
@@ -79,8 +80,8 @@ public class TestNodeFailure {
     final StorageContainerManager scm = cluster.getStorageContainerManager();
     pipelineManager = scm.getPipelineManager();
     ratisPipelines = pipelineManager.getPipelines(
-        HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.THREE);
+        new RatisReplicationConfig(
+            ReplicationFactor.THREE));
 
     timeForFailure = (int) ratisServerConfig
         .getFollowerSlownessTimeout();

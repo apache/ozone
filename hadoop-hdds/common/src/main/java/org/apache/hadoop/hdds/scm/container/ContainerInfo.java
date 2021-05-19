@@ -106,9 +106,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
 
   public static ContainerInfo fromProtobuf(HddsProtos.ContainerInfoProto info) {
     ContainerInfo.Builder builder = new ContainerInfo.Builder();
-    return builder.setPipelineID(
-        PipelineID.getFromProtobuf(info.getPipelineID()))
-        .setUsedBytes(info.getUsedBytes())
+    builder.setUsedBytes(info.getUsedBytes())
         .setNumberOfKeys(info.getNumberOfKeys())
         .setState(info.getState())
         .setStateEnterTime(info.getStateEnterTime())
@@ -119,8 +117,19 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
         .setReplicationType(info.getReplicationType())
         .setSequenceId(info.getSequenceId())
         .build();
+
+    if (info.hasPipelineID()) {
+      builder.setPipelineID(PipelineID.getFromProtobuf(info.getPipelineID()));
+    }
+    return builder.build();
+
   }
 
+  /**
+   * This method is depricated, use {@code containerID()} which returns
+   * {@link ContainerID} object.
+   */
+  @Deprecated
   public long getContainerID() {
     return containerID;
   }
@@ -179,7 +188,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
   }
 
   public ContainerID containerID() {
-    return new ContainerID(getContainerID());
+    return ContainerID.valueOf(containerID);
   }
 
   /**
@@ -199,22 +208,26 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
     lastUsed = Instant.ofEpochMilli(Time.now());
   }
 
+  @JsonIgnore
   public HddsProtos.ContainerInfoProto getProtobuf() {
     HddsProtos.ContainerInfoProto.Builder builder =
         HddsProtos.ContainerInfoProto.newBuilder();
     Preconditions.checkState(containerID > 0);
-    return builder.setContainerID(getContainerID())
+    builder.setContainerID(getContainerID())
         .setUsedBytes(getUsedBytes())
         .setNumberOfKeys(getNumberOfKeys()).setState(getState())
         .setStateEnterTime(getStateEnterTime().toEpochMilli())
         .setContainerID(getContainerID())
         .setDeleteTransactionId(getDeleteTransactionId())
-        .setPipelineID(getPipelineID().getProtobuf())
         .setReplicationFactor(getReplicationFactor())
         .setReplicationType(getReplicationType())
         .setOwner(getOwner())
-        .setSequenceId(getSequenceId())
-        .build();
+        .setSequenceId(getSequenceId());
+
+    if (getPipelineID() != null) {
+      builder.setPipelineID(getPipelineID().getProtobuf());
+    }
+    return builder.build();
   }
 
   public String getOwner() {

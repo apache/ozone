@@ -26,6 +26,7 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.protocol.proto
     .OzoneManagerProtocolProtos.OzoneAclInfo;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -36,6 +37,7 @@ import com.google.common.base.Preconditions;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_USER_MAX_VOLUME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_USER_MAX_VOLUME_DEFAULT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.USER_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 
@@ -381,28 +383,7 @@ public class VolumeManagerImpl implements VolumeManager {
       throws IOException {
     Preconditions.checkNotNull(volume);
     Preconditions.checkNotNull(userAcl);
-    metadataManager.getLock().acquireReadLock(VOLUME_LOCK, volume);
-    try {
-      String dbVolumeKey = metadataManager.getVolumeKey(volume);
-      OmVolumeArgs volumeArgs =
-          metadataManager.getVolumeTable().get(dbVolumeKey);
-      if (volumeArgs == null) {
-        LOG.debug("volume:{} does not exist", volume);
-        throw new OMException("Volume " + volume + " is not found",
-            ResultCodes.VOLUME_NOT_FOUND);
-      }
-
-      Preconditions.checkState(volume.equals(volumeArgs.getVolume()));
-      return volumeArgs.getAclMap().hasAccess(userAcl);
-    } catch (IOException ex) {
-      if (!(ex instanceof OMException)) {
-        LOG.error("Check volume access failed for volume:{} user:{} rights:{}",
-            volume, userAcl.getName(), userAcl.getRights().toString(), ex);
-      }
-      throw ex;
-    } finally {
-      metadataManager.getLock().releaseReadLock(VOLUME_LOCK, volume);
-    }
+    throw new OMException(NOT_SUPPORTED_OPERATION);
   }
 
   /**
@@ -446,18 +427,10 @@ public class VolumeManagerImpl implements VolumeManager {
         throw new OMException("Volume " + volume + " is not found",
             ResultCodes.VOLUME_NOT_FOUND);
       }
-      try {
-        volumeArgs.addAcl(acl);
-      } catch (OMException ex) {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Add acl failed.", ex);
-        }
-        return false;
+      if (volumeArgs.addAcl(acl)) {
+        metadataManager.getVolumeTable().put(dbVolumeKey, volumeArgs);
+        return true;
       }
-      metadataManager.getVolumeTable().put(dbVolumeKey, volumeArgs);
-
-      Preconditions.checkState(volume.equals(volumeArgs.getVolume()));
-      //return volumeArgs.getAclMap().hasAccess(userAcl);
     } catch (IOException ex) {
       if (!(ex instanceof OMException)) {
         LOG.error("Add acl operation failed for volume:{} acl:{}",
@@ -468,7 +441,7 @@ public class VolumeManagerImpl implements VolumeManager {
       metadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volume);
     }
 
-    return true;
+    return false;
   }
 
   /**
@@ -498,15 +471,10 @@ public class VolumeManagerImpl implements VolumeManager {
         throw new OMException("Volume " + volume + " is not found",
             ResultCodes.VOLUME_NOT_FOUND);
       }
-      try {
-        volumeArgs.removeAcl(acl);
-      } catch (OMException ex) {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Remove acl failed.", ex);
-        }
-        return false;
+      if (volumeArgs.removeAcl(acl)) {
+        metadataManager.getVolumeTable().put(dbVolumeKey, volumeArgs);
+        return true;
       }
-      metadataManager.getVolumeTable().put(dbVolumeKey, volumeArgs);
 
       Preconditions.checkState(volume.equals(volumeArgs.getVolume()));
       //return volumeArgs.getAclMap().hasAccess(userAcl);
@@ -520,7 +488,7 @@ public class VolumeManagerImpl implements VolumeManager {
       metadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volume);
     }
 
-    return true;
+    return false;
   }
 
   /**
@@ -596,7 +564,7 @@ public class VolumeManagerImpl implements VolumeManager {
       }
 
       Preconditions.checkState(volume.equals(volumeArgs.getVolume()));
-      return volumeArgs.getAclMap().getAcl();
+      return volumeArgs.getAcls();
     } catch (IOException ex) {
       if (!(ex instanceof OMException)) {
         LOG.error("Get acl operation failed for volume:{}", volume, ex);
@@ -633,8 +601,8 @@ public class VolumeManagerImpl implements VolumeManager {
       }
 
       Preconditions.checkState(volume.equals(volumeArgs.getVolume()));
-      boolean hasAccess = volumeArgs.getAclMap().hasAccess(
-          context.getAclRights(), context.getClientUgi());
+      boolean hasAccess = OzoneAclUtil.checkAclRights(
+          volumeArgs.getAcls(), context);
       if (LOG.isDebugEnabled()) {
         LOG.debug("user:{} has access rights for volume:{} :{} ",
             context.getClientUgi(), ozObject.getVolumeName(), hasAccess);

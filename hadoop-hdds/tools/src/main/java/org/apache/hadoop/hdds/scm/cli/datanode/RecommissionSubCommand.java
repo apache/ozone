@@ -17,7 +17,9 @@
  */
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
+import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import picocli.CommandLine;
@@ -27,6 +29,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
+ * Recommission one or more datanodes.
  * Place decommissioned or maintenance nodes back into service.
  */
 @Command(
@@ -36,11 +39,30 @@ import java.util.List;
     versionProvider = HddsVersionProvider.class)
 public class RecommissionSubCommand extends ScmSubcommand {
 
+  @CommandLine.Spec
+  private CommandLine.Model.CommandSpec spec;
+
   @CommandLine.Parameters(description = "List of fully qualified host names")
-  private List<String> hosts = new ArrayList<String>();
+  private List<String> hosts = new ArrayList<>();
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
-    scmClient.recommissionNodes(hosts);
+    if (hosts.size() > 0) {
+      List<DatanodeAdminError> errors = scmClient.recommissionNodes(hosts);
+      System.out.println("Started recommissioning datanode(s):\n" +
+          String.join("\n", hosts));
+      if (errors.size() > 0) {
+        for (DatanodeAdminError error : errors) {
+          System.err.println("Error: " + error.getHostname() +": "
+              + error.getError());
+        }
+        // Throwing the exception will cause a non-zero exit status for the
+        // command.
+        throw new IOException(
+            "Some nodes could be recommissioned");
+      }
+    } else {
+      GenericCli.missingSubcommand(spec);
+    }
   }
 }

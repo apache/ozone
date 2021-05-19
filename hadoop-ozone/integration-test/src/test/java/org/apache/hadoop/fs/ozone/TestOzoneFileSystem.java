@@ -53,9 +53,11 @@ import org.apache.hadoop.test.GenericTestUtils;
 
 import org.apache.commons.io.IOUtils;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
 import static org.apache.hadoop.fs.FileSystem.TRASH_PREFIX;
 import static org.apache.hadoop.fs.ozone.Constants.LISTING_PAGE_SIZE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.junit.Assert.assertEquals;
@@ -69,7 +71,6 @@ import org.apache.hadoop.test.LambdaTestUtils;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Assert;
-import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
@@ -94,14 +95,28 @@ public class TestOzoneFileSystem {
   }
 
   public TestOzoneFileSystem(boolean setDefaultFs, boolean enableOMRatis) {
-    this.enabledFileSystemPaths = setDefaultFs;
-    this.omRatisEnabled = enableOMRatis;
+    // Checking whether 'defaultFS' and 'omRatis' flags represents next
+    // parameter index values. This is to ensure that initialize
+    // TestOzoneFileSystem#init() function will be invoked only at the
+    // beginning of every new set of Parameterized.Parameters.
+    if (enabledFileSystemPaths != setDefaultFs ||
+            omRatisEnabled != enableOMRatis) {
+      enabledFileSystemPaths = setDefaultFs;
+      omRatisEnabled = enableOMRatis;
+      try {
+        teardown();
+        init();
+      } catch (Exception e) {
+        LOG.info("Unexpected exception", e);
+        fail("Unexpected exception:" + e.getMessage());
+      }
+    }
   }
   /**
    * Set a timeout for each test.
    */
   @Rule
-  public Timeout timeout = new Timeout(300000);
+  public Timeout timeout = Timeout.seconds(300);
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOzoneFileSystem.class);
@@ -116,11 +131,12 @@ public class TestOzoneFileSystem {
   private static String bucketName;
   private static Trash trash;
 
-  @BeforeClass
-  public static void init() throws Exception {
+  private void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setInt(FS_TRASH_INTERVAL_KEY, 1);
+    conf.setInt(FS_TRASH_INTERVAL_KEY, 2);
+    conf.setInt(OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY, 1);
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
+    conf.setBoolean(OZONE_ACL_ENABLED, true);
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
             enabledFileSystemPaths);
     cluster = MiniOzoneCluster.newBuilder(conf)
@@ -577,7 +593,7 @@ public class TestOzoneFileSystem {
   @Test
   public void testSeekOnFileLength() throws IOException {
     Path file = new Path("/file");
-    ContractTestUtils.createFile(fs, file, true, "a".getBytes());
+    ContractTestUtils.createFile(fs, file, true, "a".getBytes(UTF_8));
     try (FSDataInputStream stream = fs.open(file)) {
       long fileLength = fs.getFileStatus(file).getLen();
       stream.seek(fileLength);
@@ -786,7 +802,8 @@ public class TestOzoneFileSystem {
     Assert.assertTrue(trash.getConf().getClass(
         "fs.trash.classname", TrashPolicy.class).
         isAssignableFrom(TrashPolicyOzone.class));
-    Assert.assertEquals(trash.getConf().getInt(FS_TRASH_INTERVAL_KEY, 0), 1);
+    Assert.assertEquals(1, trash.getConf().
+        getInt(OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY, 0));
     // Call moveToTrash. We can't call protected fs.rename() directly
     trash.moveToTrash(path);
 

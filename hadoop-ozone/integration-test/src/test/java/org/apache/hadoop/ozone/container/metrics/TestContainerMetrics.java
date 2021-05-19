@@ -69,7 +69,7 @@ public class TestContainerMetrics {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = new Timeout(300000);
+  public Timeout timeout = Timeout.seconds(300);
 
   @Test
   public void testContainerMetrics() throws Exception {
@@ -112,7 +112,7 @@ public class TestContainerMetrics {
       }
       HddsDispatcher dispatcher = new HddsDispatcher(conf, containerSet,
           volumeSet, handlers, context, metrics, null);
-      dispatcher.setScmId(UUID.randomUUID().toString());
+      dispatcher.setClusterId(UUID.randomUUID().toString());
 
       server = new XceiverServerGrpc(datanodeDetails, conf, dispatcher, null);
       client = new XceiverClientGrpc(pipeline, conf);

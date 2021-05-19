@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone;
 
 import org.apache.hadoop.conf.TestConfigurationFieldsBase;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -38,7 +39,7 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = new Timeout(300000);
+  public Timeout timeout = Timeout.seconds(300);
 
   @Override
   public void initializeMemberVariables() {
@@ -48,12 +49,16 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
             OMConfigKeys.class, HddsConfigKeys.class,
             ReconServerConfigKeys.class,
             S3GatewayConfigKeys.class,
-            SCMHTTPServerConfig.class
+            SCMHTTPServerConfig.class,
+            SCMHTTPServerConfig.ConfigStrings.class,
+            ScmConfig.ConfigStrings.class
         };
     errorIfMissingConfigProps = true;
     errorIfMissingXmlProps = true;
     xmlPropsToSkipCompare.add("hadoop.tags.custom");
     xmlPropsToSkipCompare.add("ozone.om.nodes.EXAMPLEOMSERVICEID");
+    xmlPropsToSkipCompare.add("ozone.scm.nodes.EXAMPLESCMSERVICEID");
+    xmlPrefixToSkipCompare.add("ipc.client.rpc-timeout.ms");
     xmlPropsToSkipCompare.add("ozone.om.leader.election.minimum.timeout" +
         ".duration"); // Deprecated config
     addPropertiesNotInXml();
@@ -67,6 +72,10 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         HddsConfigKeys.HDDS_SECURITY_PROVIDER,
         HddsConfigKeys.HDDS_X509_CRL_NAME, // HDDS-2873
         OMConfigKeys.OZONE_OM_NODES_KEY,
+        ScmConfigKeys.OZONE_SCM_NODES_KEY,
+        ScmConfigKeys.OZONE_SCM_ADDRESS_KEY,
+        OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY,
+        OMConfigKeys.OZONE_FS_TRASH_CHECKPOINT_INTERVAL_KEY,
         OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE,
         OzoneConfigKeys.OZONE_S3_AUTHINFO_MAX_LIFETIME_KEY,
         ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR,

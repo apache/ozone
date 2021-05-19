@@ -25,10 +25,12 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
@@ -188,8 +190,8 @@ public class TestPipelinePlacementPolicy {
         Pipeline pipeline = Pipeline.newBuilder()
             .setId(PipelineID.randomId())
             .setState(Pipeline.PipelineState.ALLOCATED)
-            .setType(HddsProtos.ReplicationType.RATIS)
-            .setFactor(HddsProtos.ReplicationFactor.THREE)
+            .setReplicationConfig(new RatisReplicationConfig(
+                ReplicationFactor.THREE))
             .setNodes(nodes)
             .build();
         nodeManager.addPipeline(pipeline);
@@ -210,7 +212,9 @@ public class TestPipelinePlacementPolicy {
     
     // Should max out pipeline usage.
     Assert.assertEquals(maxPipelineCount,
-        stateManager.getPipelines(HddsProtos.ReplicationType.RATIS).size());
+        stateManager
+            .getPipelines(new RatisReplicationConfig(ReplicationFactor.THREE))
+            .size());
   }
 
   @Test
@@ -234,24 +238,16 @@ public class TestPipelinePlacementPolicy {
     List<DatanodeDetails> healthyNodes = overWriteLocationInNodes(
         nodeManager.getNodes(NodeStatus.inServiceHealthy()));
     DatanodeDetails node;
-    try {
-      node = placementPolicy.fallBackPickNodes(healthyNodes, null);
-      Assert.assertNotNull(node);
-    } catch (SCMException e) {
-      Assert.fail("Should not reach here.");
-    }
+
+    // test no nodes are excluded
+    node = placementPolicy.fallBackPickNodes(healthyNodes, null);
+    Assert.assertNotNull(node);
 
     // when input nodeSet are all excluded.
     List<DatanodeDetails> exclude = healthyNodes;
-    try {
-      node = placementPolicy.fallBackPickNodes(healthyNodes, exclude);
-      Assert.assertNull(node);
-    } catch (SCMException e) {
-      Assert.assertEquals(SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE,
-          e.getResult());
-    } catch (Exception ex) {
-      Assert.fail("Should not reach here.");
-    }
+    node = placementPolicy.fallBackPickNodes(healthyNodes, exclude);
+    Assert.assertNull(node);
+
   }
 
   @Test
