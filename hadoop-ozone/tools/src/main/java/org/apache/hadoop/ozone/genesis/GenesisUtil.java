@@ -38,7 +38,6 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.hdds.utils.MetadataStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -67,11 +66,6 @@ public final class GenesisUtil {
 
   public static Path getTempPath() {
     return Paths.get(System.getProperty(TMP_DIR));
-  }
-
-  public static MetadataStore getMetadataStore(String dbType)
-      throws IOException {
-    return null;
   }
 
   public static DatanodeDetails createDatanodeDetails(UUID uuid) {
