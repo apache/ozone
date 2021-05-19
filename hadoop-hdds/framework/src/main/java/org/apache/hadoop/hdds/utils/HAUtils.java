@@ -448,7 +448,7 @@ public final class HAUtils {
     boolean caListUpToDate;
     List<String> caCertPemList;
     caCertPemList = applyFunction.get();
-    caListUpToDate = caCertPemList.size() == expectedCount ? true : false;
+    caListUpToDate = caCertPemList.size() == expectedCount;
     if (!caListUpToDate) {
       LOG.info("Expected CA list size {}, where as received CA List size " +
           "{}.", expectedCount, caCertPemList.size());
