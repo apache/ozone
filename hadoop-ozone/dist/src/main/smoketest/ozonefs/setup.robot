@@ -30,6 +30,10 @@ ${DEEP_DIR}          test/${SCHEME}/dir
 
 *** Keywords ***
 Setup for FS test
+    ${random} =         Generate Random String  5  [NUMBERS]
+    Set Suite Variable  ${BUCKET}  ${random}-${BUCKET_TYPE}1-${SCHEME}
+    Set Suite Variable  ${BUCKET2}  ${random}-${BUCKET_TYPE}2-${SCHEME}
+    Set Suite Variable  ${BUCKET_IN_VOL2}  ${random}-${BUCKET_TYPE}3-${SCHEME}
     Create volumes for FS test
     Run Keyword    Create ${BUCKET_TYPE}s for FS test
     Sanity check for FS test
