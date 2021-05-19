@@ -70,7 +70,8 @@ public enum OMAction implements AuditAction {
   LOOKUP_FILE,
   LIST_STATUS,
 
-  GET_S3_SECRET;
+  GET_S3_SECRET,
+  REVOKE_S3_SECRET;
 
   @Override
   public String getAction() {
