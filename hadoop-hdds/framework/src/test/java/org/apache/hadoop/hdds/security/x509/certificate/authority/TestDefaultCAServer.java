@@ -276,8 +276,7 @@ public class TestDefaultCAServer {
     List<BigInteger> serialIDs = new ArrayList<>();
     serialIDs.add(certificate.getSerialNumber());
     Future<Optional<Long>> revoked = testCA.revokeCertificates(serialIDs,
-        CRLReason.lookup(CRLReason.keyCompromise), now,
-        new SecurityConfig(conf));
+        CRLReason.lookup(CRLReason.keyCompromise), now);
 
     // Revoking a valid certificate complete successfully without errors.
     assertTrue(revoked.isDone());
@@ -288,8 +287,7 @@ public class TestDefaultCAServer {
         () -> {
           Future<Optional<Long>> result =
               testCA.revokeCertificates(Collections.emptyList(),
-              CRLReason.lookup(CRLReason.keyCompromise), now,
-                  new SecurityConfig(conf));
+              CRLReason.lookup(CRLReason.keyCompromise), now);
           result.isDone();
           result.get();
         });

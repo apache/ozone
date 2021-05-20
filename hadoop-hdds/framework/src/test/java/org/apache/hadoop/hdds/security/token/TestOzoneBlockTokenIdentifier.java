@@ -58,7 +58,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Test class for OzoneManagerDelegationToken.
+ * Test class for {@link OzoneBlockTokenIdentifier}.
  */
 public class TestOzoneBlockTokenIdentifier {
 

@@ -165,7 +165,7 @@ public class MutableVolumeSet implements VolumeSet {
   }
 
   @VisibleForTesting
-  HddsVolumeChecker getVolumeChecker() {
+  public HddsVolumeChecker getVolumeChecker() {
     return volumeChecker;
   }
 
@@ -288,6 +288,19 @@ public class MutableVolumeSet implements VolumeSet {
     // 2. Handle Ratis log disk failure.
   }
 
+  public void checkVolumeAsync(HddsVolume volume) {
+    volumeChecker.checkVolume(
+        volume, (healthyVolumes, failedVolumes) -> {
+          if (failedVolumes.size() > 0) {
+            LOG.warn("checkVolumeAsync callback got {} failed volumes: {}",
+                failedVolumes.size(), failedVolumes);
+          } else {
+            LOG.debug("checkVolumeAsync: no volume failures detected");
+          }
+          handleVolumeFailures(failedVolumes);
+        });
+  }
+
   /**
    * If Version file exists and the {@link #clusterID} is not set yet,
    * assign it the value from Version file. Otherwise, check that the given
@@ -353,7 +366,8 @@ public class MutableVolumeSet implements VolumeSet {
         .datanodeUuid(datanodeUuid)
         .clusterID(clusterID)
         .usageCheckFactory(usageCheckFactory)
-        .storageType(storageType);
+        .storageType(storageType)
+        .volumeSet(this);
     return volumeBuilder.build();
   }
 

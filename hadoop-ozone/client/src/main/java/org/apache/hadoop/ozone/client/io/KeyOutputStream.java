@@ -33,7 +33,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
-import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
@@ -549,7 +548,7 @@ public class KeyOutputStream extends OutputStream {
    */
   public static class Builder {
     private OpenKeySession openHandler;
-    private XceiverClientManager xceiverManager;
+    private XceiverClientFactory xceiverManager;
     private OzoneManagerProtocol omClient;
     private int chunkSize;
     private String requestID;
@@ -576,7 +575,7 @@ public class KeyOutputStream extends OutputStream {
       return this;
     }
 
-    public Builder setXceiverClientManager(XceiverClientManager manager) {
+    public Builder setXceiverClientManager(XceiverClientFactory manager) {
       this.xceiverManager = manager;
       return this;
     }

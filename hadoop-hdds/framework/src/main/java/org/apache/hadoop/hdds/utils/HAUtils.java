@@ -43,9 +43,10 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDBConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
+import org.apache.hadoop.io.retry.RetryPolicies;
+import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.util.Time;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.FileUtils;
 import org.slf4j.Logger;
@@ -61,8 +62,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CA_LIST_RETRY_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CA_LIST_RETRY_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURATION;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURATION_DEFAULT;
 import static org.apache.hadoop.hdds.server.ServerUtils.getOzoneMetaDirPath;
@@ -355,8 +359,10 @@ public final class HAUtils {
    */
   public static List<String> buildCAList(CertificateClient certClient,
       ConfigurationSource configuration) throws IOException {
-    //TODO: make it configurable.
     List<String> caCertPemList;
+    long waitDuration =
+        configuration.getTimeDuration(OZONE_SCM_CA_LIST_RETRY_INTERVAL,
+            OZONE_SCM_CA_LIST_RETRY_INTERVAL_DEFAULT, TimeUnit.SECONDS);
     if (certClient != null) {
       caCertPemList = new ArrayList<>();
       if (!SCMHAUtils.isSCMHAEnabled(configuration)) {
@@ -377,9 +383,9 @@ public final class HAUtils {
           if (caCertPemList != null && caCertPemList.size() == expectedCount) {
             return caCertPemList;
           }
-          caCertPemList = waitForCACerts(() -> certClient.updateCAList(),
-              expectedCount);
-          checkCertCount(caCertPemList.size(), expectedCount);
+          caCertPemList = getCAListWithRetry(() ->
+              waitForCACerts(certClient::updateCAList, expectedCount),
+              waitDuration);
         } else {
           caCertPemList = certClient.listCA();
         }
@@ -401,10 +407,9 @@ public final class HAUtils {
         Collection<String> scmNodes = SCMHAUtils.getSCMNodeIds(configuration);
         int expectedCount = scmNodes.size() + 1;
         if (scmNodes.size() > 1) {
-          caCertPemList = waitForCACerts(
-              () -> scmSecurityProtocolClient.listCACertificate(),
-              expectedCount);
-          checkCertCount(caCertPemList.size(), expectedCount);
+          caCertPemList = getCAListWithRetry(() -> waitForCACerts(
+              scmSecurityProtocolClient::listCACertificate,
+              expectedCount), waitDuration);
         } else{
           caCertPemList = scmSecurityProtocolClient.listCACertificate();
         }
@@ -413,47 +418,41 @@ public final class HAUtils {
     return caCertPemList;
   }
 
+  /**
+   * Retry for ever until CA list matches expected count.
+   * @param task - task to get CA list.
+   * @return CA list.
+   */
+  private static List<String> getCAListWithRetry(Callable<List<String>> task,
+      long waitDuration) throws IOException {
+    RetryPolicy retryPolicy = RetryPolicies.retryForeverWithFixedSleep(
+        waitDuration, TimeUnit.SECONDS);
+    RetriableTask<List<String>> retriableTask =
+        new RetriableTask<>(retryPolicy, "getCAList", task);
+    try {
+      return retriableTask.call();
+    } catch (Exception ex) {
+      throw new SCMSecurityException("Unable to obtain complete CA " +
+          "list", ex);
+    }
+  }
+
   private static List<String> waitForCACerts(
       final SupplierWithIOException<List<String>> applyFunction,
       int expectedCount) throws IOException {
-    //TODO: make wait time and sleep time configurable if needed.
     // TODO: If SCMs are bootstrapped later, then listCA need to be
     //  refetched if listCA size is less than scm ha config node list size.
     // For now when Client of SCM's are started we compare their node list
     // size and ca list size if it is as expected, we return the ca list.
-    boolean caListUpToDate;
-    long waitTime = 5 * 60 * 1000L;
-    long retryTime = 10 * 1000L;
-    long currentTime = Time.monotonicNow();
-    List<String> caCertPemList;
-    do {
-      caCertPemList = applyFunction.get();
-      caListUpToDate =
-          caCertPemList.size() == expectedCount ? true : false;
-      if (!caListUpToDate) {
-        LOG.info("Expected CA list size {}, where as received CA List size " +
-            "{}. Retry to fetch CA List after {} seconds", expectedCount,
-            caCertPemList.size(), retryTime);
-        try {
-          Thread.sleep(retryTime);
-        } catch (InterruptedException ex) {
-          Thread.currentThread().interrupt();
-        }
-      }
-    } while (!caListUpToDate &&
-        Time.monotonicNow() - currentTime < waitTime);
-    return caCertPemList;
-  }
-
-
-  private static void checkCertCount(int certCount, int expectedCount)
-      throws SCMSecurityException{
-    if (certCount != expectedCount) {
-      LOG.error("Unable to obtain CA list for SCM cluster, obtained CA list " +
-              "size is {}, where as expected list size is {}",
-          certCount, expectedCount);
-      throw new SCMSecurityException("Unable to obtain complete CA list");
+    List<String> caCertPemList = applyFunction.get();
+    boolean caListUpToDate = caCertPemList.size() == expectedCount;
+    if (!caListUpToDate) {
+      LOG.info("Expected CA list size {}, where as received CA List size " +
+          "{}.", expectedCount, caCertPemList.size());
+      throw new SCMSecurityException("Expected CA list size " + expectedCount
+          + " is not matching actual count " + caCertPemList.size());
     }
+    return caCertPemList;
   }
 
   /**

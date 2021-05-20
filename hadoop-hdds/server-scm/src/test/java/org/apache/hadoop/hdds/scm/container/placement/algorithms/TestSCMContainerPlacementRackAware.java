@@ -25,14 +25,16 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
-import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
+import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetConstants;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.net.NodeSchema;
 import org.apache.hadoop.hdds.scm.net.NodeSchemaManager;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.junit.Assert;
@@ -53,7 +55,6 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.junit.Assume.assumeTrue;
-import static org.mockito.Matchers.anyObject;
 import static org.mockito.Mockito.when;
 
 /**
@@ -64,8 +65,8 @@ public class TestSCMContainerPlacementRackAware {
   private NetworkTopology cluster;
   private ConfigurationSource conf;
   private NodeManager nodeManager;
-  private Integer datanodeCount;
-  private List<DatanodeDetails> datanodes = new ArrayList<>();
+  private final Integer datanodeCount;
+  private final List<DatanodeInfo> datanodes = new ArrayList<>();
   // policy with fallback capability
   private SCMContainerPlacementRackAware policy;
   // policy prohibit fallback
@@ -99,10 +100,60 @@ public class TestSCMContainerPlacementRackAware {
     String hostname = "node";
     for (int i = 0; i < datanodeCount; i++) {
       // Totally 3 racks, each has 5 datanodes
-      DatanodeDetails node = MockDatanodeDetails.createDatanodeDetails(
-          hostname + i, rack + (i / NODE_PER_RACK));
-      datanodes.add(node);
-      cluster.add(node);
+      DatanodeInfo datanodeInfo = new DatanodeInfo(
+          MockDatanodeDetails.createDatanodeDetails(
+              hostname + i, rack + (i / NODE_PER_RACK)),
+          NodeStatus.inServiceHealthy());
+
+      StorageReportProto storage1 = TestUtils.createStorageReport(
+          datanodeInfo.getUuid(), "/data1-" + datanodeInfo.getUuidString(),
+          STORAGE_CAPACITY, 0, 100L, null);
+      datanodeInfo.updateStorageReports(
+          new ArrayList<>(Arrays.asList(storage1)));
+
+      datanodes.add(datanodeInfo);
+      cluster.add(datanodeInfo);
+    }
+
+    if (datanodeCount > 4) {
+      StorageReportProto storage2 = TestUtils.createStorageReport(
+          datanodes.get(2).getUuid(),
+          "/data1-" + datanodes.get(2).getUuidString(),
+          STORAGE_CAPACITY, 90L, 10L, null);
+      datanodes.get(2).updateStorageReports(
+          new ArrayList<>(Arrays.asList(storage2)));
+      StorageReportProto storage3 = TestUtils.createStorageReport(
+          datanodes.get(3).getUuid(),
+          "/data1-" + datanodes.get(3).getUuidString(),
+          STORAGE_CAPACITY, 80L, 20L, null);
+      datanodes.get(3).updateStorageReports(
+          new ArrayList<>(Arrays.asList(storage3)));
+      StorageReportProto storage4 = TestUtils.createStorageReport(
+          datanodes.get(4).getUuid(),
+          "/data1-" + datanodes.get(4).getUuidString(),
+          STORAGE_CAPACITY, 70L, 30L, null);
+      datanodes.get(4).updateStorageReports(
+          new ArrayList<>(Arrays.asList(storage4)));
+    } else if (datanodeCount > 3) {
+      StorageReportProto storage2 = TestUtils.createStorageReport(
+          datanodes.get(2).getUuid(),
+          "/data1-" + datanodes.get(2).getUuidString(),
+          STORAGE_CAPACITY, 90L, 10L, null);
+      datanodes.get(2).updateStorageReports(
+          new ArrayList<>(Arrays.asList(storage2)));
+      StorageReportProto storage3 = TestUtils.createStorageReport(
+          datanodes.get(3).getUuid(),
+          "/data1-" + datanodes.get(3).getUuidString(),
+          STORAGE_CAPACITY, 80L, 20L, null);
+      datanodes.get(3).updateStorageReports(
+          new ArrayList<>(Arrays.asList(storage3)));
+    } else if (datanodeCount > 2) {
+      StorageReportProto storage2 = TestUtils.createStorageReport(
+          datanodes.get(2).getUuid(),
+          "/data1-" + datanodes.get(2).getUuidString(),
+          STORAGE_CAPACITY, 84L, 16L, null);
+      datanodes.get(2).updateStorageReports(
+          new ArrayList<>(Arrays.asList(storage2)));
     }
 
     // create mock node manager
@@ -111,24 +162,6 @@ public class TestSCMContainerPlacementRackAware {
         .thenReturn(new ArrayList<>(datanodes));
     when(nodeManager.getClusterNetworkTopologyMap())
         .thenReturn(cluster);
-    when(nodeManager.getNodeStat(anyObject()))
-        .thenReturn(new SCMNodeMetric(STORAGE_CAPACITY, 0L, 100L));
-    if (datanodeCount > 4) {
-      when(nodeManager.getNodeStat(datanodes.get(2)))
-          .thenReturn(new SCMNodeMetric(STORAGE_CAPACITY, 90L, 10L));
-      when(nodeManager.getNodeStat(datanodes.get(3)))
-          .thenReturn(new SCMNodeMetric(STORAGE_CAPACITY, 80L, 20L));
-      when(nodeManager.getNodeStat(datanodes.get(4)))
-          .thenReturn(new SCMNodeMetric(STORAGE_CAPACITY, 70L, 30L));
-    } else if (datanodeCount > 3) {
-      when(nodeManager.getNodeStat(datanodes.get(2)))
-          .thenReturn(new SCMNodeMetric(STORAGE_CAPACITY, 90L, 10L));
-      when(nodeManager.getNodeStat(datanodes.get(3)))
-          .thenReturn(new SCMNodeMetric(STORAGE_CAPACITY, 80L, 20L));
-    } else if (datanodeCount > 2) {
-      when(nodeManager.getNodeStat(datanodes.get(2)))
-          .thenReturn(new SCMNodeMetric(STORAGE_CAPACITY, 84L, 16L));
-    }
 
     // create placement policy instances
     metrics = SCMContainerPlacementMetrics.create();
@@ -282,7 +315,7 @@ public class TestSCMContainerPlacementRackAware {
     MatcherAssert.assertThat("Not enough success count", successCount,
         greaterThanOrEqualTo(1L));
     MatcherAssert.assertThat("Not enough try count", tryCount,
-        greaterThanOrEqualTo((long) 1L));
+        greaterThanOrEqualTo(1L));
     Assert.assertEquals(compromiseCount, 0);
   }
 
@@ -353,15 +386,23 @@ public class TestSCMContainerPlacementRackAware {
   @Test
   public void testDatanodeWithDefaultNetworkLocation() throws SCMException {
     String hostname = "node";
-    List<DatanodeDetails> dataList = new ArrayList<>();
+    List<DatanodeInfo> dataList = new ArrayList<>();
     NetworkTopology clusterMap =
         new NetworkTopologyImpl(NodeSchemaManager.getInstance());
     for (int i = 0; i < 15; i++) {
       // Totally 3 racks, each has 5 datanodes
-      DatanodeDetails node = MockDatanodeDetails.createDatanodeDetails(
-          hostname + i, null);
-      dataList.add(node);
-      clusterMap.add(node);
+      DatanodeInfo datanodeInfo = new DatanodeInfo(
+          MockDatanodeDetails.createDatanodeDetails(
+          hostname + i, null), NodeStatus.inServiceHealthy());
+
+      StorageReportProto storage1 = TestUtils.createStorageReport(
+          datanodeInfo.getUuid(), "/data1-" + datanodeInfo.getUuidString(),
+          STORAGE_CAPACITY, 0, 100L, null);
+      datanodeInfo.updateStorageReports(
+          new ArrayList<>(Arrays.asList(storage1)));
+
+      dataList.add(datanodeInfo);
+      clusterMap.add(datanodeInfo);
     }
     Assert.assertEquals(dataList.size(), StringUtils.countMatches(
         clusterMap.toString(), NetConstants.DEFAULT_RACK));
