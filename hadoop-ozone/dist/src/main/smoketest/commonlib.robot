@@ -27,7 +27,7 @@ ${OM_SERVICE_ID}     om
 
 *** Keywords ***
 Kinit HTTP user
-    ${hostname} =       Execute                    hostname
+    ${hostname} =       Execute                    hostname | sed 's/scm[0-9].org/scm/'
     Wait Until Keyword Succeeds      2min       10sec      Execute            kinit -k HTTP/${hostname}@EXAMPLE.COM -t /etc/security/keytabs/HTTP.keytab
 
 Kinit test user
