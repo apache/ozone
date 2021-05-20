@@ -234,8 +234,8 @@ public class TestSCMHAConfiguration {
 
     SCMHANodeDetails scmhaNodeDetails = SCMHANodeDetails.loadSCMHAConfig(conf);
 
-    Assert.assertEquals("9894", conf.get(OZONE_SCM_RATIS_PORT_KEY));
-    Assert.assertEquals("9895", conf.get(OZONE_SCM_GRPC_PORT_KEY));
+    Assert.assertEquals("10000", conf.get(OZONE_SCM_RATIS_PORT_KEY));
+    Assert.assertEquals("10001", conf.get(OZONE_SCM_GRPC_PORT_KEY));
 
 
     InetSocketAddress clientAddress =
@@ -252,9 +252,9 @@ public class TestSCMHAConfiguration {
     Assert.assertEquals(datanodeAddress, scmhaNodeDetails.getLocalNodeDetails()
         .getDatanodeProtocolServerAddress());
 
-    Assert.assertEquals(9894,
+    Assert.assertEquals(10000,
         scmhaNodeDetails.getLocalNodeDetails().getRatisPort());
-    Assert.assertEquals(9895,
+    Assert.assertEquals(10001,
         scmhaNodeDetails.getLocalNodeDetails().getGrpcPort());
 
     for (SCMNodeDetails peer : scmhaNodeDetails.getPeerNodeDetails()) {
@@ -263,8 +263,8 @@ public class TestSCMHAConfiguration {
       Assert.assertEquals(datanodeAddress,
           peer.getDatanodeProtocolServerAddress());
 
-      Assert.assertEquals(9894, peer.getRatisPort());
-      Assert.assertEquals(9895,
+      Assert.assertEquals(10000, peer.getRatisPort());
+      Assert.assertEquals(10001,
           peer.getGrpcPort());
     }
 
