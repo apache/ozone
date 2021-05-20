@@ -64,12 +64,12 @@ public class S3RevokeSecretRequest extends OMClientRequest {
         getOmRequest().getRevokeS3SecretRequest();
     final String kerberosID = s3RevokeSecretRequest.getKerberosID();
     final UserGroupInformation user = ProtobufRpcEngine.Server.getRemoteUser();
-
+    final String username = user.getUserName();
     // Permission check. Users need to be themselves or have admin privilege
-    if (!user.getUserName().equals(kerberosID) &&
-        !ozoneManager.isAdmin(kerberosID)) {
+    if (!username.equals(kerberosID) &&
+        !ozoneManager.isAdmin(username)) {
       throw new OMException("Requested user name '" + kerberosID +
-          "' doesn't match current user '" + user.getUserName() +
+          "' doesn't match current user '" + username +
           "', nor does current user has administrator privilege.",
           OMException.ResultCodes.USER_MISMATCH);
     }
