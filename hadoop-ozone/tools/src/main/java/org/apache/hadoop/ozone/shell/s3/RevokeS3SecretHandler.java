@@ -17,32 +17,32 @@
  */
 package org.apache.hadoop.ozone.shell.s3;
 
-import java.io.IOException;
-
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.security.UserGroupInformation;
-
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.util.Scanner;
+
 /**
- * Executes getsecret calls.
+ * Executes revokesecret calls.
  */
-@Command(name = "getsecret",
-    description = "Returns s3 secret for current user")
-public class GetS3SecretHandler extends S3Handler {
+@Command(name = "revokesecret",
+    description = "Revoke s3 secret for current user")
+public class RevokeS3SecretHandler extends S3Handler {
 
   @Option(names = "-u",
       description = "Specify the user name to perform the operation on "
           + "(admins only)'")
   private String username;
 
-  @Option(names = "-e",
-      description = "Print out variables together with 'export' prefix, to "
-          + "use it from 'eval $(ozone s3 getsecret)'")
-  private boolean export;
+  @Option(names = "-y",
+      description = "Continue without interactive user confirmation")
+  private boolean yes;
 
   @Override
   protected boolean isApplicable() {
@@ -56,13 +56,21 @@ public class GetS3SecretHandler extends S3Handler {
       username = UserGroupInformation.getCurrentUser().getUserName();
     }
 
-    final S3SecretValue secret = client.getObjectStore().getS3Secret(username);
-    if (export) {
-      out().println("export AWS_ACCESS_KEY_ID=" + secret.getAwsAccessKey());
-      out().println("export AWS_SECRET_ACCESS_KEY=" + secret.getAwsSecret());
-    } else {
-      out().println(secret);
+    if (!yes) {
+      // Ask for user confirmation
+      out().print("Enter 'y' to confirm S3 secret revocation for '" +
+          username + "': ");
+      out().flush();
+      Scanner scanner = new Scanner(new InputStreamReader(
+          System.in, StandardCharsets.UTF_8));
+      String confirmation = scanner.next().trim().toLowerCase();
+      if (!confirmation.equals("y")) {
+        out().println("Operation cancelled.");
+        return;
+      }
     }
-  }
 
+    client.getObjectStore().revokeS3Secret(username);
+    out().println("S3 secret revoked.");
+  }
 }

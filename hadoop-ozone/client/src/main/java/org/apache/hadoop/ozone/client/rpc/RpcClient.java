@@ -606,6 +606,17 @@ public class RpcClient implements ClientProtocol {
     return ozoneManagerClient.getS3Secret(kerberosID);
   }
 
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public void revokeS3Secret(String kerberosID) throws IOException {
+    Preconditions.checkArgument(Strings.isNotBlank(kerberosID),
+            "kerberosID cannot be null or empty.");
+
+    ozoneManagerClient.revokeS3Secret(kerberosID);
+  }
+
   @Override
   public void setBucketVersioning(
       String volumeName, String bucketName, Boolean versioning)
