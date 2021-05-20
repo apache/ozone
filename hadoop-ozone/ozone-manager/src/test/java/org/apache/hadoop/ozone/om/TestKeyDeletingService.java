@@ -27,7 +27,9 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -198,6 +200,8 @@ public class TestKeyDeletingService {
               .setBucketName(bucketName)
               .setKeyName(keyName)
               .setAcls(Collections.emptyList())
+              .setReplicationConfig(new StandaloneReplicationConfig(
+                  HddsProtos.ReplicationFactor.ONE))
               .setLocationInfoList(new ArrayList<>())
               .build();
       //Open, Commit and Delete the Keys in the Key Manager.
