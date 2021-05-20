@@ -387,7 +387,16 @@ public final class HAUtils {
               waitForCACerts(certClient::updateCAList, expectedCount),
               waitDuration);
         } else {
-          caCertPemList = certClient.listCA();
+          List<String> x509Certificates = new ArrayList<>();
+          if (certClient.getRootCACertificate() != null) {
+            x509Certificates.add(CertificateCodec.getPEMEncodedString(
+                certClient.getRootCACertificate()));
+          }
+          if (certClient.getCACertificate() != null) {
+            x509Certificates.add(CertificateCodec.getPEMEncodedString(
+                certClient.getCACertificate()));
+          }
+          return x509Certificates;
         }
       }
     } else {
