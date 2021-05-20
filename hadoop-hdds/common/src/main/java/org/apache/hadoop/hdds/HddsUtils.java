@@ -574,7 +574,7 @@ public final class HddsUtils {
     for (String node : nodes) {
       String[] x = node.split(":");
       sb.append(String
-          .format("{ HostName : %s, Port : %s, Role : %s } ", x[0], x[1],
+          .format("{ HostName : %s, Ratis Port : %s, Role : %s } ", x[0], x[1],
               x[2]));
     }
     return sb.toString();

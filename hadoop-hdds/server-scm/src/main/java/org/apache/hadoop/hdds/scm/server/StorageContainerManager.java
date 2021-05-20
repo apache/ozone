@@ -138,6 +138,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -1713,10 +1714,27 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     return HddsUtils.format(getScmHAManager().getRatisServer().getRatisRoles());
   }
 
+  /**
+   * Primordial node is the node on which scm init operation is performed.
+   * @return hostname of primordialNode
+   */
   @Override
   public String getPrimordialNode() {
     if (SCMHAUtils.isSCMHAEnabled(configuration)) {
-      return SCMHAUtils.getPrimordialSCM(configuration);
+      String primordialNode = SCMHAUtils.getPrimordialSCM(configuration);
+      // primordialNode can be nodeId too . If it is then return hostname.
+      if (SCMHAUtils.getSCMNodeIds(configuration).contains(primordialNode)) {
+        List<SCMNodeDetails> localAndPeerNodes =
+            new ArrayList<>(scmHANodeDetails.getPeerNodeDetails());
+        localAndPeerNodes.add(getSCMHANodeDetails().getLocalNodeDetails());
+        for (SCMNodeDetails nodes : localAndPeerNodes) {
+          if (nodes.getNodeId().equals(primordialNode)) {
+            return nodes.getHostName();
+          }
+        }
+
+      }
+      return primordialNode;
     }
     return null;
   }
