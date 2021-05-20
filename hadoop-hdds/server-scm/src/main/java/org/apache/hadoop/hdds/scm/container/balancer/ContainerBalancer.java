@@ -83,6 +83,15 @@ public class ContainerBalancer {
     this.config = new ContainerBalancerConfiguration();
     this.metrics = new ContainerBalancerMetrics();
     this.scmContext = scmContext;
+
+    this.clusterCapacity = 0L;
+    this.clusterUsed = 0L;
+    this.clusterRemaining = 0L;
+
+    this.overUtilizedNodes = new ArrayList<>();
+    this.underUtilizedNodes = new ArrayList<>();
+    this.unBalancedNodes = new ArrayList<>();
+    this.withinThresholdUtilizedNodes = new ArrayList<>();
   }
 
   /**
@@ -95,25 +104,13 @@ public class ContainerBalancer {
       LOG.error("Container Balancer is already running.");
       return false;
     }
-    if (scmContext.isInSafeMode()) {
-      LOG.error("Container Balancer cannot operate while SCM is in Safe Mode.");
-      return false;
-    }
-    ozoneConfiguration = new OzoneConfiguration();
 
+    ozoneConfiguration = new OzoneConfiguration();
     this.config = balancerConfiguration;
     this.threshold = config.getThreshold();
     this.maxDatanodesToBalance = config.getMaxDatanodesToBalance();
     this.maxSizeToMove = config.getMaxSizeToMove();
-
-    this.clusterCapacity = 0L;
-    this.clusterUsed = 0L;
-    this.clusterRemaining = 0L;
-
-    this.overUtilizedNodes = new ArrayList<>();
-    this.underUtilizedNodes = new ArrayList<>();
     this.unBalancedNodes = new ArrayList<>();
-    this.withinThresholdUtilizedNodes = new ArrayList<>();
 
     LOG.info("Starting Container Balancer...{}", this);
     balance();
@@ -124,20 +121,27 @@ public class ContainerBalancer {
    * Balances the cluster.
    */
   private void balance() {
+    initializeIteration();
+
+    // unBalancedNodes is not cleared since the next iteration uses this
+    // iteration's unBalancedNodes to find out how many nodes were balanced
     overUtilizedNodes.clear();
     underUtilizedNodes.clear();
     withinThresholdUtilizedNodes.clear();
-    initializeIteration();
   }
 
   /**
-   * Initializes an iteration during balancing. Recognizes over, under,
-   * below-average,and under-average utilizes nodes. Decides whether
-   * balancing needs to continue or should be stopped.
+   * Initializes an iteration during balancing. Recognizes over, under, and
+   * within threshold utilized nodes. Decides whether balancing needs to
+   * continue or should be stopped.
    *
    * @return true if successfully initialized, otherwise false.
    */
   private boolean initializeIteration() {
+    if (scmContext.isInSafeMode()) {
+      LOG.error("Container Balancer cannot operate while SCM is in Safe Mode.");
+      return false;
+    }
     // sorted list in order from most to least used
     List<DatanodeUsageInfo> datanodeUsageInfos =
         nodeManager.getMostOrLeastUsedDatanodes(true);
@@ -204,7 +208,7 @@ public class ContainerBalancer {
     }
     // calculate total number of nodes that have been balanced so far
     numDatanodesBalanced =
-        metrics.addToNumDatanodesBalanced(numDatanodesBalanced);
+        metrics.incrementNumDatanodesBalanced(numDatanodesBalanced);
 
     unBalancedNodes = new ArrayList<>(
         overUtilizedNodes.size() + underUtilizedNodes.size());

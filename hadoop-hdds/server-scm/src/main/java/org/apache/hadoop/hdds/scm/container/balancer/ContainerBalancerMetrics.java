@@ -111,7 +111,7 @@ public final class ContainerBalancerMetrics {
    * @param valueToAdd The value to add.
    * @return The result after addition.
    */
-  public long addToNumDatanodesBalanced(long valueToAdd) {
+  public long incrementNumDatanodesBalanced(long valueToAdd) {
     numDatanodesBalanced.add(valueToAdd);
     return numDatanodesBalanced.get();
   }

@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,10 +51,10 @@ public final class ContainerBalancerConfiguration {
   private int maxDatanodesToBalance = 5;
 
   @Config(key = "size.moved.max", type = ConfigType.SIZE,
-      defaultValue = "10", tags = {ConfigTag.BALANCER},
-      description = "The maximum size of data in GB that will be moved " +
+      defaultValue = "10GB", tags = {ConfigTag.BALANCER},
+      description = "The maximum size of data in bytes that will be moved " +
           "by Container Balancer.")
-  private long maxSizeToMove = 10;
+  private long maxSizeToMove = 10 * OzoneConsts.GB;
 
   /**
    * Gets the threshold value for Container Balancer.
@@ -98,20 +99,18 @@ public final class ContainerBalancerConfiguration {
   }
 
   /**
-   * Gets the value of maximum number of Gigabytes that will be moved by the
-   * Container Balancer.
+   * Gets the maximum size that will be moved by Container Balancer.
    *
-   * @return maximum number of Gigabytes
+   * @return maximum size in Bytes
    */
   public long getMaxSizeToMove() {
     return maxSizeToMove;
   }
 
   /**
-   * Sets the value of maximum number of Gigabytes that will be moved by
-   * Container Balancer.
+   * Sets the value of maximum size that will be moved by Container Balancer.
    *
-   * @param maxSizeToMove maximum number of Gigabytes
+   * @param maxSizeToMove maximum number of Bytes
    */
   public void setMaxSizeToMove(long maxSizeToMove) {
     this.maxSizeToMove = maxSizeToMove;
@@ -123,7 +122,7 @@ public final class ContainerBalancerConfiguration {
             "%-30s %s%n" +
             "%-30s %s%n" +
             "%-30s %d%n" +
-            "%-30s %dGB%n", "Key", "Value", "Threshold",
+            "%-30s %dB%n", "Key", "Value", "Threshold",
         threshold, "Max Datanodes to Balance", maxDatanodesToBalance,
         "Max Size to Move", maxSizeToMove);
   }

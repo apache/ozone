@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.scm.container.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -66,7 +67,7 @@ public class TestContainerBalancer {
     balancerConfiguration = new ContainerBalancerConfiguration();
     balancerConfiguration.setThreshold(0.1);
     balancerConfiguration.setMaxDatanodesToBalance(10);
-    balancerConfiguration.setMaxSizeToMove(500L);
+    balancerConfiguration.setMaxSizeToMove(500 * OzoneConsts.GB);
     conf.setFromObject(balancerConfiguration);
 
     // create datanodes with the generated nodeUtilization values
