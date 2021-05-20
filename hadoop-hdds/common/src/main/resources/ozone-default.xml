@@ -2841,4 +2841,18 @@
     </description>
   </property>
 
+
+  <property>
+    <name>ozone.scm.ca.list.retry.interval</name>
+    <tag>OZONE, SCM, OM, DATANODE</tag>
+    <value>10s</value>
+    <description>SCM client wait duration between each retry to get Scm CA
+      list. OM/Datanode obtain CA list during startup, and wait
+      for the CA List size to be matched with SCM node count size plus
+      1. (Additional one certificate is root CA certificate). If the received
+      CA list size is not matching with expected count, this is the duration
+      used to wait before making next attempt to get CA list.
+    </description>
+  </property>
+
 </configuration>
