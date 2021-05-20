@@ -224,8 +224,8 @@ public class TestSCMHAConfiguration {
           node), "localhost");
     }
 
-    conf.set(OZONE_SCM_RATIS_PORT_KEY, "9894");
-    conf.set(OZONE_SCM_GRPC_PORT_KEY, "9895");
+    conf.set(OZONE_SCM_RATIS_PORT_KEY, "10000");
+    conf.set(OZONE_SCM_GRPC_PORT_KEY, "10001");
     conf.set(OZONE_SCM_BLOCK_CLIENT_PORT_KEY, "9896");
     conf.set(OZONE_SCM_CLIENT_PORT_KEY, "9897");
     conf.set(OZONE_SCM_DATANODE_PORT_KEY, "9898");
