@@ -41,7 +41,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_BI
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_BIND_HOST_KEY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_BIND_HOST_KEY;
@@ -202,7 +201,8 @@ public class SCMHANodeDetails {
         String ratisPortKey = ConfUtils.addKeySuffixes(OZONE_SCM_RATIS_PORT_KEY,
             serviceId, nodeId);
         int ratisPort = conf.getInt(ratisPortKey,
-            conf.getInt(OZONE_SCM_RATIS_PORT_KEY, OZONE_SCM_RATIS_PORT_DEFAULT));
+            conf.getInt(OZONE_SCM_RATIS_PORT_KEY,
+                OZONE_SCM_RATIS_PORT_DEFAULT));
 
         String grpcPortKey = ConfUtils
             .addKeySuffixes(ScmConfigKeys.OZONE_SCM_GRPC_PORT_KEY, serviceId,
