@@ -524,6 +524,10 @@ public final class ScmConfigKeys {
   public static final long OZONE_SCM_INFO_WAIT_DURATION_DEFAULT =
       10 * 60;
 
+  public static final String OZONE_SCM_CA_LIST_RETRY_INTERVAL =
+      "ozone.scm.ca.list.retry.interval";
+  public static final long OZONE_SCM_CA_LIST_RETRY_INTERVAL_DEFAULT = 10;
+
   /**
    * Never constructed.
    */
