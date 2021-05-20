@@ -22,8 +22,10 @@ import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.SCM_HA;
 import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.VALIDATE_IN_PREFINALIZE;
 import static org.apache.hadoop.ozone.upgrade.UpgradeActionHdds.Component.SCM;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
+import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.upgrade.HDDSUpgradeAction;
 import org.apache.hadoop.ozone.upgrade.UpgradeActionHdds;
@@ -39,11 +41,22 @@ public class ScmHAUnfinalizedStateValidationAction
     implements HDDSUpgradeAction<StorageContainerManager> {
 
   @Override
-  public void execute(StorageContainerManager scm) throws Exception {
-    if (SCMHAUtils.isSCMHAEnabled(scm.getConfiguration()) &&
-        !scm.getScmStorageConfig().isSCMHAEnabled()) {
+  public void execute(StorageContainerManager scm) throws UpgradeException {
+    checkScmHA(scm.getConfiguration(), scm.getScmStorageConfig());
+  }
+
+  /**
+   * Allows checking that SCM HA is not enabled while pre-finalized in both
+   * scm init and the upgrade action run on start.
+   * @param conf
+   * @param storageConf
+   * @throws UpgradeException
+   */
+  public static void checkScmHA(OzoneConfiguration conf,
+      SCMStorageConfig storageConf) throws UpgradeException {
+    if (SCMHAUtils.isSCMHAEnabled(conf) && !storageConf.isSCMHAEnabled()) {
       throw new UpgradeException(String.format("Configuration %s cannot be " +
-          "used until SCM upgrade has been finalized",
+              "used until SCM upgrade has been finalized",
           ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY),
           UpgradeException.ResultCodes.PREFINALIZE_ACTION_VALIDATION_FAILED);
     }

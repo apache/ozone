@@ -25,7 +25,9 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.hadoop.test.LambdaTestUtils;
+import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -59,6 +61,7 @@ public class TestSCMHAUnfinalizedStateValidationAction {
   private final boolean haEnabledPreFinalized;
   private final boolean shouldFail;
   private final String dataPath;
+  private static final String CLUSTER_ID = UUID.randomUUID().toString();
 
   @Parameterized.Parameters(name = "haEnabledBefore={0} " +
       "haEnabledPreFinalized={1}")
@@ -95,16 +98,29 @@ public class TestSCMHAUnfinalizedStateValidationAction {
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, haEnabledBefore);
     conf.set(ScmConfigKeys.OZONE_SCM_DB_DIRS, dataPath);
     conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, dataPath);
-    StorageContainerManager.scmInit(conf, UUID.randomUUID().toString());
+    // This init should always succeed, since SCM is not pre-finalized yet.
+    boolean initResult1 = StorageContainerManager.scmInit(conf, CLUSTER_ID);
+    Assert.assertTrue(initResult1);
 
     // Set up new pre-finalized SCM.
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,
         haEnabledPreFinalized);
     StorageContainerManager scm = TestUtils.getScm(conf);
+    Assert.assertEquals(UpgradeFinalizer.Status.FINALIZATION_REQUIRED,
+        scm.getUpgradeFinalizer().getStatus());
 
     if (shouldFail) {
+      // Start on its own should fail.
+      LambdaTestUtils.intercept(UpgradeException.class, scm::start);
+
+      // Init followed by start should both fail.
+      // Init is not necessary here, but is allowed to be run.
+      LambdaTestUtils.intercept(UpgradeException.class,
+          () -> StorageContainerManager.scmInit(conf, CLUSTER_ID));
       LambdaTestUtils.intercept(UpgradeException.class, scm::start);
     } else {
+      boolean initResult2 = StorageContainerManager.scmInit(conf, CLUSTER_ID);
+      Assert.assertTrue(initResult2);
       scm.start();
       scm.stop();
     }
