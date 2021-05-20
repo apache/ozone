@@ -28,7 +28,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ipc.RemoteException;
@@ -69,7 +69,7 @@ public final class SCMHAUtils {
   private static final List<Class<? extends Exception>>
       NON_RETRIABLE_EXCEPTION_LIST =
       ImmutableList.<Class<? extends Exception>>builder()
-          .add(PipelineNotFoundException.class)
+          .add(SCMException.class)
           .add(NonRetriableException.class)
           .build();
 

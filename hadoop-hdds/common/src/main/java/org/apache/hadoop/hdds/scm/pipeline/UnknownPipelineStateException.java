@@ -18,18 +18,20 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+
 import java.io.IOException;
 
 /**
  * Signals that a pipeline state is not recognized.
  */
-public class UnknownPipelineStateException extends IOException {
+public class UnknownPipelineStateException extends SCMException {
   /**
    * Constructs an {@code UnknownPipelineStateException} with {@code null}
    * as its error detail message.
    */
   public UnknownPipelineStateException() {
-    super();
+    super(ResultCodes.UNKNOWN_PIPELINE_STATE);
   }
 
   /**
@@ -41,6 +43,6 @@ public class UnknownPipelineStateException extends IOException {
    *        by the {@link #getMessage()} method)
    */
   public UnknownPipelineStateException(String message) {
-    super(message);
+    super(message, ResultCodes.UNKNOWN_PIPELINE_STATE);
   }
 }
