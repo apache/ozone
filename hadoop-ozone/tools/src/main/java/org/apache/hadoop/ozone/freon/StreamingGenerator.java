@@ -17,6 +17,7 @@
 package org.apache.hadoop.ozone.freon;
 
 import com.codahale.metrics.Timer;
+import io.netty.channel.Channel;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.ozone.container.stream.DirectoryServerDestination;
@@ -34,27 +35,24 @@ import java.nio.file.Path;
 import java.util.concurrent.Callable;
 
 @CommandLine.Command(name = "strmg",
-    aliases = "streaming-generator",
-    description =
-        "Create directory structure and stream them multiple times.",
-    versionProvider = HddsVersionProvider.class,
-    mixinStandardHelpOptions = true,
-    showDefaultValues = true)
+        aliases = "streaming-generator",
+        description = "Create directory structure and stream them multiple times.",
+        versionProvider = HddsVersionProvider.class,
+        mixinStandardHelpOptions = true,
+        showDefaultValues = true)
 public class StreamingGenerator extends BaseFreonGenerator
-    implements Callable<Void> {
+        implements Callable<Void> {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(StreamingGenerator.class);
+  private static final Logger LOG = LoggerFactory.getLogger(StreamingGenerator.class);
 
   @CommandLine.Option(names = {"--root-dir"},
-      description = "Directory where the working directories are created",
-      defaultValue = "/tmp/ozone-streaming")
-  private Path testRoot;
+          description = "Directory where the working directories are created",
+          defaultValue = "/tmp/ozone-streaming")
+  Path testRoot;
 
   @CommandLine.Option(names = {"--files"},
-      description = "Number of the files in the test directory " +
-          "to be generated.",
-      defaultValue = "50")
+          description = "Number of the files in the test directory to be generated.",
+          defaultValue = "50")
   private int numberOfFiles;
 
   @CommandLine.Option(names = {"--size"},
@@ -66,6 +64,7 @@ public class StreamingGenerator extends BaseFreonGenerator
   private int port = 1234;
 
   private String subdir = "dir1";
+
   private Timer timer;
 
 
@@ -89,13 +88,10 @@ public class StreamingGenerator extends BaseFreonGenerator
     }
     Path subDir = sourceDir.resolve(subdir);
     Files.createDirectories(subDir);
-    ContentGenerator contentGenerator = new ContentGenerator(fileSize,
-        1024);
+    ContentGenerator contentGenerator = new ContentGenerator(fileSize, 1024);
 
     for (int i = 0; i < numberOfFiles; i++) {
-      try (FileOutputStream out = new FileOutputStream(
-          subDir.resolve("file-" + i).toFile())
-      ) {
+      try (FileOutputStream out = new FileOutputStream(subDir.resolve("file-" + i).toFile())) {
         contentGenerator.write(out);
       }
     }
@@ -105,13 +101,10 @@ public class StreamingGenerator extends BaseFreonGenerator
     Path sourceDir = testRoot.resolve("streaming-" + l);
     Path destinationDir = testRoot.resolve("streaming-" + (l + 1));
 
-    try (StreamingServer server =
-             new StreamingServer(new DirectoryServerSource(sourceDir),
-                 1234)) {
+    try (StreamingServer server = new StreamingServer(new DirectoryServerSource(sourceDir), 1234)) {
       try {
         server.start();
-        LOG.info("Starting streaming server on port {} to publish dir {}",
-            port, sourceDir);
+        LOG.info("Starting streaming server on port {} to publish dir {}", port, sourceDir);
 
         try (StreamingClient client =
                      new StreamingClient("localhost", port,

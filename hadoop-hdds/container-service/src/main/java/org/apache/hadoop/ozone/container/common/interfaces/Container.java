@@ -127,20 +127,6 @@ public interface Container<CONTAINERDATA extends ContainerData> extends RwLock {
   void updateDeleteTransactionId(long deleteTransactionId);
 
   /**
-   * Import the container from an external archive.
-   */
-  void importContainerData(InputStream stream,
-      ContainerPacker<CONTAINERDATA> packer) throws IOException;
-
-  /**
-   * Export all the data of the container to one output archive with the help
-   * of the packer.
-   *
-   */
-  void exportContainerData(OutputStream stream,
-      ContainerPacker<CONTAINERDATA> packer) throws IOException;
-
-  /**
    * Returns containerReport for the container.
    */
   ContainerReplicaProto getContainerReport()

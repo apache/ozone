@@ -649,6 +649,10 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         .build();
   }
 
+  public String getClusterId() {
+    return clusterId;
+  }
+
   enum EventType {
     READ,
     WRITE
