@@ -67,7 +67,6 @@ import org.apache.commons.collections.CollectionUtils;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_REPORT_MAX_LIMIT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_REPORT_MAX_LIMIT_DEFAULT;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getLogWarnInterval;
-import static org.apache.hadoop.hdds.utils.HddsServerUtil.getReportMaxLimit;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmHeartbeatInterval;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -798,7 +797,7 @@ public class StateContext {
    * @param conf
    * @return max limit
    */
-  public static int getReportMaxLimit(ConfigurationSource conf) {
+  public int getReportMaxLimit(ConfigurationSource conf) {
     return conf.getInt(HDDS_DATANODE_REPORT_MAX_LIMIT,
         HDDS_DATANODE_REPORT_MAX_LIMIT_DEFAULT);
   }
