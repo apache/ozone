@@ -2799,6 +2799,14 @@
     </description>
   </property>
   <property>
+    <name>hdds.datanode.report.max.limit</name>
+    <tag>OZONE, DATANODE</tag>
+    <value></value>
+    <description>The max limit of all available reports.
+      Default value is Integer.MAX_VALUE.
+    </description>
+  </property>
+  <property>
     <name>ozone.om.keyname.character.check.enabled</name>
     <tag>OZONE, OM</tag>
     <value>false</value>

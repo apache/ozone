@@ -64,6 +64,8 @@ import com.google.protobuf.GeneratedMessage;
 import static java.lang.Math.min;
 import org.apache.commons.collections.CollectionUtils;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_REPORT_MAX_LIMIT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_REPORT_MAX_LIMIT_DEFAULT;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getLogWarnInterval;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getReportMaxLimit;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmHeartbeatInterval;
@@ -789,6 +791,16 @@ public class StateContext {
       this.pipelineActions.put(endpoint, new LinkedList<>());
       this.incrementalReportsQueue.put(endpoint, new LinkedList<>());
     }
+  }
+
+  /**
+   * Get the max limit when get all available reports.
+   * @param conf
+   * @return max limit
+   */
+  public static int getReportMaxLimit(ConfigurationSource conf) {
+    return conf.getInt(HDDS_DATANODE_REPORT_MAX_LIMIT,
+        HDDS_DATANODE_REPORT_MAX_LIMIT_DEFAULT);
   }
 
   @VisibleForTesting

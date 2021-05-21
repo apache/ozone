@@ -330,16 +330,6 @@ public final class HddsServerUtil {
   }
 
   /**
-   * Get the max limit when get all available reports.
-   * @param conf
-   * @return max limit
-   */
-  public static int getReportMaxLimit(ConfigurationSource conf) {
-    return conf.getInt(HDDS_DATANODE_REPORT_MAX_LIMIT,
-        HDDS_DATANODE_REPORT_MAX_LIMIT_DEFAULT);
-  }
-
-  /**
    * Fixed datanode rpc retry interval, which is used by datanode to connect
    * the SCM.
    *
