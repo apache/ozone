@@ -529,6 +529,31 @@ public class TestStorageContainerManager {
     }
   }
 
+
+  @Test
+  public void testSCMReinitializationWithHAUpgrade() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    final String path = GenericTestUtils.getTempPath(
+        UUID.randomUUID().toString());
+    Path scmPath = Paths.get(path, "scm-meta");
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, scmPath.toString());
+    //This will set the cluster id in the version file
+    final UUID clusterId = UUID.randomUUID();
+      // This will initialize SCM
+
+    StorageContainerManager.scmInit(conf, clusterId.toString());
+    SCMStorageConfig scmStore = new SCMStorageConfig(conf);
+    Assert.assertEquals(clusterId.toString(), scmStore.getClusterID());
+    Assert.assertFalse(scmStore.isSCMHAEnabled());
+
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
+    StorageContainerManager.scmInit(conf, clusterId.toString());
+    scmStore = new SCMStorageConfig(conf);
+    Assert.assertTrue(scmStore.isSCMHAEnabled());
+    validateRatisGroupExists(conf, clusterId.toString());
+
+  }
+
   @VisibleForTesting
   public static void validateRatisGroupExists(OzoneConfiguration conf,
       String clusterId) throws IOException {

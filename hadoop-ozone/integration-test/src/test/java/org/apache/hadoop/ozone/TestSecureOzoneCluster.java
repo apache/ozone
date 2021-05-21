@@ -118,6 +118,7 @@ import org.bouncycastle.cert.jcajce.JcaX509CertificateHolder;
 import org.junit.After;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
@@ -615,7 +616,7 @@ public final class TestSecureOzoneCluster {
   }
 
   @Test
-  public void testGetS3Secret() throws Exception {
+  public void testGetS3SecretAndRevokeS3Secret() throws Exception {
 
     // Setup secure OM for start
     setupOm(conf);
@@ -643,6 +644,17 @@ public final class TestSecureOzoneCluster {
       //access key fetched on both attempts must be same
       assertEquals(attempt1.getAwsAccessKey(), attempt2.getAwsAccessKey());
 
+      // Revoke the existing secret
+      omClient.revokeS3Secret(username);
+
+      // Get a new secret
+      S3SecretValue attempt3 = omClient.getS3Secret(username);
+
+      // secret should differ because it has been revoked previously
+      assertNotEquals(attempt3.getAwsSecret(), attempt2.getAwsSecret());
+
+      // accessKey is still the same because it is derived from username
+      assertEquals(attempt3.getAwsAccessKey(), attempt2.getAwsAccessKey());
 
       try {
         omClient.getS3Secret("HADOOP/JOHNDOE");
