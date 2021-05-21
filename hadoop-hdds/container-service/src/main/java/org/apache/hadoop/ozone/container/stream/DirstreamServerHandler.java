@@ -42,9 +42,6 @@ public class DirstreamServerHandler extends ChannelInboundHandlerAdapter {
 
   public static final String END_MARKER = "0 END";
 
-  public static final ByteBuf END_MARKER_BUF =
-      Unpooled.wrappedBuffer(END_MARKER.getBytes(StandardCharsets.UTF_8));
-
   private final StringBuilder id = new StringBuilder();
 
   private StreamingSource source;
@@ -103,9 +100,11 @@ public class DirstreamServerHandler extends ChannelInboundHandlerAdapter {
           new DefaultFileRegion(file.toFile(), 0, fileSize));
       if (currentIndex == entriesToWrite.size() - 1) {
         nextFuture.addListener(a ->
-            ctx.writeAndFlush(END_MARKER_BUF).addListener(b -> {
-              ctx.channel().close();
-            }));
+            ctx.writeAndFlush(
+                Unpooled.wrappedBuffer(END_MARKER.getBytes(StandardCharsets.UTF_8)))
+                .addListener(b -> {
+                  ctx.channel().close();
+                }));
       } else {
         nextFuture.addListener(
             a -> writeOneElement(ctx, entriesToWrite,
