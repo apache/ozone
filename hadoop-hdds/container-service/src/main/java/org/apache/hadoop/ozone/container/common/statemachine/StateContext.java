@@ -314,7 +314,7 @@ public class StateContext {
    */
   public List<GeneratedMessage> getAllAvailableReports(
       InetSocketAddress endpoint) {
-    return getReports(endpoint, getReportMaxLimit(conf));
+    return getReports(endpoint, getReportMaxLimit());
   }
 
   List<GeneratedMessage> getIncrementalReports(
@@ -794,10 +794,9 @@ public class StateContext {
 
   /**
    * Get the max limit when get all available reports.
-   * @param conf
    * @return max limit
    */
-  public int getReportMaxLimit(ConfigurationSource conf) {
+  public int getReportMaxLimit() {
     return conf.getInt(HDDS_DATANODE_REPORT_MAX_LIMIT,
         HDDS_DATANODE_REPORT_MAX_LIMIT_DEFAULT);
   }
