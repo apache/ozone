@@ -946,19 +946,36 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           scmStorageConfig.setClusterId(clusterId);
         }
 
-        if (SCMHAUtils.isSCMHAEnabled(conf)) {
-          SCMRatisServerImpl.initialize(scmStorageConfig.getClusterID(),
-              scmStorageConfig.getScmId(), haDetails.getLocalNodeDetails(),
-              conf);
-          scmStorageConfig.setSCMHAFlag(true);
-        }
 
         if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
           HASecurityUtils.initializeSecurity(scmStorageConfig, conf,
               getScmAddress(haDetails, conf), true);
         }
+
+        // Ensure scmRatisServer#initialize() is called post scm storage
+        // config initialization.. If SCM version file is created,
+        // the subsequent scm init should use the clusterID from version file.
+        // So, scmStorageConfig#initialize() should happen before ratis server
+        // initialize. In this way,we do not leave ratis storage directory
+        // with multiple raft group directories in failure scenario.
+
+        // The order of init should be
+        // 1. SCM storage config initialize to create version file.
+        // 2. Initialize Ratis server.
+
         scmStorageConfig.setPrimaryScmNodeId(scmStorageConfig.getScmId());
         scmStorageConfig.initialize();
+
+        if (SCMHAUtils.isSCMHAEnabled(conf)) {
+          SCMRatisServerImpl.initialize(scmStorageConfig.getClusterID(),
+              scmStorageConfig.getScmId(), haDetails.getLocalNodeDetails(),
+              conf);
+          scmStorageConfig = new SCMStorageConfig(conf);
+          scmStorageConfig.setSCMHAFlag(true);
+          // Do force initialize to persist SCM_HA flag.
+          scmStorageConfig.forceInitialize();
+        }
+
         LOG.info("SCM initialization succeeded. Current cluster id for sd={}"
                 + "; cid={}; layoutVersion={}; scmId={}",
             scmStorageConfig.getStorageDir(), scmStorageConfig.getClusterID(),
