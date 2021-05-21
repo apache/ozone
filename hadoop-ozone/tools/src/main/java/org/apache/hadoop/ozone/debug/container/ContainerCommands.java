@@ -16,10 +16,39 @@
  *  limitations under the License.
  */
 
-package org.apache.hadoop.ozone.debug;
+package org.apache.hadoop.ozone.debug.container;
+
+import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.cli.GenericCli;
+import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.cli.SubcommandWithParent;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.server.JsonUtils;
+import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.common.InconsistentStorageStateException;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
+import org.apache.hadoop.ozone.container.common.helpers.DatanodeVersionFile;
+import org.apache.hadoop.ozone.container.common.impl.ContainerData;
+import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.common.interfaces.Handler;
+import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
+import org.apache.hadoop.ozone.container.ozoneimpl.ContainerReader;
+import org.apache.hadoop.ozone.debug.OzoneDebug;
+import org.kohsuke.MetaInfServices;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import picocli.CommandLine.Command;
+import picocli.CommandLine.ParentCommand;
+import picocli.CommandLine.Model.CommandSpec;
+import picocli.CommandLine.Spec;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -31,62 +60,49 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.Callable;
 
-import org.apache.hadoop.hdds.cli.GenericParentCommand;
-import org.apache.hadoop.hdds.cli.SubcommandWithParent;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
-import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
-import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.common.InconsistentStorageStateException;
-import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
-import org.apache.hadoop.ozone.container.common.helpers.DatanodeVersionFile;
-import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
-import org.apache.hadoop.ozone.container.common.interfaces.Handler;
-import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
-import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
-import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
-import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
-import org.apache.hadoop.ozone.container.ozoneimpl.ContainerReader;
-import org.apache.hadoop.ozone.container.replication.ContainerReplicationSource;
-import org.apache.hadoop.ozone.container.replication.OnDemandContainerReplicationSource;
-
-import com.google.common.base.Preconditions;
-import org.kohsuke.MetaInfServices;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import picocli.CommandLine;
-import picocli.CommandLine.Command;
-import picocli.CommandLine.ParentCommand;
-
-@Command(name = "export-container",
-    description = "Export one container to a tarball")
+/**
+ * Subcommand to group container replica related operations.
+ */
+@Command(
+    name = "container",
+    description = "Container replica specific operations" +
+        " to be executed on datanodes only",
+    mixinStandardHelpOptions = true,
+    versionProvider = HddsVersionProvider.class,
+    subcommands = {
+        ListSubcommand.class,
+        InfoSubcommand.class,
+        ExportSubcommand.class,
+    })
 @MetaInfServices(SubcommandWithParent.class)
-public class ExportContainer implements SubcommandWithParent, Callable<Void> {
+public class ContainerCommands implements Callable<Void>, SubcommandWithParent {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(ExportContainer.class);
+      LoggerFactory.getLogger(ContainerCommands.class);
+
   @ParentCommand
-  private GenericParentCommand parent;
+  private OzoneDebug parent;
 
-  @CommandLine.Option(names = {"--container"},
-      required = true,
-      description = "Container Id")
-  private long containerId;
+  @Spec
+  private CommandSpec spec;
 
-  @CommandLine.Option(names = {"--dest"},
-      defaultValue = "/tmp",
-      description = "Destination directory")
-  private String destination;
+  private MutableVolumeSet volumeSet;
+
+  private ContainerController controller;
+
+  @Override
+  public Void call() throws Exception {
+    GenericCli.missingSubcommand(spec);
+    return null;
+  }
 
   @Override
   public Class<?> getParentType() {
     return OzoneDebug.class;
   }
 
-  @Override
-  public Void call() throws Exception {
-
-    ConfigurationSource conf = parent.createOzoneConfiguration();
+  public void loadContainersFromVolumes() throws IOException {
+    OzoneConfiguration conf = parent.getOzoneConf();
 
     ContainerSet containerSet = new ContainerSet();
 
@@ -98,11 +114,12 @@ public class ExportContainer implements SubcommandWithParent, Callable<Void> {
 
     String clusterId = getClusterId(firstStorageDir);
 
-    MutableVolumeSet volumeSet = new MutableVolumeSet(datanodeUuid, conf);
+    volumeSet = new MutableVolumeSet(datanodeUuid, conf);
 
-    Map<ContainerType, Handler> handlers = new HashMap<>();
+    Map<ContainerProtos.ContainerType, Handler> handlers = new HashMap<>();
 
-    for (ContainerType containerType : ContainerType.values()) {
+    for (ContainerProtos.ContainerType containerType
+        : ContainerProtos.ContainerType.values()) {
       final Handler handler =
           Handler.getHandlerForContainerType(
               containerType,
@@ -117,11 +134,7 @@ public class ExportContainer implements SubcommandWithParent, Callable<Void> {
       handlers.put(containerType, handler);
     }
 
-    ContainerController controller =
-        new ContainerController(containerSet, handlers);
-
-    final ContainerReplicationSource replicationSource =
-        new OnDemandContainerReplicationSource(controller);
+    controller = new ContainerController(containerSet, handlers);
 
     Iterator<HddsVolume> volumeSetIterator = volumeSet.getVolumesList()
         .iterator();
@@ -136,22 +149,18 @@ public class ExportContainer implements SubcommandWithParent, Callable<Void> {
       reader.run();
     }
 
-    LOG.info("All the container metadata is loaded. Starting to replication");
-
-    replicationSource.prepare(containerId);
-    LOG.info("Preparation is done");
-
-    final File destinationFile =
-        new File(destination, "container-" + containerId + ".tar.gz");
-    try (FileOutputStream fos = new FileOutputStream(destinationFile)) {
-      replicationSource.copyData(containerId, fos);
-    }
-    LOG.info("Container is exported to {}", destinationFile);
-
-    return null;
+    LOG.info("All the container metadata is loaded.");
   }
 
-  public String getClusterId(String storageDir) throws IOException {
+  public MutableVolumeSet getVolumeSet() {
+    return this.volumeSet;
+  }
+
+  public ContainerController getController() {
+    return this.controller;
+  }
+
+  private String getClusterId(String storageDir) throws IOException {
     Preconditions.checkNotNull(storageDir);
     final Path firstStorageDirPath = Files.list(Paths.get(storageDir, "hdds"))
         .filter(Files::isDirectory)
@@ -163,7 +172,7 @@ public class ExportContainer implements SubcommandWithParent, Callable<Void> {
     return firstStorageDirPath.toString();
   }
 
-  public String getDatanodeUUID(String storageDir, ConfigurationSource config)
+  private String getDatanodeUUID(String storageDir, ConfigurationSource config)
       throws IOException {
 
     final File versionFile = new File(storageDir, "hdds/VERSION");
@@ -188,4 +197,7 @@ public class ExportContainer implements SubcommandWithParent, Callable<Void> {
             .getUri().getPath();
   }
 
+  public static void outputContainer(ContainerData data) throws IOException {
+    System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(data));
+  }
 }

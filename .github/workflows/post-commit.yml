@@ -21,6 +21,7 @@ on:
     - cron: 30 0,12 * * *
 env:
   FAIL_FAST: ${{ github.event_name == 'pull_request' }}
+  MAVEN_OPTS: -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryHandler.class=standard -Dmaven.wagon.http.retryHandler.count=3
 jobs:
   compile:
     runs-on: ubuntu-18.04
@@ -115,6 +116,33 @@ jobs:
           rm -rf ~/.m2/repository/org/apache/hadoop/hadoop-hdds*
           rm -rf ~/.m2/repository/org/apache/hadoop/hadoop-ozone*
         if: always()
+  dependency:
+    needs: compile
+    runs-on: ubuntu-18.04
+    timeout-minutes: 5
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v2
+      - name: Download compiled Ozone binaries
+        uses: actions/download-artifact@v2
+        with:
+          name: ozone-bin
+      - name: Untar binaries
+        run: |
+          mkdir dist
+          tar  -C dist --strip-components 1 -xzf hadoop-ozone*.tar.gz
+      - name: Execute tests
+        run: |
+          export OZONE_DIST_DIR=`pwd`/dist
+          ./hadoop-ozone/dev-support/checks/dependency.sh
+      - name: Archive build results
+        uses: actions/upload-artifact@v2
+        if: always()
+        with:
+          name: dependency
+          path: target/dependency
+        continue-on-error: true
   acceptance:
     needs: compile
     runs-on: ubuntu-18.04
@@ -163,7 +191,7 @@ jobs:
         continue-on-error: true
   integration:
     runs-on: ubuntu-18.04
-    timeout-minutes: 100
+    timeout-minutes: 120
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     strategy:
       matrix:

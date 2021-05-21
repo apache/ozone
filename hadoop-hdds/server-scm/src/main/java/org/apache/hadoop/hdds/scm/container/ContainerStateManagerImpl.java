@@ -305,7 +305,16 @@ public final class ContainerStateManagerImpl
         ExecutionUtil.create(() -> {
           transactionBuffer.addToBuffer(containerStore, containerID, container);
           containers.addContainer(container);
-          pipelineManager.addContainerToPipeline(pipelineID, containerID);
+          if (pipelineManager.containsPipeline(pipelineID)) {
+            pipelineManager.addContainerToPipeline(pipelineID, containerID);
+          } else if (containerInfo.getState().
+              equals(HddsProtos.LifeCycleState.OPEN)) {
+            // Pipeline should exist, but not
+            throw new PipelineNotFoundException();
+          }
+          //recon may receive report of closed container,
+          // no corresponding Pipeline can be synced for scm.
+          // just only add the container.
         }).onException(() -> {
           containers.removeContainer(containerID);
           transactionBuffer.removeFromBuffer(containerStore, containerID);

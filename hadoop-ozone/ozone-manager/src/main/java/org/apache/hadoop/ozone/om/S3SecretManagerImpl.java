@@ -23,7 +23,7 @@ import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
-import org.apache.hadoop.ozone.security.OzoneSecurityException;
+import org.apache.hadoop.hdds.security.OzoneSecurityException;
 import org.apache.logging.log4j.util.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,7 +31,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.S3_SECRET_LOCK;
-import static org.apache.hadoop.ozone.security.OzoneSecurityException.ResultCodes.S3_SECRET_NOT_FOUND;
+import static org.apache.hadoop.hdds.security.OzoneSecurityException.ResultCodes.S3_SECRET_NOT_FOUND;
 
 /**
  * S3 Secret manager.

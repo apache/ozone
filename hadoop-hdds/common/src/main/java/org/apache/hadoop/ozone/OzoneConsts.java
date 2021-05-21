@@ -323,6 +323,7 @@ public final class OzoneConsts {
   public static final String MAX_PARTS = "maxParts";
   public static final String S3_BUCKET = "s3Bucket";
   public static final String S3_GETSECRET_USER = "S3GetSecretUser";
+  public static final String S3_REVOKESECRET_USER = "S3RevokeSecretUser";
   public static final String RENAMED_KEYS_MAP = "renamedKeysMap";
   public static final String UNRENAMED_KEYS_MAP = "unRenamedKeysMap";
   public static final String MULTIPART_UPLOAD_PART_NUMBER = "partNumber";
@@ -433,4 +434,12 @@ public final class OzoneConsts {
 
   public static final String SCM_SUB_CA_PREFIX = "scm-sub@";
   public static final String SCM_ROOT_CA_PREFIX = "scm@";
+
+  // Kerberos constants
+  public static final String KERBEROS_CONFIG_VALUE = "kerberos";
+  public static final String HTTP_AUTH_TYPE_SUFFIX = "http.auth.type";
+  public static final String OZONE_SECURITY_ENABLED_SECURE = "true";
+  public static final String OZONE_HTTP_SECURITY_ENABLED_SECURE = "true";
+  public static final String OZONE_HTTP_FILTER_INITIALIZERS_SECURE =
+      "org.apache.hadoop.security.AuthenticationFilterInitializer";
 }

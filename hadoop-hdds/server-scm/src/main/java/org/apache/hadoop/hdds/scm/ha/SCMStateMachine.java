@@ -27,15 +27,16 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImplV2;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
 import org.apache.ratis.proto.RaftProtos;
-import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftGroupId;
@@ -57,8 +58,6 @@ import org.apache.ratis.util.LifeCycle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.SCM_NOT_INITIALIZED;
-
 /**
  * The SCMStateMachine is the state machine for SCMRatisServer. It is
  * responsible for applying ratis committed transactions to
@@ -76,21 +75,22 @@ public class SCMStateMachine extends BaseStateMachine {
   private final boolean isInitialized;
   private ExecutorService installSnapshotExecutor;
 
+  // The atomic variable RaftServerImpl#inProgressInstallSnapshotRequest
+  // ensures serializable between notifyInstallSnapshotFromLeader()
+  // and reinitialize().
+  private DBCheckpoint installingDBCheckpoint = null;
+
   public SCMStateMachine(final StorageContainerManager scm,
-      final SCMRatisServer ratisServer, SCMHADBTransactionBuffer buffer)
-      throws SCMException {
+      SCMHADBTransactionBuffer buffer) {
     this.scm = scm;
     this.handlers = new EnumMap<>(RequestType.class);
     this.transactionBuffer = buffer;
     TransactionInfo latestTrxInfo = this.transactionBuffer.getLatestTrxInfo();
-    if (!latestTrxInfo.isDefault() &&
-        !updateLastAppliedTermIndex(latestTrxInfo.getTerm(),
-            latestTrxInfo.getTransactionIndex())) {
-      throw new SCMException(
-          String.format("Failed to update LastAppliedTermIndex " +
-                  "in StateMachine to term:{} index:{}",
-              latestTrxInfo.getTerm(), latestTrxInfo.getTransactionIndex()
-          ), SCM_NOT_INITIALIZED);
+    if (!latestTrxInfo.isDefault()) {
+      updateLastAppliedTermIndex(latestTrxInfo.getTerm(),
+          latestTrxInfo.getTransactionIndex());
+      LOG.info("Updated lastAppliedTermIndex {} with transactionInfo term and" +
+          "Index", latestTrxInfo);
     }
     this.installSnapshotExecutor = HadoopExecutors.newSingleThreadExecutor();
     isInitialized = true;
@@ -202,7 +202,23 @@ public class SCMStateMachine extends BaseStateMachine {
         + "term index: {}", leaderAddress, firstTermIndexInLog);
 
     CompletableFuture<TermIndex> future = CompletableFuture.supplyAsync(
-        () -> scm.getScmHAManager().installSnapshotFromLeader(leaderNodeId),
+        () -> {
+          DBCheckpoint checkpoint =
+              scm.getScmHAManager().downloadCheckpointFromLeader(leaderNodeId);
+
+          if (checkpoint == null) {
+            return null;
+          }
+
+          TermIndex termIndex =
+              scm.getScmHAManager().verifyCheckpointFromLeader(
+                  leaderNodeId, checkpoint);
+
+          if (termIndex != null) {
+            setInstallingDBCheckpoint(checkpoint);
+          }
+          return termIndex;
+        },
         installSnapshotExecutor);
     return future;
   }
@@ -296,10 +312,31 @@ public class SCMStateMachine extends BaseStateMachine {
 
   @Override
   public void reinitialize() {
-    if (getLifeCycleState() == LifeCycle.State.PAUSED) {
-      getLifeCycle().transition(LifeCycle.State.STARTING);
-      getLifeCycle().transition(LifeCycle.State.RUNNING);
+    Preconditions.checkNotNull(installingDBCheckpoint);
+    DBCheckpoint checkpoint = installingDBCheckpoint;
+
+    // explicitly set installingDBCheckpoint to be null
+    installingDBCheckpoint = null;
+
+    TermIndex termIndex = null;
+    try {
+      termIndex =
+          scm.getScmHAManager().installCheckpoint(checkpoint);
+    } catch (Exception e) {
+      LOG.error("Failed to reinitialize SCMStateMachine.");
+      return;
     }
+
+    // re-initialize the DBTransactionBuffer and update the lastAppliedIndex.
+    try {
+      transactionBuffer.init();
+      this.setLastAppliedTermIndex(termIndex);
+    } catch (IOException ioe) {
+      LOG.error("Failed to unpause ", ioe);
+    }
+
+    getLifeCycle().transition(LifeCycle.State.STARTING);
+    getLifeCycle().transition(LifeCycle.State.RUNNING);
   }
 
   @Override
@@ -312,21 +349,10 @@ public class SCMStateMachine extends BaseStateMachine {
     HadoopExecutors.
         shutdown(installSnapshotExecutor, LOG, 5, TimeUnit.SECONDS);
   }
-  /**
-   * Unpause the StateMachine, re-initialize the DoubleBuffer and update the
-   * lastAppliedIndex. This should be done after uploading new state to the
-   * StateMachine.
-   */
-  public void unpause(long newLastAppliedSnapShotTerm,
-      long newLastAppliedSnapshotIndex) {
-    getLifeCycle().startAndTransition(() -> {
-      try {
-        transactionBuffer.init();
-        this.setLastAppliedTermIndex(TermIndex
-            .valueOf(newLastAppliedSnapShotTerm, newLastAppliedSnapshotIndex));
-      } catch (IOException ioe) {
-        LOG.error("Failed to unpause ", ioe);
-      }
-    });
+
+  @VisibleForTesting
+  public void setInstallingDBCheckpoint(DBCheckpoint checkpoint) {
+    Preconditions.checkArgument(installingDBCheckpoint == null);
+    installingDBCheckpoint = checkpoint;
   }
 }

@@ -154,6 +154,9 @@ public final class HddsConfigKeys {
   public static final String HDDS_BLOCK_TOKEN_ENABLED =
       "hdds.block.token.enabled";
   public static final boolean HDDS_BLOCK_TOKEN_ENABLED_DEFAULT = false;
+  public static final String HDDS_CONTAINER_TOKEN_ENABLED =
+      "hdds.container.token.enabled";
+  public static final boolean HDDS_CONTAINER_TOKEN_ENABLED_DEFAULT = false;
 
   public static final String HDDS_X509_DIR_NAME = "hdds.x509.dir.name";
   public static final String HDDS_X509_DIR_NAME_DEFAULT = "certs";

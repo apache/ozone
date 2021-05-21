@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.container.keyvalue;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -251,6 +252,7 @@ public class KeyValueContainerData extends ContainerData {
    * @return Protocol Buffer Message
    */
   @Override
+  @JsonIgnore
   public ContainerDataProto getProtoBufMessage() {
     ContainerDataProto.Builder builder = ContainerDataProto.newBuilder();
     builder.setContainerID(this.getContainerID());

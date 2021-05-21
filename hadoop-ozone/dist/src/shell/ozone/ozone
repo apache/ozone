@@ -290,14 +290,14 @@ ozone_assemble_classpath
 
 ozone_add_client_opts
 
-ozone_add_default_gc_opts
-
 if [[ ${OZONE_WORKER_MODE} = true ]]; then
   ozone_worker_mode_execute "${OZONE_HOME}/bin/ozone" "${OZONE_USER_PARAMS[@]}"
   exit $?
 fi
 
 ozone_subcommand_opts "${OZONE_SHELL_EXECNAME}" "${OZONE_SUBCMD}"
+
+ozone_add_default_gc_opts
 
 # everything is in globals at this point, so call the generic handler
 ozone_generic_java_subcmd_handler

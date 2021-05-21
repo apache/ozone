@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone;
 
 import org.apache.hadoop.conf.TestConfigurationFieldsBase;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -48,7 +49,9 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
             OMConfigKeys.class, HddsConfigKeys.class,
             ReconServerConfigKeys.class,
             S3GatewayConfigKeys.class,
-            SCMHTTPServerConfig.class
+            SCMHTTPServerConfig.class,
+            SCMHTTPServerConfig.ConfigStrings.class,
+            ScmConfig.ConfigStrings.class
         };
     errorIfMissingConfigProps = true;
     errorIfMissingXmlProps = true;

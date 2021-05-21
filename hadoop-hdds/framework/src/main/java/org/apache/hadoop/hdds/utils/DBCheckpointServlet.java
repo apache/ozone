@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -48,6 +48,7 @@ import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
 
+import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,10 +65,13 @@ public class DBCheckpointServlet extends HttpServlet {
   private transient DBCheckpointMetrics dbMetrics;
 
   private boolean aclEnabled;
-  private Collection<String> ozAdmins;
+  private boolean isSpnegoEnabled;
+  private Collection<String> allowedUsers;
 
   public void initialize(DBStore store, DBCheckpointMetrics metrics,
-      boolean omAclEnabled, Collection<String> ozoneAdmins)
+                         boolean omAclEnabled,
+                         Collection<String> allowedAdminUsers,
+                         boolean isSpnegoAuthEnabled)
       throws ServletException {
 
     dbStore = store;
@@ -78,15 +82,17 @@ public class DBCheckpointServlet extends HttpServlet {
     }
 
     this.aclEnabled = omAclEnabled;
-    this.ozAdmins = ozoneAdmins;
+    this.allowedUsers = allowedAdminUsers;
+    this.isSpnegoEnabled = isSpnegoAuthEnabled;
   }
 
-  private boolean hasPermission(String username) {
-    // Check ACL for dbCheckpoint only when global Ozone ACL is enabled
-    if (aclEnabled) {
-      // Only Ozone admins are allowed
-      return ozAdmins.contains(OZONE_ADMINISTRATORS_WILDCARD)
-          || ozAdmins.contains(username);
+  private boolean hasPermission(UserGroupInformation user) {
+    // Check ACL for dbCheckpoint only when global Ozone ACL and SPNEGO is
+    // enabled
+    if (aclEnabled && isSpnegoEnabled) {
+      return allowedUsers.contains(OZONE_ADMINISTRATORS_WILDCARD)
+          || allowedUsers.contains(user.getShortUserName())
+          || allowedUsers.contains(user.getUserName());
     } else {
       return true;
     }
@@ -121,7 +127,9 @@ public class DBCheckpointServlet extends HttpServlet {
         return;
       } else {
         final String userPrincipalName = userPrincipal.getName();
-        if (!hasPermission(userPrincipalName)) {
+        UserGroupInformation ugi =
+            UserGroupInformation.createRemoteUser(userPrincipalName);
+        if (!hasPermission(ugi)) {
           LOG.error("Permission denied: User principal '{}' does not have"
                   + " access to /dbCheckpoint.\nThis can happen when Ozone"
                   + " Manager is started with a different user.\n"
