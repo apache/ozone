@@ -1715,7 +1715,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   }
 
   /**
-   * Primordial node is the node on which scm init operation is performed.
    * @return hostname of primordialNode
    */
   @Override

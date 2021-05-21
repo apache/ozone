@@ -74,6 +74,10 @@ public interface SCMMXBean extends ServiceRuntimeInfo {
 
   String getScmRatisRoles() throws IOException;
 
+  /**
+   * Primordial node is the node on which scm init operation is performed.
+   * @return hostname of primordialNode
+   */
   String getPrimordialNode();
 
 }
