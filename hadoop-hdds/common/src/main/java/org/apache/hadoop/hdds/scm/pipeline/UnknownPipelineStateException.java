@@ -20,8 +20,6 @@ package org.apache.hadoop.hdds.scm.pipeline;
 
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 
-import java.io.IOException;
-
 /**
  * Signals that a pipeline state is not recognized.
  */
