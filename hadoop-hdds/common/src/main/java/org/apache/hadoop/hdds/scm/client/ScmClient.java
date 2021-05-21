@@ -306,6 +306,23 @@ public interface ScmClient extends Closeable {
   boolean getReplicationManagerStatus() throws IOException;
 
   /**
+   * Start ContainerBalancer.
+   */
+  void startContainerBalancer() throws IOException;
+
+  /**
+   * Stop ContainerBalancer.
+   */
+  void stopContainerBalancer() throws IOException;
+
+  /**
+   * Returns ContainerBalancer status.
+   *
+   * @return True if ContainerBalancer is running, false otherwise.
+   */
+  boolean getContainerBalancerStatus() throws IOException;
+
+  /**
    * returns the list of ratis peer roles. Currently only include peer address.
    */
   List<String> getScmRatisRoles() throws IOException;

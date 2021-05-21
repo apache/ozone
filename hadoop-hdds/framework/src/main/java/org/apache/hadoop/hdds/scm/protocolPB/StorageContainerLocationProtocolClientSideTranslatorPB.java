@@ -57,6 +57,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.RecommissionNodesResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReplicationManagerStatusRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReplicationManagerStatusResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMCloseContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMDeleteContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMListContainerRequestProto;
@@ -69,6 +71,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartMaintenanceNodesResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartReplicationManagerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopReplicationManagerRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopContainerBalancerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
@@ -708,6 +712,39 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
         submitRequest(Type.GetReplicationManagerStatus,
             builder -> builder.setSeplicationManagerStatusRequest(request))
             .getReplicationManagerStatusResponse();
+    return response.getIsRunning();
+
+  }
+
+  @Override
+  public void startContainerBalancer() throws IOException {
+
+    StartContainerBalancerRequestProto request =
+        StartContainerBalancerRequestProto.getDefaultInstance();
+    submitRequest(Type.StartContainerBalancer,
+        builder -> builder.setStartContainerBalancerRequest(request));
+
+  }
+
+  @Override
+  public void stopContainerBalancer() throws IOException {
+
+    StopContainerBalancerRequestProto request =
+        StopContainerBalancerRequestProto.getDefaultInstance();
+    submitRequest(Type.StopContainerBalancer,
+        builder -> builder.setStopContainerBalancerRequest(request));
+
+  }
+
+  @Override
+  public boolean getContainerBalancerStatus() throws IOException {
+
+    ContainerBalancerStatusRequestProto request =
+        ContainerBalancerStatusRequestProto.getDefaultInstance();
+    ContainerBalancerStatusResponseProto response =
+        submitRequest(Type.GetContainerBalancerStatus,
+            builder -> builder.setContainerBalancerStatusRequest(request))
+            .getContainerBalancerStatusResponse();
     return response.getIsRunning();
 
   }

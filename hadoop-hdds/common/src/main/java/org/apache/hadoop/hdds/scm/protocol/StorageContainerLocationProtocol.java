@@ -287,6 +287,23 @@ public interface StorageContainerLocationProtocol extends Closeable {
   boolean getReplicationManagerStatus() throws IOException;
 
   /**
+   * Start ContainerBalancer.
+   */
+  void startContainerBalancer() throws IOException;
+
+  /**
+   * Stop ContainerBalancer.
+   */
+  void stopContainerBalancer() throws IOException;
+
+  /**
+   * Returns ContainerBalancer status.
+   *
+   * @return True if ContainerBalancer is running, false otherwise.
+   */
+  boolean getContainerBalancerStatus() throws IOException;
+
+  /**
    * Get Datanode usage information by ip or uuid.
    *
    * @param ipaddress datanode IP address String

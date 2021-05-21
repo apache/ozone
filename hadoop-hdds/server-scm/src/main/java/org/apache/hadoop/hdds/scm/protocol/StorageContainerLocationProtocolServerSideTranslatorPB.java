@@ -62,6 +62,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.RecommissionNodesResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReplicationManagerStatusRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReplicationManagerStatusResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMCloseContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMCloseContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMDeleteContainerRequestProto;
@@ -78,6 +80,10 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartReplicationManagerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopReplicationManagerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopReplicationManagerResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopContainerBalancerRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -305,6 +311,27 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setStatus(Status.OK)
             .setReplicationManagerStatusResponse(getReplicationManagerStatus(
                 request.getSeplicationManagerStatusRequest()))
+            .build();
+      case StartContainerBalancer:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setStartContainerBalancerResponse(startContainerBalancer(
+                request.getStartContainerBalancerRequest()))
+            .build();
+      case StopContainerBalancer:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setStopContainerBalancerResponse(stopContainerBalancer(
+                request.getStopContainerBalancerRequest()))
+            .build();
+      case GetContainerBalancerStatus:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setContainerBalancerStatusResponse(getContainerBalancerStatus(
+                request.getContainerBalancerStatusRequest()))
             .build();
       case GetPipeline:
         return ScmContainerLocationResponse.newBuilder()
@@ -609,6 +636,28 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       throws IOException {
     return ReplicationManagerStatusResponseProto.newBuilder()
         .setIsRunning(impl.getReplicationManagerStatus()).build();
+  }
+
+  public StartContainerBalancerResponseProto startContainerBalancer(
+      StartContainerBalancerRequestProto request)
+      throws IOException {
+    impl.startContainerBalancer();
+    return StartContainerBalancerResponseProto.newBuilder().build();
+  }
+
+  public StopContainerBalancerResponseProto stopContainerBalancer(
+      StopContainerBalancerRequestProto request)
+      throws IOException {
+    impl.stopContainerBalancer();
+    return StopContainerBalancerResponseProto.newBuilder().build();
+
+  }
+
+  public ContainerBalancerStatusResponseProto getContainerBalancerStatus(
+      ContainerBalancerStatusRequestProto request)
+      throws IOException {
+    return ContainerBalancerStatusResponseProto.newBuilder()
+        .setIsRunning(impl.getContainerBalancerStatus()).build();
   }
 
   public DecommissionNodesResponseProto decommissionNodes(

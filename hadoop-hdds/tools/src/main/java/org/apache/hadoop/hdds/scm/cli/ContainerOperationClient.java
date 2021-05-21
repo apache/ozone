@@ -539,6 +539,21 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   @Override
+  public void startContainerBalancer() throws IOException {
+    storageContainerLocationClient.startContainerBalancer();
+  }
+
+  @Override
+  public void stopContainerBalancer() throws IOException {
+    storageContainerLocationClient.stopContainerBalancer();
+  }
+
+  @Override
+  public boolean getContainerBalancerStatus() throws IOException {
+    return storageContainerLocationClient.getContainerBalancerStatus();
+  }
+
+  @Override
   public List<String> getScmRatisRoles() throws IOException {
     return storageContainerLocationClient.getScmInfo().getRatisPeerRoles();
   }

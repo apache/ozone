@@ -673,6 +673,29 @@ public class SCMClientProtocolServer implements
     return scm.getReplicationManager().isRunning();
   }
 
+  @Override
+  public void startContainerBalancer() throws IOException {
+    getScm().checkAdminAccess(getRemoteUser());
+    AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+        SCMAction.START_CONTAINER_BALANCER, null));
+    scm.getContainerBalancer().start();
+  }
+
+  @Override
+  public void stopContainerBalancer() throws IOException {
+    getScm().checkAdminAccess(getRemoteUser());
+    AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+        SCMAction.STOP_CONTAINER_BALANCER, null));
+    scm.getContainerBalancer().stop();
+  }
+
+  @Override
+  public boolean getContainerBalancerStatus() {
+    AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+        SCMAction.GET_CONTAINER_BALANCER_STATUS, null));
+    return scm.getContainerBalancer().isRunning();
+  }
+
   /**
    * Get Datanode usage info such as capacity, SCMUsed, and remaining by ip
    * or uuid.

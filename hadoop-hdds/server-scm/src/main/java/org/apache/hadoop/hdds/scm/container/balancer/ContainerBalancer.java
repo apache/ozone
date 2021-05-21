@@ -47,6 +47,11 @@ public class ContainerBalancer {
   private List<DatanodeUsageInfo> sourceNodes;
   private List<DatanodeUsageInfo> targetNodes;
   private ContainerBalancerConfiguration config;
+  /**
+   * Flag used for checking if the ContainerBalancer thread is running or
+   * not.
+   */
+  private volatile boolean running;
 
   public ContainerBalancer(
       NodeManager nodeManager,
@@ -63,16 +68,14 @@ public class ContainerBalancer {
 
   /**
    * Start ContainerBalancer. Current implementation is incomplete.
-   *
-   * @param balancerConfiguration Configuration values.
    */
-  public void start(ContainerBalancerConfiguration balancerConfiguration) {
+  public void start() {
     this.balancerRunning = true;
 
     ozoneConfiguration = new OzoneConfiguration();
 
     // initialise configs
-    this.config = balancerConfiguration;
+    //this.config = balancerConfiguration;
     this.threshold = config.getThreshold();
     this.maxDatanodesToBalance =
         config.getMaxDatanodesToBalance();
@@ -108,6 +111,15 @@ public class ContainerBalancer {
 //        targetNodes.add(node);
 //      }
 //    }
+  }
+
+  /**
+   * Returns true if the ContainerBalancer Thread is running.
+   *
+   * @return true if running, false otherwise
+   */
+  public boolean isRunning() {
+    return running;
   }
 
   // calculate the average datanode utilisation across the cluster
