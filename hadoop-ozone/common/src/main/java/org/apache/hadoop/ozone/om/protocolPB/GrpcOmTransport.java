@@ -57,7 +57,6 @@ public class GrpcOmTransport implements OmTransport {
   public GrpcOmTransport(ConfigurationSource conf,
                           UserGroupInformation ugi, String omServiceId)
       throws IOException {
-
     this.omFailoverProxyProvider = new OMFailoverProxyProvider(conf, ugi,
         omServiceId);
 
@@ -86,7 +85,6 @@ public class GrpcOmTransport implements OmTransport {
    */
   private OzoneManagerProtocolPB createRetryProxy(
       OMFailoverProxyProvider failoverProxyProvider, int maxFailovers) {
-
     OzoneManagerProtocolPB proxy = (OzoneManagerProtocolPB) RetryProxy.create(
         OzoneManagerProtocolPB.class, failoverProxyProvider,
         failoverProxyProvider.getRetryPolicy(maxFailovers));

@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.s3;
 
 import javax.annotation.PreDestroy;
-import javax.enterprise.context.RequestScoped;
+import javax.enterprise.context.ApplicationScoped;
 import javax.enterprise.inject.Produces;
 import javax.inject.Inject;
 import javax.ws.rs.container.ContainerRequestContext;
@@ -52,13 +52,15 @@ import org.slf4j.LoggerFactory;
 /**
  * This class creates the OzoneClient for the Rest endpoints.
  */
-@RequestScoped
+@ApplicationScoped
 public class OzoneClientProducer {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OzoneClientProducer.class);
 
-  private OzoneClient client;
+  // single, cached OzoneClient established on first connection
+  // for s3g gRPC OmTransport, OmRequest - OmResponse channel
+  private static OzoneClient client;
 
   @Inject
   private SignatureProcessor signatureProcessor;
@@ -84,6 +86,14 @@ public class OzoneClientProducer {
   @PreDestroy
   public void destroy() throws IOException {
     client.close();
+  }
+
+  private OzoneClient getOzoneClientInstance() throws IOException {
+    if (client == null) {
+      LOG.info("creating OzoneClient instance");
+      client = createOzoneClient();
+    }
+    return client;
   }
 
   private OzoneClient getClient(OzoneConfiguration config)
@@ -128,7 +138,7 @@ public class OzoneClientProducer {
       }
       ozoneClient =
           remoteUser.doAs((PrivilegedExceptionAction<OzoneClient>) () -> {
-            return createOzoneClient();
+            return getOzoneClientInstance();
           });
     } catch (OS3Exception ex) {
       if (LOG.isDebugEnabled()) {
