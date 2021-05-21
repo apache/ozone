@@ -359,19 +359,12 @@ public final class HAUtils {
    */
   public static List<String> buildCAList(CertificateClient certClient,
       ConfigurationSource configuration) throws IOException {
-    List<String> caCertPemList;
     long waitDuration =
         configuration.getTimeDuration(OZONE_SCM_CA_LIST_RETRY_INTERVAL,
             OZONE_SCM_CA_LIST_RETRY_INTERVAL_DEFAULT, TimeUnit.SECONDS);
     if (certClient != null) {
-      caCertPemList = new ArrayList<>();
       if (!SCMHAUtils.isSCMHAEnabled(configuration)) {
-        if (certClient.getRootCACertificate() != null) {
-          caCertPemList.add(CertificateCodec.getPEMEncodedString(
-              certClient.getRootCACertificate()));
-        }
-        caCertPemList.add(CertificateCodec.getPEMEncodedString(
-            certClient.getCACertificate()));
+        return generateCAList(certClient);
       } else {
         Collection<String> scmNodes = SCMHAUtils.getSCMNodeIds(configuration);
         int expectedCount = scmNodes.size() + 1;
@@ -379,22 +372,22 @@ public final class HAUtils {
           // First check if cert client has ca list initialized.
           // This is being done, when this method is called multiple times we
           // don't make call to SCM, we return from in-memory.
-          caCertPemList = certClient.getCAList();
+          List<String> caCertPemList = certClient.getCAList();
           if (caCertPemList != null && caCertPemList.size() == expectedCount) {
             return caCertPemList;
           }
-          caCertPemList = getCAListWithRetry(() ->
-              waitForCACerts(certClient::updateCAList, expectedCount),
+          return getCAListWithRetry(() ->
+                  waitForCACerts(certClient::updateCAList, expectedCount),
               waitDuration);
         } else {
-          caCertPemList = certClient.listCA();
+          return generateCAList(certClient);
         }
       }
     } else {
       SCMSecurityProtocolClientSideTranslatorPB scmSecurityProtocolClient =
           HddsServerUtil.getScmSecurityClient(configuration);
       if (!SCMHAUtils.isSCMHAEnabled(configuration)) {
-        caCertPemList = new ArrayList<>();
+        List<String> caCertPemList = new ArrayList<>();
         SCMGetCertResponseProto scmGetCertResponseProto =
             scmSecurityProtocolClient.getCACert();
         if (scmGetCertResponseProto.hasX509Certificate()) {
@@ -403,17 +396,31 @@ public final class HAUtils {
         if (scmGetCertResponseProto.hasX509RootCACertificate()) {
           caCertPemList.add(scmGetCertResponseProto.getX509RootCACertificate());
         }
+        return caCertPemList;
       } else {
         Collection<String> scmNodes = SCMHAUtils.getSCMNodeIds(configuration);
         int expectedCount = scmNodes.size() + 1;
         if (scmNodes.size() > 1) {
-          caCertPemList = getCAListWithRetry(() -> waitForCACerts(
+          return getCAListWithRetry(() -> waitForCACerts(
               scmSecurityProtocolClient::listCACertificate,
               expectedCount), waitDuration);
         } else{
-          caCertPemList = scmSecurityProtocolClient.listCACertificate();
+          return scmSecurityProtocolClient.listCACertificate();
         }
       }
+    }
+  }
+
+  private static List<String> generateCAList(CertificateClient certClient)
+      throws IOException {
+    List<String> caCertPemList = new ArrayList<>();
+    if (certClient.getRootCACertificate() != null) {
+      caCertPemList.add(CertificateCodec.getPEMEncodedString(
+          certClient.getRootCACertificate()));
+    }
+    if (certClient.getCACertificate() != null) {
+      caCertPemList.add(CertificateCodec.getPEMEncodedString(
+          certClient.getCACertificate()));
     }
     return caCertPemList;
   }
