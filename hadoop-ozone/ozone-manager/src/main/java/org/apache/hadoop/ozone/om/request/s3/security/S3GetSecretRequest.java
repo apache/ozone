@@ -72,11 +72,11 @@ public class S3GetSecretRequest extends OMClientRequest {
     // Generate S3 Secret to be used by OM quorum.
     String kerberosID = s3GetSecretRequest.getKerberosID();
 
-    final UserGroupInformation user = ProtobufRpcEngine.Server.getRemoteUser();
-    final String username = user.getUserName();
+    final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
+    final String username = ugi.getUserName();
     // Permission check. Users need to be themselves or have admin privilege
     if (!username.equals(kerberosID) &&
-        !ozoneManager.isAdmin(username)) {
+        !ozoneManager.isAdmin(ugi)) {
       throw new OMException("Requested user name '" + kerberosID +
           "' doesn't match current user '" + username +
           "', nor does current user has administrator privilege.",
