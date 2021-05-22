@@ -52,4 +52,12 @@ public interface StorageContainerServiceProvider {
    */
   ContainerWithPipeline getContainerWithPipeline(long containerId)
       throws IOException;
+
+  /**
+   * Requests SCM for which containers in given ID list.
+   * @param containerIDs containerId list
+   * @return list of ContainerInfo + Pipeline info exists in SCM
+   */
+  List<ContainerWithPipeline> getExistContainerWithPipelinesInBatch(
+      List<Long> containerIDs);
 }

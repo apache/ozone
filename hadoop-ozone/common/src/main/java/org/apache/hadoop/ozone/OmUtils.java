@@ -289,6 +289,7 @@ public final class OmUtils {
     case PurgeKeys:
     case RecoverTrash:
     case DeleteOpenKeys:
+    case RevokeS3Secret:
     case PurgePaths:
       return false;
     default:

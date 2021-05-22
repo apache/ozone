@@ -18,12 +18,15 @@ package org.apache.hadoop.hdds.scm.container;
 
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto
         .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
+import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.net.NetConstants;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.net.Node;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -52,6 +55,7 @@ import org.assertj.core.util.Preconditions;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -199,7 +203,22 @@ public class MockNodeManager implements NodeManager {
   public List<DatanodeDetails> getNodes(
       HddsProtos.NodeOperationalState opState, HddsProtos.NodeState nodestate) {
     if (nodestate == HEALTHY) {
-      return healthyNodes;
+      // mock storage reports for SCMCommonPlacementPolicy.hasEnoughSpace()
+      List<DatanodeDetails> healthyNodesWithInfo = new ArrayList<>();
+      for (DatanodeDetails dd : healthyNodes) {
+        DatanodeInfo di = new DatanodeInfo(dd, NodeStatus.inServiceHealthy());
+
+        long capacity = nodeMetricMap.get(dd).getCapacity().get();
+        long used = nodeMetricMap.get(dd).getScmUsed().get();
+        long remaining = nodeMetricMap.get(dd).getRemaining().get();
+        StorageReportProto storage1 = TestUtils.createStorageReport(
+            di.getUuid(), "/data1-" + di.getUuidString(),
+            capacity, used, remaining, null);
+        di.updateStorageReports(new ArrayList<>(Arrays.asList(storage1)));
+
+        healthyNodesWithInfo.add(di);
+      }
+      return healthyNodesWithInfo;
     }
 
     if (nodestate == STALE) {

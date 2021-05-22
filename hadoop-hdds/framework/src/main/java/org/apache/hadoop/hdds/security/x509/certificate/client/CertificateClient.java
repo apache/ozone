@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
+import org.apache.hadoop.hdds.security.OzoneSecurityException;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
@@ -30,6 +31,9 @@ import java.security.PublicKey;
 import java.security.cert.CertStore;
 import java.security.cert.X509Certificate;
 import java.util.List;
+import java.util.Objects;
+
+import static org.apache.hadoop.hdds.security.OzoneSecurityException.ResultCodes.OM_PUBLIC_PRIVATE_KEY_FILE_NOT_EXIST;
 
 /**
  * Certificate client provides and interface to certificate operations that
@@ -262,7 +266,6 @@ public interface CertificateClient {
    */
   List<String> updateCAList() throws IOException;
 
-
   /**
    * Get the CRLInfo based on the CRL Ids.
    * @param crlIds - list of crl ids
@@ -278,4 +281,14 @@ public interface CertificateClient {
    */
   long getLatestCrlId() throws IOException;
 
+  default void assertValidKeysAndCertificate() throws OzoneSecurityException {
+    try {
+      Objects.requireNonNull(getPublicKey());
+      Objects.requireNonNull(getPrivateKey());
+      Objects.requireNonNull(getCertificate());
+    } catch (Exception e) {
+      throw new OzoneSecurityException("Error reading keypair & certificate", e,
+          OM_PUBLIC_PRIVATE_KEY_FILE_NOT_EXIST);
+    }
+  }
 }

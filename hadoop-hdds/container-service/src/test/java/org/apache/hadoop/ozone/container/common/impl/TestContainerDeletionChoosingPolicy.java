@@ -97,13 +97,12 @@ public class TestContainerDeletionChoosingPolicy {
     containerSet = new ContainerSet();
 
     int numContainers = 10;
-    Random random = new Random();
     for (int i = 0; i < numContainers; i++) {
       KeyValueContainerData data = new KeyValueContainerData(i,
           layout,
           ContainerTestHelper.CONTAINER_MAX_SIZE, UUID.randomUUID().toString(),
           UUID.randomUUID().toString());
-      data.incrPendingDeletionBlocks(random.nextInt(numContainers) + 1);
+      data.incrPendingDeletionBlocks(20);
       data.closeContainer();
       KeyValueContainer container = new KeyValueContainer(data, conf);
       containerSet.addContainer(container);
@@ -125,22 +124,22 @@ public class TestContainerDeletionChoosingPolicy {
     }
     Assert.assertTrue(totPendingBlocks >= blockLimitPerInterval);
 
-
-    // test random choosing
-    List<ContainerBlockInfo> result1 = blockDeletingService
-        .chooseContainerForBlockDeletion(numContainers, deletionPolicy);
-    List<ContainerBlockInfo> result2 = blockDeletingService
-        .chooseContainerForBlockDeletion(numContainers, deletionPolicy);
-
-    boolean hasShuffled = false;
-    for (int i = 0; i < numContainers; i++) {
-      if (result1.get(i).getContainerData().getContainerID() != result2.get(i)
-          .getContainerData().getContainerID()) {
-        hasShuffled = true;
-        break;
+    // test random choosing. We choose 100 times the 3 datanodes twice.
+    //We expect different order at least once.
+    for (int j = 0; j < 100; j++) {
+      List<ContainerBlockInfo> result1 = blockDeletingService
+              .chooseContainerForBlockDeletion(50, deletionPolicy);
+      List<ContainerBlockInfo> result2 = blockDeletingService
+              .chooseContainerForBlockDeletion(50, deletionPolicy);
+      boolean hasShuffled = false;
+      for (int i = 0; i < result1.size(); i++) {
+        if (result1.get(i).getContainerData().getContainerID() != result2.get(i)
+                .getContainerData().getContainerID()) {
+          return;
+        }
       }
     }
-    Assert.assertTrue("Chosen container results were same", hasShuffled);
+    Assert.fail("Chosen container results were same 100 times");
 
   }
 

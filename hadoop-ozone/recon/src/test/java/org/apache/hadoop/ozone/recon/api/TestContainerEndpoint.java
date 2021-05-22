@@ -477,7 +477,7 @@ public class TestContainerEndpoint {
   void putContainerInfos(int num) throws IOException {
     for (int i = 1; i <= num; i++) {
       final ContainerInfo info = newContainerInfo(i);
-      reconContainerManager.addNewContainer(i,
+      reconContainerManager.addNewContainer(
           new ContainerWithPipeline(info, pipeline));
     }
   }

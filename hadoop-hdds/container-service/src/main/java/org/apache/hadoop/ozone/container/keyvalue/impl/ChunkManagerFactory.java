@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.keyvalue.impl;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScrubberConfiguration;
@@ -48,7 +49,7 @@ public final class ChunkManagerFactory {
    * @return
    */
   public static ChunkManager createChunkManager(ConfigurationSource conf,
-      BlockManager manager) {
+      BlockManager manager, VolumeSet volSet) {
     boolean sync =
         conf.getBoolean(OzoneConfigKeys.DFS_CONTAINER_CHUNK_WRITE_SYNC_KEY,
             OzoneConfigKeys.DFS_CONTAINER_CHUNK_WRITE_SYNC_DEFAULT);
@@ -75,6 +76,6 @@ public final class ChunkManagerFactory {
       return new ChunkManagerDummyImpl();
     }
 
-    return new ChunkManagerDispatcher(sync, manager);
+    return new ChunkManagerDispatcher(sync, manager, volSet);
   }
 }

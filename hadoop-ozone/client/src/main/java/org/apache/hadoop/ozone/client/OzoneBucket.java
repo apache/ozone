@@ -393,7 +393,7 @@ public class OzoneBucket extends WithMetadata {
    * for the bucket.
    * @throws IOException
    */
-  public boolean addAcls(OzoneAcl addAcl) throws IOException {
+  public boolean addAcl(OzoneAcl addAcl) throws IOException {
     return proxy.addAcl(ozoneObj, addAcl);
   }
 
@@ -403,8 +403,19 @@ public class OzoneBucket extends WithMetadata {
    * removed does not exist for the bucket.
    * @throws IOException
    */
-  public boolean removeAcls(OzoneAcl removeAcl) throws IOException {
+  public boolean removeAcl(OzoneAcl removeAcl) throws IOException {
     return proxy.removeAcl(ozoneObj, removeAcl);
+  }
+
+  /**
+   * Acls to be set for given Ozone object. This operations reset ACL for
+   * given object to list of ACLs provided in argument.
+   * @param acls List of acls.
+   *
+   * @throws IOException if there is error.
+   * */
+  public boolean setAcl(List<OzoneAcl> acls) throws IOException {
+    return proxy.setAcl(ozoneObj, acls);
   }
 
   /**

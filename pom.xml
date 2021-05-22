@@ -47,13 +47,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       <name>${distMgmtSnapshotsName}</name>
       <url>${distMgmtSnapshotsUrl}</url>
     </repository>
-    <repository>
-      <id>repository.jboss.org</id>
-      <url>http://repository.jboss.org/nexus/content/groups/public/</url>
-      <snapshots>
-        <enabled>false</enabled>
-      </snapshots>
-    </repository>
   </repositories>
 
   <licenses>
@@ -74,12 +67,12 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <!-- version for hdds/ozone components -->
     <hdds.version>${ozone.version}</hdds.version>
     <ozone.version>1.2.0-SNAPSHOT</ozone.version>
-    <ozone.release>Denali</ozone.release>
+    <ozone.release>Glacier</ozone.release>
     <declared.hdds.version>${hdds.version}</declared.hdds.version>
     <declared.ozone.version>${ozone.version}</declared.ozone.version>
 
     <!-- Apache Ratis version -->
-    <ratis.version>2.1.0-43915d2-SNAPSHOT</ratis.version>
+    <ratis.version>2.1.0-ff8aa66-SNAPSHOT</ratis.version>
 
     <!-- Apache Ratis thirdparty version -->
     <ratis.thirdparty.version>0.7.0-a398b19-SNAPSHOT</ratis.thirdparty.version>
@@ -1035,7 +1028,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       <dependency>
         <groupId>commons-io</groupId>
         <artifactId>commons-io</artifactId>
-        <version>2.5</version>
+        <version>2.8.0</version>
       </dependency>
 
       <dependency>
@@ -1609,7 +1602,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       <dependency>
         <groupId>org.rocksdb</groupId>
         <artifactId>rocksdbjni</artifactId>
-        <version>6.8.1</version>
+        <version>6.20.3</version>
       </dependency>
       <dependency>
         <groupId>org.xerial</groupId>
@@ -1865,35 +1858,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
             </goals>
           </execution>
         </executions>
-      </plugin>
-      <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>animal-sniffer-maven-plugin</artifactId>
-        <version>1.16</version>
-        <executions>
-          <execution>
-            <id>signature-check</id>
-            <phase>verify</phase>
-            <goals>
-              <goal>check</goal>
-            </goals>
-          </execution>
-        </executions>
-        <configuration>
-          <signature>
-            <groupId>org.codehaus.mojo.signature</groupId>
-            <artifactId>java18</artifactId>
-            <version>1.0</version>
-          </signature>
-          <ignores>
-            <ignore>sun.misc.*</ignore>
-            <ignore>sun.net.*</ignore>
-            <ignore>sun.nio.ch.*</ignore>
-            <ignore>com.sun.javadoc.*</ignore>
-            <ignore>com.sun.tools.*</ignore>
-            <ignore>java.lang.invoke.*</ignore>
-          </ignores>
-        </configuration>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>

@@ -35,6 +35,7 @@ OZONE-SITE.XML_ozone.scm.container.placement.impl=org.apache.hadoop.hdds.scm.con
 OZONE-SITE.XML_net.topology.node.switch.mapping.impl=org.apache.hadoop.net.TableMapping
 OZONE-SITE.XML_net.topology.table.file.name=/opt/hadoop/compose/ozone-topology/network-config
 OZONE-SITE.XML_ozone.network.topology.aware.read=true
+OZONE-SITE.XML_hdds.scmclient.max.retry.timeout=30s
 
 HDFS-SITE.XML_rpc.metrics.quantile.enable=true
 HDFS-SITE.XML_rpc.metrics.percentiles.intervals=60,300
