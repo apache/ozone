@@ -431,11 +431,11 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_RATIS_PORT_KEY
       = "ozone.scm.ratis.port";
   public static final int OZONE_SCM_RATIS_PORT_DEFAULT
-      = 9865;
+      = 9894;
   public static final String OZONE_SCM_GRPC_PORT_KEY
       = "ozone.scm.grpc.port";
   public static final int OZONE_SCM_GRPC_PORT_DEFAULT
-      = 9866;
+      = 9895;
   public static final String OZONE_SCM_RATIS_RPC_TYPE_KEY
       = "ozone.scm.ratis.rpc.type";
   public static final String OZONE_SCM_RATIS_RPC_TYPE_DEFAULT
@@ -523,6 +523,10 @@ public final class ScmConfigKeys {
       "ozone.scm.info.wait.duration";
   public static final long OZONE_SCM_INFO_WAIT_DURATION_DEFAULT =
       10 * 60;
+
+  public static final String OZONE_SCM_CA_LIST_RETRY_INTERVAL =
+      "ozone.scm.ca.list.retry.interval";
+  public static final long OZONE_SCM_CA_LIST_RETRY_INTERVAL_DEFAULT = 10;
 
   /**
    * Never constructed.
