@@ -49,6 +49,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Prepare
 import org.apache.hadoop.test.LambdaTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Test OM prepare against actual mini cluster.
@@ -66,6 +68,9 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
   private MiniOzoneHAClusterImpl cluster;
   private ClientProtocol clientProtocol;
   private ObjectStore store;
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TestOzoneManagerPrepare.class);
 
   public void setup() throws Exception {
     cluster = getCluster();
@@ -370,18 +375,39 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     assertKeysWritten(volumeName, expectedKeys, cluster.getOzoneManagersList());
   }
 
+  /**
+   * Checks that all provided OMs have {@code expectedKeys} in the volume
+   * {@code volumeName} and retries checking until the test timeout.
+   * All provided OMs are checked, not just a majority, so that we can
+   * test that downed OMs are able to make a full recovery after preparation,
+   * even though the cluster could appear healthy with just 2 OMs.
+   */
   private void assertKeysWritten(String volumeName, Set<String> expectedKeys,
       List<OzoneManager> ozoneManagers) throws Exception {
     for (OzoneManager om: ozoneManagers) {
-      List<OmKeyInfo> keys = om.getMetadataManager().listKeys(volumeName,
-          BUCKET, null, KEY_PREFIX, 100);
+      // Wait for a potentially slow follower to apply all key writes.
+      LambdaTestUtils.await(WAIT_TIMEOUT_MILLIS, 1000, () -> {
+        List<OmKeyInfo> keys = om.getMetadataManager().listKeys(volumeName,
+            BUCKET, null, KEY_PREFIX, 100);
 
-      Assert.assertEquals("Keys not found in " + om.getOMNodeId(),
-          expectedKeys.size(),
-          keys.size());
-      for (OmKeyInfo keyInfo: keys) {
-        Assert.assertTrue(expectedKeys.contains(keyInfo.getKeyName()));
-      }
+        boolean allKeysFound = (expectedKeys.size() == keys.size());
+        if (!allKeysFound) {
+          LOG.info("In {} waiting for number of keys {} to equal " +
+              "expected number of keys {}.", om.getOMNodeId(),
+              keys.size(), expectedKeys.size());
+        } else {
+          for (OmKeyInfo keyInfo : keys) {
+            if (!expectedKeys.contains(keyInfo.getKeyName())) {
+              allKeysFound = false;
+              LOG.info("In {} expected keys did not contain key {}",
+                  om.getOMNodeId(), keyInfo.getKeyName());
+              break;
+            }
+          }
+        }
+
+        return allKeysFound;
+      });
     }
   }
 
